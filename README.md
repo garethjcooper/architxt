@@ -1,5 +1,7 @@
 # architxt
 
+Note: entity label format has changed from map to multi-values. This will invalidate any existing entity labels you have, forcing a rebuild of any documents using the old format.
+
 **Turn messy documents into queryable knowledge.**
 
 architxt is a document processing pipeline and web UI that ingests documents — extracts structured content via an LLM-augmented pipeline (Docling, denoising, vision analysis, entity detection) — and produces clean, versioned, entity-tagged knowledge. Results can be reviewed, edited, and pushed to a [Hindsight](https://github.com/vectorize-io/hindsight/tree/main) memory bank for enterprise-scale semantic search, mental models, and cross-document reasoning.
