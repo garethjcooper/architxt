@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    proxyClientMaxBodySize: '100mb',
+  },
   async rewrites() {
     // Rewrites only used in dev mode (next dev).
     // In static export, rewrites are NOT applied.
