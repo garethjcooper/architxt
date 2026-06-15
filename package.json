@@ -1,0 +1,18 @@
+{
+  "name": "architxt",
+  "version": "0.1.0",
+  "description": "architxt: Document processing pipeline with web UI",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "build": "node scripts/build.js",
+    "start": "node scripts/start.js",
+    "dev": "node scripts/dev.js",
+    "clean": "node scripts/clean.js",
+    "purge": "node scripts/purge.js",
+    "lint": "cd server && npm run lint && cd ../ui && npm run lint"
+  }
+}

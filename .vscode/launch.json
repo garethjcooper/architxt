@@ -1,0 +1,109 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Server",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--inspect-brk=9229",
+        "--experimental-vm-modules"
+      ],
+      "args": [
+        "${workspaceFolder}/server/src/index.js"
+      ],
+      "cwd": "${workspaceFolder}/server",
+      "envFile": "${workspaceFolder}/server/.env",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Debug Server + UI",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--inspect-brk=9229",
+        "--experimental-vm-modules"
+      ],
+      "args": [
+        "${workspaceFolder}/server/src/index.js"
+      ],
+      "cwd": "${workspaceFolder}/server",
+      "envFile": "${workspaceFolder}/server/.env",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "serverReadyAction": {
+        "pattern": "ArchiTXT server running at http://(.*)",
+        "uriFormat": "http://%s",
+        "action": "startDebugging",
+        "name": "Debug UI"
+      }
+    },
+    {
+      "name": "Debug UI",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/ui",
+      "env": {
+        "PORT": "3001"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Debug Server (Attach)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "sourceMaps": true,
+      "localRoot": "${workspaceFolder}/server",
+      "remoteRoot": "."
+    },
+    {
+      "name": "Debug Extract Daemon",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "/home/dev01/.nvm/versions/node/v24.16.0/bin/node",
+      "runtimeArgs": [
+        "--inspect-brk=9230"
+      ],
+      "args": [
+        "${workspaceFolder}/server/src/daemons/extract-daemon.js"
+      ],
+      "cwd": "${workspaceFolder}/server",
+      "envFile": "${workspaceFolder}/server/.env",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "PATH": "/home/dev01/.nvm/versions/node/v24.16.0/bin:${env:PATH}"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Server + UI (Compound)",
+      "configurations": ["Debug Server", "Debug UI"],
+      "stopAll": true,
+      "preLaunchTask": "",
+      "presentation": {
+        "hidden": false,
+        "group": "ArchiTXT",
+        "order": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+# Node.js
+node_modules/
+package-lock.json
+
+# Build output
+ui/dist/
+server/dist/
+
+# Data directories
+database/
+documents/
+logs/
+tmp/
+
+# Environment
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+.next/
