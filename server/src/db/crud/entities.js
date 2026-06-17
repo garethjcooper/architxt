@@ -33,14 +33,17 @@ export const getAllEntitiesWithTypes = (db) => dbExec(() => {
  * @returns {Map<string, number>} Map of ent_entity_id -> count
  */
 export const getEntityUsageCounts = (db, entIds) => dbExec(() => {
+  if (!entIds || entIds.length === 0) return new Map();
   const placeholders = entIds.map(() => '?').join(',');
+  // Single-pass FTS5 count. The virtual table is joined against the entity id set;
+  // MATCH counts how many indexed rows contain each entity id token.
+  // unicode61 with tokenchars '-_:' keeps ids like "COM-001" whole.
   const sql = `
-    SELECT ent_entity_id, (
-      SELECT COUNT(*) FROM documents
-      WHERE doc_content LIKE '%' || ent_entity_id || '%'
-    ) as count
-    FROM entities
-    WHERE ent_entity_id IN (${placeholders})
+    SELECT e.ent_entity_id, COUNT(*) AS count
+    FROM entities e
+    JOIN documents_fts ON documents_fts MATCH '"' || e.ent_entity_id || '"'
+    WHERE e.ent_entity_id IN (${placeholders})
+    GROUP BY e.ent_entity_id
   `;
   const rows = stmt(db, sql).all(...entIds);
   const map = new Map();

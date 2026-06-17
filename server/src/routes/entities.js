@@ -244,15 +244,18 @@ router.delete('/types/:id', handleDeleteById({
  *                 $ref: '#/components/schemas/Entity'
  */
 router.get('/', async (req, res) => {
-  const start = Date.now();
-  const result = await listEntitiesWithType(db);
-
   // Add usage count (documents referencing each entity) in a single efficient query.
-  // Entities are referenced via [[...]] tags in doc_content, not via a junction table.
-  // We count documents whose content contains the entity_id in entity tag format.
+  // Uses the documents_fts FTS5 index to avoid full LIKE scans of doc_content.
+  const start = Date.now();
+  const listStart = Date.now();
+  const result = await listEntitiesWithType(db);
+  logger.info(`GET /entities listEntitiesWithType took ${Date.now() - listStart}ms`);
+
   if (result.success && result.data.length > 0) {
     const entIds = result.data.map((e) => e.ent_entity_id);
+    const countStart = Date.now();
     const countResult = await getEntityUsageCounts(db, entIds);
+    logger.info(`GET /entities getEntityUsageCounts took ${Date.now() - countStart}ms`);
     if (countResult.success) {
       result.data = result.data.map((ent) => ({
         ...ent,

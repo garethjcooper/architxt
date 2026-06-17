@@ -10,7 +10,14 @@ const JSON_FIELDS = ['doc_processing_history', 'doc_processing_progress', 'doc_t
 const base = createBaseCrud(TABLE, PK, JSON_FIELDS);
 
 // Use base for generic delete
-export const deleteDocument = base.del;
+export const deleteDocument = (db, id) => dbExec(() => {
+  const result = base.del(db, id);
+
+  // Keep FTS5 index in sync by removing entries for deleted document
+  stmt(db, `DELETE FROM documents_fts WHERE rowid = ?`).run(requireInt('doc_id', id));
+
+  return result;
+}, 'documents.delete');
 
 // Tag/metadata subqueries for list/get
 const DOC_TAGS_SQL = `
@@ -120,7 +127,15 @@ export const createDocument = (db, data) => dbExec(() => {
   const values = cols.map(c => jsonData[c]);
 
   const result = stmt(db, sql).run(...values);
-  return result.lastInsertRowid;
+
+  // Keep FTS5 index in sync for newly inserted content
+  const docId = result.lastInsertRowid;
+  if (jsonData.doc_content !== undefined && jsonData.doc_content !== null) {
+    stmt(db, `INSERT INTO documents_fts(rowid, doc_content) VALUES (?, ?)`)
+      .run(docId, jsonData.doc_content);
+  }
+
+  return docId;
 }, 'documents.create');
 
 // Explicit - needs partial update logic
@@ -133,6 +148,19 @@ export const updateDocument = (db, id, data) => dbExec(() => {
   const values = [...cols.map(c => jsonData[c]), requireInt('doc_id', id)];
 
   const result = stmt(db, sql).run(...values);
+
+  // Keep FTS5 index in sync if doc_content changed
+  if (cols.includes('doc_content')) {
+    const newContent = jsonData.doc_content;
+    if (newContent === undefined || newContent === null) {
+      stmt(db, `DELETE FROM documents_fts WHERE rowid = ?`).run(id);
+    } else {
+      stmt(db, `INSERT INTO documents_fts(rowid, doc_content) VALUES (?, ?)
+                ON CONFLICT(rowid) DO UPDATE SET doc_content = excluded.doc_content`)
+        .run(id, newContent);
+    }
+  }
+
   return result.changes > 0;
 }, 'documents.update');
 

@@ -17,9 +17,11 @@ interface MentalModelDivergence {
 
 interface MentalModelValues {
   ext_id: string;
+  id?: string;
   name?: string | null;
   source_query?: string | null;
   is_derived?: boolean;
+  derived_entity?: { mm_id: number; id: number };
 }
 
 interface MentalModelSyncRowProps {

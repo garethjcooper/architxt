@@ -15,9 +15,26 @@ const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
 
 export const createLogger = (serviceName) => {
   const logDir = config.logging?.dir;
-  
-  if (!fs.existsSync(logDir)) {
+  const env = config.server?.env;
+
+  if (logDir) {
     fs.mkdirSync(logDir, { recursive: true });
+  }
+
+  const transports = [new winston.transports.Console()];
+
+  // Avoid per-request file-write latency in development. File logs remain
+  // enabled in production unless explicitly disabled via ARCHITXT_LOG_DIR.
+  if (env !== 'development') {
+    transports.push(
+      new winston.transports.File({
+        filename: path.join(logDir, 'error.log'),
+        level: 'error'
+      }),
+      new winston.transports.File({
+        filename: path.join(logDir, 'combined.log')
+      })
+    );
   }
 
   return winston.createLogger({
@@ -28,16 +45,7 @@ export const createLogger = (serviceName) => {
       errors({ stack: true }),
       logFormat
     ),
-    transports: [
-      new winston.transports.Console(),
-      new winston.transports.File({
-        filename: path.join(logDir, 'error.log'),
-        level: 'error'
-      }),
-      new winston.transports.File({
-        filename: path.join(logDir, 'combined.log')
-      })
-    ]
+    transports
   });
 };
 

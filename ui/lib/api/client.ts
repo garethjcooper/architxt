@@ -471,7 +471,7 @@ export const healthApi = {
 
 // Hindsight Sync API
 export const hindsightApi = {
-  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' = 'documents') =>
+  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' = 'documents', summary = false) =>
     fetchApi<{
       data: {
         same: any[];
@@ -486,7 +486,7 @@ export const hindsightApi = {
         only_hindsight: number;
         total: number;
       };
-    }>(`/hindsight/diff?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&object=${object}`),
+    }>(`/hindsight/diff?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&object=${object}${summary ? '&summary=true' : ''}`),
 
   pull: (serverId: number, bankId: string, documentId: string) =>
     fetchApi<{ success: boolean; created: boolean; document: any }>('/hindsight/pull', {

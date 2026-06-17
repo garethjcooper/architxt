@@ -67,6 +67,7 @@ function ensureMissingTables(db) {
         mm_ent_refresh_mode TEXT CHECK (mm_ent_refresh_mode IN ('full', 'delta')),
         mm_ent_refresh_after_consolidation TEXT CHECK (mm_ent_refresh_after_consolidation IN ('true', 'false')),
         mm_ent_exclude_all_mental_models TEXT CHECK (mm_ent_exclude_all_mental_models IN ('true', 'false')),
+        mm_ent_max_tokens INTEGER DEFAULT 2048,
         mm_ent_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         mm_ent_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         PRIMARY KEY (ent_id, mm_id),
@@ -89,20 +90,64 @@ function ensureMissingTables(db) {
 }
 
 /**
+ * Ensure the FTS5 virtual table for documents exists and is backfilled.
+ * This is an additive migration for existing databases.
+ *
+ * Important: we intentionally recreate the table on every migration run.
+ * FTS5 has no ALTER VIRTUAL TABLE, and we need to guarantee the tokenizer
+ * (unicode61 with hyphen/underscore as token chars) matches the code's
+ * MATCH expectations. Dropping and rebuilding only loses the derived index,
+ * not any source data.
+ */
+function ensureDocumentsFts(db) {
+  const exists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name = ?"
+  ).get('documents_fts');
+
+  if (exists) {
+    logger.info('Recreating documents_fts FTS5 virtual table to ensure tokenizer is current');
+    db.exec('DROP TABLE IF EXISTS documents_fts');
+  }
+
+  logger.info('Creating documents_fts FTS5 virtual table');
+  db.exec(`
+    CREATE VIRTUAL TABLE documents_fts USING fts5(
+      doc_content,
+      content='documents',
+      content_rowid='doc_id',
+      tokenize="unicode61 tokenchars '-_:'"
+    )
+  `);
+
+  const docCount = db.prepare('SELECT COUNT(*) AS c FROM documents').get().c;
+  if (docCount > 0) {
+    logger.info(`Backfilling documents_fts with ${docCount} documents`);
+    db.exec(`
+      INSERT INTO documents_fts(rowid, doc_content)
+      SELECT doc_id, doc_content FROM documents
+    `);
+  }
+
+  logger.info('documents_fts ready');
+  return true;
+}
+
+/**
  * Apply the DDL schema to a fresh database.
  * Called automatically by db/connection.js when no tables exist.
  */
 export function ensureSchema(db) {
   const hadSchema = hasSchema(db);
   const created = ensureMissingTables(db);
+  const ftsCreated = ensureDocumentsFts(db);
 
   if (hadSchema) {
-    if (created > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s) created`);
+    if (created > 0 || ftsCreated) {
+      logger.info(`Additive migration complete — ${created} new table(s) created, FTS table created: ${ftsCreated}`);
     } else {
       logger.info('Database schema already present — no missing tables');
     }
-    return created > 0;
+    return created > 0 || ftsCreated;
   }
 
   if (!fs.existsSync(schemaPath)) {
@@ -145,10 +190,10 @@ export function resetSchema(db) {
 
   // Re-apply schema
   ensureSchema(db);
-  
+
   // Re-apply seed data after reset
   resetSeedData(db);
-  
+
   logger.info('Database reset complete');
   return true;
 }

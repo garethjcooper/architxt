@@ -156,6 +156,17 @@ CREATE TABLE entities (
 CREATE INDEX idx_entities_type ON entities(ent_type_id);
 
 -- ============================================================================
+-- FULL-TEXT SEARCH (FTS5)
+-- ============================================================================
+
+CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+  doc_content,
+  content='documents',
+  content_rowid='doc_id',
+  tokenize="unicode61 tokenchars '-_:'"
+);
+
+-- ============================================================================
 -- MENTAL MODELS — mental model local storage/configuration
 -- ============================================================================
 

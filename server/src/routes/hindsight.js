@@ -204,7 +204,8 @@ router.get('/diff', async (req, res) => {
   const serverId = parseInt(req.query.server_id, 10);
   const bankId = req.query.bank_id;
   const object = req.query.object || 'documents';
-  logger.warn('Hindsight diff: start', { serverId, bankId, object });
+  const summaryMode = req.query.summary === 'true';
+  logger.warn('Hindsight diff: start', { serverId, bankId, object, summaryMode });
 
   if (!serverId || !bankId) {
     return res.status(400).json({
@@ -285,11 +286,13 @@ router.get('/diff', async (req, res) => {
           archById.set(String(ent.entity_id), ent);
         }
 
-        const archValues = archEntities.map((e) => ({
-          entity_id: String(e.entity_id),
-          name: e.name,
-          description: e.description || '',
-        }));
+        const archValues = summaryMode
+          ? null
+          : archEntities.map((e) => ({
+              entity_id: String(e.entity_id),
+              name: e.name,
+              description: e.description || '',
+            }));
 
         if (!hind) {
           // Type only on architxt
@@ -304,7 +307,7 @@ router.get('/diff', async (req, res) => {
           continue;
         }
 
-        const hindValues = hind.values;
+        const hindValues = summaryMode ? null : hind.values;
         const hindNameById = new Map();
         for (const v of hindValues) {
           hindNameById.set(v.entity_id, v.name);
@@ -374,18 +377,22 @@ router.get('/diff', async (req, res) => {
 
         const row = {
           ext_id: typeName,
-          arch: {
-            type_name: typeName,
-            description: archTypeDescriptions.get(typeName) || '',
-            count: archEntities.length,
-            values: archValues,
-          },
-          hindsight: {
-            key: typeName,
-            description: hind.description || '',
-            count: hindValues.length,
-            values: hindValues,
-          },
+          arch: summaryMode
+            ? { type_name: typeName, count: archEntities.length }
+            : {
+                type_name: typeName,
+                description: archTypeDescriptions.get(typeName) || '',
+                count: archEntities.length,
+                values: archValues,
+              },
+          hindsight: summaryMode
+            ? { key: typeName, count: hindValues?.length ?? 0 }
+            : {
+                key: typeName,
+                description: hind.description || '',
+                count: hindValues.length,
+                values: hindValues,
+              },
           divergence,
         };
 
@@ -510,7 +517,11 @@ router.get('/diff', async (req, res) => {
         const hind = hindMap.get(extId);
 
         if (!hind) {
-          onlyArchitxt.push({ ext_id: extId, arch: plainByExtId.get(extId) || derivedByExtId.get(extId) });
+          onlyArchitxt.push({
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, is_derived: plainByExtId.get(extId)?.is_derived ?? false }
+              : (plainByExtId.get(extId) || derivedByExtId.get(extId)),
+          });
           continue;
         }
 
@@ -520,7 +531,12 @@ router.get('/diff', async (req, res) => {
         if (plainArch) {
           const divergence = buildMentalModelDivergence(plainArch, hind);
           const anyDiffers = Object.values(divergence).some(Boolean);
-          const row = { ext_id: extId, arch: plainArch, hindsight: hind, divergence };
+          const row = {
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, is_derived: false } : plainArch,
+            hindsight: summaryMode ? { ext_id: extId } : hind,
+            divergence,
+          };
           if (anyDiffers) different.push(row);
           else same.push(row);
         }
@@ -528,7 +544,12 @@ router.get('/diff', async (req, res) => {
         if (derivedArch) {
           const divergence = buildDerivedMentalModelDivergence(derivedArch, hind);
           const anyDiffers = Object.values(divergence).some(Boolean);
-          const row = { ext_id: extId, arch: derivedArch, hindsight: hind, divergence };
+          const row = {
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, is_derived: true } : derivedArch,
+            hindsight: summaryMode ? { ext_id: extId } : hind,
+            divergence,
+          };
           logger.info('Derived mental model comparison', { extId, hasHind: !!hind, divergence, archRefreshAfter: derivedArch.refresh_after_consolidation, hindRefreshAfter: hind?.refresh_after_consolidation, rawOverrides: derivedArch.__rawOverrides });
           if (anyDiffers) {
             different.push(row);
@@ -542,7 +563,10 @@ router.get('/diff', async (req, res) => {
       }
 
       for (const [extId, hind] of hindMap) {
-        onlyHindsight.push({ ext_id: extId, hindsight: hind });
+        onlyHindsight.push({
+          ext_id: extId,
+          hindsight: summaryMode ? { ext_id: extId } : hind,
+        });
       }
 
       return res.json({
@@ -705,21 +729,31 @@ router.get('/diff', async (req, res) => {
     for (const [extId, arch] of archMap) {
       const hind = hindMap.get(extId);
       if (!hind) {
-        onlyArchitxt.push({ ext_id: extId, arch });
+        onlyArchitxt.push({ ext_id: extId, arch: summaryMode ? { ext_id: extId } : arch });
       } else {
         const divergence = buildDivergence(arch, hind);
         const anyDiffers = divergence.content_differs || divergence.tags_differs || divergence.metadata_differs || divergence.context_differs || divergence.date_differs;
         if (!anyDiffers) {
-          same.push({ ext_id: extId, arch, hindsight: hind, divergence });
+          same.push({
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, content_hash: arch.content_hash } : arch,
+            hindsight: summaryMode ? { ext_id: extId, content_hash: hind.content_hash } : hind,
+            divergence,
+          });
         } else {
-          different.push({ ext_id: extId, arch, hindsight: hind, divergence });
+          different.push({
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, content_hash: arch.content_hash } : arch,
+            hindsight: summaryMode ? { ext_id: extId, content_hash: hind.content_hash } : hind,
+            divergence,
+          });
         }
         hindMap.delete(extId);
       }
     }
 
     for (const [extId, hind] of hindMap) {
-      onlyHindsight.push({ ext_id: extId, hindsight: hind });
+      onlyHindsight.push({ ext_id: extId, hindsight: summaryMode ? { ext_id: extId } : hind });
     }
 
     res.json({
