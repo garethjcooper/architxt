@@ -141,7 +141,7 @@ CREATE TABLE entities (
   ent_type_id INTEGER NOT NULL REFERENCES entity_types(et_id) ON DELETE RESTRICT,
   ent_entity_id TEXT NOT NULL UNIQUE,
   ent_name TEXT NOT NULL UNIQUE,
-  ent_description TEXT,
+    ent_description TEXT,
   ent_aliases JSON,           -- array of strings
   ent_case_match TEXT DEFAULT 'insensitive' CHECK (ent_case_match IN ('insensitive', 'sensitive')),
   ent_generated_by TEXT CHECK(ent_generated_by IN ('user', 'import')),
@@ -154,3 +154,48 @@ CREATE TABLE entities (
 -- ============================================================================
 
 CREATE INDEX idx_entities_type ON entities(ent_type_id);
+
+-- ============================================================================
+-- MENTAL MODELS — mental model local storage/configuration
+-- ============================================================================
+
+CREATE TABLE mental_models (
+  mm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mm_ext_id TEXT NOT NULL UNIQUE,
+  mm_name TEXT,
+  mm_source_query TEXT,
+  mm_refresh_after_consolidation TEXT DEFAULT 'false' CHECK (mm_refresh_after_consolidation IN ('true', 'false')),
+  mm_refresh_mode TEXT DEFAULT 'full' CHECK (mm_refresh_mode IN ('full', 'delta')),
+  mm_exclude_all_mental_models TEXT DEFAULT 'false' CHECK (mm_exclude_all_mental_models IN ('true', 'false')),
+  mm_exclude_mental_model_list TEXT,
+  mm_tags_match_mode TEXT DEFAULT 'all_strict' CHECK (mm_tags_match_mode IN ('all_strict', 'any_strict','all','any')),
+  mm_is_template TEXT DEFAULT 'false' CHECK (mm_is_template IN ('true', 'false')),
+  mm_max_tokens INTEGER DEFAULT 2048,
+  mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE mental_model_tags (
+  tag_id INTEGER NOT NULL,
+  mm_id INTEGER NOT NULL,
+  mm_tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  mm_tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (tag_id, mm_id),
+  FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+  FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
+);
+
+CREATE TABLE mental_model_entities (
+  ent_id INTEGER NOT NULL,
+  mm_id INTEGER NOT NULL,
+  mm_ent_refresh_mode TEXT CHECK (mm_ent_refresh_mode IN ('full', 'delta')),
+  mm_ent_refresh_after_consolidation TEXT CHECK (mm_ent_refresh_after_consolidation IN ('true', 'false')),
+  mm_ent_exclude_all_mental_models TEXT CHECK (mm_ent_exclude_all_mental_models IN ('true', 'false')),
+  mm_ent_max_tokens INTEGER DEFAULT 2048,
+  mm_ent_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  mm_ent_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (ent_id, mm_id),
+  FOREIGN KEY (ent_id) REFERENCES entities(ent_id) ON DELETE CASCADE,
+  FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
+);
+

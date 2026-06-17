@@ -233,6 +233,24 @@ const options = {
             updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
           }
         },
+        MentalModel: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', description: 'Unique mental model identifier' },
+            ext_id: { type: 'string', description: 'External unique identifier' },
+            name: { type: 'string', nullable: true, description: 'Mental model display name' },
+            source_query: { type: 'string', nullable: true, description: 'Query used to source this mental model' },
+            refresh_after_consolidation: { type: 'boolean', default: false, description: 'Whether to refresh after consolidation' },
+            refresh_mode: { type: 'string', enum: ['full', 'delta'], default: 'full', description: 'Refresh mode' },
+            exclude_all_mental_models: { type: 'boolean', default: false, description: 'Whether to exclude all other mental models' },
+            exclude_mental_model_list: { type: 'string', nullable: true, description: 'Comma-separated list of mental models to exclude' },
+            tags_match_mode: { type: 'string', enum: ['all_strict', 'any_strict', 'all', 'any'], default: 'all_strict', description: 'How tags on this model must match document tags' },
+            tags: { type: 'array', items: { $ref: '#/components/schemas/Tag' }, description: 'Tags associated with this mental model' },
+            entities: { type: 'array', items: { $ref: '#/components/schemas/Entity' }, description: 'Entities associated with this mental model' },
+            created_at: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
+            updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
+          }
+        },
         Error: {
           type: 'object',
           properties: {

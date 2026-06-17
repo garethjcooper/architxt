@@ -59,6 +59,11 @@ export function useMultiSelect<T extends { id: number }>(items: T[] = []) {
   const isAllSelected = items.length > 0 && selected.size === items.length;
 
   /**
+   * Check if some but not all items are selected
+   */
+  const isIndeterminate = items.length > 0 && selected.size > 0 && selected.size < items.length;
+
+  /**
    * Get count of selected items
    */
   const selectionCount = selected.size;
@@ -76,6 +81,7 @@ export function useMultiSelect<T extends { id: number }>(items: T[] = []) {
     clearSelection,
     isSelected,
     isAllSelected,
+    isIndeterminate,
     selectionCount,
     selectedIds,
   };

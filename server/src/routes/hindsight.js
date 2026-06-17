@@ -4,6 +4,9 @@ import { getDocument as hindsightGetDocument } from '../services/hindsight/docum
 import { pullDocument } from '../services/hindsight/pull.js';
 import { pushDocument } from '../services/hindsight/push.js';
 import { pushEntities, pushEntityTypes, pullEntities, pullEntityTypes } from '../services/hindsight/entities.js';
+import { listMentalModels as hindsightListMentalModels } from '../services/hindsight/mental-models.js';
+import { pushMentalModel, createMentalModel } from '../services/hindsight/push-mental-model.js';
+import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import { getBankConfig } from '../services/hindsight/bank-config.js';
 import { db } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
@@ -18,6 +21,7 @@ import { getAllEntitiesWithTypes } from '../db/crud/entities.js';
 import { getDocumentsForDiff, getDocumentByExtId, getAllDocumentContexts } from '../db/crud/documents.js';
 import { getAllDocumentTags, getDocumentTagsByDocId } from '../db/crud/document-tags.js';
 import { getContextDescriptionById } from '../db/crud/contexts.js';
+import { listMentalModelsForDiff, DEFAULT_MAX_TOKENS, DEFAULT_REFRESH_MODE, DEFAULT_TAGS_MATCH_MODE, normaliseMaxTokens } from '../db/crud/mental-models.js';
 
 const logger = createLogger('hindsight-route');
 const router = Router();
@@ -41,6 +45,118 @@ function isAbsent(value) {
   if (Array.isArray(value) && value.length === 0) return true;
   if (typeof value === 'object' && Object.keys(value).length === 0) return true;
   return false;
+}
+
+/* ── Mental model comparison helpers ── */
+
+function normalizeCsv(value) {
+  if (value == null || value === '') return [];
+  return String(value).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function arraySetEqual(a, b) {
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every((x) => setB.has(x));
+}
+
+function buildMentalModelDivergence(arch, hind) {
+  const nameDiffers = arch.name !== (hind.name ?? null);
+  const sourceQueryDiffers = arch.source_query !== (hind.source_query ?? null);
+  const maxTokensDiffers = Number(arch.max_tokens) !== Number(hind.max_tokens);
+  const refreshModeDiffers = arch.refresh_mode !== hind.refresh_mode;
+  const refreshAfterConsolidationDiffers = !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation;
+  const excludeAllDiffers = !!arch.exclude_all_mental_models !== !!hind.exclude_all_mental_models;
+  const excludeListDiffers = !arraySetEqual(
+    normalizeCsv(arch.exclude_mental_model_list),
+    hind.exclude_mental_model_ids || []
+  );
+  const tagsMatchModeDiffers = arch.tags_match_mode !== hind.tags_match_mode;
+  const tagsDiffers = !arraySetEqual(
+    (arch.tags || []).slice().sort(),
+    (hind.tags || []).slice().sort()
+  );
+
+  return {
+    name_differs: nameDiffers,
+    source_query_differs: sourceQueryDiffers,
+    tags_differs: tagsDiffers,
+    max_tokens_differs: maxTokensDiffers,
+    refresh_mode_differs: refreshModeDiffers,
+    refresh_after_consolidation_differs: refreshAfterConsolidationDiffers,
+    exclude_all_mental_models_differs: excludeAllDiffers,
+    exclude_mental_model_list_differs: excludeListDiffers,
+    tags_match_mode_differs: tagsMatchModeDiffers,
+  };
+}
+
+/**
+ * For derived mental models only the per-entity overrides can change.
+ * Template fields (name, source_query, tags, etc.) are shared across all
+ * derived instances, so comparing them here creates false out-of-sync rows
+ * that pull cannot fix.
+ */
+function buildDerivedMentalModelDivergence(arch, hind) {
+  return {
+    refresh_mode_differs: arch.refresh_mode !== hind.refresh_mode,
+    refresh_after_consolidation_differs: !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation,
+    exclude_all_mental_models_differs: !!arch.exclude_all_mental_models !== !!hind.exclude_all_mental_models,
+    max_tokens_differs: Number(arch.max_tokens) !== Number(hind.max_tokens),
+  };
+}
+
+function substituteDerived(template, entity) {
+  if (!template) return template;
+  return template
+    .replaceAll('{entity-name}', entity.name ?? '')
+    .replaceAll('{entity-id}', entity.entity_id ?? '');
+}
+
+function deriveMentalModelsForDiff(template) {
+  const entities = template.mm_entities || [];
+  if (!entities.length) return [];
+
+  return entities.map((entity) => {
+    const overrides = entity.overrides || {};
+
+    /**
+     * Mental model entity overrides are stored as TEXT in SQLite with values
+     * 'true' / 'false' / NULL, but defensive parsing also accepts 1/0 and
+     * real booleans in case the UI or future migration writes other forms.
+     */
+    const parseOverrideBool = (v) => {
+      if (v === null || v === undefined) return null;
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v === 1;
+      if (typeof v === 'string') {
+        const trimmed = v.trim().toLowerCase();
+        if (trimmed === 'true' || trimmed === '1') return true;
+        if (trimmed === 'false' || trimmed === '0') return false;
+      }
+      logger.warn('Unrecognized mental model entity override boolean value; treating as unset', { value: v, entity });
+      return null;
+    };
+
+    const refreshAfterConsolidation = parseOverrideBool(overrides.refresh_after_consolidation) ?? template.mm_refresh_after_consolidation === 'true';
+    const excludeAll = parseOverrideBool(overrides.exclude_all_mental_models) ?? template.mm_exclude_all_mental_models === 'true';
+
+    return {
+      id: `${template.mm_id}:${entity.id}`,
+      ext_id: substituteDerived(template.mm_ext_id, entity),
+      name: substituteDerived(template.mm_name, entity),
+      source_query: substituteDerived(template.mm_source_query, entity),
+      refresh_after_consolidation: refreshAfterConsolidation,
+      refresh_mode: overrides.refresh_mode || template.mm_refresh_mode || DEFAULT_REFRESH_MODE,
+      exclude_all_mental_models: excludeAll,
+      exclude_mental_model_list: template.mm_exclude_mental_model_list,
+      max_tokens: normaliseMaxTokens(overrides.max_tokens) ?? template.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+      tags_match_mode: template.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
+      tags: template.mm_tag_names || [],
+      is_derived: true,
+      derived_entity: { id: entity.id, mm_id: template.mm_id, entity_id: entity.entity_id, name: entity.name },
+      __rawOverrides: overrides,
+    };
+  });
 }
 
 /**
@@ -292,6 +408,155 @@ router.get('/diff', async (req, res) => {
       });
     } catch (err) {
       logger.error('Hindsight entities diff failed', { serverId, bankId, error: err.message, stack: err.stack });
+      return res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+    }
+  }
+
+  // ── Mental Models branch ──
+  if (object === 'mental-models') {
+    try {
+      // 1. Fetch Hindsight mental models with detail=content
+      const hindResult = await hindsightListMentalModels(serverId, bankId, { limit: 1000, detail: 'content' });
+      if (!hindResult.success) {
+        return res.status(502).json({ error: hindResult.error, code: 'REMOTE_ERROR' });
+      }
+
+      const hindMap = new Map();
+      for (const mm of hindResult.mentalModels || []) {
+        const extId = mm.id;
+        if (!extId) continue;
+        hindMap.set(extId, {
+          ext_id: extId,
+          name: mm.name || null,
+          source_query: mm.source_query || null,
+          refresh_mode: mm.trigger?.mode || DEFAULT_REFRESH_MODE,
+          refresh_after_consolidation: !!mm.trigger?.refresh_after_consolidation,
+          exclude_all_mental_models: !!mm.trigger?.exclude_mental_models,
+          exclude_mental_model_ids: Array.isArray(mm.trigger?.exclude_mental_model_ids) ? mm.trigger.exclude_mental_model_ids : [],
+          max_tokens: mm.max_tokens,
+          tags_match_mode: mm.trigger?.tags_match || DEFAULT_TAGS_MATCH_MODE,
+          tags: Array.isArray(mm.tags) ? mm.tags : [],
+        });
+      }
+
+      // 2. Fetch architxt mental models (non-templates), then expand templates into derived rows
+      const archResult = await listMentalModelsForDiff(db, { limit: 1000 });
+      if (!archResult.success) {
+        throw new Error(`Failed to fetch mental models: ${archResult.error}`);
+      }
+      const archRows = archResult.data || [];
+
+      // Separate templates and plain models
+      const templates = archRows.filter((r) => r.mm_is_template === 'true');
+      const plainRows = archRows.filter((r) => r.mm_is_template !== 'true');
+
+      const derivedRows = [];
+      for (const template of templates) {
+        derivedRows.push(...deriveMentalModelsForDiff(template));
+      }
+
+      logger.info('Mental models diff raw inputs', {
+        hindsightCount: hindMap.size,
+        architxtRowCount: archRows.length,
+        plainCount: plainRows.length,
+        templateCount: templates.length,
+        derivedCount: derivedRows.length,
+        hindsightKeys: [...hindMap.keys()],
+        plainExtIds: plainRows.map((r) => r.mm_ext_id),
+        derivedExtIds: derivedRows.map((r) => ({ extId: r.ext_id, mmId: r.derived_entity?.mm_id, entId: r.derived_entity?.id })),
+      });
+
+      const plainCandidates = plainRows.map((r) => ({
+        id: r.mm_id,
+        ext_id: r.mm_ext_id,
+        name: r.mm_name,
+        source_query: r.mm_source_query,
+        refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
+        refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
+        exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
+        exclude_mental_model_list: r.mm_exclude_mental_model_list,
+        max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+        tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
+        tags: r.mm_tag_names || [],
+        is_derived: false,
+      }));
+
+      // 3. Categorise. Keep plain and derived candidates in separate buckets so a
+      // plain model and a derived instance with the same ext_id do not shadow
+      // each other in a single Map.
+      const same = [];
+      const different = [];
+      const onlyArchitxt = [];
+      const onlyHindsight = [];
+
+      const plainByExtId = new Map();
+      const derivedByExtId = new Map();
+      for (const arch of plainCandidates) {
+        if (plainByExtId.has(arch.ext_id)) {
+          logger.warn('Duplicate plain mental model ext_id', { extId: arch.ext_id });
+        }
+        plainByExtId.set(arch.ext_id, arch);
+      }
+      for (const arch of derivedRows) {
+        if (derivedByExtId.has(arch.ext_id)) {
+          logger.warn('Duplicate derived mental model ext_id', { extId: arch.ext_id, derived: arch.derived_entity });
+        }
+        derivedByExtId.set(arch.ext_id, arch);
+      }
+
+      const allArchExtIds = new Set([...plainByExtId.keys(), ...derivedByExtId.keys()]);
+
+      for (const extId of allArchExtIds) {
+        const hind = hindMap.get(extId);
+
+        if (!hind) {
+          onlyArchitxt.push({ ext_id: extId, arch: plainByExtId.get(extId) || derivedByExtId.get(extId) });
+          continue;
+        }
+
+        const plainArch = plainByExtId.get(extId);
+        const derivedArch = derivedByExtId.get(extId);
+
+        if (plainArch) {
+          const divergence = buildMentalModelDivergence(plainArch, hind);
+          const anyDiffers = Object.values(divergence).some(Boolean);
+          const row = { ext_id: extId, arch: plainArch, hindsight: hind, divergence };
+          if (anyDiffers) different.push(row);
+          else same.push(row);
+        }
+
+        if (derivedArch) {
+          const divergence = buildDerivedMentalModelDivergence(derivedArch, hind);
+          const anyDiffers = Object.values(divergence).some(Boolean);
+          const row = { ext_id: extId, arch: derivedArch, hindsight: hind, divergence };
+          logger.info('Derived mental model comparison', { extId, hasHind: !!hind, divergence, archRefreshAfter: derivedArch.refresh_after_consolidation, hindRefreshAfter: hind?.refresh_after_consolidation, rawOverrides: derivedArch.__rawOverrides });
+          if (anyDiffers) {
+            different.push(row);
+            logger.info('Derived mental model differs', { extId, divergence, arch: derivedArch, hind });
+          } else {
+            same.push(row);
+          }
+        }
+
+        hindMap.delete(extId);
+      }
+
+      for (const [extId, hind] of hindMap) {
+        onlyHindsight.push({ ext_id: extId, hindsight: hind });
+      }
+
+      return res.json({
+        data: { same, different, only_architxt: onlyArchitxt, only_hindsight: onlyHindsight },
+        counts: {
+          same: same.length,
+          different: different.length,
+          only_architxt: onlyArchitxt.length,
+          only_hindsight: onlyHindsight.length,
+          total: same.length + different.length + onlyArchitxt.length + onlyHindsight.length,
+        },
+      });
+    } catch (err) {
+      logger.error('Hindsight mental models diff failed', { serverId, bankId, error: err.message, stack: err.stack });
       return res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
     }
   }
@@ -598,6 +863,142 @@ router.post('/push', async (req, res) => {
     });
   } catch (err) {
     logger.error('Push failed', { serverId, bankId, docId, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * @openapi
+ * /hindsight/push-mental-model:
+ *   post:
+ *     summary: Push an architxt mental model to Hindsight
+ *     description: |
+ *       Patches a single mental model into the selected Hindsight bank using
+ *       the architxt mental model values. Works for plain models and derived
+ *       template instances.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, model]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               model: { type: object }
+ *     responses:
+ *       200:
+ *         description: Push completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *       400:
+ *         description: Validation error
+ *       502:
+ *         description: Hindsight server error
+ */
+router.post('/push-mental-model', async (req, res) => {
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+  const model = req.body.model;
+  const create = req.body.create === true;
+
+  if (!serverId || !bankId || !model || !model.ext_id) {
+    return res.status(400).json({
+      error: 'server_id, bank_id, and model.ext_id are required',
+      code: 'VALIDATION_ERROR'
+    });
+  }
+
+  try {
+    const result = create
+      ? await createMentalModel(serverId, bankId, model)
+      : await pushMentalModel(serverId, bankId, model);
+    if (!result.success) {
+      return res.status(502).json({ error: result.error, code: 'PUSH_FAILED' });
+    }
+    res.json({ success: true, created: create });
+  } catch (err) {
+    logger.error('Push mental model failed', { serverId, bankId, extId: model?.ext_id, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * @openapi
+ * /hindsight/pull-mental-models:
+ *   post:
+ *     summary: Pull mental models from Hindsight into architxt
+ *     description: |
+ *       Pulls one or more mental models from the selected Hindsight bank
+ *       into architxt. Missing local models are created; existing ones are
+ *       updated. Derived rows only update their per-entity override fields.
+ *       Tags are synced by name.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               ext_ids: { type: array, items: { type: string } }
+ *               arch_info: { type: array, items: { type: object } }
+ *     responses:
+ *       200:
+ *         description: Pull completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 created: { type: integer }
+ *                 updated: { type: integer }
+ *                 errors: { type: array, items: { type: string } }
+ *       400:
+ *         description: Validation error
+ *       502:
+ *         description: Hindsight server error
+ */
+router.post('/pull-mental-models', async (req, res) => {
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+  const targets = req.body.targets;
+
+  if (!serverId || !bankId) {
+    return res.status(400).json({
+      error: 'server_id and bank_id are required',
+      code: 'VALIDATION_ERROR'
+    });
+  }
+
+  try {
+    if (targets !== undefined && !Array.isArray(targets)) {
+      return res.status(400).json({ error: 'targets must be an array', code: 'VALIDATION_ERROR' });
+    }
+
+    const result = await pullMentalModels(serverId, bankId, targets);
+    if (!result.success) {
+      return res.status(502).json({ error: result.errors?.join('; '), code: 'PULL_FAILED' });
+    }
+    res.json({
+      success: true,
+      created: result.created,
+      updated: result.updated,
+      inSync: result.inSync,
+      errors: result.errors || [],
+    });
+  } catch (err) {
+    logger.error('Pull mental models failed', { serverId, bankId, targets, error: err.message, stack: err.stack });
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });

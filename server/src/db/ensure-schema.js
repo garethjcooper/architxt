@@ -26,13 +26,83 @@ function hasSchema(db) {
 }
 
 /**
+ * Apply individual CREATE TABLE statements for new tables if they are missing.
+ * This is the additive migration path for existing databases.
+ */
+function ensureMissingTables(db) {
+  const tablesToCreate = [
+    {
+      name: 'mental_models',
+      ddl: `CREATE TABLE IF NOT EXISTS mental_models (
+        mm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mm_ext_id TEXT NOT NULL UNIQUE,
+        mm_name TEXT,
+        mm_source_query TEXT,
+        mm_refresh_after_consolidation TEXT DEFAULT 'false' CHECK (mm_refresh_after_consolidation IN ('true', 'false')),
+        mm_refresh_mode TEXT DEFAULT 'full' CHECK (mm_refresh_mode IN ('full', 'delta')),
+        mm_exclude_all_mental_models TEXT DEFAULT 'false' CHECK (mm_exclude_all_mental_models IN ('true', 'false')),
+        mm_exclude_mental_model_list TEXT,
+        mm_is_template TEXT DEFAULT 'false' CHECK (mm_is_template IN ('true', 'false')),
+        mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      )`
+    },
+    {
+      name: 'mental_model_tags',
+      ddl: `CREATE TABLE IF NOT EXISTS mental_model_tags (
+        tag_id INTEGER NOT NULL,
+        mm_id INTEGER NOT NULL,
+        mm_tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        mm_tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY (tag_id, mm_id),
+        FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+        FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'mental_model_entities',
+      ddl: `CREATE TABLE IF NOT EXISTS mental_model_entities (
+        ent_id INTEGER NOT NULL,
+        mm_id INTEGER NOT NULL,
+        mm_ent_refresh_mode TEXT CHECK (mm_ent_refresh_mode IN ('full', 'delta')),
+        mm_ent_refresh_after_consolidation TEXT CHECK (mm_ent_refresh_after_consolidation IN ('true', 'false')),
+        mm_ent_exclude_all_mental_models TEXT CHECK (mm_ent_exclude_all_mental_models IN ('true', 'false')),
+        mm_ent_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        mm_ent_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY (ent_id, mm_id),
+        FOREIGN KEY (ent_id) REFERENCES entities(ent_id) ON DELETE CASCADE,
+        FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
+      )`
+    },
+  ];
+
+  let createdCount = 0;
+  for (const { name, ddl } of tablesToCreate) {
+    const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(name);
+    if (!exists) {
+      db.exec(ddl);
+      logger.info(`Created missing table: ${name}`);
+      createdCount++;
+    }
+  }
+  return createdCount;
+}
+
+/**
  * Apply the DDL schema to a fresh database.
  * Called automatically by db/connection.js when no tables exist.
  */
 export function ensureSchema(db) {
-  if (hasSchema(db)) {
-    logger.info('Database schema already present — skipping DDL');
-    return false;
+  const hadSchema = hasSchema(db);
+  const created = ensureMissingTables(db);
+
+  if (hadSchema) {
+    if (created > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s) created`);
+    } else {
+      logger.info('Database schema already present — no missing tables');
+    }
+    return created > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

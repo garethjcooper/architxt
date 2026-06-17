@@ -18,8 +18,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Users
-} from 'lucide-react';
+  Users,
+  Layers,
+} from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
 import { DaemonStatus } from '@/components/daemon-status';
@@ -34,6 +35,7 @@ const navItems = [
   { href: '/entities', label: 'Entities', icon: Users },
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
   { href: '/hindsight', label: 'Hindsight', icon: HindsightIcon },
+  { href: '/models', label: 'Models', icon: Layers },
   { href: '/servers', label: 'Servers', icon: Server },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

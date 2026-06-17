@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Tag, Server, Metadata, Entity, EntityType } from '../types';
+import type { Document, Context, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -345,6 +345,124 @@ export const entityTypesApi = {
   delete: (id: number) => fetchApi<void>(`/entities/types/${id}`, { method: 'DELETE' }),
 };
 
+// Mental Models API
+export const mentalModelsApi = {
+  list: (params?: { limit?: number; offset?: number }) => {
+    const query = new URLSearchParams();
+    query.set('limit', (params?.limit ?? 1000).toString());
+    if (params?.offset) query.set('offset', params.offset.toString());
+    const queryString = query.toString();
+    return fetchApi<MentalModel[]>(`/mentalmodels${queryString ? '?' + queryString : ''}`);
+  },
+  get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
+  create: (data: {
+    ext_id: string;
+    name?: string;
+    source_query?: string;
+    refresh_after_consolidation?: boolean;
+    refresh_mode?: 'full' | 'delta';
+    exclude_all_mental_models?: boolean;
+    exclude_mental_model_list?: string;
+    max_tokens?: number;
+    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any';
+    is_template?: boolean;
+  }) => fetchApi<{ id: number }>('/mentalmodels', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id: number, data: {
+    ext_id?: string;
+    name?: string;
+    source_query?: string;
+    refresh_after_consolidation?: boolean;
+    refresh_mode?: 'full' | 'delta';
+    exclude_all_mental_models?: boolean;
+    exclude_mental_model_list?: string;
+    max_tokens?: number;
+    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any';
+    is_template?: boolean;
+  }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: number) => fetchApi<void>(`/mentalmodels/${id}`, { method: 'DELETE' }),
+
+  // Tags
+  getTags: (id: number) => fetchApi<Tag[]>(`/mentalmodels/${id}/tags`),
+  addTag: (mmId: number, tagId: number) =>
+    fetchApi<{ mental_model_id: number; tag_id: number }>(`/mentalmodels/${mmId}/tags/add`, {
+      method: 'POST',
+      body: JSON.stringify({ id: tagId }),
+    }),
+  removeTag: (mmId: number, tagId: number) =>
+    fetchApi<void>(`/mentalmodels/${mmId}/tags/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ id: tagId }),
+    }),
+
+  // Entities
+  getEntities: (id: number) => fetchApi<Entity[]>(`/mentalmodels/${id}/entities`),
+  addEntity: (mmId: number, entId: number) =>
+    fetchApi<{ mental_model_id: number; entity_id: number }>(`/mentalmodels/${mmId}/entities/add`, {
+      method: 'POST',
+      body: JSON.stringify({ id: entId }),
+    }),
+  removeEntity: (mmId: number, entId: number) =>
+    fetchApi<void>(`/mentalmodels/${mmId}/entities/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ id: entId }),
+    }),
+
+  // Derived instances
+  getDerived: (id: number) => fetchApi<DerivedMentalModel[]>(`/mentalmodels/${id}/derived`),
+  batchUpdateEntityOverrides: (mmId: number, entityIds: number[], overrides: MentalModelEntityOverrides) =>
+    fetchApi<{ updated: number }>(`/mentalmodels/${mmId}/entities/overrides`, {
+      method: 'PUT',
+      body: JSON.stringify({ entity_ids: entityIds, overrides }),
+    }),
+  updateEntityOverrides: (mmId: number, entityId: number, overrides: MentalModelEntityOverrides) =>
+    fetchApi<{ success: boolean }>(`/mentalmodels/${mmId}/entities/${entityId}/overrides`, {
+      method: 'PUT',
+      body: JSON.stringify(overrides),
+    }),
+  deleteEntityOverrides: (mmId: number, entityId: number) =>
+    fetchApi<{ success: boolean }>(`/mentalmodels/${mmId}/entities/${entityId}/overrides`, { method: 'DELETE' }),
+
+  // Batch
+  batchUpdateTags: (mmIds: number[], tagsToAdd: number[] = [], tagsToRemove: number[] = []) =>
+    fetchApi<{ success: boolean; models_updated: number; tags_added: number; tags_removed: number }>(
+      '/mentalmodels/batch/updatetags',
+      {
+        method: 'POST',
+        body: JSON.stringify({ mental_model_ids: mmIds, tags_to_add: tagsToAdd, tags_to_remove: tagsToRemove }),
+      }
+    ),
+
+  batchUpdateEntities: (mmIds: number[], entitiesToAdd: number[] = [], entitiesToRemove: number[] = []) =>
+    fetchApi<{ success: boolean; models_updated: number; entities_added: number; entities_removed: number }>(
+      '/mentalmodels/batch/updateentities',
+      {
+        method: 'POST',
+        body: JSON.stringify({ mental_model_ids: mmIds, entities_to_add: entitiesToAdd, entities_to_remove: entitiesToRemove }),
+      }
+    ),
+
+  batchUpdateConfig: (mmIds: number[], config: {
+    refresh_mode?: 'full' | 'delta' | null;
+    refresh_after_consolidation?: boolean | null;
+    exclude_all_mental_models?: boolean | null;
+    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | null;
+    max_tokens?: number | null;
+  }) =>
+    fetchApi<{ success: boolean; models_updated: number; entities_updated: number }>(
+      '/mentalmodels/batch/updateconfig',
+      {
+        method: 'POST',
+        body: JSON.stringify({ mental_model_ids: mmIds, ...config }),
+      }
+    ),
+};
+
 // Health check
 export const healthApi = {
   check: () => 
@@ -353,7 +471,7 @@ export const healthApi = {
 
 // Hindsight Sync API
 export const hindsightApi = {
-  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' = 'documents') =>
+  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' = 'documents') =>
     fetchApi<{
       data: {
         same: any[];
@@ -392,6 +510,18 @@ export const hindsightApi = {
     fetchApi<{ success: boolean; createdTypes?: number; createdEntities?: number; updatedEntities?: number; deletedEntities?: number }>('/hindsight/entities/pull', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, type_names: typeNames }),
+    }),
+
+  pushMentalModel: (serverId: number, bankId: string, model: any, create = false) =>
+    fetchApi<{ success: boolean; created?: boolean }>('/hindsight/push-mental-model', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create }),
+    }),
+
+  pullMentalModels: (serverId: number, bankId: string, targets: { ext_id: string; hind_id: string; is_derived: boolean; derived_entity?: { mm_id: number; id: number } }[]) =>
+    fetchApi<{ success: boolean; created?: number; updated?: number; inSync?: number; errors?: string[] }>('/hindsight/pull-mental-models', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, targets }),
     }),
 
   compare: (serverId: number, bankId: string, documentId: string) =>
@@ -459,7 +589,7 @@ export const hindsightApi = {
 export { ApiError };
 
 // Re-export types for convenient importing
-export type { Document, Context, Tag, Server, Metadata, Entity, EntityType };
+export type { Document, Context, Tag, Server, Metadata, Entity, EntityType, MentalModel };
 
 // Config API — entity tag format discovery
 export const configApi = {

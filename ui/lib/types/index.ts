@@ -102,8 +102,40 @@ export interface Entity {
   type_case_match: 'insensitive' | 'sensitive';
   generated_by: 'user' | 'import';
   usage_count?: number;
+  overrides?: MentalModelEntityOverrides;
   created_at: string;
   updated_at: string;
+}
+
+export interface MentalModel {
+  id: number;
+  ext_id: string;
+  name: string | null;
+  source_query: string | null;
+  refresh_after_consolidation: boolean;
+  refresh_mode: 'full' | 'delta';
+  exclude_all_mental_models: boolean;
+  exclude_mental_model_list: string | null;
+  max_tokens: number;
+  tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any';
+  is_template: boolean;
+  tags: Tag[];
+  entities: Entity[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DerivedMentalModel extends MentalModel {
+  is_derived: true;
+  derived_entity: Entity;
+  overrides?: MentalModelEntityOverrides;
+}
+
+export interface MentalModelEntityOverrides {
+  refresh_mode?: 'full' | 'delta';
+  refresh_after_consolidation?: boolean;
+  exclude_all_mental_models?: boolean;
+  max_tokens?: number;
 }
 
 export interface ApiError {
