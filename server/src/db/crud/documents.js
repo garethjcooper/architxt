@@ -155,8 +155,7 @@ export const updateDocument = (db, id, data) => dbExec(() => {
     if (newContent === undefined || newContent === null) {
       stmt(db, `DELETE FROM documents_fts WHERE rowid = ?`).run(id);
     } else {
-      stmt(db, `INSERT INTO documents_fts(rowid, doc_content) VALUES (?, ?)
-                ON CONFLICT(rowid) DO UPDATE SET doc_content = excluded.doc_content`)
+      stmt(db, `INSERT OR REPLACE INTO documents_fts(rowid, doc_content) VALUES (?, ?)`)
         .run(id, newContent);
     }
   }
