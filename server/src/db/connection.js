@@ -25,7 +25,7 @@ const initializeDatabase = () => {
     
     // Open database
     const db = new Database(dbPath, {
-      timeout: config.database.timeout_ms || 5000
+      timeout: config.database.timeout_ms
     });
     
     // Enable WAL mode for concurrency
