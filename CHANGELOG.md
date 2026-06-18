@@ -2,6 +2,36 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.2.0] - 2026-06-18
+
+### Added
+- Mental models: local-first template + derived-instance workflow with full-row-state per-entity config
+- Mental models: Hindsight sync (diff, push, pull, compare modal) for plain and derived rows
+- Hindsight sync: read-only entity label diff and push/pull between architxt entities/types and Hindsight bank config
+- Settings page with server configuration viewer and restart action
+- Configurable max file upload size via `ARCHITXT_MAX_FILE_SIZE` (env-driven, exposed in settings)
+- Multi-select data table helpers and bulk-action patterns across documents, tags, and mental models
+- `?summary=true` mode on `/hindsight/diff` for lightweight divergence counts
+- ConfirmDialog component for destructive actions, replacing native `window.confirm()`
+
+### Changed
+- Improved entity list and Hindsight diff performance with FTS5 batched usage counts
+- Settings/config routes now read values fail-fast from the config object without silent fallbacks
+- Document processing pipeline now uses background daemon polling instead of frontend poll loops
+- Stage runner signature alignment across pipeline stages
+- README: added divergent-branch recovery instructions for in-place updates
+
+### Fixed
+- Fresh-install crash: `ensureSchema()` now applies base DDL before running additive FTS migration
+- Removed `|| 5000` fallback on database `timeout_ms`
+- Next.js dev proxy body-size limit raised to 100 MB to match backend upload limit
+- SQLite JSON boolean normalization for per-entity mental-model overrides
+- Various UI polish: table resizing, page header consistency, dialog layouts
+
+### Removed
+- `POST /hindsight/operations/poll` route (daemon now handles polling)
+- Frontend `pollOperations` loop and related API client method
+
 ## [0.1.0] - 2026-06-10
 
 ### Added
