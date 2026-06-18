@@ -121,24 +121,21 @@ export default function SyncRow({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mt-1 text-[11px]">
+          <div className="flex flex-col gap-0.5 mt-1 text-[11px]">
             {archFilename && (
-              <span className="flex items-center gap-1.5 truncate max-w-[140px]" title={`${archFilename} • ${archHash || ''}`}>
-                <span className="text-white/40">A: {archFilename}</span>
-                {archHash && <span className="text-white/20 font-mono text-[10px]">{archHash.slice(0, 8)}</span>}
+              <span className="flex items-center gap-1.5 min-w-0 truncate" title={`${archFilename} • ${archHash || ''}`}>
+                <span className="text-white/40 shrink-0">A: {archFilename}</span>
+                {archHash && <span className="text-white/20 font-mono text-[10px] shrink-0">{archHash.slice(0, 8)}</span>}
               </span>
             )}
             {!archFilename && archHash && (
-              <span className="text-white/20 font-mono text-[10px]" title={archHash}>A-hash: {archHash.slice(0, 8)}</span>
+              <span className="text-white/20 font-mono text-[10px] truncate" title={archHash}>A-hash: {archHash.slice(0, 8)}</span>
             )}
             {hindTitle && (
-              <span className="flex items-center gap-1.5 truncate max-w-[140px]" title={`${hindTitle} • ${hindHash || ''}`}>
-                <span className="text-white/40">H: {hindTitle}</span>
-                {hindHash && <span className="text-white/20 font-mono text-[10px]">{hindHash.slice(0, 8)}</span>}
+              <span className="flex items-center gap-1.5 min-w-0 truncate" title={`${hindTitle} • ${hindHash || ''}`}>
+                <span className="text-white/40 shrink-0">H: {hindTitle}</span>
+                {hindHash && <span className="text-white/20 font-mono text-[10px] shrink-0">{hindHash.slice(0, 8)}</span>}
               </span>
-            )}
-            {!hindTitle && hindHash && (
-              <span className="text-white/20 font-mono text-[10px]" title={hindHash}>H-hash: {hindHash.slice(0, 8)}</span>
             )}
           </div>
 

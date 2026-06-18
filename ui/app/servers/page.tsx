@@ -171,14 +171,13 @@ export default function ServersPage() {
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Server ID</th>
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</th>
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Base URL</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>API Version</th>
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-24", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Health</th>
             </tr>
           </thead>
           <tbody>
             {servers.length === 0 && !loading ? (
               <tr key="empty-state">
-                <td colSpan={6} className="text-center py-8 text-white/70">
+                <td colSpan={5} className="text-center py-8 text-white/70">
                   <div className="flex flex-col items-center gap-2">
                     <ServerIcon className="h-8 w-8 opacity-50" />
                     <p>No servers found.</p>
@@ -212,9 +211,6 @@ export default function ServersPage() {
                   </td>
                   <td className="py-1.5 px-4 text-xs text-white/60">
                     {server.base_url}
-                  </td>
-                  <td className="py-1.5 px-4 text-xs text-white/50">
-                    {server.api_version || '-'}
                   </td>
                   <td className="py-1.5 px-4">
                     <div className="flex items-center gap-2">

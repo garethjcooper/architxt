@@ -28,7 +28,6 @@ export function CreateServerDialog({
   const [baseUrl, setBaseUrl] = useState('');
   const [name, setName] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [apiVersion, setApiVersion] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Reset fields when dialog opens
@@ -37,7 +36,6 @@ export function CreateServerDialog({
       setBaseUrl('');
       setName('');
       setApiKey('');
-      setApiVersion('');
     }
   }, [open]);
 
@@ -57,7 +55,6 @@ export function CreateServerDialog({
         base_url: trimmedUrl,
         name: name.trim() || undefined,
         api_key: apiKey.trim() || undefined,
-        api_version: apiVersion.trim() || undefined,
       });
       toast.success('Server created successfully');
       onOpenChange(false);
@@ -129,24 +126,6 @@ export function CreateServerDialog({
               placeholder="sk-..."
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
-            />
-          </div>
-
-          {/* API Version */}
-          <div className="space-y-2">
-            <Label htmlFor="api_version" className="text-xs uppercase text-white/50 font-medium">
-              API Version
-            </Label>
-            <Input
-              id="api_version"
-              placeholder="v1"
-              value={apiVersion}
-              onChange={(e) => setApiVersion(e.target.value)}
               className={inputClass}
               style={{
                 '--tw-ring-color': 'rgb(52, 211, 153)',

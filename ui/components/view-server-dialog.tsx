@@ -37,14 +37,12 @@ export function ViewServerDialog({
   const [name, setName] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [apiVersion, setApiVersion] = useState('');
 
   useEffect(() => {
     if (server) {
       setName(server.name || '');
       setBaseUrl(server.base_url || '');
       setApiKey(server.api_key || '');
-      setApiVersion(server.api_version || '');
     }
   }, [server, open]);
 
@@ -53,8 +51,7 @@ export function ViewServerDialog({
   const hasChanges =
     name !== (server.name || '') ||
     baseUrl !== (server.base_url || '') ||
-    apiKey !== (server.api_key || '') ||
-    apiVersion !== (server.api_version || '');
+    apiKey !== (server.api_key || '');
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -69,9 +66,6 @@ export function ViewServerDialog({
       }
       if (apiKey !== (server.api_key || '')) {
         updates.api_key = apiKey || null;
-      }
-      if (apiVersion !== (server.api_version || '')) {
-        updates.api_version = apiVersion || null;
       }
 
       if (Object.keys(updates).length > 0) {
@@ -146,24 +140,6 @@ export function ViewServerDialog({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="Enter API key (hidden)"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
-              />
-            </div>
-
-            {/* API Version */}
-            <div className="space-y-2">
-              <Label htmlFor="api-version" className="text-xs uppercase text-white/50 font-medium">
-                API Version
-              </Label>
-              <Input
-                id="api-version"
-                value={apiVersion}
-                onChange={(e) => setApiVersion(e.target.value)}
-                placeholder="Enter API version"
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',

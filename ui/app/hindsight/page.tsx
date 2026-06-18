@@ -708,7 +708,7 @@ export default function HindsightPage() {
 
       {/* 3-Column Grid */}
       {diffResult && counts && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-240px)] min-h-[300px]">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-4 h-[calc(100vh-240px)] min-h-[300px]">
           {/* ── Column 1: Only on architxt ── */}
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">

@@ -107,6 +107,14 @@ export function hasEntityPlaceholders(mmName, mmExtId, mmSourceQuery) {
 }
 
 /**
+ * Returns true if the external id contains a supported entity placeholder.
+ * Templates require this because ext_id becomes read-only after creation.
+ */
+export function hasEntityPlaceholderInExtId(mmExtId) {
+  return PLACEHOLDER_PATTERN.test(mmExtId ?? '');
+}
+
+/**
  * Validate that a model is eligible to act as an entity template.
  * Returns { valid: boolean, error: string?, code: string? } instead of throwing.
  */
@@ -120,10 +128,10 @@ export function validateEntityTemplateEligibility({
     return { valid: true };
   }
 
-  if (!hasEntityPlaceholders(mm_name, mm_ext_id, mm_source_query)) {
+  if (!hasEntityPlaceholderInExtId(mm_ext_id)) {
     return {
       valid: false,
-      error: `Template mode requires a placeholder ('${ENTITY_ID_PLACEHOLDER}' or '${ENTITY_NAME_PLACEHOLDER}') in external id, name or source query`,
+      error: `Template mode requires '${ENTITY_ID_PLACEHOLDER}' or '${ENTITY_NAME_PLACEHOLDER}' in External ID`,
       code: 'VALIDATION_ERROR',
     };
   }

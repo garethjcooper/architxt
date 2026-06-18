@@ -63,12 +63,11 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    const haystack = `${name}${extId}${sourceQuery}`;
-    if (!/\{entity-(id|name)\}/.test(haystack)) {
-      return "Template mode requires {entity-id} or {entity-name} in External ID, Name, or Source Query.";
+    if (!/\{entity-(id|name)\}/.test(extId)) {
+      return "Template mode requires {entity-id} or {entity-name} to be present in External ID at a minimum. Name or Source Query can also use entity tags.";
     }
     return null;
-  }, [isTemplate, name, extId, sourceQuery]);
+  }, [isTemplate, extId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

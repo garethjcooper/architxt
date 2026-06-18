@@ -50,11 +50,11 @@ function MentalModelDivergenceBadges({
     { label: 'query', key: 'source_query_differs', supported: !isDerived },
     { label: 'tags', key: 'tags_differs', supported: !isDerived },
     { label: 'tokens', key: 'max_tokens_differs', supported: true },
-    { label: 'mode', key: 'refresh_mode_differs', supported: true },
-    { label: 'after', key: 'refresh_after_consolidation_differs', supported: true },
-    { label: 'exclude', key: 'exclude_all_mental_models_differs', supported: true },
-    { label: 'ex list', key: 'exclude_mental_model_list_differs', supported: !isDerived },
-    { label: 'match', key: 'tags_match_mode_differs', supported: !isDerived },
+    { label: 'refresh mode', key: 'refresh_mode_differs', supported: true },
+    { label: 'refresh after', key: 'refresh_after_consolidation_differs', supported: true },
+    { label: 'exclude models', key: 'exclude_all_mental_models_differs', supported: true },
+    { label: 'exclude models list', key: 'exclude_mental_model_list_differs', supported: !isDerived },
+    { label: 'tag match', key: 'tags_match_mode_differs', supported: !isDerived },
   ];
 
   return (

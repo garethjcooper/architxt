@@ -8,6 +8,7 @@ import { mentalModelsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { Settings2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { MentalModel } from '@/lib/types/index';
 
 interface ManageModelConfigDialogProps {
@@ -102,6 +103,7 @@ export function ManageModelConfigDialog({
   onConfigUpdated,
 }: ManageModelConfigDialogProps) {
   const [fieldStates, setFieldStates] = useState<Record<FieldKey, FieldState>>({} as Record<FieldKey, FieldState>);
+  const [enabled, setEnabled] = useState<Record<FieldKey, boolean>>({} as Record<FieldKey, boolean>);
   const [loading, setLoading] = useState(false);
 
   const selectedModels = useMemo(
@@ -149,6 +151,12 @@ export function ManageModelConfigDialog({
     }
 
     setFieldStates(next as Record<FieldKey, FieldState>);
+    const defaultEnabled = selectedModels.length === 1;
+    const nextEnabled: Record<FieldKey, boolean> = {} as Record<FieldKey, boolean>;
+    for (const f of FIELDS) {
+      nextEnabled[f.key] = defaultEnabled;
+    }
+    setEnabled(nextEnabled);
   }, [isOpen, selectedModels]);
 
   const handleToggle = (fieldDef: ConfigFieldDef, nextValue: FieldValue) => {
@@ -175,6 +183,20 @@ export function ManageModelConfigDialog({
     });
   };
 
+  const toggleFieldEnabled = (fieldDef: ConfigFieldDef, checked: boolean) => {
+    setEnabled((prev) => ({ ...prev, [fieldDef.key]: checked }));
+  };
+
+  const allEnabled = useMemo(() => FIELDS.every((f) => enabled[f.key]), [enabled]);
+
+  const toggleAllEnabled = (checked: boolean) => {
+    const next: Record<FieldKey, boolean> = {} as Record<FieldKey, boolean>;
+    for (const f of FIELDS) {
+      next[f.key] = checked;
+    }
+    setEnabled(next);
+  };
+
   const handleSave = async () => {
     try {
       setLoading(true);
@@ -189,6 +211,8 @@ export function ManageModelConfigDialog({
       let impactedCount = 0;
 
       for (const fieldDef of FIELDS) {
+        if (!enabled[fieldDef.key]) continue;
+
         const state = fieldStates[fieldDef.key];
         if (!state) continue;
 
@@ -213,7 +237,7 @@ export function ManageModelConfigDialog({
       }
 
       if (Object.keys(config).length === 0) {
-        toast.info('No changes to save');
+        toast.info('No fields selected to save');
         onClose();
         return;
       }
@@ -253,13 +277,22 @@ export function ManageModelConfigDialog({
       statusText = `${selectedLabel} selected — ${selectedCount} match, ${differentCount} different`;
     }
 
+    const isFieldEnabled = enabled[fieldDef.key] ?? false;
+
     return (
       <div
         key={fieldDef.key}
-        className="flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02]"
+        className={`flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02] transition-opacity ${
+          isFieldEnabled ? '' : 'opacity-50'
+        }`}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <Settings2 className="w-4 h-4 text-white/40 shrink-0" />
+          <Checkbox
+            checked={isFieldEnabled}
+            onCheckedChange={(checked) => toggleFieldEnabled(fieldDef, checked === true)}
+            className="shrink-0"
+          />
+          <Settings2 className={`w-4 h-4 shrink-0 ${isFieldEnabled ? 'text-white/40' : 'text-white/20'}`} />
           <div>
             <p className="text-sm font-medium text-white/90">{fieldDef.label}</p>
             <p className="text-xs text-white/50">{statusText}</p>
@@ -283,12 +316,13 @@ export function ManageModelConfigDialog({
                 return (
                   <button
                     key={String(option.value)}
-                    onClick={() => handleToggle(fieldDef, option.value)}
+                    onClick={() => isFieldEnabled && handleToggle(fieldDef, option.value)}
+                    disabled={!isFieldEnabled}
                     className={`px-2.5 py-1 rounded text-xs border transition-all ${
                       active
                         ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                         : 'bg-slate-800/50 border-slate-700 text-white/60 hover:bg-slate-700/50'
-                    }`}
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     {option.label}
                   </button>
@@ -302,16 +336,18 @@ export function ManageModelConfigDialog({
               max={fieldDef.max}
               step={fieldDef.step}
               value={state.selectedValue as number}
+              disabled={!isFieldEnabled}
               onChange={(e) => {
                 const value = e.target.value === '' ? fieldDef.defaultValue : Number(e.target.value);
                 handleToggle(fieldDef, value);
               }}
-              className="w-24 h-8 text-xs bg-slate-800/50 border-slate-700 text-white placeholder:text-white/40 focus:border-emerald-400 focus:ring-emerald-400/30"
+              className="w-24 h-8 text-xs bg-slate-800/50 border-slate-700 text-white placeholder:text-white/40 focus:border-emerald-400 focus:ring-emerald-400/30 disabled:opacity-40 disabled:cursor-not-allowed"
             />
           ) : (
             <Switch
               checked={!!state.selectedValue}
-              onCheckedChange={() => handleSwitchToggle(fieldDef)}
+              disabled={!isFieldEnabled}
+              onCheckedChange={() => isFieldEnabled && handleSwitchToggle(fieldDef)}
             />
           )}
         </div>
@@ -321,13 +357,14 @@ export function ManageModelConfigDialog({
 
   const hasChanges = useMemo(() => {
     return FIELDS.some((fieldDef) => {
+      if (!enabled[fieldDef.key]) return false;
       const state = fieldStates[fieldDef.key];
       if (!state) return false;
       return selectedModels.some(
         (m) => (m[fieldDef.key] ?? fieldDef.defaultValue) !== state.selectedValue
       );
     });
-  }, [fieldStates, selectedModels]);
+  }, [fieldStates, selectedModels, enabled]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -338,6 +375,17 @@ export function ManageModelConfigDialog({
             {selectedModelIds.length} mental model(s) selected
           </p>
         </DialogHeader>
+
+        <div className="flex items-center gap-2 py-2 px-3 rounded border border-white/10 bg-white/[0.03]">
+          <Checkbox
+            id="select-all-config"
+            checked={allEnabled}
+            onCheckedChange={(checked) => toggleAllEnabled(checked === true)}
+          />
+          <label htmlFor="select-all-config" className="text-xs text-white/70 cursor-pointer select-none">
+            Select / deselect all fields
+          </label>
+        </div>
 
         <div className="space-y-3 overflow-y-auto flex-1 py-2">
           {FIELDS.map((fieldDef) => renderFieldRow(fieldDef))}

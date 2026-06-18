@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Settings2 } from 'lucide-react';
 import type { DerivedMentalModel } from '@/lib/types/index';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type FieldKey = 'refresh_mode' | 'refresh_after_consolidation' | 'exclude_all_mental_models' | 'max_tokens';
 type FieldValue = string | boolean | number;
@@ -93,6 +94,7 @@ export function ManageDerivedModelConfigDialog({
   const [fieldStates, setFieldStates] = useState<Record<FieldKey, FieldState>>(
     {} as Record<FieldKey, FieldState>
   );
+  const [enabled, setEnabled] = useState<Record<FieldKey, boolean>>({} as Record<FieldKey, boolean>);
 
   useEffect(() => {
     if (!isOpen || derived.length === 0) return;
@@ -133,6 +135,13 @@ export function ManageDerivedModelConfigDialog({
       }
       return next as Record<FieldKey, FieldState>;
     });
+
+    const defaultEnabled = derived.length === 1;
+    const nextEnabled: Record<FieldKey, boolean> = {} as Record<FieldKey, boolean>;
+    for (const f of FIELDS) {
+      nextEnabled[f.key] = defaultEnabled;
+    }
+    setEnabled(nextEnabled);
   }, [isOpen, derived]);
 
   const handleToggle = (fieldDef: ConfigFieldDef, nextValue: FieldValue) => {
@@ -158,15 +167,29 @@ export function ManageDerivedModelConfigDialog({
     });
   };
 
+  const toggleFieldEnabled = (fieldDef: ConfigFieldDef, checked: boolean) => {
+    setEnabled((prev) => ({ ...prev, [fieldDef.key]: checked }));
+  };
+
+  const allEnabled = useMemo(() => FIELDS.every((f) => enabled[f.key]), [enabled]);
+
+  const toggleAllEnabled = (checked: boolean) => {
+    const next: Record<FieldKey, boolean> = {} as Record<FieldKey, boolean>;
+    for (const f of FIELDS) {
+      next[f.key] = checked;
+    }
+    setEnabled(next);
+  };
+
   const handleSave = () => {
     const patch: Partial<Pick<DerivedMentalModel, FieldKey>> = {};
-    if (fieldStates.refresh_mode) {
+    if (enabled.refresh_mode && fieldStates.refresh_mode) {
       const changed = derived.some((d) => d.refresh_mode !== fieldStates.refresh_mode!.selectedValue);
       if (changed) {
         patch.refresh_mode = fieldStates.refresh_mode.selectedValue as 'full' | 'delta';
       }
     }
-    if (fieldStates.refresh_after_consolidation) {
+    if (enabled.refresh_after_consolidation && fieldStates.refresh_after_consolidation) {
       const changed = derived.some(
         (d) => d.refresh_after_consolidation !== !!fieldStates.refresh_after_consolidation!.selectedValue
       );
@@ -174,7 +197,7 @@ export function ManageDerivedModelConfigDialog({
         patch.refresh_after_consolidation = !!fieldStates.refresh_after_consolidation.selectedValue;
       }
     }
-    if (fieldStates.exclude_all_mental_models) {
+    if (enabled.exclude_all_mental_models && fieldStates.exclude_all_mental_models) {
       const changed = derived.some(
         (d) => d.exclude_all_mental_models !== !!fieldStates.exclude_all_mental_models!.selectedValue
       );
@@ -182,7 +205,7 @@ export function ManageDerivedModelConfigDialog({
         patch.exclude_all_mental_models = !!fieldStates.exclude_all_mental_models.selectedValue;
       }
     }
-    if (fieldStates.max_tokens) {
+    if (enabled.max_tokens && fieldStates.max_tokens) {
       const changed = derived.some(
         (d) => d.max_tokens !== Number(fieldStates.max_tokens!.selectedValue)
       );
@@ -220,13 +243,22 @@ export function ManageDerivedModelConfigDialog({
       statusText = `${selectedLabel} selected — ${selectedCount} match, ${differentCount} different`;
     }
 
+    const isFieldEnabled = enabled[fieldDef.key] ?? false;
+
     return (
       <div
         key={fieldDef.key}
-        className="flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02]"
+        className={`flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02] transition-opacity ${
+          isFieldEnabled ? '' : 'opacity-50'
+        }`}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <Settings2 className="w-4 h-4 text-white/40 shrink-0" />
+          <Checkbox
+            checked={isFieldEnabled}
+            onCheckedChange={(checked) => toggleFieldEnabled(fieldDef, checked === true)}
+            className="shrink-0"
+          />
+          <Settings2 className={`w-4 h-4 shrink-0 ${isFieldEnabled ? 'text-white/40' : 'text-white/20'}`} />
           <div>
             <p className="text-sm font-medium text-white/90">{fieldDef.label}</p>
             <p className="text-xs text-white/50">{statusText}</p>
@@ -250,12 +282,13 @@ export function ManageDerivedModelConfigDialog({
                 return (
                   <button
                     key={String(option.value)}
-                    onClick={() => handleToggle(fieldDef, option.value)}
+                    onClick={() => isFieldEnabled && handleToggle(fieldDef, option.value)}
+                    disabled={!isFieldEnabled}
                     className={`px-2.5 py-1 rounded text-xs border transition-all ${
                       active
                         ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                         : 'bg-slate-800/50 border-slate-700 text-white/60 hover:bg-slate-700/50'
-                    }`}
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     {option.label}
                   </button>
@@ -269,16 +302,18 @@ export function ManageDerivedModelConfigDialog({
               max={fieldDef.max}
               step={fieldDef.step}
               value={state.selectedValue as number}
+              disabled={!isFieldEnabled}
               onChange={(e) => {
                 const value = e.target.value === '' ? fieldDef.defaultValue : Number(e.target.value);
                 handleToggle(fieldDef, value);
               }}
-              className="w-24 h-8 text-xs bg-slate-800/50 border-slate-700 text-white placeholder:text-white/40 focus:border-emerald-400 focus:ring-emerald-400/30"
+              className="w-24 h-8 text-xs bg-slate-800/50 border-slate-700 text-white placeholder:text-white/40 focus:border-emerald-400 focus:ring-emerald-400/30 disabled:opacity-40 disabled:cursor-not-allowed"
             />
           ) : (
             <Switch
               checked={!!state.selectedValue}
-              onCheckedChange={() => handleSwitchToggle(fieldDef)}
+              disabled={!isFieldEnabled}
+              onCheckedChange={() => isFieldEnabled && handleSwitchToggle(fieldDef)}
             />
           )}
         </div>
@@ -287,11 +322,11 @@ export function ManageDerivedModelConfigDialog({
   };
 
   const hasChanges = useMemo(() => {
-    return FIELDS.some(
-      (fieldDef) =>
-        derived.some((d) => fieldValue(d, fieldDef) !== fieldStates[fieldDef.key]?.selectedValue)
-    );
-  }, [fieldStates, derived]);
+    return FIELDS.some((fieldDef) => {
+      if (!enabled[fieldDef.key]) return false;
+      return derived.some((d) => fieldValue(d, fieldDef) !== fieldStates[fieldDef.key]?.selectedValue);
+    });
+  }, [fieldStates, derived, enabled]);
 
   if (derived.length === 0) return null;
 
@@ -304,6 +339,17 @@ export function ManageDerivedModelConfigDialog({
             {derived.length} derived instance{derived.length === 1 ? '' : 's'} selected
           </p>
         </DialogHeader>
+
+        <div className="flex items-center gap-2 py-2 px-3 rounded border border-white/10 bg-white/[0.03]">
+          <Checkbox
+            id="select-all-derived-config"
+            checked={allEnabled}
+            onCheckedChange={(checked) => toggleAllEnabled(checked === true)}
+          />
+          <label htmlFor="select-all-derived-config" className="text-xs text-white/70 cursor-pointer select-none">
+            Select / deselect all fields
+          </label>
+        </div>
 
         <div className="space-y-3 overflow-y-auto flex-1 py-2">
           {FIELDS.map((fieldDef) => renderFieldRow(fieldDef))}

@@ -456,7 +456,7 @@ function ModelsPageContent() {
 
       {createDialogOpen && (
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold text-white">Create Mental Model</DialogTitle>
             </DialogHeader>

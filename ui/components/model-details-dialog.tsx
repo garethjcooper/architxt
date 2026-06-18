@@ -229,12 +229,11 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    const haystack = `${name}${model.ext_id}${sourceQuery}`;
-    if (!/\{entity-(id|name)\}/.test(haystack)) {
-      return 'Template mode requires {entity-id} or {entity-name} in External ID, Name, or Source Query.';
+    if (!/\{entity-(id|name)\}/.test(model.ext_id ?? '')) {
+      return 'Template mode requires {entity-id} or {entity-name} to be present in External ID at a minimum. Name or Source Query can also use entity tags.';
     }
     return null;
-  }, [isTemplate, model.ext_id, name, sourceQuery]);
+  }, [isTemplate, model.ext_id]);
 
   const willDisableTemplateOnSave =
     model.is_template === true && isTemplate === false && (model.entities?.length ?? 0) > 0;
