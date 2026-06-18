@@ -197,6 +197,29 @@ npm run build
 npm start
 ```
 
+### If `git pull` reports divergent branches
+
+Some installs (for example, a clean-slate release package or an unpacked archive) contain local-only commits such as README or version-bump changes that are not on the Forgejo `origin/main` history. In that case `git pull origin main` fails with a message like:
+
+```
+hint: You have divergent branches and need to specify how to reconcile them.
+fatal: Need to specify how to reconcile divergent branches.
+```
+
+Your existing data (`server/database/`, `server/documents/`, `server/.env`, etc.) lives outside git and is **not** affected by the command below.
+
+If you do not need to keep those local-only commits, discard them and align with the remote history:
+
+```bash
+git reset --hard origin/main
+npm install
+npm run setup
+npm run build
+npm start
+```
+
+Then compare `server/.env` with `server/.env.example` and add any new required variables before starting.
+
 ### What `npm run setup` does on an existing install
 
 `setup` is **idempotent** — safe to run multiple times:
