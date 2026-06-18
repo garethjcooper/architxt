@@ -42,7 +42,9 @@ function ensureMissingTables(db) {
         mm_refresh_mode TEXT DEFAULT 'full' CHECK (mm_refresh_mode IN ('full', 'delta')),
         mm_exclude_all_mental_models TEXT DEFAULT 'false' CHECK (mm_exclude_all_mental_models IN ('true', 'false')),
         mm_exclude_mental_model_list TEXT,
+        mm_tags_match_mode TEXT DEFAULT 'all_strict' CHECK (mm_tags_match_mode IN ('all_strict', 'any_strict','all','any')),
         mm_is_template TEXT DEFAULT 'false' CHECK (mm_is_template IN ('true', 'false')),
+        mm_max_tokens INTEGER DEFAULT 2048,
         mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
@@ -87,6 +89,60 @@ function ensureMissingTables(db) {
     }
   }
   return createdCount;
+}
+
+/**
+ * Apply individual ADD COLUMN migrations for existing tables.
+ * SQLite supports ALTER TABLE ADD COLUMN, but only for non-constraint-heavy
+ * additions. Defaults and type-only constraints are safe.
+ */
+function ensureMissingColumns(db) {
+  const migrations = [
+    {
+      table: 'mental_models',
+      columns: [
+        {
+          name: 'mm_tags_match_mode',
+          ddl: "ALTER TABLE mental_models ADD COLUMN mm_tags_match_mode TEXT DEFAULT 'all_strict' CHECK (mm_tags_match_mode IN ('all_strict', 'any_strict','all','any'))"
+        },
+        {
+          name: 'mm_max_tokens',
+          ddl: 'ALTER TABLE mental_models ADD COLUMN mm_max_tokens INTEGER DEFAULT 2048'
+        }
+      ]
+    },
+    {
+      table: 'mental_model_entities',
+      columns: [
+        {
+          name: 'mm_ent_max_tokens',
+          ddl: 'ALTER TABLE mental_model_entities ADD COLUMN mm_ent_max_tokens INTEGER DEFAULT 2048'
+        }
+      ]
+    }
+  ];
+
+  const existingColumns = (table) => {
+    return new Set(
+      db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name)
+    );
+  };
+
+  let addedCount = 0;
+  for (const { table, columns } of migrations) {
+    const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(table);
+    if (!tableExists) continue;
+
+    const cols = existingColumns(table);
+    for (const { name, ddl } of columns) {
+      if (!cols.has(name)) {
+        db.exec(ddl);
+        logger.info(`Added missing column: ${table}.${name}`);
+        addedCount++;
+      }
+    }
+  }
+  return addedCount;
 }
 
 /**
@@ -141,13 +197,14 @@ export function ensureSchema(db) {
 
   if (hadSchema) {
     const created = ensureMissingTables(db);
+    const added = ensureMissingColumns(db);
     const ftsCreated = ensureDocumentsFts(db);
-    if (created > 0 || ftsCreated) {
-      logger.info(`Additive migration complete — ${created} new table(s) created, FTS table created: ${ftsCreated}`);
+    if (created > 0 || added > 0 || ftsCreated) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${added} new column(s), FTS table created: ${ftsCreated}`);
     } else {
-      logger.info('Database schema already present — no missing tables');
+      logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || ftsCreated;
+    return created > 0 || added > 0 || ftsCreated;
   }
 
   if (!fs.existsSync(schemaPath)) {
