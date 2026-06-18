@@ -138,10 +138,10 @@ function ensureDocumentsFts(db) {
  */
 export function ensureSchema(db) {
   const hadSchema = hasSchema(db);
-  const created = ensureMissingTables(db);
-  const ftsCreated = ensureDocumentsFts(db);
 
   if (hadSchema) {
+    const created = ensureMissingTables(db);
+    const ftsCreated = ensureDocumentsFts(db);
     if (created > 0 || ftsCreated) {
       logger.info(`Additive migration complete — ${created} new table(s) created, FTS table created: ${ftsCreated}`);
     } else {
