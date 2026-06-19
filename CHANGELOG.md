@@ -2,6 +2,24 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.2.1] - 2026-06-19
+
+### Added
+- Hindsight sync: `Directives` as a fourth syncable object type with diff, push, pull, and side-by-side compare modal
+- Directives: architxt directives now require `dir_name` and keep `dir_ext_id` as an optional Hindsight-generated id only
+- Mental models: new `exact` tag match mode (sent as lowercase `exact` to the API)
+
+### Changed
+- Mental model `mm_tags_match_mode`, `mm_refresh_mode`, and `mm_ent_refresh_mode` values are now validated at application level instead of by SQLite CHECK constraints
+- Database migration (`ensureSchema`) recreates mental model tables without CHECK constraints and preserves junction rows (`mental_model_tags`, `mental_model_entities`)
+
+### Fixed
+- Hindsight directive push no longer sends `ext_id` when creating a new bank directive
+- Diff correctly lists architxt-only directives that have not yet been pushed (synthetic local key when `dir_ext_id` is null)
+
+### Removed
+- Stale broken pipeline harness files `server/test-pipeline.js` and `server/test-pipeline.mjs`
+
 ## [0.2.0] - 2026-06-18
 
 ### Added

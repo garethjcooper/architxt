@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides } from '../types';
+import type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -231,6 +231,42 @@ export const contextsApi = {
     fetchApi<void>(`/contexts/${id}`, { method: 'DELETE' }),
 };
 
+// Directives API
+export const directivesApi = {
+  list: () => fetchApi<Directive[]>('/directives?limit=1000'),
+  get: (id: number) => fetchApi<Directive>(`/directives/${id}`),
+  create: (data: { name: string; ext_id?: string; statement: string; is_active?: boolean; priority?: number; generated_by?: 'user' | 'import' }) =>
+    fetchApi<{ id: number }>('/directives', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: number, data: { name?: string; ext_id?: string; statement?: string; is_active?: boolean; priority?: number }) =>
+    fetchApi<void>(`/directives/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) => fetchApi<void>(`/directives/${id}`, { method: 'DELETE' }),
+  getTags: (id: number) => fetchApi<Tag[]>(`/directives/${id}/tags`),
+  addTag: (id: number, tagId: number) =>
+    fetchApi<void>(`/directives/${id}/tags/add`, {
+      method: 'POST',
+      body: JSON.stringify({ tag_id: tagId }),
+    }),
+  removeTag: (id: number, tagId: number) =>
+    fetchApi<void>(`/directives/${id}/tags/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ tag_id: tagId }),
+    }),
+  batchUpdateTags: (directiveIds: number[], tagsToAdd: number[], tagsToRemove: number[]) =>
+    fetchApi<{ directives_updated: number; tags_added: number; tags_removed: number }>(
+      '/directives/batch/updatetags',
+      {
+        method: 'POST',
+        body: JSON.stringify({ directive_ids: directiveIds, tags_to_add: tagsToAdd, tags_to_remove: tagsToRemove }),
+      }
+    ),
+};
+
 // Tags API
 export const tagsApi = {
   list: () => fetchApi<Tag[]>('/tags?limit=1000'),
@@ -364,7 +400,7 @@ export const mentalModelsApi = {
     exclude_all_mental_models?: boolean;
     exclude_mental_model_list?: string;
     max_tokens?: number;
-    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any';
+    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     is_template?: boolean;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
     method: 'POST',
@@ -379,7 +415,7 @@ export const mentalModelsApi = {
     exclude_all_mental_models?: boolean;
     exclude_mental_model_list?: string;
     max_tokens?: number;
-    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any';
+    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     is_template?: boolean;
   }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
     method: 'PUT',
@@ -451,7 +487,7 @@ export const mentalModelsApi = {
     refresh_mode?: 'full' | 'delta' | null;
     refresh_after_consolidation?: boolean | null;
     exclude_all_mental_models?: boolean | null;
-    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | null;
+    tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact' | null;
     max_tokens?: number | null;
   }) =>
     fetchApi<{ success: boolean; models_updated: number; entities_updated: number }>(
@@ -471,7 +507,7 @@ export const healthApi = {
 
 // Hindsight Sync API
 export const hindsightApi = {
-  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' = 'documents', summary = false) =>
+  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' | 'directives' = 'documents', summary = false) =>
     fetchApi<{
       data: {
         same: any[];
@@ -516,6 +552,18 @@ export const hindsightApi = {
     fetchApi<{ success: boolean; created?: boolean }>('/hindsight/push-mental-model', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create }),
+    }),
+
+  pushDirective: (serverId: number, bankId: string, dirId: number) =>
+    fetchApi<{ success: boolean; ext_id: string }>('/hindsight/push/directive', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dir_id: dirId }),
+    }),
+
+  pullDirective: (serverId: number, bankId: string, directiveId: string) =>
+    fetchApi<{ success: boolean; created: boolean }>('/hindsight/pull/directive', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, directive_id: directiveId }),
     }),
 
   pullMentalModels: (serverId: number, bankId: string, targets: { ext_id: string; hind_id: string; is_derived: boolean; derived_entity?: { mm_id: number; id: number } }[]) =>
@@ -589,7 +637,7 @@ export const hindsightApi = {
 export { ApiError };
 
 // Re-export types for convenient importing
-export type { Document, Context, Tag, Server, Metadata, Entity, EntityType, MentalModel };
+export type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel };
 
 // Config API — entity tag format discovery
 export const configApi = {

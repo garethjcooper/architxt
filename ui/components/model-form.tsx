@@ -28,7 +28,7 @@ interface ModelFormProps {
     exclude_all_mental_models: boolean;
     exclude_mental_model_list?: string;
     max_tokens: number;
-    tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any';
+    tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     is_template: boolean;
   }) => Promise<void>;
   onCancel: () => void;
@@ -57,7 +57,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [excludeList, setExcludeList] = useState(initial?.exclude_mental_model_list ?? '');
   const [maxTokens, setMaxTokens] = useState(initial?.max_tokens?.toString() ?? '2048');
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
-  const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any'>(initial?.tags_match_mode ?? 'all_strict');
+  const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -177,13 +177,14 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           <select
             id="mm-tags-match-mode"
             value={tagsMatchMode}
-            onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any')}
+            onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
             className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
           >
             <option value="all_strict">All Strict</option>
             <option value="any_strict">Any Strict</option>
             <option value="all">All</option>
             <option value="any">Any</option>
+            <option value="exact">Exact</option>
           </select>
           <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
         </div>

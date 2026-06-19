@@ -46,26 +46,28 @@ function MentalModelDivergenceBadges({
   if (!divergence) return null;
 
   const allFields = [
-    { label: 'name', key: 'name_differs', supported: !isDerived },
-    { label: 'query', key: 'source_query_differs', supported: !isDerived },
-    { label: 'tags', key: 'tags_differs', supported: !isDerived },
-    { label: 'tokens', key: 'max_tokens_differs', supported: true },
-    { label: 'refresh mode', key: 'refresh_mode_differs', supported: true },
-    { label: 'refresh after', key: 'refresh_after_consolidation_differs', supported: true },
-    { label: 'exclude models', key: 'exclude_all_mental_models_differs', supported: true },
-    { label: 'exclude models list', key: 'exclude_mental_model_list_differs', supported: !isDerived },
-    { label: 'tag match', key: 'tags_match_mode_differs', supported: !isDerived },
+    { label: 'name', key: 'name_differs', pullable: !isDerived },
+    { label: 'query', key: 'source_query_differs', pullable: !isDerived },
+    { label: 'tags', key: 'tags_differs', pullable: !isDerived },
+    { label: 'tokens', key: 'max_tokens_differs', pullable: true },
+    { label: 'refresh mode', key: 'refresh_mode_differs', pullable: true },
+    { label: 'refresh after', key: 'refresh_after_consolidation_differs', pullable: true },
+    { label: 'exclude models', key: 'exclude_all_mental_models_differs', pullable: true },
+    { label: 'exclude models list', key: 'exclude_mental_model_list_differs', pullable: !isDerived },
+    { label: 'tag match', key: 'tags_match_mode_differs', pullable: !isDerived },
   ];
 
   return (
     <div className="flex flex-wrap gap-1 mt-1">
       {allFields.map((f) => {
         const differs = (divergence as any)[f.key];
-        const color = f.supported
-          ? differs
+        const color = differs
+          ? f.pullable
             ? 'bg-red-500/15 text-red-300 border-red-500/25'
-            : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
-          : 'bg-white/[0.06] text-white/30 border-white/10';
+            : 'bg-transparent text-red-300 border-red-500/50'
+          : f.pullable
+            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
+            : 'bg-transparent text-emerald-300 border-emerald-500/50';
         return (
           <span key={f.label} className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${color}`}>
             {f.label}

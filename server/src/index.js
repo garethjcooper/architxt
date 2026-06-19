@@ -16,6 +16,7 @@ import hindsightRoute from './routes/hindsight.js';
 import entitiesRoute from './routes/entities.js';
 import configRoute from './routes/config.js';
 import mentalModelsRoute from './routes/mental-models.js';
+import directivesRoute from './routes/directives.js';
 import swaggerSpecs, { swaggerUi } from './swagger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -183,6 +184,7 @@ app.use('/api/v1/hindsight', hindsightRoute);
 app.use('/api/v1/entities', entitiesRoute);
 app.use('/api/v1/config', configRoute);
 app.use('/api/v1/mentalmodels', mentalModelsRoute);
+app.use('/api/v1/directives', directivesRoute);
 
 // Health check
 app.get('/health', (req, res) => {

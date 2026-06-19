@@ -125,7 +125,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const [maxTokens, setMaxTokens] = useState(model.max_tokens?.toString() ?? '2048');
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<
-    'all_strict' | 'any_strict' | 'all' | 'any'
+    'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
@@ -444,13 +444,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
             <select
               id="mm-detail-tags-match-mode"
               value={tagsMatchMode}
-              onChange={(e) => setTagsMatchMode(e.target.value as typeof tagsMatchMode)}
+              onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
               className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
             >
               <option value="all_strict">All Strict</option>
               <option value="any_strict">Any Strict</option>
               <option value="all">All</option>
               <option value="any">Any</option>
+              <option value="exact">Exact</option>
             </select>
             <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
           </div>

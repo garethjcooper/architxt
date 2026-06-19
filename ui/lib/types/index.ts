@@ -49,6 +49,19 @@ export interface Context {
   updated_at: string;
 }
 
+export interface Directive {
+  id: number;
+  ext_id: string | null;
+  name: string;
+  statement: string;
+  is_active: boolean;
+  priority: number;
+  generated_by: 'user' | 'import';
+  tags?: Tag[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Tag {
   id: number;
   name: string;
@@ -117,7 +130,7 @@ export interface MentalModel {
   exclude_all_mental_models: boolean;
   exclude_mental_model_list: string | null;
   max_tokens: number;
-  tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any';
+  tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
   is_template: boolean;
   tags: Tag[];
   entities: Entity[];

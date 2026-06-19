@@ -73,6 +73,7 @@ const FIELDS: ConfigFieldDef[] = [
       { value: 'any_strict', label: 'Any Strict' },
       { value: 'all', label: 'All' },
       { value: 'any', label: 'Any' },
+      { value: 'exact', label: 'Exact' },
     ],
     defaultValue: 'all_strict',
   },
@@ -205,7 +206,7 @@ export function ManageModelConfigDialog({
         refresh_mode?: 'full' | 'delta';
         refresh_after_consolidation?: boolean;
         exclude_all_mental_models?: boolean;
-        tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any';
+        tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
         max_tokens?: number;
       } = {};
       let impactedCount = 0;
@@ -229,7 +230,7 @@ export function ManageModelConfigDialog({
           } else if (fieldDef.key === 'exclude_all_mental_models') {
             config.exclude_all_mental_models = state.selectedValue as boolean;
           } else if (fieldDef.key === 'tags_match_mode') {
-            config.tags_match_mode = state.selectedValue as 'all_strict' | 'any_strict' | 'all' | 'any';
+            config.tags_match_mode = state.selectedValue as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
           } else if (fieldDef.key === 'max_tokens') {
             config.max_tokens = state.selectedValue as number;
           }
