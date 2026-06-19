@@ -17,7 +17,7 @@ const ENTITY_ID_PLACEHOLDER = '{entity-id}';
 const PLACEHOLDER_PATTERN = new RegExp(`\\${ENTITY_NAME_PLACEHOLDER}|\\${ENTITY_ID_PLACEHOLDER}`, 'g');
 
 const VALID_REFRESH_MODES = new Set(['full', 'delta']);
-const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any']);
+const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any', 'exact']);
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
 const MIN_MAX_TOKENS = 256;
 const MAX_MAX_TOKENS = 8192;

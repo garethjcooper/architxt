@@ -5,6 +5,9 @@ import { pullDocument } from '../services/hindsight/pull.js';
 import { pushDocument } from '../services/hindsight/push.js';
 import { pushEntities, pushEntityTypes, pullEntities, pullEntityTypes } from '../services/hindsight/entities.js';
 import { listMentalModels as hindsightListMentalModels } from '../services/hindsight/mental-models.js';
+import { listDirectives as hindsightListDirectives } from '../services/hindsight/directives.js';
+import { pushDirective as pushHindsightDirective } from '../services/hindsight/push-directive.js';
+import { pullDirective as pullHindsightDirective } from '../services/hindsight/pull-directive.js';
 import { pushMentalModel, createMentalModel } from '../services/hindsight/push-mental-model.js';
 import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import { getBankConfig } from '../services/hindsight/bank-config.js';
@@ -22,6 +25,7 @@ import { getDocumentsForDiff, getDocumentByExtId, getAllDocumentContexts } from 
 import { getAllDocumentTags, getDocumentTagsByDocId } from '../db/crud/document-tags.js';
 import { getContextDescriptionById } from '../db/crud/contexts.js';
 import { listMentalModelsForDiff, DEFAULT_MAX_TOKENS, DEFAULT_REFRESH_MODE, DEFAULT_TAGS_MATCH_MODE, normaliseMaxTokens } from '../db/crud/mental-models.js';
+import { listDirectivesForDiff } from '../db/crud/directives.js';
 
 const logger = createLogger('hindsight-route');
 const router = Router();
@@ -91,18 +95,14 @@ function buildMentalModelDivergence(arch, hind) {
 }
 
 /**
- * For derived mental models only the per-entity overrides can change.
- * Template fields (name, source_query, tags, etc.) are shared across all
- * derived instances, so comparing them here creates false out-of-sync rows
- * that pull cannot fix.
+ * Derived mental models inherit template fields, but the effective architxt
+ * values already substitute entity placeholders and can diverge from the bank
+ * when the template changes. Use the same full comparison as plain models so
+ * every badge reflects real sync state. Pull still skips derived rows; Push
+ * handles them.
  */
 function buildDerivedMentalModelDivergence(arch, hind) {
-  return {
-    refresh_mode_differs: arch.refresh_mode !== hind.refresh_mode,
-    refresh_after_consolidation_differs: !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation,
-    exclude_all_mental_models_differs: !!arch.exclude_all_mental_models !== !!hind.exclude_all_mental_models,
-    max_tokens_differs: Number(arch.max_tokens) !== Number(hind.max_tokens),
-  };
+  return buildMentalModelDivergence(arch, hind);
 }
 
 function substituteDerived(template, entity) {
@@ -585,6 +585,113 @@ router.get('/diff', async (req, res) => {
     }
   }
 
+  // ── Directives branch ──
+  if (object === 'directives') {
+    try {
+      const hindResult = await hindsightListDirectives(serverId, bankId, { limit: 1000 });
+      if (!hindResult.success) {
+        return res.status(502).json({ error: hindResult.error, code: 'REMOTE_ERROR' });
+      }
+
+      const hindMap = new Map();
+      for (const d of hindResult.directives || []) {
+        const extId = d.id;
+        if (!extId) continue;
+        hindMap.set(extId, {
+          ext_id: extId,
+          name: d.name || null,
+          statement: d.content || null,
+          priority: d.priority ?? 0,
+          is_active: d.is_active === true,
+          tags: Array.isArray(d.tags) ? d.tags : [],
+        });
+      }
+
+      const archResult = await listDirectivesForDiff(db, { limit: 1000 });
+      if (!archResult.success) {
+        throw new Error(`Failed to fetch directives: ${archResult.error}`);
+      }
+      const archRows = archResult.data || [];
+
+      const same = [];
+      const different = [];
+      const onlyArchitxt = [];
+      const onlyHindsight = [];
+
+      const archMap = new Map();
+      for (const row of archRows) {
+        const extId = row.dir_ext_id || `local:${row.dir_id}`;
+        if (!extId) continue;
+        const arch = {
+          id: row.dir_id,
+          ext_id: row.dir_ext_id || null,
+          local_key: !row.dir_ext_id ? `local:${row.dir_id}` : null,
+          name: row.dir_name || null,
+          statement: row.dir_statement || null,
+          priority: row.dir_priority ?? 0,
+          is_active: row.dir_is_active === 'true',
+          tags: row.dir_tag_names || [],
+        };
+        archMap.set(extId, arch);
+      }
+
+      for (const [extId, arch] of archMap) {
+        const hind = hindMap.get(extId);
+        if (!hind) {
+          onlyArchitxt.push({ ext_id: extId, arch: summaryMode ? { ext_id: extId } : arch });
+          continue;
+        }
+
+        const nameDiffers = (arch.name || '') !== (hind.name || '');
+        const statementDiffers = (arch.statement || '') !== (hind.statement || '');
+        const priorityDiffers = Number(arch.priority) !== Number(hind.priority);
+        const isActiveDiffers = !!arch.is_active !== !!hind.is_active;
+        const tagsDiffers = !arraySetEqual(
+          (arch.tags || []).slice().sort(),
+          (hind.tags || []).slice().sort()
+        );
+
+        const divergence = {
+          name_differs: nameDiffers,
+          statement_differs: statementDiffers,
+          priority_differs: priorityDiffers,
+          is_active_differs: isActiveDiffers,
+          tags_differs: tagsDiffers,
+        };
+        const anyDiffers = Object.values(divergence).some(Boolean);
+        const row = {
+          ext_id: extId,
+          arch: summaryMode ? { ext_id: extId } : arch,
+          hindsight: summaryMode ? { ext_id: extId } : hind,
+          divergence,
+        };
+
+        if (anyDiffers) different.push(row);
+        else same.push(row);
+
+        hindMap.delete(extId);
+      }
+
+      for (const [extId, hind] of hindMap) {
+        onlyHindsight.push({ ext_id: extId, hindsight: summaryMode ? { ext_id: extId } : hind });
+      }
+
+      return res.json({
+        data: { same, different, only_architxt: onlyArchitxt, only_hindsight: onlyHindsight },
+        counts: {
+          same: same.length,
+          different: different.length,
+          only_architxt: onlyArchitxt.length,
+          only_hindsight: onlyHindsight.length,
+          total: same.length + different.length + onlyArchitxt.length + onlyHindsight.length,
+        },
+      });
+    } catch (err) {
+      logger.error('Hindsight directives diff failed', { serverId, bankId, error: err.message, stack: err.stack });
+      return res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+    }
+  }
+
   try {
     // 1. Fetch architxt documents (need all fields used by system expanders)
     const docResult = await getDocumentsForDiff(db);
@@ -959,6 +1066,126 @@ router.post('/push-mental-model', async (req, res) => {
     res.json({ success: true, created: create });
   } catch (err) {
     logger.error('Push mental model failed', { serverId, bankId, extId: model?.ext_id, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * @openapi
+ * /hindsight/push/directive:
+ *   post:
+ *     summary: Push a directive to Hindsight
+ *     description: |
+ *       Pushes an architxt directive to Hindsight. If the directive already
+ *       has an ext_id it is PATCHed; otherwise it is POSTed and the returned
+ *       Hindsight id is stored locally.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, dir_id]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               dir_id: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Push completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 ext_id: { type: string }
+ *       400:
+ *         description: Validation error
+ *       502:
+ *         description: Hindsight server error
+ */
+router.post('/push/directive', async (req, res) => {
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+  const dirId = parseInt(req.body.dir_id, 10);
+
+  if (!serverId || !bankId || !dirId) {
+    return res.status(400).json({
+      error: 'server_id, bank_id, and dir_id are required',
+      code: 'VALIDATION_ERROR'
+    });
+  }
+
+  try {
+    const result = await pushHindsightDirective(serverId, bankId, dirId);
+    if (!result.success) {
+      return res.status(502).json({ error: result.error, code: 'PUSH_FAILED' });
+    }
+    res.json({ success: true, ext_id: result.ext_id });
+  } catch (err) {
+    logger.error('Push directive failed', { serverId, bankId, dirId, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * @openapi
+ * /hindsight/pull/directive:
+ *   post:
+ *     summary: Pull a directive from Hindsight into architxt
+ *     description: |
+ *       Pulls a single directive from the selected Hindsight bank into
+ *       architxt. If a directive with the same ext_id exists locally it is
+ *       updated; otherwise a new directive is created.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, directive_id]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               directive_id: { type: string }
+ *     responses:
+ *       200:
+ *         description: Pull completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 created: { type: boolean }
+ *       400:
+ *         description: Validation error
+ *       502:
+ *         description: Hindsight server error
+ */
+router.post('/pull/directive', async (req, res) => {
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+  const directiveId = req.body.directive_id;
+
+  if (!serverId || !bankId || !directiveId) {
+    return res.status(400).json({
+      error: 'server_id, bank_id, and directive_id are required',
+      code: 'VALIDATION_ERROR'
+    });
+  }
+
+  try {
+    const result = await pullHindsightDirective(serverId, bankId, directiveId);
+    if (!result.success) {
+      return res.status(502).json({ error: result.error, code: 'PULL_FAILED' });
+    }
+    res.json({ success: true, created: result.created });
+  } catch (err) {
+    logger.error('Pull directive failed', { serverId, bankId, directiveId, error: err.message, stack: err.stack });
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });

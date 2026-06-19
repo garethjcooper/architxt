@@ -521,6 +521,60 @@ export function parseContextImport(input: string): ImportItem[] {
   });
 }
 
+/** Directives: directive_name, directive_statement. Optional: is_active, priority */
+export function parseDirectiveImport(input: string): ImportItem[] {
+  const { headers, rows } = parseCsv(input, ['directive_name', 'name']);
+  const nameIndex = headers.length > 0
+    ? headers.findIndex((h) =>
+        h.toLowerCase() === 'directive_name' ||
+        h.toLowerCase() === 'name' ||
+        h.toLowerCase() === 'directive id'
+      )
+    : 0;
+  const statementIndex = headers.length > 0
+    ? headers.findIndex((h) =>
+        h.toLowerCase() === 'directive_statement' ||
+        h.toLowerCase() === 'statement' ||
+        h.toLowerCase() === 'description'
+      )
+    : 1;
+  const isActiveIndex = headers.length > 0
+    ? headers.findIndex((h) =>
+        h.toLowerCase() === 'is_active' ||
+        h.toLowerCase() === 'active'
+      )
+    : -1;
+  const priorityIndex = headers.length > 0
+    ? headers.findIndex((h) =>
+        h.toLowerCase() === 'priority'
+      )
+    : -1;
+
+  return rows.map((row) => {
+    const raw = row.join(',');
+    const name = stripQuotes(row[nameIndex] || '');
+    const statement = stripQuotes(row[statementIndex] || '');
+    const rawActive = isActiveIndex >= 0 ? stripQuotes(row[isActiveIndex] || '').toLowerCase() : '';
+    const rawPriority = priorityIndex >= 0 ? stripQuotes(row[priorityIndex] || '') : '';
+
+    const is_active = rawActive ? ['true', 'yes', '1', 'active'].includes(rawActive) : undefined;
+    const parsedPriority = rawPriority ? parseInt(rawPriority, 10) : undefined;
+    const priority = Number.isFinite(parsedPriority) ? parsedPriority : undefined;
+
+    const errors: string[] = [];
+    if (!name.trim()) errors.push('Empty directive name');
+    if (!statement.trim()) errors.push('Empty directive statement');
+    if (rawPriority && !Number.isFinite(parsedPriority)) errors.push(`Invalid priority: ${rawPriority}`);
+
+    return {
+      valid: errors.length === 0,
+      error: errors.join('; ') || undefined,
+      raw,
+      data: { directive_name: name.trim(), directive_statement: statement.trim(), is_active, priority }
+    };
+  });
+}
+
 /** Metadata: two columns — key, value (with or without header) */
 export function parseMetadataImport(input: string): ImportItem[] {
   const { headers, rows } = parseCsv(input, ['key', 'meta_key']);

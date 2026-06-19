@@ -205,7 +205,7 @@ router.get('/:id', async (req, res) => {
  *               exclude_all_mental_models: { type: boolean, default: false }
  *               exclude_mental_model_list: { type: string, nullable: true }
  *               max_tokens: { type: integer, minimum: 1, maximum: 8192, default: 2048 }
- *               tags_match_mode: { type: string, enum: ['all_strict', 'any_strict', 'all', 'any'], default: 'all_strict' }
+ *               tags_match_mode: { type: string, enum: ['all_strict', 'any_strict', 'all', 'any', 'exact'], default: 'all_strict' }
  *     responses:
  *       201:
  *         description: Mental model created
@@ -288,7 +288,7 @@ router.post('/', async (req, res) => {
  *               exclude_all_mental_models: { type: boolean }
  *               exclude_mental_model_list: { type: string, nullable: true }
  *               max_tokens: { type: integer, minimum: 1, maximum: 8192 }
- *               tags_match_mode: { type: string, enum: ['all_strict', 'any_strict', 'all', 'any'] }
+ *               tags_match_mode: { type: string, enum: ['all_strict', 'any_strict', 'all', 'any', 'exact'] }
  *     responses:
  *       200:
  *         description: Mental model updated

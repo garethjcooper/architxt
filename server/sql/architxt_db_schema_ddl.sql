@@ -175,12 +175,12 @@ CREATE TABLE mental_models (
   mm_ext_id TEXT NOT NULL UNIQUE,
   mm_name TEXT,
   mm_source_query TEXT,
-  mm_refresh_after_consolidation TEXT DEFAULT 'false' CHECK (mm_refresh_after_consolidation IN ('true', 'false')),
-  mm_refresh_mode TEXT DEFAULT 'full' CHECK (mm_refresh_mode IN ('full', 'delta')),
-  mm_exclude_all_mental_models TEXT DEFAULT 'false' CHECK (mm_exclude_all_mental_models IN ('true', 'false')),
+  mm_refresh_after_consolidation TEXT DEFAULT 'false',
+  mm_refresh_mode TEXT DEFAULT 'full',
+  mm_exclude_all_mental_models TEXT DEFAULT 'false',
   mm_exclude_mental_model_list TEXT,
-  mm_tags_match_mode TEXT DEFAULT 'all_strict' CHECK (mm_tags_match_mode IN ('all_strict', 'any_strict','all','any')),
-  mm_is_template TEXT DEFAULT 'false' CHECK (mm_is_template IN ('true', 'false')),
+  mm_tags_match_mode TEXT DEFAULT 'all_strict',
+  mm_is_template TEXT DEFAULT 'false',
   mm_max_tokens INTEGER DEFAULT 2048,
   mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -199,9 +199,9 @@ CREATE TABLE mental_model_tags (
 CREATE TABLE mental_model_entities (
   ent_id INTEGER NOT NULL,
   mm_id INTEGER NOT NULL,
-  mm_ent_refresh_mode TEXT CHECK (mm_ent_refresh_mode IN ('full', 'delta')),
-  mm_ent_refresh_after_consolidation TEXT CHECK (mm_ent_refresh_after_consolidation IN ('true', 'false')),
-  mm_ent_exclude_all_mental_models TEXT CHECK (mm_ent_exclude_all_mental_models IN ('true', 'false')),
+  mm_ent_refresh_mode TEXT,
+  mm_ent_refresh_after_consolidation TEXT,
+  mm_ent_exclude_all_mental_models TEXT,
   mm_ent_max_tokens INTEGER DEFAULT 2048,
   mm_ent_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   mm_ent_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -210,3 +210,24 @@ CREATE TABLE mental_model_entities (
   FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
 );
 
+CREATE TABLE directives (
+  dir_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dir_ext_id TEXT UNIQUE,
+  dir_name TEXT,
+  dir_statement TEXT,
+  dir_is_active TEXT CHECK (dir_is_active IN ('true', 'false')),
+  dir_priority INTEGER DEFAULT 0,
+  dir_generated_by TEXT CHECK(dir_generated_by IN ('user', 'import')),
+  dir_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  dir_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE directive_tags (
+  tag_id INTEGER NOT NULL,
+  dir_id INTEGER NOT NULL,
+  dir_tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  dir_tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (tag_id, dir_id),
+  FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+  FOREIGN KEY (dir_id) REFERENCES directives(dir_id) ON DELETE CASCADE
+);

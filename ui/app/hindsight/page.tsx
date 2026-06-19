@@ -25,9 +25,11 @@ import { BatchProgressDialog, type BatchItem } from '@/components/batch-progress
 import CompareModal from './compare-modal';
 import EntityCompareModal from './entity-compare-modal';
 import MentalModelCompareModal from './mental-model-compare-modal';
+import DirectiveCompareModal from './directive-compare-modal';
 import SyncRow from './sync-row';
 import EntitySyncRow from './entity-sync-row';
 import MentalModelSyncRow from './mental-model-sync-row';
+import DirectiveSyncRow from './directive-sync-row';
 
 const logger = createLogger('HindsightPage');
 
@@ -121,7 +123,7 @@ export default function HindsightPage() {
   const [selectedServerId, setSelectedServerId] = useState<string>('');
   const [banks, setBanks] = useState<any[]>([]);
   const [selectedBankId, setSelectedBankId] = useState<string>('');
-  const [selectedObject, setSelectedObject] = useState<'documents' | 'entities' | 'mental-models'>('documents');
+  const [selectedObject, setSelectedObject] = useState<'documents' | 'entities' | 'mental-models' | 'directives'>('documents');
   const [loadingServers, setLoadingServers] = useState(true);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [loadingDiff, setLoadingDiff] = useState(false);
@@ -139,6 +141,7 @@ export default function HindsightPage() {
   const [compareId, setCompareId] = useState<string | null>(null);
   const [entityCompareId, setEntityCompareId] = useState<string | null>(null);
   const [mentalCompareId, setMentalCompareId] = useState<string | null>(null);
+  const [directiveCompareId, setDirectiveCompareId] = useState<string | null>(null);
 
   // ── Batch progress dialog state ────────────────────────────────────
   const [batchProgressOpen, setBatchProgressOpen] = useState(false);
@@ -261,6 +264,11 @@ export default function HindsightPage() {
     return op ? op.pop_status : null;
   };
 
+  // ── Derived mental model detection ─────────────────────────────────
+
+  const isDerivedMentalModel = (row: any) =>
+    row?.arch?.is_derived === true || row?.hindsight?.is_derived === true;
+
   // ── Selection helpers ───────────────────────────────────────────────
 
   const isSelected = (extId: string) => selectedIds.has(extId);
@@ -323,6 +331,29 @@ export default function HindsightPage() {
     await hindsightApi.pull(parseInt(selectedServerId, 10), selectedBankId, extId);
   };
 
+  // ── Directive single push / pull helpers ───────────────────────────
+  const pushDirectiveOne = async (extId: string) => {
+    if (!selectedServerId || !selectedBankId) {
+      throw new Error('Select a server and bank first');
+    }
+    const item =
+      diffResult?.only_architxt?.find((d) => d.ext_id === extId) ||
+      diffResult?.different?.find((d) => d.ext_id === extId) ||
+      diffResult?.same?.find((d) => d.ext_id === extId);
+    const dirId = item?.arch?.id;
+    if (!dirId) {
+      throw new Error(`Directive ${extId} has no architxt ID`);
+    }
+    await hindsightApi.pushDirective(parseInt(selectedServerId, 10), selectedBankId, dirId);
+  };
+
+  const pullDirectiveOne = async (extId: string) => {
+    if (!selectedServerId || !selectedBankId) {
+      throw new Error('Select a server and bank first');
+    }
+    await hindsightApi.pullDirective(parseInt(selectedServerId, 10), selectedBankId, extId);
+  };
+
   // ── Entity Push / Pull by type ────────────────────────────────────
 
   const extractTypeNames = (extIds: string[]) => [...new Set(extIds.map((id) => id.split(':')[0]))];
@@ -378,6 +409,19 @@ export default function HindsightPage() {
       handlePushEntityTypes(extIds);
       return;
     }
+    if (isDirectiveMode) {
+      const items = (diffResult?.only_architxt || []).filter((d) => extIds.includes(d.ext_id));
+      const labelFor = (item: any) => item.arch?.name || item.ext_id;
+      setBatchTitle('Pushing Directives');
+      setBatchDescription(`${items.length} directive${items.length !== 1 ? 's' : ''}`);
+      setBatchItems(items.map((item) => ({ id: item.ext_id, label: labelFor(item) })));
+      setBatchOperation(() => async (item: BatchItem) => {
+        await pushDirectiveOne(String(item.id));
+      });
+      setBatchOnComplete(() => () => fetchDiff());
+      setBatchProgressOpen(true);
+      return;
+    }
     const archIdMap = new Map(
       (diffResult?.only_architxt || [])
         .filter((d) => extIds.includes(d.ext_id))
@@ -399,7 +443,7 @@ export default function HindsightPage() {
 
     const sourceRows = [...(diffResult.different || []), ...(diffResult.only_hindsight || [])];
 
-    const targets = extIds.map((extId) => {
+    const targets = extIds.flatMap((extId) => {
       const row: any = sourceRows.find((d) => d.ext_id === extId);
       if (!row) {
         throw new Error(`Mental model ${extId} not found in diff`);
@@ -410,25 +454,22 @@ export default function HindsightPage() {
 
       const isDerived = row.arch?.is_derived === true;
       if (isDerived) {
-        const mmId = row.arch.derived_entity?.mm_id;
-        const entId = row.arch.derived_entity?.id;
-        if (!mmId || !entId) {
-          throw new Error(`Derived mental model ${extId} missing derived_entity.mm_id or id`);
-        }
-        return {
-          ext_id: extId,
-          hind_id: row.hindsight.ext_id,
-          is_derived: true,
-          derived_entity: { mm_id: mmId, id: entId },
-        };
+        return [];
       }
 
-      return {
-        ext_id: extId,
-        hind_id: row.hindsight.ext_id,
-        is_derived: false,
-      };
+      return [
+        {
+          ext_id: extId,
+          hind_id: row.hindsight.ext_id,
+          is_derived: false,
+        },
+      ];
     });
+
+    if (targets.length === 0) {
+      toast.info('No pull-eligible mental models selected');
+      return;
+    }
 
     try {
       const result = await hindsightApi.pullMentalModels(
@@ -458,6 +499,19 @@ export default function HindsightPage() {
       handlePullEntityTypes(extIds);
       return;
     }
+    if (isDirectiveMode) {
+      const items = (diffResult?.only_hindsight || []).filter((d) => extIds.includes(d.ext_id));
+      const labelFor = (item: any) => item.hindsight?.name || item.ext_id;
+      setBatchTitle('Pulling Directives');
+      setBatchDescription(`${items.length} directive${items.length !== 1 ? 's' : ''}`);
+      setBatchItems(items.map((item) => ({ id: item.ext_id, label: labelFor(item) })));
+      setBatchOperation(() => async (item: BatchItem) => {
+        await pullDirectiveOne(String(item.id));
+      });
+      setBatchOnComplete(() => () => fetchDiff());
+      setBatchProgressOpen(true);
+      return;
+    }
     setBatchTitle('Pulling Documents');
     setBatchDescription(`${extIds.length} document${extIds.length !== 1 ? 's' : ''}`);
     setBatchItems(extIds.map((id) => ({ id, label: id })));
@@ -485,6 +539,19 @@ export default function HindsightPage() {
       handlePushEntityTypes(extIds);
       return;
     }
+    if (isDirectiveMode) {
+      const items = onBoth.filter((d) => extIds.includes(d.ext_id) && d.syncStatus === 'out_of_sync');
+      const labelFor = (item: any) => item.arch?.name || item.ext_id;
+      setBatchTitle('Pushing Directives to Server');
+      setBatchDescription(`${items.length} directive${items.length !== 1 ? 's' : ''}`);
+      setBatchItems(items.map((item) => ({ id: item.ext_id, label: labelFor(item) })));
+      setBatchOperation(() => async (item: BatchItem) => {
+        await pushDirectiveOne(String(item.id));
+      });
+      setBatchOnComplete(() => () => fetchDiff());
+      setBatchProgressOpen(true);
+      return;
+    }
     const items = onBoth.filter((d) => extIds.includes(d.ext_id) && d.syncStatus === 'out_of_sync');
     const archIdMap = new Map(items.map((d) => [d.ext_id, d.arch?.id]));
     setBatchTitle('Pushing to Server');
@@ -507,6 +574,19 @@ export default function HindsightPage() {
       handlePullEntityTypes(extIds);
       return;
     }
+    if (isDirectiveMode) {
+      const items = onBoth.filter((d) => extIds.includes(d.ext_id) && d.syncStatus === 'out_of_sync');
+      const labelFor = (item: any) => item.hindsight?.name || item.ext_id;
+      setBatchTitle('Pulling Directives from Server');
+      setBatchDescription(`${items.length} directive${items.length !== 1 ? 's' : ''}`);
+      setBatchItems(items.map((item) => ({ id: item.ext_id, label: labelFor(item) })));
+      setBatchOperation(() => async (item: BatchItem) => {
+        await pullDirectiveOne(String(item.id));
+      });
+      setBatchOnComplete(() => () => fetchDiff());
+      setBatchProgressOpen(true);
+      return;
+    }
     const items = onBoth.filter((d) => extIds.includes(d.ext_id) && d.syncStatus === 'out_of_sync');
     setBatchTitle('Pulling from Server');
     setBatchDescription(`${items.length} document${items.length !== 1 ? 's' : ''}`);
@@ -522,23 +602,30 @@ export default function HindsightPage() {
 
   const isEntityMode = selectedObject === 'entities';
   const isMentalModelMode = selectedObject === 'mental-models';
+  const isDirectiveMode = selectedObject === 'directives';
 
   const emptyCol1Text = isEntityMode
     ? 'All architxt entities exist on server'
     : isMentalModelMode
     ? 'All architxt mental models exist on server'
+    : isDirectiveMode
+    ? 'All architxt directives exist on server'
     : 'All architxt documents exist on server';
 
   const emptyCol2Text = isEntityMode
     ? (col2Filter === 'out_of_sync' ? 'No out-of-sync entities' : col2Filter === 'in_sync' ? 'No in-sync entities' : 'No shared entities')
     : isMentalModelMode
     ? (col2Filter === 'out_of_sync' ? 'No out-of-sync mental models' : col2Filter === 'in_sync' ? 'No in-sync mental models' : 'No shared mental models')
+    : isDirectiveMode
+    ? (col2Filter === 'out_of_sync' ? 'No out-of-sync directives' : col2Filter === 'in_sync' ? 'No in-sync directives' : 'No shared directives')
     : (col2Filter === 'out_of_sync' ? 'No out-of-sync documents' : col2Filter === 'in_sync' ? 'No in-sync documents' : 'No shared documents');
 
   const emptyCol3Text = isEntityMode
     ? 'All server entities exist on architxt'
     : isMentalModelMode
     ? 'All server mental models exist on architxt'
+    : isDirectiveMode
+    ? 'All server directives exist on architxt'
     : 'All server documents exist on architxt';
 
   const col1 = diffResult?.only_architxt || [];
@@ -567,6 +654,14 @@ export default function HindsightPage() {
             item.hindsight?.name,
             item.arch?.source_query,
             item.hindsight?.source_query,
+          ]
+        : isDirectiveMode
+        ? [
+            item.ext_id,
+            item.arch?.statement,
+            item.hindsight?.statement,
+            item.hindsight?.name,
+            item.hindsight?.content,
           ]
         : [
             item.ext_id,
@@ -602,6 +697,13 @@ export default function HindsightPage() {
   const filteredCol2 = col2Filtered.merged;
   const filteredCol3 = col3Filtered.merged;
 
+  const col2PullCount = filteredCol2.filter(
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d))
+  ).length;
+  const col2PushCount = filteredCol2.filter(
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync'
+  ).length;
+
   return (
     <PageShell
       title="Hindsight"
@@ -609,6 +711,8 @@ export default function HindsightPage() {
         ? "Compare and synchronise entity labels with a remote Hindsight server."
         : isMentalModelMode
         ? "Compare mental models with a remote Hindsight server."
+        : isDirectiveMode
+        ? "Compare directives with a remote Hindsight server."
         : "Compare and synchronise documents with a remote Hindsight server."}
       loading={loadingServers}
     >
@@ -649,7 +753,7 @@ export default function HindsightPage() {
           <select
             value={selectedObject}
             onChange={(e) => {
-              setSelectedObject(e.target.value as 'documents' | 'entities' | 'mental-models');
+              setSelectedObject(e.target.value as 'documents' | 'entities' | 'mental-models' | 'directives');
               setDiffResult(null);
               setCounts(null);
               setSelectedIds(new Set());
@@ -659,6 +763,7 @@ export default function HindsightPage() {
             <option value="documents">Documents</option>
             <option value="entities">Entities</option>
             <option value="mental-models">Mental Models</option>
+            <option value="directives">Directives</option>
           </select>
         </div>
 
@@ -668,7 +773,7 @@ export default function HindsightPage() {
           className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-emerald-900/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
         >
           {loadingDiff ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
-          {loadingDiff ? 'Fetching...' : `Fetch ${selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : 'Mental Models'}`}
+          {loadingDiff ? 'Fetching...' : `Fetch ${selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'}`}
         </Button>
 
         {counts && (
@@ -688,7 +793,7 @@ export default function HindsightPage() {
       {!diffResult && !loadingDiff && (
         <div className="text-center py-16 text-white/30">
           <ArrowRightLeft className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">Select a server and bank, then click Fetch {selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : 'Mental Models'} to start the comparison.</p>
+          <p className="text-sm">Select a server and bank, then click Fetch {selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'} to start the comparison.</p>
         </div>
       )}
 
@@ -773,6 +878,16 @@ export default function HindsightPage() {
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                     />
                   ))
+                ) : isDirectiveMode ? (
+                  filteredCol1.map((item) => (
+                    <DirectiveSyncRow
+                      key={item.ext_id}
+                      ext_id={item.ext_id}
+                      arch={item.arch}
+                      isSelected={isSelected(item.ext_id)}
+                      onSelect={(checked) => toggleSelection(item.ext_id, checked)}
+                    />
+                  ))
                 ) : (
                   filteredCol1.map((item) => (
                     <SyncRow
@@ -818,22 +933,22 @@ export default function HindsightPage() {
                     if (ids.length === 0) return;
                     handleMakeLikeBank(ids);
                   }}
-                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync')}
-                  className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50 shrink-0"
-                >
-                  <Download className="h-4 w-4" /> Pull from Bank
-                </Button>
-                <Button
+                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d)))}
+                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50 shrink-0"
+                  >
+                  <Download className="h-4 w-4" /> Pull from Bank{col2PullCount > 0 ? ` (${col2PullCount})` : ''}
+                  </Button>
+                  <Button
                   onClick={() => {
                     const ids = filteredCol2.filter((d) => selectedIds.has(d.ext_id)).map((d) => d.ext_id);
                     if (ids.length === 0) return;
                     handleMakeLikeArchitxt(ids);
                   }}
                   disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync')}
-                  className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-blue-900/30 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50 shrink-0"
-                >
-                  <Upload className="h-4 w-4" /> Push to Bank
-                </Button>
+                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-blue-900/30 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50 shrink-0"
+                  >
+                  <Upload className="h-4 w-4" /> Push to Bank{col2PushCount > 0 ? ` (${col2PushCount})` : ''}
+                  </Button>
               </div>
             </div>
             <ColumnCard
@@ -841,8 +956,8 @@ export default function HindsightPage() {
               icon={<ArrowRightLeft className="h-4 w-4 text-emerald-400" />}
               count={col2Filtered.pureFiltered.length}
               colorClass="bg-emerald-900/20 text-emerald-300 border-emerald-500/20"
-              extIds={filteredCol2.map((d) => d.ext_id)}
-              showSelectAll={col2Filter === 'out_of_sync'}
+              extIds={filteredCol2.filter((d) => d.syncStatus === 'out_of_sync').map((d) => d.ext_id)}
+              showSelectAll={col2Filter === 'out_of_sync' || col2Filter === 'all'}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
               headerExtra={
@@ -896,6 +1011,21 @@ export default function HindsightPage() {
                       showCheckbox={item.syncStatus === 'out_of_sync'}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setMentalCompareId(item.ext_id)}
+                    />
+                  ))
+                ) : isDirectiveMode ? (
+                  filteredCol2.map((item) => (
+                    <DirectiveSyncRow
+                      key={item.ext_id}
+                      ext_id={item.ext_id}
+                      arch={item.arch}
+                      hindsight={item.hindsight}
+                      divergence={item.divergence}
+                      isSelected={isSelected(item.ext_id)}
+                      onSelect={(checked) => toggleSelection(item.ext_id, checked)}
+                      showCheckbox={item.syncStatus === 'out_of_sync'}
+                      showCompare={item.syncStatus === 'out_of_sync'}
+                      onCompare={() => setDirectiveCompareId(item.ext_id)}
                     />
                   ))
                 ) : (
@@ -986,6 +1116,16 @@ export default function HindsightPage() {
                     onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                   />
                 ))
+              ) : isDirectiveMode ? (
+                filteredCol3.map((item) => (
+                  <DirectiveSyncRow
+                    key={item.ext_id}
+                    ext_id={item.ext_id}
+                    hindsight={item.hindsight}
+                    isSelected={isSelected(item.ext_id)}
+                    onSelect={(checked) => toggleSelection(item.ext_id, checked)}
+                  />
+                ))
               ) : (
                 filteredCol3.map((item) => (
                   <SyncRow
@@ -1036,6 +1176,21 @@ export default function HindsightPage() {
             isOpen={!!mentalCompareId}
             onClose={() => setMentalCompareId(null)}
             ext_id={mentalCompareId || ''}
+            arch={item?.arch}
+            hind={item?.hindsight}
+            divergence={item?.divergence}
+          />
+        );
+      })()}
+
+      {/* Directive Compare Modal */}
+      {(() => {
+        const item = diffResult?.different?.find((d: any) => d.ext_id === directiveCompareId);
+        return (
+          <DirectiveCompareModal
+            isOpen={!!directiveCompareId}
+            onClose={() => setDirectiveCompareId(null)}
+            ext_id={directiveCompareId || ''}
             arch={item?.arch}
             hind={item?.hindsight}
             divergence={item?.divergence}

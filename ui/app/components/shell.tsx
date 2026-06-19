@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
+import { DirectiveIcon } from '@/components/icons/directive-icon';
 import { DaemonStatus } from '@/components/daemon-status';
 import { HindsightStatus } from '@/components/hindsight-status';
 import { useVersion } from '@/lib/use-version';
@@ -36,6 +37,7 @@ const navItems = [
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
   { href: '/hindsight', label: 'Hindsight', icon: HindsightIcon },
   { href: '/models', label: 'Models', icon: Layers },
+  { href: '/directives', label: 'Directives', icon: DirectiveIcon },
   { href: '/servers', label: 'Servers', icon: Server },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
