@@ -51,18 +51,20 @@ function buildUrl(base_url, chat_style) {
  * Build request body based on provider
  */
 function buildRequestBody(messages, options, chat_style) {
-  const { model, temperature } = options;
+  const { model, temperature, max_tokens } = options;
   // OpenAI-compatible formats (includes cloud variants)
   if (chat_style === 'openai') {
-    return {
+    const body = {
       model,
       messages,
       temperature,
     };
+    if (max_tokens !== undefined) body.max_tokens = max_tokens;
+    return body;
   }
 
   // Ollama local format
-  return {
+  const body = {
     model,
     messages,
     stream: false,
@@ -70,6 +72,8 @@ function buildRequestBody(messages, options, chat_style) {
       temperature,
     },
   };
+  if (max_tokens !== undefined) body.options.num_predict = max_tokens;
+  return body;
 }
 
 /**
@@ -135,6 +139,7 @@ export async function generateCompletion(messages, options = {}) {
   const requestOptions = {
     model,
     temperature: options.temperature,
+    max_tokens: options.max_tokens,
   };
 
   const url = buildUrl(providerConfig.base_url, providerConfig.chat_style);
@@ -311,6 +316,8 @@ export async function complete(prompt, options = {}) {
   return {
     success: true,
     data: result.data.content,
+    model: result.data.model,
+    usage: result.data.usage,
   };
 }
 

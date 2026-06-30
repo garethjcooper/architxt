@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Users,
   Layers,
+  Microscope,
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
@@ -30,6 +31,7 @@ import { useVersion } from '@/lib/use-version';
 import { useServerEnv } from '@/lib/use-server-env';
 
 const navItems = [
+  { href: '/research', label: 'Research', icon: Microscope },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/tags', label: 'Tags', icon: Tags },
@@ -53,7 +55,7 @@ export function Shell({ children }: ShellProps) {
   const serverEnv = useServerEnv();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Top Row - Header + Top Bar */}
       <div className="flex">
         {/* Sidebar Header - aligned with top bar */}
@@ -109,10 +111,10 @@ export function Shell({ children }: ShellProps) {
       {/* Edge-to-edge green gradient separator */}
       <div className="h-[3px] w-full bg-gradient-to-r from-emerald-700 via-green-500 to-green-400"></div>
 
-      {/* Bottom Row - Navigation + Content */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
+        {/* Bottom Row - Navigation + Content */}
         {/* Sidebar Navigation */}
-        <aside className={`border-r border-white/10 bg-[oklch(0.22_0_0)] min-h-[calc(100vh-58px)] flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
+        <aside className={`border-r border-white/10 bg-[oklch(0.22_0_0)] flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
           <div className="h-px bg-white/10" />
           
           <nav className="p-2 space-y-1 flex-1">
@@ -154,7 +156,7 @@ export function Shell({ children }: ShellProps) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 px-6 py-2.5 bg-[oklch(0.17_0_0)] min-w-0">
+        <main className="flex-1 px-6 py-2.5 bg-[oklch(0.17_0_0)] min-w-0 flex flex-col min-h-0 overflow-y-auto">
           {children}
         </main>
       </div>

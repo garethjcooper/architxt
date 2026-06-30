@@ -21,25 +21,53 @@ class ApiError extends Error {
 
 async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  fetchOptions?: { timeoutMs?: number }
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
   
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  if (fetchOptions?.timeoutMs && fetchOptions.timeoutMs > 0) {
+    timeoutId = setTimeout(() => controller.abort(), fetchOptions.timeoutMs);
+  }
+
   const response = await fetch(url, {
     ...options,
+    signal: controller.signal,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  }).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
   });
 
-  const data = await response.json().catch(() => null);
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const data = await response.json().catch((err) => {
+    throw new ApiError(
+      `Invalid JSON response from ${endpoint}: ${err.message}`,
+      response.status,
+      'INVALID_JSON'
+    );
+  });
 
   if (!response.ok) {
     throw new ApiError(
       data?.error || `Request failed: ${response.statusText}`,
       response.status,
       data?.code || 'UNKNOWN_ERROR'
+    );
+  }
+
+  if (data === null || data === undefined) {
+    throw new ApiError(
+      `Empty response from ${endpoint}`,
+      response.status,
+      'EMPTY_RESPONSE'
     );
   }
 
@@ -304,7 +332,11 @@ export const serversApi = {
     fetchApi<{ status: string; timestamp: string; [key: string]: any }>(`/servers/${id}/health`),
   // List banks from server
   listBanks: (id: number) =>
-    fetchApi<Array<{ id: string; name: string; description?: string }>>(`/servers/${id}/banks`),
+    fetchApi<Array<{ bank_id: string; name: string; description?: string }>>(`/servers/${id}/banks`),
+  listBankTags: (serverId: number, bankId: string) =>
+    fetchApi<{ items: Array<{ tag: string; count: number }>; total: number }>(`/hindsight/banks/${encodeURIComponent(bankId)}/tags?server_id=${serverId}`),
+  getBankGraph: (serverId: number, bankId: string) =>
+    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/graph?server_id=${serverId}`),
 };
 
 // Metadata API
@@ -390,6 +422,7 @@ export const mentalModelsApi = {
     const queryString = query.toString();
     return fetchApi<MentalModel[]>(`/mentalmodels${queryString ? '?' + queryString : ''}`);
   },
+  listDimensions: () => fetchApi<string[]>('/mentalmodels/dimensions'),
   get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
   create: (data: {
     ext_id: string;
@@ -401,6 +434,9 @@ export const mentalModelsApi = {
     exclude_mental_model_list?: string;
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
+    dimension?: string | null;
+    returns?: 'json' | 'narrative';
+    concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
     method: 'POST',
@@ -416,6 +452,9 @@ export const mentalModelsApi = {
     exclude_mental_model_list?: string;
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
+    dimension?: string | null;
+    returns?: 'json' | 'narrative';
+    concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
     method: 'PUT',
@@ -632,6 +671,315 @@ export const hindsightApi = {
         pop_updated_at: string;
       }>;
     }>('/hindsight/operations/all'),
+
+  recall: (serverId: number, bankId: string, body: { query: string; limit?: number; trace?: boolean }) =>
+    fetchApi<any>(`/hindsight/banks/${encodeURIComponent(bankId)}/recall?server_id=${serverId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }, { timeoutMs: 60000 }),
+
+  reflect: (serverId: number, bankId: string, body: { query: string; budget?: string }) =>
+    fetchApi<any>(`/hindsight/banks/${encodeURIComponent(bankId)}/reflect?server_id=${serverId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }, { timeoutMs: 120000 }),
+
+  reflectWithBudgetFallback: async (serverId: number, bankId: string, body: { query: string; budget?: string }) => {
+    const result = await hindsightApi.reflect(serverId, bankId, body);
+    if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+      const errorText = String((result as any).error || '').toLowerCase();
+      const isTimeout = errorText.includes('timeout') || errorText.includes('timed out') || errorText.includes('request time');
+      if (isTimeout && (!body.budget || body.budget === 'mid')) {
+        return hindsightApi.reflect(serverId, bankId, { ...body, budget: 'low' });
+      }
+    }
+    return result;
+  },
+};
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  label_long?: string;
+  type?: string;
+  category?: string;
+  mention_count?: number;
+  prominence?: number;
+  depth?: number;
+  source?: 'canonical' | 'alias' | 'hindsight' | 'mental_model' | 'mental_model_referenced';
+  hindsight_id?: string | null;
+  mental_model_applied?: boolean;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  color?: string;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  weight?: number;
+  link_type?: string;
+  relationship_type?: string;
+  edge_source?: 'co_occurrence' | 'mental_model' | 'synthesize';
+  source_fact_ids?: string[];
+  label_long?: string;
+}
+
+export interface GraphMeta {
+  mental_model_applied_to?: string[];
+  mental_model_missing?: string[];
+  mental_model_referenced_entity_ids?: string[];
+  mental_model_edge_count?: number;
+}
+
+export interface PrebuiltModelResult {
+  id: number;
+  ext_id: string;
+  name: string;
+  returns: string;
+  concatenation: string;
+  found: boolean;
+  error?: string;
+  narrative?: string;
+  graph?: {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  };
+}
+
+export interface PrebuiltEntityResult {
+  entity: string;
+  found: boolean;
+  model_results: PrebuiltModelResult[];
+}
+
+export interface PrebuiltDimensionResult {
+  dimension: string;
+  entities: PrebuiltEntityResult[];
+  found_count: number;
+  missing_count: number;
+  result: {
+    narrative?: string;
+    json_result?:
+      | {
+          nodes: GraphNode[];
+          edges: GraphEdge[];
+        }
+      | Array<{
+          nodes: GraphNode[];
+          edges: GraphEdge[];
+        }>;
+  };
+}
+
+export interface PrebuiltResponse {
+  success: boolean;
+  error?: string;
+  entities: string[];
+  entity_summary: Array<{ entity: string; dimension: string; found: boolean }>;
+  dimensions: PrebuiltDimensionResult[];
+  session_id?: number;
+  step_id?: number;
+}
+
+export interface ResearchSession {
+  id: number;
+  title: string;
+  description: string | null;
+  bank_id: string;
+  viewpoint_ids: number[];
+  status: 'active' | 'closed' | 'archived';
+  current_step_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoverStepResponse {
+  session_id: number;
+  step_id: number;
+  status: 'running' | 'completed' | 'failed';
+  bank_id: string;
+  viewpoint_ids: number[];
+  query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | string;
+  action_type?: string;
+  parameters?: Record<string, any> | null;
+  synthesis?: {
+    narrative: string;
+  };
+  canvas?: {
+    graph: {
+      nodes: GraphNode[];
+      edges: GraphEdge[];
+    };
+    meta?: GraphMeta;
+  };
+  calls?: Array<{
+    tool: string;
+    mode: string;
+    status: 'success' | 'failure';
+    duration_ms: number;
+    error?: string;
+    code?: string;
+    prompt_text?: string;
+    response_text?: string;
+    model?: string;
+    usage?: Record<string, any>;
+  }>;
+  tool_calls_used?: number;
+  error_message?: string | null;
+}
+
+export interface ResearchStepCall {
+  tool: string;
+  mode: string;
+  status: 'success' | 'failure';
+  duration_ms: number;
+  error?: string;
+  code?: string;
+  topic_goal?: string;
+  metrics?: Record<string, unknown>;
+  request_payload_chars?: number;
+  model?: string;
+  usage?: Record<string, any>;
+  prompt_text?: string;
+  response_text?: string;
+  backend?: string;
+  response_summary?: string | { kind: string; preview?: string; findingCount?: number; seamCount?: number; keys?: string[] };
+  request?: {
+    method: string;
+    url: string;
+    body: Record<string, any>;
+  };
+}
+
+export interface ResearchRecallParams {
+  budget?: 'low' | 'mid' | 'high';
+  max_tokens?: number;
+  types?: string[];
+  tags?: string[];
+  tags_match?: string;
+}
+
+export interface ResearchStep {
+  id: number;
+  session_id: number;
+  parent_step_id: number | null;
+  intent_text: string;
+  action_type: string;
+  parameters: Record<string, any> | null;
+  selections: any[] | null;
+  viewpoint_ids: number[] | null;
+  canvas: DiscoverStepResponse['canvas'] | null;
+  synthesis: DiscoverStepResponse['synthesis'] | null;
+  calls: ResearchStepCall[] | null;
+  tool_calls_used: number;
+  status: 'running' | 'completed' | 'failed';
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface ResearchStepSummary {
+  id: number;
+  session_id: number;
+  parent_step_id: number | null;
+  intent_text: string;
+  action_type: string;
+  parameters: Record<string, any> | null;
+  created_at: string;
+  canvas: DiscoverStepResponse['canvas'] | null;
+  synthesis: DiscoverStepResponse['synthesis'] | null;
+  selections: any[] | null;
+  viewpoint_ids: number[] | null;
+  calls: ResearchStepCall[] | null;
+  status: 'running' | 'completed' | 'failed';
+  error_message: string | null;
+  tool_calls_used: number;
+}
+
+export const researchApi = {
+  discover: (payload: {
+    server_id: number;
+    session_id?: number;
+    bank_id: string;
+    viewpoint_ids: number[];
+    intent_text: string;
+    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize';
+    dimension?: string;
+    selections?: any[];
+    budget?: 'low' | 'mid' | 'high';
+    max_tokens?: number;
+    types?: string[];
+    prefer_observations?: boolean;
+    include?: { facts?: {}; source_facts?: {}; };
+    fact_types?: string[];
+    tags?: string[];
+    tags_match?: string;
+  }) =>
+    fetchApi<DiscoverStepResponse>('/research/discover', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }),
+  prebuilt: (payload: {
+    server_id: number;
+    bank_id: string;
+    entities: string[];
+    dimensions: string[];
+    session_id?: number;
+  }) =>
+    fetchApi<PrebuiltResponse>('/research/prebuilt', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 60000 }),
+  synthesize: (payload: {
+    server_id: number;
+    bank_id: string;
+    session_id: number;
+    source_step_ids: number[];
+    intent_text: string;
+    budget?: 'low' | 'mid' | 'high';
+    max_tokens?: number;
+  }) =>
+    fetchApi<DiscoverStepResponse>('/research/synthesize', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }),
+  getSessionSteps: (sessionId: number) =>
+    fetchApi<ResearchStepSummary[]>(`/research/sessions/${sessionId}/steps`),
+  getStep: (stepId: number) =>
+    fetchApi<ResearchStep>(`/research/steps/${stepId}`),
+  deleteStep: (stepId: number) =>
+    fetchApi<{ deleted_step_id: number; session_id: number; remaining_step_count: number }>(`/research/steps/${stepId}`, {
+      method: 'DELETE',
+    }),
+
+  listSessions: (bankId: string) =>
+    fetchApi<ResearchSession[]>(`/research/banks/${encodeURIComponent(bankId)}/sessions`),
+
+  createSession: (payload: {
+    bank_id: string;
+    viewpoint_ids: number[];
+    title?: string;
+    description?: string;
+  }) =>
+    fetchApi<{ session_id: number }>('/research/sessions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateSession: (sessionId: number, data: { title?: string; description?: string; status?: 'active' | 'closed' | 'archived' }) =>
+    fetchApi<{ updated: true; session_id: number }>(`/research/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteSession: (sessionId: number) =>
+    fetchApi<{ deleted: true; session_id: number }>(`/research/sessions/${sessionId}`, {
+      method: 'DELETE',
+    }),
 };
 
 export { ApiError };

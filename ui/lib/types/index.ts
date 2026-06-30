@@ -125,18 +125,25 @@ export interface MentalModel {
   ext_id: string;
   name: string | null;
   source_query: string | null;
+  viewp_description: string | null;
+  viewp_meta: Record<string, any> | null;
   refresh_after_consolidation: boolean;
   refresh_mode: 'full' | 'delta';
   exclude_all_mental_models: boolean;
   exclude_mental_model_list: string | null;
   max_tokens: number;
   tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
+  dimension: string | null;
+  returns: 'json' | 'narrative';
+  concatenation: 'merge' | 'compile';
   is_template: boolean;
   tags: Tag[];
   entities: Entity[];
   created_at: string;
   updated_at: string;
 }
+
+export const STANDARD_DIMENSIONS = ['interface', 'summary', 'interface-found', 'capability'] as const;
 
 export interface DerivedMentalModel extends MentalModel {
   is_derived: true;

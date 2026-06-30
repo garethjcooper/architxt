@@ -16,6 +16,7 @@ import {
   deleteMentalModel,
   getMentalModelWithRelations,
   listMentalModels,
+  listMentalModelDimensions,
   getMentalModelTags,
   addMentalModelTag,
   removeMentalModelTag,
@@ -34,6 +35,8 @@ import {
   normaliseRefreshMode,
   normaliseTagsMatchMode,
   normaliseMaxTokens,
+  normaliseReturns,
+  normaliseConcatenation,
   toDbBool,
   DEFAULT_MAX_TOKENS,
   DEFAULT_REFRESH_MODE,
@@ -73,6 +76,8 @@ const toApiMentalModel = (dbRow) => ({
   ext_id: dbRow.mm_ext_id,
   name: dbRow.mm_name,
   source_query: dbRow.mm_source_query,
+  viewp_description: dbRow.mm_viewp_description ?? null,
+  viewp_meta: dbRow.mm_viewp_meta ?? null,
   refresh_after_consolidation: dbRow.mm_refresh_after_consolidation === 'true',
   refresh_mode: dbRow.mm_refresh_mode,
   exclude_all_mental_models: dbRow.mm_exclude_all_mental_models === 'true',
@@ -80,6 +85,9 @@ const toApiMentalModel = (dbRow) => ({
   max_tokens: dbRow.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
   tags_match_mode: dbRow.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
   is_template: dbRow.mm_is_template === 'true',
+  dimension: dbRow.mm_dimension ?? null,
+  returns: dbRow.mm_returns ?? 'narrative',
+  concatenation: dbRow.mm_concatenation ?? 'compile',
   tags: dbRow.mm_tags || [],
   entities: (dbRow.mm_entities || []).map((e) => ({
     ...e,
@@ -131,7 +139,12 @@ const toApiMentalModel = (dbRow) => ({
  */
 router.get('/', async (req, res) => {
   const start = Date.now();
-  const result = await listMentalModels(db, { limit: Number(req.query.limit) || 1000, offset: Number(req.query.offset) || 0 });
+  const result = await listMentalModels(db, {
+    limit: Number(req.query.limit) || 1000,
+    offset: Number(req.query.offset) || 0,
+    dimension: req.query.dimension,
+    returns: req.query.returns,
+  });
   handleCrudResult({
     res,
     result,
@@ -143,6 +156,23 @@ router.get('/', async (req, res) => {
     path: '/mentalmodels',
     start,
   });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/dimensions:
+ *   get:
+ *     summary: List distinct mental model dimensions
+ *     tags: [MentalModels]
+ *     responses:
+ *       200:
+ *         description: Array of dimension names
+ */
+router.get('/dimensions', async (req, res) => {
+  const start = Date.now();
+  const result = await listMentalModelDimensions(db);
+  const dimensions = Array.isArray(result) ? result : (result.success ? result.data : []);
+  sendResponse({ res, status: 200, data: dimensions, logger, method: 'GET', path: '/mentalmodels/dimensions', duration: Date.now() - start });
 });
 
 /**
@@ -206,6 +236,9 @@ router.get('/:id', async (req, res) => {
  *               exclude_mental_model_list: { type: string, nullable: true }
  *               max_tokens: { type: integer, minimum: 1, maximum: 8192, default: 2048 }
  *               tags_match_mode: { type: string, enum: ['all_strict', 'any_strict', 'all', 'any', 'exact'], default: 'all_strict' }
+ *               dimension: { type: string, nullable: true }
+ *               returns: { type: string, enum: ['json', 'narrative'], default: 'narrative' }
+ *               concatenation: { type: string, enum: ['merge', 'compile'], default: 'compile' }
  *     responses:
  *       201:
  *         description: Mental model created
@@ -253,6 +286,9 @@ router.post('/', async (req, res) => {
     mm_tags_match_mode: normaliseTagsMatchMode(body.tags_match_mode) ?? DEFAULT_TAGS_MATCH_MODE,
     mm_is_template: isTemplate,
     mm_max_tokens: normaliseMaxTokens(body.max_tokens) ?? DEFAULT_MAX_TOKENS,
+    mm_dimension: body.dimension ?? null,
+    mm_returns: normaliseReturns(body.returns) ?? 'narrative',
+    mm_concatenation: normaliseConcatenation(body.concatenation) ?? 'compile',
   });
 
   handleCrudResult({
@@ -289,6 +325,9 @@ router.post('/', async (req, res) => {
  *               exclude_mental_model_list: { type: string, nullable: true }
  *               max_tokens: { type: integer, minimum: 1, maximum: 8192 }
  *               tags_match_mode: { type: string, enum: ['all_strict', 'any_strict', 'all', 'any', 'exact'] }
+ *               dimension: { type: string, nullable: true }
+ *               returns: { type: string, enum: ['json', 'narrative'] }
+ *               concatenation: { type: string, enum: ['merge', 'compile'] }
  *     responses:
  *       200:
  *         description: Mental model updated
@@ -352,6 +391,15 @@ router.put('/:id', async (req, res) => {
   }
   if (body.tags_match_mode !== undefined) {
     data.mm_tags_match_mode = normaliseTagsMatchMode(body.tags_match_mode);
+  }
+  if (body.dimension !== undefined) {
+    data.mm_dimension = body.dimension === '' ? null : body.dimension;
+  }
+  if (body.returns !== undefined) {
+    data.mm_returns = normaliseReturns(body.returns);
+  }
+  if (body.concatenation !== undefined) {
+    data.mm_concatenation = normaliseConcatenation(body.concatenation);
   }
 
   const result = await updateMentalModel(db, idCheck.id, data);

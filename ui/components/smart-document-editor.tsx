@@ -195,6 +195,17 @@ function getSidebarIndent(structuralBlocks: SmartBlock[], index: number): number
   return 0;
 }
 
+/** Convert a heading title into a URL-safe slug. */
+export function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'heading';
+}
+
+export { getSectionBlockIds, getSidebarIndent };
+
 interface SmartDocumentEditorProps {
   documentId: number;
   content: string | null;

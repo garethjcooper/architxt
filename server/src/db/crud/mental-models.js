@@ -14,10 +14,17 @@ export const deleteMentalModel = base.del;
 /** Placeholders supported in template fields (ext_id, name, source_query). */
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
-const PLACEHOLDER_PATTERN = new RegExp(`\\${ENTITY_NAME_PLACEHOLDER}|\\${ENTITY_ID_PLACEHOLDER}`, 'g');
+const ENTITY_TYPE_PLACEHOLDER = '{entity-type}';
+const PLACEHOLDER_PATTERN = new RegExp(
+  `\\${ENTITY_NAME_PLACEHOLDER}|\\${ENTITY_ID_PLACEHOLDER}|\\${ENTITY_TYPE_PLACEHOLDER}`,
+  'g'
+);
 
 const VALID_REFRESH_MODES = new Set(['full', 'delta']);
 const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any', 'exact']);
+export const VALID_RETURNS = new Set(['json', 'narrative']);
+export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
+export const STANDARD_DIMENSIONS = ['interface', 'summary'];
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
 const MIN_MAX_TOKENS = 256;
 const MAX_MAX_TOKENS = 8192;
@@ -88,6 +95,30 @@ export function normaliseMaxTokens(value) {
   return truncated;
 }
 
+export function normaliseReturns(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (!VALID_RETURNS.has(value)) {
+    throw new Error(`Invalid returns: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+export function normaliseConcatenation(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (!VALID_CONCATENATIONS.has(value)) {
+    throw new Error(`Invalid concatenation: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+/**
+ * Returns true if the given dimension is one of the standard dimensions.
+ */
+export function isStandardDimension(value) {
+  if (typeof value !== 'string' || value === '') return false;
+  return STANDARD_DIMENSIONS.includes(value);
+}
+
 /**
  * Substitute entity placeholders into a template string.
  */
@@ -95,7 +126,8 @@ function substitutePlaceholders(template, entity) {
   if (!template) return template;
   return template
     .replaceAll(ENTITY_NAME_PLACEHOLDER, entity.name ?? '')
-    .replaceAll(ENTITY_ID_PLACEHOLDER, entity.entity_id ?? '');
+    .replaceAll(ENTITY_ID_PLACEHOLDER, entity.entity_id ?? '')
+    .replaceAll(ENTITY_TYPE_PLACEHOLDER, entity.type_name ?? '');
 }
 
 /**
@@ -128,10 +160,10 @@ export function validateEntityTemplateEligibility({
     return { valid: true };
   }
 
-  if (!hasEntityPlaceholderInExtId(mm_ext_id)) {
+  if (!hasEntityPlaceholders(mm_name, mm_ext_id, '')) {
     return {
       valid: false,
-      error: `Template mode requires '${ENTITY_ID_PLACEHOLDER}' or '${ENTITY_NAME_PLACEHOLDER}' in External ID`,
+      error: `Template mode requires '${ENTITY_ID_PLACEHOLDER}' or '${ENTITY_NAME_PLACEHOLDER}' in Template Id (External ID) or Name`,
       code: 'VALIDATION_ERROR',
     };
   }
@@ -160,6 +192,9 @@ export function deriveMentalModels(template) {
     exclude_mental_model_list: template.exclude_mental_model_list,
     max_tokens: normaliseMaxTokens(template.max_tokens),
     tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
+    dimension: template.dimension,
+    returns: template.returns,
+    concatenation: template.concatenation,
     is_template: template.is_template,
     tags: template.tags || [],
     entities: entities,
@@ -180,6 +215,9 @@ export function deriveMentalModels(template) {
       exclude_all_mental_models: overrides.exclude_all_mental_models ?? template.exclude_all_mental_models,
       max_tokens: overrides.max_tokens ?? normaliseMaxTokens(template.max_tokens),
       tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
+      dimension: template.dimension,
+      returns: template.returns,
+      concatenation: template.concatenation,
       derived_entity: entity,
       is_derived: true,
     };
@@ -230,18 +268,51 @@ const ENTITIES_SQL = `
  * List all mental models with their associated tags and entities as JSON arrays.
  */
 export const listMentalModels = (db, options = {}) => dbExec(() => {
-  const { limit = 1000, offset = 0 } = options;
+  const { limit = 1000, offset = 0, dimension, dimensions, returns } = options;
+  const conditions = [];
+  const params = [];
+  if (dimension !== undefined && dimension !== null) {
+    conditions.push('m.mm_dimension = ?');
+    params.push(dimension);
+  }
+  if (Array.isArray(dimensions) && dimensions.length > 0) {
+    conditions.push(`m.mm_dimension IN (${dimensions.map(() => '?').join(',')})`);
+    params.push(...dimensions);
+  }
+  if (returns !== undefined && returns !== null) {
+    conditions.push('m.mm_returns = ?');
+    params.push(returns);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const sql = `
     SELECT m.*,
       ${TAGS_SQL} AS mm_tags,
       ${ENTITIES_SQL} AS mm_entities
     FROM ${TABLE} m
+    ${where}
     ORDER BY m.${PK} DESC
     LIMIT ? OFFSET ?
   `;
-  const rows = stmt(db, sql).all(requireInt('limit', limit), requireInt('offset', offset));
+  params.push(requireInt('limit', limit), requireInt('offset', offset));
+  const rows = stmt(db, sql).all(...params);
   return rows.map(r => fromJson(r, ['mm_tags', 'mm_entities']));
 }, 'mentalModels.list');
+
+/**
+ * List distinct mental model dimensions. Returns an array of non-empty
+ * dimension strings sorted alphabetically.
+ */
+export const listMentalModelDimensions = (db) => dbExec(() => {
+  const sql = `
+    SELECT DISTINCT mm_dimension AS dimension
+    FROM ${TABLE}
+    WHERE mm_dimension IS NOT NULL
+      AND mm_dimension != ''
+    ORDER BY mm_dimension ASC
+  `;
+  return stmt(db, sql).all().map((r) => r.dimension);
+}, 'mentalModels.listDimensions');
 
 /**
  * List mental models suitable for a Hindsight diff.
@@ -285,7 +356,7 @@ export const getMentalModelWithRelations = (db, id) => dbExec(() => {
 export const createMentalModel = (db, data) => dbExec(() => {
   requireString('mm_ext_id', data.mm_ext_id);
 
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens'];
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation'];
   const presentCols = cols.filter(c => data[c] !== undefined && data[c] !== null);
   const placeholders = presentCols.map(() => '?').join(',');
   const values = presentCols.map(c => data[c]);
@@ -299,7 +370,7 @@ export const createMentalModel = (db, data) => dbExec(() => {
  * Update mental model. Only present fields are updated.
  */
 export const updateMentalModel = (db, id, data) => dbExec(() => {
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens'];
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation'];
   const updates = [];
   const values = [];
 

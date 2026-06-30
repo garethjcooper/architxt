@@ -21,7 +21,7 @@ export const deletePendingOperation = base.del;
 export const createPendingOperation = (db, data) => dbExec(() => {
   const cols = [
     'pop_operation_id', 'pop_server_id', 'pop_bank_id', 'pop_doc_id',
-    'pop_ext_id', 'pop_action', 'pop_status'
+    'pop_rs_id', 'pop_rstep_id', 'pop_ext_id', 'pop_action', 'pop_status'
   ];
   const placeholders = cols.map(() => '?').join(',');
   const sql = `INSERT INTO ${TABLE} (${cols.join(',')}) VALUES (${placeholders})`;
@@ -29,7 +29,9 @@ export const createPendingOperation = (db, data) => dbExec(() => {
     data.pop_operation_id,
     requireInt('pop_server_id', data.pop_server_id),
     data.pop_bank_id,
-    requireInt('pop_doc_id', data.pop_doc_id),
+    data.pop_doc_id == null ? null : requireInt('pop_doc_id', data.pop_doc_id),
+    data.pop_rs_id == null ? null : requireInt('pop_rs_id', data.pop_rs_id),
+    data.pop_rstep_id == null ? null : requireInt('pop_rstep_id', data.pop_rstep_id),
     data.pop_ext_id || null,
     data.pop_action || 'push',
     data.pop_status || 'pending',
@@ -47,7 +49,7 @@ export const createPendingOperation = (db, data) => dbExec(() => {
 export const listAllPending = (db) => dbExec(() => {
   const sql = `
     SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
-           pop_ext_id, pop_action, pop_status, pop_error_message,
+           pop_rs_id, pop_rstep_id, pop_ext_id, pop_action, pop_status, pop_error_message,
            pop_created_at, pop_updated_at
     FROM ${TABLE}
     WHERE pop_status NOT IN ('completed', 'failed', 'acknowledged')
@@ -67,7 +69,7 @@ export const listAllPending = (db) => dbExec(() => {
 export const listPendingByServerBank = (db, serverId, bankId) => dbExec(() => {
   const sql = `
     SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
-           pop_ext_id, pop_action, pop_status, pop_error_message,
+           pop_rs_id, pop_rstep_id, pop_ext_id, pop_action, pop_status, pop_error_message,
            pop_created_at, pop_updated_at
     FROM ${TABLE}
     WHERE pop_server_id = ? AND pop_bank_id = ? AND pop_status NOT IN ('completed', 'failed', 'acknowledged')
@@ -137,7 +139,7 @@ export const deleteAcknowledgedOperation = (db, id) => dbExec(() => {
 export const findByOperationId = (db, operationId) => dbExec(() => {
   const sql = `
     SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
-           pop_ext_id, pop_action, pop_status, pop_error_message,
+           pop_rs_id, pop_rstep_id, pop_ext_id, pop_action, pop_status, pop_error_message,
            pop_created_at, pop_updated_at
     FROM ${TABLE}
     WHERE pop_operation_id = ?
@@ -145,3 +147,39 @@ export const findByOperationId = (db, operationId) => dbExec(() => {
   `;
   return stmt(db, sql).get(operationId);
 }, `${TABLE}.findByOperationId`);
+
+/**
+ * List pending operations linked to a research session.
+ * @param {Object} db
+ * @param {number} rsId
+ * @returns {Array}
+ */
+export const listPendingByResearchSession = (db, rsId) => dbExec(() => {
+  const sql = `
+    SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
+           pop_rs_id, pop_rstep_id, pop_ext_id, pop_action, pop_status, pop_error_message,
+           pop_created_at, pop_updated_at
+    FROM ${TABLE}
+    WHERE pop_rs_id = ? AND pop_status NOT IN ('completed', 'failed', 'acknowledged')
+    ORDER BY pop_created_at DESC
+  `;
+  return stmt(db, sql).all(requireInt('rsId', rsId));
+}, `${TABLE}.listPendingByResearchSession`);
+
+/**
+ * List pending operations linked to a research step.
+ * @param {Object} db
+ * @param {number} rstepId
+ * @returns {Array}
+ */
+export const listPendingByResearchStep = (db, rstepId) => dbExec(() => {
+  const sql = `
+    SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
+           pop_rs_id, pop_rstep_id, pop_ext_id, pop_action, pop_status, pop_error_message,
+           pop_created_at, pop_updated_at
+    FROM ${TABLE}
+    WHERE pop_rstep_id = ? AND pop_status NOT IN ('completed', 'failed', 'acknowledged')
+    ORDER BY pop_created_at DESC
+  `;
+  return stmt(db, sql).all(requireInt('rstepId', rstepId));
+}, `${TABLE}.listPendingByResearchStep`);

@@ -31,14 +31,16 @@ const SelectPopup = React.forwardRef<
   React.ElementRef<typeof SelectUI.Popup>,
   React.ComponentPropsWithoutRef<typeof SelectUI.Popup>
 >(({ className, ...props }, ref) => (
-  <SelectUI.Popup
-    ref={ref}
-    className={cn(
-      'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
-      className
-    )}
-    {...props}
-  />
+  <SelectUI.Positioner>
+    <SelectUI.Popup
+      ref={ref}
+      className={cn(
+        'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
+        className
+      )}
+      {...props}
+    />
+  </SelectUI.Positioner>
 ));
 SelectPopup.displayName = 'SelectPopup';
 

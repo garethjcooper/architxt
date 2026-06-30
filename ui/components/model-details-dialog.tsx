@@ -9,6 +9,7 @@ import type {
   Entity,
   MentalModelEntityOverrides,
 } from '@/lib/types/index';
+import { STANDARD_DIMENSIONS } from '@/lib/types/index';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +32,7 @@ const inputClass =
 
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
+const ENTITY_TYPE_PLACEHOLDER = '{entity-type}';
 
 export interface BaseConfig {
   ext_id: string | null;
@@ -40,6 +42,9 @@ export interface BaseConfig {
   refresh_after_consolidation: boolean;
   exclude_all_mental_models: boolean;
   max_tokens: number;
+  dimension: string | null;
+  returns: 'json' | 'narrative';
+  concatenation: 'merge' | 'compile';
 }
 
 interface ModelDetailsDialogProps {
@@ -53,7 +58,8 @@ function substitutePlaceholders(template: string | null, entity: Entity): string
   if (!template) return '';
   return template
     .replaceAll(ENTITY_NAME_PLACEHOLDER, entity.name ?? '')
-    .replaceAll(ENTITY_ID_PLACEHOLDER, entity.entity_id ?? '');
+    .replaceAll(ENTITY_ID_PLACEHOLDER, entity.entity_id ?? '')
+    .replaceAll(ENTITY_TYPE_PLACEHOLDER, entity.type_name ?? '');
 }
 
 function parseMaxTokens(value: string, fallback: number): number {
@@ -76,6 +82,9 @@ function buildBaseConfig(
     exclude_all_mental_models:
       local.exclude_all_mental_models ?? model.exclude_all_mental_models ?? false,
     max_tokens: local.max_tokens ?? model.max_tokens ?? 2048,
+    dimension: local.dimension ?? model.dimension ?? null,
+    returns: local.returns ?? model.returns ?? 'narrative',
+    concatenation: local.concatenation ?? model.concatenation ?? 'compile',
   };
 }
 
@@ -90,6 +99,8 @@ function buildDerivedRow(
     ext_id: substitutePlaceholders(baseConfig.ext_id, entity),
     name: substitutePlaceholders(baseConfig.name, entity),
     source_query: substitutePlaceholders(baseConfig.source_query, entity),
+    viewp_description: null,
+    viewp_meta: null,
     refresh_mode: overrides.refresh_mode ?? baseConfig.refresh_mode,
     refresh_after_consolidation:
       overrides.refresh_after_consolidation ?? baseConfig.refresh_after_consolidation,
@@ -98,6 +109,9 @@ function buildDerivedRow(
     exclude_mental_model_list: null,
     max_tokens: overrides.max_tokens ?? baseConfig.max_tokens,
     tags_match_mode: model.tags_match_mode,
+    dimension: baseConfig.dimension,
+    returns: baseConfig.returns,
+    concatenation: baseConfig.concatenation,
     is_template: false,
     is_derived: true,
     derived_entity: entity,
@@ -128,6 +142,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
+  const [dimension, setDimension] = useState(model.dimension || 'interface');
+  const [returns, setReturns] = useState<'json' | 'narrative'>(model.returns ?? 'narrative');
+  const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(model.concatenation ?? 'compile');
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
     buildDerivedRows(model, buildBaseConfig(model))
   );
@@ -144,8 +161,11 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       refresh_after_consolidation: refreshAfterConsolidation,
       exclude_all_mental_models: excludeAll,
       max_tokens: parseMaxTokens(maxTokens, model.max_tokens ?? 2048),
+      dimension: dimension.trim() || null,
+      returns,
+      concatenation,
     }),
-    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
+    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens, dimension, returns, concatenation]
   );
 
   const derivedRef = useRef(derived);
@@ -167,6 +187,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setMaxTokensError(null);
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
+    setDimension(model.dimension || 'interface');
+    setReturns(model.returns ?? 'narrative');
+    setConcatenation(model.concatenation ?? 'compile');
     setDerived(buildDerivedRows(model, buildBaseConfig(model)));
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
@@ -225,12 +248,15 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     parsedMaxTokens !== (model.max_tokens ?? 2048) ||
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
     isTemplate !== (model.is_template ?? false) ||
+    dimension !== (model.dimension || 'interface') ||
+    returns !== (model.returns ?? 'narrative') ||
+    concatenation !== (model.concatenation ?? 'compile') ||
     derivedChanged;
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    if (!/\{entity-(id|name)\}/.test(model.ext_id ?? '')) {
-      return 'Template mode requires {entity-id} or {entity-name} to be present in External ID at a minimum. Name or Source Query can also use entity tags.';
+    if (!/\{entity-(id|name|type)\}/.test(model.ext_id ?? '')) {
+      return 'Template mode requires {entity-id}, {entity-name} or {entity-type} to be present in External ID at a minimum. Name or Source Query can also use entity tags.';
     }
     return null;
   }, [isTemplate, model.ext_id]);
@@ -343,6 +369,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       }
       if (tagsMatchMode !== (model.tags_match_mode ?? 'all_strict')) updates.tags_match_mode = tagsMatchMode;
       if (isTemplate !== (model.is_template ?? false)) updates.is_template = isTemplate;
+      const nextDimension = dimension.trim() || null;
+      if (nextDimension !== (model.dimension ?? null)) updates.dimension = nextDimension;
+      if (returns !== (model.returns ?? 'narrative')) updates.returns = returns;
+      if (concatenation !== (model.concatenation ?? 'compile')) updates.concatenation = concatenation;
 
       if (Object.keys(updates).length > 0) {
         await mentalModelsApi.update(model.id, updates);
@@ -454,6 +484,52 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               <option value="exact">Exact</option>
             </select>
             <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
+              Dimension
+            </Label>
+            <select
+              id="mm-detail-dimension"
+              value={dimension}
+              onChange={(e) => setDimension(e.target.value)}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            >
+              {STANDARD_DIMENSIONS.map((d) => (
+                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
+              Returns
+            </Label>
+            <select
+              id="mm-detail-returns"
+              value={returns}
+              onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            >
+              <option value="json">JSON</option>
+              <option value="narrative">Narrative</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
+              Concatenation
+            </Label>
+            <select
+              id="mm-detail-concatenation"
+              value={concatenation}
+              onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            >
+              <option value="merge">Merge</option>
+              <option value="compile">Compile</option>
+            </select>
           </div>
         </div>
 

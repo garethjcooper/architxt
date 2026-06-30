@@ -54,14 +54,14 @@ export function PageShell({
     : `${count ?? 0} ${countLabel}${(count ?? 0) !== 1 ? 's' : ''}`;
 
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Page Header */}
       <div className="pt-1 pb-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
         {subtitle && <p className="text-white/70 mt-2">{subtitle}</p>}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-col flex-1 min-h-0">
         {/* Tabs */}
         {tabs && tabs.length > 0 && activeTab && onTabChange && (
           <div className="border-b border-white/15">
@@ -89,8 +89,8 @@ export function PageShell({
         )}
 
         {/* Content */}
-        <div className="mt-2 flex-1 flex flex-col min-h-0 min-w-0">{children}</div>
+        <div className="mt-2 flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">{children}</div>
       </div>
-    </>
+    </div>
   );
 }
