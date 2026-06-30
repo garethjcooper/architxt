@@ -11,6 +11,12 @@ It is built on the idea of the [Temporal Mosaic](docs/concepts/architxt-temporal
 <p align="center">
   <img src="docs/designs/architxt-user-sml.gif" width="800" alt="architxt in action" />
 </p>
+<p align="center">
+  <img src="docs/designs/architxt-v030-1.gif" width="800" alt="architxt in action" />
+</p>
+<p align="center">
+  <img src="docs/designs/architxt-v030-2.gif" width="800" alt="architxt in action" />
+</p>
 
 ---
 
@@ -25,6 +31,9 @@ It is built on the idea of the [Temporal Mosaic](docs/concepts/architxt-temporal
 - [What Am I Looking At?](#what-am-i-looking-at)
 - [Scripts Reference](#scripts-reference)
 - [Configuration](#configuration)
+- [Mental Model Templates](#mental-model-templates)
+- [Prebuilt Research Dimensions](#prebuilt-research-dimensions)
+- [Mental Model Return Type and Concatenation](#mental-model-return-type-and-concatenation)
 - [The Daemons](#the-daemons)
 - [Docling](#docling)
 - [Database](#database)
@@ -423,6 +432,112 @@ All settings are in `server/.env` (copied from `.env.example` during setup).
 | Anthropic | `ARCHITXT_ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
 
 The backend loads these via `server/src/config.js`, which enforces fail-fast validation — missing required vars cause the server to exit immediately with a clear error.
+
+---
+
+## Mental Model Templates
+
+Mental models are reusable LLM prompts that analyse a single entity from your architecture. They are stored under **Models** and are used heavily by the **Research** page.
+
+### Template placeholders
+
+A template can include placeholders that are expanded at runtime for the selected entity:
+
+| Placeholder | Expands to |
+|---|---|
+| `{entity-id}` | The entity identifier, e.g. `COM-001` |
+| `{entity-name}` | The human-readable entity name, e.g. `Billing Service` |
+| `{entity-type}` | The entity type, e.g. `Company` or `Service` |
+
+### Template dimensions
+
+Each template has a **dimension** that groups related analyses together. The built-in dimensions are:
+
+| Dimension | Purpose | Return format |
+|---|---|---|
+| `summary` | Describe the core role of the entity | Markdown narrative |
+| `capability` | List the entity's architectural capabilities and responsibilities | Markdown narrative |
+| `interface` | Report known interfaces/flows between this entity and other known entities | JSON graph |
+| `interface-found` | Discover and report likely interfaces with unknown or inferred entities | JSON graph |
+
+### Graph return format
+
+Templates that return a graph must produce a single JSON object with this exact structure:
+
+```json
+{
+  "nodes": [
+    { "entity": "entity-id", "entity_name": "entity-name" }
+  ],
+  "edges": [
+    {
+      "source": "entity-id",
+      "target": "entity-id",
+      "edge_type": "calls",
+      "label": "short human-readable phrase (max 4 words)",
+      "label_long": "the full description of the edge context. Limit to 2 sentences",
+      "source_fact_ids": ["fact-uuid-1"]
+    }
+  ]
+}
+```
+
+- `entity` and `edge.source`/`edge.target` must be valid entity identifiers.
+- `edge_type` must be from the allowed set for the dimension.
+- `label` is the short text shown on the graph.
+- `label_long` is the full description shown in the inspector / detail view.
+- `source_fact_ids` references the facts that justify the relationship.
+
+For `interface-found`, use the `found:*` edge types and prefix discovered external entity ids with `found:`, e.g. `found:external-system-name`.
+
+---
+
+## Prebuilt Research Dimensions
+
+The **Research** page can run a set of mental models in one go via **Prebuilt** queries. You pick one or more entities and one or more dimensions; architxt expands every matching template for every selected entity and merges the results.
+
+### How it works
+
+1. Select entities from your corpus.
+2. Choose dimensions (e.g. `interface`, `capability`).
+3. architxt finds templates whose dimension matches.
+4. Each template is rendered per entity using `{entity-id}`, `{entity-name}`, and `{entity-type}`.
+5. Results are merged into a single graph and narrative on the research canvas.
+
+### Built-in dimensions
+
+| Dimension | What you get |
+|---|---|
+| `summary` | A short summary of each entity |
+| `capability` | The capabilities and responsibilities of each entity |
+| `interface` | Known interfaces/flows between selected entities |
+| `interface-found` | Discovered or inferred interfaces with external/unknown entities |
+
+### Adding new dimensions
+
+Dimensions are just string labels. Add new templates with any dimension value via the **Models** page; they will automatically appear in the Prebuilt dimension selector if at least one template exists for that dimension.
+
+---
+
+## Mental Model Return Type and Concatenation
+
+Every mental model also declares a **return type** and a **concatenation mode**. These tell architxt how to combine results when the same template is applied to multiple entities.
+
+### Return type
+
+| Return type | Use when |
+|---|---|
+| `narrative` | The model returns Markdown text (a summary, table, or analysis). Multiple outputs are concatenated into one document. |
+| `json` | The model returns a structured JSON graph. Multiple outputs are merged into a single graph with combined `nodes` and `edges`. |
+
+### Concatenation mode
+
+| Mode | Behaviour |
+|---|---|
+| `compile` | Narrative results are appended one after another. JSON graph results are merged into a single graph; duplicate nodes/edges are deduplicated. |
+| `merge` | Results are merged more aggressively. For JSON graphs this means overlapping nodes are unified and edges across all outputs share one namespace. Use this when templates from different entities are expected to produce a connected graph. |
+
+Choose `narrative` + `compile` for self-contained summaries and `json` + `merge` when you want a single connected graph across all selected entities.
 
 ---
 
