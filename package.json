@@ -6,6 +6,11 @@
     "node": ">=22.0.0"
   },
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "server",
+    "ui"
+  ],
   "scripts": {
     "setup": "node scripts/setup.js",
     "build": "node scripts/build.js",

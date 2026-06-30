@@ -3,6 +3,13 @@ import { listDocuments as hindsightListDocuments } from '../services/hindsight/d
 import { getDocument as hindsightGetDocument } from '../services/hindsight/documents.js';
 import { pullDocument } from '../services/hindsight/pull.js';
 import { pushDocument } from '../services/hindsight/push.js';
+import {
+  listBanks,
+  getBank,
+  listBankTags,
+  createBank,
+  deleteBank,
+} from '../services/hindsight/index.js';
 import { pushEntities, pushEntityTypes, pullEntities, pullEntityTypes } from '../services/hindsight/entities.js';
 import { listMentalModels as hindsightListMentalModels } from '../services/hindsight/mental-models.js';
 import { listDirectives as hindsightListDirectives } from '../services/hindsight/directives.js';
@@ -21,6 +28,15 @@ import {
 } from '../db/crud/pending-operations.js';
 import { getSyncedFields } from '../entity-tag-format.js';
 import { getAllEntitiesWithTypes } from '../db/crud/entities.js';
+import { sendResponse } from '../utils/route-helpers.js';
+import {
+  recall,
+  reflect,
+  reflectWithBudgetFallback,
+  getEntityGraph,
+  listMemories,
+  entityCooccurrence,
+} from '../services/hindsight/index.js';
 import { getDocumentsForDiff, getDocumentByExtId, getAllDocumentContexts } from '../db/crud/documents.js';
 import { getAllDocumentTags, getDocumentTagsByDocId } from '../db/crud/document-tags.js';
 import { getContextDescriptionById } from '../db/crud/contexts.js';
@@ -109,7 +125,8 @@ function substituteDerived(template, entity) {
   if (!template) return template;
   return template
     .replaceAll('{entity-name}', entity.name ?? '')
-    .replaceAll('{entity-id}', entity.entity_id ?? '');
+    .replaceAll('{entity-id}', entity.entity_id ?? '')
+    .replaceAll('{entity-type}', entity.type_name ?? '');
 }
 
 function deriveMentalModelsForDiff(template) {
@@ -1614,6 +1631,98 @@ router.post('/entities/pull', async (req, res) => {
   } catch (err) {
     logger.error('Entity pull failed', { serverId, bankId, error: err.message });
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.post('/banks/:bankId/recall', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
+  const bankId = req.params.bankId;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await recall(serverId, bankId, req.body);
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'RECALL_FAILED', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Recall route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+  }
+});
+
+router.post('/banks/:bankId/reflect', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
+  const bankId = req.params.bankId;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await reflectWithBudgetFallback(serverId, bankId, req.body);
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'REFLECT_FAILED', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Reflect route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+  }
+});
+
+router.get('/banks/:bankId/tags', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.params.bankId;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await listBankTags(serverId, bankId);
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: 'BANK_TAGS_FAILED', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: { items: result.items || [], total: result.total ?? 0 }, logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Bank tags route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+  }
+});
+
+router.get('/banks/:bankId/graph', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.params.bankId;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await getEntityGraph(serverId, bankId, { limit: req.query.limit, min_count: req.query.min_count });
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITY_GRAPH_FAILED', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Entity graph route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
   }
 });
 

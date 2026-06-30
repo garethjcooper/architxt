@@ -188,6 +188,18 @@ export const config = {
     concurrency: getInt('ARCHITXT_DIAGRAM_CONCURRENCY', 3),
     temperature: parseFloat(getEnv('ARCHITXT_DIAGRAM_TEMPERATURE', '0.0'))
   },
+  research: {
+    synthesize: {
+      provider: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_PROVIDER', 'ollama_cloud'),
+      model: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MODEL', ''),
+      temperature: parseFloat(getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPERATURE', '0.2')),
+      max_tokens: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', '') !== ''
+        ? getInt('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', 0)
+        : undefined,
+      system_prompt: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_SYSTEM_PROMPT', 'You are a synthesis assistant. Read the provided corpus (narratives, entities, edges) and the user\'s intent, then produce a single, self-contained synthesis as a JSON object. The output must always include both a Markdown "narrative" and a "graph" object with "nodes" and "edges" arrays. If you choose to surface entities in the graph, every returned node id must exist in the corpus and every edge must connect two of those returned node ids using a relationship label grounded in the corpus. If no relationships can be justified, return edges: []. If no entities should be surfaced, return nodes: [] and edges: []. Do not omit the graph object, do not omit the edges array, and do not invent nodes, ids, labels, or flows that are not grounded in the corpus.'),
+      task_prompt: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TASK_PROMPT', 'Using the corpus as background context, write a focused Markdown narrative that answers the user\'s intent. Then return a JSON object with two top-level keys: "narrative" (the Markdown text) and "graph" (an object containing "nodes" and "edges" arrays). The graph must reuse ONLY entity ids and labels from the corpus. Every edge must have source and target ids that appear in graph.nodes and a label grounded in the source material. If no edges are justified, explicitly return "edges": []. Do not return a graph with nodes but no edges. The "narrative" field must be Markdown text only; do NOT embed the graph JSON inside the narrative.'),
+    },
+  },
   document_denoise_llm: {
     enabled: getEnv('ARCHITXT_DENOISE_LLM_ENABLED', 'true') === 'true',
     provider: getEnv('ARCHITXT_DENOISE_LLM_PROVIDER', 'ollama_cloud'),

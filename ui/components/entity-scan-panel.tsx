@@ -1,71 +1,59 @@
 'use client';
 
 /**
- * Entity tag utilities — pure text transforms, no offset tracking.
+ * Entity Scan Panel — UI for detecting and applying entity tags.
  *
- * These functions are format-aware: they read the active tag format
- * from the server via /api/v1/config/entity-format.
+ * Uses @architxt/entity-matcher as the source of truth for:
+ *   - existing tag discovery
+ *   - clean-text entity scanning
+ *   - tag building
  *
- * Tag syntax (current active format — v1-dual):
- *   [[MatchedText (entity.name, entity.entity_id)]]
- *
- * If entity_id is omitted:
- *   [[MatchedText (entity.name)]]
- *
- * To switch formats server-wide, change ACTIVE_FORMAT_KEY in
- * server/src/entity-tag-format.js. The UI discovers the new format
- * on next page load via loadFormatRegistry().
+ * UI-only concerns (grouping cards, per-match apply, rendering) stay here.
  */
 
 import type { Entity } from '@/lib/api/client';
+import { getCachedFormat } from '@/lib/entity-tag-format';
 import {
-  getActiveRegex,
-  parseTagParen,
-  buildTag,
-  hasEntityTags,
-} from '@/lib/entity-tag-format';
+  buildTag as sharedBuildTag,
+  findExistingEntityTags as sharedFindExistingEntityTags,
+  scanForEntityMatches as sharedScanForEntityMatches,
+  buildCleanToRawMap as sharedBuildCleanToRawMap,
+  renderEntityTaggedContent as sharedRenderEntityTaggedContent,
+} from '@architxt/entity-matcher';
+
+function uiFormat() {
+  const { active } = getCachedFormat();
+  return {
+    key: active.key,
+    regexSource: active.regexSource,
+    regexFlags: active.regexFlags,
+    presentInIndicator: active.presentInIndicator,
+  };
+}
 
 /** Remove all entity markup tags, leaving plain text */
 export function stripEntityTags(content: string): string {
-  const regex = getActiveRegex();
+  const regex = new RegExp(uiFormat().regexSource, uiFormat().regexFlags);
   return content.replace(regex, '$1');
 }
 
 /** Find all existing entity tags in content */
 export interface ExistingTag {
-  text: string;     // display / matched text
-  name: string;     // entity name (from paren)
-  id?: string;      // entity id (from paren, if present)
+  text: string;
+  name: string;
+  id?: string;
   start: number;
   end: number;
 }
 
 export function findExistingEntityTags(content: string): ExistingTag[] {
-  const tags: ExistingTag[] = [];
-  const regex = getActiveRegex();
-  let m: RegExpExecArray | null;
-  regex.lastIndex = 0;
-  while ((m = regex.exec(content)) !== null) {
-    const matchedText = m[1].trim();
-    const parenContent = m[2];
-
-    const parsed = parseTagParen(matchedText, parenContent);
-
-    tags.push({
-      text: parsed.matchedText,
-      name: parsed.entityName || parsed.matchedText,
-      id: parsed.entityId,
-      start: m.index,
-      end: m.index + m[0].length,
-    });
-  }
-  return tags;
+  return sharedFindExistingEntityTags(uiFormat(), content);
 }
 
 /** Group existing tags by entity and collect per-occurrence context */
 export interface ExistingTagGroup {
-  id: string;          // entity_id (e.g. "SYS-003")
-  entityName: string;  // entity name from parens
+  id: string;
+  entityName: string;
   matches: Array<{
     text: string;
     start: number;
@@ -83,18 +71,15 @@ export function groupExistingTagsByEntity(
   let cursor = 0;
   for (const line of lines) {
     lineRanges.push({ start: cursor, end: cursor + line.length });
-    cursor += line.length + 1; // +1 for newline
+    cursor += line.length + 1;
   }
 
   const map = new Map<string, ExistingTagGroup>();
 
   for (const tag of tags) {
-    // Find the line this tag appears on
-    let lineIndex = -1;
     let contextLine = '';
     for (let i = 0; i < lineRanges.length; i++) {
       if (tag.start >= lineRanges[i].start && tag.start < lineRanges[i].end + 1) {
-        lineIndex = i;
         contextLine = lines[i];
         break;
       }
@@ -120,16 +105,16 @@ export function groupExistingTagsByEntity(
 
 /** Scan clean text for entity matches, returning groups */
 export interface MatchGroup {
-  id: string; // entityDbId:matchedText
-  dbId: number;     // numeric DB id — for grouping
-  entityId: string; // e.g. "SYS-001" — written into tag parens
+  id: string;
+  dbId: number;
+  entityId: string;
   entityName: string;
   description: string | null;
   matchedText: string;
-  replacementText: string; // preview shown in UI
+  replacementText: string;
   matches: Array<{
-    startIndex: number; // offset in the CLEAN text
-    rawStartIndex: number; // offset in the RAW content (for scrolling linkage)
+    startIndex: number;
+    rawStartIndex: number;
     lineContext: string;
   }>;
 }
@@ -143,120 +128,63 @@ export function scanForEntityMatches(
   entities: Entity[],
   content: string
 ): MatchGroup[] {
-  // Build clean text while tracking which ranges were inside existing tags
-  let cleanText = '';
-  const taggedRanges: Array<{ start: number; end: number }> = [];
-  const cleanToRaw: number[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  const regex = getActiveRegex();
-  while ((m = regex.exec(content)) !== null) {
-    // Untagged region before this tag — maps 1:1 to raw
-    const untaggedText = content.slice(lastIndex, m.index);
-    for (let i = 0; i < untaggedText.length; i++) {
-      cleanToRaw.push(lastIndex + i);
-    }
-    cleanText += untaggedText;
-    const innerText = m[1]; // text inside [[...]]
-    const innerStart = m.index + 2; // after "[["
-    for (let i = 0; i < innerText.length; i++) {
-      cleanToRaw.push(innerStart + i);
-    }
-    const tagStartInClean = cleanText.length;
-    cleanText += innerText;
-    taggedRanges.push({ start: tagStartInClean, end: tagStartInClean + innerText.length });
-    lastIndex = m.index + m[0].length;
-  }
-  // Remaining untagged region
-  const remaining = content.slice(lastIndex);
-  for (let i = 0; i < remaining.length; i++) {
-    cleanToRaw.push(lastIndex + i);
-  }
-  cleanText += remaining;
+  const rawMatches = sharedScanForEntityMatches(
+    uiFormat(),
+    entities.map((e) => ({
+      id: e.id,
+      entity_id: e.entity_id,
+      name: e.name,
+      type_name: e.type_name,
+      aliases: e.aliases,
+      case_match: e.case_match,
+      type_case_match: e.type_case_match,
+    })),
+    content
+  );
 
-  // Helper: check if range overlaps any tagged range
-  const isTagged = (start: number, end: number) =>
-    taggedRanges.some((r) => start < r.end && end > r.start);
-
-  const eligibility: Array<{ text: string; entity: Entity }> = [];
-  const seen = new Set<string>();
-
-  for (const entity of entities) {
-    const texts = [entity.name, ...entity.aliases].filter(Boolean);
-    for (const text of texts) {
-      if (!text || text.trim().length === 0) continue;
-      const key = `${entity.id}:${text}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      eligibility.push({ text, entity });
-    }
-  }
-
-  eligibility.sort((a, b) => b.text.length - a.text.length);
-
-  const matchedRanges = new Set<number>();
   const groupMap = new Map<string, MatchGroup>();
+  const cleanToRaw = sharedBuildCleanToRawMap(uiFormat(), content);
+  const cleanText = stripEntityTags(content);
 
-  for (const { text, entity } of eligibility) {
-    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const resolvedMatch = entity.case_match ?? entity.type_case_match ?? 'insensitive';
-    const flags = resolvedMatch === 'sensitive' ? 'g' : 'gi';
-    const re = new RegExp(`\\b${escaped}\\b`, flags);
+  for (const m of rawMatches) {
+    if (m.fromTag) continue; // UI scan panel only shows untagged proposed matches
 
-    let match: RegExpExecArray | null;
-    while ((match = re.exec(cleanText)) !== null) {
-      const start = match.index;
-      const end = start + text.length;
-
-      // Skip if this text was already inside an entity tag
-      if (isTagged(start, end)) continue;
-
-      let covered = false;
-      for (let i = start; i < end; i++) {
-        if (matchedRanges.has(i)) {
-          covered = true;
-          break;
-        }
-      }
-      if (covered) continue;
-
-      for (let i = start; i < end; i++) {
-        matchedRanges.add(i);
-      }
-
-      const replacement = buildTag(text, entity.name, entity.entity_id);
-
-      const lines = cleanText.split('\n');
-      let charCount = 0;
-      let contextLine = '';
-      for (const line of lines) {
-        if (charCount <= start && start < charCount + line.length) {
-          contextLine = line;
-          break;
-        }
-        charCount += line.length + 1;
-      }
-
-      const groupId = `${entity.id}:${text}`;
-      if (!groupMap.has(groupId)) {
-        groupMap.set(groupId, {
-          id: groupId,
-          dbId: entity.id,
-          entityId: entity.entity_id,
-          entityName: entity.name,
-          description: entity.description,
-          matchedText: text,
-          replacementText: replacement,
-          matches: [],
-        });
-      }
-
-      groupMap.get(groupId)!.matches.push({
-        startIndex: start,
-        rawStartIndex: cleanToRaw[start],
-        lineContext: contextLine || text,
+    const groupId = `${m.dbId}:${m.matchedText}`;
+    if (!groupMap.has(groupId)) {
+      const entity = entities.find((e) => e.id === m.dbId);
+      groupMap.set(groupId, {
+        id: groupId,
+        dbId: Number(m.dbId),
+        entityId: m.entity_id,
+        entityName: m.name,
+        description: entity?.description ?? null,
+        matchedText: m.matchedText,
+        replacementText: sharedBuildTag(
+          m.matchedText,
+          m.name,
+          m.entity_id,
+          uiFormat().key as 'v1-dual' | 'v2-single'
+        ),
+        matches: [],
       });
     }
+
+    const lines = cleanText.split('\n');
+    let charCount = 0;
+    let contextLine = '';
+    for (const line of lines) {
+      if (charCount <= m.startIndex! && m.startIndex! < charCount + line.length) {
+        contextLine = line;
+        break;
+      }
+      charCount += line.length + 1;
+    }
+
+    groupMap.get(groupId)!.matches.push({
+      startIndex: m.startIndex!,
+      rawStartIndex: cleanToRaw[m.startIndex!],
+      lineContext: contextLine || m.matchedText,
+    });
   }
 
   return Array.from(groupMap.values());
@@ -274,34 +202,7 @@ export function insertEntityTags(
   groups: MatchGroup[],
   includedGroupIds: Set<string>
 ): string {
-  // Build clean-to-raw offset mapping so we can insert into raw content
-  // while leaving existing tags untouched.
-  const cleanToRaw: number[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  const regex = getActiveRegex();
-
-  while ((m = regex.exec(content)) !== null) {
-    // Untagged region before this tag — maps 1:1
-    for (let i = lastIndex; i < m.index; i++) {
-      cleanToRaw.push(i);
-    }
-    // Inner text of the tag — appears in clean text, maps inside the raw tag
-    const innerText = m[1];
-    const innerStart = m.index + 2; // after "[["
-    for (let i = 0; i < innerText.length; i++) {
-      cleanToRaw.push(innerStart + i);
-    }
-    lastIndex = m.index + m[0].length;
-  }
-  // Remaining untagged region
-  for (let i = lastIndex; i < content.length; i++) {
-    cleanToRaw.push(i);
-  }
-  // Sentinel: end of clean text → end of raw text
-  cleanToRaw.push(content.length);
-
-  // Collect matches to insert, mapping clean offsets to raw positions
+  const cleanToRaw = sharedBuildCleanToRawMap(uiFormat(), content);
   const allMatches: Array<{
     cleanStart: number;
     rawStart: number;
@@ -312,7 +213,7 @@ export function insertEntityTags(
   for (const group of groups) {
     if (!includedGroupIds.has(group.id)) continue;
 
-    const tag = buildTag(group.matchedText, group.entityName, group.entityId);
+    const tag = group.replacementText;
 
     for (const match of group.matches) {
       const cleanStart = match.startIndex;
@@ -326,10 +227,8 @@ export function insertEntityTags(
     }
   }
 
-  // Sort right-to-left by raw position so earlier offsets stay valid
   allMatches.sort((a, b) => b.rawStart - a.rawStart);
 
-  // Insert directly into raw content — existing tags are untouched
   let result = content;
   for (const match of allMatches) {
     const before = result.slice(0, match.rawStart);
@@ -346,53 +245,13 @@ export interface ContentSegment {
   content: string;
   name?: string;
   id?: string;
-  start?: number; // offset in the raw content (for entity segments)
-  end?: number;   // end offset in raw content
+  start?: number;
+  end?: number;
 }
 
 export function renderEntityTaggedContent(content: string): ContentSegment[] {
-  const segments: ContentSegment[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-
-  const regex = getActiveRegex();
-  regex.lastIndex = 0;
-  while ((m = regex.exec(content)) !== null) {
-    if (m.index > lastIndex) {
-      segments.push({
-        type: 'text',
-        content: content.slice(lastIndex, m.index),
-        start: lastIndex,
-        end: m.index,
-      });
-    }
-
-    const matchedText = m[1].trim();
-    const parenContent = m[2];
-    const parsed = parseTagParen(matchedText, parenContent);
-
-    segments.push({
-      type: 'entity',
-      content: parsed.matchedText,
-      name: parsed.entityName,
-      id: parsed.entityId,
-      start: m.index,
-      end: m.index + m[0].length,
-    });
-    lastIndex = m.index + m[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    segments.push({
-      type: 'text',
-      content: content.slice(lastIndex),
-      start: lastIndex,
-      end: content.length,
-    });
-  }
-
-  return segments;
+  return sharedRenderEntityTaggedContent(uiFormat(), content);
 }
 
 // Re-export for consumers that only need the presence check
-export { hasEntityTags };
+export { hasEntityTags } from '@architxt/entity-matcher';

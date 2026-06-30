@@ -32,6 +32,7 @@ import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
+import { STANDARD_DIMENSIONS } from '@/lib/types/index';
 
 const logger = createLogger('ModelsPage');
 
@@ -462,10 +463,14 @@ function ModelsPageContent() {
             </DialogHeader>
             <ModelForm
               onSubmit={async (data) => {
-                await mentalModelsApi.create(data);
-                toast.success('Mental model created');
-                setCreateDialogOpen(false);
-                fetchModels();
+                try {
+                  await mentalModelsApi.create(data);
+                  toast.success('Mental model created');
+                  setCreateDialogOpen(false);
+                  fetchModels();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to create mental model');
+                }
               }}
               onCancel={() => setCreateDialogOpen(false)}
               submitLabel="Create"

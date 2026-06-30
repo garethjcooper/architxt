@@ -5,7 +5,8 @@ import { useState, useCallback } from 'react';
  * Handles selection state, toggle logic, and all-select functionality
  * Works with any item type that has an `id` property
  */
-export function useMultiSelect<T extends { id: number }>(items: T[] = []) {
+export function useMultiSelect<T extends { id: number }>(items: T[] | null | undefined = []) {
+  const safeItems = items ?? [];
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   /**
@@ -30,13 +31,13 @@ export function useMultiSelect<T extends { id: number }>(items: T[] = []) {
    */
   const toggleAll = useCallback(() => {
     setSelected((prevSelected) => {
-      if (prevSelected.size === items.length && items.length > 0) {
+      if (prevSelected.size === safeItems.length && safeItems.length > 0) {
         return new Set();
       } else {
-        return new Set(items.map((item) => item.id));
+        return new Set(safeItems.map((item) => item.id));
       }
     });
-  }, [items]);
+  }, [safeItems]);
 
   /**
    * Clear all selections
@@ -56,12 +57,12 @@ export function useMultiSelect<T extends { id: number }>(items: T[] = []) {
   /**
    * Check if all items are selected
    */
-  const isAllSelected = items.length > 0 && selected.size === items.length;
+  const isAllSelected = safeItems.length > 0 && selected.size === safeItems.length;
 
   /**
    * Check if some but not all items are selected
    */
-  const isIndeterminate = items.length > 0 && selected.size > 0 && selected.size < items.length;
+  const isIndeterminate = safeItems.length > 0 && selected.size > 0 && selected.size < safeItems.length;
 
   /**
    * Get count of selected items

@@ -102,20 +102,26 @@ CREATE TABLE pending_operations (
   pop_operation_id TEXT NOT NULL,
   pop_server_id INTEGER NOT NULL,
   pop_bank_id TEXT NOT NULL,
-  pop_doc_id INTEGER NOT NULL,
+  pop_doc_id INTEGER,
+  pop_rs_id INTEGER,
+  pop_rstep_id INTEGER,
   pop_ext_id TEXT,
   pop_action TEXT NOT NULL DEFAULT 'push',
   pop_status TEXT NOT NULL DEFAULT 'pending',
   pop_error_message TEXT,
   pop_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   pop_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  FOREIGN KEY (pop_doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE
+  FOREIGN KEY (pop_doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE,
+  FOREIGN KEY (pop_rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+  FOREIGN KEY (pop_rstep_id) REFERENCES research_steps(rstep_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_pending_ops_server_bank ON pending_operations(pop_server_id, pop_bank_id);
 CREATE INDEX idx_pending_ops_status ON pending_operations(pop_status);
 CREATE INDEX idx_pending_ops_ext_id ON pending_operations(pop_ext_id);
 CREATE INDEX idx_pending_ops_doc_id ON pending_operations(pop_doc_id);
+CREATE INDEX idx_pending_ops_research_session ON pending_operations(pop_rs_id);
+CREATE INDEX idx_pending_ops_research_step ON pending_operations(pop_rstep_id);
 
 -- ============================================================================
 -- ENTITY TYPES — classification groups (e.g. Application Component, Service)
@@ -182,6 +188,11 @@ CREATE TABLE mental_models (
   mm_tags_match_mode TEXT DEFAULT 'all_strict',
   mm_is_template TEXT DEFAULT 'false',
   mm_max_tokens INTEGER DEFAULT 2048,
+  mm_viewp_description TEXT,
+  mm_viewp_meta JSON,
+  mm_dimension TEXT,
+  mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
+  mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
   mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -231,3 +242,104 @@ CREATE TABLE directive_tags (
   FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
   FOREIGN KEY (dir_id) REFERENCES directives(dir_id) ON DELETE CASCADE
 );
+
+-- ============================================================================
+-- RESEARCH DISCOVERY — query/refine sessions, steps, and artifact snapshots
+-- ============================================================================
+
+CREATE TABLE research_sessions (
+  rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rs_title TEXT NOT NULL,
+  rs_description TEXT,
+  rs_bank_id TEXT NOT NULL,
+  rs_viewpoint_ids JSON NOT NULL,
+  rs_status TEXT NOT NULL DEFAULT 'active',
+  rs_current_step_id INTEGER,
+  rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+);
+
+CREATE TABLE research_session_tags (
+  tag_id INTEGER NOT NULL,
+  rs_id INTEGER NOT NULL,
+  rs_tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  rs_tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (tag_id, rs_id),
+  FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+);
+
+CREATE TABLE research_steps (
+  rstep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rs_id INTEGER NOT NULL,
+  rstep_parent_step_id INTEGER,
+  rstep_intent_text TEXT NOT NULL,
+  rstep_selections JSON,
+  rstep_action_type TEXT NOT NULL,
+  rstep_parameters JSON,
+  rstep_viewpoint_ids JSON,
+  rstep_canvas_state JSON,
+  rstep_synthesis JSON,
+  rstep_tool_calls_used INTEGER DEFAULT 0,
+  rstep_status TEXT,
+  rstep_error_message TEXT,
+  rstep_calls JSON,
+  rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  rstep_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+  FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_research_steps_session ON research_steps(rs_id);
+CREATE INDEX idx_research_steps_parent ON research_steps(rstep_parent_step_id);
+
+CREATE TABLE research_tasks (
+  rt_id TEXT PRIMARY KEY,
+  rs_id INTEGER NOT NULL,
+  rstep_id INTEGER NOT NULL,
+  rt_type TEXT NOT NULL,
+  rt_status TEXT NOT NULL DEFAULT 'pending',
+  rt_payload JSON,
+  rt_result JSON,
+  rt_error TEXT,
+  rt_code TEXT,
+  rt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  rt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+  FOREIGN KEY (rstep_id) REFERENCES research_steps(rstep_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_research_tasks_step ON research_tasks(rstep_id);
+CREATE INDEX idx_research_tasks_status ON research_tasks(rt_status);
+
+CREATE TABLE research_artifacts (
+  ra_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rs_id INTEGER NOT NULL,
+  ra_title TEXT NOT NULL,
+  ra_description TEXT,
+  ra_bank_id TEXT NOT NULL,
+  ra_viewpoint_ids JSON NOT NULL,
+  ra_source_step_ids JSON NOT NULL,
+  ra_query_trail_snapshot JSON NOT NULL,
+  ra_seam_report JSON NOT NULL,
+  ra_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  ra_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+);
+
+CREATE TABLE research_artifact_outputs (
+  rao_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ra_id INTEGER NOT NULL,
+  rao_output_type TEXT NOT NULL,
+  rao_name TEXT NOT NULL,
+  rao_content JSON NOT NULL,
+  rao_rendered TEXT,
+  rao_source_selections JSON,
+  rao_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  rao_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (ra_id) REFERENCES research_artifacts(ra_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_research_artifacts_session ON research_artifacts(rs_id);
+CREATE INDEX idx_research_artifact_outputs_artifact ON research_artifact_outputs(ra_id);

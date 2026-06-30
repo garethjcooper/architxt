@@ -9,6 +9,48 @@ import { mapErrorToStatus, isNullish } from '../utils/db-helpers.js';
  * Send response and log in one place
  * Single return path pattern - eliminates multiple return statements
  */
+function findBadJsonValue(value, path = 'root') {
+  if (value === undefined) return path;
+  if (typeof value === 'function') return `${path} (function)`;
+  if (typeof value === 'symbol') return `${path} (symbol)`;
+  if (typeof value === 'bigint') return `${path} (bigint)`;
+  if (Number.isNaN(value)) return `${path} (NaN)`;
+  if (value === Infinity || value === -Infinity) return `${path} (Infinity)`;
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        const found = findBadJsonValue(value[i], `${path}[${i}]`);
+        if (found) return found;
+      }
+    } else {
+      for (const key of Object.keys(value)) {
+        const found = findBadJsonValue(value[key], `${path}.${key}`);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+export function makeJsonSafe(value) {
+  if (value === undefined) return null;
+  if (typeof value === 'function' || typeof value === 'symbol') return null;
+  if (typeof value === 'bigint') return Number(value);
+  if (Number.isNaN(value)) return null;
+  if (value === Infinity || value === -Infinity) return null;
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value)) {
+      return value.map((v) => makeJsonSafe(v));
+    }
+    const out = {};
+    for (const key of Object.keys(value)) {
+      out[key] = makeJsonSafe(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
 export const sendResponse = ({ res, status, data, error, code, logger, method, path, duration, extra = {} }) => {
   const message = error || `${method} ${path} ${status}`;
   const level = status >= 400 ? 'warn' : 'info';
@@ -25,7 +67,18 @@ export const sendResponse = ({ res, status, data, error, code, logger, method, p
   if (error) {
     return res.status(status).json({ error, code });
   }
-  return res.status(status).json(data);
+
+  const safeData = makeJsonSafe(data);
+
+  try {
+    JSON.stringify(safeData);
+  } catch (err) {
+    const badPath = findBadJsonValue(safeData);
+    logger.error('Response data is not JSON serializable', { error: err.message, badPath });
+    return res.status(500).json({ error: 'Internal server error: response serialization failed', code: 'SERIALIZATION_ERROR' });
+  }
+
+  return res.status(status).json(safeData);
 };
 
 /**

@@ -52,17 +52,17 @@ export async function healthCheck(serverId) {
 
     const data = await response.json();
 
+    // The /health endpoint has no fixed schema. Don't assume version/status
+    // fields; only record that the endpoint returned a 200 and the raw payload.
     logger.debug('Hindsight health check passed', {
       serverId,
-      version: data.version,
-      status: data.status,
+      responseKeys: data && typeof data === 'object' ? Object.keys(data) : [],
     });
 
     return {
       success: true,
       healthy: true,
-      version: data.version,
-      status: data.status,
+      raw: data,
     };
   } catch (error) {
     logger.error('Hindsight health check error', { serverId, error: error.message });

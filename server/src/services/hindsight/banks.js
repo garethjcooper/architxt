@@ -85,6 +85,41 @@ export async function getBank(serverId, bankId) {
 }
 
 /**
+ * List tags for a bank - GET {server_url}/v1/default/banks/{bank_id}/tags
+ *
+ * @param {number} serverId - Server ID from servers table
+ * @param {string} bankId - Bank identifier
+ * @returns {Promise<{success: boolean, items?: Array, total?: number, error?: string}>}
+ */
+export async function listBankTags(serverId, bankId) {
+  const configResult = await getServerConfig(serverId);
+  if (!configResult.success) return configResult;
+  if (!bankId) return { success: false, error: 'bankId is required' };
+
+  const { serviceUrl } = configResult.config;
+
+  try {
+    const response = await fetch(`${serviceUrl}/v1/default/banks/${encodeURIComponent(bankId)}/tags`, {
+      method: 'GET',
+      headers: buildHeaders(configResult.config),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('Hindsight listBankTags failed', { serverId, bankId, status: response.status, error: errorText });
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+    }
+
+    const data = await response.json();
+    logger.debug('Hindsight listBankTags complete', { serverId, bankId, count: data.items?.length || 0 });
+    return { success: true, items: data.items || [], total: data.total ?? data.items?.length ?? 0 };
+  } catch (error) {
+    logger.error('Hindsight listBankTags error', { serverId, bankId, error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Create a new bank - POST {server_url}/v1/default/banks
  *
  * @param {number} serverId - Server ID from servers table

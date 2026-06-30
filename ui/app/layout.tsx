@@ -35,7 +35,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>
             <Shell>

@@ -17,6 +17,7 @@ export { healthCheck } from './health.js';
 export {
   listBanks,
   getBank,
+  listBankTags,
   createBank,
   deleteBank,
 } from './banks.js';
@@ -26,3 +27,13 @@ export {
   retainMemories,
   listOperations,
 } from './memories.js';
+
+// Research/Recall Operations
+export {
+  recall,
+  reflect,
+  reflectWithBudgetFallback,
+  getEntityGraph,
+  listMemories,
+  entityCooccurrence,
+} from './research.js';

@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { MentalModel } from '@/lib/types/index';
+import { STANDARD_DIMENSIONS } from '@/lib/types/index';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -29,6 +30,9 @@ interface ModelFormProps {
     exclude_mental_model_list?: string;
     max_tokens: number;
     tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
+    dimension: string | null;
+    returns: 'json' | 'narrative';
+    concatenation: 'merge' | 'compile';
     is_template: boolean;
   }) => Promise<void>;
   onCancel: () => void;
@@ -59,15 +63,18 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
+  const [dimension, setDimension] = useState(initial?.dimension || 'interface');
+  const [returns, setReturns] = useState<'json' | 'narrative'>(initial?.returns ?? 'narrative');
+  const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(initial?.concatenation ?? 'compile');
   const [submitting, setSubmitting] = useState(false);
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    if (!/\{entity-(id|name)\}/.test(extId)) {
-      return "Template mode requires {entity-id} or {entity-name} to be present in External ID at a minimum. Name or Source Query can also use entity tags.";
+    if (!/\{entity-(id|name|type)\}/.test(`${extId}${name}`)) {
+      return "Template mode requires {entity-id}, {entity-name} or {entity-type} to be present in Template Id (External ID) or Name at a minimum. Source Query can also use entity tags.";
     }
     return null;
-  }, [isTemplate, extId]);
+  }, [isTemplate, extId, name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,10 +104,13 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
         exclude_mental_model_list: excludeList.trim() || undefined,
         max_tokens: maxTokensValidation.value,
         tags_match_mode: tagsMatchMode,
+        dimension: dimension.trim() || null,
+        returns,
+        concatenation,
         is_template: isTemplate,
       });
     } catch (err) {
-      toast.error('Failed to save mental model');
+      toast.error(err instanceof Error ? err.message : 'Failed to save mental model');
     } finally {
       setSubmitting(false);
     }
@@ -189,6 +199,47 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
         </div>
       </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
+          <select
+            id="mm-dimension"
+            value={dimension}
+            onChange={(e) => setDimension(e.target.value)}
+            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+          >
+            {STANDARD_DIMENSIONS.map((d) => (
+              <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="mm-returns" className="text-xs uppercase text-white/50 font-medium">Returns</Label>
+          <select
+            id="mm-returns"
+            value={returns}
+            onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
+            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+          >
+            <option value="json">JSON</option>
+            <option value="narrative">Narrative</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="mm-concatenation" className="text-xs uppercase text-white/50 font-medium">Concatenation</Label>
+          <select
+            id="mm-concatenation"
+            value={concatenation}
+            onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
+            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+          >
+            <option value="merge">Merge</option>
+            <option value="compile">Compile</option>
+          </select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
           <div className="space-y-0.5">

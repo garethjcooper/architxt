@@ -45,6 +45,11 @@ function ensureMissingTables(db) {
         mm_tags_match_mode TEXT DEFAULT 'all_strict',
         mm_is_template TEXT DEFAULT 'false',
         mm_max_tokens INTEGER DEFAULT 2048,
+        mm_viewp_description TEXT,
+        mm_viewp_meta JSON,
+        mm_dimension TEXT,
+        mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
+        mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
         mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
@@ -77,6 +82,105 @@ function ensureMissingTables(db) {
         FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
       )`
     },
+    {
+      name: 'research_steps',
+      ddl: `CREATE TABLE IF NOT EXISTS research_steps (
+        rstep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rs_id INTEGER NOT NULL,
+        rstep_parent_step_id INTEGER,
+        rstep_intent_text TEXT NOT NULL,
+        rstep_selections JSON,
+        rstep_action_type TEXT NOT NULL,
+        rstep_parameters JSON,
+        rstep_viewpoint_ids JSON,
+        rstep_canvas_state JSON,
+        rstep_synthesis JSON,
+        rstep_tool_calls_used INTEGER DEFAULT 0,
+        rstep_status TEXT,
+        rstep_error_message TEXT,
+        rstep_calls JSON,
+        rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+        FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+      )`
+    },
+    {
+      name: 'research_sessions',
+      ddl: `CREATE TABLE IF NOT EXISTS research_sessions (
+        rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rs_title TEXT NOT NULL,
+        rs_description TEXT,
+        rs_bank_id TEXT NOT NULL,
+        rs_viewpoint_ids JSON NOT NULL,
+        rs_status TEXT NOT NULL DEFAULT 'active',
+        rs_current_step_id INTEGER,
+        rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+      )`
+    },
+    {
+      name: 'research_session_tags',
+      ddl: `CREATE TABLE IF NOT EXISTS research_session_tags (
+        tag_id INTEGER NOT NULL,
+        rs_id INTEGER NOT NULL,
+        rs_tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        rs_tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY (tag_id, rs_id),
+        FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'research_artifacts',
+      ddl: `CREATE TABLE IF NOT EXISTS research_artifacts (
+        ra_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rs_id INTEGER NOT NULL,
+        ra_title TEXT NOT NULL,
+        ra_description TEXT,
+        ra_bank_id TEXT NOT NULL,
+        ra_viewpoint_ids JSON NOT NULL,
+        ra_source_step_ids JSON NOT NULL,
+        ra_query_trail_snapshot JSON NOT NULL,
+        ra_seam_report JSON NOT NULL,
+        ra_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        ra_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'research_artifact_outputs',
+      ddl: `CREATE TABLE IF NOT EXISTS research_artifact_outputs (
+        rao_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ra_id INTEGER NOT NULL,
+        rao_output_type TEXT NOT NULL,
+        rao_name TEXT NOT NULL,
+        rao_content JSON NOT NULL,
+        rao_rendered TEXT,
+        rao_source_selections JSON,
+        rao_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        rao_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (ra_id) REFERENCES research_artifacts(ra_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'research_tasks',
+      ddl: `CREATE TABLE IF NOT EXISTS research_tasks (
+        rt_id TEXT PRIMARY KEY,
+        rs_id INTEGER NOT NULL,
+        rstep_id INTEGER NOT NULL,
+        rt_type TEXT NOT NULL,
+        rt_status TEXT NOT NULL DEFAULT 'pending',
+        rt_payload JSON,
+        rt_result JSON,
+        rt_error TEXT,
+        rt_code TEXT,
+        rt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        rt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+        FOREIGN KEY (rstep_id) REFERENCES research_steps(rstep_id) ON DELETE CASCADE
+      )`
+    }
   ];
 
   let createdCount = 0;
@@ -91,6 +195,79 @@ function ensureMissingTables(db) {
   return createdCount;
 }
 
+function relaxResearchStepsParentCascade(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'research_steps'").get();
+  if (!tableExists) {
+    return 0;
+  }
+
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='research_steps'").pluck().get();
+  if (typeof sql !== 'string') return 0;
+
+  const parentFkPattern = /FOREIGN\s+KEY\s*\(\s*rstep_parent_step_id\s*\)\s*REFERENCES\s+research_steps\s*\(\s*rstep_id\s*\)\s*ON\s+DELETE\s+(CASCADE|SET\s+NULL)/i;
+  const match = sql.match(parentFkPattern);
+  if (!match) {
+    return 0;
+  }
+
+  const action = match[1].toUpperCase();
+  if (action === 'SET NULL') {
+    return 0;
+  }
+
+  logger.warn('Recreating research_steps with ON DELETE SET NULL for rstep_parent_step_id');
+
+  const columns = [
+    'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_selections',
+    'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_canvas_state',
+    'rstep_synthesis', 'rstep_proposed_actions', 'rstep_anchors', 'rstep_intent_tag',
+    'rstep_status', 'rstep_error_message',
+    'rstep_tool_calls_used', 'rstep_tool_tokens_used', 'rstep_synthesis_tokens_used',
+    'rstep_truncated_by', 'rstep_created_at'
+  ];
+  const colList = columns.join(', ');
+
+  try {
+    db.pragma('foreign_keys = OFF');
+
+    db.exec(`CREATE TABLE _research_steps_new (
+      rstep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rs_id INTEGER NOT NULL,
+      rstep_parent_step_id INTEGER,
+      rstep_intent_text TEXT NOT NULL,
+      rstep_selections JSON,
+      rstep_action_type TEXT NOT NULL,
+      rstep_parameters JSON,
+      rstep_viewpoint_ids JSON,
+      rstep_canvas_state JSON,
+      rstep_synthesis JSON,
+      rstep_status TEXT,
+      rstep_error_message TEXT,
+      rstep_tool_calls_used INTEGER DEFAULT 0,
+      rstep_calls JSON,
+      rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+      FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+    )`);
+
+    db.exec(`INSERT INTO _research_steps_new (${colList}) SELECT ${colList} FROM research_steps`);
+    db.exec('DROP TABLE research_steps');
+    db.exec('ALTER TABLE _research_steps_new RENAME TO research_steps');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_steps_session ON research_steps(rs_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_steps_parent ON research_steps(rstep_parent_step_id)');
+
+    const fkCheck = db.pragma('foreign_key_check');
+    if (fkCheck && fkCheck.length > 0) {
+      logger.warn('Foreign key check found issues after research_steps migration', { issues: fkCheck });
+    }
+
+    logger.info('Recreated research_steps with ON DELETE SET NULL');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
 /**
  * Remove restrictive CHECK constraints from mental model tables.
  * SQLite doesn't support ALTER TABLE DROP CONSTRAINT, so we recreate
@@ -101,6 +278,18 @@ function ensureMissingTables(db) {
  * junction rows into temp tables before recreating the parents.
  */
 function removeMentalModelCheckConstraints(db) {
+  // If dependent tables are missing, we cannot safely recreate tables with FK references.
+  // This can happen on partially-initialized databases; the base schema should be applied first.
+  const requiredTables = ['mental_models', 'mental_model_entities', 'entities'];
+  const missing = requiredTables.filter((name) => {
+    const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(name);
+    return !row;
+  });
+  if (missing.length > 0) {
+    logger.warn('Skipping mental model CHECK constraint removal — missing dependent tables', { missing });
+    return 0;
+  }
+
   const mentalModelsInfo = {
     name: 'mental_models',
     newDdl: `CREATE TABLE mental_models_new (
@@ -115,10 +304,13 @@ function removeMentalModelCheckConstraints(db) {
       mm_tags_match_mode TEXT DEFAULT 'all_strict',
       mm_is_template TEXT DEFAULT 'false',
       mm_max_tokens INTEGER DEFAULT 2048,
+      mm_dimension TEXT,
+      mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
+      mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
       mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
     )`,
-    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_created_at', 'mm_updated_at']
+    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
   };
 
   const mentalModelEntitiesInfo = {
@@ -140,6 +332,9 @@ function removeMentalModelCheckConstraints(db) {
   };
 
   function tableHasConstraint(name) {
+    const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(name);
+    if (!exists) return false;
+
     const tableInfo = db.prepare(`PRAGMA table_info(${name})`).all();
     if (!tableInfo.length) return false;
 
@@ -159,6 +354,12 @@ function removeMentalModelCheckConstraints(db) {
     logger.info('No CHECK constraints to remove from mental model tables');
     return 0;
   }
+
+  // Clean up any stale tables left behind by a previous interrupted migration.
+  db.exec(`DROP TABLE IF EXISTS mental_models_new`);
+  db.exec(`DROP TABLE IF EXISTS mental_model_entities_new`);
+  db.exec(`DROP TABLE IF EXISTS _temp_mm_tags`);
+  db.exec(`DROP TABLE IF EXISTS _temp_mm_entities`);
 
   // Save junction rows BEFORE dropping the parent table so CASCADE doesn't delete them.
   if (needsModels) {
@@ -211,6 +412,36 @@ function removeMentalModelCheckConstraints(db) {
 function ensureMissingColumns(db) {
   const migrations = [
     {
+      table: 'pending_operations',
+      columns: [
+        {
+          name: 'pop_rs_id',
+          ddl: 'ALTER TABLE pending_operations ADD COLUMN pop_rs_id INTEGER'
+        },
+        {
+          name: 'pop_rstep_id',
+          ddl: 'ALTER TABLE pending_operations ADD COLUMN pop_rstep_id INTEGER'
+        }
+      ]
+    },
+    {
+      table: 'research_steps',
+      columns: [
+        {
+          name: 'rstep_status',
+          ddl: "ALTER TABLE research_steps ADD COLUMN rstep_status TEXT DEFAULT 'running'"
+        },
+        {
+          name: 'rstep_error_message',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_error_message TEXT'
+        },
+        {
+          name: 'rstep_calls',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_calls JSON'
+        }
+      ]
+    },
+    {
       table: 'mental_models',
       columns: [
         {
@@ -220,6 +451,26 @@ function ensureMissingColumns(db) {
         {
           name: 'mm_max_tokens',
           ddl: 'ALTER TABLE mental_models ADD COLUMN mm_max_tokens INTEGER DEFAULT 2048'
+        },
+        {
+          name: 'mm_viewp_description',
+          ddl: 'ALTER TABLE mental_models ADD COLUMN mm_viewp_description TEXT'
+        },
+        {
+          name: 'mm_viewp_meta',
+          ddl: 'ALTER TABLE mental_models ADD COLUMN mm_viewp_meta JSON'
+        },
+        {
+          name: 'mm_dimension',
+          ddl: 'ALTER TABLE mental_models ADD COLUMN mm_dimension TEXT'
+        },
+        {
+          name: 'mm_returns',
+          ddl: "ALTER TABLE mental_models ADD COLUMN mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative'))"
+        },
+        {
+          name: 'mm_concatenation',
+          ddl: "ALTER TABLE mental_models ADD COLUMN mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile'))"
         }
       ]
     },
@@ -311,13 +562,14 @@ export function ensureSchema(db) {
     const created = ensureMissingTables(db);
     const added = ensureMissingColumns(db);
     const removed = removeMentalModelCheckConstraints(db);
+    const relaxed = relaxResearchStepsParentCascade(db);
     const ftsCreated = ensureDocumentsFts(db);
-    if (created > 0 || added > 0 || removed > 0 || ftsCreated) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, FTS table created: ${ftsCreated}`);
+    if (created > 0 || added > 0 || removed > 0 || relaxed > 0 || ftsCreated) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${relaxed} FK action(s) relaxed, FTS table created: ${ftsCreated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || ftsCreated;
+    return created > 0 || added > 0 || removed > 0 || relaxed > 0 || ftsCreated;
   }
 
   if (!fs.existsSync(schemaPath)) {
