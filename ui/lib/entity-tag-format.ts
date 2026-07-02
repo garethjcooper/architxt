@@ -34,10 +34,10 @@ export async function loadFormatRegistry(): Promise<FormatRegistry> {
   } catch (err) {
     console.warn('[entity-tag-format] Server format fetch failed, using default', err);
     const fallback: FormatRegistry = {
-      activeKey: 'v2-single',
+      activeKey: 'v3-single-entity',
       active: {
-        key: 'v2-single',
-        displayName: 'Single Field (id only)',
+        key: 'v3-single-entity',
+        displayName: 'Single Field with Type Prefix (type:id)',
         regexSource: '\\[\\[(.*?)\\s*(?:\\(([^)]*)\\))?\\]\\]',
         regexFlags: 'g',
         presentInIndicator: '[[',
@@ -51,10 +51,10 @@ export async function loadFormatRegistry(): Promise<FormatRegistry> {
 
 export function getCachedFormat(): FormatRegistry {
   return _cachedFormat ?? {
-    activeKey: 'v2-single',
+    activeKey: 'v3-single-entity',
     active: {
-      key: 'v2-single',
-      displayName: 'Single Field (id only)',
+      key: 'v3-single-entity',
+      displayName: 'Single Field with Type Prefix (type:id)',
       regexSource: '\\[\\[(.*?)\\s*(?:\\(([^)]*)\\))?\\]\\]',
       regexFlags: 'g',
       presentInIndicator: '[[',

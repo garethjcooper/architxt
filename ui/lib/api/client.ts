@@ -423,6 +423,7 @@ export const mentalModelsApi = {
     return fetchApi<MentalModel[]>(`/mentalmodels${queryString ? '?' + queryString : ''}`);
   },
   listDimensions: () => fetchApi<string[]>('/mentalmodels/dimensions'),
+  listStandardDimensions: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/dimensions/standard'),
   get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
   create: (data: {
     ext_id: string;
@@ -954,6 +955,12 @@ export const researchApi = {
   deleteStep: (stepId: number) =>
     fetchApi<{ deleted_step_id: number; session_id: number; remaining_step_count: number }>(`/research/steps/${stepId}`, {
       method: 'DELETE',
+    }),
+
+  rerunStep: (stepId: number, payload: { server_id: number }) =>
+    fetchApi<{ step_id: number; session_id: number; status: string; action_type: string }>(`/research/steps/${stepId}/rerun`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   listSessions: (bankId: string) =>

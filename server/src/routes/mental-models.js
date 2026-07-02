@@ -17,6 +17,7 @@ import {
   getMentalModelWithRelations,
   listMentalModels,
   listMentalModelDimensions,
+  listStandardDimensions,
   getMentalModelTags,
   addMentalModelTag,
   removeMentalModelTag,
@@ -173,6 +174,31 @@ router.get('/dimensions', async (req, res) => {
   const result = await listMentalModelDimensions(db);
   const dimensions = Array.isArray(result) ? result : (result.success ? result.data : []);
   sendResponse({ res, status: 200, data: dimensions, logger, method: 'GET', path: '/mentalmodels/dimensions', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/dimensions/standard:
+ *   get:
+ *     summary: List canonical standard mental model dimensions
+ *     tags: [MentalModels]
+ *     responses:
+ *       200:
+ *         description: Array of dimension value/label pairs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   value: { type: string }
+ *                   label: { type: string }
+ */
+router.get('/dimensions/standard', async (req, res) => {
+  const start = Date.now();
+  const result = listStandardDimensions();
+  sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: '/mentalmodels/dimensions/standard', duration: Date.now() - start });
 });
 
 /**

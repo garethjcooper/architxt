@@ -2,6 +2,7 @@ export interface TagMatchData {
   matchedText: string;
   entityName?: string;
   entityId?: string;
+  entityType?: string;
 }
 
 export interface Format {
@@ -44,7 +45,13 @@ export interface EntityLike {
 
 export function buildRegex(format: Format): RegExp;
 export function parseTagParen(matchedText: string, parenContent?: string): TagMatchData;
-export function buildTag(matchedText: string, entityName: string, entityId: string, formatKey?: 'v1-dual' | 'v2-single'): string;
+export function buildTag(
+  matchedText: string,
+  entityName: string,
+  entityId: string,
+  entityType?: string,
+  formatKey?: 'v1-dual' | 'v2-single' | 'v3-single-entity'
+): string;
 export function findExistingEntityTags(format: Format, content: string): ExistingTag[];
 export function scanForEntityMatches(format: Format, entities: EntityLike[], content: string): EntityMatch[];
 export function groupMatchesByEntity(matches: EntityMatch[]): Map<string, { entity_id: string; name: string; type_name?: string; count: number; fromTag: boolean; ranges: Array<{ start: number; end: number }> }>;

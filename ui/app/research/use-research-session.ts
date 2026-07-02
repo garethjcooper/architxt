@@ -20,13 +20,9 @@ const MAX_POLL_MS = 10 * 60 * 1000;
 export interface UseResearchSessionOptions {
   serverId: string;
   bankId: string;
-  query: string;
-  setQuery: (q: string) => void;
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize';
-  dimensions: string[];
   viewMode: 'step' | 'session';
   onViewModeChange?: (mode: 'step' | 'session') => void;
-  queryOptions?: ResearchQueryOptions;
+  availableDimensions?: Array<{ value: string; label: string }>;
 }
 
 export interface ResearchQueryOptions {
@@ -48,6 +44,8 @@ export interface ResearchQueryOptions {
     maxTokens?: number;
   };
 }
+
+const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize'>(['prebuilt', 'recall', 'reflect', 'synthesize']);
 
 function buildDiscoverOptions(
   queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize',
@@ -80,17 +78,74 @@ function buildDiscoverOptions(
   return {};
 }
 
+function buildQueryOptionsFromParameters(
+  actionType: string,
+  parameters: Record<string, any> | null,
+): ResearchQueryOptions {
+  const opts: ResearchQueryOptions = {};
+  if (!parameters) return opts;
+
+  if (actionType === 'recall') {
+    opts.recall = {
+      ...(Array.isArray(parameters.types) && { types: parameters.types }),
+      ...(typeof parameters.prefer_observations === 'boolean' && { preferObservations: parameters.prefer_observations }),
+      ...(parameters.include?.source_facts != null && { includeSourceFacts: true }),
+      ...(['low', 'mid', 'high'].includes(parameters.budget) && { budget: parameters.budget }),
+      ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
+    };
+  } else if (actionType === 'reflect') {
+    opts.reflect = {
+      ...(parameters.include?.facts != null && { includeSourceFacts: true }),
+      ...(['low', 'mid', 'high'].includes(parameters.budget) && { budget: parameters.budget }),
+      ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
+      ...(Array.isArray(parameters.fact_types) && { factTypes: parameters.fact_types }),
+      ...(typeof parameters.exclude_mental_models === 'boolean' && { excludeMentalModels: parameters.exclude_mental_models }),
+    };
+  } else if (actionType === 'synthesize') {
+    opts.synthesize = {
+      ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
+    };
+  }
+
+  return opts;
+}
+
+const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
+  recall: {
+    types: ['world', 'observation'],
+    preferObservations: false,
+    includeSourceFacts: false,
+    budget: 'mid',
+    maxTokens: 4096,
+  },
+  reflect: {
+    includeSourceFacts: false,
+    budget: 'low',
+    maxTokens: 4096,
+    factTypes: ['world', 'observation'],
+    excludeMentalModels: false,
+  },
+  synthesize: {
+    maxTokens: 4096,
+  },
+};
+
 export function useResearchSession({
   serverId,
   bankId,
-  query,
-  setQuery,
-  queryMode,
-  dimensions,
   viewMode,
   onViewModeChange,
-  queryOptions,
+  availableDimensions = [],
 }: UseResearchSessionOptions) {
+  const [query, setQuery] = useState('');
+  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize'>('prebuilt');
+  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
+  const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
+    recall: { ...DEFAULT_QUERY_OPTIONS.recall },
+    reflect: { ...DEFAULT_QUERY_OPTIONS.reflect },
+    synthesize: { ...DEFAULT_QUERY_OPTIONS.synthesize },
+  });
+
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -393,6 +448,70 @@ export function useResearchSession({
     }
   }, [activeStepId, fetchTrail]);
 
+  const handleRerunStep = useCallback(async (stepId: number) => {
+    if (!serverId) {
+      toast.error('Select a server first');
+      return;
+    }
+    try {
+      const response = await researchApi.rerunStep(stepId, {
+        server_id: parseInt(serverId, 10),
+      });
+      setRunningStepId(stepId);
+      onViewModeChange?.('step');
+      setActiveStepId(stepId);
+      setSelectedStepIds(new Set());
+      await pollForStepCompletion(response.session_id, stepId);
+      logger.info('Research step re-run completed', {
+        session_id: response.session_id,
+        step_id: stepId,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : String(err);
+      logger.error('Failed to re-run step', err);
+      toast.error(`Failed to re-run query: ${message}`);
+    } finally {
+      setRunningStepId((prev) => (prev === stepId ? null : prev));
+    }
+  }, [serverId, pollForStepCompletion, onViewModeChange]);
+
+  const handleLoadStepDetails = useCallback(async (stepId: number) => {
+    try {
+      const step = await researchApi.getStep(stepId);
+      if (step.action_type === 'synthesize') {
+        toast.info('"Use details" is not available for synthesis steps yet');
+        return;
+      }
+
+      setQuery(step.intent_text || '');
+
+      if (VALID_QUERY_MODES.has(step.action_type as any)) {
+        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize');
+      } else {
+        logger.warn('Unsupported action_type for use details', { action_type: step.action_type });
+      }
+
+      setQueryOptions((prev) => ({
+        ...prev,
+        ...buildQueryOptionsFromParameters(step.action_type, step.parameters),
+      }));
+
+      if (step.action_type === 'prebuilt' && Array.isArray(step.parameters?.dimensions)) {
+        const validValues = new Set(availableDimensions.map((d) => d.value));
+        const restored = step.parameters.dimensions.filter((d: string) => validValues.has(d));
+        setSelectedDimensions(restored);
+      } else if (step.action_type !== 'prebuilt') {
+        setSelectedDimensions([]);
+      }
+
+      toast.success('Loaded query details into query card');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : String(err);
+      logger.error('Failed to load step details', err);
+      toast.error(`Failed to load query details: ${message}`);
+    }
+  }, [availableDimensions]);
+
   const handleSynthesize = useCallback(async (sourceStepIds: number[], intentText: string) => {
     if (!serverId || !bankId || !activeSessionId) {
       toast.error('Select a server, bank, and session first');
@@ -411,7 +530,9 @@ export function useResearchSession({
         session_id: activeSessionId,
         source_step_ids: sourceStepIds,
         intent_text: intentText.trim(),
-        ...(queryOptions?.synthesize?.maxTokens != null && { max_tokens: queryOptions.synthesize.maxTokens }),
+        ...(queryOptions.synthesize?.maxTokens != null
+          ? { max_tokens: queryOptions.synthesize.maxTokens }
+          : {}),
       });
       setActiveSessionId(response.session_id);
       onViewModeChange?.('step');
@@ -430,7 +551,7 @@ export function useResearchSession({
     } finally {
       setLoading(false);
     }
-  }, [serverId, bankId, activeSessionId, pollForStepCompletion, onViewModeChange, setActiveStepId, setSelectedStepIds]);
+  }, [serverId, bankId, activeSessionId, queryOptions, pollForStepCompletion, onViewModeChange, setActiveStepId, setSelectedStepIds]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -459,7 +580,7 @@ export function useResearchSession({
       .map((t) => (t.type ? `${t.type}:${t.id}` : t.id));
 
     if (queryMode === 'prebuilt') {
-      if (dimensions.length === 0) {
+      if (selectedDimensions.length === 0) {
         toast.error('Select at least one dimension');
         return;
       }
@@ -474,7 +595,7 @@ export function useResearchSession({
           server_id: parseInt(serverId, 10),
           bank_id: bankId,
           entities: entityIds,
-          dimensions,
+          dimensions: selectedDimensions,
           session_id: activeSessionId ?? undefined,
         });
         if (!prebuilt.success) {
@@ -552,7 +673,7 @@ export function useResearchSession({
     } finally {
       setLoading(false);
     }
-  }, [serverId, bankId, query, queryMode, dimensions, activeSessionId, queryOptions, fetchSessions, pollForStepCompletion, viewMode, selectedStepIds, activeStepId, handleSynthesize]);
+  }, [serverId, bankId, query, queryMode, selectedDimensions, activeSessionId, queryOptions, fetchSessions, pollForStepCompletion, viewMode, selectedStepIds, activeStepId, handleSynthesize]);
 
   return {
     sessions,
@@ -564,6 +685,14 @@ export function useResearchSession({
     setSelectedStepIds,
     activeStepId,
     setActiveStepId,
+    query,
+    setQuery,
+    queryMode,
+    setQueryMode,
+    selectedDimensions,
+    setSelectedDimensions,
+    queryOptions,
+    setQueryOptions,
     creatingSession,
     setCreatingSession,
     stepToDelete,
@@ -585,6 +714,8 @@ export function useResearchSession({
     clearStepSelection,
     handleLoadStep,
     handleDeleteStep,
+    handleRerunStep,
+    handleLoadStepDetails,
     handleSubmit,
     handleSynthesize,
   };

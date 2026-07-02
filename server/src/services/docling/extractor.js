@@ -82,11 +82,19 @@ export async function extract(fileBuffer, filename, options = {}) {
     });
 
     if (result.status !== 'success') {
-      throw new Error(`Docling conversion failed: ${result.errors?.join(', ') || 'unknown error'}`);
+      const doclingErrors = result.errors?.join('; ') || 'unknown error';
+      const err = new Error(`Docling conversion failed (${result.status}): ${doclingErrors}`);
+      err.doclingStatus = result.status;
+      err.doclingErrors = result.errors || [];
+      err.doclingResponse = result;
+      throw err;
     }
 
     if (!result.markdown) {
-      throw new Error('Docling returned no markdown content');
+      const err = new Error('Docling returned no markdown content');
+      err.doclingStatus = result.status;
+      err.doclingResponse = result;
+      throw err;
     }
 
     // Step 2: Extract images from markdown
@@ -120,7 +128,11 @@ export async function extract(fileBuffer, filename, options = {}) {
 
   } catch (error) {
     logger.error('Extraction failed', { filename, error: error.message });
-    throw error;
+    const err = new Error(error.message || 'Extraction failed');
+    err.doclingStatus = error.doclingStatus;
+    err.doclingErrors = error.doclingErrors;
+    err.doclingResponse = error.doclingResponse;
+    throw err;
   }
 }
 

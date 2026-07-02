@@ -31,7 +31,7 @@ export const deleteSession = sessionBase.del;
 export const getStep = stepBase.get;
 export const updateStep = (db, stepId, data) => dbExec(() => {
   const id = requireInt('stepId', stepId);
-  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message']);
+  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_created_at']);
   const entries = Object.entries(data).filter(([key]) => allowedFields.has(key));
   if (entries.length === 0) {
     throw new Error('No allowed fields to update');

@@ -32,7 +32,6 @@ import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
-import { STANDARD_DIMENSIONS } from '@/lib/types/index';
 
 const logger = createLogger('ModelsPage');
 

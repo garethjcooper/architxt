@@ -1,20 +1,28 @@
 'use client';
 
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2 } from 'lucide-react';
+import { Trash2, MoreHorizontal, Play, ClipboardList } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { ResearchStepSummary } from '@/lib/api/client';
 
 export interface QueryTrailProps {
   trail: ResearchStepSummary[];
   selectedStepIds: Set<number>;
   activeStepId: number | null;
-  deletingStepId: number | null;
+  runningStepId: number | null;
   viewMode?: 'step' | 'session';
   onToggleStep: (stepId: number) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
   onActivateStep: (stepId: number) => void;
   onRequestDelete: (stepId: number) => void;
+  onRerunStep?: (stepId: number) => Promise<unknown>;
+  onUseDetails?: (stepId: number) => Promise<unknown> | void;
   onInspectStep?: (stepId: number) => void;
 }
 
@@ -23,17 +31,20 @@ export function QueryTrail(props: QueryTrailProps) {
     trail,
     selectedStepIds,
     activeStepId,
-    deletingStepId,
+    runningStepId,
     viewMode,
     onToggleStep,
     onSelectAll,
     onClearSelection,
     onActivateStep,
     onRequestDelete,
+    onRerunStep,
+    onUseDetails,
     onInspectStep,
   } = props;
 
   const isMerge = viewMode === 'session';
+  const anyRunning = runningStepId != null;
 
   return (
     <div className="flex flex-col min-h-0 h-full">
@@ -95,15 +106,47 @@ export function QueryTrail(props: QueryTrailProps) {
                     {step.intent_text || 'Untitled query'}
                   </div>
                 </button>
-                <button
-                  type="button"
-                  disabled={deletingStepId === step.id}
-                  onClick={() => onRequestDelete(step.id)}
-                  className="shrink-0 p-1 rounded text-white/30 hover:text-red-400 hover:bg-red-900/20 disabled:opacity-50"
-                  aria-label={`Delete query ${idx + 1}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger>
+                    <span
+                      className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/30 hover:text-white hover:bg-white/10 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Query ${idx + 1} actions`}
+                      role="button"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-32">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUseDetails?.(step.id);
+                      }}
+                      disabled={step.status === 'running' || isSynthesize}
+                    >
+                      <ClipboardList className="h-3 w-3 mr-2" /> Re-use
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRerunStep?.(step.id);
+                      }}
+                      disabled={step.status === 'running' || anyRunning}
+                    >
+                      <Play className="h-3 w-3 mr-2" /> Re-run
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-rose-400 focus:text-rose-400 focus:bg-rose-950/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRequestDelete(step.id);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             );
           })

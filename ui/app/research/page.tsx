@@ -36,7 +36,7 @@ import {
   useResearchSession,
   type ResearchQueryOptions,
 } from './use-research-session';
-import { useResearchGraph } from './use-research-graph';
+import { useResearchGraph, resolveNodeType, canonicalEntityId } from './use-research-graph';
 import { ResearchResultPanel } from './research-result-panel';
 
 const logger = createLogger('ResearchPage');
@@ -67,14 +67,9 @@ export default function ResearchPage() {
   const [banks, setBanks] = useState<Array<{ bank_id: string; name: string; description?: string }>>([]);
   const [selectedBankId, setSelectedBankId] = useState<string>('');
 
-  const [query, setQuery] = useState('');
   const [queryCursor, setQueryCursor] = useState(0);
-  const queryRef = useRef(query);
   const queryCursorRef = useRef(queryCursor);
 
-  useEffect(() => {
-    queryRef.current = query;
-  }, [query]);
   useEffect(() => {
     queryCursorRef.current = queryCursor;
   }, [queryCursor]);
@@ -87,10 +82,10 @@ export default function ResearchPage() {
 
   const [entityTab, setEntityTab] = useState<EntityTab>('entities');
   const [edgeTab, setEdgeTab] = useState<EdgeTab>('found');
-  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize'>('prebuilt');
   const [viewMode, setViewMode] = useState<'step' | 'session'>('step');
-  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
-  const [availableDimensions, setAvailableDimensions] = useState<string[]>(['interface']);
+  const [availableDimensions, setAvailableDimensions] = useState<Array<{ value: string; label: string }>>([
+    { value: 'interface', label: 'Interface' },
+  ]);
   const resultView: 'narrative' = 'narrative';
   const [canvasView, setCanvasView] = useState<'graph' | 'components'>('graph');
   const [viewLayouts, setViewLayouts] = useState<Record<'graph' | 'components', GraphLayout>>({
@@ -98,6 +93,10 @@ export default function ResearchPage() {
     components: 'dagre',
   });
   const [viewEdgeFilters, setViewEdgeFilters] = useState<Record<'graph' | 'components', Set<string>>>({
+    graph: new Set(),
+    components: new Set(),
+  });
+  const [viewNodeFilters, setViewNodeFilters] = useState<Record<'graph' | 'components', Set<string>>>({
     graph: new Set(),
     components: new Set(),
   });
@@ -114,13 +113,9 @@ export default function ResearchPage() {
     graph: false,
     components: false,
   });
-  const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
-    recall: { ...DEFAULT_QUERY_OPTIONS.recall },
-    reflect: { ...DEFAULT_QUERY_OPTIONS.reflect },
-    synthesize: { ...DEFAULT_QUERY_OPTIONS.synthesize },
-  });
   const graphLayout = viewLayouts[canvasView];
   const graphEdgeFilters = viewEdgeFilters[canvasView];
+  const graphNodeFilters = viewNodeFilters[canvasView];
   const showEdgeLabels = viewShowEdgeLabels[canvasView];
   const narrativeWidth = narrativeWidths[canvasView];
   const showNarrativePlain = viewNarrativePlain[canvasView];
@@ -141,6 +136,14 @@ export default function ResearchPage() {
       return { ...prev, [canvasView]: next };
     });
   }, [canvasView]);
+  const toggleGraphNodeFilter = useCallback((type: string) => {
+    setViewNodeFilters((prev) => {
+      const next = new Set(prev[canvasView]);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return { ...prev, [canvasView]: next };
+    });
+  }, [canvasView]);
   const [stepToInspect, setStepToInspect] = useState<ResearchStepSummary | null>(null);
 
   const {
@@ -153,6 +156,14 @@ export default function ResearchPage() {
     setSelectedStepIds,
     activeStepId,
     setActiveStepId,
+    query,
+    setQuery,
+    queryMode,
+    setQueryMode,
+    selectedDimensions,
+    setSelectedDimensions,
+    queryOptions,
+    setQueryOptions,
     creatingSession,
     setCreatingSession,
     stepToDelete,
@@ -173,18 +184,21 @@ export default function ResearchPage() {
     clearStepSelection,
     handleLoadStep,
     handleDeleteStep,
+    handleRerunStep,
+    handleLoadStepDetails,
     handleSubmit,
   } = useResearchSession({
     serverId: selectedServerId,
     bankId: selectedBankId,
-    query,
-    setQuery,
-    queryMode,
-    dimensions: selectedDimensions,
     viewMode,
     onViewModeChange: setViewMode,
-    queryOptions,
+    availableDimensions,
   });
+
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   const activeSession = useMemo(() => sessions.find((s) => s.id === activeSessionId), [sessions, activeSessionId]);
   const activeSessionName = activeSession?.title || 'narrative';
@@ -233,6 +247,25 @@ export default function ResearchPage() {
     });
   }, [graphEdges]);
 
+  useEffect(() => {
+    const allTypes = Array.from(new Set(graphNodes.map((n) => n.type).filter((t): t is string => Boolean(t) && t !== 'system'))).sort();
+    setViewNodeFilters((prev) => {
+      let changed = false;
+      const next: Record<'graph' | 'components', Set<string>> = { ...prev };
+      for (const view of ['graph', 'components'] as const) {
+        const current = new Set(prev[view]);
+        for (const type of allTypes) {
+          if (!current.has(type)) {
+            current.add(type);
+            changed = true;
+          }
+        }
+        next[view] = current;
+      }
+      return changed ? next : prev;
+    });
+  }, [graphNodes]);
+
   const nodeMap = useMemo(() => {
     const map = new Map<string, GraphNode>();
     for (const n of graphNodes) map.set(n.id, n);
@@ -274,6 +307,10 @@ export default function ResearchPage() {
   }, [handleLoadStep, setSelectedStepIds]);
 
   const handleInsertToken = useCallback((token: string) => {
+    if (queryMode === 'prebuilt' && /\[\[[^\[\]—]+?\s*—\s*[^\[\]—→]+?\s*→\s*[^\[\]]+?\]\]/.test(token)) {
+      toast.info('Edges cannot be added to prebuilt queries');
+      return;
+    }
     const before = queryRef.current.slice(0, queryCursorRef.current);
     const after = queryRef.current.slice(queryCursorRef.current);
     const prefix = before.length > 0 && !before.endsWith(' ') ? ' ' : '';
@@ -281,7 +318,7 @@ export default function ResearchPage() {
     const pos = next.length - after.length;
     setQuery(next);
     setQueryCursor(pos);
-  }, []);
+  }, [queryMode]);
 
   const handleGraphAddToQuery = useCallback(
     (selection: { kind: string; ids: string[]; source?: string }) => {
@@ -292,12 +329,16 @@ export default function ResearchPage() {
         if (!node) return;
         handleInsertToken(formatEntityToken(node.label || node.id, node.id, node.type));
       } else if (selection.kind === 'edge') {
+        if (queryMode === 'prebuilt') {
+          toast.info('Edges cannot be added to prebuilt queries');
+          return;
+        }
         const edge = graphEdges.find((e) => e.id === id);
         if (!edge) return;
         handleInsertToken(formatEdgeToken(edge.source, edge.target, edge.label || edge.relationship_type || 'edge'));
       }
     },
-    [nodeMap, graphEdges, handleInsertToken],
+    [nodeMap, graphEdges, handleInsertToken, queryMode],
   );
 
   useEffect(() => {
@@ -310,15 +351,17 @@ export default function ResearchPage() {
     fetchServers();
     // Dimensions come from the local mental-model configuration, not any
     // selected bank/server, so load them once at page startup.
-    mentalModelsApi.listDimensions()
+    mentalModelsApi.listStandardDimensions()
       .then((data) => {
-        const dims = Array.isArray(data) ? data : [];
-        setAvailableDimensions(dims.length > 0 ? dims : ['interface']);
-        setSelectedDimensions((prev: string[]) => prev.filter((d) => dims.includes(d)));
+        const dims = (Array.isArray(data) ? data : []).filter(
+          (d) => d.value?.toLowerCase() !== 'none' && d.label?.toLowerCase() !== 'none',
+        );
+        setAvailableDimensions(dims.length > 0 ? dims : [{ value: 'interface', label: 'Interface' }]);
+        setSelectedDimensions((prev: string[]) => prev.filter((d) => dims.some((dim) => dim.value === d)));
       })
       .catch((err) => {
         logger.error('Failed to fetch mental model dimensions', err);
-        setAvailableDimensions(['interface']);
+        setAvailableDimensions([{ value: 'interface', label: 'Interface' }]);
       });
   }, []);
 
@@ -527,7 +570,6 @@ export default function ResearchPage() {
                 trail={trail}
                 selectedStepIds={selectedStepIds}
                 activeStepId={activeStepId}
-                deletingStepId={deletingStepId}
                 viewMode={viewMode}
                 onToggleStep={(stepId) => {
                   if (viewMode === 'step') {
@@ -548,6 +590,9 @@ export default function ResearchPage() {
                   switchToStep(stepId);
                 }}
                 onRequestDelete={setStepToDelete}
+                onRerunStep={handleRerunStep}
+                onUseDetails={handleLoadStepDetails}
+                runningStepId={runningStepId}
                 onInspectStep={(stepId) => {
                   const step = trail.find((s) => s.id === stepId) ?? null;
                   setStepToInspect(step);
@@ -592,7 +637,14 @@ export default function ResearchPage() {
                 setCursor={setQueryCursor}
                 loading={loading}
                 isRunning={isRunning}
-                availableEntities={allEntities.map((e) => ({ id: e.entity_id, label: e.name, type: e.type_name }))}
+                availableEntities={allEntities.map((e) => {
+                  const type = resolveNodeType({ id: e.entity_id, label: e.name, type: e.type_name });
+                  return {
+                    id: canonicalEntityId(type, e.entity_id),
+                    label: e.name,
+                    type,
+                  };
+                })}
                 availableEdges={graphEdges}
                 onSubmit={handleSubmit}
                 queryMode={queryMode}
@@ -706,6 +758,8 @@ export default function ResearchPage() {
           setShowEdgeLabels={setShowEdgeLabels}
           edgeFilters={graphEdgeFilters}
           toggleEdgeFilter={toggleGraphEdgeFilter}
+          nodeFilters={graphNodeFilters}
+          toggleNodeFilter={toggleGraphNodeFilter}
           onGraphAddToQuery={handleGraphAddToQuery}
           bottomFlex={bottomFlex}
           narrativeWidth={narrativeWidth}

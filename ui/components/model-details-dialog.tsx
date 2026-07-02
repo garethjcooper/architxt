@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi } from '@/lib/api/client';
 import type {
@@ -8,8 +8,8 @@ import type {
   DerivedMentalModel,
   Entity,
   MentalModelEntityOverrides,
+  StandardDimension,
 } from '@/lib/types/index';
-import { STANDARD_DIMENSIONS } from '@/lib/types/index';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -142,7 +142,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
-  const [dimension, setDimension] = useState(model.dimension || 'interface');
+  const [dimension, setDimension] = useState(model.dimension || 'none');
   const [returns, setReturns] = useState<'json' | 'narrative'>(model.returns ?? 'narrative');
   const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(model.concatenation ?? 'compile');
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
@@ -151,6 +151,17 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
   const [confirmTemplateOffOpen, setConfirmTemplateOffOpen] = useState(false);
+  const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    mentalModelsApi.listStandardDimensions().then((dims) => {
+      if (!cancelled) setStandardDimensions(dims);
+    }).catch(() => {
+      if (!cancelled) setStandardDimensions([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const baseConfig: BaseConfig = useMemo(
     () => ({
@@ -187,7 +198,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setMaxTokensError(null);
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
-    setDimension(model.dimension || 'interface');
+    setDimension(model.dimension || 'none');
     setReturns(model.returns ?? 'narrative');
     setConcatenation(model.concatenation ?? 'compile');
     setDerived(buildDerivedRows(model, buildBaseConfig(model)));
@@ -248,7 +259,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     parsedMaxTokens !== (model.max_tokens ?? 2048) ||
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
     isTemplate !== (model.is_template ?? false) ||
-    dimension !== (model.dimension || 'interface') ||
+    dimension !== (model.dimension || 'none') ||
     returns !== (model.returns ?? 'narrative') ||
     concatenation !== (model.concatenation ?? 'compile') ||
     derivedChanged;
@@ -320,6 +331,21 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     if (value && derived.length === 0) {
       setDerived(buildDerivedRows(model, baseConfig));
     }
+  };
+
+  const handleDimensionChange = (value: string) => {
+    setDimension(value);
+    setDerived((prev) => prev.map((d) => ({ ...d, dimension: value.trim() || null })));
+  };
+
+  const handleReturnsChange = (value: 'json' | 'narrative') => {
+    setReturns(value);
+    setDerived((prev) => prev.map((d) => ({ ...d, returns: value })));
+  };
+
+  const handleConcatenationChange = (value: 'merge' | 'compile') => {
+    setConcatenation(value);
+    setDerived((prev) => prev.map((d) => ({ ...d, concatenation: value })));
   };
 
   const handleSave = async () => {
@@ -414,6 +440,54 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} />
         </div>
 
+        {!isTemplate && (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
+                Dimension
+              </Label>
+              <select
+                id="mm-detail-dimension"
+                value={dimension}
+                onChange={(e) => handleDimensionChange(e.target.value)}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                {standardDimensions.map((d) => (
+                  <option key={d.value} value={d.value}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
+                Returns
+              </Label>
+              <select
+                id="mm-detail-returns"
+                value={returns}
+                onChange={(e) => handleReturnsChange(e.target.value as 'json' | 'narrative')}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                <option value="json">JSON</option>
+                <option value="narrative">Narrative</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
+                Concatenation
+              </Label>
+              <select
+                id="mm-detail-concatenation"
+                value={concatenation}
+                onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                <option value="merge">Merge</option>
+                <option value="compile">Compile</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="mm-detail-ext-id" className="text-xs uppercase text-white/50 font-medium">
@@ -484,52 +558,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               <option value="exact">Exact</option>
             </select>
             <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
-              Dimension
-            </Label>
-            <select
-              id="mm-detail-dimension"
-              value={dimension}
-              onChange={(e) => setDimension(e.target.value)}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-            >
-              {STANDARD_DIMENSIONS.map((d) => (
-                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
-              Returns
-            </Label>
-            <select
-              id="mm-detail-returns"
-              value={returns}
-              onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-            >
-              <option value="json">JSON</option>
-              <option value="narrative">Narrative</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
-              Concatenation
-            </Label>
-            <select
-              id="mm-detail-concatenation"
-              value={concatenation}
-              onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-            >
-              <option value="merge">Merge</option>
-              <option value="compile">Compile</option>
-            </select>
           </div>
         </div>
 
@@ -691,7 +719,55 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
-                <div className="w-1/2 min-w-[480px] p-4 flex flex-col overflow-hidden">
+                <div className="w-1/2 min-w-[480px] p-4 flex flex-col gap-4 overflow-hidden">
+                  <div className="shrink-0 border border-white/10 rounded-lg p-3 bg-white/[0.02]">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
+                          Dimension
+                        </Label>
+                        <select
+                          id="mm-detail-dimension"
+                          value={dimension}
+                          onChange={(e) => handleDimensionChange(e.target.value)}
+                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                        >
+                          {standardDimensions.map((d) => (
+                            <option key={d.value} value={d.value}>{d.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
+                          Returns
+                        </Label>
+                        <select
+                          id="mm-detail-returns"
+                          value={returns}
+                          onChange={(e) => handleReturnsChange(e.target.value as 'json' | 'narrative')}
+                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                        >
+                          <option value="json">JSON</option>
+                          <option value="narrative">Narrative</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
+                          Concatenation
+                        </Label>
+                        <select
+                          id="mm-detail-concatenation"
+                          value={concatenation}
+                          onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
+                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                        >
+                          <option value="merge">Merge</option>
+                          <option value="compile">Compile</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
                   <DerivedModelsPanel
                     model={model}
                     derived={derived}

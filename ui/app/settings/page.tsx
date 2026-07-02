@@ -59,9 +59,10 @@ export default function SettingsPage() {
       </div>
 
       {settings && (
-        <div className="space-y-6">
-          {/* -- PROMPTS -- */}
-          <SectionCard icon={<Image className="h-4 w-4" />} title="Pipeline Stages">
+        <div className="flex-1 overflow-auto min-h-0 -mr-2 pr-2">
+          <div className="space-y-6">
+            {/* -- PROMPTS -- */}
+            <SectionCard icon={<Image className="h-4 w-4" />} title="Pipeline Stages">
             <div className="space-y-6">
               <DiagramPromptBlock
                 label="Diagram Description (Vision)"
@@ -168,6 +169,7 @@ export default function SettingsPage() {
               />
             </div>
           </SectionCard>
+          </div>
         </div>
       )}
     </PageShell>

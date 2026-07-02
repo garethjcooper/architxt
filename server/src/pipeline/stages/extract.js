@@ -96,12 +96,19 @@ async function execute(artifacts, config, data, services, context) {
   } catch (error) {
     logger.error('Extract failed', {
       docId: data.doc_id,
-      error: error.message
+      error: error.message,
+      doclingStatus: error.doclingStatus,
+      doclingErrors: error.doclingErrors
     });
 
     return {
       stageResult: { success: false, error: `Extract failed: ${error.message}` },
-      stageMetrics: { durationMs: Date.now() - startTime },
+      stageMetrics: {
+        durationMs: Date.now() - startTime,
+        error: error.message,
+        doclingStatus: error.doclingStatus || null,
+        doclingErrors: error.doclingErrors || null,
+      },
       stageOutput: []
     };
   }

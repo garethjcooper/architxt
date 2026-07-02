@@ -161,6 +161,9 @@ export async function processDocument(doc, abortSignal) {
       success: result.success,
       metrics: mergedMetrics,
       error: result.success ? null : result.errors.join(', '),
+      errorDetails: result.success ? null : result.results
+        .filter((r) => !r.success)
+        .map((r) => ({ stage: r.stage, error: r.error, metrics: r.metrics })),
       provenance_log: result.provenanceLog,
       // Extract final outputs from provenance log for API reporting
       ...extractFinalOutputs(result.provenanceLog)

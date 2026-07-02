@@ -71,7 +71,16 @@ export function createRunner(options = {}) {
       // Helper: skip reporter calls after abort to avoid API noise (e.g. 409 on request_release)
       const reportIfActive = (method, ...args) => {
         if (!signal?.aborted && reporter?.[method]) {
-          reporter[method](...args);
+          try {
+            const maybePromise = reporter[method](...args);
+            if (maybePromise && typeof maybePromise.catch === 'function') {
+              maybePromise.catch((err) => {
+                logger.warn('Reporter call failed; continuing pipeline', { method, error: err.message });
+              });
+            }
+          } catch (err) {
+            logger.warn('Reporter call threw; continuing pipeline', { method, error: err.message });
+          }
         }
       };
 

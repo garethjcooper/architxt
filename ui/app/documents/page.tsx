@@ -33,6 +33,7 @@ import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
+import { formatErrorSummary } from '@/lib/error-format';
 
 const logger = createLogger('DocumentsPage');
 
@@ -249,6 +250,14 @@ function DocumentsPageContent() {
   const badgeText = (text: string) => {
     if (compactBadges || text.length <= 30) return text;
     return text.slice(0, 30) + '...';
+  };
+
+  const getLastExtractError = (doc: Document): string | null => {
+    if (!doc.processing_history?.length) return null;
+    const failed = [...doc.processing_history].reverse().find(
+      (h) => h.to === 'processed_extract_failed' || h.success === false,
+    );
+    return failed?.error || null;
   };
 
   const isAllSelected = filteredDocuments.length > 0 && selected.size === filteredDocuments.length;
@@ -575,8 +584,15 @@ function DocumentsPageContent() {
                         className="py-1.5 px-4 text-xs cursor-pointer"
                         onClick={() => handleView(doc)}
                       >
-                        <Badge className={`text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 ${statusColors[doc.status] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}>
-                          <ArchitxtIcon className="h-3 w-3" />
+                        <Badge
+                          title={getLastExtractError(doc) || undefined}
+                          className={`text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 ${statusColors[doc.status] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}
+                        >
+                          {doc.status === 'processed_extract_failed' ? (
+                            <AlertCircle className="h-3 w-3 shrink-0" />
+                          ) : (
+                            <ArchitxtIcon className="h-3 w-3" />
+                          )}
                           {statusLabels[doc.status] || doc.status}
                         </Badge>
                       </TableCell>

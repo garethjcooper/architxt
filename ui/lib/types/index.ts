@@ -30,7 +30,12 @@ export interface Document {
     from: string;
     to: string;
     at: string;
+    success?: boolean;
+    error?: string;
+    metrics?: Record<string, unknown>;
+    reason?: string;
   }> | null;
+  processing_progress: Record<string, unknown> | null;
   tags: Array<{ id: number; name: string }>;
   metadata: Array<{ id: number; key: string; value: string | null }>;
   content_length_k: number | null;
@@ -143,7 +148,10 @@ export interface MentalModel {
   updated_at: string;
 }
 
-export const STANDARD_DIMENSIONS = ['interface', 'summary', 'interface-found', 'capability'] as const;
+export type StandardDimension = {
+  value: string;
+  label: string;
+};
 
 export interface DerivedMentalModel extends MentalModel {
   is_derived: true;

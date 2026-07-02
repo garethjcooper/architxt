@@ -11,6 +11,7 @@ import {
   updateSessionCurrentStep,
   createStep,
   updateStep,
+  getSession,
   getSessionWithCurrentStep,
   listStepsForSession,
   getStep,
@@ -25,6 +26,120 @@ import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 
 const logger = createLogger('research-route');
 const router = Router();
+
+async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, errorMessage = null } = {}) {
+  return updateStep(db, stepId, {
+    rstep_canvas_state: snapshot.rstep_canvas_state,
+    rstep_synthesis: snapshot.rstep_synthesis,
+    rstep_calls: snapshot.rstep_calls,
+    rstep_status: keepFailed ? 'failed' : snapshot.rstep_status,
+    rstep_error_message: keepFailed ? errorMessage : snapshot.rstep_error_message,
+    rstep_tool_calls_used: snapshot.rstep_tool_calls_used,
+  });
+}
+
+async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
+  const parameters = step.rstep_parameters || {};
+  const dimensions = parameters.dimensions || [];
+  const selections = step.rstep_selections || [];
+  const entities = selections
+    .filter((s) => s.kind === 'entity')
+    .map((s) => (s.id ? String(s.id) : undefined))
+    .filter(Boolean);
+
+  if (!entities.length || !dimensions.length) {
+    await updateStep(db, step.rstep_id, {
+      rstep_status: 'failed',
+      rstep_error_message: 'Prebuilt step is missing entities or dimensions',
+      rstep_calls: [],
+      rstep_tool_calls_used: 0,
+    });
+    return;
+  }
+
+  const prebuiltStart = Date.now();
+  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, dimensions });
+  const prebuiltDuration = Date.now() - prebuiltStart;
+  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, dimensions };
+  const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
+
+  const buildPrebuiltCall = (status, extra = {}) => ({
+    tool: 'prebuilt_research',
+    mode: 'prebuilt',
+    status,
+    duration_ms: prebuiltDuration,
+    request_payload_chars: prebuiltPayloadChars,
+    request: {
+      method: 'POST',
+      url: '/research/prebuilt',
+      body: prebuiltRequestBody,
+    },
+    ...extra,
+  });
+
+  if (!result.success) {
+    logger.warn('Prebuilt re-run failed; restoring step snapshot', { stepId: step.rstep_id, error: result.error, code: result.code });
+    await restoreStepSnapshot(db, step.rstep_id, snapshot, { errorMessage: result.error });
+    return;
+  }
+
+  const mergedGraph = { nodes: [], edges: [] };
+  const narratives = [];
+  for (const dim of result.dimensions || []) {
+    const found = (dim.entities || [])
+      .filter((e) => e.found)
+      .map((e) => e.entity);
+    const modelNames = (dim.entities || [])
+      .flatMap((e) => (e.model_results || []).filter((m) => m.found).map((m) => m.name))
+      .filter((v, i, a) => a.indexOf(v) === i);
+    const lines = [`## ${dim.dimension}`, ''];
+    if (dim.result?.narrative) {
+      lines.push(dim.result.narrative);
+    } else {
+      lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
+      lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
+    }
+    narratives.push(lines.join('\n'));
+
+    const jsonResult = dim.result?.json_result;
+    if (jsonResult) {
+      const graphs = Array.isArray(jsonResult) ? jsonResult : [jsonResult];
+      for (const g of graphs) {
+        if (!g || !Array.isArray(g.nodes)) continue;
+        for (const n of g.nodes) {
+          if (!mergedGraph.nodes.some((x) => x.id === n.id)) mergedGraph.nodes.push(n);
+        }
+        for (const e of g.edges || []) {
+          const key = e.id || `${e.source}|${e.target}|${e.label}`;
+          if (!mergedGraph.edges.some((x) => (x.id || `${x.source}|${x.target}|${x.label}`) === key)) {
+            mergedGraph.edges.push(e);
+          }
+        }
+      }
+    }
+  }
+
+  const foundCount = (result.dimensions || []).reduce((sum, d) => sum + (d.found_count || 0), 0);
+  const missingCount = (result.dimensions || []).reduce((sum, d) => sum + (d.missing_count || 0), 0);
+
+  await updateStep(db, step.rstep_id, {
+    rstep_canvas_state: { graph: mergedGraph },
+    rstep_synthesis: { narrative: narratives.join('\n\n') },
+    rstep_status: 'completed',
+    rstep_error_message: null,
+    rstep_tool_calls_used: 1,
+    rstep_calls: [
+      buildPrebuiltCall('success', {
+        response_summary: {
+          dimensions: (result.dimensions || []).map((d) => d.dimension),
+          entity_count: entities.length,
+          found_count: foundCount,
+          missing_count: missingCount,
+        },
+      }),
+    ],
+  });
+}
 
 const toApiSession = (dbRow) => ({
   id: dbRow.rs_id,
@@ -1022,6 +1137,141 @@ router.delete('/steps/:id', async (req, res) => {
     logger,
     method: 'DELETE',
     path: '/research/steps/:id',
+    duration: Date.now() - start,
+  });
+});
+
+/**
+ * @openapi
+ * /research/steps/{id}/rerun:
+ *   post:
+ *     summary: Re-run an existing research step in place
+ *     tags: [Research]
+ *     description: |
+ *       Re-executes the original query using the same runner that created the
+ *       step. On success the step's canvas/synthesis/calls/status are replaced
+ *       with the new result. On failure the previous step state is restored so
+ *       the step remains non-destructive.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *     responses:
+ *       202:
+ *         description: Re-run started; poll the step for completion
+ *       404:
+ *         description: Step not found
+ *       400:
+ *         description: Invalid server_id or unsupported action_type
+ */
+router.post('/steps/:id/rerun', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/steps/:id/rerun', start });
+  if (!idCheck.valid) return;
+
+  const { server_id } = req.body;
+  if (!server_id || typeof server_id !== 'number') {
+    sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
+    return;
+  }
+
+  const stepResult = await getStep(db, idCheck.id);
+  if (!stepResult.success || !stepResult.data) {
+    sendResponse({ res, status: 404, error: 'Research step not found', code: 'NOT_FOUND', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
+    return;
+  }
+
+  const step = stepResult.data;
+  const sessionResult = await getSession(db, step.rs_id);
+  if (!sessionResult.success || !sessionResult.data) {
+    sendResponse({ res, status: 404, error: 'Research session not found', code: 'NOT_FOUND', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
+    return;
+  }
+  const bankId = sessionResult.data.rs_bank_id;
+  if (!bankId) {
+    sendResponse({ res, status: 500, error: 'Session is missing bank_id', code: 'DATABASE_ERROR', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
+    return;
+  }
+
+  const supportedActionTypes = new Set(['prebuilt', 'recall', 'reflect', 'synthesize']);
+  if (!supportedActionTypes.has(step.rstep_action_type)) {
+    sendResponse({ res, status: 400, error: `Re-run not supported for action_type: ${step.rstep_action_type}`, code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
+    return;
+  }
+
+  const snapshot = {
+    rstep_canvas_state: step.rstep_canvas_state,
+    rstep_synthesis: step.rstep_synthesis,
+    rstep_calls: step.rstep_calls,
+    rstep_status: step.rstep_status,
+    rstep_error_message: step.rstep_error_message,
+    rstep_tool_calls_used: step.rstep_tool_calls_used,
+  };
+
+  // Mark step as running and clear previous error so the UI reflects the re-run.
+  const runningUpdate = await updateStep(db, idCheck.id, {
+    rstep_status: 'running',
+    rstep_error_message: null,
+    rstep_created_at: new Date().toISOString(),
+  });
+  if (!runningUpdate.success) {
+    sendResponse({ res, status: 500, error: runningUpdate.error, code: runningUpdate.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
+    return;
+  }
+
+  setImmediate(() => {
+    if (step.rstep_action_type === 'prebuilt') {
+      rerunPrebuiltStep(db, server_id, bankId, step, snapshot).catch((err) => {
+        logger.error('Prebuilt re-run runner error; restoring step snapshot', { stepId: step.rstep_id, error: err.message });
+        restoreStepSnapshot(db, step.rstep_id, snapshot, { errorMessage: err.message }).catch((restoreErr) => {
+          logger.error('Failed to restore step snapshot after prebuilt re-run error', { stepId: step.rstep_id, error: restoreErr.message });
+        });
+      });
+      return;
+    }
+
+    runDiscoverStep({
+      db,
+      serverId: server_id,
+      bankId,
+      queryDepth: step.rstep_action_type,
+      intentText: step.rstep_intent_text,
+      selections: step.rstep_selections || [],
+      options: step.rstep_parameters || {},
+      rsId: step.rs_id,
+      rstepId: step.rstep_id,
+    })
+      .then((result) => {
+        if (!result.success) {
+          logger.warn('Re-run failed; restoring step snapshot', { stepId: step.rstep_id, error: result.error, code: result.code });
+          return restoreStepSnapshot(db, step.rstep_id, snapshot, { errorMessage: result.error }).then(() => result);
+        }
+        return result;
+      })
+      .catch((err) => {
+        logger.error('Re-run runner error; restoring step snapshot', { stepId: step.rstep_id, error: err.message });
+        return restoreStepSnapshot(db, step.rstep_id, snapshot, { errorMessage: err.message }).then(() => ({ success: false, error: err.message, code: 'RERUN_FAILED' }));
+      });
+  });
+
+  sendResponse({
+    res,
+    status: 202,
+    data: {
+      step_id: step.rstep_id,
+      session_id: step.rs_id,
+      status: 'running',
+      action_type: step.rstep_action_type,
+    },
+    logger,
+    method: 'POST',
+    path: '/research/steps/:id/rerun',
     duration: Date.now() - start,
   });
 });

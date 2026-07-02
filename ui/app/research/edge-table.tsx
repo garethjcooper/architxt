@@ -3,6 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import type { GraphEdge, GraphNode } from '@/lib/api/client';
 import { formatEdgeToken } from './query-tokens';
+import { colorForType } from '@/components/research-canvas';
 
 export interface EdgeTableProps {
   edges: Array<GraphEdge & { inScope?: boolean }>;
@@ -18,7 +19,7 @@ export function EdgeTable({
   const labelFor = (id: string) => nodeMap.get(id)?.label || id;
   const qualifiedFor = (id: string) => {
     const node = nodeMap.get(id);
-    return node?.type ? `${node.type}:${id}` : id;
+    return node?.type && !id.startsWith(`${node.type}:`) ? `${node.type}:${id}` : id;
   };
 
   return (
@@ -36,6 +37,7 @@ export function EdgeTable({
                 ? 'border-white/5 bg-black/20 hover:bg-white/5'
                 : 'border-white/5 bg-black/10 opacity-60 hover:bg-white/5 hover:opacity-80'
             }`}
+            style={{ borderLeftColor: colorForType(e.relationship_type || undefined), borderLeftWidth: 3 }}
           >
             <div className="min-w-0 flex-1 flex flex-col gap-0.5">
               <div className="flex items-center gap-1.5 text-xs text-white/90 truncate">

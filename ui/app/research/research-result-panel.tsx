@@ -102,6 +102,8 @@ export interface ResearchResultPanelProps {
   setShowEdgeLabels: (v: boolean) => void;
   edgeFilters: Set<string>;
   toggleEdgeFilter: (type: string) => void;
+  nodeFilters: Set<string>;
+  toggleNodeFilter: (type: string) => void;
   onGraphAddToQuery: (selection: { kind: string; ids: string[]; source?: string }) => void;
   bottomFlex?: number;
   narrativeWidth?: number;
@@ -133,6 +135,8 @@ export function ResearchResultPanel({
   setShowEdgeLabels,
   edgeFilters,
   toggleEdgeFilter,
+  nodeFilters,
+  toggleNodeFilter,
   onGraphAddToQuery,
   bottomFlex,
   narrativeWidth = 40,
@@ -149,9 +153,8 @@ export function ResearchResultPanel({
   const [showNarrativeIndex, setShowNarrativeIndex] = useState(true);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
-  const typeLegend = useMemo(() => {
-    if (graphNodes.length === 0) return [];
-    return Array.from(new Set(graphNodes.map((n) => n.type).filter((t): t is string => Boolean(t) && t !== 'system'))).sort().slice(0, 8);
+  const nodeTypes = useMemo(() => {
+    return Array.from(new Set(graphNodes.map((n) => n.type).filter((t): t is string => Boolean(t) && t !== 'system'))).sort();
   }, [graphNodes]);
 
   const edgeTypes = useMemo(() => {
@@ -396,18 +399,49 @@ export function ResearchResultPanel({
                 />
                 Inspector
               </label>
-              {typeLegend.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] text-white/50">Types:</span>
-                  {typeLegend.map((type) => (
-                    <span
-                      key={type}
-                      className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/20 text-white/70"
-                      style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
-                    >
-                      {type}
-                    </span>
-                  ))}
+              {nodeTypes.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-white/50">Types:</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => nodeTypes.forEach((t) => { if (!nodeFilters.has(t)) toggleNodeFilter(t); })}
+                        className="text-[9px] text-emerald-300/80 hover:text-emerald-300"
+                      >
+                        all
+                      </button>
+                      <span className="text-white/20">|</span>
+                      <button
+                        type="button"
+                        onClick={() => nodeTypes.forEach((t) => { if (nodeFilters.has(t)) toggleNodeFilter(t); })}
+                        className="text-[9px] text-white/50 hover:text-white/70"
+                      >
+                        none
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {nodeTypes.map((type) => {
+                      const active = nodeFilters.has(type);
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => toggleNodeFilter(type)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                            active
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                              : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
+                          }`}
+                          style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
+                          title={active ? 'Hide this node type' : 'Show this node type'}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
               {edgeTypes.length > 0 && (
@@ -445,6 +479,7 @@ export function ResearchResultPanel({
                               ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                               : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
                           }`}
+                          style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
                           title={active ? 'Hide this edge type' : 'Show this edge type'}
                         >
                           {type}
@@ -571,6 +606,7 @@ export function ResearchResultPanel({
                 layoutAnimate={graphLayoutAnimate}
                 onAddToQuery={onGraphAddToQuery}
                 edgeFilters={edgeFilters}
+                nodeFilters={nodeFilters}
                 showEdgeLabels={showEdgeLabels}
                 onCyReady={(cy) => { cyRef.current = cy; }}
                 onHover={setHoveredInfo}
@@ -589,6 +625,7 @@ export function ResearchResultPanel({
                 layoutAnimate={graphLayoutAnimate}
                 onAddToQuery={onGraphAddToQuery}
                 edgeFilters={edgeFilters}
+                nodeFilters={nodeFilters}
                 showEdgeLabels={showEdgeLabels}
                 onCyReady={(cy) => { cyRef.current = cy; }}
                 onHover={setHoveredInfo}

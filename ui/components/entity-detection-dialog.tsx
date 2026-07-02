@@ -275,10 +275,22 @@ export function EntityDetectionDialog({
     [workingContent]
   );
 
+  const entityById = useMemo(() => {
+    const map = new Map<number, Entity>();
+    for (const e of entities) map.set(e.id, e);
+    return map;
+  }, [entities]);
+
   const existingTagGroups = useMemo(
     () => groupExistingTagsByEntity(workingContent, existingTags),
     [workingContent, existingTags]
   );
+
+  const formatExistingTag = useCallback((group: ExistingTagGroup) => {
+    const entity = entityById.get(parseInt(group.id, 10));
+    const typeName = entity?.type_name;
+    return `[[${group.entityName} (${typeName ? `${typeName}:` : ''}${group.id})]]`;
+  }, [entityById]);
 
   const handleScrollToExistingMatch = (groupId: string, matchIdx: number) => {
     const group = existingTagGroups.find((g) => g.id === groupId);
@@ -367,7 +379,7 @@ export function EntityDetectionDialog({
                             </span>
                             <span className="text-[10px] text-white/30">→</span>
                             <span className="text-xs text-purple-300">
-                              &ldquo;[[{group.entityName} ({group.id})]]&rdquo;
+                              &ldquo;{formatExistingTag(group)}&rdquo;
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
