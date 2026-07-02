@@ -67,6 +67,7 @@ interface InteractiveGraphProps {
   showMentalModelLabels?: boolean;
   showEdgeLabels?: boolean;
   edgeFilters?: Set<string>;
+  nodeFilters?: Set<string>;
   /** Called with the Cytoscape instance once it is created. */
   onCyReady?: (cy: cytoscape.Core) => void;
   /** Called when the user hovers over a node or edge. */
@@ -149,6 +150,7 @@ export function InteractiveGraph({
   showMentalModelLabels = true,
   showEdgeLabels = false,
   edgeFilters,
+  nodeFilters,
   onCyReady,
   onHover,
 }: InteractiveGraphProps) {
@@ -727,31 +729,56 @@ export function InteractiveGraph({
     const cy = cyRef.current;
     if (!cy) return;
 
-    // Apply edge-filter dimming without removing elements. Active edges and
-    // their endpoint nodes stay bright; everything else is muted.
+    // Apply edge and node filter dimming without removing elements. Active edges
+    // connect active node types; active nodes are endpoints of active edges.
+    const hasEdgeFilters = edgeFilters && edgeFilters.size > 0;
+    const hasNodeFilters = nodeFilters && nodeFilters.size > 0;
+    if (!hasEdgeFilters && !hasNodeFilters) {
+      cy.elements().removeClass('dimmed-edge dimmed-node');
+      return;
+    }
+
+    let activeEdges = cy.edges();
     if (edgeFilters) {
-      const activeEdges = cy.edges().filter((e) => {
+      activeEdges = activeEdges.filter((e) => {
         const type = e.data('relationship_type');
         return type ? edgeFilters.has(type) : false;
       });
-      const activeNodeIds = new Set<string>();
-      activeEdges.forEach((e) => {
-        activeNodeIds.add(e.source().id());
-        activeNodeIds.add(e.target().id());
-      });
-      cy.edges().not(activeEdges).addClass('dimmed-edge');
-      activeEdges.removeClass('dimmed-edge');
-      cy.nodes().forEach((n) => {
-        if (activeNodeIds.has(n.id())) {
-          n.removeClass('dimmed-node');
-        } else {
-          n.addClass('dimmed-node');
-        }
-      });
-    } else {
-      cy.elements().removeClass('dimmed-edge dimmed-node');
     }
-  }, [elements, edgeFilters]);
+
+    let activeNodes = cy.nodes();
+    if (nodeFilters) {
+      activeNodes = activeNodes.filter((n) => {
+        const type = n.data('type');
+        return type ? nodeFilters.has(type) : false;
+      });
+    }
+
+    const activeNodeIds = new Set(activeNodes.map((n) => n.id()));
+    activeEdges = activeEdges.filter((e) => activeNodeIds.has(e.source().id()) && activeNodeIds.has(e.target().id()));
+
+    const finalActiveNodeIds = new Set<string>();
+    const activeEdgeIds = new Set(activeEdges.map((e) => e.id()));
+    activeEdges.forEach((e) => {
+      finalActiveNodeIds.add(e.source().id());
+      finalActiveNodeIds.add(e.target().id());
+    });
+
+    cy.nodes().forEach((n) => {
+      if (finalActiveNodeIds.has(n.id())) {
+        n.removeClass('dimmed-node');
+      } else {
+        n.addClass('dimmed-node');
+      }
+    });
+    cy.edges().forEach((e) => {
+      if (activeEdgeIds.has(e.id())) {
+        e.removeClass('dimmed-edge');
+      } else {
+        e.addClass('dimmed-edge');
+      }
+    });
+  }, [elements, edgeFilters, nodeFilters]);
 
   useEffect(() => {
     const cy = cyRef.current;

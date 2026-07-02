@@ -181,9 +181,21 @@ export async function generateCompletion(messages, options = {}) {
         statusText: response.statusText,
         error: errorText,
       });
+
+      // Try to extract a provider-level message from the response body
+      let providerError = errorText;
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.error?.message) providerError = parsed.error.message;
+        else if (parsed.error) providerError = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+        else if (parsed.message) providerError = parsed.message;
+      } catch {
+        // leave providerError as the raw text
+      }
+
       return {
         success: false,
-        error: `LLM request failed: ${response.status} ${response.statusText}`,
+        error: `LLM request failed: ${response.status} ${response.statusText}${providerError ? ` — ${providerError}` : ''}`,
         code: 'LLM_REQUEST_FAILED',
       };
     }

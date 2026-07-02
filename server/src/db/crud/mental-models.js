@@ -24,7 +24,7 @@ const VALID_REFRESH_MODES = new Set(['full', 'delta']);
 const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any', 'exact']);
 export const VALID_RETURNS = new Set(['json', 'narrative']);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
-export const STANDARD_DIMENSIONS = ['interface', 'summary'];
+export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability'];
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
 const MIN_MAX_TOKENS = 256;
 const MAX_MAX_TOKENS = 8192;
@@ -309,10 +309,32 @@ export const listMentalModelDimensions = (db) => dbExec(() => {
     FROM ${TABLE}
     WHERE mm_dimension IS NOT NULL
       AND mm_dimension != ''
+      AND mm_dimension != 'none'
     ORDER BY mm_dimension ASC
   `;
   return stmt(db, sql).all().map((r) => r.dimension);
 }, 'mentalModels.listDimensions');
+
+/**
+ * Return the canonical list of standard mental model dimensions with display
+ * labels. Kept in code today; can be moved to a DB lookup table later without
+ * changing the API contract.
+ */
+const DISPLAY_LABELS = {
+  none: 'None',
+  interface: 'Interface',
+  summary: 'Summary',
+  'interface-found': 'Interface-Discovered',
+  capability: 'Capability',
+};
+
+export const listStandardDimensions = () => {
+  const dimensions = STANDARD_DIMENSIONS.map((value) => ({
+    value,
+    label: DISPLAY_LABELS[value] ?? value,
+  }));
+  return { success: true, data: dimensions };
+};
 
 /**
  * List mental models suitable for a Hindsight diff.

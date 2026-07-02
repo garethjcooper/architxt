@@ -221,8 +221,20 @@ async function execute(artifacts, config, data, services, context) {
     }
   }
 
-  const successCount = analyses.filter(a => !a.error).length;
-  const failCount = analyses.length - successCount;
+  const failedAnalyses = analyses.filter(a => a.error);
+  const successCount = analyses.length - failedAnalyses.length;
+  const failCount = failedAnalyses.length;
+
+  // Build a concise top-level error message when images fail
+  let stageError;
+  if (failCount > 0) {
+    const errorMessages = failedAnalyses
+      .map(a => a.error)
+      .filter((value, index, self) => self.indexOf(value) === index);
+    stageError = failCount === 1
+      ? `Vision failed for 1 image: ${errorMessages[0]}`
+      : `Vision failed for ${failCount}/${analyses.length} images: ${errorMessages.join('; ')}`;
+  }
 
   logger.info('Vision: Image analysis complete', {
     total: analyses.length,
@@ -233,12 +245,13 @@ async function execute(artifacts, config, data, services, context) {
   });
 
   return {
-    stageResult: { success: failCount === 0 },
+    stageResult: { success: failCount === 0, error: stageError },
     stageMetrics: {
       durationMs,
       totalImages: analyses.length,
       successCount,
-      failCount
+      failCount,
+      failedImageIds: failedAnalyses.map(a => a.imageId)
     },
     stageOutput: [
       { name: 'image-analyses', data: analyses },

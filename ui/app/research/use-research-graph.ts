@@ -5,16 +5,69 @@ function edgeKey(e: GraphEdge): string {
   return `${e.source}|${e.target}|${e.label || e.relationship_type || ''}`;
 }
 
+export function resolveNodeType(n: GraphNode): string {
+  if (n.type) return n.type;
+  if (typeof n.id === 'string' && n.id.includes(':')) {
+    return n.id.split(':')[0];
+  }
+  return 'other';
+}
+
+export function canonicalEntityId(type: string, id: string): string {
+  if (!id || type === 'other' || id.includes(':')) return id;
+  return `${type}:${id}`;
+}
+
+function canonicalNodeId(n: GraphNode): string {
+  const type = resolveNodeType(n);
+  if (typeof n.id !== 'string') return n.id;
+  if (n.id.includes(':') || type === 'other') return n.id;
+  return `${type}:${n.id}`;
+}
+
+function normalizeNode(n: GraphNode): GraphNode {
+  return { ...n, id: canonicalNodeId(n), type: resolveNodeType(n) };
+}
+
+function normalizeEdgeEndpoints(
+  e: GraphEdge,
+  canonicalIdByRaw: Map<string, string>,
+): GraphEdge {
+  const source = canonicalIdByRaw.get(e.source) || e.source;
+  const target = canonicalIdByRaw.get(e.target) || e.target;
+  if (source === e.source && target === e.target) return e;
+  return { ...e, source, target };
+}
+
 function mergeMentalModelAppliedFlags(
   nodeMap: Map<string, GraphNode>,
   appliedIds: Set<string>,
 ) {
   for (const id of appliedIds) {
     const node = nodeMap.get(id);
-    if (node) {
-      node.mental_model_applied = true;
+    if (node) node.mental_model_applied = true;
+  }
+}
+
+function buildCanonicalIdMap(nodes: GraphNode[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const n of nodes) {
+    if (!n?.id) continue;
+    const normalized = normalizeNode(n);
+    if (normalized.id !== n.id) {
+      map.set(n.id, normalized.id);
+    }
+    // Also index by a de-prefixed id so "COM-007" can resolve to "a-com:COM-007".
+    if (typeof n.id === 'string' && n.id.includes(':')) {
+      const bare = n.id.split(':').slice(1).join(':');
+      if (!map.has(bare)) map.set(bare, normalized.id);
     }
   }
+  return map;
+}
+
+function canonicalizeIds(ids: string[], map: Map<string, string>): string[] {
+  return ids.map((id) => map.get(id) || id);
 }
 
 export function mergeStepNodes(
@@ -28,27 +81,32 @@ export function mergeStepNodes(
     const nodes = step.canvas?.graph?.nodes || [];
     const edges = step.canvas?.graph?.edges || [];
     const meta = step.canvas?.meta;
-    for (const id of meta?.mental_model_applied_to || []) {
+
+    const canonicalMap = buildCanonicalIdMap(nodes);
+    for (const id of canonicalizeIds(meta?.mental_model_applied_to || [], canonicalMap)) {
       mentalModelAppliedIds.add(id);
     }
+
     for (const n of nodes) {
       if (!n || !n.id) continue;
-      const existing = nodeMap.get(n.id);
+      const normalized = normalizeNode(n);
+      const existing = nodeMap.get(normalized.id);
       if (!existing) {
-        nodeMap.set(n.id, { ...n });
+        nodeMap.set(normalized.id, { ...normalized });
       } else {
-        existing.mention_count = Math.max(existing.mention_count ?? 1, n.mention_count ?? 1);
-        existing.prominence = Math.max(existing.prominence ?? 0, n.prominence ?? 0);
-        if ((n.source === 'canonical' || n.source === 'alias') && existing.source !== 'canonical' && existing.source !== 'alias') {
-          existing.source = n.source;
+        existing.mention_count = Math.max(existing.mention_count ?? 1, normalized.mention_count ?? 1);
+        existing.prominence = Math.max(existing.prominence ?? 0, normalized.prominence ?? 0);
+        if ((normalized.source === 'canonical' || normalized.source === 'alias') && existing.source !== 'canonical' && existing.source !== 'alias') {
+          existing.source = normalized.source;
         }
       }
     }
     for (const e of edges) {
       if (!e || !e.source || !e.target) continue;
-      const key = edgeKey(e);
+      const normalizedEdge = normalizeEdgeEndpoints(e, canonicalMap);
+      const key = edgeKey(normalizedEdge);
       if (!edgeMap.has(key)) {
-        edgeMap.set(key, { ...e, relationship_type: e.relationship_type || e.link_type });
+        edgeMap.set(key, { ...normalizedEdge, relationship_type: normalizedEdge.relationship_type || normalizedEdge.link_type });
       }
     }
   }
@@ -118,27 +176,32 @@ export function useResearchGraph(
     const nodeMap = new Map<string, GraphNode>();
     for (const n of workingNodes) {
       if (!n || !n.id) continue;
-      const existing = nodeMap.get(n.id);
+      const normalized = normalizeNode(n);
+      const existing = nodeMap.get(normalized.id);
       if (!existing) {
-        nodeMap.set(n.id, { ...n, depth: Math.min(n.depth ?? 0, 1) });
+        nodeMap.set(normalized.id, { ...normalized, depth: Math.min(normalized.depth ?? 0, 1) });
       } else {
-        existing.mention_count = Math.max(existing.mention_count ?? 1, n.mention_count ?? 1);
-        existing.prominence = Math.max(existing.prominence ?? 0, n.prominence ?? 0);
-        if ((n.source === 'canonical' || n.source === 'alias') && existing.source !== 'canonical' && existing.source !== 'alias') {
-          existing.source = n.source;
+        existing.mention_count = Math.max(existing.mention_count ?? 1, normalized.mention_count ?? 1);
+        existing.prominence = Math.max(existing.prominence ?? 0, normalized.prominence ?? 0);
+        if ((normalized.source === 'canonical' || normalized.source === 'alias') && existing.source !== 'canonical' && existing.source !== 'alias') {
+          existing.source = normalized.source;
         }
       }
     }
 
     mergeMentalModelAppliedFlags(nodeMap, mentalModelAppliedIds);
 
+    const canonicalIdMap = buildCanonicalIdMap(workingNodes);
     const edgeMap = new Map<string, GraphEdge>();
     for (const e of workingEdges) {
       if (!e || !e.source || !e.target) continue;
-      if (!nodeMap.has(e.source) || !nodeMap.has(e.target)) continue;
-      const key = edgeKey(e);
+      // Re-canonicalize edge endpoints in case edges were loaded from a result
+      // where node/edge ids do not share the same prefix convention.
+      const normalizedEdge = normalizeEdgeEndpoints(e, canonicalIdMap);
+      if (!nodeMap.has(normalizedEdge.source) || !nodeMap.has(normalizedEdge.target)) continue;
+      const key = edgeKey(normalizedEdge);
       if (!edgeMap.has(key)) {
-        edgeMap.set(key, { ...e, id: key, relationship_type: e.relationship_type || e.link_type });
+        edgeMap.set(key, { ...normalizedEdge, id: key, relationship_type: normalizedEdge.relationship_type || normalizedEdge.link_type });
       }
     }
 
@@ -175,8 +238,9 @@ export function useResearchGraph(
     // across Merge/Step mode and not limited to the checked merge selection.
     const allNodes = new Map<string, GraphNode>();
     for (const step of viewMode === 'session' ? trail : trail.filter((s) => s.id === activeStepId)) {
-      for (const n of step.canvas?.graph?.nodes || []) {
-        if (!n?.id) continue;
+      for (const raw of step.canvas?.graph?.nodes || []) {
+        if (!raw?.id) continue;
+        const n = normalizeNode(raw);
         const existing = allNodes.get(n.id);
         if (!existing) {
           allNodes.set(n.id, { ...n });
@@ -189,8 +253,9 @@ export function useResearchGraph(
 
     // Also include nodes from the active result if in step mode.
     if (viewMode === 'step') {
-      for (const n of result?.canvas?.graph?.nodes || []) {
-        if (!n?.id) continue;
+      for (const raw of result?.canvas?.graph?.nodes || []) {
+        if (!raw?.id) continue;
+        const n = normalizeNode(raw);
         if (!allNodes.has(n.id)) {
           allNodes.set(n.id, { ...n });
         }
@@ -202,9 +267,9 @@ export function useResearchGraph(
       if (allNodes.has(id)) continue;
       // Try to find node metadata anywhere in the trail.
       for (const step of trail) {
-        const node = step.canvas?.graph?.nodes.find((n) => n.id === id);
-        if (node) {
-          allNodes.set(id, { ...node, source: 'mental_model_referenced' });
+        const raw = step.canvas?.graph?.nodes.find((n) => n.id === id);
+        if (raw) {
+          allNodes.set(id, { ...normalizeNode(raw), source: 'mental_model_referenced' });
           break;
         }
       }

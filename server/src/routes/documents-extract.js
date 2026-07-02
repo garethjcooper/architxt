@@ -133,7 +133,7 @@ router.post('/:id/extracted', async (req, res) => {
   const id = idCheck.id;
 
   // Extract markdown and images from request
-  const { success, error: errorMsg, metrics, markdown, images = [], metadata = {} } = req.body || {};
+  const { success, error: errorMsg, metrics, markdown, images = [], metadata = {}, errorDetails } = req.body || {};
 
   if (typeof success !== 'boolean') {
     sendResponse({ res, status: 400, error: 'success boolean required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: routePath, duration: Date.now() - start });
@@ -169,7 +169,10 @@ router.post('/:id/extracted', async (req, res) => {
     to: finalStatus,
     success,
     error: errorMsg,
-    metrics
+    metrics: {
+      ...(metrics || {}),
+      ...(!success ? { errorDetails: errorDetails || null } : {})
+    }
   });
 
   let updateData = buildStatusTransition({ newStatus: finalStatus, existingHistory: docResult.data.doc_processing_history, entry: historyEntry });

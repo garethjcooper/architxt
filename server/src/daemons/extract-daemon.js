@@ -171,7 +171,7 @@ async function processNext() {
       metrics: processResult.metrics,
       ...(processResult.success
         ? { markdown: processResult.markdown, images: processResult.images }
-        : { error: processResult.error }
+        : { error: processResult.error, errorDetails: processResult.errorDetails }
       )
     });
 
@@ -195,7 +195,11 @@ async function processNext() {
           await releaseDocument(currentDocId, 'user cancelled during processing', {});
           logger.info('Released document from catch block after user cancellation', { docId: currentDocId });
         } else if (latestDoc?.status === 'processing_extract') {
-          await reportExtracted(currentDocId, false, { error: error.message });
+          // Preserve any structured stage errors we already collected before the exception
+          await reportExtracted(currentDocId, false, {
+            error: error.message,
+            errorDetails: processResult?.errorDetails || []
+          });
         } else {
           logger.warn('Document in unexpected state in catch block', { docId: currentDocId, status: latestDoc?.status });
         }

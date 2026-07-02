@@ -15,6 +15,7 @@ export interface ComponentDiagramProps {
   layoutAnimate?: boolean;
   showEdgeLabels?: boolean;
   edgeFilters?: Set<string>;
+  nodeFilters?: Set<string>;
   /** Called with the Cytoscape instance once it is created. */
   onCyReady?: (cy: cytoscape.Core) => void;
   /** Called when the user hovers over a node or edge. */
@@ -43,6 +44,7 @@ export function ComponentDiagram({
   layoutAnimate = true,
   showEdgeLabels = false,
   edgeFilters,
+  nodeFilters,
   onCyReady,
   onHover,
 }: ComponentDiagramProps) {
@@ -65,7 +67,7 @@ export function ComponentDiagram({
     }
 
     const seenEdgeKeys = new Set<string>();
-    const visibleEdges: { id: string; source: string; target: string; label: string; relationship_type?: string; edge_source?: string; weight?: number }[] = [];
+    const visibleEdges: { id: string; source: string; target: string; label: string; label_long?: string; relationship_type?: string; edge_source?: string; weight?: number }[] = [];
     for (const e of edges) {
       if (!e?.source || !e?.target) continue;
       if (!nodeById.has(e.source) || !nodeById.has(e.target)) continue;
@@ -79,6 +81,7 @@ export function ComponentDiagram({
         source: e.source,
         target: e.target,
         label,
+        label_long: e.label_long,
         relationship_type: e.relationship_type,
         edge_source: e.edge_source,
         weight: e.weight,
@@ -125,6 +128,7 @@ export function ComponentDiagram({
           source: e.source,
           target: e.target,
           label: e.label,
+          label_long: e.label_long,
           relationship_type: e.relationship_type || e.label,
           edge_source: e.edge_source,
           weight: e.weight ?? 1,
@@ -243,24 +247,24 @@ export function ComponentDiagram({
         {
           selector: '.dimmed',
           style: {
-            opacity: 0.12,
-            'text-opacity': 0.15,
+            opacity: 0.35,
+            'text-opacity': 0.85,
             'z-index': 0,
           },
         },
         {
           selector: '.dimmed-edge',
           style: {
-            opacity: 0.15,
-            'text-opacity': 0.1,
+            opacity: 0.25,
+            'text-opacity': 0.85,
             'z-index': 0,
           },
         },
         {
           selector: '.dimmed-node',
           style: {
-            opacity: 0.25,
-            'text-opacity': 0.2,
+            opacity: 0.45,
+            'text-opacity': 0.9,
             'z-index': 0,
           },
         },
@@ -554,31 +558,56 @@ export function ComponentDiagram({
     const cy = cyRef.current;
     if (!cy) return;
 
-    // Apply edge-filter dimming without removing elements. Active edges and
-    // their endpoint nodes stay bright; everything else is muted.
+    // Apply edge and node filter dimming without removing elements. Active edges
+    // connect active node types; active nodes are endpoints of active edges.
+    const hasEdgeFilters = edgeFilters && edgeFilters.size > 0;
+    const hasNodeFilters = nodeFilters && nodeFilters.size > 0;
+    if (!hasEdgeFilters && !hasNodeFilters) {
+      cy.elements().removeClass('dimmed-edge dimmed-node');
+      return;
+    }
+
+    let activeEdges = cy.edges();
     if (edgeFilters) {
-      const activeEdges = cy.edges().filter((e) => {
+      activeEdges = activeEdges.filter((e) => {
         const type = e.data('relationship_type');
         return type ? edgeFilters.has(type) : false;
       });
-      const activeNodeIds = new Set<string>();
-      activeEdges.forEach((e) => {
-        activeNodeIds.add(e.source().id());
-        activeNodeIds.add(e.target().id());
-      });
-      cy.edges().not(activeEdges).addClass('dimmed-edge');
-      activeEdges.removeClass('dimmed-edge');
-      cy.nodes().forEach((n) => {
-        if (activeNodeIds.has(n.id())) {
-          n.removeClass('dimmed-node');
-        } else {
-          n.addClass('dimmed-node');
-        }
-      });
-    } else {
-      cy.elements().removeClass('dimmed-edge dimmed-node');
     }
-  }, [elements, edgeFilters]);
+
+    let activeNodes = cy.nodes();
+    if (nodeFilters) {
+      activeNodes = activeNodes.filter((n) => {
+        const type = n.data('type');
+        return type ? nodeFilters.has(type) : false;
+      });
+    }
+
+    const activeNodeIds = new Set(activeNodes.map((n) => n.id()));
+    activeEdges = activeEdges.filter((e) => activeNodeIds.has(e.source().id()) && activeNodeIds.has(e.target().id()));
+
+    const finalActiveNodeIds = new Set<string>();
+    const activeEdgeIds = new Set(activeEdges.map((e) => e.id()));
+    activeEdges.forEach((e) => {
+      finalActiveNodeIds.add(e.source().id());
+      finalActiveNodeIds.add(e.target().id());
+    });
+
+    cy.nodes().forEach((n) => {
+      if (finalActiveNodeIds.has(n.id())) {
+        n.removeClass('dimmed-node');
+      } else {
+        n.addClass('dimmed-node');
+      }
+    });
+    cy.edges().forEach((e) => {
+      if (activeEdgeIds.has(e.id())) {
+        e.removeClass('dimmed-edge');
+      } else {
+        e.addClass('dimmed-edge');
+      }
+    });
+  }, [elements, edgeFilters, nodeFilters]);
 
   useEffect(() => {
     const cy = cyRef.current;

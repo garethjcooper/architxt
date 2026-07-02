@@ -1,5 +1,7 @@
 'use client';
 
+import { colorForType } from '@/components/research-canvas';
+
 /**
  * Query token helpers.
  *
@@ -38,7 +40,7 @@ export interface EdgeLike {
 }
 
 export function formatEntityToken(label: string, id: string, type?: string | null): string {
-  const qualified = type ? `${type}:${id}` : id;
+  const qualified = type && !id.startsWith(`${type}:`) ? `${type}:${id}` : id;
   return `[[${label} (${qualified})]]`;
 }
 
@@ -119,6 +121,37 @@ export function renderQueryHtml(
   let html = '';
   let lastIndex = 0;
 
+  const entityLabelById = new Map(entities.map((e) => [e.id, e.label || e.id]));
+  const lowerLabel = (s: string) => s.toLowerCase();
+
+  function resolveEdgeType(tokenId: string): string | null {
+    const [sourceId, targetId, relLabel] = tokenId.split('|');
+    const sourceLabel = entityLabelById.get(sourceId);
+    const targetLabel = entityLabelById.get(targetId);
+
+    // Exact endpoint + label match.
+    const exact = edges.find(
+      (e) => e.source === sourceId && e.target === targetId && (e.relationship_type === relLabel || e.label === relLabel),
+    );
+    if (exact?.relationship_type) return exact.relationship_type;
+
+    // Fallback: match by resolved entity labels in case token ids differ from graph ids.
+    if (sourceLabel && targetLabel) {
+      const byLabel = edges.find((e) => {
+        const sLabel = entityLabelById.get(e.source);
+        const tLabel = entityLabelById.get(e.target);
+        return (
+          lowerLabel(sLabel || e.source) === lowerLabel(sourceLabel) &&
+          lowerLabel(tLabel || e.target) === lowerLabel(targetLabel) &&
+          (e.relationship_type === relLabel || e.label === relLabel)
+        );
+      });
+      if (byLabel?.relationship_type) return byLabel.relationship_type;
+    }
+
+    return relLabel || null;
+  }
+
   for (const token of tokens) {
     if (token.index > lastIndex) {
       html += escapeHtml(query.slice(lastIndex, token.index));
@@ -136,16 +169,17 @@ export function renderQueryHtml(
 
     const entity = token.kind === 'entity' ? entities.find((e) => e.id === token.id) : undefined;
     const entityType = token.kind === 'entity' ? (token.type || entity?.type || null) : null;
-    const chipColor = entityType ? colorForType(entityType) : undefined;
+    const edgeType = token.kind === 'edge' ? resolveEdgeType(token.id) : null;
+    const chipColor = entityType || edgeType ? colorForType(entityType || edgeType) : undefined;
     const iconColor = chipColor || '#fbbf24';
     const chipHtml = token.kind === 'entity' && entityType
-      ? `${escapeHtml(token.label || fullRaw)} (${escapeHtml(entityType)}:${escapeHtml(token.id)})`
+      ? `${escapeHtml(token.label || fullRaw)} (${escapeHtml(token.id.startsWith(`${entityType}:`) ? token.id : `${entityType}:${token.id}`)})`
       : escapeHtml(chipText);
 
     const iconSvg =
       token.kind === 'entity'
         ? `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:${iconColor};flex-shrink:0"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fbbf24;flex-shrink:0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>`;
+        : '';
 
     const chipStyle = chipColor
       ? `background-color:${chipColor}20;border-color:${chipColor}40;color:${chipColor}`
@@ -298,10 +332,4 @@ export function getAutocompleteFilter(query: string, offset: number): { kind: 'e
   }
 
   return null;
-}
-
-/** Stub: colorForType is defined in the research-canvas component. The real import
- *  happens in query-form.tsx; this file only references it for the render helper. */
-function colorForType(_type?: string | null): string {
-  return '#94a3b8';
 }

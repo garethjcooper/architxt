@@ -109,6 +109,7 @@ export interface MatchGroup {
   dbId: number;
   entityId: string;
   entityName: string;
+  entityType: string | null;
   description: string | null;
   matchedText: string;
   replacementText: string;
@@ -157,13 +158,15 @@ export function scanForEntityMatches(
         dbId: Number(m.dbId),
         entityId: m.entity_id,
         entityName: m.name,
+        entityType: entity?.type_name ?? null,
         description: entity?.description ?? null,
         matchedText: m.matchedText,
         replacementText: sharedBuildTag(
           m.matchedText,
           m.name,
           m.entity_id,
-          uiFormat().key as 'v1-dual' | 'v2-single'
+          entity?.type_name,
+          uiFormat().key as 'v1-dual' | 'v2-single' | 'v3-single-entity'
         ),
         matches: [],
       });

@@ -85,12 +85,13 @@ export async function convertDocument(fileBuffer, filename, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const detail = errorText ? ` - ${errorText.slice(0, 2000)}` : '';
       logger.error('Docling conversion failed', { 
         status: response.status, 
         statusText: response.statusText,
         error: errorText 
       });
-      throw new Error(`Docling conversion failed: ${response.status} ${response.statusText}`);
+      throw new Error(`Docling conversion failed: ${response.status} ${response.statusText}${detail}`);
     }
 
     const result = await response.json();

@@ -2,6 +2,7 @@
 
 import type { GraphNode } from '@/lib/api/client';
 import { formatEntityToken } from './query-tokens';
+import { colorForType } from '@/components/research-canvas';
 
 export type EntityTab = 'entities' | 'tags' | 'global';
 
@@ -69,11 +70,12 @@ export function CompositeEntities(props: CompositeEntitiesProps) {
                     ? 'border-white/5 bg-black/20 hover:bg-white/5'
                     : 'border-white/5 bg-black/10 opacity-60 hover:bg-white/5 hover:opacity-80'
                 }`}
+                style={{ borderLeftColor: colorForType(entity.type || undefined), borderLeftWidth: 3 }}
               >
                 <div className="min-w-0 flex-1 flex flex-col gap-0.5">
                   <div className="text-xs text-white/90 truncate">{entity.label}</div>
                   <div className="text-[10px] text-white/50 font-mono truncate">
-                    {entity.type ? `${entity.type}:${entity.id}` : entity.id}
+                    {entity.type && !entity.id.startsWith(`${entity.type}:`) ? `${entity.type}:${entity.id}` : entity.id}
                   </div>
                 </div>
                 {!inScope && (

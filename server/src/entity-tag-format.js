@@ -109,6 +109,64 @@ const FORMATS = {
       return content.includes('[[');
     },
   },
+
+  /**
+   * v3-single-entity: [[MatchedText (entity.type_name:entity.entity_id)]]
+   * CURRENT production format. Includes entity type prefix in the id field
+   * to make tags self-describing while keeping Hindsight sync ID-only.
+   */
+  'v3-single-entity': {
+    key: 'v3-single-entity',
+    displayName: 'Single Field with Type Prefix (type:id)',
+    regex: /\[\[(.*?)\s*(?:\(([^)]*)\))?\]\]/g,
+
+    parse(match) {
+      const matchedText = match[1].trim();
+      const parenContent = match[2];
+
+      if (!parenContent) {
+        return { matchedText };
+      }
+
+      const trimmed = parenContent.trim();
+
+      // v3: "type:id" (colon, no comma)
+      if (trimmed.includes(':') && !trimmed.includes(',')) {
+        const colonIdx = trimmed.indexOf(':');
+        const entityType = trimmed.slice(0, colonIdx).trim() || undefined;
+        const entityId = trimmed.slice(colonIdx + 1).trim();
+        return {
+          matchedText,
+          entityId,
+          entityType,
+        };
+      }
+
+      // Backward compatible with older v1/v2 tags
+      if (trimmed.includes(',')) {
+        const parts = trimmed.split(',').map((s) => s.trim());
+        return {
+          matchedText,
+          entityName: parts[0] || matchedText,
+          entityId: parts[1],
+        };
+      }
+
+      return {
+        matchedText,
+        entityId: trimmed,
+      };
+    },
+
+    build(data) {
+      if (!data.entityId) return `[[${data.matchedText}]]`;
+      return `[[${data.matchedText} (${data.entityType ? `${data.entityType}:` : ''}${data.entityId})]]`;
+    },
+
+    presentIn(content) {
+      return content.includes('[[');
+    },
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -116,7 +174,7 @@ const FORMATS = {
 // ═══════════════════════════════════════════════════════════════
 
 /** @type {string} */
-export const ACTIVE_FORMAT_KEY = 'v2-single';
+export const ACTIVE_FORMAT_KEY = 'v3-single-entity';
 
 /**
  * Get the currently active format definition.
@@ -158,7 +216,7 @@ export function getSqlPresenceExpression(column = 'd.doc_content') {
 /**
  * When pushing entity types to Hindsight as map labels,
  * should we include the 'name' field?
- * v1-dual: yes. v2-single: no.
+ * v1-dual: yes. v2/v3: no.
  *
  * @returns {boolean}
  */
@@ -170,7 +228,7 @@ export function shouldSyncNameField() {
  * Fields that are actually synced/comparable for the active format.
  * The UI should only show diff badges/sections for these fields.
  * v1-dual: ['id', 'name', 'description']
- * v2-single: ['id', 'description'] (name is not part of the sync contract)
+ * v2/v3: ['id', 'description'] (name is not part of the sync contract)
  *
  * @returns {string[]}
  */

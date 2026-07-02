@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ChevronDown, Check, FileText, Clock, ArrowRight, ChevronRight, ChevronUp, Calendar as CalendarIcon, X, Sparkles } from 'lucide-react';
+import { Loader2, ChevronDown, Check, FileText, Clock, ArrowRight, ChevronRight, ChevronUp, Calendar as CalendarIcon, X, Sparkles, AlertCircle } from 'lucide-react';
 import { ArchitxtIcon } from './icons/architxt-icon';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import { documentsApi, type Document, type Metadata } from '@/lib/api/client';
@@ -19,6 +19,7 @@ import { SmartEditDialog } from './smart-edit-dialog';
 import { EntityDetectionDialog } from './entity-detection-dialog';
 import { EntityTaggedContent } from './entity-tagged-content';
 import { loadFormatRegistry } from '@/lib/entity-tag-format';
+import { formatErrorValue } from '@/lib/error-format';
 
 interface Context {
   id: number;
@@ -30,6 +31,8 @@ interface ProcessingHistoryEntry {
   from: string;
   to: string;
   success: boolean;
+  error?: string;
+  reason?: string;
   metrics?: Record<string, any>;
 }
 
@@ -759,61 +762,127 @@ export function ViewDocumentDialog({
 
                           {/* Expanded metrics */}
                           {isExpanded && hasMetrics && (
-                            <div className="px-3 pb-3 pt-1 border-t border-white/[0.04] space-y-2">
+                            <div className="px-3 pb-3 pt-1 border-t border-white/[0.04] space-y-3">
+                              {entry.error && (
+                                <div className="rounded bg-red-500/10 border border-red-500/20 px-2.5 py-2">
+                                  <div className="flex items-start gap-2">
+                                    <AlertCircle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" />
+                                    <p className="text-xs text-red-200/80 leading-relaxed whitespace-pre-wrap">
+                                      {formatErrorValue(entry.error)}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {entry.reason && !entry.error && (
+                                <div className="text-xs text-white/40 italic">
+                                  Reason: {formatErrorValue(entry.reason)}
+                                </div>
+                              )}
+
                               {Object.entries(entry.metrics!).map(([stageKey, stageMetrics]: [string, any]) => (
                                 <div key={stageKey} className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <ChevronRight className="h-3 w-3 text-white/20" />
-                                    <span className="text-[11px] uppercase font-medium text-white/40">
-                                      {stageKey}
-                                    </span>
-                                    {stageMetrics.durationMs !== undefined && (
-                                      <span className="text-[11px] text-white/30">
-                                        {formatDuration(stageMetrics.durationMs)}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="ml-5 flex flex-wrap gap-1.5">
-                                    {stageMetrics.fileSize !== undefined && (
-                                      <MetricBadge label="file" value={stageMetrics.fileSize.toLocaleString()} />
-                                    )}
-                                    {stageMetrics.markdownLength !== undefined && (
-                                      <MetricBadge label="md" value={stageMetrics.markdownLength.toLocaleString()} />
-                                    )}
-                                    {stageMetrics.imageCount !== undefined && (
-                                      <MetricBadge label="images" value={stageMetrics.imageCount} />
-                                    )}
-                                    {stageMetrics.originalLength !== undefined && (
-                                      <MetricBadge label="orig" value={stageMetrics.originalLength.toLocaleString()} />
-                                    )}
-                                    {stageMetrics.cleanedLength !== undefined && (
-                                      <MetricBadge label="clean" value={stageMetrics.cleanedLength.toLocaleString()} />
-                                    )}
-                                    {stageMetrics.reductionPercent !== undefined && (
-                                      <MetricBadge label="reduction" value={`${stageMetrics.reductionPercent}%`} />
-                                    )}
-                                    {stageMetrics.stats?.inputLength !== undefined && (
-                                      <MetricBadge label="in" value={stageMetrics.stats.inputLength.toLocaleString()} />
-                                    )}
-                                    {stageMetrics.stats?.outputLength !== undefined && (
-                                      <MetricBadge label="out" value={stageMetrics.stats.outputLength.toLocaleString()} />
-                                    )}
-                                    {stageMetrics.stats?.chunkCount !== undefined && (
-                                      <MetricBadge label="chunks" value={stageMetrics.stats.chunkCount} />
-                                    )}
-                                    {stageMetrics.avgDurationMs !== undefined && (
-                                      <MetricBadge label="avg" value={formatDuration(stageMetrics.avgDurationMs)} />
-                                    )}
-                                    {stageMetrics.minDurationMs !== undefined && stageMetrics.maxDurationMs !== undefined && (
-                                      <MetricBadge label="range" value={`${formatDuration(stageMetrics.minDurationMs)}–${formatDuration(stageMetrics.maxDurationMs)}`} />
-                                    )}
-                                    {stageMetrics.totalItems !== undefined && (
-                                      <MetricBadge label="items" value={stageMetrics.totalItems} />
-                                    )}
-                                    {stageMetrics.totalTokens !== undefined && (
-                                      <MetricBadge label="tokens" value={stageMetrics.totalTokens.toLocaleString()} />
-                                    )}
-                                  </div>
+                                  {stageKey === 'errorDetails' && Array.isArray(stageMetrics) ? (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                        <ChevronRight className="h-3 w-3 text-white/20" />
+                                        <span className="text-[11px] uppercase font-medium text-white/40">
+                                          Error Details
+                                        </span>
+                                      </div>
+                                      <div className="ml-5 space-y-2">
+                                        {stageMetrics.map((detail: any, dIdx: number) => (
+                                          <div key={dIdx} className="rounded bg-white/[0.03] border border-white/[0.06] px-2 py-1.5 space-y-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-[11px] uppercase font-medium text-white/50">{detail.stage || 'unknown'}</span>
+                                              {detail.metrics?.durationMs !== undefined && (
+                                                <span className="text-[11px] text-white/30">{formatDuration(detail.metrics.durationMs)}</span>
+                                              )}
+                                            </div>
+                                            {detail.error && (
+                                              <p className="text-[11px] text-red-300/80 leading-relaxed whitespace-pre-wrap">{formatErrorValue(detail.error)}</p>
+                                            )}
+                                            {detail.metrics?.doclingStatus && (
+                                              <MetricBadge label="status" value={String(detail.metrics.doclingStatus)} />
+                                            )}
+                                            {Array.isArray(detail.metrics?.doclingErrors) && detail.metrics.doclingErrors.length > 0 && (
+                                              <div className="flex flex-col gap-0.5">
+                                                {detail.metrics.doclingErrors.map((err: any, eIdx: number) => (
+                                                  <span key={eIdx} className="text-[11px] text-white/50 leading-relaxed">• {formatErrorValue(err)}</span>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                        <ChevronRight className="h-3 w-3 text-white/20" />
+                                        <span className="text-[11px] uppercase font-medium text-white/40">
+                                          {stageKey}
+                                        </span>
+                                        {stageMetrics.durationMs !== undefined && (
+                                          <span className="text-[11px] text-white/30">
+                                            {formatDuration(stageMetrics.durationMs)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="ml-5 flex flex-wrap gap-1.5">
+                                        {stageMetrics.fileSize !== undefined && (
+                                          <MetricBadge label="file" value={stageMetrics.fileSize.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.markdownLength !== undefined && (
+                                          <MetricBadge label="md" value={stageMetrics.markdownLength.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.imageCount !== undefined && (
+                                          <MetricBadge label="images" value={stageMetrics.imageCount} />
+                                        )}
+                                        {stageMetrics.originalLength !== undefined && (
+                                          <MetricBadge label="orig" value={stageMetrics.originalLength.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.cleanedLength !== undefined && (
+                                          <MetricBadge label="clean" value={stageMetrics.cleanedLength.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.reductionPercent !== undefined && (
+                                          <MetricBadge label="reduction" value={`${stageMetrics.reductionPercent}%`} />
+                                        )}
+                                        {stageMetrics.stats?.inputLength !== undefined && (
+                                          <MetricBadge label="in" value={stageMetrics.stats.inputLength.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.stats?.outputLength !== undefined && (
+                                          <MetricBadge label="out" value={stageMetrics.stats.outputLength.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.stats?.chunkCount !== undefined && (
+                                          <MetricBadge label="chunks" value={stageMetrics.stats.chunkCount} />
+                                        )}
+                                        {stageMetrics.avgDurationMs !== undefined && (
+                                          <MetricBadge label="avg" value={formatDuration(stageMetrics.avgDurationMs)} />
+                                        )}
+                                        {stageMetrics.minDurationMs !== undefined && stageMetrics.maxDurationMs !== undefined && (
+                                          <MetricBadge label="range" value={`${formatDuration(stageMetrics.minDurationMs)}–${formatDuration(stageMetrics.maxDurationMs)}`} />
+                                        )}
+                                        {stageMetrics.totalItems !== undefined && (
+                                          <MetricBadge label="items" value={stageMetrics.totalItems} />
+                                        )}
+                                        {stageMetrics.totalTokens !== undefined && (
+                                          <MetricBadge label="tokens" value={stageMetrics.totalTokens.toLocaleString()} />
+                                        )}
+                                        {stageMetrics.error && (
+                                          <MetricBadge label="error" value={formatErrorValue(stageMetrics.error)} />
+                                        )}
+                                        {stageMetrics.doclingStatus && (
+                                          <MetricBadge label="docling status" value={String(stageMetrics.doclingStatus)} />
+                                        )}
+                                        {Array.isArray(stageMetrics.doclingErrors) && stageMetrics.doclingErrors.map((err: any, eIdx: number) => (
+                                          <span key={eIdx} className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] text-red-300/80">
+                                            docling: {formatErrorValue(err)}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               ))}
                             </div>

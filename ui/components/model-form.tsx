@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { MentalModel } from '@/lib/types/index';
-import { STANDARD_DIMENSIONS } from '@/lib/types/index';
+import { useEffect } from 'react';
+import type { MentalModel, StandardDimension } from '@/lib/types/index';
+import { mentalModelsApi } from '@/lib/api/client';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -63,10 +64,21 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
-  const [dimension, setDimension] = useState(initial?.dimension || 'interface');
+  const [dimension, setDimension] = useState(initial?.dimension || 'none');
   const [returns, setReturns] = useState<'json' | 'narrative'>(initial?.returns ?? 'narrative');
   const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(initial?.concatenation ?? 'compile');
   const [submitting, setSubmitting] = useState(false);
+  const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    mentalModelsApi.listStandardDimensions().then((dims) => {
+      if (!cancelled) setStandardDimensions(dims);
+    }).catch(() => {
+      if (!cancelled) setStandardDimensions([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
@@ -131,6 +143,51 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           onCheckedChange={(v) => setIsTemplate(!!v)}
         />
       </div>
+
+      {isTemplate && (
+        <div className="border border-white/10 rounded-lg p-3 bg-white/[0.02]">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
+              <select
+                id="mm-dimension"
+                value={dimension}
+                onChange={(e) => setDimension(e.target.value)}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                {standardDimensions.map((d) => (
+                  <option key={d.value} value={d.value}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mm-returns" className="text-xs uppercase text-white/50 font-medium">Returns</Label>
+              <select
+                id="mm-returns"
+                value={returns}
+                onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                <option value="json">JSON</option>
+                <option value="narrative">Narrative</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mm-concatenation" className="text-xs uppercase text-white/50 font-medium">Concatenation</Label>
+              <select
+                id="mm-concatenation"
+                value={concatenation}
+                onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                <option value="merge">Merge</option>
+                <option value="compile">Compile</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -200,46 +257,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
-          <select
-            id="mm-dimension"
-            value={dimension}
-            onChange={(e) => setDimension(e.target.value)}
-            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-          >
-            {STANDARD_DIMENSIONS.map((d) => (
-              <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="mm-returns" className="text-xs uppercase text-white/50 font-medium">Returns</Label>
-          <select
-            id="mm-returns"
-            value={returns}
-            onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-          >
-            <option value="json">JSON</option>
-            <option value="narrative">Narrative</option>
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="mm-concatenation" className="text-xs uppercase text-white/50 font-medium">Concatenation</Label>
-          <select
-            id="mm-concatenation"
-            value={concatenation}
-            onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-          >
-            <option value="merge">Merge</option>
-            <option value="compile">Compile</option>
-          </select>
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
           <div className="space-y-0.5">
@@ -297,6 +314,48 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           )}
         </div>
       </div>
+
+      {!isTemplate && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
+            <select
+              id="mm-dimension"
+              value={dimension}
+              onChange={(e) => setDimension(e.target.value)}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            >
+              {standardDimensions.map((d) => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mm-returns" className="text-xs uppercase text-white/50 font-medium">Returns</Label>
+            <select
+              id="mm-returns"
+              value={returns}
+              onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            >
+              <option value="json">JSON</option>
+              <option value="narrative">Narrative</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mm-concatenation" className="text-xs uppercase text-white/50 font-medium">Concatenation</Label>
+            <select
+              id="mm-concatenation"
+              value={concatenation}
+              onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            >
+              <option value="merge">Merge</option>
+              <option value="compile">Compile</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
         <Button type="button" variant="ghost" onClick={onCancel} className="text-white/70 hover:text-white hover:bg-white/5">Close</Button>

@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useLayoutEffect, useCallback, useMemo } fr
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import {
   formatEntityToken,
   formatEdgeToken,
@@ -41,7 +41,7 @@ export interface QueryFormProps {
   queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize';
   dimensions: string[];
   setDimensions: (d: string[]) => void;
-  availableDimensions: string[];
+  availableDimensions: Array<{ value: string; label: string }>;
   queryOptions: ResearchQueryOptions;
   setQueryOptions: (opts: ResearchQueryOptions | ((prev: ResearchQueryOptions) => ResearchQueryOptions)) => void;
 }
@@ -431,46 +431,117 @@ export function QueryForm(props: QueryFormProps) {
 
   const autocompleteItems = useMemo(() => {
     if (!showAutocomplete) return [];
-    const term = autocompleteFilter.toLowerCase();
-    const entityItems = availableEntities
-        .filter((e) => {
-          const hay = `${e.label} ${e.id}`.toLowerCase();
-          return !term || hay.split(/[^a-z0-9]+/).some((word) => word.startsWith(term));
-        })
-        .map((e) => ({
-          kind: 'entity' as const,
-          id: e.id,
-          label: e.label || e.id,
-          type: e.type,
-          render: e.label || e.id,
-          token: formatEntityToken(e.label || e.id, e.id, e.type),
-          icon: (
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: colorForType(e.type || undefined) }}
-            />
-          ),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-    const edgeItems = availableEdges
-        .filter((e) => {
-          const hay = `${e.source} ${e.target} ${e.label || e.relationship_type || ''}`.toLowerCase();
-          return !term || hay.split(/[^a-z0-9]+/).some((word) => word.startsWith(term));
-        })
-        .map((e) => {
-          const l = e.label || e.relationship_type || 'edge';
-          return {
-            kind: 'edge' as const,
-            id: `${e.source}|${e.target}|${l}`,
-            label: l,
-            render: `${e.source} — ${l} → ${e.target}`,
-            token: formatEdgeToken(e.source, e.target, l),
-            icon: <ArrowRight className="w-3 h-3 text-amber-300" />,
-          };
-        });
+    const rawTerm = autocompleteFilter.toLowerCase().trim();
+    const entityLabelMap = new Map(availableEntities.map((e) => [e.id, e.label || e.id]));
 
-    return [...entityItems, ...edgeItems].slice(0, 8);
-  }, [showAutocomplete, autocompleteFilter, availableEntities, availableEdges]);
+    // Split the user's filter into tokens so spaces/dashes don't break matching.
+    // e.g. "bill db" matches items containing words starting with both "bill" and "db".
+    const termTokens = (term: string) => term.split(/[^a-z0-9]+/).filter(Boolean);
+    const matchesTokens = (hay: string, term: string) => {
+      const tokens = termTokens(term);
+      if (tokens.length === 0) return true;
+      const words = hay.split(/[^a-z0-9]+/).filter(Boolean);
+      return tokens.every((t) => words.some((word) => word.startsWith(t)));
+    };
+
+    const entityItems = availableEntities
+      .filter((e) => {
+        if (!rawTerm) return true;
+        const hay = `${e.type || ''} ${e.label || ''} ${e.id || ''}`.toLowerCase();
+        // Support "type:foo" style filtering by entity type.
+        const typeMatch = rawTerm.match(/^([a-z0-9_-]+):(.*)$/);
+        if (typeMatch) {
+          const [, requestedType, rest] = typeMatch;
+          const typeOk = requestedType === (e.type || '').toLowerCase();
+          if (!typeOk) return false;
+          if (!rest.trim()) return true;
+          return matchesTokens(hay, rest.trim());
+        }
+        return matchesTokens(hay, rawTerm);
+      })
+      .map((e) => ({
+        kind: 'entity' as const,
+        id: e.id,
+        label: e.label || e.id,
+        type: e.type,
+        render: e.label || e.id,
+        sublabel: e.type ? `${e.type}:${e.id}` : e.id,
+        token: formatEntityToken(e.label || e.id, e.id, e.type),
+        icon: (
+          <span
+            className="w-3 h-3 shrink-0"
+            style={{ borderLeftColor: colorForType(e.type || undefined), borderLeftWidth: 3, backgroundColor: 'transparent' }}
+          />
+        ),
+      }))
+      .sort((a, b) => {
+        const tokens = termTokens(rawTerm);
+        const firstToken = tokens[0] || rawTerm;
+        const aLabel = a.label.toLowerCase();
+        const bLabel = b.label.toLowerCase();
+        const aType = (a.type || '').toLowerCase();
+        const bType = (b.type || '').toLowerCase();
+        const aId = a.id.toLowerCase();
+        const bId = b.id.toLowerCase();
+        const score = (label: string, type: string, id: string) => {
+          if (label.startsWith(firstToken)) return 4;
+          if (tokens.length > 1 && tokens.every((t) => label.includes(t))) return 3;
+          if (type.startsWith(firstToken)) return 2;
+          if (id.startsWith(firstToken)) return 1;
+          return 0;
+        };
+        const aScore = score(aLabel, aType, aId);
+        const bScore = score(bLabel, bType, bId);
+        if (bScore !== aScore) return bScore - aScore;
+        return a.label.localeCompare(b.label);
+      });
+
+    const edgeItems = availableEdges
+      .filter((e) => {
+        if (!rawTerm) return true;
+        const sourceLabel = entityLabelMap.get(e.source) || e.source;
+        const targetLabel = entityLabelMap.get(e.target) || e.target;
+        const rel = e.label || e.relationship_type || '';
+        const hay = `${sourceLabel} ${e.source} ${targetLabel} ${e.target} ${rel}`.toLowerCase();
+        return matchesTokens(hay, rawTerm);
+      })
+      .map((e) => {
+        const l = e.label || e.relationship_type || 'edge';
+        const sourceLabel = entityLabelMap.get(e.source) || e.source;
+        const targetLabel = entityLabelMap.get(e.target) || e.target;
+        return {
+          kind: 'edge' as const,
+          id: `${e.source}|${e.target}|${l}`,
+          label: l,
+          render: `${sourceLabel} — ${l} → ${targetLabel}`,
+          sublabel: `${e.source} → ${e.target}`,
+          token: formatEdgeToken(e.source, e.target, l),
+          icon: <span className="w-3 h-3 shrink-0" style={{ borderLeftColor: colorForType(l), borderLeftWidth: 3, backgroundColor: 'transparent' }} />,
+        };
+      })
+      .sort((a, b) => {
+        const tokens = termTokens(rawTerm);
+        const firstToken = tokens[0] || rawTerm;
+        const aRel = a.label.toLowerCase();
+        const bRel = b.label.toLowerCase();
+        const aScore = aRel.startsWith(firstToken) ? 2 : tokens.length > 1 && tokens.every((t) => aRel.includes(t)) ? 1 : 0;
+        const bScore = bRel.startsWith(firstToken) ? 2 : tokens.length > 1 && tokens.every((t) => bRel.includes(t)) ? 1 : 0;
+        if (bScore !== aScore) return bScore - aScore;
+        return a.label.localeCompare(b.label);
+      });
+
+    // If the user types something that clearly looks like a type prefix (e.g. "a-com"),
+    // prefer showing all matching entities of that type first.
+    const requestedTypeOnly = rawTerm.match(/^([a-z0-9_-]+)$/)?.[1];
+    const typeMatchCount = requestedTypeOnly
+      ? entityItems.filter((e) => (e.type || '').toLowerCase() === requestedTypeOnly).length
+      : 0;
+    const topEntities = typeMatchCount > 0
+      ? entityItems.filter((e) => (e.type || '').toLowerCase() === requestedTypeOnly)
+      : entityItems;
+
+    return [...topEntities, ...(queryMode === 'prebuilt' ? [] : edgeItems)].slice(0, 8);
+  }, [showAutocomplete, autocompleteFilter, availableEntities, availableEdges, queryMode]);
 
   useEffect(() => {
     if (!showAutocomplete) return;
@@ -620,8 +691,13 @@ export function QueryForm(props: QueryFormProps) {
                     idx === selectedIndex ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'
                   }`}
                 >
-                  {item.icon}
+                {item.icon}
+                <div className="min-w-0 flex flex-col">
                   <span className="truncate">{item.render}</span>
+                  {'sublabel' in item && item.sublabel && (
+                    <span className="truncate text-[10px] text-white/40 font-mono">{item.sublabel}</span>
+                  )}
+                </div>
                 </button>
               ))}
             </div>
@@ -638,12 +714,11 @@ export function QueryForm(props: QueryFormProps) {
           <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
             <div className="text-[10px] text-white/70 font-medium mb-1">Dimensions</div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-              {availableDimensions.map((d) => {
-                const label = d.charAt(0).toUpperCase() + d.slice(1);
-                const selected = dimensions.includes(d);
+              {availableDimensions.map(({ value, label }) => {
+                const selected = dimensions.includes(value);
                 return (
                   <label
-                    key={d}
+                    key={value}
                     className={`flex items-center gap-2 text-[10px] text-white/80 ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer'}`}
                   >
                     <Checkbox
@@ -651,9 +726,9 @@ export function QueryForm(props: QueryFormProps) {
                       checked={selected}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setDimensions([...dimensions, d]);
+                          setDimensions([...dimensions, value]);
                         } else {
-                          setDimensions(dimensions.filter((x) => x !== d));
+                          setDimensions(dimensions.filter((x) => x !== value));
                         }
                       }}
                     />

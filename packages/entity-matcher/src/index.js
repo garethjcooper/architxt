@@ -33,7 +33,35 @@ export function buildRegex(format) {
 }
 
 /**
+ * Build a tag string in v1-dual, v2-single, or v3-single-entity style.
+ *
+ * @param {string} matchedText
+ * @param {string} entityName
+ * @param {string} entityId
+ * @param {string} [entityType]
+ * @param {'v1-dual'|'v2-single'|'v3-single-entity'} [formatKey]
+ * @returns {string}
+ */
+export function buildTag(matchedText, entityName, entityId, entityType, formatKey = 'v1-dual') {
+  if (formatKey === 'v3-single-entity') {
+    if (!entityId) return `[[${matchedText}]]`;
+    return `[[${matchedText} (${entityType ? `${entityType}:` : ''}${entityId})]]`;
+  }
+  if (formatKey === 'v2-single') {
+    if (!entityId) return `[[${matchedText}]]`;
+    return `[[${matchedText} (${entityId})]]`;
+  }
+  if (!entityId) return `[[${matchedText}]]`;
+  return `[[${matchedText} (${entityName}, ${entityId})]]`;
+}
+
+/**
  * Parse tag paren content.
+ *
+ * Supports:
+ *   - v1-dual: "Name, id"
+ *   - v2-single: "id"
+ *   - v3-single-entity: "type:id"
  *
  * @param {string} matchedText
  * @param {string} [parenContent]
@@ -45,6 +73,18 @@ export function parseTagParen(matchedText, parenContent) {
   }
 
   const trimmed = parenContent.trim();
+
+  // v3-single-entity: "type:id" (colon present, no comma)
+  if (trimmed.includes(':') && !trimmed.includes(',')) {
+    const colonIdx = trimmed.indexOf(':');
+    const entityType = trimmed.slice(0, colonIdx).trim() || undefined;
+    const entityId = trimmed.slice(colonIdx + 1).trim();
+    return {
+      matchedText,
+      entityId,
+      entityType,
+    };
+  }
 
   if (trimmed.includes(',')) {
     const parts = trimmed.split(',').map((s) => s.trim());
@@ -59,22 +99,6 @@ export function parseTagParen(matchedText, parenContent) {
     matchedText,
     entityId: trimmed,
   };
-}
-
-/**
- * Build a tag string in v1-dual or v2-single style.
- *
- * @param {string} matchedText
- * @param {string} entityName
- * @param {string} entityId
- * @param {'v1-dual'|'v2-single'} [formatKey]
- * @returns {string}
- */
-export function buildTag(matchedText, entityName, entityId, formatKey = 'v1-dual') {
-  if (formatKey === 'v2-single') {
-    return `[[${matchedText} (${entityId})]]`;
-  }
-  return `[[${matchedText} (${entityName}, ${entityId})]]`;
 }
 
 /**

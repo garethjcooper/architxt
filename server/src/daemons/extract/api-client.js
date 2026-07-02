@@ -35,17 +35,28 @@ async function apiCall(method, path, body = null) {
     options.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, options);
+  try {
+    const response = await fetch(url, options);
 
-  const data = response.headers.get('content-type')?.includes('json')
-    ? await response.json()
-    : null;
+    const data = response.headers.get('content-type')?.includes('json')
+      ? await response.json()
+      : null;
 
-  return {
-    status: response.status,
-    ok: response.ok,
-    data
-  };
+    return {
+      status: response.status,
+      ok: response.ok,
+      data
+    };
+  } catch (error) {
+    logger.warn('API call failed', { method, path, error: error.message, code: error.code });
+    return {
+      status: 0,
+      ok: false,
+      data: null,
+      error: error.message,
+      networkError: true
+    };
+  }
 }
 
 /**
