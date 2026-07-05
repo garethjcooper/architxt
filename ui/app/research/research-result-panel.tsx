@@ -22,6 +22,17 @@ function downloadBlob(content: string | Blob, filename: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, base64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+  const binary = atob(base64);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    array[i] = binary.charCodeAt(i);
+  }
+  return new Blob([array], { type: mime });
+}
+
 function sanitizeFilenameBase(sessionName: string): string {
   return sessionName.replace(/[^a-zA-Z0-9\-_]/g, '_').slice(0, 50);
 }
@@ -499,7 +510,7 @@ export function ResearchResultPanel({
                   const sanitized = sanitizeFilenameBase(sessionName);
                   const filename = `${sanitized}-${canvasView}-${date}.png`;
                   const dataUrl = (cy as any).png({ full: true, bg: 'transparent', scale: 4 });
-                  downloadBlob(dataUrl, filename, 'image/png');
+                  downloadBlob(dataUrlToBlob(dataUrl), filename, 'image/png');
                   toast.success(`Diagram saved as ${filename}`);
                 }}
                 className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-emerald-300 transition-colors"

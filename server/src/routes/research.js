@@ -474,6 +474,9 @@ router.post('/eligible-mental-models', async (req, res) => {
  *               bank_id: { type: string }
  *               entities: { type: array, items: { type: string } }
  *               dimensions: { type: array, items: { type: string } }
+ *               session_id:
+ *                 type: integer
+ *                 nullable: true
  *     responses:
  *       200:
  *         description: Per-dimension entity results with merged narrative/graph output
@@ -594,6 +597,7 @@ router.post('/prebuilt', async (req, res) => {
     // Derive a merged canvas/synthesis for the step so it works in the trail.
     const mergedGraph = { nodes: [], edges: [] };
     const narratives = [];
+    const parseErrors = [];
     for (const dim of result.dimensions || []) {
       const found = (dim.entities || [])
         .filter((e) => e.found)
@@ -607,6 +611,14 @@ router.post('/prebuilt', async (req, res) => {
       } else {
         lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
         lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
+      }
+      if (dim.result?.errors && dim.result.errors.length > 0) {
+        lines.push('');
+        lines.push('Errors:');
+        for (const err of dim.result.errors) {
+          lines.push(`- ${err.model}: ${err.error}`);
+        }
+        parseErrors.push(...dim.result.errors);
       }
       narratives.push(lines.join('\n'));
 
@@ -635,7 +647,7 @@ router.post('/prebuilt', async (req, res) => {
       rstep_canvas_state: { graph: mergedGraph },
       rstep_synthesis: { narrative: narratives.join('\n\n') },
       rstep_status: 'completed',
-      rstep_error_message: null,
+      rstep_error_message: parseErrors.length > 0 ? `Some mental models could not be parsed. ${parseErrors.map((e) => `${e.model}: ${e.error}`).join('; ')}` : null,
       rstep_tool_calls_used: 1,
       rstep_calls: [
         buildPrebuiltCall('success', {
@@ -661,6 +673,75 @@ router.post('/prebuilt', async (req, res) => {
   } catch (err) {
     logger.error('Research prebuilt route error', { error: err.message, stack: err.stack });
     sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/prebuilt/oneshot:
+ *   post:
+ *     summary: Run prebuilt research without creating a session or step
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, entities, dimensions]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               entities: { type: array, items: { type: string } }
+ *               dimensions: { type: array, items: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Per-dimension entity results with merged narrative/graph output
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Prebuilt research error
+ */
+router.post('/prebuilt/oneshot', async (req, res) => {
+  const start = Date.now();
+  try {
+    const { server_id, bank_id, entities, dimensions } = req.body;
+
+    if (!server_id || typeof server_id !== 'number') {
+      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
+      return;
+    }
+    if (!bank_id || typeof bank_id !== 'string') {
+      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
+      return;
+    }
+    if (!Array.isArray(entities) || entities.length === 0) {
+      sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
+      return;
+    }
+    if (!Array.isArray(dimensions) || dimensions.length === 0) {
+      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
+      return;
+    }
+
+    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, dimensions });
+    if (!result.success) {
+      sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: result,
+      logger,
+      method: 'POST',
+      path: '/research/prebuilt/oneshot',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research prebuilt oneshot route error', { error: err.message, stack: err.stack });
+    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
   }
 });
 

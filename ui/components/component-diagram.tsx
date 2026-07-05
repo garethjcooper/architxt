@@ -233,15 +233,24 @@ export function ComponentDiagram({
           },
         })),
         {
-          selector: ':selected',
+          selector: 'node:selected',
           style: {
-            'background-color': '#10b981',
+            'background-color': '#f59e0b',
             'background-opacity': 0.25,
-            'line-color': 'rgba(16,185,129,0.7)',
-            'target-arrow-color': 'rgba(16,185,129,0.7)',
-            'border-color': '#10b981',
-            color: '#10b981',
+            'border-color': '#f59e0b',
+            'border-width': 2,
+            'border-position': 'inside',
+            color: '#f59e0b',
             'text-opacity': 1,
+          },
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            'line-color': 'rgba(245,158,11,0.85)',
+            'target-arrow-color': 'rgba(245,158,11,0.85)',
+            width: 1,
+            'z-index': 9998,
           },
         },
         {

@@ -139,6 +139,40 @@ export function extractGraph(content) {
   return null;
 }
 
+/**
+ * Extract a graph from mental-model content and report why extraction failed if
+ * content is present but does not produce a usable graph. This makes truncation
+ * or JSON parse errors visible to callers instead of returning an empty graph.
+ *
+ * @param {string|object} content
+ * @returns {{ graph: { nodes: object[], edges: object[] } | null, error: string | null }}
+ */
+export function tryExtractGraph(content) {
+  if (!content) {
+    return { graph: null, error: null };
+  }
+  if (typeof content === 'string') {
+    const parsed = parseJsonString(content);
+    if (!parsed) {
+      // Detect obvious truncation so callers can report a useful message.
+      const trimmed = content.trim();
+      const startsObject = trimmed.startsWith('{');
+      const startsArray = trimmed.startsWith('[');
+      const endsObject = trimmed.endsWith('}');
+      const endsArray = trimmed.endsWith(']');
+      if ((startsObject && !endsObject) || (startsArray && !endsArray)) {
+        return { graph: null, error: 'Mental-model content appears truncated and could not be parsed as JSON.' };
+      }
+      return { graph: null, error: 'Mental-model content could not be parsed as JSON.' };
+    }
+  }
+  const graph = extractGraph(content);
+  if (!graph || (graph.nodes.length === 0 && graph.edges.length === 0)) {
+    return { graph: null, error: 'Mental-model content parsed but contained no usable nodes or edges.' };
+  }
+  return { graph, error: null };
+}
+
 export function extractNarrative(content) {
   if (!content) return null;
   if (typeof content === 'string') {
@@ -241,5 +275,6 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
     narrative: result.narrative || '',
     appliedEntityIds: Array.from(appliedEntityIds),
     missingEntityIds,
+    errors: result.errors || [],
   };
 }

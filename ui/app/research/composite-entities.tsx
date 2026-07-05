@@ -12,7 +12,14 @@ export interface CompositeEntitiesProps {
   globalEntities: GraphNode[];
   bankTags: Array<{ tag: string; count: number }>;
   tagsLoading: boolean;
-  onInsertToken: (token: string) => void;
+  onInsertToken?: (token: string) => void;
+  onDoubleClickEntity?: (entity: GraphNode) => void;
+  /** If provided, single click toggles the entity on/off the canvas instead of inserting a token. */
+  onClickEntity?: (entity: GraphNode) => void;
+  /** If provided, called when the user hovers over or leaves an entity. */
+  onHoverEntity?: (entity: GraphNode | null) => void;
+  /** IDs of nodes currently on the canvas; entities not in this set are dimmed. */
+  canvasNodeIds?: Set<string>;
 }
 
 export function CompositeEntities(props: CompositeEntitiesProps) {
@@ -23,6 +30,10 @@ export function CompositeEntities(props: CompositeEntitiesProps) {
     bankTags,
     tagsLoading,
     onInsertToken,
+    onDoubleClickEntity,
+    onClickEntity,
+    onHoverEntity,
+    canvasNodeIds,
   } = props;
 
   const visibleEntities: Array<GraphNode & { inScope?: boolean }> = entityTab === 'entities'
@@ -59,12 +70,21 @@ export function CompositeEntities(props: CompositeEntitiesProps) {
           )
         ) : visibleEntities.length > 0 ? (
           visibleEntities.map((entity) => {
-            const inScope = entity.inScope ?? true;
+            const inScope = canvasNodeIds ? canvasNodeIds.has(entity.id) : (entity.inScope ?? true);
             return (
               <button
                 key={entity.id}
                 type="button"
-                onDoubleClick={() => onInsertToken(formatEntityToken(entity.label || entity.id, entity.id, entity.type))}
+                onClick={() => {
+                  if (onClickEntity) {
+                    onClickEntity(entity);
+                  } else if (onInsertToken) {
+                    onInsertToken(formatEntityToken(entity.label || entity.id, entity.id, entity.type));
+                  }
+                }}
+                onDoubleClick={() => onDoubleClickEntity?.(entity)}
+                onMouseEnter={() => onHoverEntity?.(entity)}
+                onMouseLeave={() => onHoverEntity?.(null)}
                 className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
                   inScope
                     ? 'border-white/5 bg-black/20 hover:bg-white/5'
