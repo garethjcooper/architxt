@@ -21,7 +21,7 @@
 
 import { listEligibleMentalModels } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { extractGraph, extractNarrative } from './mental-model-results.js';
+import { extractNarrative, tryExtractGraph } from './mental-model-results.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt');
@@ -57,23 +57,64 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     };
   }
 
-  const content = hindsightResult.mentalModel.content ?? null;
+  const mentalModel = hindsightResult.mentalModel;
+  const content = mentalModel.content ?? null;
+  const contentLength = typeof content === 'string' ? content.length : content ? JSON.stringify(content).length : 0;
   const returns = (candidate.returns || 'json').toLowerCase();
 
+  if (!content) {
+    logger.info('Prebuilt candidate content missing', {
+      serverId,
+      bankId,
+      extId,
+      candidateId: candidate.id,
+      returns,
+      contentKeys: Object.keys(mentalModel),
+    });
+    return {
+      ...candidate,
+      found: true,
+      content: null,
+      graph: { nodes: [], edges: [] },
+      graph_error: 'Mental-model content is empty or missing.',
+    };
+  }
+
   if (returns === 'narrative') {
+    const narrative = extractNarrative(content) || '';
+    logger.info('Prebuilt candidate narrative extracted', {
+      serverId,
+      bankId,
+      extId,
+      candidateId: candidate.id,
+      contentLength,
+      narrativeLength: narrative.length,
+    });
     return {
       ...candidate,
       found: true,
       content,
-      narrative: extractNarrative(content) || '',
+      narrative,
     };
   }
 
+  const { graph, error: graphError } = tryExtractGraph(content);
+  logger.info('Prebuilt candidate graph extracted', {
+    serverId,
+    bankId,
+    extId,
+    candidateId: candidate.id,
+    contentLength,
+    nodeCount: graph?.nodes.length ?? 0,
+    edgeCount: graph?.edges.length ?? 0,
+    graphError: graphError || null,
+  });
   return {
     ...candidate,
     found: true,
     content,
-    graph: extractGraph(content) || { nodes: [], edges: [] },
+    graph: graph || { nodes: [], edges: [] },
+    graph_error: graphError,
   };
 }
 
@@ -116,12 +157,17 @@ function toApiModelResult(candidate) {
   if (candidate.returns === 'narrative') {
     return { ...base, narrative: candidate.narrative };
   }
-  return { ...base, graph: candidate.graph };
+  return {
+    ...base,
+    graph: candidate.graph,
+    graph_error: candidate.graph_error || undefined,
+  };
 }
 
 function aggregateDimensionResults(entityResults) {
   const narratives = [];
   const graphs = [];
+  const errors = [];
   let effectiveConcatenation = 'merge';
 
   for (const entityResult of entityResults) {
@@ -131,8 +177,12 @@ function aggregateDimensionResults(entityResults) {
         narratives.push(candidate.narrative);
       }
       if (candidate.graph) {
-        graphs.push(candidate.graph);
-        effectiveConcatenation = candidate.concatenation || effectiveConcatenation;
+        if (candidate.graph.nodes.length > 0 || candidate.graph.edges.length > 0) {
+          graphs.push(candidate.graph);
+          effectiveConcatenation = candidate.concatenation || effectiveConcatenation;
+        } else if (candidate.graph_error) {
+          errors.push({ model: candidate.name || candidate.ext_id, error: candidate.graph_error });
+        }
       }
     }
   }
@@ -145,6 +195,9 @@ function aggregateDimensionResults(entityResults) {
     result.json_result = effectiveConcatenation === 'compile'
       ? graphs
       : mergeGraphs(graphs);
+  }
+  if (errors.length > 0) {
+    result.errors = errors;
   }
   return result;
 }

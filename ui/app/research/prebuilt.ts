@@ -32,7 +32,7 @@ function mergeGraphs(graphs: { nodes: GraphNode[]; edges: GraphEdge[] }[]): {
       const key = e.id || `${e.source}|${e.target}|${e.label}`;
       if (edgeKeys.has(key)) continue;
       edgeKeys.add(key);
-      edges.push(e);
+      edges.push({ ...e, edge_source: e.edge_source || 'mental_model' });
     }
   }
 
@@ -66,6 +66,7 @@ export function transformPrebuiltToDiscoverResponse(
 ): DiscoverStepResponse {
   const narratives: string[] = [];
   const graphs: { nodes: GraphNode[]; edges: GraphEdge[] }[] = [];
+  const errors: string[] = [];
 
   for (const dimension of response.dimensions || []) {
     if (dimension.result?.narrative) {
@@ -88,6 +89,17 @@ export function transformPrebuiltToDiscoverResponse(
         narratives.push(lines.join('\n'));
       }
     }
+    if (dimension.result?.errors && dimension.result.errors.length > 0) {
+      for (const err of dimension.result.errors) {
+        errors.push(`${dimension.dimension}: ${err.model || 'model'} — ${err.error}`);
+      }
+    }
+  }
+
+  const errorMessage = errors.length > 0 ? errors.join('\n') : undefined;
+  const narrativeParts = narratives.length > 0 ? narratives : ['No prebuilt results available.'];
+  if (errorMessage) {
+    narrativeParts.push('', 'Errors:', errorMessage);
   }
 
   return {
@@ -98,7 +110,7 @@ export function transformPrebuiltToDiscoverResponse(
     viewpoint_ids: [],
     query_depth: 'prebuilt',
     synthesis: {
-      narrative: narratives.join('\n\n') || 'No prebuilt results available.',
+      narrative: narrativeParts.join('\n'),
     },
     canvas: {
       graph: graphs.length > 0 ? mergeGraphs(graphs) : { nodes: [], edges: [] },

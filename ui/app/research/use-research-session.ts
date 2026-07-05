@@ -260,6 +260,9 @@ export function useResearchSession({
           continue;
         }
         if (step.status === 'completed') {
+          if (step.error_message) {
+            toast.warning(`Research completed with warnings: ${step.error_message}`);
+          }
           if (viewMode === 'step') {
             setSelectedStepIds(new Set([stepId]));
             setActiveStepId(stepId);
@@ -286,7 +289,7 @@ export function useResearchSession({
               synthesis: step.synthesis,
               canvas: step.canvas,
               tool_calls_used: step.tool_calls_used,
-              error_message: null,
+              error_message: step.error_message || null,
             });
           }
           return step;

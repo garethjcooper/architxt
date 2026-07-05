@@ -707,7 +707,7 @@ export interface GraphNode {
   mention_count?: number;
   prominence?: number;
   depth?: number;
-  source?: 'canonical' | 'alias' | 'hindsight' | 'mental_model' | 'mental_model_referenced';
+  source?: 'canonical' | 'alias' | 'hindsight' | 'mental_model' | 'mental_model_referenced' | string;
   hindsight_id?: string | null;
   mental_model_applied?: boolean;
   x?: number;
@@ -750,6 +750,7 @@ export interface PrebuiltModelResult {
     nodes: GraphNode[];
     edges: GraphEdge[];
   };
+  graph_error?: string;
 }
 
 export interface PrebuiltEntityResult {
@@ -774,6 +775,7 @@ export interface PrebuiltDimensionResult {
           nodes: GraphNode[];
           edges: GraphEdge[];
         }>;
+    errors?: Array<{ model?: string; error: string }>;
   };
 }
 
@@ -935,6 +937,18 @@ export const researchApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { timeoutMs: 60000 }),
+
+  prebuiltOneshot: (payload: {
+    server_id: number;
+    bank_id: string;
+    entities: string[];
+    dimensions: string[];
+  }) =>
+    fetchApi<PrebuiltResponse>('/research/prebuilt/oneshot', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 60000 }),
+
   synthesize: (payload: {
     server_id: number;
     bank_id: string;

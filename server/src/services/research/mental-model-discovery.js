@@ -24,6 +24,7 @@ import {
   extractGraph,
   extractNarrative,
   modelMatchesEntities,
+  tryExtractGraph,
 } from './mental-model-results.js';
 import { createLogger } from '../../utils/logger.js';
 
@@ -163,6 +164,7 @@ async function mergeDimensionResult(candidates, entityIds) {
   const edgeKeys = new Set();
   const edges = [];
   const narratives = [];
+  const errors = [];
 
   for (const candidate of candidates) {
     if (!candidate.found || !candidate.content) continue;
@@ -170,7 +172,7 @@ async function mergeDimensionResult(candidates, entityIds) {
 
     const returns = (candidate.returns || 'json').toLowerCase();
     if (returns === 'json') {
-      const graph = extractGraph(candidate.content);
+      const { graph, error: graphError } = tryExtractGraph(candidate.content);
       if (graph) {
         for (const n of graph.nodes) {
           if (!nodeById.has(n.id)) nodeById.set(n.id, n);
@@ -181,6 +183,8 @@ async function mergeDimensionResult(candidates, entityIds) {
           edgeKeys.add(key);
           edges.push(e);
         }
+      } else if (graphError) {
+        errors.push({ model: candidate.name || candidate.ext_id, error: graphError });
       }
     } else if (returns === 'narrative') {
       const narrative = extractNarrative(candidate.content);
@@ -196,6 +200,9 @@ async function mergeDimensionResult(candidates, entityIds) {
   }
   if (narratives.length > 0) {
     result.narrative = narratives.join('\n\n');
+  }
+  if (errors.length > 0) {
+    result.errors = errors;
   }
   return result;
 }

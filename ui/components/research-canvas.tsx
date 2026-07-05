@@ -68,11 +68,41 @@ interface InteractiveGraphProps {
   showEdgeLabels?: boolean;
   edgeFilters?: Set<string>;
   nodeFilters?: Set<string>;
+  /** How to interpret `nodeFilters`/`edgeFilters`.
+   *  - 'active' (default): filters list types that should stay visible.
+   *  - 'hidden': filters list types that should be dimmed. */
+  filterMode?: 'active' | 'hidden';
   /** Called with the Cytoscape instance once it is created. */
   onCyReady?: (cy: cytoscape.Core) => void;
   /** Called when the user hovers over a node or edge. */
   onHover?: (info: { kind: 'node' | 'edge'; data: any }) => void;
+  /** Called when the user left-clicks (taps) a node. */
+  onNodeClick?: (nodeId: string) => void;
+  /** IDs of nodes that should be highlighted as having a discovery/load error. */
+  errorNodeIds?: Set<string>;
+  /** When true, adding/removing nodes or edges will not trigger a full re-layout.
+   *  Existing nodes keep their positions; new nodes are seeded near the current
+   *  graph center. A layout still runs on first render, explicit layout changes,
+   *  or if any node is unpositioned. */
+  preserveLayoutOnUpdate?: boolean;
+  /** If provided, new nodes with no position are placed around this source node
+   *  in the sparsest direction. Falls back to the graph center if missing. */
+  placementSourceNodeId?: string;
+  /** Optional temporary nodes/edges to render as a dimmed preview. */
+  previewGraph?: GraphCanvas;
+  /** Edge ID to highlight (e.g. when hovering a corresponding list row). */
+  highlightedEdgeId?: string | null;
+  /** Called when the user hovers over or leaves an edge on the canvas. */
+  onEdgeHover?: (edgeId: string | null) => void;
+  /** Node ID to highlight (e.g. when hovering a corresponding list row). */
+  highlightedNodeId?: string | null;
+  /** Called when the user hovers over or leaves a node on the canvas. */
+  onNodeHover?: (nodeId: string | null) => void;
 }
+
+// Tunable distance from the source node when seeding new nodes. Increase this
+// to space new nodes further out; decrease to pack them closer.
+const NEW_NODE_PLACEMENT_RADIUS = 60;
 
 const TYPE_PALETTE = [
   '#E06C75', // red
@@ -101,9 +131,101 @@ function hashString(str: string): number {
   return Math.abs(h);
 }
 
+// Place unpositioned nodes around the source node (or graph center) at a fixed
+// radius in the sparsest direction. Used for both real additions and previews.
+function placeNodesNearSource(
+  cy: cytoscape.Core,
+  unpositionedNodes: cytoscape.NodeCollection,
+  placementSourceNodeId?: string,
+  radius: number = NEW_NODE_PLACEMENT_RADIUS,
+) {
+  if (unpositionedNodes.length === 0) return;
+
+  const initialPositioned = cy.nodes().filter((n) => {
+    const p = n.position();
+    return !(p.x === 0 && p.y === 0);
+  });
+  if (initialPositioned.length === 0) return;
+
+  const sourceNodeId = placementSourceNodeId || initialPositioned[initialPositioned.length - 1]?.id();
+  const sourceNode = sourceNodeId ? cy.getElementById(sourceNodeId) : null;
+  const sourcePos =
+    sourceNode && sourceNode.length > 0
+      ? sourceNode.position()
+      : (() => {
+          let cx = 0;
+          let cy_ = 0;
+          initialPositioned.forEach((n) => {
+            const p = n.position();
+            cx += p.x;
+            cy_ += p.y;
+          });
+          return { x: cx / initialPositioned.length, y: cy_ / initialPositioned.length };
+        })();
+
+  const sampleCount = 24;
+  const nearbyThreshold = radius * 1.25;
+
+  // Maintain an array of positions that should be avoided, including nodes placed
+  // earlier in this same call so batch-added nodes don't stack on each other.
+  const obstaclePositions: { x: number; y: number }[] = [];
+  initialPositioned.forEach((n) => {
+    const p = n.position();
+    obstaclePositions.push({ x: p.x, y: p.y });
+  });
+
+  const findBestAngle = (nodeRadius: number): number => {
+    let bestAngle = 0;
+    let bestCount = Infinity;
+    for (let i = 0; i < sampleCount; i++) {
+      const angle = (i / sampleCount) * 2 * Math.PI;
+      const cx = sourcePos.x + Math.cos(angle) * nodeRadius;
+      const cy_ = sourcePos.y + Math.sin(angle) * nodeRadius;
+      let count = 0;
+      for (const p of obstaclePositions) {
+        const dx = p.x - cx;
+        const dy = p.y - cy_;
+        if (Math.sqrt(dx * dx + dy * dy) < nearbyThreshold) count++;
+      }
+      if (count < bestCount) {
+        bestCount = count;
+        bestAngle = angle;
+      }
+    }
+    return bestAngle;
+  };
+
+  unpositionedNodes.forEach((n, idx) => {
+    const ring = Math.floor(idx / 8);
+    const nodeRadius = radius * (1 + ring * 0.5);
+    const angle = findBestAngle(nodeRadius);
+    const pos = {
+      x: sourcePos.x + Math.cos(angle) * nodeRadius,
+      y: sourcePos.y + Math.sin(angle) * nodeRadius,
+    };
+    n.position(pos);
+    obstaclePositions.push(pos);
+  });
+}
+
 export function colorForType(type?: string | null): string {
   if (!type) return '#64748b';
   return TYPE_PALETTE[hashString(type) % TYPE_PALETTE.length];
+}
+
+export function colorForEdge(edge?: { edge_source?: string | null; relationship_type?: string | null }): string {
+  const source = edge?.edge_source;
+  const rel = edge?.relationship_type;
+  if (source === 'synthesize') return '#8b5cf6';
+  if (source === 'mental_model') {
+    if (rel === 'calls') return '#64d2c8';
+    if (rel === 'depends_on') return '#d2a078';
+    if (rel === 'sends') return '#b496d2';
+    if (rel === 'reads') return '#96bea0';
+    if (rel === 'writes') return '#dc8c96';
+    return '#42a5f5';
+  }
+  return 'rgba(255,255,255,0.12)';
 }
 
 export function mapTypeName(type?: string | null): string {
@@ -151,8 +273,18 @@ export function InteractiveGraph({
   showEdgeLabels = false,
   edgeFilters,
   nodeFilters,
+  filterMode = 'active',
   onCyReady,
   onHover,
+  onNodeClick,
+  errorNodeIds,
+  preserveLayoutOnUpdate = false,
+  placementSourceNodeId,
+  previewGraph,
+  highlightedEdgeId,
+  onEdgeHover,
+  highlightedNodeId,
+  onNodeHover,
 }: InteractiveGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
@@ -199,11 +331,58 @@ export function InteractiveGraph({
     };
   }, [graph]);
 
+  const previewElements = useMemo(() => {
+    const previewNodes = previewGraph?.nodes || [];
+    const previewEdges = previewGraph?.edges || [];
+    const realNodeIds = new Set((graph.nodes || []).map((n) => n.id));
+    const allNodeIds = new Set([...realNodeIds, ...previewNodes.map((n) => n.id)]);
+    const visiblePreviewEdges = previewEdges.filter(
+      (e) => allNodeIds.has(e.source) && allNodeIds.has(e.target),
+    );
+
+    return {
+      nodes: previewNodes
+        .filter((n) => !realNodeIds.has(n.id))
+        .map((n) => ({
+          data: {
+            id: n.id,
+            label: truncateLabel(n.label),
+            fullLabel: n.label,
+            label_long: n.label_long,
+            qualifiedId: n.type ? `${n.type}:${n.id}` : n.id,
+            type: n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other'),
+            category: n.category || mapTypeName(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
+            backgroundColor: n.color || colorForType(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
+            source: n.source || 'preview',
+            mental_model_applied: n.mental_model_applied ?? false,
+          },
+        })),
+      edges: visiblePreviewEdges.map((e) => ({
+        data: {
+          id: `preview:${e.id}`,
+          source: e.source,
+          target: e.target,
+          weight: typeof e.weight === 'number' ? e.weight : 1,
+          label: typeof e.label === 'string' ? e.label : '',
+          relationship_type: e.relationship_type,
+          label_long: e.label_long,
+          edge_source: e.edge_source || 'preview',
+        },
+      })),
+    };
+  }, [previewGraph, graph]);
+
   const prevElementsRef = useRef(elements);
   const prevSnapshotRef = useRef({ nodeIds: new Set<string>(), edgeIds: new Set<string>() });
   const prevLayoutNameRef = useRef<GraphLayout>(layoutName);
   const prevLayoutAnimateRef = useRef<boolean>(layoutAnimate);
   const showEdgeLabelsRef = useRef(showEdgeLabels);
+  const shouldFitOnLayoutStopRef = useRef<boolean>(true);
+  const onNodeClickRef = useRef(onNodeClick);
+
+  useEffect(() => {
+    onNodeClickRef.current = onNodeClick;
+  });
 
   useEffect(() => {
     showEdgeLabelsRef.current = showEdgeLabels;
@@ -334,14 +513,24 @@ export function InteractiveGraph({
           },
         },
         {
-          selector: ':selected',
+          selector: 'node:selected',
           style: {
-            'background-color': '#10b981',
-            'line-color': 'rgba(16,185,129,0.7)',
-            'target-arrow-color': 'rgba(16,185,129,0.7)',
-            'border-color': '#10b981',
+            'background-color': '#f59e0b',
+            'border-color': '#f59e0b',
+            'border-width': 2,
+            'border-position': 'inside',
             color: '#ffffff',
             'text-opacity': 1,
+          },
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            'line-color': 'rgba(245,158,11,0.85)',
+            'target-arrow-color': 'rgba(245,158,11,0.85)',
+            'source-arrow-color': 'rgba(245,158,11,0.85)',
+            width: 1,
+            'z-index': 9998,
           },
         },
         {
@@ -381,6 +570,49 @@ export function InteractiveGraph({
             'z-index': 9999,
           },
         },
+        {
+          selector: 'node.preview',
+          style: {
+            opacity: 0.45,
+            'border-width': 1,
+            'border-color': 'rgba(255,255,255,0.4)',
+            'border-style': 'dashed',
+            'z-index': 1,
+          },
+        },
+        {
+          selector: 'edge.preview',
+          style: {
+            opacity: 0.35,
+            'line-style': 'dashed',
+            'z-index': 1,
+          },
+        },
+        {
+          selector: 'node.discovery-error',
+          style: {
+            'border-width': 1,
+            'border-color': 'rgba(239,68,68,0.5)',
+            'border-style': 'dashed',
+            'border-position': 'inside',
+          },
+        },
+        {
+          selector: 'edge.edge-hover-highlight',
+          style: {
+            'z-index': 9998,
+          },
+        },
+        {
+          selector: 'node.node-hover-highlight',
+          style: {
+            'border-width': 2,
+            'border-color': 'rgba(230,240,255,0.85)',
+            'border-style': 'solid',
+            'border-position': 'inside',
+            'z-index': 9999,
+          },
+        },
       ],
       wheelSensitivity: 1,
       minZoom: 0.05,
@@ -417,6 +649,9 @@ export function InteractiveGraph({
         const kind = target.isNode() ? 'graph' : 'edge';
         const label = target.data('label') || id;
         onSelect?.({ source: 'graph', kind, ids: [id], context: String(label) });
+        if (target.isNode?.()) {
+          onNodeClickRef.current?.(id);
+        }
       }
     });
     cy.on('dbltap', 'node, edge', (event) => {
@@ -427,9 +662,42 @@ export function InteractiveGraph({
       onAddToQuery?.({ source: 'graph', kind, ids: [id], context: String(label) });
     });
 
+    // Track edge hover and report it to the parent so a corresponding edge list
+    // can be scrolled/ synchronised.
+    const handleEdgeMouseOver = (event: cytoscape.EventObject) => {
+      const edge = event.target;
+      if (!edge.isEdge?.()) return;
+      onEdgeHover?.(edge.id());
+    };
+    const handleEdgeMouseOut = (event: cytoscape.EventObject) => {
+      const edge = event.target;
+      if (!edge.isEdge?.()) return;
+      onEdgeHover?.(null);
+    };
+    cy.on('mouseover', 'edge', handleEdgeMouseOver);
+    cy.on('mouseout', 'edge', handleEdgeMouseOut);
+
+    // Track node hover and report it to the parent so a corresponding entity
+    // list can be scrolled/ synchronised.
+    const handleNodeMouseOver = (event: cytoscape.EventObject) => {
+      const node = event.target;
+      if (!node.isNode?.()) return;
+      onNodeHover?.(node.id());
+    };
+    const handleNodeMouseOut = (event: cytoscape.EventObject) => {
+      const node = event.target;
+      if (!node.isNode?.()) return;
+      onNodeHover?.(null);
+    };
+    cy.on('mouseover', 'node', handleNodeMouseOver);
+    cy.on('mouseout', 'node', handleNodeMouseOut);
+
     cy.on('layoutstop', () => {
       if (!cyRef.current || cyRef.current.destroyed()) return;
-      cyRef.current.fit(undefined, 20);
+      if (shouldFitOnLayoutStopRef.current) {
+        cyRef.current.fit(undefined, 120);
+        shouldFitOnLayoutStopRef.current = false;
+      }
       setReady(true);
     });
 
@@ -508,6 +776,11 @@ export function InteractiveGraph({
       }
     });
 
+    cy.nodes().forEach((node) => {
+      const id = node.id();
+      node.toggleClass('discovery-error', errorNodeIds?.has(id) ?? false);
+    });
+
     const layoutChanged = layoutName !== prevLayoutNameRef.current || layoutAnimate !== prevLayoutAnimateRef.current;
     prevLayoutNameRef.current = layoutName;
     prevLayoutAnimateRef.current = layoutAnimate;
@@ -521,6 +794,9 @@ export function InteractiveGraph({
       prev.edgeIds.size !== nextEdgeIds.size ||
       Array.from(nextEdgeIds).some((id) => !prev.edgeIds.has(id)) ||
       Array.from(prev.edgeIds).some((id) => !nextEdgeIds.has(id));
+
+    const newNodesAdded = Array.from(nextNodeIds).some((id) => !prev.nodeIds.has(id));
+    const isFirstRender = prev.nodeIds.size === 0 && nextNodeIds.size > 0;
 
     prevSnapshotRef.current = { nodeIds: nextNodeIds, edgeIds: nextEdgeIds };
     prevElementsRef.current = elements;
@@ -563,56 +839,52 @@ export function InteractiveGraph({
     const seedNewNodePositions = () => {
       const currentCy = cyRef.current;
       if (!currentCy || currentCy.destroyed()) return;
-      const positionedNodes = currentCy.nodes().filter((n) => {
+      const unpositionedNodes = currentCy.nodes().filter((n) => {
         const p = n.position();
-        return !(p.x === 0 && p.y === 0);
+        return p.x === 0 && p.y === 0;
       });
-      if (positionedNodes.length === 0) return;
-
-      let cx = 0;
-      let cy = 0;
-      positionedNodes.forEach((n) => {
-        const p = n.position();
-        cx += p.x;
-        cy += p.y;
-      });
-      cx /= positionedNodes.length;
-      cy /= positionedNodes.length;
-
-      currentCy.nodes().forEach((n) => {
-        const p = n.position();
-        if (p.x === 0 && p.y === 0) {
-          // Slightly jitter so overlapping new nodes don't sit exactly on top of each other.
-          const angle = Math.random() * 2 * Math.PI;
-          const radius = 20 + Math.random() * 30;
-          n.position({
-            x: cx + Math.cos(angle) * radius,
-            y: cy + Math.sin(angle) * radius,
-          });
-        }
-      });
+      placeNodesNearSource(currentCy, unpositionedNodes, placementSourceNodeId);
     };
 
     const innerRunLayout = () => {
       const currentCy = cyRef.current;
       if (!currentCy || currentCy.destroyed()) return;
-      setReady(false);
-      currentCy.resize();
 
-      // If only edges changed, don't run a layout; just keep the current view.
-      if (!nodeSetChanged && !layoutChanged && !hasUnpositionedNodes) {
-        setReady(true);
+      // Seed new nodes first so we can decide whether a full layout is needed.
+      seedNewNodePositions();
+
+      const stillHasUnpositionedNodes =
+        currentCy.nodes().length > 0 &&
+        currentCy.nodes().toArray().some((n) => {
+          const p = n.position();
+          return p.x === 0 && p.y === 0;
+        });
+
+      // If nothing about the nodes/edges changed and all nodes are positioned,
+      // there is nothing to do (e.g. a canvas click or edge-only update).
+      if (!nodeSetChanged && !edgeSetChanged && !layoutChanged && currentCy.nodes().length > 0 && !stillHasUnpositionedNodes) {
         return;
       }
 
-      const name = layoutName || 'cose';
-
-      // Data-driven updates (node/edge changes) should snap into place without
-      // flying across the canvas. Only explicit layout/animate changes animate.
+      // When preserveLayoutOnUpdate is enabled, data-driven changes (adding or
+      // removing nodes/edges) should not trigger a full re-layout. New nodes
+      // were seeded above around the source node. We still run a full layout on
+      // first render, explicit layout setting changes, or if seeding failed to
+      // place every node.
       const isUserDrivenLayoutChange = layoutChanged;
-      const shouldAnimate = isUserDrivenLayoutChange && layoutAnimate;
+      if (preserveLayoutOnUpdate && !isUserDrivenLayoutChange && !stillHasUnpositionedNodes && !isFirstRender) {
+        return;
+      }
 
-      seedNewNodePositions();
+      setReady(false);
+      currentCy.resize();
+
+      // For user-driven layout changes and first render we want to fit the view
+      // once the layout finishes. Data-driven updates keep the current pan/zoom.
+      shouldFitOnLayoutStopRef.current = isUserDrivenLayoutChange || isFirstRender;
+
+      const name = layoutName || 'cose';
+      const shouldAnimate = isUserDrivenLayoutChange && layoutAnimate;
 
       let layout;
       switch (name) {
@@ -723,62 +995,59 @@ export function InteractiveGraph({
     };
 
     requestAnimationFrame(runLayout);
-  }, [elements, layoutName, layoutAnimate, cyInstance]);
+  }, [elements, layoutName, layoutAnimate, cyInstance, errorNodeIds]);
 
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
 
-    // Apply edge and node filter dimming without removing elements. Active edges
-    // connect active node types; active nodes are endpoints of active edges.
-    const hasEdgeFilters = edgeFilters && edgeFilters.size > 0;
+    // Apply edge and node filter dimming without removing elements.
+    // - 'active' mode: filter lists types that should stay visible (Research default).
+    // - 'hidden' mode: filter lists types that should be dimmed (Explore show/hide).
+    const isHiddenMode = filterMode === 'hidden';
     const hasNodeFilters = nodeFilters && nodeFilters.size > 0;
-    if (!hasEdgeFilters && !hasNodeFilters) {
-      cy.elements().removeClass('dimmed-edge dimmed-node');
-      return;
-    }
+    const hasEdgeFilters = edgeFilters && edgeFilters.size > 0;
 
-    let activeEdges = cy.edges();
-    if (edgeFilters) {
-      activeEdges = activeEdges.filter((e) => {
-        const type = e.data('relationship_type');
-        return type ? edgeFilters.has(type) : false;
-      });
-    }
-
-    let activeNodes = cy.nodes();
-    if (nodeFilters) {
-      activeNodes = activeNodes.filter((n) => {
+    let visibleNodes = cy.nodes();
+    if (hasNodeFilters) {
+      visibleNodes = visibleNodes.filter((n) => {
         const type = n.data('type');
-        return type ? nodeFilters.has(type) : false;
+        if (!type) return false;
+        const inSet = nodeFilters.has(type);
+        return isHiddenMode ? !inSet : inSet;
       });
     }
 
-    const activeNodeIds = new Set(activeNodes.map((n) => n.id()));
-    activeEdges = activeEdges.filter((e) => activeNodeIds.has(e.source().id()) && activeNodeIds.has(e.target().id()));
+    const visibleNodeIds = new Set(visibleNodes.map((n) => n.id()));
 
-    const finalActiveNodeIds = new Set<string>();
-    const activeEdgeIds = new Set(activeEdges.map((e) => e.id()));
-    activeEdges.forEach((e) => {
-      finalActiveNodeIds.add(e.source().id());
-      finalActiveNodeIds.add(e.target().id());
-    });
+    let visibleEdges = cy.edges();
+    if (hasEdgeFilters) {
+      visibleEdges = visibleEdges.filter((e) => {
+        const type = e.data('relationship_type');
+        if (!type) return false;
+        const inSet = edgeFilters.has(type);
+        return isHiddenMode ? !inSet : inSet;
+      });
+    }
+    visibleEdges = visibleEdges.filter((e) => visibleNodeIds.has(e.source().id()) && visibleNodeIds.has(e.target().id()));
+
+    const visibleEdgeIds = new Set(visibleEdges.map((e) => e.id()));
 
     cy.nodes().forEach((n) => {
-      if (finalActiveNodeIds.has(n.id())) {
+      if (visibleNodeIds.has(n.id())) {
         n.removeClass('dimmed-node');
       } else {
         n.addClass('dimmed-node');
       }
     });
     cy.edges().forEach((e) => {
-      if (activeEdgeIds.has(e.id())) {
+      if (visibleEdgeIds.has(e.id())) {
         e.removeClass('dimmed-edge');
       } else {
         e.addClass('dimmed-edge');
       }
     });
-  }, [elements, edgeFilters, nodeFilters]);
+  }, [elements, edgeFilters, nodeFilters, filterMode]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -803,18 +1072,123 @@ export function InteractiveGraph({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || cy.destroyed()) return;
+    const realNodeIds = new Set(elements.nodes.map((n) => n.data.id));
+    const realEdgeIds = new Set(elements.edges.map((e) => e.data.id));
+
+    // Remove any preview elements that are no longer in the preview or that have
+    // become real elements.
+    cy.nodes().forEach((n) => {
+      if (n.hasClass('preview') && (realNodeIds.has(n.id()) || !previewElements.nodes.some((pn) => pn.data.id === n.id()))) {
+        n.remove();
+      }
+    });
+    cy.edges().forEach((e) => {
+      if (e.hasClass('preview') && (realEdgeIds.has(e.id()) || !previewElements.edges.some((pe) => pe.data.id === e.id()))) {
+        e.remove();
+      }
+    });
+
+    // Add/update preview nodes.
+    previewElements.nodes.forEach((n) => {
+      const existing = cy.getElementById(n.data.id);
+      if (existing.length > 0 && existing.hasClass('preview')) {
+        existing.data(n.data);
+        existing.addClass('preview');
+        return;
+      }
+      const added = cy.add({ group: 'nodes', data: n.data });
+      added.addClass('preview');
+    });
+
+    // Add/update preview edges. Skip any edge whose source or target is not yet
+    // present in Cytoscape (either as a real or preview node) to avoid crashes
+    // during render races.
+    const cyNodeIds = new Set(cy.nodes().map((n) => n.id()));
+    previewElements.edges.forEach((e) => {
+      if (!cyNodeIds.has(e.data.source) || !cyNodeIds.has(e.data.target)) return;
+      const existing = cy.getElementById(e.data.id);
+      if (existing.length > 0 && existing.hasClass('preview')) {
+        existing.data(e.data);
+        existing.addClass('preview');
+        return;
+      }
+      const added = cy.add({ group: 'edges', data: e.data });
+      added.addClass('preview');
+    });
+
+    // Position unpositioned preview nodes around the source without triggering a
+    // full layout.
+    const unpositionedPreviewNodes = cy.nodes('.preview').filter((n) => {
+      const p = n.position();
+      return p.x === 0 && p.y === 0;
+    });
+    placeNodesNearSource(cy, unpositionedPreviewNodes, placementSourceNodeId);
+  }, [previewElements, elements, placementSourceNodeId]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || cy.destroyed()) return;
     // When cy becomes ready, ensure the current label setting is applied to all edges.
     if (showEdgeLabels) {
       cy.edges().addClass('show-label');
     }
   }, [cyInstance]);
 
+  // Highlight the edge that the parent (e.g. edge list) asked for. We use
+  // bypass styles for color because relationship-specific stylesheet rules are
+  // more specific than our highlight class.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || cy.destroyed()) return;
+
+    const edge = highlightedEdgeId ? cy.getElementById(highlightedEdgeId) : null;
+    if (edge && edge.isEdge?.() && edge.length > 0) {
+      edge.addClass('edge-hover-highlight');
+      edge.style('line-color', 'rgba(230,240,255,0.85)');
+      edge.style('target-arrow-color', 'rgba(230,240,255,0.85)');
+      edge.style('source-arrow-color', 'rgba(230,240,255,0.85)');
+    }
+
+    return () => {
+      if (!cy || cy.destroyed()) return;
+      if (edge && edge.isEdge?.() && edge.length > 0) {
+        edge.removeClass('edge-hover-highlight');
+        edge.removeStyle();
+      }
+    };
+  }, [highlightedEdgeId]);
+
+  // Highlight the node that the parent (e.g. entity list) asked for.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || cy.destroyed()) return;
+
+    const node = highlightedNodeId ? cy.getElementById(highlightedNodeId) : null;
+    if (node && node.isNode?.() && node.length > 0) {
+      node.addClass('node-hover-highlight');
+    }
+
+    return () => {
+      if (!cy || cy.destroyed()) return;
+      if (node && node.isNode?.() && node.length > 0) {
+        node.removeClass('node-hover-highlight');
+      }
+    };
+  }, [highlightedNodeId]);
+
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
       {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-white/40">
-          Building graph…
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-white/40">
+          {graph.nodes.length === 0 ? (
+            <>
+              <span className="text-white/50">Explore makes exclusive use of prebuilt mental models.</span>
+              <span className="text-[11px] text-white/30">Ensure you have at least one set of Interface mental models for entities you want to use.</span>
+            </>
+          ) : (
+            'Building graph…'
+          )}
         </div>
       )}
     </div>
