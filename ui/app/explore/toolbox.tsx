@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Grip, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +25,7 @@ export interface PrebuiltDimensionStatus {
   dimension: string;
   label?: string;
   loaded: boolean;
+  hasData: boolean;
   nodeCount?: number;
   error?: string;
 }
@@ -50,6 +52,10 @@ export interface ExploreToolboxProps {
   searchValue?: string;
   /** Called when the search input changes. */
   onSearchChange?: (value: string) => void;
+  /** Current search value for filtering edge targets in the Edges tab. */
+  edgesSearchValue?: string;
+  /** Called when the edge search input changes. */
+  onEdgesSearchChange?: (value: string) => void;
   /** Status of each prebuilt dimension loaded for the current node. */
   prebuiltDimensions?: PrebuiltDimensionStatus[];
   onApply: (nodeId: string, selections: TargetSelection[]) => void;
@@ -122,7 +128,7 @@ function groupTargets(
   };
 }
 
-export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDiscovering, activeTab, onTabChange, entities, onClickEntity, onHoverEntity, canvasNodeIds, searchValue, onSearchChange, prebuiltDimensions, onApply, onClose, onHoverTarget }: ExploreToolboxProps) {
+export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDiscovering, activeTab, onTabChange, entities, onClickEntity, onHoverEntity, canvasNodeIds, searchValue, onSearchChange, edgesSearchValue, onEdgesSearchChange, prebuiltDimensions, onApply, onClose, onHoverTarget }: ExploreToolboxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -145,6 +151,13 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
     startMouse: { x: number; y: number };
     startPos: { x: number; y: number };
   } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [preview, setPreview] = useState<{
+    title?: string;
+    summary?: string;
+    inbound?: string[];
+    outbound?: string[];
+  } | null>(null);
 
   useEffect(() => {
     latestPositionRef.current = position;
@@ -164,6 +177,18 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
 
   const { inbound, outbound } = useMemo(() => groupTargets(nodeId, graph, discovery), [nodeId, graph, discovery]);
 
+  const inboundEdgesById = useMemo(() => {
+    const map = new Map<string, GraphEdge[]>();
+    for (const t of inbound) map.set(t.target.id, t.edges);
+    return map;
+  }, [inbound]);
+
+  const outboundEdgesById = useMemo(() => {
+    const map = new Map<string, GraphEdge[]>();
+    for (const t of outbound) map.set(t.target.id, t.edges);
+    return map;
+  }, [outbound]);
+
   const sourceNode = useMemo(() => graph.nodes.find((n) => n.id === nodeId), [graph, nodeId]);
   const sourceLabel = sourceNode?.label || nodeId || 'No node selected';
   const sourceId = sourceNode?.id;
@@ -175,7 +200,14 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
     <button
       key={key}
       type="button"
-      onClick={() => onTabChange?.(key)}
+      onClick={() => {
+        onTabChange?.(key);
+        if (key === 'node') {
+          onEdgesSearchChange?.('');
+        } else {
+          onSearchChange?.('');
+        }
+      }}
       className={cn(
         'text-[10px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap',
         activeTab === key
@@ -187,7 +219,8 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
     </button>
   );
 
-  const renderEntityList = () => (
+  const renderEntityList = () => {
+    return (
     <div className="flex flex-col w-full">
       {entities.length === 0 ? (
         <div className="px-3 py-3 text-[11px] text-white/40">No entities available.</div>
@@ -200,13 +233,30 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
               : entity.id;
             const qualified = entity.id.includes(':') ? entity.id : targetType ? `${targetType}:${entity.id}` : entity.id;
             const onCanvas = canvasNodeIds?.has(qualified) ?? false;
+            const summaryText = (entity as any).summaryText || '';
+            const inboundLabels = (inboundEdgesById.get(entity.id) || [])
+              .map((e) => e.label_long || e.label || e.relationship_type || `→ ${e.source}`)
+              .filter(Boolean);
+            const outboundLabels = (outboundEdgesById.get(entity.id) || [])
+              .map((e) => e.label_long || e.label || e.relationship_type || `→ ${e.target}`)
+              .filter(Boolean);
             return (
               <button
                 key={entity.id}
                 type="button"
                 onClick={() => onClickEntity?.(entity)}
-                onMouseEnter={() => onHoverEntity?.(entity)}
-                onMouseLeave={() => onHoverEntity?.(null)}
+                onMouseEnter={() => {
+                  onHoverEntity?.(entity);
+                  setPreview({
+                    title: entity.label || entity.id,
+                    summary: onCanvas ? (summaryText || 'No summary available.') : (summaryText || 'Not loaded'),
+                    inbound: inboundLabels.length > 0 ? inboundLabels : undefined,
+                    outbound: outboundLabels.length > 0 ? outboundLabels : undefined,
+                  });
+                }}
+                onMouseLeave={() => {
+                  onHoverEntity?.(null);
+                }}
                 className={cn(
                   'w-full flex items-center gap-2 rounded border border-white/5 px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
                   onCanvas
@@ -230,7 +280,8 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const clampPosition = (x: number, y: number): { x: number; y: number } => {
     const panel = panelRef.current;
@@ -283,78 +334,107 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
     targets: Array<{ target: GraphNode; edges: GraphEdge[]; active: boolean }>,
     allActive: boolean,
     emptyMessage: string,
-  ) => (
-    <div className="flex flex-col w-1/2 min-w-0 border-r border-white/5 last:border-r-0">
-      <div className="px-2.5 py-1 border-b border-white/5 bg-black/20 flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-white/50 font-medium">{title}</span>
-        {targets.length > 0 && (
-          <button
-            type="button"
-            onClick={() => toggleAll(direction, targets, !allActive)}
-            className="text-[10px] text-emerald-300/70 hover:text-emerald-300 transition-colors"
-          >
-            {allActive ? 'none' : 'all'}
-          </button>
-        )}
-      </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-        {targets.length === 0 && (
-          <div className="text-[11px] text-white/40 px-2 py-3">{emptyMessage}</div>
-        )}
-        {targets.map((t) => {
-          const targetType =
-            t.target.type ||
-            (typeof t.target.id === 'string' && t.target.id.includes(':')
-              ? t.target.id.split(':')[0]
-              : undefined);
-          const typeLine = targetType && !t.target.id.startsWith(`${targetType}:`)
-            ? `${targetType}:${t.target.id}`
-            : t.target.id;
-          return (
-            <button
-              key={t.target.id}
-              type="button"
-              onClick={() => toggleTarget(direction, t.target.id, t.active)}
-              onMouseEnter={() => onHoverTarget?.({ targetId: t.target.id, direction })}
-              onMouseLeave={() => onHoverTarget?.({ targetId: null, direction })}
-              className={cn(
-                'w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
-                t.active
-                  ? 'border-white/5 bg-black/20 hover:bg-white/5'
-                  : 'border-white/5 bg-black/[0.02] text-white/[0.18] hover:text-white/50 hover:bg-black/[0.04]'
-              )}
-              style={{
-                borderLeftColor: t.active
-                  ? colorForType(targetType)
-                  : `color-mix(in srgb, ${colorForType(targetType)} 25%, transparent)`,
-                borderLeftWidth: 3,
-              }}
-              title={typeLine}
-            >
-              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                <div className={cn('text-xs truncate', t.active ? 'text-white/90' : 'text-white/[0.22]')}>{t.target.label || t.target.id}</div>
-                <div className={cn('text-[10px] truncate', t.active ? 'text-white/40' : 'text-white/[0.15]')}>{typeLine}</div>
-              </div>
-              {t.edges.length > 1 && (
-                <span className={cn(
-                  'text-[10px] px-1.5 py-0.5 rounded border border-white/10 shrink-0',
-                  t.active ? 'bg-white/5 text-white/50' : 'bg-white/[0.03] text-white/25'
-                )}>
-                  {t.edges.length} edges
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      {targets.length > 0 && (
-        <div className="px-2 py-1 border-t border-white/5 bg-black/20 text-[10px] text-white/30">
-          {targets.filter((t) => t.active).length}/{targets.length}
+  ) => {
+    const q = (edgesSearchValue || '').trim().toLowerCase();
+    const filteredTargets = q
+      ? targets.filter((t) => {
+          const label = (t.target.label || '').toLowerCase();
+          const id = (t.target.id || '').toLowerCase();
+          const type = (t.target.type || '').toLowerCase();
+          const edgeLabels = t.edges
+            .map((e) => (e.label_long || e.label || e.relationship_type || '').toLowerCase())
+            .join(' ');
+          return label.includes(q) || id.includes(q) || type.includes(q) || edgeLabels.includes(q);
+        })
+      : targets;
+    const activeCount = filteredTargets.filter((t) => t.active).length;
+    return (
+      <div className="flex flex-col w-1/2 min-w-0 border-r border-white/5 last:border-r-0">
+        <div className="px-2.5 py-1 border-b border-white/5 bg-black/20 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider text-white/50 font-medium">{title}</span>
+          {filteredTargets.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleAll(direction, filteredTargets, !allActive)}
+                className="text-[10px] text-emerald-300/70 hover:text-emerald-300 transition-colors"
+              >
+                {allActive ? 'none' : 'all'}
+              </button>
+              <span className="text-[10px] text-white/30">{activeCount}/{filteredTargets.length}</span>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
-
+        <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
+          {filteredTargets.length === 0 && (
+            <div className="text-[11px] text-white/40 px-2 py-3">{q ? 'No matching targets' : emptyMessage}</div>
+          )}
+          {filteredTargets.map((t) => {
+            const targetType =
+              t.target.type ||
+              (typeof t.target.id === 'string' && t.target.id.includes(':')
+                ? t.target.id.split(':')[0]
+                : undefined);
+            const typeLine = targetType && !t.target.id.startsWith(`${targetType}:`)
+              ? `${targetType}:${t.target.id}`
+              : t.target.id;
+            const previewInbound = t.edges
+              .filter((e) => e.target === nodeId)
+              .map((e) => e.label_long || e.label || e.relationship_type || `← ${e.source}`)
+              .filter(Boolean);
+            const previewOutbound = t.edges
+              .filter((e) => e.source === nodeId)
+              .map((e) => e.label_long || e.label || e.relationship_type || `→ ${e.target}`)
+              .filter(Boolean);
+            return (
+              <button
+                key={t.target.id}
+                type="button"
+                onClick={() => toggleTarget(direction, t.target.id, t.active)}
+                onMouseEnter={() => {
+                  onHoverTarget?.({ targetId: t.target.id, direction });
+                  setPreview({
+                    title: t.target.label || t.target.id,
+                    inbound: previewInbound.length > 0 ? previewInbound : undefined,
+                    outbound: previewOutbound.length > 0 ? previewOutbound : undefined,
+                  });
+                }}
+                onMouseLeave={() => {
+                  onHoverTarget?.({ targetId: null, direction });
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
+                  t.active
+                    ? 'border-white/5 bg-black/20 hover:bg-white/5'
+                    : 'border-white/5 bg-black/[0.02] text-white/[0.18] hover:text-white/50 hover:bg-black/[0.04]'
+                )}
+                style={{
+                  borderLeftColor: t.active
+                    ? colorForType(targetType)
+                    : `color-mix(in srgb, ${colorForType(targetType)} 25%, transparent)`,
+                  borderLeftWidth: 3,
+                }}
+                title={typeLine}
+              >
+                <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                  <div className={cn('text-xs truncate', t.active ? 'text-white/90' : 'text-white/[0.22]')}>{t.target.label || t.target.id}</div>
+                  <div className={cn('text-[10px] truncate', t.active ? 'text-white/40' : 'text-white/[0.15]')}>{typeLine}</div>
+                </div>
+                {t.edges.length > 1 && (
+                  <span className={cn(
+                    'text-[10px] px-1.5 py-0.5 rounded border border-white/10 shrink-0',
+                    t.active ? 'bg-white/5 text-white/50' : 'bg-white/[0.03] text-white/25'
+                  )}>
+                    {t.edges.length} edges
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
   useEffect(() => {
     if (!dragState?.dragging) return;
     const handleMove = (e: MouseEvent) => {
@@ -427,44 +507,66 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
               />
             </div>
           )}
+          {activeTab === 'node' && (
+            <div className="relative w-[45%] max-w-[12rem] shrink-0">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30 pointer-events-none" />
+              <Input
+                type="search"
+                placeholder="Search edges..."
+                value={edgesSearchValue}
+                onChange={(e) => onEdgesSearchChange?.(e.target.value)}
+                className="h-7 pl-7 pr-2 bg-black/20 border-white/10 text-white/80 placeholder:text-white/30 text-xs"
+              />
+            </div>
+          )}
         </div>
       </div>
 
       {prebuiltDimensions && prebuiltDimensions.length > 0 && (
-        <div className="px-2.5 py-1 border-b border-white/5 bg-black/20 flex flex-wrap items-center gap-1.5">
-          {prebuiltDimensions.map((dim) => {
-            const isInterface = dim.dimension.startsWith('interface');
-            const label = dimensionLabel(dim);
-            return (
-              <Tooltip key={dim.dimension}>
-                <TooltipTrigger>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className={cn(
-                      'text-[10px] px-1.5 py-0.5 rounded border flex items-center gap-1 cursor-default',
-                      dim.loaded
-                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                        : 'bg-red-500/15 border-red-500/30 text-red-300'
-                    )}
-                  >
-                    {label}
-                    {isInterface && dim.nodeCount !== undefined && (
-                      <span className="text-[9px] px-1 py-0 rounded bg-black/30 text-white/70">{dim.nodeCount}</span>
-                    )}
-                    {!dim.loaded && dim.error && (
-                      <AlertTriangle className="w-3 h-3" />
-                    )}
-                  </div>
-                </TooltipTrigger>
-                {dim.error && (
-                  <TooltipContent side="bottom" sideOffset={4} className="max-w-xs text-xs bg-black/90 border border-white/10 text-white/90 p-2">
-                    {dim.error}
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            );
-          })}
+        <div className="px-2.5 py-1 border-b border-white/5 bg-black/20 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {prebuiltDimensions.map((dim) => {
+              const isInterface = dim.dimension.startsWith('interface');
+              const label = dimensionLabel(dim);
+              return (
+                <Tooltip key={dim.dimension}>
+                  <TooltipTrigger>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded border flex items-center gap-1 cursor-default',
+                        dim.error
+                          ? 'bg-red-500/15 border-red-500/30 text-red-300'
+                          : dim.loaded && dim.hasData
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                            : dim.loaded
+                              ? 'bg-orange-500/15 border-orange-500/30 text-orange-300'
+                              : 'bg-white/5 border-white/10 text-white/50'
+                      )}
+                    >
+                      {label}
+                      {isInterface && dim.nodeCount !== undefined && (
+                        <span className="text-[9px] px-1 py-0 rounded bg-black/30 text-white/70">{dim.nodeCount}</span>
+                      )}
+                      {!dim.loaded && dim.error && (
+                        <AlertTriangle className="w-3 h-3" />
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  {dim.error && (
+                    <TooltipContent side="bottom" sideOffset={4} className="max-w-xs text-xs bg-black/90 border border-white/10 text-white/90 p-2">
+                      {dim.error}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              );
+            })}
+          </div>
+          <label className="shrink-0 inline-flex items-center gap-1.5 text-[10px] text-white/60 cursor-pointer select-none">
+            <Switch checked={showPreview} onCheckedChange={(checked) => setShowPreview(Boolean(checked))} size="sm" />
+            Preview
+          </label>
         </div>
       )}
 
@@ -481,6 +583,46 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
         <div className="flex max-h-[min(360px,55vh)]">
           {renderTargetList('inbound', 'Inbound', inbound, allInboundActive, isDiscovering ? 'Loading…' : nodeId ? 'No inbound edges' : 'Click a node')}
           {renderTargetList('outbound', 'Outbound', outbound, allOutboundActive, isDiscovering ? 'Loading…' : nodeId ? 'No outbound edges' : 'Click a node')}
+        </div>
+      )}
+
+      {showPreview && (
+        <div className="shrink-0 border-t border-white/5 bg-black/20 px-2.5 py-1.5 h-48 flex flex-col">
+          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium mb-1">Preview{preview?.title ? ` – ${preview.title}` : ''}</div>
+          <div className="flex-1 overflow-y-auto text-[11px] text-white/80 leading-snug break-words space-y-1.5">
+            {!preview ? (
+              <span className="text-white/30 italic">Hover an item to see details.</span>
+            ) : (
+              <>
+                {preview.summary !== undefined && (
+                  <div className={preview.summary === 'Not loaded' ? 'text-white/40 italic' : ''}>{preview.summary}</div>
+                )}
+                {preview.inbound && preview.inbound.length > 0 && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Inbound</div>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {preview.inbound.map((label, i) => (
+                        <li key={i}>{label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {preview.outbound && preview.outbound.length > 0 && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Outbound</div>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {preview.outbound.map((label, i) => (
+                        <li key={i}>{label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {preview.summary === undefined && !preview.inbound?.length && !preview.outbound?.length && (
+                  <span className="text-white/30 italic">No details available.</span>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -73,6 +73,13 @@ function execute(artifacts, config, data, services) {
       stats.entitiesUnescaped = before - cleaned.length;
     }
 
+    // Step 4b: Unescape spurious Markdown punctuation (e.g. FLAT\_LOW -> FLAT_LOW)
+    if (denoiseConfig?.unescape_markdown_punctuation) {
+      const before = cleaned.length;
+      cleaned = unescapeMarkdownPunctuation(cleaned);
+      stats.markdownPunctuationUnescaped = before - cleaned.length;
+    }
+
     // Step 5: Normalize whitespace
     if (denoiseConfig?.normalize_whitespace) {
       const before = cleaned.length;
@@ -193,6 +200,20 @@ function unescapeHtmlEntities(text) {
   }
   
   return text;
+}
+
+/**
+ * Reverse spurious Markdown punctuation escaping introduced by some Docling
+ * exporters (e.g. FLAT\_LOW -> FLAT_LOW, \[text\] -> [text]).
+ *
+ * Only unescapes backslash before punctuation characters commonly escaped by
+ * Markdown generators; literal double-backslashes (\\) are preserved.
+ *
+ * @param {string} text - Markdown content
+ * @returns {string} Text with punctuation escapes removed
+ */
+function unescapeMarkdownPunctuation(text) {
+  return text.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\]^_`{|}~])/g, '$1');
 }
 
 function normalizeWhitespace(text, maxConsecutiveNewlines = 3) {

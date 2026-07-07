@@ -482,6 +482,40 @@ function ensureMissingColumns(db) {
           ddl: 'ALTER TABLE mental_model_entities ADD COLUMN mm_ent_max_tokens INTEGER DEFAULT 2048'
         }
       ]
+    },
+    {
+      table: 'entity_types',
+      columns: [
+        {
+          name: 'et_word_boundary_match',
+          ddl: "ALTER TABLE entity_types ADD COLUMN et_word_boundary_match TEXT DEFAULT 'boundaries' CHECK (et_word_boundary_match IN ('boundaries', 'no-boundaries'))"
+        },
+        {
+          name: 'et_uses_entity_id_pattern',
+          ddl: 'ALTER TABLE entity_types ADD COLUMN et_uses_entity_id_pattern INTEGER DEFAULT 0 CHECK (et_uses_entity_id_pattern IN (0, 1))'
+        },
+        {
+          name: 'et_id_format_prefix',
+          ddl: 'ALTER TABLE entity_types ADD COLUMN et_id_format_prefix TEXT'
+        },
+        {
+          name: 'et_min_id_digits',
+          ddl: 'ALTER TABLE entity_types ADD COLUMN et_min_id_digits INTEGER DEFAULT 3 CHECK (et_min_id_digits BETWEEN 1 AND 10)'
+        },
+        {
+          name: 'et_id_separator',
+          ddl: "ALTER TABLE entity_types ADD COLUMN et_id_separator TEXT"
+        }
+      ]
+    },
+    {
+      table: 'entities',
+      columns: [
+        {
+          name: 'ent_word_boundary_match',
+          ddl: "ALTER TABLE entities ADD COLUMN ent_word_boundary_match TEXT DEFAULT 'boundaries' CHECK (ent_word_boundary_match IN ('boundaries', 'no-boundaries'))"
+        }
+      ]
     }
   ];
 
@@ -499,13 +533,136 @@ function ensureMissingColumns(db) {
     const cols = existingColumns(table);
     for (const { name, ddl } of columns) {
       if (!cols.has(name)) {
-        db.exec(ddl);
+        // Older SQLite versions do not support IF NOT EXISTS on ADD COLUMN, so
+        // ignore duplicate-column errors instead of crashing. This also makes
+        // concurrent initialization safe across parallel test workers/processes.
+        try {
+          db.exec(ddl);
+        } catch (err) {
+          const isDuplicateColumn = err?.message?.toLowerCase().includes("duplicate column name");
+          if (!isDuplicateColumn) throw err;
+        }
         logger.info(`Added missing column: ${table}.${name}`);
         addedCount++;
       }
     }
   }
   return addedCount;
+}
+
+/**
+ * Normalize entity case/boundary match data after schema upgrades.
+ *
+ * - Backfills entity_types with NULL case/boundary defaults to the schema defaults.
+ * - Clears entity-level overrides that are identical to the type default so
+ *   the entity inherits from the type instead of redundantly overriding it.
+ *
+ * Idempotent: running twice produces no changes the second time.
+ */
+function normalizeEntityMatchInheritance(db) {
+  const cols = new Set(db.prepare("PRAGMA table_info(entity_types)").all().map((r) => r.name));
+  if (!cols.has('et_case_match') || !cols.has('et_word_boundary_match')) {
+    return 0;
+  }
+
+  let changes = 0;
+
+  // Ensure every entity type has explicit defaults rather than relying on
+  // implicit schema defaults.
+  const typeFill = db.prepare(`
+    UPDATE entity_types
+    SET et_case_match = COALESCE(et_case_match, 'insensitive'),
+        et_word_boundary_match = COALESCE(et_word_boundary_match, 'boundaries')
+    WHERE et_case_match IS NULL
+       OR et_word_boundary_match IS NULL
+  `);
+  const typeFillChanges = typeFill.run().changes;
+  if (typeFillChanges > 0) {
+    logger.info(`Backfilled ${typeFillChanges} entity type default(s) for case/boundary`);
+    changes += typeFillChanges;
+  }
+
+  // Backfill entity-level NULL case/boundary values from the type defaults.
+  // This denormalizes the effective values into the entities table for upgraded
+  // installations, so queries can read them directly without coalescing.
+  const entityCols = new Set(db.prepare("PRAGMA table_info(entities)").all().map((r) => r.name));
+  if (entityCols.has('ent_case_match') && entityCols.has('ent_word_boundary_match')) {
+    const entityFill = db.prepare(`
+      UPDATE entities
+      SET ent_case_match = COALESCE(ent_case_match, (
+        SELECT t.et_case_match FROM entity_types t WHERE t.et_id = entities.ent_type_id
+      )),
+          ent_word_boundary_match = COALESCE(ent_word_boundary_match, (
+        SELECT t.et_word_boundary_match FROM entity_types t WHERE t.et_id = entities.ent_type_id
+      ))
+      WHERE ent_case_match IS NULL
+         OR ent_word_boundary_match IS NULL
+    `);
+    const entityFillChanges = entityFill.run().changes;
+    if (entityFillChanges > 0) {
+      logger.info(`Backfilled ${entityFillChanges} entity match value(s) from type defaults`);
+      changes += entityFillChanges;
+    }
+  }
+
+  return changes;
+}
+
+/**
+ * Ensure pending_operations.pop_doc_id is nullable. Older schemas created it
+ * as NOT NULL, but document-less async operations (e.g. mental-model refresh)
+ * need to leave it null. Recreate the table preserving existing rows only when
+ * the current schema still enforces the constraint.
+ */
+function ensurePendingOpsNullableDocId(db) {
+  const tableInfo = db.prepare("PRAGMA table_info(pending_operations)").all();
+  const docCol = tableInfo.find((c) => c.name === 'pop_doc_id');
+  if (!docCol) return 0;
+  if (docCol.notnull === 0) return 0;
+
+  logger.warn('Recreating pending_operations to make pop_doc_id nullable');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`
+      CREATE TABLE _pending_operations_new (
+        pop_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pop_operation_id TEXT NOT NULL,
+        pop_server_id INTEGER NOT NULL,
+        pop_bank_id TEXT NOT NULL,
+        pop_doc_id INTEGER,
+        pop_rs_id INTEGER,
+        pop_rstep_id INTEGER,
+        pop_ext_id TEXT,
+        pop_action TEXT NOT NULL DEFAULT 'push',
+        pop_status TEXT NOT NULL DEFAULT 'pending',
+        pop_error_message TEXT,
+        pop_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        pop_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      )
+    `);
+
+    const columns = [
+      'pop_id', 'pop_operation_id', 'pop_server_id', 'pop_bank_id', 'pop_doc_id',
+      'pop_rs_id', 'pop_rstep_id', 'pop_ext_id', 'pop_action', 'pop_status',
+      'pop_error_message', 'pop_created_at', 'pop_updated_at'
+    ];
+    const colList = columns.join(', ');
+    db.exec(`INSERT INTO _pending_operations_new (${colList}) SELECT ${colList} FROM pending_operations`);
+    db.exec('DROP TABLE pending_operations');
+    db.exec('ALTER TABLE _pending_operations_new RENAME TO pending_operations');
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_server_bank ON pending_operations(pop_server_id, pop_bank_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_status ON pending_operations(pop_status)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_ext_id ON pending_operations(pop_ext_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_doc_id ON pending_operations(pop_doc_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_research_session ON pending_operations(pop_rs_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_research_step ON pending_operations(pop_rstep_id)');
+
+    logger.info('pending_operations recreated with nullable pop_doc_id');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
 }
 
 /**
@@ -563,13 +720,15 @@ export function ensureSchema(db) {
     const added = ensureMissingColumns(db);
     const removed = removeMentalModelCheckConstraints(db);
     const relaxed = relaxResearchStepsParentCascade(db);
+    const nullableDocId = ensurePendingOpsNullableDocId(db);
     const ftsCreated = ensureDocumentsFts(db);
-    if (created > 0 || added > 0 || removed > 0 || relaxed > 0 || ftsCreated) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${relaxed} FK action(s) relaxed, FTS table created: ${ftsCreated}`);
+    const normalized = normalizeEntityMatchInheritance(db);
+    if (created > 0 || added > 0 || removed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || relaxed > 0 || ftsCreated;
+    return created > 0 || added > 0 || removed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

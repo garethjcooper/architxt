@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ScanSearch, Check, Undo2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ScanSearch, ChevronDown, ChevronUp, Wrench, Search } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { entitiesApi, type Entity, documentsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import {
@@ -12,8 +13,8 @@ import {
   stripEntityTags,
   insertEntityTags,
   findExistingEntityTags,
-  hasEntityTags,
   groupExistingTagsByEntity,
+  repairMalformedEntityTags,
   type MatchGroup,
   type ExistingTagGroup,
 } from './entity-scan-panel';
@@ -21,6 +22,7 @@ import {
   EntityTaggedContent,
 } from './entity-tagged-content';
 import { loadFormatRegistry } from '@/lib/entity-tag-format';
+import { colorForType } from '@/components/research-canvas';
 
 interface EntityDetectionDialogProps {
   documentId: number;
@@ -49,6 +51,7 @@ export function EntityDetectionDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [showPlainText, setShowPlainText] = useState(false);
   const [highlightRange, setHighlightRange] = useState<{ start: number; end: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Kick off format registry load (no state needed — getCachedFormat is safe)
   useEffect(() => {
@@ -57,13 +60,14 @@ export function EntityDetectionDialog({
     }
   }, [isOpen]);
 
-  // Initialise working state when dialog opens — only reset scan state on OPEN, not on content refresh
+  // Initialise working state when dialog opens — only set when there is no prior
+  // working copy so a parent content refresh does not wipe unsaved changes.
   useEffect(() => {
-    if (isOpen && content) {
+    if (isOpen && content && workingContent === '' && originalContent === '') {
       setOriginalContent(content);
       setWorkingContent(content);
     }
-  }, [isOpen, content]);
+  }, [isOpen, content, workingContent, originalContent]);
 
   // Reset scan state only when dialog transitions from closed to open
   const wasOpenRef = useRef(false);
@@ -74,6 +78,7 @@ export function EntityDetectionDialog({
       setExpandedGroups(new Set());
       setIncludedMatchIds(new Set());
       setShowPlainText(false);
+      setSearchQuery('');
     }
     wasOpenRef.current = isOpen;
     if (!isOpen) {
@@ -84,6 +89,7 @@ export function EntityDetectionDialog({
       setExpandedGroups(new Set());
       setIncludedMatchIds(new Set());
       setShowPlainText(false);
+      setSearchQuery('');
     }
   }, [isOpen]);
 
@@ -100,6 +106,9 @@ export function EntityDetectionDialog({
   }, [isOpen, entities.length]);
 
   const handleScan = useCallback(() => {
+    // Pass the original tagged content to the shared matcher. It builds the clean
+    // text internally and marks existing tag inner-text as tagged, so already-tagged
+    // entities are not re-proposed as new matches.
     if (entities.length === 0 || !workingContent) return;
     setScanning(true);
     setTimeout(() => {
@@ -134,6 +143,7 @@ export function EntityDetectionDialog({
       });
 
       setScanning(false);
+      setActiveSidebarTab('found');
     }, 50);
   }, [entities, workingContent]);
 
@@ -201,7 +211,7 @@ export function EntityDetectionDialog({
     setShowPlainText(false);
 
     // Compute raw end: rawStartIndex + matchedText.length in clean text
-    const rawEnd = match.rawStartIndex + group.matchedText.length;
+    const rawEnd = match.rawEndIndex;
     setHighlightRange({ start: match.rawStartIndex, end: rawEnd });
   };
 
@@ -246,6 +256,14 @@ export function EntityDetectionDialog({
     toast.info('Entity markup removed');
   };
 
+  const handleRepairMalformed = () => {
+    if (malformedTags.length === 0) return;
+    const repaired = repairMalformedEntityTags(workingContent);
+    setWorkingContent(repaired);
+    setHighlightRange(null); // clear highlight — offsets invalidated
+    toast.info(`${malformedTags.length} malformed tag${malformedTags.length === 1 ? '' : 's'} repaired`);
+  };
+
   const hasChanges = useMemo(
     () => workingContent !== originalContent,
     [workingContent, originalContent]
@@ -275,9 +293,20 @@ export function EntityDetectionDialog({
     [workingContent]
   );
 
+  const malformedTags = useMemo(
+    () => existingTags.filter((t) => !t.isValid),
+    [existingTags]
+  );
+
   const entityById = useMemo(() => {
     const map = new Map<number, Entity>();
     for (const e of entities) map.set(e.id, e);
+    return map;
+  }, [entities]);
+
+  const entityByEntityId = useMemo(() => {
+    const map = new Map<string, Entity>();
+    for (const e of entities) map.set(e.entity_id, e);
     return map;
   }, [entities]);
 
@@ -286,11 +315,37 @@ export function EntityDetectionDialog({
     [workingContent, existingTags]
   );
 
+  const validExistingTagCount = useMemo(
+    () => existingTagGroups.reduce((sum, g) => sum + g.matches.length, 0),
+    [existingTagGroups]
+  );
+
   const formatExistingTag = useCallback((group: ExistingTagGroup) => {
-    const entity = entityById.get(parseInt(group.id, 10));
+    let entity: Entity | undefined;
+    if (/^\d+$/.test(group.id)) {
+      entity = entityById.get(parseInt(group.id, 10));
+    }
+    if (!entity) {
+      entity = entityByEntityId.get(group.id) ?? entityByEntityId.get(group.entityName);
+    }
     const typeName = entity?.type_name;
-    return `[[${group.entityName} (${typeName ? `${typeName}:` : ''}${group.id})]]`;
-  }, [entityById]);
+    const entityId = entity?.entity_id;
+    if (typeName && entityId) return `${typeName}:${entityId}`;
+    if (entityId) return entityId;
+    if (typeName) return typeName;
+    return group.id;
+  }, [entityById, entityByEntityId]);
+
+  const entityTypeColor = useCallback((group: ExistingTagGroup) => {
+    let entity: Entity | undefined;
+    if (/^\d+$/.test(group.id)) {
+      entity = entityById.get(parseInt(group.id, 10));
+    }
+    if (!entity) {
+      entity = entityByEntityId.get(group.id) ?? entityByEntityId.get(group.entityName);
+    }
+    return colorForType(entity?.type_name ?? null);
+  }, [entityById, entityByEntityId]);
 
   const handleScrollToExistingMatch = (groupId: string, matchIdx: number) => {
     const group = existingTagGroups.find((g) => g.id === groupId);
@@ -315,12 +370,28 @@ export function EntityDetectionDialog({
     toast.info(`Removed tag for "${match.text}"`);
   };
 
-  const includedCount = matchGroups.filter((g) => includedGroupIds.has(g.id)).length;
-  const totalMatches = matchGroups.reduce((sum, g) => sum + g.matches.length, 0);
-  const includedMatches = matchGroups.reduce(
+  const includedMatches = useMemo(() => matchGroups.reduce(
     (sum, g) => sum + g.matches.filter((_, i) => includedMatchIds.has(`${g.id}::${i}`)).length,
     0
+  ), [matchGroups, includedMatchIds]);
+  const includedGroupsCount = useMemo(
+    () => matchGroups.filter((g) => includedGroupIds.has(g.id)).length,
+    [matchGroups, includedGroupIds]
   );
+  const totalMatches = useMemo(() => matchGroups.reduce((sum, g) => sum + g.matches.length, 0), [matchGroups]);
+  const filteredExistingGroups = useMemo(() => {
+    if (!searchQuery.trim()) return existingTagGroups;
+    const q = searchQuery.toLowerCase();
+    return existingTagGroups.filter((g) => g.entityName.toLowerCase().includes(q));
+  }, [existingTagGroups, searchQuery]);
+
+  const filteredMatchGroups = useMemo(() => {
+    if (!searchQuery.trim()) return matchGroups;
+    const q = searchQuery.toLowerCase();
+    return matchGroups.filter((g) => g.entityName.toLowerCase().includes(q));
+  }, [matchGroups, searchQuery]);
+
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'existing' | 'found'>('existing');
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -334,220 +405,269 @@ export function EntityDetectionDialog({
           <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
             {/* Header */}
             <div className="px-3 py-2 border-b border-white/10 bg-white/[0.03] flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white/60">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-white/60 shrink-0">
                   {entities.length} entities loaded
                 </span>
-              </div>
-              {existingTags.length > 0 && (
-                <div className="mt-1.5">
-                  <span className="text-[10px] text-white/40">
-                    {existingTags.length} existing tag{existingTags.length === 1 ? '' : 's'} in document
-                  </span>
+                <div className="relative flex-1 max-w-[14rem]">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-white/30" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search entities..."
+                    className="w-full h-7 pl-7 pr-2 rounded-md bg-white/5 border border-white/10 text-xs text-white/80 placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                  />
                 </div>
-              )}
+              </div>
               {matchGroups.length > 0 && (
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-[10px] text-white/40">
                     {includedMatches} of {totalMatches} new matches
                   </span>
                   <span className="text-[10px] text-white/40">
-                    {includedCount} of {matchGroups.length} groups
+                    {includedGroupsCount} of {matchGroups.length} groups
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Existing Tags panel */}
-            {existingTags.length > 0 && (
-              <div className="border-b border-white/10 flex-shrink-0 max-h-[40%] flex flex-col">
-                <div className="px-3 py-1.5 bg-white/[0.02] flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-white/50">Existing Tags</span>
-                  <span className="text-[10px] text-white/30">{existingTags.length} occurrence{existingTags.length !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                  {existingTagGroups.map((group) => (
-                    <div
-                      key={group.id}
-                      className="rounded-md border border-white/10 bg-white/[0.02] hover:border-purple-500/20 hover:bg-purple-900/5 transition-colors"
-                    >
-                      <div className="flex items-start gap-2 px-2 py-1.5">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-medium text-white/80">
-                              &ldquo;{group.entityName}&rdquo;
-                            </span>
-                            <span className="text-[10px] text-white/30">→</span>
-                            <span className="text-xs text-purple-300">
-                              &ldquo;{formatExistingTag(group)}&rdquo;
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] text-white/40">
-                              {group.matches.length} occurrence{group.matches.length !== 1 ? 's' : ''}
-                            </span>
-                            <span className="text-[10px] text-white/20">·</span>
-                            <span className="text-[10px] text-white/40">{group.id}</span>
-                            <button
-                              onClick={() => toggleGroupExpanded(`existing-${group.id}`)}
-                              className="text-[10px] text-white/30 hover:text-white/60 ml-auto flex items-center gap-0.5"
-                            >
-                              {expandedGroups.has(`existing-${group.id}`) ? (
-                                <>
-                                  Collapse <ChevronUp className="h-3 w-3" />
-                                </>
-                              ) : (
-                                <>
-                                  Expand <ChevronDown className="h-3 w-3" />
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+            <Tabs
+              value={activeSidebarTab}
+              onValueChange={(v) => setActiveSidebarTab(v as 'existing' | 'found')}
+              className="flex-1 min-h-0 overflow-hidden"
+            >
+              <TabsList className="w-full m-1 bg-white/5 rounded-lg h-9" variant="default">
+                <TabsTrigger
+                  value="existing"
+                  className="flex-1 text-xs font-medium text-white/50 data-active:bg-white/10 data-active:text-white rounded-md"
+                >
+                  Existing
+                  {validExistingTagCount > 0 && (
+                    <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-white/60">
+                      {validExistingTagCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="found"
+                  className="flex-1 text-xs font-medium text-white/50 data-active:bg-white/10 data-active:text-white rounded-md"
+                >
+                  Found
+                  {matchGroups.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-white/60">
+                      {totalMatches}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
 
-                      {expandedGroups.has(`existing-${group.id}`) && (
-                        <div className="mt-1.5 space-y-1 px-2 pb-2">
-                          {group.matches.map((match, i) => (
-                            <div
-                              key={i}
-                              className="group flex items-start gap-2 text-[10px] text-white/30 pl-2 border-l border-white/10 cursor-pointer hover:text-white/50"
-                              onClick={() => handleScrollToExistingMatch(group.id, i)}
-                            >
-                              <span className="break-all leading-relaxed">
-                                {match.lineContext.slice(0, match.lineContext.indexOf(match.text))}
-                                <span className="text-purple-300 font-medium">{match.text}</span>
-                                {match.lineContext.slice(match.lineContext.indexOf(match.text) + match.text.length)}
+              <TabsContent value="existing" className="flex-1 min-h-0 overflow-hidden flex flex-col p-0 m-0" keepMounted>
+                {existingTagGroups.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-white/30 text-xs italic p-4">
+                    No existing entity tags
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                    {[...filteredExistingGroups].sort((a, b) =>
+                      a.entityName.localeCompare(b.entityName)
+                    ).map((group) => {
+                      const typeColor = entityTypeColor(group);
+                      return (
+                        <div
+                          key={group.id}
+                          className="group flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors cursor-pointer border-white/5 hover:bg-white/5"
+                          style={{ borderLeftColor: typeColor, borderLeftWidth: 3 }}
+                          onClick={() => toggleGroupExpanded(`existing-${group.id}`)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs text-white/90 truncate">{group.entityName.length > 80 ? `${group.entityName.slice(0, 80)}…` : group.entityName}</div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] text-white/40 shrink-0">
+                                {group.matches.length} occurrence{group.matches.length !== 1 ? 's' : ''}
                               </span>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleRemoveExistingMatch(group.id, i); }}
-                                className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity p-0.5 shrink-0"
-                                title="Remove this tag"
+                                onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(`existing-${group.id}`); }}
+                                className="text-[10px] text-white/30 hover:text-white/60 flex items-center gap-0.5"
                               >
-                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                {expandedGroups.has(`existing-${group.id}`) ? (
+                                  <>
+                                    Collapse <ChevronUp className="h-3 w-3" />
+                                  </>
+                                ) : (
+                                  <>
+                                    Expand <ChevronDown className="h-3 w-3" />
+                                  </>
+                                )}
                               </button>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Match groups list */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-              {entitiesLoading && matchGroups.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-white/30">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span className="text-xs">Loading entities...</span>
-                </div>
-              ) : matchGroups.length === 0 ? (
-                <p className="text-xs text-white/30 italic p-2 text-center">
-                  {scanning ? 'Scanning...' : 'Click Scan to find entity matches'}
-                </p>
-              ) : (
-                matchGroups.map((group) => (
-                  <div
-                    key={group.id}
-                    className={`rounded-md border transition-colors ${
-                      includedGroupIds.has(group.id)
-                        ? 'bg-purple-900/10 border-purple-500/20'
-                        : 'border-white/5 opacity-50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2 px-2 py-1.5">
-                      <Checkbox
-                        checked={includedGroupIds.has(group.id)}
-                        onCheckedChange={() => toggleGroup(group.id)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-medium text-white/80">&ldquo;{group.matchedText}&rdquo;</span>
-                          <span className="text-[10px] text-white/30">→</span>
-                          <span className="text-xs text-purple-300">&ldquo;{group.replacementText}&rdquo;</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] text-white/40">
-                            {group.matches.length} occurrence{group.matches.length !== 1 ? 's' : ''}
-                          </span>
-                          <span className="text-[10px] text-white/20">·</span>
-                          <span className="text-[10px] text-white/40">{group.entityId}</span>
-                          <button
-                            onClick={() => toggleGroupExpanded(group.id)}
-                            className="text-[10px] text-white/30 hover:text-white/60 ml-auto flex items-center gap-0.5"
-                          >
-                            {expandedGroups.has(group.id) ? (
-                              <>
-                                Collapse <ChevronUp className="h-3 w-3" />
-                              </>
-                            ) : (
-                              <>
-                                Expand <ChevronDown className="h-3 w-3" />
-                              </>
-                            )}
-                          </button>
-                        </div>
-
-                        {expandedGroups.has(group.id) && (
-                          <div className="mt-1.5 space-y-1 px-2 pb-1.5">
-                            {group.matches.map((match, i) => {
-                              const matchId = `${group.id}::${i}`;
-                              const isSelected = includedMatchIds.has(matchId);
-                              const before = match.lineContext.slice(0, match.lineContext.indexOf(group.matchedText));
-                              const after = match.lineContext.slice(match.lineContext.indexOf(group.matchedText) + group.matchedText.length);
-                              return (
-                                <div
-                                  key={matchId}
-                                  className={`group flex items-start gap-2 text-[10px] pl-2 border-l border-white/10 cursor-pointer transition-colors ${
-                                    isSelected ? 'text-white/60' : 'text-white/30 hover:text-white/50'
-                                  }`}
-                                  onClick={() => handleScrollToMatch(group.id, i)}
-                                >
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() => toggleMatch(matchId, group.id)}
-                                    className="mt-0.5 shrink-0"
-                                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                                  />
-                                  <span className="break-all leading-relaxed">
-                                    {before}
-                                    <span className={`font-medium ${isSelected ? 'text-purple-300' : 'text-purple-400/60'}`}>{group.matchedText}</span>
-                                    {after}
-                                  </span>
-                                </div>
-                              );
-                            })}
                           </div>
-                        )}
-                      </div>
-                    </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-white/40 truncate pr-2">{formatExistingTag(group)}</span>
+                          </div>
+
+                          {expandedGroups.has(`existing-${group.id}`) && (
+                            <div className="mt-1.5 space-y-1">
+                              {group.matches.map((match, i) => {
+                                const displayContext = match.lineContext;
+                                const idx = displayContext.indexOf(match.text);
+                                const before = idx >= 0 ? displayContext.slice(0, idx) : displayContext;
+                                const after = idx >= 0 ? displayContext.slice(idx + match.text.length) : '';
+                                return (
+                                  <div
+                                    key={i}
+                                    className="group/match rounded border border-white/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-white/60 cursor-pointer hover:border-white/10 hover:bg-[oklch(0.19_0_0)] transition-colors"
+                                    onClick={(e) => { e.stopPropagation(); handleScrollToExistingMatch(group.id, i); }}
+                                  >
+                                    <span className="break-all leading-relaxed line-clamp-3">
+                                      {before}
+                                      <span className="text-purple-500 font-semibold">{match.text}</span>
+                                      {after}
+                                    </span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleRemoveExistingMatch(group.id, i); }}
+                                      className="opacity-0 group-hover/match:opacity-100 text-white/30 hover:text-red-400 transition-opacity p-0.5 shrink-0 mt-0.5"
+                                      title="Remove this tag"
+                                    >
+                                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))
-              )}
-            </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="found" className="flex-1 min-h-0 overflow-hidden flex flex-col p-0 m-0" keepMounted>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                  {entitiesLoading && matchGroups.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-white/30">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-xs">Loading entities...</span>
+                    </div>
+                  ) : matchGroups.length === 0 ? (
+                    <p className="text-xs text-white/30 italic p-2 text-center">
+                      {scanning ? 'Scanning...' : 'Click Scan to find entity matches'}
+                    </p>
+                  ) : (
+                    [...filteredMatchGroups].sort((a, b) =>
+                      a.entityName.localeCompare(b.entityName)
+                    ).map((group) => (
+                      <div
+                        key={group.id}
+                        className="group flex items-start gap-2 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors cursor-pointer border-white/5 hover:bg-white/5"
+                        style={{ borderLeftColor: colorForType(group.entityType), borderLeftWidth: 3 }}
+                        onClick={() => toggleGroupExpanded(group.id)}
+                      >
+                        <Checkbox
+                          checked={includedGroupIds.has(group.id)}
+                          onCheckedChange={() => toggleGroup(group.id)}
+                          className="mt-0.5 shrink-0"
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        />
+                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs text-white/90 truncate">{group.entityName.length > 80 ? `${group.entityName.slice(0, 80)}…` : group.entityName}</div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] text-white/40 shrink-0">
+                                {group.matches.length} occurrence{group.matches.length !== 1 ? 's' : ''}
+                              </span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(group.id); }}
+                                className="text-[10px] text-white/30 hover:text-white/60 flex items-center gap-0.5"
+                              >
+                                {expandedGroups.has(group.id) ? (
+                                  <>
+                                    Collapse <ChevronUp className="h-3 w-3" />
+                                  </>
+                                ) : (
+                                  <>
+                                    Expand <ChevronDown className="h-3 w-3" />
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-white/40 truncate pr-2">
+                              {group.entityType && group.entityId ? `${group.entityType}:${group.entityId}` : group.entityId}
+                            </span>
+                          </div>
+
+                          {expandedGroups.has(group.id) && (
+                            <div className="mt-1.5 space-y-1">
+                              {group.matches.map((match, i) => {
+                                const matchId = `${group.id}::${i}`;
+                                const isSelected = includedMatchIds.has(matchId);
+                                const displayContext = match.lineContext;
+                                const idx = displayContext.indexOf(group.matchedText);
+                                const before = idx >= 0 ? displayContext.slice(0, idx) : displayContext;
+                                const after = idx >= 0 ? displayContext.slice(idx + group.matchedText.length) : '';
+                                return (
+                                  <div
+                                    key={matchId}
+                                    className="group/match rounded border border-white/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-white/60 cursor-pointer hover:border-white/10 hover:bg-[oklch(0.19_0_0)] transition-colors"
+                                    onClick={(e) => { e.stopPropagation(); handleScrollToMatch(group.id, i); }}
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => toggleMatch(matchId, group.id)}
+                                      className="mt-0.5 shrink-0"
+                                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                    />
+                                    <span className="break-all leading-relaxed line-clamp-3">
+                                      {before}
+                                      <span className="font-semibold text-purple-500">{group.matchedText}</span>
+                                      {after}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
 
             {/* Footer */}
             <div className="px-3 py-2 border-t border-white/10 flex items-center justify-end gap-2 flex-shrink-0">
               {existingTags.length > 0 && (
                 <Button
                   onClick={handleUndo}
-                  className="h-7 px-2.5 text-xs bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] flex items-center gap-1"
+                  className="h-7 px-2.5 text-xs bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)]"
                 >
-                  <Undo2 className="h-3 w-3" />
                   Remove Tags
+                </Button>
+              )}
+              {malformedTags.length > 0 && (
+                <Button
+                  onClick={handleRepairMalformed}
+                  className="h-7 px-2.5 text-xs bg-amber-600/20 border border-amber-500/30 text-amber-400 hover:bg-amber-600/30 flex items-center gap-1"
+                >
+                  <Wrench className="h-3 w-3" />
+                  Repair {malformedTags.length} malformed
                 </Button>
               )}
               <Button
                 onClick={handleApply}
                 disabled={matchGroups.length === 0 || includedMatches === 0}
-                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-3 w-3" />
                 Insert Tags
               </Button>
               <Button
@@ -567,12 +687,14 @@ export function EntityDetectionDialog({
               <span className="text-[10px] text-white/40 font-sans">
                 {showPlainText ? 'Plain text view' : 'Highlighted entities'}
               </span>
-              <button
-                onClick={() => setShowPlainText((v) => !v)}
-                className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/50 hover:text-white/80 hover:border-white/20 transition-colors font-sans"
-              >
-                {showPlainText ? 'Show Tags' : 'Show Plain'}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowPlainText((v) => !v)}
+                  className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/50 hover:text-white/80 hover:border-white/20 transition-colors font-sans"
+                >
+                  {showPlainText ? 'Show Tags' : 'Show Plain'}
+                </button>
+              </div>
             </div>
             <div className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
               {showPlainText ? (

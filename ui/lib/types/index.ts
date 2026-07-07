@@ -104,6 +104,11 @@ export interface EntityType {
   id_label: string | null;
   name_label: string | null;
   case_match: 'insensitive' | 'sensitive';
+  word_boundary_match: 'boundaries' | 'no-boundaries';
+  uses_entity_id_pattern: boolean;
+  id_format_prefix: string | null;
+  min_id_digits: number;
+  id_separator: 'none' | '-';
   created_at: string;
   updated_at: string;
 }
@@ -118,6 +123,12 @@ export interface Entity {
   aliases: string[];
   case_match: 'insensitive' | 'sensitive';
   type_case_match: 'insensitive' | 'sensitive';
+  word_boundary_match: 'boundaries' | 'no-boundaries';
+  type_word_boundary_match: 'boundaries' | 'no-boundaries';
+  type_uses_entity_id_pattern: boolean;
+  type_id_format_prefix: string | null;
+  type_min_id_digits: number;
+  type_id_separator: 'none' | '-';
   generated_by: 'user' | 'import';
   usage_count?: number;
   overrides?: MentalModelEntityOverrides;

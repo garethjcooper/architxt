@@ -7,7 +7,7 @@
  * inference layer can trust.
  */
 
-import { listEntitiesWithType } from '../../db/crud/entities.js';
+import { listEntitiesForDetection } from '../../db/crud/entities.js';
 import { scanForEntityMatches, groupMatchesByEntity } from '../../utils/entity-matcher.js';
 import { createLogger } from '../../utils/logger.js';
 
@@ -20,12 +20,12 @@ const logger = createLogger('research-entity-seed');
  * @returns {Promise<{nodes: Object[], edges: Object[], sourceIds: string[]}>}
  */
 export async function buildVerifiedEntitySeed(db, findings, narrative) {
-  const entityResult = await listEntitiesWithType(db);
+  const entityResult = await listEntitiesForDetection(db);
   if (!entityResult.success || !entityResult.data?.length) {
     return { nodes: [], edges: [], sourceIds: [] };
   }
 
-  const entities = entityResult.data.map(toMatcherEntity);
+  const entities = entityResult.success ? entityResult.data : [];
   const corpusParts = [];
   if (narrative) corpusParts.push(narrative);
   for (const f of findings || []) {
@@ -67,38 +67,6 @@ export async function buildVerifiedEntitySeed(db, findings, narrative) {
     edges: [],
     sourceIds: nodes.map((n) => n.id),
     nameById: Object.fromEntries(entities.map((e) => [e.entity_id, e.name])),
-  };
-}
-
-function splitCorpusIntoWindows(corpus) {
-  if (!corpus) return [];
-  const paragraphs = corpus.split(/\n\s*\n/);
-  const windows = [];
-  for (const para of paragraphs) {
-    const trimmed = para.trim();
-    if (!trimmed) continue;
-    if (trimmed.length <= 240) {
-      windows.push(trimmed);
-      continue;
-    }
-    const sentences = trimmed.match(/[^.!?]+[.!?]+\s*/g) || [trimmed];
-    for (const s of sentences) {
-      const st = s.trim();
-      if (st) windows.push(st);
-    }
-  }
-  return windows;
-}
-
-function toMatcherEntity(dbRow) {
-  return {
-    id: dbRow.ent_id,
-    entity_id: dbRow.ent_entity_id,
-    name: dbRow.ent_name,
-    type_name: dbRow.et_type_name,
-    aliases: dbRow.ent_aliases || [],
-    case_match: dbRow.ent_case_match,
-    type_case_match: dbRow.et_case_match,
   };
 }
 

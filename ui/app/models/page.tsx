@@ -195,7 +195,7 @@ function ModelsPageContent() {
             <Button onClick={() => setCreateDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
           </div>
         }
-        <div className={["rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden", !freeze ? "max-h-[calc(100vh-240px)]" : ""].filter(Boolean).join(" ")}>
+        <div className="rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="flex items-center justify-end px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
             <div className="flex items-center gap-2">
               <button
@@ -232,6 +232,7 @@ function ModelsPageContent() {
                   </TableHead>
                   <TableHead className={["w-12 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>ID</TableHead>
                   <TableHead className={["w-20 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Template</TableHead>
+                  <TableHead className={["w-24 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Dimension</TableHead>
                   <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>External ID</TableHead>
                   <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</TableHead>
                   <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entities</TableHead>
@@ -251,6 +252,7 @@ function ModelsPageContent() {
                       <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-14" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-14" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
@@ -265,7 +267,7 @@ function ModelsPageContent() {
                   ))
                 ) : displayModels.length === 0 ? (
                   <TableRow>
-                  <TableCell colSpan={12} className="text-center py-8 text-white/70">
+                  <TableCell colSpan={13} className="text-center py-8 text-white/70">
                       <div className="flex flex-col items-center gap-2">
                         <EntityIcon className="h-8 w-8 opacity-50" />
                         <p>No mental models found.</p>
@@ -296,6 +298,9 @@ function ModelsPageContent() {
                         ) : (
                           <span className="text-white/30">-</span>
                         )}
+                      </TableCell>
+                      <TableCell className="py-1.5 px-4 text-xs text-white/70">
+                        {model.dimension ?? <span className="text-white/30">-</span>}
                       </TableCell>
                       <TableCell className="py-1.5 px-4 font-mono text-xs text-white font-semibold">
                         <span className="truncate max-w-full inline-block">{model.ext_id || '-'}</span>

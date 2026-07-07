@@ -50,6 +50,15 @@ describe('mental-model-results.tryExtractGraph', () => {
     assert.ok(error.includes('no usable nodes or edges'), `expected empty graph error, got: ${error}`);
   });
 
+  it('returns empty graph and no error when JSON parses to empty nodes/edges', () => {
+    const content = JSON.stringify({ nodes: [], edges: [] });
+    const { graph, error } = tryExtractGraph(content);
+    assert.ok(graph);
+    assert.equal(error, null);
+    assert.equal(graph.nodes.length, 0);
+    assert.equal(graph.edges.length, 0);
+  });
+
   it('returns null error for missing content', () => {
     const { graph, error } = tryExtractGraph(null);
     assert.equal(graph, null);

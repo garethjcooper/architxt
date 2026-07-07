@@ -1,6 +1,6 @@
 'use client';
 
-import { GitCompare, Clock } from 'lucide-react';
+import { GitCompare, Clock, ScanSearch } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface Divergence {
@@ -40,6 +40,7 @@ interface SyncRowProps {
   archHash?: string;
   hindHash?: string;
   archStatus?: string;
+  archHasEntities?: boolean;
   divergence?: Divergence;
   isSelected: boolean;
   onSelect: (checked: boolean) => void;
@@ -83,6 +84,7 @@ export default function SyncRow({
   archHash,
   hindHash,
   archStatus,
+  archHasEntities,
   divergence,
   isSelected,
   onSelect,
@@ -110,6 +112,12 @@ export default function SyncRow({
               {archStatus && (
                 <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusBadgeClass[archStatus] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}>
                   {statusLabel[archStatus] || archStatus}
+                </span>
+              )}
+              {archHasEntities && (
+                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium bg-purple-800/15 text-purple-400 border-purple-700/20" title="Entities detected in extracted content">
+                  <ScanSearch className="h-3 w-3" />
+                  Detected
                 </span>
               )}
               {pendingStatus && (

@@ -22,9 +22,10 @@ import { ViewDocumentDialog } from '@/components/view-document-dialog';
 import { ManageTagsDialog } from '@/components/manage-tags-dialog';
 import { ManageMetadataDialog } from '@/components/manage-metadata-dialog';
 import { ManageContextDialog } from '@/components/manage-context-dialog';
+import { ManageDocumentConfigDialog } from '@/components/manage-document-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { BatchProgressDialog, type BatchItem, type BatchResult } from '@/components/batch-progress-dialog';
-import { FileText, AlertCircle, Plus, Trash2, Play, RefreshCw, Tag, FolderOpen, Search, X, ScanSearch, TableIcon } from 'lucide-react';
+import { FileText, AlertCircle, Plus, Trash2, Play, RefreshCw, Tag, FolderOpen, Search, X, ScanSearch, TableIcon, Settings2 } from 'lucide-react';
 import { ArchitxtIcon } from '@/components/icons/architxt-icon';
 import { toast } from 'sonner';
 import { PageShell } from '@/app/components/page-shell';
@@ -92,6 +93,7 @@ function DocumentsPageContent() {
   const [manageTagsDialogOpen, setManageTagsDialogOpen] = useState(false);
   const [manageMetadataDialogOpen, setManageMetadataDialogOpen] = useState(false);
   const [manageContextDialogOpen, setManageContextDialogOpen] = useState(false);
+  const [manageConfigDialogOpen, setManageConfigDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [processActionConfirmOpen, setProcessActionConfirmOpen] = useState(false);
@@ -349,6 +351,7 @@ function DocumentsPageContent() {
               <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-orange-500/30 text-orange-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
               <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-blue-500/30 text-blue-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
               <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-violet-500/30 text-violet-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
+              <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
               <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-emerald-500/30 text-emerald-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
               <div className="flex-1" />
               <div className="w-px h-5 bg-white/10 mx-1" />
@@ -357,7 +360,7 @@ function DocumentsPageContent() {
               <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
             </div>
         }
-        <div className={["rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden", !freeze ? "max-h-[calc(100vh-240px)]" : ""].filter(Boolean).join(" ")}>
+        <div className="rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
             <div className="flex items-center gap-1">
               {MANAGE_FILTERS.map(f => (
@@ -630,6 +633,17 @@ function DocumentsPageContent() {
         onClose={() => setManageContextDialogOpen(false)}
         selectedDocIds={useMemo(() => Array.from(selected), [selected])}
         onContextUpdated={() => {
+          clearSelection();
+          fetchDocuments();
+        }}
+      />
+
+      <ManageDocumentConfigDialog
+        isOpen={manageConfigDialogOpen}
+        onClose={() => setManageConfigDialogOpen(false)}
+        selectedDocIds={useMemo(() => Array.from(selected), [selected])}
+        documents={documents}
+        onConfigUpdated={() => {
           clearSelection();
           fetchDocuments();
         }}

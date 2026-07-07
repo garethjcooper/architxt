@@ -24,10 +24,12 @@ import {
   type PrebuiltResponse,
 } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
+import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { InteractiveGraph, type GraphCanvas, type GraphNode, type GraphEdge, type GraphLayout, colorForType, colorForEdge } from '@/components/research-canvas';
 import { transformPrebuiltToDiscoverResponse } from '@/app/research/prebuilt';
 import { ExploreToolbox, type TargetSelection, type PrebuiltDimensionStatus } from './toolbox';
 import { GraphControls } from './graph-controls';
+import { CardControls } from './card-controls';
 
 const logger = createLogger('ExplorePage');
 
@@ -69,6 +71,35 @@ function stripMarkdown(text: string): string {
     .replace(/^#{1,6}\s*/gm, '')
     .replace(/\n+/g, ' ')
     .trim();
+}
+
+function escapeMdCell(value: string): string {
+  return value.replace(/\|/g, '\\|').replace(/\n/g, ' ').replace(/\r/g, '');
+}
+
+function buildEntityCompiledMarkdown(entities: GraphNode[]): string {
+  const blocks: string[] = [];
+  for (const entity of entities) {
+    const targetType = entity.type || (typeof entity.id === 'string' && entity.id.includes(':') ? entity.id.split(':')[0] : undefined);
+    const typeLine = targetType && !entity.id.startsWith(`${targetType}:`)
+      ? `${targetType}:${entity.id}`
+      : entity.id;
+    const summaryText = (entity as any).summaryText || 'No summary available.';
+    blocks.push(`# ${escapeMdCell(entity.label || entity.id)} (${escapeMdCell(typeLine)})\n\n${escapeMdCell(summaryText)}`);
+  }
+  return blocks.join('\n\n');
+}
+
+function buildEdgeMarkdownTable(edges: GraphEdge[], nodeById: Map<string, GraphNode>): string {
+  const rows = ['| Source name | Target name | Label long | Source entity | Target entity |', '| --- | --- | --- | --- | --- |'];
+  for (const e of edges) {
+    const sourceNode = nodeById.get(e.source);
+    const targetNode = nodeById.get(e.target);
+    rows.push(
+      `| ${escapeMdCell(sourceNode?.label || e.source)} | ${escapeMdCell(targetNode?.label || e.target)} | ${escapeMdCell(e.label_long || e.label || e.relationship_type || '')} | ${escapeMdCell(e.source)} | ${escapeMdCell(e.target)} |`
+    );
+  }
+  return rows.join('\n');
 }
 
 function extractEntitySummary(prebuilt: { dimensions?: Array<{ dimension: string; result?: { narrative?: string; errors?: Array<{ model?: string; error: string }> } }> } | undefined, entityId: string): { text: string; ok: boolean; reason?: string } {
@@ -173,11 +204,13 @@ function buildPrebuiltDimensionStatuses(
       }
     }
 
+    const loaded = errors.length === 0;
     const hasData = dim.found_count > 0 || (dim.result?.narrative ? dim.result.narrative.trim().length > 0 : false);
     return {
       dimension: dim.dimension,
       label: dimensionLabels.get(dim.dimension) || dim.dimension,
-      loaded: hasData && errors.length === 0,
+      loaded,
+      hasData,
       nodeCount: dim.dimension.startsWith('interface') ? nodeCount : undefined,
       error: errors.length > 0 ? errors.join('; ') : undefined,
     };
@@ -186,13 +219,18 @@ function buildPrebuiltDimensionStatuses(
 
 export default function ExplorePage() {
   const [servers, setServers] = useState<Server[]>([]);
-  const [selectedServerId, setSelectedServerId] = useState<string>('');
   const [banks, setBanks] = useState<SelectorBank[]>([]);
-  const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [loadingBanks, setLoadingBanks] = useState(false);
+  const {
+    selectedServerId,
+    setSelectedServerId,
+    selectedBankId,
+    setSelectedBankId,
+  } = usePersistentServerBank(servers, banks);
   const [globalGraph, setGlobalGraph] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
   const [globalGraphLoading, setGlobalGraphLoading] = useState(false);
   const [entitySearch, setEntitySearch] = useState('');
+  const [edgesSearch, setEdgesSearch] = useState('');
 
   const [graph, setGraph] = useState<GraphCanvas>({ nodes: [], edges: [] });
   const [discoveries, setDiscoveries] = useState<Map<string, DiscoverStepResponse>>(new Map());
@@ -219,6 +257,7 @@ export default function ExplorePage() {
   const [hoveredTargetDirection, setHoveredTargetDirection] = useState<'inbound' | 'outbound' | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [topFlex, setTopFlex] = useState(2);
   const bottomFlex = 5 - topFlex;
   const [leftFlex, setLeftFlex] = useState(1.0);
@@ -274,7 +313,6 @@ export default function ExplorePage() {
   useEffect(() => {
     if (!selectedServerId) {
       setBanks([]);
-      setSelectedBankId('');
       return;
     }
     fetchBanks(parseInt(selectedServerId, 10));
@@ -309,6 +347,7 @@ export default function ExplorePage() {
     setPrebuiltDimensionStatuses(new Map());
     setToolboxNodeId(null);
     setEntitySearch('');
+    setEdgesSearch('');
     setHoveredEntityId(null);
     setHoveredTargetDirection(null);
     setPlacementSourceNodeId(null);
@@ -517,6 +556,21 @@ export default function ExplorePage() {
     setHoveredNodeId(nodeId);
   }, []);
 
+  const selectOnCanvas = useCallback((id: string) => {
+    setSelectedIds([id]);
+    const cy = cyRef.current;
+    if (!cy || cy.destroyed()) return;
+    const el = cy.getElementById(id);
+    if (el.length === 0) return;
+    cy.elements().unselect();
+    el.select();
+    cy.fit(el, 80);
+  }, []);
+
+  const handleSelectEdge = useCallback((edge: GraphEdge) => {
+    selectOnCanvas(edge.id);
+  }, [selectOnCanvas]);
+
   // When an edge is hovered on the canvas, scroll the matching list row into view.
   useEffect(() => {
     if (!hoveredEdgeId || !edgeListRef.current || !autoScrollEdges) return;
@@ -717,6 +771,12 @@ export default function ExplorePage() {
     setShowToolbox(true);
   }, [discovering, runPrebuiltData]);
 
+  const handleSelectEntity = useCallback((entity: GraphNode) => {
+    const id = qualifiedId(entity.id, entity.type);
+    selectOnCanvas(id);
+    handleNodeClick(id);
+  }, [selectOnCanvas, handleNodeClick]);
+
   const handleApplyEdges = useCallback((nodeId: string, selections: TargetSelection[]) => {
     const discovery = discoveries.get(nodeId);
     if (!discovery?.canvas?.graph) {
@@ -823,14 +883,36 @@ export default function ExplorePage() {
             <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
               <span className="font-medium text-sm truncate">Entity Summaries</span>
               <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-[10px] text-white/60 cursor-pointer">
-                  <Switch
-                    checked={autoScrollEntities}
-                    onCheckedChange={(checked) => setAutoScrollEntities(Boolean(checked))}
-                    size="sm"
-                  />
-                  Scroll
-                </label>
+                <CardControls
+                  scroll={autoScrollEntities}
+                  onScrollChange={(checked) => setAutoScrollEntities(Boolean(checked))}
+                  onCopy={() => {
+                    if (canvasEntities.length === 0) {
+                      toast.info('No entities to copy');
+                      return;
+                    }
+                    navigator.clipboard.writeText(buildEntityCompiledMarkdown(canvasEntities))
+                      .then(() => toast.success('Entity summaries copied to clipboard'));
+                  }}
+                  onSaveMd={() => {
+                    if (canvasEntities.length === 0) {
+                      toast.info('No entities to save');
+                      return;
+                    }
+                    const date = new Date().toISOString().split('T')[0];
+                    const filename = `explore-entity-summaries-${date}.md`;
+                    const blob = new Blob([buildEntityCompiledMarkdown(canvasEntities)], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success(`Entity summaries saved as ${filename}`);
+                  }}
+                />
                 <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono h-5 inline-flex items-center">
                   {canvasEntities.length}
                 </span>
@@ -859,7 +941,13 @@ export default function ExplorePage() {
                       role="button"
                       tabIndex={0}
                       data-node-id={entity.id}
-                      onClick={() => handleClickEntity(entity)}
+                      onClick={() => handleSelectEntity(entity)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelectEntity(entity);
+                        }
+                      }}
                       onMouseEnter={() => handleHoverEntity(entity)}
                       onMouseLeave={() => handleHoverEntity(null)}
                       className={cn(
@@ -908,14 +996,36 @@ export default function ExplorePage() {
             <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
               <span className="font-medium text-sm">Edges</span>
               <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-[10px] text-white/60 cursor-pointer">
-                  <Switch
-                    checked={autoScrollEdges}
-                    onCheckedChange={(checked) => setAutoScrollEdges(Boolean(checked))}
-                    size="sm"
-                  />
-                  Scroll
-                </label>
+                <CardControls
+                  scroll={autoScrollEdges}
+                  onScrollChange={(checked) => setAutoScrollEdges(Boolean(checked))}
+                  onCopy={() => {
+                    if (canvasEdges.length === 0) {
+                      toast.info('No edges to copy');
+                      return;
+                    }
+                    navigator.clipboard.writeText(buildEdgeMarkdownTable(graph.edges, nodeById))
+                      .then(() => toast.success('Edges copied to clipboard'));
+                  }}
+                  onSaveMd={() => {
+                    if (canvasEdges.length === 0) {
+                      toast.info('No edges to save');
+                      return;
+                    }
+                    const date = new Date().toISOString().split('T')[0];
+                    const filename = `explore-edges-${date}.md`;
+                    const blob = new Blob([buildEdgeMarkdownTable(graph.edges, nodeById)], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success(`Edges saved as ${filename}`);
+                  }}
+                />
                 <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono h-5 inline-flex items-center">
                   {canvasEdges.length}
                 </span>
@@ -933,6 +1043,7 @@ export default function ExplorePage() {
                     key={e.id}
                     type="button"
                     data-edge-id={e.id}
+                    onClick={() => handleSelectEdge(e)}
                     onMouseEnter={() => setHoveredEdgeId(e.id)}
                     onMouseLeave={() => setHoveredEdgeId(null)}
                     className={cn(
@@ -1003,6 +1114,7 @@ export default function ExplorePage() {
               )}
               <InteractiveGraph
                 graph={graph}
+                selectedIds={selectedIds}
                 layoutName={graphLayout}
                 layoutAnimate={graphLayoutAnimate}
                 showEdgeLabels={showEdgeLabels}
@@ -1035,6 +1147,8 @@ export default function ExplorePage() {
                     canvasNodeIds={canvasNodeIds}
                     searchValue={entitySearch}
                     onSearchChange={setEntitySearch}
+                    edgesSearchValue={edgesSearch}
+                    onEdgesSearchChange={setEdgesSearch}
                     prebuiltDimensions={toolboxNodeId ? prebuiltDimensionStatuses.get(toolboxNodeId) : undefined}
                     onApply={handleApplyEdges}
                     onClose={() => setShowToolbox(false)}

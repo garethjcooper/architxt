@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { entitiesApi } from '@/lib/api/client';
+import { entitiesApi, entityTypesApi } from '@/lib/api/client';
 import type { Entity, EntityType } from '@/lib/types';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
+import { checkEntityIdConformity, formatEntityIdPattern } from '@/lib/entity-id-pattern';
 
 interface Props {
   open: boolean;
@@ -35,6 +36,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
   const [aliases, setAliases] = useState<string[]>([]);
   const [newAlias, setNewAlias] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wordBoundaries, setWordBoundaries] = useState(true);
 
   useEffect(() => {
     if (entity) {
@@ -45,18 +47,54 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
       setAliases([...entity.aliases]);
       setNewAlias('');
       setCaseSensitive(entity.case_match === 'sensitive');
+      setWordBoundaries((entity.word_boundary_match ?? 'boundaries') === 'boundaries');
     }
   }, [entity, open]);
 
-  if (!entity) return null;
+  const selectedType = entityTypes.find((t) => t.id === Number(typeId)) || null;
 
-  const hasChanges =
-    name !== (entity.name || '') ||
-    entityId !== (entity.entity_id || '') ||
-    typeId !== entity.type_id ||
-    description !== (entity.description || '') ||
-    JSON.stringify(aliases) !== JSON.stringify(entity.aliases) ||
-    caseSensitive !== (entity.case_match === 'sensitive');
+  const entityIdConformity = useMemo(() => {
+    if (!selectedType) return null;
+    return checkEntityIdConformity(entityId, selectedType);
+  }, [entityId, selectedType]);
+
+  const [nextEntityId, setNextEntityId] = useState<string | null>(null);
+  const [nextIdLoading, setNextIdLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedType || !selectedType.uses_entity_id_pattern || !entity) {
+      setNextEntityId(null);
+      return;
+    }
+    let cancelled = false;
+    setNextIdLoading(true);
+    entityTypesApi.getNextEntityId(selectedType.id, entity.entity_id)
+      .then((res) => {
+        if (!cancelled) setNextEntityId(res.next_entity_id);
+      })
+      .catch(() => {
+        if (!cancelled) setNextEntityId(null);
+      })
+      .finally(() => {
+        if (!cancelled) setNextIdLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedType, entity]);
+
+  const hasChanges = useMemo(() => {
+    if (!entity) return false;
+    return (
+      name !== (entity.name || '') ||
+      entityId !== (entity.entity_id || '') ||
+      typeId !== entity.type_id ||
+      description !== (entity.description || '') ||
+      JSON.stringify(aliases) !== JSON.stringify(entity.aliases) ||
+      caseSensitive !== (entity.case_match === 'sensitive') ||
+      wordBoundaries !== (entity.word_boundary_match === 'boundaries')
+    );
+  }, [entity, name, entityId, typeId, description, aliases, caseSensitive, wordBoundaries]);
+
+  if (!entity) return null;
 
   const addAlias = () => {
     const trimmed = newAlias.trim();
@@ -83,7 +121,12 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
       if (name.trim() !== entity.name) updates.name = name.trim();
       if (description.trim() !== (entity.description || '')) updates.description = description.trim() || null;
       if (JSON.stringify(aliases) !== JSON.stringify(entity.aliases)) updates.aliases = aliases;
-      if (caseSensitive !== (entity.case_match === 'sensitive')) updates.case_match = caseSensitive ? 'sensitive' : 'insensitive';
+      if (caseSensitive !== (entity.case_match === 'sensitive')) {
+        updates.case_match = caseSensitive ? 'sensitive' : 'insensitive';
+      }
+      if (wordBoundaries !== (entity.word_boundary_match === 'boundaries')) {
+        updates.word_boundary_match = wordBoundaries ? 'boundaries' : 'no-boundaries';
+      }
 
       if (Object.keys(updates).length > 0) {
         await entitiesApi.update(entity.id, updates);
@@ -139,6 +182,29 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
                   style={inputFocusStyle}
                 />
+                {selectedType?.uses_entity_id_pattern && entityIdConformity && (
+                  <div className="flex items-center justify-between mt-2 gap-2">
+                    <span
+                      title={entityIdConformity.message || ''}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
+                        entityIdConformity.conforms
+                          ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
+                          : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
+                      }`}
+                    >
+                      {formatEntityIdPattern(selectedType)}
+                    </span>
+                    {nextEntityId && (
+                      <button
+                        type="button"
+                        onClick={() => setEntityId(nextEntityId)}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-emerald-800/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-800/30"
+                      >
+                        Next ID: {nextEntityId}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ent-type" className="text-xs uppercase text-white/50 font-medium">
@@ -208,11 +274,23 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-xs uppercase text-white/50 font-medium">Case-Sensitive Match</Label>
-                <p className="text-[10px] text-white/40">OFF = insensitive (default), ON = exact case</p>
+                <p className="text-[10px] text-white/40">OFF = insensitive, ON = exact case</p>
               </div>
               <CaseMatchToggle
                 checked={caseSensitive}
                 onChange={setCaseSensitive}
+              />
+            </div>
+
+            {/* Word Boundary Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
+                <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match</p>
+              </div>
+              <CaseMatchToggle
+                checked={wordBoundaries}
+                onChange={setWordBoundaries}
               />
             </div>
           </div>

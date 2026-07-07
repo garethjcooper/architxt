@@ -167,7 +167,17 @@ export function tryExtractGraph(content) {
     }
   }
   const graph = extractGraph(content);
-  if (!graph || (graph.nodes.length === 0 && graph.edges.length === 0)) {
+  if (!graph) {
+    // If extractGraph returned null because the content does not have a nodes/edges
+    // shape at all, report that as an error. An empty graph JSON (e.g.
+    // {"nodes": [], "edges": []}) is a successfully parsed response and is not
+    // treated as an error — callers can decide whether empty data is healthy.
+    const parsedGraph = typeof content === 'string' ? parseJsonString(content) : content;
+    const hasGraphShape = parsedGraph && typeof parsedGraph === 'object' && !Array.isArray(parsedGraph)
+      && ('nodes' in parsedGraph || 'edges' in parsedGraph);
+    if (hasGraphShape) {
+      return { graph: { nodes: [], edges: [] }, error: null };
+    }
     return { graph: null, error: 'Mental-model content parsed but contained no usable nodes or edges.' };
   }
   return { graph, error: null };

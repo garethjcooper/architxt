@@ -18,6 +18,7 @@ export interface ExistingTag {
   id?: string;
   start: number;
   end: number;
+  isValid?: boolean;
 }
 
 export interface EntityMatch {
@@ -31,6 +32,7 @@ export interface EntityMatch {
   fromTag: boolean;
   startIndex?: number;
   rawStartIndex?: number;
+  rawEndIndex?: number;
 }
 
 export interface EntityLike {
@@ -41,6 +43,8 @@ export interface EntityLike {
   aliases?: string[];
   case_match?: string;
   type_case_match?: string;
+  word_boundary_match?: string;
+  type_word_boundary_match?: string;
 }
 
 export function buildRegex(format: Format): RegExp;
@@ -55,6 +59,8 @@ export function buildTag(
 export function findExistingEntityTags(format: Format, content: string): ExistingTag[];
 export function scanForEntityMatches(format: Format, entities: EntityLike[], content: string): EntityMatch[];
 export function groupMatchesByEntity(matches: EntityMatch[]): Map<string, { entity_id: string; name: string; type_name?: string; count: number; fromTag: boolean; ranges: Array<{ start: number; end: number }> }>;
+export function stripEntityTags(format: Format, content: string): string;
 export function buildCleanToRawMap(format: Format, content: string): number[];
 export function renderEntityTaggedContent(format: Format, content: string): Array<{ type: 'text' | 'entity'; content: string; name?: string; id?: string; start: number; end: number }>;
 export function hasEntityTags(format: Format, content: string): boolean;
+export function repairMalformedEntityTags(format: Format, content: string): string;

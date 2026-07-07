@@ -5,13 +5,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Trash2, Pencil, X, Layers } from 'lucide-react';
 import { entityTypesApi, entitiesApi } from '@/lib/api/client';
 import type { EntityType } from '@/lib/types';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
+import { CaseMatchToggle } from './case-match-toggle';
+import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
 
 const logger = createLogger('ManageEntityTypesDialog');
+
+const WORD_BOUNDARY_LABELS: Record<'boundaries' | 'no-boundaries', string> = {
+  boundaries: '\u2202',
+  'no-boundaries': '\u221e',
+};
+
+const MIN_DIGITS = 1;
+const MAX_DIGITS = 10;
+const DEFAULT_DIGITS = 3;
 
 interface Props {
   open: boolean;
@@ -27,17 +39,25 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [addTypeName, setAddTypeName] = useState('');
-  const [addIdLabel, setAddIdLabel] = useState('');
-  const [addNameLabel, setAddNameLabel] = useState('');
   const [addDescription, setAddDescription] = useState('');
+  const [addCaseSensitive, setAddCaseSensitive] = useState(false);
+  const [addWordBoundaries, setAddWordBoundaries] = useState(true);
+  const [addUsesPattern, setAddUsesPattern] = useState(false);
+  const [addIdFormatPrefix, setAddIdFormatPrefix] = useState('');
+  const [addMinIdDigits, setAddMinIdDigits] = useState(String(DEFAULT_DIGITS));
+  const [addIdSeparator, setAddIdSeparator] = useState<'none' | '-'>('none');
   const [adding, setAdding] = useState(false);
 
   // Edit state: id -> field values
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTypeName, setEditTypeName] = useState('');
-  const [editIdLabel, setEditIdLabel] = useState('');
-  const [editNameLabel, setEditNameLabel] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editCaseSensitive, setEditCaseSensitive] = useState(false);
+  const [editWordBoundaries, setEditWordBoundaries] = useState(true);
+  const [editUsesPattern, setEditUsesPattern] = useState(false);
+  const [editIdFormatPrefix, setEditIdFormatPrefix] = useState('');
+  const [editMinIdDigits, setEditMinIdDigits] = useState(String(DEFAULT_DIGITS));
+  const [editIdSeparator, setEditIdSeparator] = useState<'none' | '-'>('none');
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Delete state
@@ -73,10 +93,28 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
 
   const resetAddForm = () => {
     setAddTypeName('');
-    setAddIdLabel('');
-    setAddNameLabel('');
     setAddDescription('');
+    setAddCaseSensitive(false);
+    setAddWordBoundaries(true);
+    setAddUsesPattern(false);
+    setAddIdFormatPrefix('');
+    setAddMinIdDigits(String(DEFAULT_DIGITS));
+    setAddIdSeparator('none');
     setShowAddForm(false);
+  };
+
+  const handlePrefixChange = (setter: (v: string) => void) => (value: string) => {
+    setter(value.replace(/[^a-zA-Z0-9]/g, ''));
+  };
+
+  const handleDigitsChange = (setter: (v: string) => void) => (value: string) => {
+    if (value === '') {
+      setter('');
+      return;
+    }
+    const num = Number(value);
+    if (Number.isNaN(num)) return;
+    setter(String(Math.max(MIN_DIGITS, Math.min(MAX_DIGITS, num))));
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -86,13 +124,31 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
       toast.error('Type name is required');
       return;
     }
+
+    if (addUsesPattern) {
+      const prefix = addIdFormatPrefix.trim();
+      if (!prefix) {
+        toast.error('Id Format Prefix is required when Entity Id Pattern is enabled');
+        return;
+      }
+      const digits = Number(addMinIdDigits || DEFAULT_DIGITS);
+      if (!Number.isInteger(digits) || digits < MIN_DIGITS || digits > MAX_DIGITS) {
+        toast.error(`Minimum Number Of Id Digits must be between ${MIN_DIGITS} and ${MAX_DIGITS}`);
+        return;
+      }
+    }
+
     setAdding(true);
     try {
       await entityTypesApi.create({
         type_name: name,
-        id_label: addIdLabel.trim() || undefined,
-        name_label: addNameLabel.trim() || undefined,
         description: addDescription.trim() || undefined,
+        case_match: addCaseSensitive ? 'sensitive' : 'insensitive',
+        word_boundary_match: addWordBoundaries ? 'boundaries' : 'no-boundaries',
+        uses_entity_id_pattern: addUsesPattern,
+        id_format_prefix: addUsesPattern ? addIdFormatPrefix.trim() || undefined : undefined,
+        min_id_digits: addUsesPattern ? Number(addMinIdDigits || DEFAULT_DIGITS) : undefined,
+        id_separator: addUsesPattern ? addIdSeparator : undefined,
       });
       toast.success('Entity type created');
       resetAddForm();
@@ -108,17 +164,25 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   const startEdit = (t: EntityType) => {
     setEditingId(t.id);
     setEditTypeName(t.type_name || '');
-    setEditIdLabel(t.id_label || '');
-    setEditNameLabel(t.name_label || '');
     setEditDescription(t.description || '');
+    setEditCaseSensitive(t.case_match === 'sensitive');
+    setEditWordBoundaries((t.word_boundary_match ?? 'boundaries') === 'boundaries');
+    setEditUsesPattern(t.uses_entity_id_pattern ?? false);
+    setEditIdFormatPrefix(t.id_format_prefix || '');
+    setEditMinIdDigits(String(t.min_id_digits ?? DEFAULT_DIGITS));
+    setEditIdSeparator(t.id_separator ?? 'none');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditTypeName('');
-    setEditIdLabel('');
-    setEditNameLabel('');
     setEditDescription('');
+    setEditCaseSensitive(false);
+    setEditWordBoundaries(true);
+    setEditUsesPattern(false);
+    setEditIdFormatPrefix('');
+    setEditMinIdDigits(String(DEFAULT_DIGITS));
+    setEditIdSeparator('none');
   };
 
   const handleSaveEdit = async (id: number) => {
@@ -127,13 +191,31 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
       toast.error('Type name is required');
       return;
     }
+
+    if (editUsesPattern) {
+      const prefix = editIdFormatPrefix.trim();
+      if (!prefix) {
+        toast.error('Id Format Prefix is required when Entity Id Pattern is enabled');
+        return;
+      }
+      const digits = Number(editMinIdDigits || DEFAULT_DIGITS);
+      if (!Number.isInteger(digits) || digits < MIN_DIGITS || digits > MAX_DIGITS) {
+        toast.error(`Minimum Number Of Id Digits must be between ${MIN_DIGITS} and ${MAX_DIGITS}`);
+        return;
+      }
+    }
+
     setSavingEdit(true);
     try {
       await entityTypesApi.update(id, {
         type_name: name,
-        id_label: editIdLabel.trim() || undefined,
-        name_label: editNameLabel.trim() || undefined,
         description: editDescription.trim() || undefined,
+        case_match: editCaseSensitive ? 'sensitive' : 'insensitive',
+        word_boundary_match: editWordBoundaries ? 'boundaries' : 'no-boundaries',
+        uses_entity_id_pattern: editUsesPattern,
+        id_format_prefix: editUsesPattern ? editIdFormatPrefix.trim() || undefined : undefined,
+        min_id_digits: editUsesPattern ? Number(editMinIdDigits || DEFAULT_DIGITS) : undefined,
+        id_separator: editUsesPattern ? editIdSeparator : undefined,
       });
       toast.success('Entity type updated');
       setEditingId(null);
@@ -167,9 +249,20 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     }
   };
 
+  const renderPatternPreview = (t: EntityType) => {
+    if (!t.uses_entity_id_pattern) return <span className="text-white/20">-</span>;
+    const digits = t.min_id_digits ?? DEFAULT_DIGITS;
+    const placeholder = '0'.repeat(Math.min(digits, 6));
+    const sep = t.id_separator === '-' ? '-' : '';
+    const text = `${t.id_format_prefix || ''}${sep}${placeholder}`;
+    return <span title={`${digits} digit(s)`} className="text-white/60 text-xs">{text}</span>;
+  };
+
+  const disabledClass = "opacity-50 pointer-events-none";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-white">
             <Layers className="h-5 w-5 text-emerald-400" />
@@ -215,25 +308,68 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                     className="h-8 text-sm"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-xs text-white/60">Use Entity Id Pattern</Label>
+                  <p className="text-[10px] text-white/40">Generate formatted ids like PREFIX-001</p>
+                </div>
+                <Switch checked={addUsesPattern} onCheckedChange={(v) => setAddUsesPattern(v)} />
+              </div>
+
+              <div className={`space-y-2 transition-opacity ${!addUsesPattern ? disabledClass : ''}`}>
+                <div className="flex gap-3 items-start">
+                  <div className="flex-1 space-y-1 min-w-0">
+                    <Label className="text-xs text-white/60">Id Format Prefix *</Label>
+                    <Input
+                      value={addIdFormatPrefix}
+                      onChange={(e) => handlePrefixChange(setAddIdFormatPrefix)(e.target.value)}
+                      placeholder="e.g. APP"
+                      className="h-8 text-sm"
+                      disabled={!addUsesPattern}
+                    />
+                  </div>
+                  <div className="w-20 space-y-1">
+                    <Label className="text-xs text-white/60">Separator *</Label>
+                    <EntityTypeIdSeparatorSelect
+                      value={addIdSeparator}
+                      onChange={setAddIdSeparator}
+                      disabled={!addUsesPattern}
+                    />
+                  </div>
+                  <div className="w-24 space-y-1">
+                    <Label className="text-xs text-white/60">Digits *</Label>
+                    <Input
+                      type="number"
+                      min={MIN_DIGITS}
+                      max={MAX_DIGITS}
+                      value={addMinIdDigits}
+                      onChange={(e) => handleDigitsChange(setAddMinIdDigits)(e.target.value)}
+                      placeholder="3"
+                      className="h-8 text-sm"
+                      disabled={!addUsesPattern}
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-white/40">Alphanumeric prefix; separator; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-white/60">ID Label</Label>
-                  <Input
-                    value={addIdLabel}
-                    onChange={(e) => setAddIdLabel(e.target.value)}
-                    placeholder="e.g. Component ID"
-                    className="h-8 text-sm"
-                  />
+                  <Label className="text-xs text-white/60">Case-Sensitive</Label>
+                  <div className="flex items-center h-8">
+                    <CaseMatchToggle checked={addCaseSensitive} onChange={setAddCaseSensitive} />
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-white/60">Name Label</Label>
-                  <Input
-                    value={addNameLabel}
-                    onChange={(e) => setAddNameLabel(e.target.value)}
-                    placeholder="e.g. Component Name"
-                    className="h-8 text-sm"
-                  />
+                  <Label className="text-xs text-white/60">Word Boundaries</Label>
+                  <div className="flex items-center h-8">
+                    <CaseMatchToggle checked={addWordBoundaries} onChange={setAddWordBoundaries} />
+                  </div>
                 </div>
               </div>
+
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="ghost" size="sm" onClick={resetAddForm}>Close</Button>
                 <Button type="submit" size="sm" disabled={adding} className="bg-emerald-600 hover:bg-emerald-500 text-white">
@@ -250,10 +386,10 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
               <thead>
                 <tr className="border-b border-white/10 bg-white/5">
                   <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Type Name</th>
-                  <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">ID Label</th>
-                  <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Name Label</th>
                   <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Description</th>
-                  <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Match</th>
+                  <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Pattern</th>
+                  <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Case</th>
+                  <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Boundary</th>
                   <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Entities</th>
                   <th className="text-right py-2 px-3 text-xs uppercase text-white/50 font-medium w-24">Actions</th>
                 </tr>
@@ -287,27 +423,54 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                           </td>
                           <td className="py-2 px-3">
                             <Input
-                              value={editIdLabel}
-                              onChange={(e) => setEditIdLabel(e.target.value)}
-                              className="h-7 text-sm px-2"
-                              placeholder="ID Label"
-                            />
-                          </td>
-                          <td className="py-2 px-3">
-                            <Input
-                              value={editNameLabel}
-                              onChange={(e) => setEditNameLabel(e.target.value)}
-                              className="h-7 text-sm px-2"
-                              placeholder="Name Label"
-                            />
-                          </td>
-                          <td className="py-2 px-3">
-                            <Input
                               value={editDescription}
                               onChange={(e) => setEditDescription(e.target.value)}
                               className="h-7 text-sm px-2"
                               placeholder="Description"
                             />
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className={`space-y-2 ${!editUsesPattern ? disabledClass : ''}`}>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-white/50">Use pattern</span>
+                                <Switch checked={editUsesPattern} onCheckedChange={(v) => setEditUsesPattern(v)} size="sm" />
+                              </div>
+                              <div className="flex gap-2 items-start">
+                                <Input
+                                  value={editIdFormatPrefix}
+                                  onChange={(e) => handlePrefixChange(setEditIdFormatPrefix)(e.target.value)}
+                                  className="h-6 text-xs px-2 flex-1 min-w-0"
+                                  placeholder="Prefix"
+                                  disabled={!editUsesPattern}
+                                />
+                                <EntityTypeIdSeparatorSelect
+                                  value={editIdSeparator}
+                                  onChange={setEditIdSeparator}
+                                  disabled={!editUsesPattern}
+                                  compact
+                                />
+                                <Input
+                                  type="number"
+                                  min={MIN_DIGITS}
+                                  max={MAX_DIGITS}
+                                  value={editMinIdDigits}
+                                  onChange={(e) => handleDigitsChange(setEditMinIdDigits)(e.target.value)}
+                                  className="h-6 text-xs px-2 w-16"
+                                  placeholder="Digits"
+                                  disabled={!editUsesPattern}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <div className="flex items-center justify-center">
+                              <CaseMatchToggle checked={editCaseSensitive} onChange={setEditCaseSensitive} />
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <div className="flex items-center justify-center">
+                              <CaseMatchToggle checked={editWordBoundaries} onChange={setEditWordBoundaries} />
+                            </div>
                           </td>
                           <td className="py-2 px-3 text-center text-xs text-white/40">{entityCounts[t.id] || 0}</td>
                           <td className="py-2 px-3 text-right">
@@ -339,9 +502,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                       ) : (
                         <>
                           <td className="py-2 px-3 text-white/80 font-medium">{t.type_name}</td>
-                          <td className="py-2 px-3 text-white/50 text-xs">{t.id_label || <span className="text-white/20">-</span>}</td>
-                          <td className="py-2 px-3 text-white/50 text-xs">{t.name_label || <span className="text-white/20">-</span>}</td>
                           <td className="py-2 px-3 text-white/50 text-xs">{t.description || <span className="text-white/20">-</span>}</td>
+                          <td className="py-2 px-3">{renderPatternPreview(t)}</td>
                           <td className="py-2 px-3 text-center">
                             <span
                               title={(t.case_match ?? 'insensitive') === 'sensitive' ? 'Case-sensitive match' : 'Case-insensitive match'}
@@ -352,6 +514,18 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               }`}
                             >
                               {(t.case_match ?? 'insensitive') === 'sensitive' ? 'Aa' : 'aa'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <span
+                              title={(t.word_boundary_match ?? 'boundaries') === 'boundaries' ? 'Whole-word match' : 'Substring match'}
+                              className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${
+                                (t.word_boundary_match ?? 'boundaries') === 'boundaries'
+                                  ? 'bg-violet-800/15 text-violet-400 border-violet-700/20'
+                                  : 'bg-white/5 text-white/20 border-white/5'
+                              }`}
+                            >
+                              {WORD_BOUNDARY_LABELS[(t.word_boundary_match ?? 'boundaries')]}
                             </span>
                           </td>
                           <td className="py-2 px-3 text-center">

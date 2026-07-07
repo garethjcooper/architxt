@@ -102,12 +102,42 @@ export function parseTagParen(matchedText, parenContent) {
 }
 
 /**
+ * Determine whether a tag at [start, end) in content is well-formed.
+ * Malformed if the inner text contains brackets, splits a word, contains
+ * line breaks, looks like JSON, or is unreasonably long for an entity name.
+ */
+function isValidTag(content, start, end) {
+  if (start < 0 || end > content.length || end - start < 5) return false;
+  const innerStart = start + 2;
+  const innerEnd = end - 2;
+  if (innerStart >= innerEnd) return false;
+  const inner = content.slice(innerStart, innerEnd);
+  if (inner.includes('[') || inner.includes(']')) return false;
+  if (inner.includes('\n') || inner.includes('\r')) return false;
+
+  // Treat JSON-like/code blobs as malformed tags that should be repaired.
+  const MAX_INNER_LEN = 200;
+  if (inner.length > MAX_INNER_LEN) return false;
+  const jsonLike = /^\s*[\{\[]|[\}\]]\s*$/.test(inner);
+  if (jsonLike) return false;
+
+  const before = content[start - 1];
+  const after = content[end];
+  const wordBefore = before !== undefined && /\w/.test(before);
+  const wordAfter = after !== undefined && /\w/.test(after);
+  if (wordBefore && wordAfter) return false;
+
+  return true;
+}
+
+/**
  * @typedef {Object} ExistingTag
  * @property {string} text
  * @property {string} name
  * @property {string} [id]
  * @property {number} start
  * @property {number} end
+ * @property {boolean} isValid
  */
 
 /**
@@ -126,15 +156,40 @@ export function findExistingEntityTags(format, content) {
     const matchedText = m[1].trim();
     const parenContent = m[2];
     const parsed = parseTagParen(matchedText, parenContent);
+    const start = m.index;
+    const end = m.index + m[0].length;
     tags.push({
       text: parsed.matchedText,
       name: parsed.entityName || parsed.matchedText,
       id: parsed.entityId,
-      start: m.index,
-      end: m.index + m[0].length,
+      start,
+      end,
+      isValid: isValidTag(content, start, end),
     });
   }
   return tags;
+}
+
+/**
+ * Remove well-formed entity tags, leaving plain text. Malformed tags are kept
+ * as-is so they cannot corrupt downstream offset calculations.
+ *
+ * @param {Format} format
+ * @param {string} content
+ * @returns {string}
+ */
+export function stripEntityTags(format, content) {
+  const tags = findExistingEntityTags(format, content);
+  let result = '';
+  let lastIndex = 0;
+  for (const tag of tags) {
+    if (!tag.isValid) continue;
+    result += content.slice(lastIndex, tag.start);
+    result += tag.text;
+    lastIndex = tag.end;
+  }
+  result += content.slice(lastIndex);
+  return result;
 }
 
 /**
@@ -155,14 +210,15 @@ export function findExistingEntityTags(format, content) {
  * Scan raw content for entity matches, both tagged and untagged.
  *
  * @param {Format} format
- * @param {Array<{id: number|string, entity_id: string, name: string, type_name?: string, aliases: string[], case_match?: string, type_case_match?: string}>} entities
+ * @param {Array<{id: number|string, entity_id: string, name: string, type_name?: string, aliases: string[], case_match?: string, type_case_match?: string, word_boundary_match?: string, type_word_boundary_match?: string}>} entities
  * @param {string} content
  * @returns {EntityMatch[]}
  */
 export function scanForEntityMatches(format, entities, content) {
   const existingTags = findExistingEntityTags(format, content);
 
-  // Build clean text: untagged regions map 1:1, tagged inner text is preserved.
+  // Build clean text: untagged regions map 1:1, valid tag inner text is preserved,
+  // malformed tag raw text is preserved (to keep offsets aligned) but marked tagged.
   let cleanText = '';
   const cleanToRaw = [];
   const taggedRanges = [];
@@ -172,18 +228,29 @@ export function scanForEntityMatches(format, entities, content) {
     for (let i = 0; i < untagged.length; i++) cleanToRaw.push(lastIndex + i);
     cleanText += untagged;
 
-    const innerStart = tag.start + 2; // after "[["
-    const innerEnd = tag.end - 2;     // before "]]]"
-    const innerText = content.slice(innerStart, innerEnd);
     const tagStartInClean = cleanText.length;
-    for (let i = 0; i < innerText.length; i++) cleanToRaw.push(innerStart + i);
-    cleanText += innerText;
-    taggedRanges.push({ start: tagStartInClean, end: tagStartInClean + innerText.length });
+    if (tag.isValid) {
+      const innerStart = tag.start + 2; // after "[["
+      const innerEnd = tag.end - 2;     // before "]]]"
+      const innerText = content.slice(innerStart, innerEnd);
+      for (let i = 0; i < innerText.length; i++) cleanToRaw.push(innerStart + i);
+      cleanText += innerText;
+      taggedRanges.push({ start: tagStartInClean, end: tagStartInClean + innerText.length });
+    } else {
+      // Malformed tag: keep raw text (including brackets) in clean text so
+      // offsets stay aligned with the raw document, but mark range tagged so we
+      // do not propose matches inside it.
+      const rawTagText = content.slice(tag.start, tag.end);
+      for (let i = 0; i < rawTagText.length; i++) cleanToRaw.push(tag.start + i);
+      cleanText += rawTagText;
+      taggedRanges.push({ start: tagStartInClean, end: tagStartInClean + rawTagText.length });
+    }
     lastIndex = tag.end;
   }
   const remaining = content.slice(lastIndex);
   for (let i = 0; i < remaining.length; i++) cleanToRaw.push(lastIndex + i);
   cleanText += remaining;
+  cleanToRaw.push(content.length);
 
   const isTagged = (start, end) => taggedRanges.some((r) => start < r.end && end > r.start);
 
@@ -209,7 +276,10 @@ export function scanForEntityMatches(format, entities, content) {
     const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const caseRule = entity.case_match || entity.type_case_match || 'insensitive';
     const flags = caseRule === 'sensitive' ? 'g' : 'gi';
-    const re = new RegExp(`\\b${escaped}\\b`, flags);
+    const boundaryRule = entity.word_boundary_match || entity.type_word_boundary_match || 'boundaries';
+    const boundaryPrefix = boundaryRule === 'no-boundaries' ? '' : '\\b';
+    const boundarySuffix = boundaryRule === 'no-boundaries' ? '' : '\\b';
+    const re = new RegExp(`${boundaryPrefix}${escaped}${boundarySuffix}`, flags);
 
     let match;
     while ((match = re.exec(cleanText)) !== null) {
@@ -240,6 +310,7 @@ export function scanForEntityMatches(format, entities, content) {
         fromTag: false,
         startIndex: start,
         rawStartIndex: cleanToRaw[start],
+        rawEndIndex: cleanToRaw[end],
       });
     }
   }
@@ -260,6 +331,7 @@ export function scanForEntityMatches(format, entities, content) {
         fromTag: true,
         startIndex: tag.start,
         rawStartIndex: tag.start,
+        rawEndIndex: tag.end,
       };
     });
 
@@ -303,15 +375,14 @@ export function groupMatchesByEntity(matches) {
  */
 export function buildCleanToRawMap(format, content) {
   const cleanToRaw = [];
+  const tags = findExistingEntityTags(format, content);
   let lastIndex = 0;
-  const regex = buildRegex(format);
-  let m;
-  while ((m = regex.exec(content)) !== null) {
-    for (let i = lastIndex; i < m.index; i++) cleanToRaw.push(i);
-    const innerText = m[1];
-    const innerStart = m.index + 2;
-    for (let i = 0; i < innerText.length; i++) cleanToRaw.push(innerStart + i);
-    lastIndex = m.index + m[0].length;
+  for (const tag of tags) {
+    if (!tag.isValid) continue;
+    for (let i = lastIndex; i < tag.start; i++) cleanToRaw.push(i);
+    const innerStart = tag.start + 2;
+    for (let i = 0; i < tag.text.length; i++) cleanToRaw.push(innerStart + i);
+    lastIndex = tag.end;
   }
   for (let i = lastIndex; i < content.length; i++) cleanToRaw.push(i);
   cleanToRaw.push(content.length);
@@ -328,32 +399,35 @@ export function buildCleanToRawMap(format, content) {
 export function renderEntityTaggedContent(format, content) {
   const segments = [];
   let lastIndex = 0;
-  const regex = buildRegex(format);
-  regex.lastIndex = 0;
-  let m;
-  while ((m = regex.exec(content)) !== null) {
-    if (m.index > lastIndex) {
+  const tags = findExistingEntityTags(format, content);
+  for (const tag of tags) {
+    if (tag.start > lastIndex) {
       segments.push({
         type: 'text',
-        content: content.slice(lastIndex, m.index),
+        content: content.slice(lastIndex, tag.start),
         start: lastIndex,
-        end: m.index,
+        end: tag.start,
       });
     }
 
-    const matchedText = m[1].trim();
-    const parenContent = m[2];
-    const parsed = parseTagParen(matchedText, parenContent);
-
-    segments.push({
-      type: 'entity',
-      content: parsed.matchedText,
-      name: parsed.entityName,
-      id: parsed.entityId,
-      start: m.index,
-      end: m.index + m[0].length,
-    });
-    lastIndex = m.index + m[0].length;
+    if (tag.isValid) {
+      segments.push({
+        type: 'entity',
+        content: tag.text,
+        name: tag.name,
+        id: tag.id,
+        start: tag.start,
+        end: tag.end,
+      });
+    } else {
+      segments.push({
+        type: 'text',
+        content: content.slice(tag.start, tag.end),
+        start: tag.start,
+        end: tag.end,
+      });
+    }
+    lastIndex = tag.end;
   }
 
   if (lastIndex < content.length) {
@@ -369,7 +443,32 @@ export function renderEntityTaggedContent(format, content) {
 }
 
 /**
- * Quick check: does content contain entity tags?
+ * Repair malformed entity tags by stripping their bracket markup and metadata,
+ * leaving only the matched inner text. Well-formed tags are preserved.
+ *
+ * @param {Format} format
+ * @param {string} content
+ * @returns {string}
+ */
+export function repairMalformedEntityTags(format, content) {
+  const tags = findExistingEntityTags(format, content);
+  let result = '';
+  let lastIndex = 0;
+  for (const tag of tags) {
+    if (!tag.isValid) {
+      result += content.slice(lastIndex, tag.start);
+      result += tag.text;
+      lastIndex = tag.end;
+    }
+  }
+  result += content.slice(lastIndex);
+  return result;
+}
+
+/**
+ * Quick check: does content contain *inserted* entity tags?
+ * Requires at least one `[[matchedText (entityId)]]` pattern so raw `[[`
+ * markers or `[[text]]` placeholders without IDs do not count.
  *
  * @param {Format} format
  * @param {string} content
@@ -377,5 +476,6 @@ export function renderEntityTaggedContent(format, content) {
  */
 export function hasEntityTags(format, content) {
   if (!content) return false;
-  return content.includes(format.presentInIndicator);
+  const tags = findExistingEntityTags(format, content);
+  return tags.some((t) => t.id);
 }
