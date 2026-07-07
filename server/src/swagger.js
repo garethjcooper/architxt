@@ -212,6 +212,7 @@ const options = {
             id_label: { type: 'string', nullable: true, description: 'Label for the entity ID field' },
             name_label: { type: 'string', nullable: true, description: 'Label for the entity name field' },
             case_match: { type: 'string', enum: ['insensitive', 'sensitive'], default: 'insensitive', description: 'Default case matching rule for scan' },
+            word_boundary_match: { type: 'string', enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Default word-boundary matching rule for scan' },
             created_at: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
             updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
           }
@@ -228,6 +229,8 @@ const options = {
             aliases: { type: 'array', items: { type: 'string' }, description: 'Alternative names for this entity' },
             case_match: { type: 'string', enum: ['insensitive', 'sensitive'], default: 'insensitive', description: 'Case matching rule for scan' },
             type_case_match: { type: 'string', enum: ['insensitive', 'sensitive'], default: 'insensitive', description: 'Inherited type default for scan' },
+            word_boundary_match: { type: 'string', enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Word-boundary matching rule for scan' },
+            type_word_boundary_match: { type: 'string', enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Inherited type default for scan' },
             generated_by: { type: 'string', enum: ['user', 'import'], description: 'Who created the entity' },
             created_at: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
             updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }

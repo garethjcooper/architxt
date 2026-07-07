@@ -199,14 +199,16 @@ export function getAllFormats() {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Returns a SQLite expression that detects presence of entity tags.
- * Both v1 and v2 share [[ ... ]] delimiters, so this is stable.
+ * Returns a SQLite expression that detects presence of *inserted* entity tags.
+ * All supported formats wrap entity mentions as `[[matchedText (entityId)]]`,
+ * so requiring a `(` before the closing `]]` distinguishes inserted tags from
+ * raw `[[` markers or `[[text]]` detection placeholders.
  *
  * @param {string} [column='d.doc_content']
  * @returns {string}
  */
 export function getSqlPresenceExpression(column = 'd.doc_content') {
-  return `${column} LIKE '%[[%'`;
+  return `${column} LIKE '%[[%(%]]%'`;
 }
 
 // ═══════════════════════════════════════════════════════════════

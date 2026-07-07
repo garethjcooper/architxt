@@ -632,6 +632,14 @@ export function parseEntityImport(
         h.toLowerCase() === 'case'
       )
     : -1;
+  const wordBoundaryMatchIndex = headers.length > 0
+    ? headers.findIndex((h) =>
+        h.toLowerCase() === 'word_boundary_match' ||
+        h.toLowerCase() === 'boundary' ||
+        h.toLowerCase() === 'word_boundary' ||
+        h.toLowerCase() === 'wb'
+      )
+    : -1;
 
   const typeMap = new Map(entityTypes.map((t) => [t.type_name.toLowerCase(), t.id]));
 
@@ -643,6 +651,7 @@ export function parseEntityImport(
     const description = descIndex >= 0 ? stripQuotes(row[descIndex] || '') : '';
     const aliasField = aliasIndex >= 0 ? stripQuotes(row[aliasIndex] || '') : '';
     const caseMatchRaw = caseMatchIndex >= 0 ? stripQuotes(row[caseMatchIndex] || '').toLowerCase() : '';
+    const wordBoundaryMatchRaw = wordBoundaryMatchIndex >= 0 ? stripQuotes(row[wordBoundaryMatchIndex] || '').toLowerCase() : '';
 
     if (!entityId.trim()) {
       return { valid: false, error: 'Empty entity_id', raw, data: {} };
@@ -680,6 +689,22 @@ export function parseEntityImport(
       }
     }
 
+    let word_boundary_match: 'boundaries' | 'no-boundaries' | undefined;
+    if (wordBoundaryMatchRaw) {
+      if (wordBoundaryMatchRaw === 'boundaries' || wordBoundaryMatchRaw === 'b') {
+        word_boundary_match = 'boundaries';
+      } else if (wordBoundaryMatchRaw === 'no-boundaries' || wordBoundaryMatchRaw === 'n' || wordBoundaryMatchRaw === 'noboundaries') {
+        word_boundary_match = 'no-boundaries';
+      } else {
+        return {
+          valid: false,
+          error: `Invalid word_boundary_match "${wordBoundaryMatchRaw}" — must be "boundaries" or "no-boundaries"`,
+          raw,
+          data: {},
+        };
+      }
+    }
+
     let aliases: string[] = [];
     if (aliasField.trim()) {
       const aliasResult = parseCsv(aliasField);
@@ -697,6 +722,7 @@ export function parseEntityImport(
         description: description.trim() || undefined,
         aliases,
         case_match,
+        word_boundary_match,
       },
     };
   });

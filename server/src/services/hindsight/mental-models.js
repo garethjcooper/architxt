@@ -40,6 +40,49 @@ const VALID_DETAIL_LEVELS = new Set(['metadata', 'content', 'full']);
  * @param {number} [options.timeoutMs] - Fetch timeout in milliseconds (default 30000)
  * @returns {Promise<{success: boolean, mentalModels?: Array, total?: number, error?: string}>}
  */
+/**
+ * Refresh a mental model - POST {server_url}/v1/default/banks/{bank_id}/mental-models/{mental_model_id}/refresh
+ *
+ * @param {number} serverId - Server ID from servers table
+ * @param {string} bankId - Bank identifier
+ * @param {string} mentalModelId - Mental model id on Hindsight
+ * @returns {Promise<{success: boolean, operationId?: string, status?: string, error?: string}>}
+ */
+export async function refreshMentalModel(serverId, bankId, mentalModelId) {
+  const configResult = await getServerConfig(serverId);
+  if (!configResult.success) return configResult;
+  if (!bankId) return { success: false, error: 'bankId is required' };
+  if (!mentalModelId) return { success: false, error: 'mentalModelId is required' };
+
+  const { serviceUrl } = configResult.config;
+  const url = `${serviceUrl}/v1/default/banks/${encodeURIComponent(bankId)}/mental-models/${encodeURIComponent(mentalModelId)}/refresh`;
+
+  try {
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: buildHeaders(configResult.config),
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('Hindsight refreshMentalModel failed', { serverId, bankId, mentalModelId, status: response.status, error: errorText });
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+    }
+
+    const data = await response.json();
+    logger.info('Hindsight refreshMentalModel OK', { serverId, bankId, mentalModelId, operationId: data.operation_id, status: data.status });
+    return {
+      success: true,
+      operationId: data.operation_id,
+      status: data.status,
+    };
+  } catch (error) {
+    logger.error('Hindsight refreshMentalModel error', { serverId, bankId, mentalModelId, error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
 export async function listMentalModels(serverId, bankId, options = {}) {
   const configResult = await getServerConfig(serverId);
   if (!configResult.success) return configResult;

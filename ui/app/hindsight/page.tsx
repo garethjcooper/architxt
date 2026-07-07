@@ -5,6 +5,7 @@ import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { serversApi, hindsightApi } from '@/lib/api/client';
+import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
   AlertCircle,
   ArrowRightLeft,
@@ -120,9 +121,13 @@ function ColumnCard({
 
 export default function HindsightPage() {
   const [servers, setServers] = useState<any[]>([]);
-  const [selectedServerId, setSelectedServerId] = useState<string>('');
   const [banks, setBanks] = useState<any[]>([]);
-  const [selectedBankId, setSelectedBankId] = useState<string>('');
+  const {
+    selectedServerId,
+    setSelectedServerId,
+    selectedBankId,
+    setSelectedBankId,
+  } = usePersistentServerBank(servers, banks);
   const [selectedObject, setSelectedObject] = useState<'documents' | 'entities' | 'mental-models' | 'directives'>('documents');
   const [loadingServers, setLoadingServers] = useState(true);
   const [loadingBanks, setLoadingBanks] = useState(false);
@@ -189,7 +194,6 @@ export default function HindsightPage() {
   useEffect(() => {
     if (!selectedServerId) {
       setBanks([]);
-      setSelectedBankId('');
       return;
     }
     fetchBanks(parseInt(selectedServerId, 10));
@@ -211,7 +215,6 @@ export default function HindsightPage() {
   const fetchBanks = async (serverId: number) => {
     setLoadingBanks(true);
     setBanks([]);
-    setSelectedBankId('');
     try {
       const data = await serversApi.listBanks(serverId);
       setBanks(Array.isArray(data) ? data : []);
@@ -896,6 +899,7 @@ export default function HindsightPage() {
                       archFilename={item.arch?.filename}
                       archHash={item.arch?.content_hash}
                       archStatus={item.arch?.status}
+                      archHasEntities={item.arch?.has_entities}
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                       pendingStatus={getPendingStatus(item.ext_id)}
@@ -1038,6 +1042,7 @@ export default function HindsightPage() {
                       archHash={item.arch?.content_hash}
                       hindHash={item.hindsight?.content_hash}
                       archStatus={item.arch?.status}
+                      archHasEntities={item.arch?.has_entities}
                       divergence={item.divergence}
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}

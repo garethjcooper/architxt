@@ -730,6 +730,7 @@ router.get('/diff', async (req, res) => {
         full_path: row.doc_full_path,
         authors: row.doc_authors,
         content: row.doc_content,
+        has_entities: row.doc_has_entities === 1,
       });
     }
 
@@ -1438,6 +1439,7 @@ router.get('/compare', async (req, res) => {
 router.get('/operations', async (req, res) => {
   const serverId = parseInt(req.query.server_id, 10);
   const bankId = req.query.bank_id;
+  const includeTerminal = req.query.include_terminal === 'true';
 
   if (!serverId || !bankId) {
     return res.status(400).json({
@@ -1447,7 +1449,7 @@ router.get('/operations', async (req, res) => {
   }
 
   try {
-    const result = listPendingByServerBank(db, serverId, bankId);
+    const result = listPendingByServerBank(db, serverId, bankId, includeTerminal);
     if (!result.success) {
       return res.status(500).json({ error: result.error, code: result.code });
     }

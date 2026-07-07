@@ -23,6 +23,9 @@ import {
 
 import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
+import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
+import { createPendingOperation } from '../db/crud/pending-operations.js';
+import { tryExtractGraph, extractNarrative } from '../services/research/mental-model-results.js';
 
 const logger = createLogger('research-route');
 const router = Router();
@@ -803,6 +806,203 @@ router.post('/mental-models', async (req, res) => {
   } catch (err) {
     logger.error('Research mental-models route error', { error: err.message, stack: err.stack });
     sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/mental-models/health:
+ *   post:
+ *     summary: Lightweight health check for mental-model ext_ids
+ *     description: |
+ *       For each provided mental model, fetches the Hindsight content by ext_id
+ *       and reports whether it was found and whether its content parsed cleanly.
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, models]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               models:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [ext_id]
+ *                   properties:
+ *                     ext_id: { type: string }
+ *                     returns: { type: string, enum: [json, narrative], default: json }
+ *     responses:
+ *       200:
+ *         description: Per-model health results
+ */
+router.post('/mental-models/health', async (req, res) => {
+  const start = Date.now();
+  try {
+    const { server_id, bank_id, models } = req.body;
+
+    if (!server_id || typeof server_id !== 'number') {
+      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models/health', duration: Date.now() - start });
+      return;
+    }
+    if (!bank_id || typeof bank_id !== 'string') {
+      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models/health', duration: Date.now() - start });
+      return;
+    }
+    if (!Array.isArray(models) || models.length === 0) {
+      sendResponse({ res, status: 400, error: 'models must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models/health', duration: Date.now() - start });
+      return;
+    }
+
+    const results = await Promise.all(models.map(async (model) => {
+      const extId = model.ext_id;
+      const returns = (model.returns || 'json').toLowerCase();
+      if (!extId || typeof extId !== 'string') {
+        return { ext_id: extId, healthy: false, error: 'ext_id is required' };
+      }
+
+      const hindsightResult = await getHindsightMentalModel(server_id, bank_id, extId, {
+        detail: 'content',
+        timeoutMs: 15000,
+      });
+
+      if (!hindsightResult.success || !hindsightResult.mentalModel) {
+        return {
+          ext_id: extId,
+          healthy: false,
+          error: hindsightResult.error || 'Mental model not found in Hindsight',
+        };
+      }
+
+      const content = hindsightResult.mentalModel.content ?? null;
+      if (!content) {
+        return {
+          ext_id: extId,
+          healthy: false,
+          found: true,
+          content: null,
+          content_length: 0,
+          error: 'Mental-model content is empty',
+        };
+      }
+
+      if (returns === 'narrative') {
+        const narrative = extractNarrative(content) || '';
+        return {
+          ext_id: extId,
+          healthy: narrative.length > 0,
+          found: true,
+          content,
+          content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
+          parsed: { narrative },
+          error: narrative.length > 0 ? undefined : 'Narrative content is empty',
+        };
+      }
+
+      const { graph, error: graphError } = tryExtractGraph(content);
+      return {
+        ext_id: extId,
+        healthy: graph != null,
+        found: true,
+        content,
+        content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
+        parsed: graph ? { graph } : undefined,
+        node_count: graph?.nodes.length ?? 0,
+        edge_count: graph?.edges.length ?? 0,
+        error: graphError,
+      };
+    }));
+
+    sendResponse({
+      res,
+      status: 200,
+      data: { results },
+      logger,
+      method: 'POST',
+      path: '/research/mental-models/health',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research mental-models health route error', { error: err.message, stack: err.stack });
+    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/mental-models/health', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/mental-models/refresh:
+ *   post:
+ *     summary: Refresh a single Hindsight mental model
+ *     description: |
+ *       Calls the Hindsight refresh endpoint for the given mental-model ext_id
+ *       and tracks the async operation in pending_operations.
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, ext_id]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               ext_id: { type: string, description: 'Hindsight mental_model_id' }
+ *     responses:
+ *       200:
+ *         description: Refresh queued
+ *       400:
+ *         description: Validation error
+ *       502:
+ *         description: Hindsight server error
+ */
+router.post('/mental-models/refresh', async (req, res) => {
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+  const extId = req.body.ext_id;
+
+  if (!serverId || !bankId || !extId) {
+    return res.status(400).json({ error: 'server_id, bank_id, and ext_id are required', code: 'VALIDATION_ERROR' });
+  }
+
+  const start = Date.now();
+  try {
+    const refreshResult = await refreshHindsightMentalModel(serverId, bankId, extId);
+    if (!refreshResult.success) {
+      return res.status(502).json({ error: refreshResult.error, code: 'REFRESH_FAILED' });
+    }
+
+    const createResult = createPendingOperation(db, {
+      pop_operation_id: refreshResult.operationId,
+      pop_server_id: serverId,
+      pop_bank_id: bankId,
+      pop_ext_id: extId,
+      pop_action: 'refresh',
+      pop_status: refreshResult.status || 'pending',
+    });
+
+    if (!createResult.success) {
+      logger.error('Failed to create pending operation for mental-model refresh', { serverId, bankId, extId, error: createResult.error });
+      return res.status(500).json({ error: createResult.error, code: 'TRACKING_ERROR' });
+    }
+
+    logger.info('Mental-model refresh queued', { serverId, bankId, extId, operationId: refreshResult.operationId, popId: createResult.data });
+    sendResponse({
+      res,
+      status: 200,
+      data: { operation_id: refreshResult.operationId, pop_id: createResult.data, status: refreshResult.status },
+      logger,
+      method: 'POST',
+      path: '/research/mental-models/refresh',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research mental-models refresh failed', { serverId, bankId, extId, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });
 

@@ -7,7 +7,8 @@ import { documentsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { ImageReviewModal, extractImageDescription } from './image-review-modal';
 import { stripEntityTags } from './entity-scan-panel';
-import { getActiveRegex } from '@/lib/entity-tag-format';
+import { getCachedFormat } from '@/lib/entity-tag-format';
+import { buildCleanToRawMap as sharedBuildCleanToRawMap } from '@architxt/entity-matcher';
 
 export interface SmartBlock {
   id: string;
@@ -113,24 +114,7 @@ function blocksMatchIgnoringTags(blocks: any[], content: string): boolean {
  *  into the correct positions in the raw content string.
  */
 function buildCleanToRawMap(content: string): number[] {
-  const cleanToRaw: number[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  const regex = getActiveRegex();
-  while ((m = regex.exec(content)) !== null) {
-    // Untagged region before this tag — maps 1:1
-    for (let i = lastIndex; i < m.index; i++) cleanToRaw.push(i);
-    // Inner text of the tag — appears in clean text, maps inside the raw tag
-    const innerText = m[1];
-    const innerStart = m.index + 2; // after "[["
-    for (let i = 0; i < innerText.length; i++) cleanToRaw.push(innerStart + i);
-    lastIndex = m.index + m[0].length;
-  }
-  // Remaining untagged region
-  for (let i = lastIndex; i < content.length; i++) cleanToRaw.push(i);
-  // Sentinel: end of clean text → end of raw text
-  cleanToRaw.push(content.length);
-  return cleanToRaw;
+  return sharedBuildCleanToRawMap(getCachedFormat().active, content);
 }
 
 /** Preserve block structure while updating texts to include entity tags from content.

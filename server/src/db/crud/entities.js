@@ -35,17 +35,32 @@ export const getAllEntitiesWithTypes = (db) => dbExec(() => {
 export const getEntityUsageCounts = (db, entIds) => dbExec(() => {
   if (!entIds || entIds.length === 0) return new Map();
   const placeholders = entIds.map(() => '?').join(',');
-  // Single-pass FTS5 count. The virtual table is joined against the entity id set;
-  // MATCH counts how many indexed rows contain each entity id token.
-  // unicode61 with tokenchars '-_:' keeps ids like "COM-001" whole.
+
+  // Build a term list per entity: entity_id, name, and each alias.
+  // Then join against the FTS5 index so counts reflect id/name/alias matches
+  // consistently with findDocumentsForEntities.
   const sql = `
-    SELECT e.ent_entity_id, COUNT(*) AS count
-    FROM entities e
-    JOIN documents_fts ON documents_fts MATCH '"' || e.ent_entity_id || '"'
-    WHERE e.ent_entity_id IN (${placeholders})
-    GROUP BY e.ent_entity_id
+    WITH terms(ent_entity_id, term) AS (
+      SELECT ent_entity_id, ent_entity_id
+      FROM entities
+      WHERE ent_entity_id IN (${placeholders})
+      UNION ALL
+      SELECT ent_entity_id, ent_name
+      FROM entities
+      WHERE ent_entity_id IN (${placeholders}) AND ent_name IS NOT NULL AND ent_name != ''
+      UNION ALL
+      SELECT e.ent_entity_id, j.value
+      FROM entities e, json_each(e.ent_aliases) AS j
+      WHERE e.ent_entity_id IN (${placeholders}) AND j.value IS NOT NULL AND j.value != ''
+    )
+    SELECT t.ent_entity_id, COUNT(DISTINCT d.doc_id) AS count
+    FROM terms t
+    JOIN documents_fts f ON f.doc_content MATCH '"' || t.term || '"'
+    JOIN documents d ON d.doc_id = f.rowid
+    GROUP BY t.ent_entity_id
   `;
-  const rows = stmt(db, sql).all(...entIds);
+  const params = [...entIds, ...entIds, ...entIds];
+  const rows = stmt(db, sql).all(...params);
   const map = new Map();
   for (const r of rows) map.set(r.ent_entity_id, r.count);
   return map;
@@ -109,7 +124,7 @@ function checkUniqueConflicts(db, typeId, entityId, name, aliases, excludeId = n
  * @param {Object} data — { type_id, entity_id, name, description, aliases, generated_by }
  */
 export const createEntity = (db, data) => dbExec(() => {
-  const { type_id, entity_id, name, description, aliases = [], case_match, generated_by } = data;
+  const { type_id, entity_id, name, description, aliases = [], case_match, word_boundary_match, generated_by } = data;
 
   if (!entity_id) throw new Error('Internal: entity_id is required');
   if (!name) throw new Error('Internal: name is required');
@@ -120,11 +135,11 @@ export const createEntity = (db, data) => dbExec(() => {
     throw new Error(`Duplicate ${conflict.field}: "${conflict.conflict}" already exists`);
   }
 
-  const sql = `INSERT INTO ${TABLE} (ent_type_id, ent_entity_id, ent_name, ent_description, ent_aliases, ent_case_match, ent_generated_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO ${TABLE} (ent_type_id, ent_entity_id, ent_name, ent_description, ent_aliases, ent_case_match, ent_word_boundary_match, ent_generated_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
   const result = stmt(db, sql).run(
     type_id, entity_id, name, description || null,
-    JSON.stringify(aliases), case_match || 'insensitive', generated_by || null
+    JSON.stringify(aliases), case_match ?? null, word_boundary_match ?? null, generated_by || null
   );
   return result.lastInsertRowid;
 }, 'entities.create');
@@ -136,7 +151,8 @@ export const createEntity = (db, data) => dbExec(() => {
  */
 export const getEntityWithType = (db, id) => dbExec(() => {
   const sql = `
-    SELECT e.*, t.et_type_name, t.et_id_label, t.et_name_label, t.et_case_match
+    SELECT e.*, t.et_type_name, t.et_id_label, t.et_name_label, t.et_case_match, t.et_word_boundary_match,
+           t.et_uses_entity_id_pattern, t.et_id_format_prefix, t.et_min_id_digits, t.et_id_separator
     FROM ${TABLE} e
     JOIN entity_types t ON e.ent_type_id = t.et_id
     WHERE e.${PK} = ?
@@ -156,7 +172,8 @@ export const getEntityWithType = (db, id) => dbExec(() => {
  */
 export const listEntitiesWithType = (db) => dbExec(() => {
   const rows = stmt(db, `
-    SELECT e.*, t.et_type_name, t.et_id_label, t.et_name_label, t.et_case_match
+    SELECT e.*, t.et_type_name, t.et_id_label, t.et_name_label, t.et_case_match, t.et_word_boundary_match,
+           t.et_uses_entity_id_pattern, t.et_id_format_prefix, t.et_min_id_digits, t.et_id_separator
     FROM ${TABLE} e
     JOIN entity_types t ON e.ent_type_id = t.et_id
     ORDER BY e.${PK} DESC
@@ -174,7 +191,7 @@ export const listEntitiesWithType = (db) => dbExec(() => {
  */
 export const listEntitiesForDetection = (db) => dbExec(() => {
   const rows = stmt(db, `
-    SELECT e.*, t.et_case_match AS type_case_match
+    SELECT e.*, t.et_case_match AS type_case_match, t.et_word_boundary_match AS type_word_boundary_match
     FROM ${TABLE} e
     JOIN entity_types t ON e.ent_type_id = t.et_id
   `).all();
@@ -185,7 +202,9 @@ export const listEntitiesForDetection = (db) => dbExec(() => {
     aliases: JSON.parse(r.ent_aliases || '[]'),
     type_id: r.ent_type_id,
     type_case_match: r.type_case_match,
+    type_word_boundary_match: r.type_word_boundary_match,
     case_match: r.ent_case_match,
+    word_boundary_match: r.ent_word_boundary_match,
     description: r.ent_description,
   }));
 }, 'entities.listForDetection');
@@ -197,7 +216,7 @@ export const listEntitiesForDetection = (db) => dbExec(() => {
  * @param {Object} data
  */
 export const updateEntity = (db, id, data) => dbExec(() => {
-  const { type_id, entity_id, name, description, aliases, case_match, generated_by } = data;
+  const { type_id, entity_id, name, description, aliases, case_match, word_boundary_match, generated_by } = data;
 
   const existing = stmt(db, `SELECT ent_type_id, ent_entity_id, ent_name, ent_aliases FROM ${TABLE} WHERE ${PK} = ?`).get(id);
   if (!existing) {
@@ -225,6 +244,7 @@ export const updateEntity = (db, id, data) => dbExec(() => {
   if (description !== undefined) { updates.push('ent_description = ?'); params.push(description); }
   if (aliases !== undefined) { updates.push('ent_aliases = ?'); params.push(JSON.stringify(aliases)); }
   if (case_match !== undefined) { updates.push('ent_case_match = ?'); params.push(case_match); }
+  if (word_boundary_match !== undefined) { updates.push('ent_word_boundary_match = ?'); params.push(word_boundary_match); }
   if (generated_by !== undefined) { updates.push('ent_generated_by = ?'); params.push(generated_by); }
 
   if (updates.length > 1) {
@@ -234,3 +254,133 @@ export const updateEntity = (db, id, data) => dbExec(() => {
 
   return true;
 }, 'entities.update');
+
+/**
+ * Find documents whose indexed content contains any of the selected entities.
+ * Uses the FTS5 virtual table on documents.doc_content, searching by entity_id
+ * and aliases. Returns distinct { doc_id, doc_ext_id } rows.
+ */
+export const findDocumentsForEntities = (db, entIds, options = {}) => dbExec(() => {
+  if (!entIds || entIds.length === 0) return [];
+
+  const placeholders = entIds.map(() => '?').join(',');
+  const entityRows = stmt(db, `
+    SELECT e.ent_entity_id, e.ent_name, e.ent_aliases
+    FROM entities e
+    WHERE e.ent_id IN (${placeholders})
+  `).all(...entIds);
+
+  if (entityRows.length === 0) return [];
+
+  const terms = new Set();
+  for (const row of entityRows) {
+    if (row.ent_entity_id) terms.add(row.ent_entity_id);
+    if (row.ent_name) terms.add(row.ent_name);
+    const aliases = JSON.parse(row.ent_aliases || '[]');
+    for (const alias of aliases) {
+      if (alias) terms.add(alias);
+    }
+  }
+
+  if (terms.size === 0) return [];
+
+  // Build an FTS5 OR query: "term1" OR "term2" ...
+  const matchExpr = Array.from(terms)
+    .map((t) => `"${String(t).replace(/"/g, '""')}"`)
+    .join(' OR ');
+
+  const limit = Math.max(1, Math.min(1000, options.limit ?? 1000));
+
+  const docs = stmt(db, `
+    SELECT DISTINCT d.doc_id, d.doc_ext_id, d.doc_filename
+    FROM documents d
+    JOIN documents_fts f ON f.rowid = d.doc_id
+    WHERE f.doc_content MATCH ?
+    ORDER BY d.doc_id DESC
+    LIMIT ?
+  `).all(matchExpr, limit);
+
+  return docs.map((d) => ({
+    id: d.doc_id,
+    ext_id: d.doc_ext_id,
+    filename: d.doc_filename,
+  }));
+}, 'entities.findDocuments');
+
+/**
+ * Compute the next entity id for a given entity type.
+ */
+export const getNextEntityIdForType = (db, type, options = {}) => dbExec(() => {
+  if (!type?.et_uses_entity_id_pattern) return null;
+
+  const { excludeEntityId } = options;
+  const prefix = (type.et_id_format_prefix || '').trim();
+  const separator = type.et_id_separator === '-' ? '-' : '';
+  const digits = Math.max(1, Math.min(10, type.et_min_id_digits ?? 3));
+  const typeId = requireInt('type_id', type.et_id);
+
+  // Select all entity ids for this type so we can find the max numeric suffix.
+  const rows = stmt(db, `SELECT ent_entity_id FROM ${TABLE} WHERE ent_type_id = ?`).all(typeId);
+  const existingIds = new Set(rows.map((r) => r.ent_entity_id));
+
+  // Build a regex matching the type pattern so we only consider conforming ids.
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedSep = separator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${escapedPrefix}${escapedSep}\\d{${digits},}$`);
+
+  let max = 0;
+  for (const { ent_entity_id: id } of rows) {
+    if (excludeEntityId && id === excludeEntityId) continue;
+    if (!pattern.test(id)) continue;
+    const match = id.match(/(\d+)$/);
+    if (!match) continue;
+    const n = Number(match[1]);
+    if (Number.isFinite(n) && n >= 0 && n > max) {
+      max = n;
+    }
+  }
+
+  let next = max + 1;
+  let candidate = `${prefix}${separator}${String(next).padStart(digits, '0')}`;
+  while (existingIds.has(candidate) && next < Number.MAX_SAFE_INTEGER) {
+    if (candidate === excludeEntityId) {
+      next += 1;
+      candidate = `${prefix}${separator}${String(next).padStart(digits, '0')}`;
+      continue;
+    }
+    next += 1;
+    candidate = `${prefix}${separator}${String(next).padStart(digits, '0')}`;
+  }
+
+  return candidate;
+}, 'entities.getNextEntityIdForType');
+
+export const batchUpdateEntityConfig = (db, entIds, config) => dbExec(() => {
+  const ids = entIds.map((id) => requireInt('ent_id', id));
+
+  const updates = [];
+  const values = [];
+
+  if (config.type_id !== undefined && config.type_id !== null) {
+    updates.push('ent_type_id = ?');
+    values.push(requireInt('type_id', config.type_id));
+  }
+  if (config.case_match !== undefined && config.case_match !== null) {
+    updates.push('ent_case_match = ?');
+    values.push(config.case_match);
+  }
+  if (config.word_boundary_match !== undefined && config.word_boundary_match !== null) {
+    updates.push('ent_word_boundary_match = ?');
+    values.push(config.word_boundary_match);
+  }
+
+  if (updates.length === 0 || ids.length === 0) {
+    return { entitiesUpdated: 0 };
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
+  const sql = `UPDATE ${TABLE} SET ${updates.join(', ')}, ent_updated_at = CURRENT_TIMESTAMP WHERE ${PK} IN (${placeholders})`;
+  const result = stmt(db, sql).run(...values, ...ids);
+
+  return { entitiesUpdated: result.changes };
+}, 'entities.batchUpdateConfig');

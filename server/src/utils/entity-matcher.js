@@ -31,7 +31,7 @@ export function findExistingEntityTags(content) {
 }
 
 /**
- * @param {Array<{id: number|string, entity_id: string, name: string, type_name?: string, aliases?: string[], case_match?: string, type_case_match?: string}>} entities
+ * @param {Array<{id: number|string, entity_id: string, name: string, type_name?: string, aliases?: string[], case_match?: string, type_case_match?: string, word_boundary_match?: string, type_word_boundary_match?: string}>} entities
  * @param {string} content
  * @returns {Array<{entityDbId?: number|string, entity_id: string, name: string, type_name?: string, matchedText: string, start: number, end: number, fromTag: boolean}>}
  */

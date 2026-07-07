@@ -6,6 +6,7 @@
  */
 
 import { configApi } from '@/lib/api/client';
+import { hasEntityTags as sharedHasEntityTags } from '@architxt/entity-matcher';
 
 export interface EntityTagFormat {
   key: string;
@@ -71,7 +72,15 @@ export function getActiveRegex(): RegExp {
 export function hasEntityTags(content: string | null): boolean {
   if (!content) return false;
   const { active } = getCachedFormat();
-  return content.includes(active.presentInIndicator);
+  return sharedHasEntityTags(
+    {
+      key: active.key,
+      regexSource: active.regexSource,
+      regexFlags: active.regexFlags,
+      presentInIndicator: active.presentInIndicator,
+    },
+    content
+  );
 }
 
 /** Re-export shared tag primitives. */

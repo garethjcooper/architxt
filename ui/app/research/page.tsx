@@ -26,6 +26,7 @@ import { InteractiveGraph, type GraphLayout } from '@/components/research-canvas
 import { QueryForm } from './query-form';
 import { QueryInspectDialog } from './query-inspect-dialog';
 import { ServerBankSelectors, type SelectorServer, type SelectorBank } from './server-bank-selectors';
+import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { formatEntityToken, formatEdgeToken } from './query-tokens';
 import { QueryTrail } from './query-trail';
 import { CompositeEntities, type EntityTab } from './composite-entities';
@@ -63,9 +64,13 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
 
 export default function ResearchPage() {
   const [servers, setServers] = useState<Server[]>([]);
-  const [selectedServerId, setSelectedServerId] = useState<string>('');
   const [banks, setBanks] = useState<Array<{ bank_id: string; name: string; description?: string }>>([]);
-  const [selectedBankId, setSelectedBankId] = useState<string>('');
+  const {
+    selectedServerId,
+    setSelectedServerId,
+    selectedBankId,
+    setSelectedBankId,
+  } = usePersistentServerBank(servers, banks);
 
   const [queryCursor, setQueryCursor] = useState(0);
   const queryCursorRef = useRef(queryCursor);
@@ -368,7 +373,6 @@ export default function ResearchPage() {
   useEffect(() => {
     if (!selectedServerId) {
       setBanks([]);
-      setSelectedBankId('');
       return;
     }
     fetchBanks(parseInt(selectedServerId, 10));

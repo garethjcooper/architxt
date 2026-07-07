@@ -356,6 +356,15 @@ export function ManageModelConfigDialog({
     );
   };
 
+  const hasActiveUpdateField = useMemo(() => {
+    return FIELDS.some((fieldDef) => {
+      if (!enabled[fieldDef.key]) return false;
+      const state = fieldStates[fieldDef.key];
+      if (!state) return false;
+      return true;
+    });
+  }, [fieldStates, enabled]);
+
   const hasChanges = useMemo(() => {
     return FIELDS.some((fieldDef) => {
       if (!enabled[fieldDef.key]) return false;
@@ -402,7 +411,7 @@ export function ManageModelConfigDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={loading || !hasChanges}
+            disabled={loading || !hasActiveUpdateField}
             className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}

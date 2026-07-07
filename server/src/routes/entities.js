@@ -7,6 +7,8 @@ import {
   validateId,
   validateBodyId,
   validateRequiredString,
+  validateOptionalIdArray,
+  validateIdArray,
   handleCrudResult
 } from '../utils/route-helpers.js';
 import {
@@ -22,7 +24,10 @@ import {
   deleteEntity,
   getEntityWithType,
   listEntitiesWithType,
-  getEntityUsageCounts
+  getEntityUsageCounts,
+  batchUpdateEntityConfig,
+  getNextEntityIdForType,
+  findDocumentsForEntities,
 } from '../db/crud/entities.js';
 
 const logger = createLogger('entities-route');
@@ -37,6 +42,11 @@ const toApiEntityType = (dbRow) => ({
   id_label: dbRow.et_id_label,
   name_label: dbRow.et_name_label,
   case_match: dbRow.et_case_match,
+  word_boundary_match: dbRow.et_word_boundary_match,
+  uses_entity_id_pattern: dbRow.et_uses_entity_id_pattern === 1,
+  id_format_prefix: dbRow.et_id_format_prefix,
+  min_id_digits: dbRow.et_min_id_digits,
+  id_separator: dbRow.et_id_separator ?? 'none',
   created_at: dbRow.et_created_at,
   updated_at: dbRow.et_updated_at,
 });
@@ -51,6 +61,12 @@ const toApiEntity = (dbRow) => ({
   aliases: dbRow.ent_aliases || [],
   case_match: dbRow.ent_case_match,
   type_case_match: dbRow.et_case_match,
+  word_boundary_match: dbRow.ent_word_boundary_match,
+  type_word_boundary_match: dbRow.et_word_boundary_match,
+  type_uses_entity_id_pattern: dbRow.et_uses_entity_id_pattern === 1,
+  type_id_format_prefix: dbRow.et_id_format_prefix,
+  type_min_id_digits: dbRow.et_min_id_digits,
+  type_id_separator: dbRow.et_id_separator ?? 'none',
   generated_by: dbRow.ent_generated_by,
   usage_count: dbRow.usage_count || 0,
   created_at: dbRow.ent_created_at,
@@ -112,6 +128,11 @@ router.get('/types', async (req, res) => {
  *               id_label: { type: string }
  *               name_label: { type: string }
  *               case_match: { type: string, enum: ['insensitive', 'sensitive'], default: 'insensitive', description: 'Case matching rule for entity scan' }
+ *               word_boundary_match: { type: string, enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Word-boundary matching rule for entity scan' }
+ *               uses_entity_id_pattern: { type: boolean, default: false, description: 'Whether entities of this type use a formatted entity id pattern' }
+ *               id_format_prefix: { type: string, description: 'Alphanumeric prefix for formatted entity ids (e.g. APP)' }
+ *               min_id_digits: { type: integer, default: 3, minimum: 1, maximum: 10, description: 'Minimum zero-padded digits in formatted entity ids' }
+ *               id_separator: { type: string, enum: ['none', '-'], default: 'none', description: 'Separator between prefix and zero-padded entity id' }
  *     responses:
  *       201:
  *         description: Entity type created
@@ -137,6 +158,11 @@ router.post('/types', async (req, res) => {
     id_label: req.body.id_label || null,
     name_label: req.body.name_label || null,
     case_match: req.body.case_match || 'insensitive',
+    word_boundary_match: req.body.word_boundary_match || 'boundaries',
+    uses_entity_id_pattern: req.body.uses_entity_id_pattern,
+    id_format_prefix: req.body.id_format_prefix,
+    min_id_digits: req.body.min_id_digits,
+    id_separator: req.body.id_separator,
   });
 
   handleCrudResult({
@@ -169,6 +195,11 @@ router.post('/types', async (req, res) => {
  *               id_label: { type: string }
  *               name_label: { type: string }
  *               case_match: { type: string, enum: ['insensitive', 'sensitive'] }
+ *               word_boundary_match: { type: string, enum: ['boundaries', 'no-boundaries'] }
+ *               uses_entity_id_pattern: { type: boolean, description: 'Whether entities of this type use a formatted entity id pattern' }
+ *               id_format_prefix: { type: string, description: 'Alphanumeric prefix for formatted entity ids (e.g. APP)' }
+ *               min_id_digits: { type: integer, minimum: 1, maximum: 10, description: 'Minimum zero-padded digits in formatted entity ids' }
+ *               id_separator: { type: string, enum: ['none', '-'], description: 'Separator between prefix and zero-padded entity id' }
  *     responses:
  *       200:
  *         description: Entity type updated
@@ -194,6 +225,11 @@ router.put('/types/:id', async (req, res) => {
     id_label: req.body.id_label,
     name_label: req.body.name_label,
     case_match: req.body.case_match,
+    word_boundary_match: req.body.word_boundary_match,
+    uses_entity_id_pattern: req.body.uses_entity_id_pattern,
+    id_format_prefix: req.body.id_format_prefix,
+    min_id_digits: req.body.min_id_digits,
+    id_separator: req.body.id_separator,
   });
 
   handleCrudResult({
@@ -222,6 +258,47 @@ router.put('/types/:id', async (req, res) => {
 router.delete('/types/:id', handleDeleteById({
   db, crudFn: deleteEntityType, resourceName: 'entity type', logger, basePath: '/entity-types',
 }));
+
+/**
+ * @openapi
+ * /entities/types/{id}/next-id:
+ *   get:
+ *     summary: Get the next formatted entity id for a type
+ *     tags: [Entities]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Next entity id or null if the type has no pattern
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 next_entity_id: { type: string, nullable: true }
+ *       404:
+ *         description: Entity type not found
+ */
+router.get('/types/:id/next-id', async (req, res) => {
+  const start = Date.now();
+  const path = `/entity-types/${req.params.id}/next-id`;
+
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/entity-types', start });
+  if (!idCheck.valid) return;
+
+  const typeResult = await getEntityType(db, idCheck.id);
+  if (!typeResult.success || !typeResult.data) {
+    sendResponse({ res, status: 404, error: 'Entity type not found', code: 'NOT_FOUND', logger, method: 'GET', path, duration: Date.now() - start });
+    return;
+  }
+
+  const nextIdResult = await getNextEntityIdForType(db, typeResult.data, { excludeEntityId: req.query.exclude_entity_id });
+  const nextId = nextIdResult.success ? nextIdResult.data : null;
+  sendResponse({ res, status: 200, data: { next_entity_id: nextId }, logger, method: 'GET', path, duration: Date.now() - start });
+});
 
 /* ═══════════════════════════════════════════
    ENTITIES
@@ -331,6 +408,7 @@ router.get('/:id', async (req, res) => {
  *               aliases: { type: array, items: { type: string } }
  *               generated_by: { type: string, enum: ['user', 'import'], default: 'user' }
  *               case_match: { type: string, enum: ['insensitive', 'sensitive'], default: 'insensitive', description: 'Case matching rule for entity scan' }
+ *               word_boundary_match: { type: string, enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Word-boundary matching rule for entity scan' }
  *     responses:
  *       201:
  *         description: Entity created
@@ -362,7 +440,8 @@ router.post('/', async (req, res) => {
     name: nameCheck.value,
     description: req.body.description || null,
     aliases: Array.isArray(req.body.aliases) ? req.body.aliases : [],
-    case_match: req.body.case_match || 'insensitive',
+    case_match: req.body.case_match,
+    word_boundary_match: req.body.word_boundary_match,
     generated_by: req.body.generated_by || 'user',
   });
 
@@ -398,6 +477,7 @@ router.post('/', async (req, res) => {
  *               aliases: { type: array, items: { type: string } }
  *               generated_by: { type: string, enum: ['user', 'import'] }
  *               case_match: { type: string, enum: ['insensitive', 'sensitive'] }
+ *               word_boundary_match: { type: string, enum: ['boundaries', 'no-boundaries'] }
  *     responses:
  *       200:
  *         description: Entity updated
@@ -424,6 +504,7 @@ router.put('/:id', async (req, res) => {
     description: req.body.description,
     aliases: req.body.aliases,
     case_match: req.body.case_match,
+    word_boundary_match: req.body.word_boundary_match,
     generated_by: req.body.generated_by,
   });
 
@@ -453,5 +534,146 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', handleDeleteById({
   db, crudFn: deleteEntity, resourceName: 'entity', logger, basePath: '/entities',
 }));
+
+/**
+ * @openapi
+ * /entities/batch/updateconfig:
+ *   post:
+ *     summary: Batch update entity configuration across entities
+ *     tags: [Entities]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [entity_ids]
+ *             properties:
+ *               entity_ids:
+ *                 type: array
+ *                 items: { type: integer }
+ *               type_id:
+ *                 type: integer
+ *               case_match:
+ *                 type: string
+ *                 enum: ['insensitive', 'sensitive']
+ *               word_boundary_match:
+ *                 type: string
+ *                 enum: ['boundaries', 'no-boundaries']
+ *     responses:
+ *       200:
+ *         description: Batch update summary
+ */
+router.post('/batch/updateconfig', async (req, res) => {
+  const start = Date.now();
+  const path = '/entities/batch/updateconfig';
+
+  const idsCheck = validateOptionalIdArray({ req, res, field: 'entity_ids', logger, path, start });
+  if (!idsCheck.valid) return;
+  const entityIds = idsCheck.ids;
+
+  if (entityIds.length === 0) {
+    const duration = Date.now() - start;
+    sendResponse({
+      res, status: 400, error: 'entity_ids must be a non-empty array', code: 'VALIDATION_ERROR',
+      logger, method: 'POST', path, duration,
+    });
+    return;
+  }
+
+  const config = {};
+  if (req.body.type_id !== undefined && req.body.type_id !== null) {
+    config.type_id = Number(req.body.type_id);
+  }
+  if (req.body.case_match !== undefined && req.body.case_match !== null) {
+    config.case_match = req.body.case_match;
+  }
+  if (req.body.word_boundary_match !== undefined && req.body.word_boundary_match !== null) {
+    config.word_boundary_match = req.body.word_boundary_match;
+  }
+
+  if (Object.keys(config).length === 0) {
+    const duration = Date.now() - start;
+    sendResponse({
+      res, status: 400, error: 'At least one config field is required', code: 'VALIDATION_ERROR',
+      logger, method: 'POST', path, duration,
+    });
+    return;
+  }
+
+  const result = await batchUpdateEntityConfig(db, entityIds, config);
+
+  if (!result.success) {
+    handleCrudResult({ res, result, notFoundError: null, successStatus: 200, logger, method: 'POST', path, start });
+    return;
+  }
+
+  const { entitiesUpdated } = result.data;
+  const duration = Date.now() - start;
+  sendResponse({
+    res, status: 200, data: { success: true, entities_updated: entitiesUpdated },
+    logger, method: 'POST', path, duration,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/documents:
+ *   post:
+ *     summary: Find documents containing any of the provided entities
+ *     description: Uses the FTS5 document index to return distinct documents whose content matches the entity ids, names, or aliases.
+ *     tags: [Entities]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [entity_ids]
+ *             properties:
+ *               entity_ids:
+ *                 type: array
+ *                 items: { type: integer }
+ *               limit:
+ *                 type: integer
+ *                 default: 1000
+ *     responses:
+ *       200:
+ *         description: List of matching documents
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: integer }
+ *                   ext_id: { type: string, nullable: true }
+ */
+router.post('/documents', async (req, res) => {
+  const start = Date.now();
+  const path = '/entities/documents';
+
+  const idsCheck = validateIdArray({ req, res, field: 'entity_ids', logger, path, start });
+  if (!idsCheck.valid) return;
+
+  const limit = parseInt(req.body.limit, 10) || undefined;
+  const result = await findDocumentsForEntities(db, idsCheck.ids, { limit });
+
+  if (!result.success) {
+    handleCrudResult({ res, result, notFoundError: null, successStatus: 200, logger, method: 'POST', path, start });
+    return;
+  }
+
+  const docs = (result.data || []).map((d) => ({
+    id: d.id ?? d.doc_id,
+    ext_id: d.ext_id ?? d.doc_ext_id,
+    filename: d.filename ?? d.doc_filename,
+  }));
+  sendResponse({
+    res, status: 200, data: docs,
+    logger, method: 'POST', path, duration: Date.now() - start,
+  });
+});
 
 export default router;

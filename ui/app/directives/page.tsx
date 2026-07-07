@@ -180,7 +180,7 @@ export default function DirectivesPage() {
         </Button>
       </div>
 
-      <div className={["rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden", !freeze ? "max-h-[calc(100vh-240px)]" : ""].filter(Boolean).join(" ")}>
+      <div className="rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header bar */}
         <div className="flex items-center justify-between px-4 py-2 bg-amber-900/20 border-b border-amber-500/30 shrink-0">
           <div className="flex-1" />

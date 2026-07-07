@@ -114,7 +114,7 @@ export function GraphControls({
   sessionName = 'explore',
 }: GraphControlsProps) {
   const nodeTypes = useMemo(() => {
-    return Array.from(new Set(nodes.map((n) => n.type).filter((t): t is string => Boolean(t) && t !== 'system'))).sort();
+    return Array.from(new Set(nodes.map((n) => n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)).filter((t): t is string => Boolean(t) && t !== 'system'))).sort();
   }, [nodes]);
 
   const edgeTypes = useMemo(() => {

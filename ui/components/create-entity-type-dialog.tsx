@@ -5,10 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { entityTypesApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
+import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
 
 interface Props {
   open: boolean;
@@ -16,20 +18,44 @@ interface Props {
   onEntityTypeCreated?: () => void;
 }
 
+const MIN_DIGITS = 1;
+const MAX_DIGITS = 10;
+const DEFAULT_DIGITS = 3;
+
 export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [typeName, setTypeName] = useState('');
   const [description, setDescription] = useState('');
-  const [idLabel, setIdLabel] = useState('id');
-  const [nameLabel, setNameLabel] = useState('name');
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wordBoundaries, setWordBoundaries] = useState(true);
+  const [usesPattern, setUsesPattern] = useState(false);
+  const [idFormatPrefix, setIdFormatPrefix] = useState('');
+  const [minIdDigits, setMinIdDigits] = useState(String(DEFAULT_DIGITS));
+  const [idSeparator, setIdSeparator] = useState<'none' | '-'>('none');
 
   const reset = () => {
     setTypeName('');
     setDescription('');
-    setIdLabel('id');
-    setNameLabel('name');
     setCaseSensitive(false);
+    setWordBoundaries(true);
+    setUsesPattern(false);
+    setIdFormatPrefix('');
+    setMinIdDigits(String(DEFAULT_DIGITS));
+    setIdSeparator('none');
+  };
+
+  const handlePrefixChange = (value: string) => {
+    setIdFormatPrefix(value.replace(/[^a-zA-Z0-9]/g, ''));
+  };
+
+  const handleDigitsChange = (value: string) => {
+    if (value === '') {
+      setMinIdDigits('');
+      return;
+    }
+    const num = Number(value);
+    if (Number.isNaN(num)) return;
+    setMinIdDigits(String(Math.max(MIN_DIGITS, Math.min(MAX_DIGITS, num))));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,14 +65,31 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
       toast.error('Type name is required');
       return;
     }
+
+    if (usesPattern) {
+      const prefix = idFormatPrefix.trim();
+      if (!prefix) {
+        toast.error('Id Format Prefix is required when Entity Id Pattern is enabled');
+        return;
+      }
+      const digits = Number(minIdDigits);
+      if (!Number.isInteger(digits) || digits < MIN_DIGITS || digits > MAX_DIGITS) {
+        toast.error(`Minimum Number Of Id Digits must be between ${MIN_DIGITS} and ${MAX_DIGITS}`);
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       await entityTypesApi.create({
         type_name: trimmed,
         description: description.trim() || undefined,
-        id_label: idLabel.trim() || undefined,
-        name_label: nameLabel.trim() || undefined,
         case_match: caseSensitive ? 'sensitive' : 'insensitive',
+        word_boundary_match: wordBoundaries ? 'boundaries' : 'no-boundaries',
+        uses_entity_id_pattern: usesPattern,
+        id_format_prefix: usesPattern ? idFormatPrefix.trim() || undefined : undefined,
+        min_id_digits: usesPattern ? Number(minIdDigits) : undefined,
+        id_separator: usesPattern ? idSeparator : undefined,
       });
       toast.success('Entity type created');
       reset();
@@ -60,6 +103,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
   };
 
   const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2";
+  const disabledClass = "opacity-50 pointer-events-none";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -89,39 +133,6 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cet-id-label" className="text-xs uppercase text-white/50 font-medium">
-                ID Label
-              </Label>
-              <Input
-                id="cet-id-label"
-                value={idLabel}
-                readOnly
-                className={`${inputClass} cursor-default opacity-60`}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cet-name-label" className="text-xs uppercase text-white/50 font-medium">
-                Name Label
-              </Label>
-              <Input
-                id="cet-name-label"
-                value={nameLabel}
-                readOnly
-                className={`${inputClass} cursor-default opacity-60`}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
-              />
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="cet-desc" className="text-xs uppercase text-white/50 font-medium">
               Description
@@ -139,6 +150,70 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
             />
           </div>
 
+          {/* Entity Id Pattern Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-xs uppercase text-white/50 font-medium">Use Entity Id Pattern</Label>
+              <p className="text-[10px] text-white/40">Generate formatted ids like PREFIX-001</p>
+            </div>
+            <Switch checked={usesPattern} onCheckedChange={(v) => setUsesPattern(v)} />
+          </div>
+
+          {/* Pattern Fields */}
+          <div className={`space-y-3 transition-opacity ${!usesPattern ? disabledClass : ''}`}>
+            <div className="flex gap-3 items-start">
+              <div className="flex-1 space-y-2 min-w-0">
+                <Label htmlFor="cet-prefix" className="text-xs uppercase text-white/50 font-medium">
+                  Id Format Prefix *
+                </Label>
+                <Input
+                  id="cet-prefix"
+                  value={idFormatPrefix}
+                  onChange={(e) => handlePrefixChange(e.target.value)}
+                  placeholder="e.g. APP"
+                  className={inputClass}
+                  style={{
+                    '--tw-ring-color': 'rgb(52, 211, 153)',
+                    '--tw-ring-opacity': '0.4',
+                  } as React.CSSProperties}
+                  disabled={!usesPattern}
+                />
+              </div>
+              <div className="w-20 space-y-2">
+                <Label htmlFor="cet-separator" className="text-xs uppercase text-white/50 font-medium">
+                  Separator *
+                </Label>
+                <EntityTypeIdSeparatorSelect
+                  id="cet-separator"
+                  value={idSeparator}
+                  onChange={setIdSeparator}
+                  disabled={!usesPattern}
+                />
+              </div>
+              <div className="w-24 space-y-2">
+                <Label htmlFor="cet-digits" className="text-xs uppercase text-white/50 font-medium">
+                  Digits *
+                </Label>
+                <Input
+                  id="cet-digits"
+                  type="number"
+                  min={MIN_DIGITS}
+                  max={MAX_DIGITS}
+                  value={minIdDigits}
+                  onChange={(e) => handleDigitsChange(e.target.value)}
+                  placeholder="3"
+                  className={inputClass}
+                  style={{
+                    '--tw-ring-color': 'rgb(52, 211, 153)',
+                    '--tw-ring-opacity': '0.4',
+                  } as React.CSSProperties}
+                  disabled={!usesPattern}
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-white/40">Alphanumeric prefix; separator between prefix and number; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
+          </div>
+
           {/* Case Match Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
@@ -148,6 +223,18 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
             <CaseMatchToggle
               checked={caseSensitive}
               onChange={setCaseSensitive}
+            />
+          </div>
+
+          {/* Word Boundary Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
+              <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match (default)</p>
+            </div>
+            <CaseMatchToggle
+              checked={wordBoundaries}
+              onChange={setWordBoundaries}
             />
           </div>
 

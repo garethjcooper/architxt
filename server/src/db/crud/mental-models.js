@@ -471,13 +471,52 @@ export const getMentalModelEntities = (db, mmId) => dbExec(() => {
 }, 'mentalModelEntities.getByModel');
 
 /**
+ * Read the current template/override source values from a mental model.
+ * Used when seeding a new junction row so the new entity inherits the
+ * parent model's current configuration instead of the table defaults.
+ */
+function getMentalModelTemplateValues(db, mmId) {
+  const row = stmt(db, `
+    SELECT mm_refresh_mode AS refresh_mode,
+           mm_refresh_after_consolidation AS refresh_after_consolidation,
+           mm_exclude_all_mental_models AS exclude_all_mental_models,
+           mm_max_tokens AS max_tokens
+    FROM mental_models
+    WHERE mm_id = ?
+  `).get(mmId);
+  return row || null;
+}
+
+/**
  * Add an entity to a mental model.
+ * The new junction row is seeded with the parent mental model's current
+ * values so it behaves consistently with existing entities.
  */
 export const addMentalModelEntity = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
   const eId = requireInt('ent_id', entId);
-  const sql = `INSERT OR IGNORE INTO mental_model_entities (mm_id, ent_id) VALUES (?, ?)`;
-  stmt(db, sql).run(mId, eId);
+  const template = getMentalModelTemplateValues(db, mId);
+
+  if (template) {
+    const sql = `INSERT OR IGNORE INTO mental_model_entities (
+      mm_id, ent_id,
+      mm_ent_refresh_mode, mm_ent_refresh_after_consolidation,
+      mm_ent_exclude_all_mental_models, mm_ent_max_tokens
+    ) VALUES (?, ?, ?, ?, ?, ?)`;
+    stmt(db, sql).run(
+      mId, eId,
+      normaliseRefreshMode(template.refresh_mode),
+      toDbBool(template.refresh_after_consolidation),
+      toDbBool(template.exclude_all_mental_models),
+      normaliseMaxTokens(template.max_tokens)
+    );
+  } else {
+    // Parent model not found; fall back to the legacy insert so callers still
+    // receive a consistent result. Foreign-key rules will prevent bad data.
+    const sql = `INSERT OR IGNORE INTO mental_model_entities (mm_id, ent_id) VALUES (?, ?)`;
+    stmt(db, sql).run(mId, eId);
+  }
+
   return { mm_id: mId, ent_id: eId };
 }, 'mentalModelEntities.add');
 
@@ -704,9 +743,28 @@ export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitie
     for (const rawEntId of entitiesToAdd) {
       const entId = requireInt('ent_id', rawEntId);
       for (const mmId of ids) {
-        const sql = `INSERT OR IGNORE INTO mental_model_entities (mm_id, ent_id) VALUES (?, ?)`;
+        const template = getMentalModelTemplateValues(db, mmId);
+        let sql;
+        let params;
+        if (template) {
+          sql = `INSERT OR IGNORE INTO mental_model_entities (
+            mm_id, ent_id,
+            mm_ent_refresh_mode, mm_ent_refresh_after_consolidation,
+            mm_ent_exclude_all_mental_models, mm_ent_max_tokens
+          ) VALUES (?, ?, ?, ?, ?, ?)`;
+          params = [
+            mmId, entId,
+            normaliseRefreshMode(template.refresh_mode),
+            toDbBool(template.refresh_after_consolidation),
+            toDbBool(template.exclude_all_mental_models),
+            normaliseMaxTokens(template.max_tokens),
+          ];
+        } else {
+          sql = `INSERT OR IGNORE INTO mental_model_entities (mm_id, ent_id) VALUES (?, ?)`;
+          params = [mmId, entId];
+        }
         try {
-          const result = stmt(db, sql).run(mmId, entId);
+          const result = stmt(db, sql).run(...params);
           if (result.changes > 0) entitiesAdded++;
         } catch (err) {
           if (!err.message.includes('UNIQUE')) throw err;

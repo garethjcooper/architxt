@@ -54,11 +54,12 @@ export const getDocument = (db, id) => dbExec(() => {
 // Fetch all documents with fields needed for diff comparison
 export const getDocumentsForDiff = (db) => dbExec(() => {
   const sql = `
-    SELECT doc_id, doc_ext_id, doc_content_hash, doc_filename, doc_status,
-           doc_timestamp, ctxt_id, doc_full_path, doc_authors, doc_content
-    FROM documents
-    WHERE doc_ext_id IS NOT NULL
-    ORDER BY doc_ext_id
+    SELECT d.doc_id, d.doc_ext_id, d.doc_content_hash, d.doc_filename, d.doc_status,
+           d.doc_timestamp, d.ctxt_id, d.doc_full_path, d.doc_authors, d.doc_content,
+           CASE WHEN ${getSqlPresenceExpression('d.doc_content')} THEN 1 ELSE 0 END AS doc_has_entities
+    FROM documents d
+    WHERE d.doc_ext_id IS NOT NULL
+    ORDER BY d.doc_ext_id
   `;
   return stmt(db, sql).all();
 }, 'documents.getForDiff');
@@ -204,3 +205,12 @@ export const batchUpdateDocumentContext = (db, docIds, contextId) => dbExec(() =
   const result = stmt(db, sql).run(ctxId, ...ids);
   return { docsUpdated: result.changes };
 }, 'documents.batchUpdateContext');
+
+// Custom - batch update document timestamp for multiple documents
+export const batchUpdateDocumentTimestamp = (db, docIds, timestamp) => dbExec(() => {
+  const ids = docIds.map((id) => requireInt('doc_id', id));
+  const ts = timestamp === null ? null : timestamp;
+  const sql = `UPDATE ${TABLE} SET doc_timestamp = ?, doc_updated_at = CURRENT_TIMESTAMP WHERE ${PK} IN (${ids.map(() => '?').join(',')})`;
+  const result = stmt(db, sql).run(ts, ...ids);
+  return { docsUpdated: result.changes };
+}, 'documents.batchUpdateTimestamp');

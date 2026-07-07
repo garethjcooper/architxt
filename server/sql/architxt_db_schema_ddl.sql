@@ -134,6 +134,11 @@ CREATE TABLE entity_types (
   et_id_label TEXT,
   et_name_label TEXT,
   et_case_match TEXT DEFAULT 'insensitive' CHECK (et_case_match IN ('insensitive', 'sensitive')),
+  et_word_boundary_match TEXT DEFAULT 'boundaries' CHECK (et_word_boundary_match IN ('boundaries', 'no-boundaries')),
+  et_uses_entity_id_pattern INTEGER DEFAULT 0 CHECK (et_uses_entity_id_pattern IN (0, 1)),
+  et_id_format_prefix TEXT,
+  et_min_id_digits INTEGER DEFAULT 3 CHECK(et_min_id_digits BETWEEN 1 AND 10),
+  et_id_separator TEXT,
   et_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   et_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -150,6 +155,7 @@ CREATE TABLE entities (
     ent_description TEXT,
   ent_aliases JSON,           -- array of strings
   ent_case_match TEXT DEFAULT 'insensitive' CHECK (ent_case_match IN ('insensitive', 'sensitive')),
+  ent_word_boundary_match TEXT DEFAULT 'boundaries' CHECK (ent_word_boundary_match IN ('boundaries', 'no-boundaries')),
   ent_generated_by TEXT CHECK(ent_generated_by IN ('user', 'import')),
   ent_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   ent_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -286,7 +292,6 @@ CREATE TABLE research_steps (
   rstep_error_message TEXT,
   rstep_calls JSON,
   rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  rstep_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
   FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
 );

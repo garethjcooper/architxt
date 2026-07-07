@@ -64,17 +64,23 @@ export const listAllPending = (db) => dbExec(() => {
  * @param {Object} db
  * @param {number} serverId
  * @param {string} bankId
+ * @param {boolean} [includeTerminal] - if true, also include completed/failed ops from the last 15 minutes
  * @returns {{success: boolean, data?: Array, error?: string, code?: string}}
  */
-export const listPendingByServerBank = (db, serverId, bankId) => dbExec(() => {
-  const sql = `
+export const listPendingByServerBank = (db, serverId, bankId, includeTerminal = false) => dbExec(() => {
+  let sql = `
     SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
            pop_rs_id, pop_rstep_id, pop_ext_id, pop_action, pop_status, pop_error_message,
            pop_created_at, pop_updated_at
     FROM ${TABLE}
-    WHERE pop_server_id = ? AND pop_bank_id = ? AND pop_status NOT IN ('completed', 'failed', 'acknowledged')
-    ORDER BY pop_created_at DESC
+    WHERE pop_server_id = ? AND pop_bank_id = ?
   `;
+  if (!includeTerminal) {
+    sql += ` AND pop_status NOT IN ('completed', 'failed', 'acknowledged')`;
+  } else {
+    sql += ` AND (pop_status NOT IN ('completed', 'failed', 'acknowledged') OR pop_updated_at > datetime('now', '-15 minutes'))`;
+  }
+  sql += ` ORDER BY pop_created_at DESC`;
   return stmt(db, sql).all(requireInt('pop_server_id', serverId), bankId);
 }, `${TABLE}.listPendingByServerBank`);
 

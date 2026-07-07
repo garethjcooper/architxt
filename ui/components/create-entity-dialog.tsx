@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, X } from 'lucide-react';
-import { entitiesApi } from '@/lib/api/client';
+import { entitiesApi, entityTypesApi } from '@/lib/api/client';
 import type { EntityType } from '@/lib/types';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
-
+import { checkEntityIdConformity, formatEntityIdPattern } from '@/lib/entity-id-pattern';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,12 +28,58 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
   const [aliases, setAliases] = useState<string[]>([]);
   const [newAlias, setNewAlias] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wordBoundaries, setWordBoundaries] = useState(true);
+
+  const selectedType = useMemo(
+    () => entityTypes.find((t) => t.id === Number(typeId)) || null,
+    [typeId, entityTypes]
+  );
+
+  const entityIdConformity = useMemo(() => {
+    if (!selectedType) return null;
+    return checkEntityIdConformity(entityId, selectedType);
+  }, [entityId, selectedType]);
+
+  const [nextEntityId, setNextEntityId] = useState<string | null>(null);
+  const [nextIdLoading, setNextIdLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedType || !selectedType.uses_entity_id_pattern) {
+      setNextEntityId(null);
+      return;
+    }
+    let cancelled = false;
+    setNextIdLoading(true);
+    entityTypesApi.getNextEntityId(selectedType.id)
+      .then((res) => {
+        if (!cancelled) setNextEntityId(res.next_entity_id);
+      })
+      .catch(() => {
+        if (!cancelled) setNextEntityId(null);
+      })
+      .finally(() => {
+        if (!cancelled) setNextIdLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedType]);
 
   useEffect(() => {
     if (open && defaultTypeId) {
       setTypeId(defaultTypeId);
     }
   }, [open, defaultTypeId]);
+
+  // Inherit type defaults when type changes
+  useEffect(() => {
+    if (typeId === '') {
+      setCaseSensitive(false);
+      setWordBoundaries(true);
+      return;
+    }
+    const type = selectedType;
+    setCaseSensitive((type?.case_match ?? 'insensitive') === 'sensitive');
+    setWordBoundaries((type?.word_boundary_match ?? 'boundaries') === 'boundaries');
+  }, [typeId, selectedType]);
 
   const addAlias = () => {
     const trimmed = newAlias.trim();
@@ -55,6 +101,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
     setAliases([]);
     setNewAlias('');
     setCaseSensitive(false);
+    setWordBoundaries(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +119,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
         description: description.trim() || undefined,
         aliases,
         case_match: caseSensitive ? 'sensitive' : 'insensitive',
+        word_boundary_match: wordBoundaries ? 'boundaries' : 'no-boundaries',
       });
       toast.success('Entity created');
       reset();
@@ -132,6 +180,32 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                 } as React.CSSProperties}
                 required
               />
+              {selectedType?.uses_entity_id_pattern && entityIdConformity && (
+                <div className="flex items-center justify-between mt-2 gap-2">
+                  <span
+                    title={entityIdConformity.message || ''}
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
+                      entityIdConformity.conforms
+                        ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
+                        : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
+                    }`}
+                  >
+                    {formatEntityIdPattern(selectedType)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {nextIdLoading && <Loader2 className="h-3 w-3 animate-spin text-white/40" />}
+                    {nextEntityId && (
+                      <button
+                        type="button"
+                        onClick={() => setEntityId(nextEntityId)}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-emerald-800/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-800/30"
+                      >
+                        Next ID: {nextEntityId}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="ce-name" className="text-xs uppercase text-white/50 font-medium">
@@ -210,6 +284,18 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
             <CaseMatchToggle
               checked={caseSensitive}
               onChange={setCaseSensitive}
+            />
+          </div>
+
+          {/* Word Boundary Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
+              <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match (default)</p>
+            </div>
+            <CaseMatchToggle
+              checked={wordBoundaries}
+              onChange={setWordBoundaries}
             />
           </div>
 

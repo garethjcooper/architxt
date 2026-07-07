@@ -22,17 +22,20 @@ import {
   validateIdArray,
   validateOptionalIdArray
 } from '../utils/route-helpers.js';
-import { 
-  getDocument, 
-  createDocument, 
-  deleteDocument, 
+import {
+  getDocument,
+  createDocument,
+  deleteDocument,
   listDocuments,
   updateDocument,
-  getDocumentProcessing,
-  batchUpdateDocumentContext
+  batchUpdateDocumentContext,
+  batchUpdateDocumentTimestamp,
+  getDocumentsForDiff,
+  getAllDocumentContexts,
+  getDocumentProcessing
 } from '../db/crud/documents.js';
 import { stmt } from '../cache.js';
-import { 
+import {
   batchUpdateDocumentTags
 } from '../db/crud/document-tags.js';
 import { batchUpdateDocumentMetadata } from '../db/crud/document-metadata.js';
@@ -992,8 +995,6 @@ router.post('/batch/context', async (req, res) => {
 });
 
 
-export default router;
-export { toApiDocument };
 /**
  * @openapi
  * /documents/batch/updatemetadata:
@@ -1096,3 +1097,99 @@ router.post('/batch/updatemetadata', async (req, res) => {
   }
 });
 
+
+
+/**
+ * @openapi
+ * /documents/batch/updateconfig:
+ *   post:
+ *     summary: Batch update configuration fields for multiple documents
+ *     description: Updates per-field configuration (timestamp, ext_id) for selected documents.
+ *     tags: [Documents]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - document_ids
+ *             properties:
+ *               document_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: Document IDs to update
+ *               timestamp:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 description: New document timestamp (ISO 8601)
+ *     responses:
+ *       200:
+ *         description: Configuration updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 docs_updated:
+ *                   type: integer
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
+ */
+router.post('/batch/updateconfig', async (req, res) => {
+  const start = Date.now();
+  const path = '/documents/batch/updateconfig';
+
+  try {
+    const docIdsCheck = validateIdArray({ req, res, field: 'document_ids', logger, path, start });
+    if (!docIdsCheck.valid) return;
+    const docIds = docIdsCheck.ids;
+
+    const { timestamp } = req.body;
+
+    if (timestamp === undefined) {
+      const duration = Date.now() - start;
+      sendResponse({
+        res, status: 400, error: 'Must provide timestamp to update', code: 'VALIDATION_ERROR',
+        logger, method: 'POST', path, duration
+      });
+      return;
+    }
+
+    const result = batchUpdateDocumentTimestamp(db, docIds, timestamp);
+
+    if (!result.success) {
+      handleCrudResult({
+        res, result,
+        notFoundError: null,
+        successStatus: 200,
+        logger, method: 'POST', path, start
+      });
+      return;
+    }
+
+    const { docsUpdated } = result.data;
+    const duration = Date.now() - start;
+    sendResponse({
+      res, status: 200, data: { success: true, docs_updated: docsUpdated },
+      logger, method: 'POST', path, duration
+    });
+  } catch (error) {
+    logger.error('Batch config update error:', error);
+    const duration = Date.now() - start;
+    sendResponse({
+      res, status: 500, error: 'Failed to update document configuration',
+      code: 'SERVER_ERROR',
+      logger, method: 'POST', path, duration
+    });
+  }
+});
+
+export default router;
+export { toApiDocument };

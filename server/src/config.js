@@ -215,6 +215,7 @@ export const config = {
     remove_confidential_headers: getEnv('ARCHITXT_DENOISE_REMOVE_CONFIDENTIAL', '1') === 'true',
     remove_document_ids: getEnv('ARCHITXT_DENOISE_REMOVE_DOC_IDS', '1') === '1',
     unescape_html_entities: getEnv('ARCHITXT_DENOISE_UNESCAPE_HTML', '1') === '1',
+    unescape_markdown_punctuation: getEnv('ARCHITXT_DENOISE_UNESCAPE_MARKDOWN_PUNCT', '1') === '1',
     normalize_whitespace: getEnv('ARCHITXT_DENOISE_NORMALIZE_WS', '1') === '1',
     remove_non_ascii: getEnv('ARCHITXT_DENOISE_REMOVE_NON_ASCII', '1') === '1',
     max_consecutive_newlines: getInt('ARCHITXT_DENOISE_MAX_NEWLINES', 3)

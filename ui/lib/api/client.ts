@@ -238,6 +238,15 @@ export const documentsApi = {
         body: JSON.stringify({ document_ids: docIds, context_id: contextId }),
       }
     ),
+  // Batch config update — use API field names
+  batchUpdateConfig: (docIds: number[], config: { timestamp?: string | null }) =>
+    fetchApi<{ success: boolean; docs_updated: number }>(
+      '/documents/batch/updateconfig',
+      {
+        method: 'POST',
+        body: JSON.stringify({ document_ids: docIds, ...config }),
+      }
+    ),
 };
 
 // Contexts API
@@ -367,6 +376,7 @@ export const entitiesApi = {
     description?: string;
     aliases?: string[];
     case_match?: 'insensitive' | 'sensitive';
+    word_boundary_match?: 'boundaries' | 'no-boundaries';
     generated_by?: 'user' | 'import';
   }) => fetchApi<{ id: number }>('/entities', {
     method: 'POST',
@@ -376,15 +386,29 @@ export const entitiesApi = {
     type_id?: number;
     entity_id?: string;
     name?: string;
-    description?: string;
+    description?: string | null;
     aliases?: string[];
-    case_match?: 'insensitive' | 'sensitive';
+    case_match?: 'insensitive' | 'sensitive' | null;
+    word_boundary_match?: 'boundaries' | 'no-boundaries' | null;
     generated_by?: 'user' | 'import';
   }) => fetchApi<void>(`/entities/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
   delete: (id: number) => fetchApi<void>(`/entities/${id}`, { method: 'DELETE' }),
+  batchUpdateConfig: (entIds: number[], config: {
+    type_id?: number | null;
+    case_match?: 'insensitive' | 'sensitive' | null;
+    word_boundary_match?: 'boundaries' | 'no-boundaries' | null;
+  }) => fetchApi<{ success: boolean; entities_updated: number }>('/entities/batch/updateconfig', {
+    method: 'POST',
+    body: JSON.stringify({ entity_ids: entIds, ...config }),
+  }),
+  getDocuments: (entIds: number[], limit?: number) =>
+    fetchApi<Array<{ id: number; ext_id: string | null; filename: string | null }>>('/entities/documents', {
+      method: 'POST',
+      body: JSON.stringify({ entity_ids: entIds, limit }),
+    }),
 };
 
 export const entityTypesApi = {
@@ -396,21 +420,38 @@ export const entityTypesApi = {
     id_label?: string;
     name_label?: string;
     case_match?: 'insensitive' | 'sensitive';
+    word_boundary_match?: 'boundaries' | 'no-boundaries';
+    uses_entity_id_pattern?: boolean;
+    id_format_prefix?: string;
+    min_id_digits?: number;
+    id_separator?: 'none' | '-';
   }) => fetchApi<{ id: number }>('/entities/types', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  update: (id: number, data: {
-    type_name?: string;
-    description?: string;
-    id_label?: string;
-    name_label?: string;
-    case_match?: 'insensitive' | 'sensitive';
-  }) => fetchApi<void>(`/entities/types/${id}`, {
+  update: (
+    id: number,
+    data: {
+      type_name?: string;
+      description?: string | null;
+      id_label?: string;
+      name_label?: string;
+      case_match?: 'insensitive' | 'sensitive';
+      word_boundary_match?: 'boundaries' | 'no-boundaries';
+      uses_entity_id_pattern?: boolean;
+      id_format_prefix?: string;
+      min_id_digits?: number;
+      id_separator?: 'none' | '-';
+    }
+  ) => fetchApi<unknown>(`/entities/types/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
   delete: (id: number) => fetchApi<void>(`/entities/types/${id}`, { method: 'DELETE' }),
+  getNextEntityId: (id: number, excludeEntityId?: string) => {
+    const query = excludeEntityId ? `?exclude_entity_id=${encodeURIComponent(excludeEntityId)}` : '';
+    return fetchApi<{ next_entity_id: string | null }>(`/entities/types/${id}/next-id${query}`);
+  },
 };
 
 // Mental Models API
@@ -462,6 +503,44 @@ export const mentalModelsApi = {
     body: JSON.stringify(data),
   }),
   delete: (id: number) => fetchApi<void>(`/mentalmodels/${id}`, { method: 'DELETE' }),
+
+  // Refresh a single Hindsight mental model (async, tracked via pending_operations)
+  refresh: (payload: {
+    server_id: number;
+    bank_id: string;
+    ext_id: string;
+  }) =>
+    fetchApi<{
+      operation_id: string;
+      pop_id: number;
+      status: string;
+    }>('/research/mental-models/refresh', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Health check for derived mental-model ext_ids against Hindsight content
+  healthCheck: (payload: {
+    server_id: number;
+    bank_id: string;
+    models: { ext_id: string; returns?: 'json' | 'narrative' }[];
+  }) =>
+    fetchApi<{
+      results: {
+        ext_id: string;
+        healthy: boolean;
+        found?: boolean;
+        content?: string | object | null;
+        content_length?: number;
+        parsed?: { narrative?: string; graph?: { nodes: unknown[]; edges: unknown[] } };
+        node_count?: number;
+        edge_count?: number;
+        error?: string;
+      }[];
+    }>('/research/mental-models/health', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 60000 }),
 
   // Tags
   getTags: (id: number) => fetchApi<Tag[]>(`/mentalmodels/${id}/tags`),
@@ -626,8 +705,9 @@ export const hindsightApi = {
 
   /**
    * List local pending operations for a server+bank (excludes acknowledged).
+   * Set includeTerminal to also receive completed/failed ops from the last 15 minutes.
    */
-  listOperations: (serverId: number, bankId: string) =>
+  listOperations: (serverId: number, bankId: string, includeTerminal?: boolean) =>
     fetchApi<{
       success: boolean;
       operations: Array<{
@@ -645,7 +725,7 @@ export const hindsightApi = {
       }>;
       server_id: number;
       bank_id: string;
-    }>(`/hindsight/operations?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}`),
+    }>(`/hindsight/operations?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}${includeTerminal ? '&include_terminal=true' : ''}`),
 
   dismissOperation: (popId: number) =>
     fetchApi<{ success: boolean; dismissed: number }>(`/hindsight/operations/${popId}`, {

@@ -26,6 +26,8 @@ import {
   RefreshCw,
   Download,
   Table as TableIcon,
+  Settings2,
+  FileText,
 } from 'lucide-react';
 import { entitiesApi, entityTypesApi, type Entity, type EntityType } from '@/lib/api/client';
 import { useMultiSelect } from '@/hooks/useMultiSelect';
@@ -36,10 +38,14 @@ import { CreateEntityTypeDialog } from '@/components/create-entity-type-dialog';
 import { ViewEntityDialog } from '@/components/view-entity-dialog';
 import { ViewEntityTypeDialog } from '@/components/view-entity-type-dialog';
 import { ImportDialog, parseEntityImport } from '@/components/import-dialog';
+import { colorForType } from '@/components/research-canvas';
+import { ManageEntityConfigDialog } from '@/components/manage-entity-config-dialog';
+import { EntityDocumentsDialog } from '@/components/entity-documents-dialog';
 import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
+import { checkEntityIdConformity, formatEntityIdPattern } from '@/lib/entity-id-pattern';
 
 const logger = createLogger('EntitiesPage');
 
@@ -52,7 +58,7 @@ export default function EntitiesPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmDesc, setConfirmDesc] = useState('');
-  const [confirmVariant, setConfirmVariant] = useState<'destructive'>('destructive');
+  const [confirmVariant, setConfirmVariant] = useState<'destructive' | 'default'>('destructive');
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   /* ── Batch progress ── */
@@ -71,6 +77,7 @@ export default function EntitiesPage() {
   const [viewEntityOpen, setViewEntityOpen] = useState(false);
   const [entitySearch, setEntitySearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState<number | 'all'>('all');
+  const [manageConfigDialogOpen, setManageConfigDialogOpen] = useState(false);
 
   /* ── Freeze panes state ── */
   const [freeze, setFreeze] = useState(false);
@@ -81,6 +88,7 @@ export default function EntitiesPage() {
   const [createTypeOpen, setCreateTypeOpen] = useState(false);
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType | null>(null);
   const [viewTypeOpen, setViewTypeOpen] = useState(false);
+  const [entityDocumentsOpen, setEntityDocumentsOpen] = useState(false);
 
   /* ── Derived: filtered entities ── */
   const filteredEntities = useMemo(() => {
@@ -206,11 +214,11 @@ export default function EntitiesPage() {
     const succeeded = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
     if (failed === 0) {
-      toast.success(`${succeeded} item${succeeded !== 1 ? 's' : ''} deleted`);
+      toast.success(`${succeeded} item${succeeded !== 1 ? 's' : ''} updated`);
     } else if (succeeded === 0) {
-      toast.error(`All ${failed} delete operations failed`);
+      toast.error(`All ${failed} operations failed`);
     } else {
-      toast.warning(`${succeeded} deleted, ${failed} failed`);
+      toast.warning(`${succeeded} updated, ${failed} failed`);
     }
     entityMulti.clearSelection();
     typeMulti.clearSelection();
@@ -287,6 +295,22 @@ export default function EntitiesPage() {
               )}
             </div>
 
+            <Button
+              onClick={() => setManageConfigDialogOpen(true)}
+              disabled={entityMulti.selected.size === 0}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Settings2 className="h-3.5 w-3.5" />Config
+            </Button>
+
+            <Button
+              onClick={() => setEntityDocumentsOpen(true)}
+              disabled={entityMulti.selected.size === 0}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FileText className="h-3.5 w-3.5" />Documents
+            </Button>
+
             <div className="flex-1" />
             <div className="w-px h-5 bg-white/10 mx-1" />
 
@@ -362,9 +386,11 @@ export default function EntitiesPage() {
                         />
                       </TableHead>
                       <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entity ID</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Pattern</TableHead>
                       <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</TableHead>
                       <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Type</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Match</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Case</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Boundary</TableHead>
                       <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Documents</TableHead>
                       <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Aliases</TableHead>
                       <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Created</TableHead>
@@ -386,32 +412,85 @@ export default function EntitiesPage() {
                           />
                         </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs text-white/50 font-mono">{item.entity_id}</TableCell>
+                        <TableCell className="py-1.5 px-4">
+                          {(() => {
+                            const type = entityTypes.find((t) => t.id === item.type_id);
+                            if (!type?.uses_entity_id_pattern) {
+                              return <span className="text-white/20 text-[10px]">-</span>;
+                            }
+                            const result = checkEntityIdConformity(item.entity_id, type);
+                            const patternLabel = formatEntityIdPattern(type);
+                            return (
+                              <span
+                                title={result.message || (result.conforms ? 'Conforms to entity type pattern' : 'Does not conform to entity type pattern')}
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
+                                  result.conforms
+                                    ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
+                                    : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
+                                }`}
+                              >
+                                {patternLabel}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs font-medium text-white/80">{item.name}</TableCell>
                         <TableCell className="py-1.5 px-4">
-                          <span
-                            className={`inline-flex px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
-                              entitySearch.trim() && (entityTypes.find((t) => t.id === item.type_id)?.type_name.toLowerCase().includes(entitySearch.toLowerCase()) || false)
-                                ? 'bg-blue-800/30 text-blue-200 border-blue-700/40 ring-1 ring-blue-400/40'
-                                : 'bg-blue-800/15 text-blue-400 border-blue-700/20'
-                            }`}
-                          >
-                            {entityTypeName(item.type_id)}
-                          </span>
+                          {(() => {
+                            const typeName = entityTypeName(item.type_id);
+                            const typeColor = colorForType(typeName);
+                            return (
+                              <span
+                                title={typeName}
+                                className="inline-flex px-2.5 py-1 rounded-full text-[10px] border transition-colors"
+                                style={{
+                                  color: typeColor,
+                                  backgroundColor: `${typeColor}1A`,
+                                  borderColor: `${typeColor}33`,
+                                }}
+                              >
+                                {typeName}
+                              </span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {(() => {
-                            const resolved = item.case_match ?? item.type_case_match ?? 'insensitive';
-                            const isSensitive = resolved === 'sensitive';
+                            const entityValue = item.case_match ?? 'insensitive';
+                            const typeValue = item.type_case_match ?? 'insensitive';
+                            const isSensitive = entityValue === 'sensitive';
+                            const differs = entityValue !== typeValue;
                             return (
                               <span
-                                title={isSensitive ? 'Case-sensitive match' : 'Case-insensitive match (default)'}
+                                title={differs ? `Entity override — entity type: case-${typeValue}` : `Case-${isSensitive ? 'sensitive' : 'insensitive'} match`}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   isSensitive
                                     ? 'bg-amber-800/15 text-amber-400 border-amber-700/20'
-                                    : 'bg-white/5 text-white/20 border-white/5'
-                                }`}
+                                    : 'bg-white/5 text-white/40 border-white/10'
+                                } ${differs ? 'ring-1 ring-amber-400/40' : ''}`}
                               >
                                 {isSensitive ? 'Aa' : 'aa'}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4">
+                          {(() => {
+                            const entityValue = item.word_boundary_match ?? 'boundaries';
+                            const typeValue = item.type_word_boundary_match ?? 'boundaries';
+                            const hasBoundaries = entityValue === 'boundaries';
+                            const differs = entityValue !== typeValue;
+                            const typeLabel = typeValue === 'boundaries' ? 'whole-word' : 'no boundaries';
+                            return (
+                              <span
+                                title={differs ? `Entity override — entity type: ${typeLabel}` : `${hasBoundaries ? 'Whole-word' : 'No boundaries'} match`}
+                                className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
+                                  !hasBoundaries
+                                    ? 'bg-rose-800/15 text-rose-400 border-rose-700/20'
+                                    : 'bg-white/5 text-white/40 border-white/10'
+                                } ${differs ? 'ring-1 ring-amber-400/40' : ''}`}
+                              >
+                                {hasBoundaries ? '∂' : '∞'}
                               </span>
                             );
                           })()}
@@ -526,9 +605,9 @@ export default function EntitiesPage() {
                       </TableHead>
                       <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Type Name</TableHead>
                       <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Description</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">ID Label</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Name Label</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16">Match</TableHead>
+                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20">Pattern</TableHead>
+                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16">Case</TableHead>
+                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16">Boundary</TableHead>
                       <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Created</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -553,11 +632,24 @@ export default function EntitiesPage() {
                         <TableCell className="py-1.5 px-4 text-xs text-white/60">
                           {type.description || <span className="text-white/20">-</span>}
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs text-white/50">
-                          {type.id_label || <span className="text-white/20">-</span>}
-                        </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs text-white/50">
-                          {type.name_label || <span className="text-white/20">-</span>}
+                        <TableCell className="py-1.5 px-4">
+                          {type.uses_entity_id_pattern ? (
+                            (() => {
+                              const sep = type.id_separator === '-' ? '-' : '';
+                              const digits = Math.min(type.min_id_digits ?? 3, 6);
+                              const placeholder = '0'.repeat(digits);
+                              return (
+                                <span
+                                  title={`${placeholder.length} digit(s)`}
+                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border bg-emerald-800/15 text-emerald-400 border-emerald-700/20"
+                                >
+                                  {type.id_format_prefix || ''}{sep}{placeholder}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-white/20 text-xs">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {(() => {
@@ -572,6 +664,23 @@ export default function EntitiesPage() {
                                 }`}
                               >
                                 {isSensitive ? 'Aa' : 'aa'}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4">
+                          {(() => {
+                            const hasBoundaries = (type.word_boundary_match ?? 'boundaries') === 'boundaries';
+                            return (
+                              <span
+                                title={hasBoundaries ? 'Respects word boundaries (default)' : 'Substring match'}
+                                className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
+                                  hasBoundaries
+                                    ? 'bg-white/5 text-white/20 border-white/5'
+                                    : 'bg-rose-800/15 text-rose-400 border-rose-700/20'
+                                }`}
+                              >
+                                {hasBoundaries ? '∂' : '∞'}
                               </span>
                             );
                           })()}
@@ -623,12 +732,6 @@ export default function EntitiesPage() {
         defaultTypeId={entityTypeFilter !== 'all' ? entityTypeFilter : undefined}
       />
 
-      <CreateEntityTypeDialog
-        open={createTypeOpen}
-        onOpenChange={setCreateTypeOpen}
-        onEntityTypeCreated={fetchAll}
-      />
-
       <ViewEntityDialog
         open={viewEntityOpen}
         onOpenChange={setViewEntityOpen}
@@ -637,19 +740,43 @@ export default function EntitiesPage() {
         onEntityUpdated={fetchAll}
       />
 
+      <CreateEntityTypeDialog
+        open={createTypeOpen}
+        onOpenChange={setCreateTypeOpen}
+        onEntityTypeCreated={fetchAll}
+      />
+
       <ViewEntityTypeDialog
+        entityType={selectedEntityType}
         open={viewTypeOpen}
         onOpenChange={setViewTypeOpen}
-        entityType={selectedEntityType}
         onEntityTypeUpdated={fetchAll}
+      />
+
+      <ManageEntityConfigDialog
+        isOpen={manageConfigDialogOpen}
+        onClose={() => setManageConfigDialogOpen(false)}
+        selectedEntityIds={useMemo(() => Array.from(entityMulti.selected), [entityMulti.selected])}
+        entities={entities}
+        entityTypes={entityTypes}
+        onConfigUpdated={() => {
+          entityMulti.clearSelection();
+          fetchAll();
+        }}
+      />
+
+      <EntityDocumentsDialog
+        isOpen={entityDocumentsOpen}
+        onClose={() => setEntityDocumentsOpen(false)}
+        selectedEntityIds={useMemo(() => Array.from(entityMulti.selected), [entityMulti.selected])}
       />
 
       <ImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import Entities"
-        description="Paste CSV with entity_id, entity_name, entity_type, entity_description, entity_aliases, case_match. entity_type must match an existing type name. Aliases are a packed CSV string. case_match is optional ('insensitive' or 'sensitive')."
-        placeholder={`entity_id,entity_name,entity_type,entity_description,entity_aliases,case_match\n"COM-001","Billing System","ac","Strategic billing platform","BS, Billing System, BillingSys","insensitive"\n"COM-002","Finance Gateway","ac","Core finance API","FG, Finance API","sensitive"`}
+        description="Paste CSV with entity_id, entity_name, entity_type, entity_description, entity_aliases, case_match, word_boundary_match. entity_type must match an existing type name. Aliases are a packed CSV string. case_match and word_boundary_match are optional ('insensitive'/'sensitive' and 'boundaries'/'no-boundaries')."
+        placeholder={`entity_id,entity_name,entity_type,entity_description,entity_aliases,case_match,word_boundary_match\n"COM-001","Billing System","ac","Strategic billing platform","BS, Billing System, BillingSys","insensitive","boundaries"\n"COM-002","Finance Gateway","ac","Core finance API","FG, Finance API","sensitive","no-boundaries"`}
         parser={(input) => parseEntityImport(input, entityTypes.map((t) => ({ type_name: t.type_name, id: t.id })))}
         onImport={async (item) => {
           await entitiesApi.create({
@@ -659,6 +786,7 @@ export default function EntitiesPage() {
             description: item.data.description,
             aliases: item.data.aliases || [],
             case_match: item.data.case_match,
+            word_boundary_match: item.data.word_boundary_match,
             generated_by: 'import',
           });
         }}
@@ -669,7 +797,8 @@ export default function EntitiesPage() {
           { key: 'type_name', label: 'Type', width: '70px' },
           { key: 'description', label: 'Description', width: '200px' },
           { key: 'aliases', label: 'Aliases', width: '140px' },
-          { key: 'case_match', label: 'Match', width: '70px' },
+          { key: 'case_match', label: 'Case', width: '60px' },
+          { key: 'word_boundary_match', label: 'Boundary', width: '60px' },
         ]}
       />
     </PageShell>
