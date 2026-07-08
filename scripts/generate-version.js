@@ -43,9 +43,9 @@ const outputPath = path.join(publicDir, 'version.json');
 fs.writeFileSync(outputPath, JSON.stringify(versionInfo, null, 2));
 
 // Also copy to ui/dist/ if it exists (so already-built apps get updated)
-const distPath = path.join(rootDir, 'ui', 'dist', 'version.json');
-if (fs.existsSync(path.dirname(distPath))) {
-  fs.writeFileSync(distPath, JSON.stringify(versionInfo, null, 2));
+const distDir = path.join(rootDir, 'ui', 'dist');
+if (fs.existsSync(distDir)) {
+  fs.writeFileSync(path.join(distDir, 'version.json'), JSON.stringify(versionInfo, null, 2));
   console.log(`[version] v${versionInfo.version} (commit: ${versionInfo.commit}) → ${outputPath} + dist/`);
 } else {
   console.log(`[version] v${versionInfo.version} (commit: ${versionInfo.commit}) → ${outputPath}`);

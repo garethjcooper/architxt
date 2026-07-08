@@ -1,0 +1,42 @@
+services:
+  architxt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: architxt:0.3.3
+    container_name: architxt
+    ports:
+      - "3000:3000"
+    env_file:
+      # Create server/.env from server/.env.example before first run.
+      # This file is NOT committed to git.
+      - server/.env
+    environment:
+      # Override paths so data is written inside the container under a single mount point.
+      # If you prefer to keep data next to the project, change these back to the defaults
+      # and update the volume paths below.
+      ARCHITXT_DB_PATH: /app/server/database/architxt.db
+      ARCHITXT_STORAGE_PATH: /app/server/documents
+      ARCHITXT_LOG_DIR: /app/server/logs
+      ARCHITXT_TEMP_DIR: /app/server/tmp
+      ARCHITXT_HOST: 0.0.0.0
+    volumes:
+      - architxt-database:/app/server/database
+      - architxt-documents:/app/server/documents
+      - architxt-logs:/app/server/logs
+      - architxt-tmp:/app/server/tmp
+    restart: unless-stopped
+    # Give the server + daemons time to shut down cleanly (default is 10s)
+    stop_grace_period: 30s
+    healthcheck:  # Existing content continues...
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => { if (!r.ok) throw new Error('not ok'); process.exit(0) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  architxt-database:
+  architxt-documents:
+  architxt-logs:
+  architxt-tmp:
