@@ -141,6 +141,103 @@ npm start           # starts backend + UI on http://localhost:3000
 
 ---
 
+## Docker / Podman (Optional)
+
+If you prefer a containerized deployment, a `Dockerfile` and `docker-compose.yml` are included.
+
+### Quick Start with Docker
+
+```bash
+git clone <repo-url> && cd architxt
+
+# 1. Create your environment file
+cp server/.env.example server/.env
+# Edit server/.env — add your API keys and configure providers
+
+# 2. Build and run
+docker compose up --build
+```
+
+Open your browser to `http://localhost:3000`.
+
+### With Podman
+
+```bash
+podman compose up --build
+
+# If your Podman installation does not include compose:
+podman-compose up --build
+```
+
+### What the compose file does
+
+- Builds the architxt image from the `Dockerfile`
+- Exposes the app on port `3000`
+- Creates named volumes for persistent data:
+  - `architxt-database`
+  - `architxt-documents`
+  - `architxt-logs`
+  - `architxt-tmp`
+- Runs database, documents, logs, and temp dirs inside `/app/server/...`
+- Sets a 30-second graceful shutdown window so background daemons stop cleanly
+
+### Updating the Docker deployment
+
+Pull the latest code, then rebuild:
+
+```bash
+git pull origin main
+docker compose up --build -d
+```
+
+Your data in the named volumes is preserved across rebuilds.
+
+### Running without compose
+
+```bash
+# Build
+docker build -t architxt:latest .
+
+# Run with a named volume for persistence
+docker run -d -p 3000:3000 \
+  -v architxt-data:/app/server \
+  -e ARCHITXT_HOST=0.0.0.0 \
+  --name architxt architxt:latest
+```
+
+### Notes
+
+- At least one LLM provider must be configured in `server/.env` or via environment variables, or the container will fail to start.
+- The container is built for a single-replica deployment. SQLite is used for storage, so do not scale horizontally without switching to a shared database.
+- `podman compose` and `docker compose` are supported. `podman-compose` is a separate Python package if your distribution does not bundle the Docker-compatible plugin.
+
+### Plain Podman fallback (no compose)
+
+If you do not want to install a compose plugin, use plain `podman` commands:
+
+```bash
+# Build
+podman build -t architxt:latest .
+
+# Run with named volumes for persistence
+podman run -d \
+  --name architxt \
+  -p 3000:3000 \
+  -v architxt-database:/app/server/database \
+  -v architxt-documents:/app/server/documents \
+  -v architxt-logs:/app/server/logs \
+  -v architxt-tmp:/app/server/tmp \
+  --env-file server/.env \
+  -e ARCHITXT_HOST=0.0.0.0 \
+  architxt:latest
+
+# Stop cleanly
+podman stop --time=30 architxt
+podman rm architxt
+```
+
+---
+
 ## Basic Workflows
 
 The quickest way to understand architxt is to walk through a complete document lifecycle.

@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+server/node_modules/
+ui/node_modules/
+packages/*/node_modules/
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+ui/dist/
+server/dist/
+ui/.next/
+
+# Runtime data (must be mounted as volumes, not copied into image)
+database/
+documents/
+logs/
+tmp/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+server/.env
+server/.env.local
+
+# Git / CI
+.gitignore
+.github/
+.gitattributes
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.md
+docs/
+scripts/__pycache__/
+scripts/*.pyc
