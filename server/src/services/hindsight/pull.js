@@ -12,12 +12,13 @@ import {
   getDocument as getArchitxtDocument,
   createDocument,
   updateDocument,
+  getDocumentByExtId,
 } from '../../db/crud/documents.js';
 import { addDocumentTag, removeAllDocumentTags } from '../../db/crud/document-tags.js';
-import { createTag } from '../../db/crud/tags.js';
+import { getOrCreateTagByName } from '../../db/crud/tags.js';
 import { addDocumentMetadata, removeAllDocumentMetadata } from '../../db/crud/document-metadata.js';
-import { createMetadata } from '../../db/crud/metadata.js';
-import { createContext } from '../../db/crud/contexts.js';
+import { getMetadataByKeyValue, createMetadata } from '../../db/crud/metadata.js';
+import { getOrCreateContextByDesc } from '../../db/crud/contexts.js';
 import { writeToStorage } from '../../utils/file-helpers.js';
 import { config } from '../../config.js';
 import path from 'path';
@@ -26,34 +27,19 @@ const logger = createLogger('hindsight-pull');
 
 /**
  * Resolve or create a context by description string.
- * Returns the context_id (number).
+ * Returns the context_id (number) or null on failure.
  */
 function resolveContextId(contextDesc) {
   if (!contextDesc) return null;
 
-  // Direct SQL lookup — avoids LIMIT truncation from DB layer
-  const existing = db
-    .prepare('SELECT ctxt_id FROM contexts WHERE ctxt_desc = ?')
-    .get(contextDesc);
-  if (existing) return existing.ctxt_id;
-
-  // Generate a deterministic hash for generated_by
-  const ctxResult = createContext(db, {
-    ctxt_desc: contextDesc,
-    ctxt_generated_by: 'import'
-  });
-  if (!ctxResult.success || !ctxResult.data) {
-    logger.error('resolveContextId: creation failed', { contextDesc, error: ctxResult.error, code: ctxResult.code });
+  const result = getOrCreateContextByDesc(db, contextDesc);
+  if (!result.success || !result.data) {
+    logger.error('resolveContextId: failed', { contextDesc, error: result.error, code: result.code });
     return null;
   }
-  return ctxResult.data;
+  return result.data;
 }
 
-/**
- * Sync tags for a document.
- * Deletes existing tag relationships, then creates/applies new tags.
- * Uses direct SQL for lookup to avoid the LIMIT 100 truncation in listTags().
- */
 function syncDocumentTags(docId, tagNames) {
   // Wipe existing junctions first
   removeAllDocumentTags(db, docId);
@@ -61,32 +47,19 @@ function syncDocumentTags(docId, tagNames) {
   if (!tagNames || tagNames.length === 0) return;
 
   for (const tagName of tagNames) {
-    const existing = db
-      .prepare('SELECT tag_id FROM tags WHERE tag_name = ?')
-      .get(tagName);
-
-    let tagId;
-    if (existing) {
-      tagId = existing.tag_id;
-    } else {
-      const tagResult = createTag(db, {
-        tag_name: tagName,
-        tag_generated_by: 'import' // must satisfy CHECK IN ('user','import')
-      });
-      tagId = tagResult.success && tagResult.data ? tagResult.data : null;
-      if (!tagId) {
-        logger.warn('syncDocumentTags: tag creation failed', { tagName, error: tagResult.error, code: tagResult.code });
-        continue; // skip for this document, but keep processing others
-      }
+    const tagResult = getOrCreateTagByName(db, tagName, 'import');
+    if (!tagResult.success || !tagResult.data) {
+      logger.warn('syncDocumentTags: tag creation failed', { tagName, error: tagResult.error, code: tagResult.code });
+      continue; // skip for this document, but keep processing others
     }
-    addDocumentTag(db, docId, tagId);
+    addDocumentTag(db, docId, tagResult.data);
   }
 }
 
 /**
  * Sync metadata for a document.
  * Deletes existing metadata relationships, then creates/applies new metadata.
- * Uses direct SQL for lookup to avoid the LIMIT 100 truncation in listMetadata().
+ * Uses getMetadataByKeyValue CRUD helper to avoid the LIMIT 100 truncation in listMetadata().
  */
 function syncDocumentMetadata(docId, metadataObj) {
   // Wipe existing junctions first
@@ -98,9 +71,8 @@ function syncDocumentMetadata(docId, metadataObj) {
     const valStr = value !== null && value !== undefined ? String(value) : '';
 
     // Lookup existing entry by BOTH key AND value (composite identity for junction table)
-    const existing = db
-      .prepare('SELECT meta_id FROM metadata WHERE meta_key = ? AND meta_value = ?')
-      .get(key, valStr);
+    const existingResult = getMetadataByKeyValue(db, key, valStr);
+    const existing = existingResult.success ? existingResult.data : null;
 
     let metaId;
     if (existing) {
@@ -157,8 +129,8 @@ export async function pullDocument(serverId, bankId, documentId) {
   const hindsightFilename = ensureMdExtension(h.filename || h.title || h.name || h.id);
 
   // 2. Check if this ext_id already exists in Architxt
-  const existingRows = db.prepare('SELECT doc_id FROM documents WHERE doc_ext_id = ?').all(h.id);
-  const existingDocId = existingRows.length > 0 ? existingRows[0].doc_id : null;
+  const extIdResult = getDocumentByExtId(db, h.id);
+  const existingDocId = extIdResult.success && extIdResult.data ? extIdResult.data.doc_id : null;
 
   // 3. Resolve context from retain_params.context
   const contextId = resolveContextId(h.retain_params?.context || null);

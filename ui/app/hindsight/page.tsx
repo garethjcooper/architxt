@@ -335,7 +335,7 @@ export default function HindsightPage() {
   };
 
   // ── Directive single push / pull helpers ───────────────────────────
-  const pushDirectiveOne = async (extId: string) => {
+  const pushDirectiveOne = async (extId: string, create = false) => {
     if (!selectedServerId || !selectedBankId) {
       throw new Error('Select a server and bank first');
     }
@@ -347,7 +347,7 @@ export default function HindsightPage() {
     if (!dirId) {
       throw new Error(`Directive ${extId} has no architxt ID`);
     }
-    await hindsightApi.pushDirective(parseInt(selectedServerId, 10), selectedBankId, dirId);
+    await hindsightApi.pushDirective(parseInt(selectedServerId, 10), selectedBankId, dirId, create);
   };
 
   const pullDirectiveOne = async (extId: string) => {
@@ -419,7 +419,7 @@ export default function HindsightPage() {
       setBatchDescription(`${items.length} directive${items.length !== 1 ? 's' : ''}`);
       setBatchItems(items.map((item) => ({ id: item.ext_id, label: labelFor(item) })));
       setBatchOperation(() => async (item: BatchItem) => {
-        await pushDirectiveOne(String(item.id));
+        await pushDirectiveOne(String(item.id), true);
       });
       setBatchOnComplete(() => () => fetchDiff());
       setBatchProgressOpen(true);
@@ -745,7 +745,7 @@ export default function HindsightPage() {
           >
             <option value="">{loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}</option>
             {banks.map((b, idx) => (
-              <option key={b.id ?? `bank-${idx}`} value={b.id}>{b.name || b.id}</option>
+              <option key={b.bank_id ?? `bank-${idx}`} value={b.bank_id}>{b.name || b.bank_id}</option>
             ))}
           </select>
         </div>

@@ -11,43 +11,10 @@ import {
   getDirectiveByExtId,
   createDirective,
   updateDirective,
-  addDirectiveTag,
+  syncDirectiveTags,
 } from '../../db/crud/directives.js';
-import { createTag } from '../../db/crud/tags.js';
 
 const logger = createLogger('hindsight-directive-pull');
-
-/**
- * Resolve or create a tag by name.
- */
-function resolveTagId(tagName) {
-  const existing = db.prepare('SELECT tag_id FROM tags WHERE tag_name = ?').get(tagName);
-  if (existing) return existing.tag_id;
-
-  const tagResult = createTag(db, {
-    tag_name: tagName,
-    tag_generated_by: 'import'
-  });
-  return tagResult.success && tagResult.data ? tagResult.data : null;
-}
-
-/**
- * Replace all tags on a directive with the given tag names.
- */
-function syncDirectiveTags(dirId, tagNames) {
-  db.prepare('DELETE FROM directive_tags WHERE dir_id = ?').run(dirId);
-
-  if (!tagNames || tagNames.length === 0) return;
-
-  for (const tagName of tagNames) {
-    const tagId = resolveTagId(tagName);
-    if (!tagId) {
-      logger.warn('syncDirectiveTags: tag creation failed', { tagName });
-      continue;
-    }
-    addDirectiveTag(db, dirId, tagId);
-  }
-}
 
 /**
  * Pull a single directive from Hindsight into architxt.
@@ -100,7 +67,10 @@ export async function pullDirective(serverId, bankId, directiveId) {
       return { success: false, error: updateResult.error };
     }
 
-    syncDirectiveTags(existing.dir_id, tags);
+    const tagsResult = syncDirectiveTags(db, existing.dir_id, tags);
+    if (!tagsResult.success) {
+      logger.warn('Failed to sync directive tags', { dirId: existing.dir_id, error: tagsResult.error });
+    }
 
     return { success: true, directive: existing, created: false };
   }
@@ -120,7 +90,10 @@ export async function pullDirective(serverId, bankId, directiveId) {
   }
 
   const newDirId = createResult.data;
-  syncDirectiveTags(newDirId, tags);
+  const tagsResult = syncDirectiveTags(db, newDirId, tags);
+  if (!tagsResult.success) {
+    logger.warn('Failed to sync directive tags', { dirId: newDirId, error: tagsResult.error });
+  }
 
   return { success: true, directive: { dir_id: newDirId }, created: true };
 }

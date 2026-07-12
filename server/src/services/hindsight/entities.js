@@ -30,6 +30,8 @@ import {
   createEntity,
   updateEntity,
   deleteEntity,
+  getEntitiesForSync,
+  getAllEntitiesWithTypes,
 } from '../../db/crud/entities.js';
 
 const logger = createLogger('hindsight-entity-sync');
@@ -51,15 +53,14 @@ function buildHeaders(serverConfig) {
  * Each label is a flat multi-values list: value = entity id, description = entity name.
  */
 function buildMapLabelsFromArchitxt() {
-  const rows = db.prepare(`
-    SELECT e.ent_entity_id, e.ent_name, et.et_type_name, et.et_description
-    FROM entities e
-    JOIN entity_types et ON e.ent_type_id = et.et_id
-    ORDER BY et.et_type_name, e.ent_entity_id
-  `).all();
+  const rowsResult = getEntitiesForSync(db);
+  if (!rowsResult.success) {
+    logger.warn('buildMapLabelsFromArchitxt: failed to load entities', { error: rowsResult.error });
+    return [];
+  }
 
   const byType = new Map();
-  for (const row of rows) {
+  for (const row of rowsResult.data) {
     const tn = row.et_type_name;
     if (!byType.has(tn)) {
       byType.set(tn, {
@@ -159,11 +160,8 @@ function pullMapLabelsIntoArchitxt(mapLabels, opts = {}) {
     }
   }
 
-  const existingEntities = db.prepare(`
-    SELECT e.ent_id, e.ent_entity_id, e.ent_name, e.ent_description, et.et_type_name
-    FROM entities e
-    JOIN entity_types et ON e.ent_type_id = et.et_id
-  `).all();
+  const existingEntitiesResult = getAllEntitiesWithTypes(db);
+  const existingEntities = existingEntitiesResult.success ? existingEntitiesResult.data : [];
 
   const entityKeyToId = new Map();
   for (const row of existingEntities) {

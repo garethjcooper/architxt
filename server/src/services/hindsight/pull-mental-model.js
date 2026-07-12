@@ -16,12 +16,13 @@
 
 import { createLogger } from '../../utils/logger.js';
 import { db } from '../../db/connection.js';
-import { createTag } from '../../db/crud/tags.js';
 import {
   createMentalModel,
   updateMentalModel,
   getMentalModelWithRelations,
   updateMentalModelEntityOverrides,
+  syncMentalModelTags,
+  getMentalModelIdByExtId,
   normaliseRefreshMode,
   normaliseTagsMatchMode,
   normaliseMaxTokens,
@@ -59,41 +60,6 @@ function mapHindsightToDbModel(h) {
 }
 
 /**
- * Resolve or create a tag by name. Returns the tag_id, or null if creation fails.
- */
-function resolveTagId(tagName) {
-  const existing = db.prepare('SELECT tag_id FROM tags WHERE tag_name = ?').get(tagName);
-  if (existing) return existing.tag_id;
-
-  const result = createTag(db, {
-    tag_name: tagName,
-    tag_generated_by: 'import',
-  });
-  if (!result.success) {
-    logger.warn('resolveTagId: tag creation failed', { tagName, error: result.error });
-    return null;
-  }
-  return result.data;
-}
-
-/**
- * Replace all tag relationships for a mental model with the given tag names.
- */
-function syncMentalModelTags(mmId, tagNames) {
-  db.prepare('DELETE FROM mental_model_tags WHERE mm_id = ?').run(mmId);
-
-  if (!tagNames || tagNames.length === 0) return;
-
-  const insert = db.prepare('INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)');
-  for (const tagName of tagNames) {
-    const tagId = resolveTagId(tagName);
-    if (tagId != null) {
-      insert.run(mmId, tagId);
-    }
-  }
-}
-
-/**
  * Pull a single plain mental model from Hindsight into architxt.
  * Either updates an existing row by mm_ext_id or creates a new one.
  */
@@ -101,21 +67,25 @@ async function pullPlainMentalModel(hindModel) {
   const extId = hindModel.id;
   logger.info('Pulling plain mental model', { extId });
 
-  const existingRow = db.prepare('SELECT mm_id FROM mental_models WHERE mm_ext_id = ?').get(extId);
+  const lookup = getMentalModelIdByExtId(db, extId);
+  const existingId = lookup.success ? lookup.data : null;
 
-  if (existingRow) {
-    logger.info('Updating existing plain mental model', { mmId: existingRow.mm_id, extId });
+  if (existingId) {
+    logger.info('Updating existing plain mental model', { mmId: existingId, extId });
     const dbData = mapHindsightToDbModel(hindModel);
     delete dbData.mm_ext_id;
 
-    const updateResult = updateMentalModel(db, existingRow.mm_id, dbData);
+    const updateResult = updateMentalModel(db, existingId, dbData);
     if (!updateResult.success) {
       throw new Error(`update failed: ${updateResult.error}`);
     }
 
-    syncMentalModelTags(existingRow.mm_id, hindModel.tags || []);
+    const tagsResult = syncMentalModelTags(db, existingId, hindModel.tags || []);
+    if (!tagsResult.success) {
+      logger.warn('Failed to sync mental model tags', { mmId: existingId, error: tagsResult.error });
+    }
 
-    const refreshed = await getMentalModelWithRelations(db, existingRow.mm_id);
+    const refreshed = await getMentalModelWithRelations(db, existingId);
     return { created: false, model: refreshed.success ? refreshed.data : null };
   }
 
@@ -127,7 +97,10 @@ async function pullPlainMentalModel(hindModel) {
   }
 
   const newId = createResult.data;
-  syncMentalModelTags(newId, hindModel.tags || []);
+  const tagsResult = syncMentalModelTags(db, newId, hindModel.tags || []);
+  if (!tagsResult.success) {
+    logger.warn('Failed to sync mental model tags', { mmId: newId, error: tagsResult.error });
+  }
 
   const refreshed = await getMentalModelWithRelations(db, newId);
   return { created: true, model: refreshed.success ? refreshed.data : null };

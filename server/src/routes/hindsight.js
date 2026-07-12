@@ -36,6 +36,7 @@ import {
   getEntityGraph,
   listMemories,
   entityCooccurrence,
+  dryRunExtract,
 } from '../services/hindsight/index.js';
 import { getDocumentsForDiff, getDocumentByExtId, getAllDocumentContexts } from '../db/crud/documents.js';
 import { getAllDocumentTags, getDocumentTagsByDocId } from '../db/crud/document-tags.js';
@@ -1109,6 +1110,7 @@ router.post('/push-mental-model', async (req, res) => {
  *               server_id: { type: integer }
  *               bank_id: { type: string }
  *               dir_id: { type: integer }
+ *               create: { type: boolean, description: 'Force POST create even if a local ext_id exists' }
  *     responses:
  *       200:
  *         description: Push completed
@@ -1137,7 +1139,7 @@ router.post('/push/directive', async (req, res) => {
   }
 
   try {
-    const result = await pushHindsightDirective(serverId, bankId, dirId);
+    const result = await pushHindsightDirective(serverId, bankId, dirId, { forceCreate: req.body.create === true });
     if (!result.success) {
       return res.status(502).json({ error: result.error, code: 'PUSH_FAILED' });
     }
@@ -1725,6 +1727,167 @@ router.get('/banks/:bankId/graph', async (req, res) => {
   } catch (err) {
     logger.error('Entity graph route error', { serverId, bankId, error: err.message });
     sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /hindsight/dry-run-extract:
+ *   post:
+ *     summary: Dry-run fact extraction on a Hindsight bank
+ *     description: |
+ *       Preview what the Hindsight retain step would extract from the supplied
+ *       text without persisting anything to the bank. Passes prompt-affecting
+ *       overrides (retain_mission, retain_extraction_mode, etc.) through to
+ *       Hindsight as-is.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, content]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *                 description: Server ID from the servers table
+ *               bank_id:
+ *                 type: string
+ *                 description: Hindsight bank identifier
+ *               content:
+ *                 type: string
+ *                 description: Text to extract facts from
+ *               context:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional context about the content
+ *               timestamp:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 description: Reference timestamp for relative times
+ *               agent_name:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Narrator/owner override
+ *               retain_mission:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Override bank retain mission
+ *               retain_extraction_mode:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Override extraction mode
+ *               retain_custom_instructions:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Override custom instructions
+ *               retain_extract_causal_links:
+ *                 type: boolean
+ *                 nullable: true
+ *                 description: Override causal-link extraction
+ *               retain_chunk_size:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: Override chunk size
+ *               entity_labels:
+ *                 type: array
+ *                 nullable: true
+ *                 description: Override entity labels
+ *               entities_allow_free_form:
+ *                 type: boolean
+ *                 nullable: true
+ *                 description: Allow free-form entities
+ *               llm_output_language:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Output language override
+ *     responses:
+ *       200:
+ *         description: Dry-run result with candidate facts and token usage
+ *       400:
+ *         description: Missing server_id, bank_id, or content
+ *       502:
+ *         description: Hindsight server error
+ */
+router.post('/dry-run-extract', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
+  const bankId = req.body.bank_id;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/hindsight/dry-run-extract', duration: Date.now() - start });
+    return;
+  }
+
+  if (isAbsent(req.body.content)) {
+    sendResponse({ res, status: 400, error: 'content is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/hindsight/dry-run-extract', duration: Date.now() - start });
+    return;
+  }
+
+  // Strip routing fields so they don't leak upstream; pass Hindsight overrides through.
+  const { server_id, bank_id, ...hindsightBody } = req.body;
+
+  try {
+    const result = await dryRunExtract(serverId, bankId, hindsightBody);
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'DRY_RUN_EXTRACT_FAILED', logger, method: 'POST', path: '/hindsight/dry-run-extract', duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: '/hindsight/dry-run-extract', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Dry-run extract route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: '/hindsight/dry-run-extract', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /hindsight/bank-config:
+ *   get:
+ *     summary: Get Hindsight bank configuration
+ *     description: Returns the raw bank configuration from the selected Hindsight server, including entity_labels.
+ *     tags: [Hindsight]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Bank configuration object
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight server error
+ */
+router.get('/bank-config', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.query.bank_id;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/hindsight/bank-config', duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await getBankConfig(serverId, bankId);
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: 'REMOTE_ERROR', logger, method: 'GET', path: '/hindsight/bank-config', duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: result.config, logger, method: 'GET', path: '/hindsight/bank-config', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Bank config route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/bank-config', duration: Date.now() - start });
   }
 });
 

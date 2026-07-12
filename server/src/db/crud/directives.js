@@ -1,6 +1,10 @@
 import { createBaseCrud } from '../base.js';
 import { stmt } from '../../cache.js';
 import { fromJson, requireString, requireInt, dbExec } from '../../utils/db-helpers.js';
+import { getOrCreateTagByName } from './tags.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('directives-crud');
 
 const TABLE = 'directives';
 const PK = 'dir_id';
@@ -190,6 +194,42 @@ export const getAllDirectiveTags = (db) => dbExec(() => {
   `;
   return stmt(db, sql).all();
 }, 'directiveTags.getAll');
+
+/**
+ * Replace all tags on a directive with the given tag names.
+ * Resolves each tag by name (creating it if necessary) and ignores any that
+ * fail to resolve so a single bad tag does not abort the whole sync.
+ *
+ * @param {Object} db - Database connection
+ * @param {number} dirId - Directive ID
+ * @param {string[]} tagNames - Tag names to attach
+ * @returns {Promise<{success: true, data: { added: number, removed: number }}|{success: false, error: string, code: string}>}
+ */
+export const syncDirectiveTags = (db, dirId, tagNames) => dbExec(() => {
+  const dId = requireInt('dir_id', dirId);
+
+  // Remove existing tags
+  const deleteSql = `DELETE FROM directive_tags WHERE dir_id = ?`;
+  stmt(db, deleteSql).run(dId);
+
+  if (!tagNames || tagNames.length === 0) {
+    return { added: 0, removed: 0 };
+  }
+
+  const insertSql = `INSERT OR IGNORE INTO directive_tags (dir_id, tag_id) VALUES (?, ?)`;
+  let added = 0;
+  for (const tagName of tagNames) {
+    const tagResult = getOrCreateTagByName(db, tagName, 'import');
+    if (!tagResult.success || tagResult.data == null) {
+      logger.warn('syncDirectiveTags: tag resolution failed', { tagName, error: tagResult.error });
+      continue;
+    }
+    const result = stmt(db, insertSql).run(dId, tagResult.data);
+    if (result.changes > 0) added++;
+  }
+
+  return { added, removed: 0 };
+}, 'directiveTags.sync');
 
 /**
  * Add a tag to a directive.

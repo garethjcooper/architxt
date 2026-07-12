@@ -14,6 +14,23 @@ export const listContexts = base.list;
 export const deleteContext = base.del;
 
 /**
+ * Get or create a context by description string.
+ * @param {Object} db
+ * @param {string} contextDesc
+ * @returns {{success: boolean, data?: number, error?: string, code?: string}}
+ */
+export const getOrCreateContextByDesc = (db, contextDesc) => dbExec(() => {
+  requireString(contextDesc, 'contextDesc');
+
+  const existing = stmt(db, `SELECT ${PK} FROM ${TABLE} WHERE ctxt_desc = ?`).get(contextDesc);
+  if (existing) return existing.ctxt_id;
+
+  const sql = `INSERT INTO ${TABLE} (ctxt_desc, ctxt_generated_by) VALUES (?, ?)`;
+  const result = stmt(db, sql).run(contextDesc, 'import');
+  return result.lastInsertRowid;
+}, `${TABLE}.getOrCreateByDesc`);
+
+/**
  * Fetch context description by ID
  * @param {Object} db
  * @param {number} id

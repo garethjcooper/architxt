@@ -41,7 +41,7 @@ function getDirectiveWithTags(dirId) {
  * @param {number} dirId - architxt directive id
  * @returns {Promise<{success: boolean, ext_id?: string, error?: string}>}
  */
-export async function pushDirective(serverId, bankId, dirId) {
+export async function pushDirective(serverId, bankId, dirId, { forceCreate = false } = {}) {
   logger.info('Pushing directive to Hindsight', { serverId, bankId, dirId });
 
   const directive = getDirectiveWithTags(dirId);
@@ -57,8 +57,11 @@ export async function pushDirective(serverId, bankId, dirId) {
     tags: directive.tags,
   };
 
+  // When forceCreate is true we always POST, even if a stale ext_id remains locally.
+  const existingDirective = forceCreate ? null : directive.dir_ext_id;
+
   // Existing directive on bank — PATCH by ext_id
-  if (directive.dir_ext_id) {
+  if (existingDirective) {
     const result = await updateHindsightDirective(serverId, bankId, { ...payload, ext_id: directive.dir_ext_id });
     if (!result.success) {
       return result;

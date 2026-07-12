@@ -1,6 +1,10 @@
 import { createBaseCrud } from '../base.js';
 import { stmt } from '../../cache.js';
 import { fromJson, requireInt, requireString, dbExec } from '../../utils/db-helpers.js';
+import { getOrCreateTagByName } from './tags.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('mental-models-crud');
 
 const TABLE = 'mental_models';
 const PK = 'mm_id';
@@ -372,6 +376,18 @@ export const getMentalModelWithRelations = (db, id) => dbExec(() => {
 }, 'mentalModels.getWithRelations');
 
 /**
+ * Fetch mental model id by external ID.
+ * @param {Object} db
+ * @param {string} extId
+ * @returns {{success: boolean, data?: number, error?: string, code?: string}}
+ */
+export const getMentalModelIdByExtId = (db, extId) => dbExec(() => {
+  const sql = `SELECT ${PK} FROM ${TABLE} WHERE mm_ext_id = ?`;
+  const row = stmt(db, sql).get(extId);
+  return row ? row[PK] : null;
+}, `${TABLE}.getIdByExtId`);
+
+/**
  * Create mental model.
  * Route layer should already validate and translate API field names to DB names.
  */
@@ -450,6 +466,42 @@ export const removeMentalModelTag = (db, mmId, tagId) => dbExec(() => {
   const result = stmt(db, sql).run(mId, tId);
   return result.changes > 0;
 }, 'mentalModelTags.remove');
+
+/**
+ * Replace all tag relationships for a mental model with the given tag names.
+ * Resolves each tag by name (creating it if necessary) and ignores any that
+ * fail to resolve so a single bad tag does not abort the whole sync.
+ *
+ * @param {Object} db - Database connection
+ * @param {number} mmId - Mental model ID
+ * @param {string[]} tagNames - Tag names to attach
+ * @returns {Promise<{success: true, data: { added: number, removed: number }}|{success: false, error: string, code: string}>}
+ */
+export const syncMentalModelTags = (db, mmId, tagNames) => dbExec(() => {
+  const mId = requireInt('mm_id', mmId);
+
+  // Remove existing tags
+  const deleteSql = `DELETE FROM mental_model_tags WHERE mm_id = ?`;
+  stmt(db, deleteSql).run(mId);
+
+  if (!tagNames || tagNames.length === 0) {
+    return { added: 0, removed: 0 };
+  }
+
+  const insertSql = `INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)`;
+  let added = 0;
+  for (const tagName of tagNames) {
+    const tagResult = getOrCreateTagByName(db, tagName, 'import');
+    if (!tagResult.success || tagResult.data == null) {
+      logger.warn('syncMentalModelTags: tag resolution failed', { tagName, error: tagResult.error });
+      continue;
+    }
+    const result = stmt(db, insertSql).run(mId, tagResult.data);
+    if (result.changes > 0) added++;
+  }
+
+  return { added, removed: 0 };
+}, 'mentalModelTags.sync');
 
 /**
  * Get all entities for a specific mental model.
