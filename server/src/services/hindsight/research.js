@@ -232,3 +232,40 @@ export async function entityCooccurrence(serverId, bankId, body) {
     return { success: false, error: error.message, code: 'HINDSIGHT_COOCCURRENCE_ERROR' };
   }
 }
+
+/**
+ * POST /v1/default/banks/{bank_id}/memories/dry-run-extract
+ * Preview what the retain step would extract without persistence.
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {Object} body
+ */
+export async function dryRunExtract(serverId, bankId, body) {
+  const resolved = await resolveServer(serverId);
+  if (!resolved.success) return resolved;
+
+  const url = buildUrl(resolved.serviceUrl, bankId, '/memories/dry-run-extract');
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: buildHeaders(resolved.config),
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('Hindsight dry-run extract failed', { serverId, bankId, status: response.status, error: errorText });
+      return { success: false, error: `HTTP ${response.status}: ${errorText}`, code: 'HINDSIGHT_DRY_RUN_EXTRACT_FAILED' };
+    }
+
+    const data = await response.json();
+    const factCount = Array.isArray(data.facts) ? data.facts.length : 0;
+    const totalTokens = data.usage?.total_tokens ?? 0;
+    logger.info('Hindsight dry-run extract OK', { serverId, bankId, factCount, totalTokens });
+    return { success: true, data };
+  } catch (error) {
+    logger.error('Hindsight dry-run extract error', { serverId, bankId, error: error.message });
+    return { success: false, error: error.message, code: 'HINDSIGHT_DRY_RUN_EXTRACT_ERROR' };
+  }
+}

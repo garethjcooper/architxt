@@ -322,7 +322,7 @@ router.get('/types/:id/next-id', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   // Add usage count (documents referencing each entity) in a single efficient query.
-  // Uses the documents_fts FTS5 index to avoid full LIKE scans of doc_content.
+  // Uses the configured full-text document index to avoid full LIKE scans of doc_content.
   const start = Date.now();
   const listStart = Date.now();
   const result = await listEntitiesWithType(db);
@@ -621,7 +621,7 @@ router.post('/batch/updateconfig', async (req, res) => {
  * /entities/documents:
  *   post:
  *     summary: Find documents containing any of the provided entities
- *     description: Uses the FTS5 document index to return distinct documents whose content matches the entity ids, names, or aliases.
+ *     description: Uses the full-text document index to return distinct documents whose content matches the entity ids, names, or aliases.
  *     tags: [Entities]
  *     requestBody:
  *       required: true

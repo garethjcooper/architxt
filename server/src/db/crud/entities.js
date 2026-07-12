@@ -1,6 +1,7 @@
 import { createBaseCrud } from '../base.js';
 import { stmt } from '../../cache.js';
 import { requireInt, dbExec } from '../../utils/db-helpers.js';
+import { countDocumentsForTerms, findDocumentsByTerms } from '../../services/search/full-text.js';
 
 const TABLE = 'entities';
 const PK = 'ent_id';
@@ -12,7 +13,23 @@ export const getEntity = base.get;
 export const deleteEntity = base.del;
 
 /**
- * Fetch all entities joined with their type names
+ * Fetch all entities joined with their type names for Hindsight sync.
+ * Returns rows ordered by type name then entity id.
+ * @param {Object} db
+ * @returns {Promise<{success: true, data: Array}>}
+ */
+export const getEntitiesForSync = (db) => dbExec(() => {
+  const sql = `
+    SELECT e.ent_entity_id, e.ent_name, et.et_type_name, et.et_description
+    FROM entities e
+    JOIN entity_types et ON e.ent_type_id = et.et_id
+    ORDER BY et.et_type_name, e.ent_entity_id
+  `;
+  return stmt(db, sql).all();
+}, 'entities.getForSync');
+
+/**
+ * Fetch all entities joined with their type names.
  * @param {Object} db
  * @returns {Promise<{success: true, data: Array}>}
  */
@@ -34,36 +51,27 @@ export const getAllEntitiesWithTypes = (db) => dbExec(() => {
  */
 export const getEntityUsageCounts = (db, entIds) => dbExec(() => {
   if (!entIds || entIds.length === 0) return new Map();
-  const placeholders = entIds.map(() => '?').join(',');
 
-  // Build a term list per entity: entity_id, name, and each alias.
-  // Then join against the FTS5 index so counts reflect id/name/alias matches
-  // consistently with findDocumentsForEntities.
+  const placeholders = entIds.map(() => '?').join(',');
   const sql = `
-    WITH terms(ent_entity_id, term) AS (
-      SELECT ent_entity_id, ent_entity_id
-      FROM entities
-      WHERE ent_entity_id IN (${placeholders})
-      UNION ALL
-      SELECT ent_entity_id, ent_name
-      FROM entities
-      WHERE ent_entity_id IN (${placeholders}) AND ent_name IS NOT NULL AND ent_name != ''
-      UNION ALL
-      SELECT e.ent_entity_id, j.value
-      FROM entities e, json_each(e.ent_aliases) AS j
-      WHERE e.ent_entity_id IN (${placeholders}) AND j.value IS NOT NULL AND j.value != ''
-    )
-    SELECT t.ent_entity_id, COUNT(DISTINCT d.doc_id) AS count
-    FROM terms t
-    JOIN documents_fts f ON f.doc_content MATCH '"' || t.term || '"'
-    JOIN documents d ON d.doc_id = f.rowid
-    GROUP BY t.ent_entity_id
+    SELECT e.ent_entity_id, e.ent_name, e.ent_aliases
+    FROM entities e
+    WHERE e.ent_entity_id IN (${placeholders})
   `;
-  const params = [...entIds, ...entIds, ...entIds];
-  const rows = stmt(db, sql).all(...params);
-  const map = new Map();
-  for (const r of rows) map.set(r.ent_entity_id, r.count);
-  return map;
+  const rows = stmt(db, sql).all(...entIds);
+
+  const termGroups = [];
+  for (const r of rows) {
+    if (r.ent_entity_id) termGroups.push({ entityId: r.ent_entity_id, term: r.ent_entity_id });
+    if (r.ent_name) termGroups.push({ entityId: r.ent_entity_id, term: r.ent_name });
+    const aliases = JSON.parse(r.ent_aliases || '[]');
+    for (const alias of aliases) {
+      if (alias) termGroups.push({ entityId: r.ent_entity_id, term: alias });
+    }
+  }
+
+  const result = countDocumentsForTerms(db, termGroups);
+  return result.success ? result.data : new Map();
 }, 'entities.usageCounts');
 
 /**
@@ -257,8 +265,8 @@ export const updateEntity = (db, id, data) => dbExec(() => {
 
 /**
  * Find documents whose indexed content contains any of the selected entities.
- * Uses the FTS5 virtual table on documents.doc_content, searching by entity_id
- * and aliases. Returns distinct { doc_id, doc_ext_id } rows.
+ * Delegates term matching to the full-text search adapter so the entities CRUD
+ * module stays independent of the underlying search engine.
  */
 export const findDocumentsForEntities = (db, entIds, options = {}) => dbExec(() => {
   if (!entIds || entIds.length === 0) return [];
@@ -282,29 +290,8 @@ export const findDocumentsForEntities = (db, entIds, options = {}) => dbExec(() 
     }
   }
 
-  if (terms.size === 0) return [];
-
-  // Build an FTS5 OR query: "term1" OR "term2" ...
-  const matchExpr = Array.from(terms)
-    .map((t) => `"${String(t).replace(/"/g, '""')}"`)
-    .join(' OR ');
-
-  const limit = Math.max(1, Math.min(1000, options.limit ?? 1000));
-
-  const docs = stmt(db, `
-    SELECT DISTINCT d.doc_id, d.doc_ext_id, d.doc_filename
-    FROM documents d
-    JOIN documents_fts f ON f.rowid = d.doc_id
-    WHERE f.doc_content MATCH ?
-    ORDER BY d.doc_id DESC
-    LIMIT ?
-  `).all(matchExpr, limit);
-
-  return docs.map((d) => ({
-    id: d.doc_id,
-    ext_id: d.doc_ext_id,
-    filename: d.doc_filename,
-  }));
+  const result = findDocumentsByTerms(db, Array.from(terms), { limit: options.limit });
+  return result.success ? result.data : [];
 }, 'entities.findDocuments');
 
 /**

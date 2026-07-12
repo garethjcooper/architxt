@@ -41,6 +41,24 @@ export const createPendingOperation = (db, data) => dbExec(() => {
 }, `${TABLE}.create`);
 
 /**
+ * Fetch all active pending operations for the Hindsight poll daemon.
+ * Excludes terminal statuses so the daemon only polls operations that may still change.
+ * @param {Object} db
+ * @returns {{success: boolean, data?: Array, error?: string, code?: string}}
+ */
+export const getPendingOperationsForPoll = (db) => dbExec(() => {
+  const sql = `
+    SELECT ${PK}, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
+           pop_ext_id, pop_action, pop_status, pop_error_message,
+           pop_created_at, pop_updated_at
+    FROM ${TABLE}
+    WHERE pop_status NOT IN ('completed', 'failed', 'acknowledged')
+    ORDER BY pop_created_at DESC
+  `;
+  return stmt(db, sql).all();
+}, `${TABLE}.getForPoll`);
+
+/**
  * List ALL pending operations across all servers/banks, excluding acknowledged.
  * Used by the global status indicator in the top bar.
  * @param {Object} db

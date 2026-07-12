@@ -17,9 +17,11 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SmartEditDialog } from './smart-edit-dialog';
 import { EntityDetectionDialog } from './entity-detection-dialog';
+import { DryRunExtractDialog } from './dry-run-extract-dialog';
 import { EntityTaggedContent } from './entity-tagged-content';
 import { loadFormatRegistry } from '@/lib/entity-tag-format';
 import { formatErrorValue } from '@/lib/error-format';
+import { HindsightIcon } from './icons/hindsight-icon';
 
 interface Context {
   id: number;
@@ -102,6 +104,9 @@ export function ViewDocumentDialog({
 
   // Entity detection dialog state
   const [entityDetectionOpen, setEntityDetectionOpen] = useState(false);
+
+  // Dry-run extraction dialog state
+  const [dryRunOpen, setDryRunOpen] = useState(false);
 
   // Expanded metadata state
   const [metadata, setMetadata] = useState<Metadata[]>([]);
@@ -949,6 +954,14 @@ export function ViewDocumentDialog({
         <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
           <Button
             variant="ghost"
+            onClick={() => setDryRunOpen(true)}
+            className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
+          >
+            <HindsightIcon className="h-4 w-4" />
+            Dry-Run
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setEntityDetectionOpen(true)}
             className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
           >
@@ -1016,6 +1029,14 @@ export function ViewDocumentDialog({
             }
             onDocumentUpdated?.();
           }}
+        />
+        <DryRunExtractDialog
+          open={dryRunOpen}
+          onOpenChange={setDryRunOpen}
+          initialContent={content}
+          initialContext={document?.context?.description ?? null}
+          initialTimestamp={document?.timestamp ?? null}
+          contexts={contexts}
         />
       </DialogContent>
     </Dialog>

@@ -36,4 +36,5 @@ export {
   getEntityGraph,
   listMemories,
   entityCooccurrence,
+  dryRunExtract,
 } from './research.js';

@@ -50,6 +50,36 @@ export const createTag = (db, data) => dbExec(() => {
 }, 'tags.create');
 
 /**
+ * Get a tag by its name.
+ * @param {Object} db - Database connection
+ * @param {string} tagName - Tag name
+ * @returns {Object|null} Tag row, or null if not found
+ */
+export const getTagByName = (db, tagName) => dbExec(() => {
+  const name = requireString('tag_name', tagName);
+  const sql = `SELECT * FROM ${TABLE} WHERE tag_name = ?`;
+  return stmt(db, sql).get(name) || null;
+}, 'tags.getByName');
+
+/**
+ * Resolve an existing tag by name, or create it if it does not exist.
+ * @param {Object} db - Database connection
+ * @param {string} tagName - Tag name
+ * @param {string} generatedBy - Value for tag_generated_by when creating
+ * @returns {number|null} tag_id, or null if creation failed
+ */
+export const getOrCreateTagByName = (db, tagName, generatedBy) => dbExec(() => {
+  const existing = getTagByName(db, tagName).data;
+  if (existing) return existing.tag_id;
+
+  const createdId = createTag(db, {
+    tag_name: tagName,
+    tag_generated_by: generatedBy,
+  });
+  return createdId ?? null;
+}, 'tags.getOrCreateByName');
+
+/**
  * Update tag - expects DB field names from route layer
  * @param {Object} db - Database connection
  * @param {number} id - Tag ID (INTEGER primary key)

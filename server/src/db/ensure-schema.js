@@ -2,7 +2,9 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { stmt } from '../cache.js';
 import { createLogger } from '../utils/logger.js';
+import { createFtsIndex } from '../services/search/full-text.js';
 import { resetSeedData } from './ensure-seed.js';
 
 const logger = createLogger('schema');
@@ -666,46 +668,13 @@ function ensurePendingOpsNullableDocId(db) {
 }
 
 /**
- * Ensure the FTS5 virtual table for documents exists and is backfilled.
- * This is an additive migration for existing databases.
- *
- * Important: we intentionally recreate the table on every migration run.
- * FTS5 has no ALTER VIRTUAL TABLE, and we need to guarantee the tokenizer
- * (unicode61 with hyphen/underscore as token chars) matches the code's
- * MATCH expectations. Dropping and rebuilding only loses the derived index,
- * not any source data.
+ * Ensure the FTS index for documents exists and is backfilled.
+ * Delegates to the search adapter so the migration engine stays free of
+ * SQLite FTS5 specifics.
  */
 function ensureDocumentsFts(db) {
-  const exists = db.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name = ?"
-  ).get('documents_fts');
-
-  if (exists) {
-    logger.info('Recreating documents_fts FTS5 virtual table to ensure tokenizer is current');
-    db.exec('DROP TABLE IF EXISTS documents_fts');
-  }
-
-  logger.info('Creating documents_fts FTS5 virtual table');
-  db.exec(`
-    CREATE VIRTUAL TABLE documents_fts USING fts5(
-      doc_content,
-      content='documents',
-      content_rowid='doc_id',
-      tokenize="unicode61 tokenchars '-_:'"
-    )
-  `);
-
-  const docCount = db.prepare('SELECT COUNT(*) AS c FROM documents').get().c;
-  if (docCount > 0) {
-    logger.info(`Backfilling documents_fts with ${docCount} documents`);
-    db.exec(`
-      INSERT INTO documents_fts(rowid, doc_content)
-      SELECT doc_id, doc_content FROM documents
-    `);
-  }
-
-  logger.info('documents_fts ready');
-  return true;
+  const result = createFtsIndex(db);
+  return result.success ? result.data : false;
 }
 
 /**

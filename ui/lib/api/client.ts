@@ -673,10 +673,10 @@ export const hindsightApi = {
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create }),
     }),
 
-  pushDirective: (serverId: number, bankId: string, dirId: number) =>
+  pushDirective: (serverId: number, bankId: string, dirId: number, create = false) =>
     fetchApi<{ success: boolean; ext_id: string }>('/hindsight/push/directive', {
       method: 'POST',
-      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dir_id: dirId }),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dir_id: dirId, create }),
     }),
 
   pullDirective: (serverId: number, bankId: string, directiveId: string) =>
@@ -776,6 +776,45 @@ export const hindsightApi = {
     }
     return result;
   },
+
+  dryRunExtract: (serverId: number, bankId: string, body: {
+    content: string;
+    context?: string | null;
+    timestamp?: string | null;
+    agent_name?: string | null;
+    retain_mission?: string | null;
+    retain_extraction_mode?: string | null;
+    retain_custom_instructions?: string | null;
+    retain_extract_causal_links?: boolean | null;
+    retain_chunk_size?: number | null;
+    entity_labels?: any[] | null;
+    entities_allow_free_form?: boolean | null;
+    llm_output_language?: string | null;
+  }) =>
+    fetchApi<{
+      facts: Array<{
+        text: string;
+        fact_type: string;
+        occurred_start: string | null;
+        occurred_end: string | null;
+        entities: string[];
+      }>;
+      usage: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+        cached_tokens: number;
+        thoughts_tokens: number;
+      };
+    }>('/hindsight/dry-run-extract', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...body }),
+    }),
+
+  getBankConfig: (serverId: number, bankId: string) =>
+    fetchApi<{ bank_id: string; config: { entity_labels?: any[]; retain_mission?: string | null } }>(
+      `/hindsight/bank-config?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`
+    ),
 };
 
 export interface GraphNode {

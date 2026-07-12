@@ -2,6 +2,7 @@ import { createBaseCrud } from '../base.js';
 import { stmt } from '../../cache.js';
 import { fromJson, toJson, requireInt, requireField, requireNonEmpty, dbExec } from '../../utils/db-helpers.js';
 import { getSqlPresenceExpression } from '../../entity-tag-format.js';
+import { upsertFtsDocument, deleteFtsDocument } from '../../services/search/full-text.js';
 
 const TABLE = 'documents';
 const PK = 'doc_id';
@@ -12,10 +13,7 @@ const base = createBaseCrud(TABLE, PK, JSON_FIELDS);
 // Use base for generic delete
 export const deleteDocument = (db, id) => dbExec(() => {
   const result = base.del(db, id);
-
-  // Keep FTS5 index in sync by removing entries for deleted document
-  stmt(db, `DELETE FROM documents_fts WHERE rowid = ?`).run(requireInt('doc_id', id));
-
+  deleteFtsDocument(db, id);
   return result;
 }, 'documents.delete');
 
@@ -129,12 +127,9 @@ export const createDocument = (db, data) => dbExec(() => {
 
   const result = stmt(db, sql).run(...values);
 
-  // Keep FTS5 index in sync for newly inserted content
+  // Keep FTS index in sync for newly inserted content
   const docId = result.lastInsertRowid;
-  if (jsonData.doc_content !== undefined && jsonData.doc_content !== null) {
-    stmt(db, `INSERT INTO documents_fts(rowid, doc_content) VALUES (?, ?)`)
-      .run(docId, jsonData.doc_content);
-  }
+  upsertFtsDocument(db, docId, jsonData.doc_content);
 
   return docId;
 }, 'documents.create');
@@ -150,15 +145,9 @@ export const updateDocument = (db, id, data) => dbExec(() => {
 
   const result = stmt(db, sql).run(...values);
 
-  // Keep FTS5 index in sync if doc_content changed
+  // Keep FTS index in sync if doc_content changed
   if (cols.includes('doc_content')) {
-    const newContent = jsonData.doc_content;
-    if (newContent === undefined || newContent === null) {
-      stmt(db, `DELETE FROM documents_fts WHERE rowid = ?`).run(id);
-    } else {
-      stmt(db, `INSERT OR REPLACE INTO documents_fts(rowid, doc_content) VALUES (?, ?)`)
-        .run(id, newContent);
-    }
+    upsertFtsDocument(db, id, jsonData.doc_content);
   }
 
   return result.changes > 0;

@@ -371,7 +371,13 @@ router.get('/:id/banks', async (req, res) => {
   sendResponse({
     res,
     status: 200,
-    data: banksResult.banks || [],
+    data: (banksResult.banks || [])
+      .filter((b) => b.name)
+      .map((b) => ({
+        bank_id: b.name,
+        name: b.name,
+        description: b.description,
+      })),
     logger,
     method: 'GET',
     path,

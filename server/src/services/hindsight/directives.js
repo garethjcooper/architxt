@@ -84,15 +84,15 @@ function buildPayload(directive) {
 }
 
 /**
- * Push (update) an existing directive on Hindsight via PATCH.
+ * Push (update or create) a directive on Hindsight.
  * @param {number} serverId
  * @param {string} bankId
  * @param {Object} directive - Must have ext_id, name, statement, priority, is_active, tags
- * @returns {Promise<{success: boolean, error?: string}>}
+ * @returns {Promise<{success: boolean, error?: string, directive?: Object}>}
  */
-export async function pushDirective(serverId, bankId, directive) {
-  if (!directive?.ext_id) {
-    return { success: false, error: 'Directive ext_id is required for push update' };
+export async function pushDirective(serverId, bankId, directive, { forceCreate = false } = {}) {
+  if (!directive?.ext_id || forceCreate) {
+    return createDirective(serverId, bankId, directive);
   }
 
   logger.info('Updating directive on Hindsight', { serverId, bankId, extId: directive.ext_id });

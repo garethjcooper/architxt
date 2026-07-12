@@ -22,6 +22,7 @@ import { config } from '../../config.js';
 import { listOperations } from '../../services/hindsight/memories.js';
 import {
   updatePendingOperationStatus,
+  getPendingOperationsForPoll,
 } from '../../db/crud/pending-operations.js';
 
 const logger = createLogger('hindsight-poll-daemon');
@@ -105,24 +106,19 @@ async function pollOnce() {
   }
 
     // 1. Fetch all pending ops from local DB (across all servers/banks)
-    let pendingOps;
+    let pendingOpsResult;
     try {
-      pendingOps = db.prepare(`
-        SELECT pop_id, pop_operation_id, pop_server_id, pop_bank_id, pop_doc_id,
-               pop_ext_id, pop_action, pop_status, pop_error_message,
-               pop_created_at, pop_updated_at
-        FROM pending_operations
-        WHERE pop_status NOT IN ('completed', 'failed', 'acknowledged')
-        ORDER BY pop_created_at DESC
-      `).all();
+      pendingOpsResult = getPendingOperationsForPoll(db);
     } catch (err) {
-    logger.error('Failed to query pending operations', { error: err.message });
-    return 0;
-  }
-  if (pendingOps.length === 0) {
-    logger.debug('No pending operations to poll');
-    return 0;
-  }
+      logger.error('Failed to query pending operations', { error: err.message });
+      return 0;
+    }
+
+    const pendingOps = pendingOpsResult.success ? pendingOpsResult.data : [];
+    if (pendingOps.length === 0) {
+      logger.debug('No pending operations to poll');
+      return 0;
+    }
 
   logger.info('Polling Hindsight for pending operations', { count: pendingOps.length });
 
