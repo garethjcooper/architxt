@@ -121,7 +121,7 @@ export function SessionList({
             key={session.id}
             onClick={() => onSelect(session)}
             className={[
-              'w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] cursor-pointer text-left transition-colors text-xs',
+              'group w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] cursor-pointer text-left transition-colors text-xs',
               activeSessionId === session.id
                 ? 'bg-emerald-500/20 text-emerald-100 border-emerald-500/30'
                 : 'text-white/90 border-white/5 bg-black/20 hover:bg-white/5',
@@ -157,16 +157,16 @@ export function SessionList({
 
             <DropdownMenu>
               <DropdownMenuTrigger>
-              <span
-                className="h-5 w-5 inline-flex items-center justify-center rounded opacity-0 group-hover:opacity-100 text-white/50 hover:text-white hover:bg-white/10 transition-opacity cursor-pointer"
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Session actions"
-                role="button"
-              >
-                <MoreHorizontal className="h-3 w-3" />
-              </span>
-            </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
+                <span
+                  className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label="Session actions"
+                  role="button"
+                >
+                  <MoreHorizontal className="h-3 w-3" />
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36 bg-[oklch(0.18_0_0)] border-white/10 text-white/90">
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();

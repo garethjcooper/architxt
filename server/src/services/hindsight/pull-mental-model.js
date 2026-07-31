@@ -31,7 +31,7 @@ import {
   DEFAULT_REFRESH_MODE,
   DEFAULT_TAGS_MATCH_MODE,
 } from '../../db/crud/mental-models.js';
-import { listMentalModels } from './mental-models.js';
+import { listAllMentalModels } from './mental-models.js';
 
 const logger = createLogger('hindsight-mental-model-pull');
 
@@ -182,7 +182,7 @@ export async function pullMentalModels(serverId, bankId, targets = []) {
 
   // Fetch Hindsight list once. We need it both for explicit targets (lookup)
   // and for the fallback "pull all" path.
-  const listResult = await listMentalModels(serverId, bankId, { limit: 1000, detail: 'content' });
+  const listResult = await listAllMentalModels(serverId, bankId, { detail: 'content' });
   if (!listResult.success) {
     return { success: false, errors: [listResult.error] };
   }

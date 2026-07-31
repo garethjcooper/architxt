@@ -88,7 +88,7 @@ function groupTargets(
   if (!discoveryGraph || !nodeId) return { inbound: [], outbound: [] };
 
   const graphNodeIds = new Set(graph.nodes.map((n) => n.id));
-  const graphEdgeIds = new Set(graph.edges.map((e) => e.id));
+  const graphEdgeKeys = new Set(graph.edges.map((e) => `${e.from}|${e.to}|${e.type || e.label || ''}`));
   const discoveryNodeById = new Map((discoveryGraph.nodes || []).map((n) => [n.id, n]));
 
   const byDirection = {
@@ -96,30 +96,29 @@ function groupTargets(
     outbound: new Map<string, GraphEdge[]>(),
   };
   for (const edge of discoveryGraph.edges || []) {
-    if (edge.source === nodeId) {
-      const list = byDirection.outbound.get(edge.target) || [];
+    if (edge.from === nodeId) {
+      const list = byDirection.outbound.get(edge.to) || [];
       list.push(edge);
-      byDirection.outbound.set(edge.target, list);
-    } else if (edge.target === nodeId) {
-      const list = byDirection.inbound.get(edge.source) || [];
+      byDirection.outbound.set(edge.to, list);
+    } else if (edge.to === nodeId) {
+      const list = byDirection.inbound.get(edge.from) || [];
       list.push(edge);
-      byDirection.inbound.set(edge.source, list);
+      byDirection.inbound.set(edge.from, list);
     }
   }
 
   const sortTargets = (map: Map<string, GraphEdge[]>) =>
     Array.from(map.entries())
       .map(([neighborId, edges]) => ({
-        target: discoveryNodeById.get(neighborId) || ({ id: neighborId, label: neighborId } as GraphNode),
+        target: discoveryNodeById.get(neighborId) || ({ id: neighborId, name: neighborId } as GraphNode),
         edges,
-        active: edges.length > 0 && edges.every((e) => graphEdgeIds.has(e.id)),
-        onCanvas: graphNodeIds.has(neighborId),
+        active: edges.length > 0 && edges.every((e) => graphEdgeKeys.has(`${e.from}|${e.to}|${e.type || e.label || ''}`)),
       }))
       .sort((a, b) => {
         // Targets whose edges are all active float to the top.
         if (a.active && !b.active) return -1;
         if (!a.active && b.active) return 1;
-        return (a.target.label || a.target.id).localeCompare(b.target.label || b.target.id);
+        return (a.target.name || a.target.label || a.target.id).localeCompare(b.target.name || b.target.label || b.target.id);
       });
 
   return {
@@ -235,10 +234,10 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
             const onCanvas = canvasNodeIds?.has(qualified) ?? false;
             const summaryText = (entity as any).summaryText || '';
             const inboundLabels = (inboundEdgesById.get(entity.id) || [])
-              .map((e) => e.label_long || e.label || e.relationship_type || `→ ${e.source}`)
+              .map((e) => e.detail || e.label || e.type || `→ ${e.from}`)
               .filter(Boolean);
             const outboundLabels = (outboundEdgesById.get(entity.id) || [])
-              .map((e) => e.label_long || e.label || e.relationship_type || `→ ${e.target}`)
+              .map((e) => e.detail || e.label || e.type || `→ ${e.to}`)
               .filter(Boolean);
             return (
               <button
@@ -248,7 +247,7 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
                 onMouseEnter={() => {
                   onHoverEntity?.(entity);
                   setPreview({
-                    title: entity.label || entity.id,
+                    title: entity.name || entity.label || entity.id,
                     summary: onCanvas ? (summaryText || 'No summary available.') : (summaryText || 'Not loaded'),
                     inbound: inboundLabels.length > 0 ? inboundLabels : undefined,
                     outbound: outboundLabels.length > 0 ? outboundLabels : undefined,
@@ -271,7 +270,7 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
                 }}
               >
                 <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                  <div className={cn('text-xs truncate', onCanvas ? 'text-white/90' : 'text-white/[0.22]')}>{entity.label || entity.id}</div>
+                  <div className={cn('text-xs truncate', onCanvas ? 'text-white/90' : 'text-white/[0.22]')}>{entity.name || entity.label || entity.id}</div>
                   <div className={cn('text-[10px] truncate', onCanvas ? 'text-white/40' : 'text-white/[0.15]')}>{typeLine}</div>
                 </div>
               </button>
@@ -338,11 +337,11 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
     const q = (edgesSearchValue || '').trim().toLowerCase();
     const filteredTargets = q
       ? targets.filter((t) => {
-          const label = (t.target.label || '').toLowerCase();
+          const label = (t.target.name || '').toLowerCase();
           const id = (t.target.id || '').toLowerCase();
           const type = (t.target.type || '').toLowerCase();
           const edgeLabels = t.edges
-            .map((e) => (e.label_long || e.label || e.relationship_type || '').toLowerCase())
+            .map((e) => (e.detail || e.label || e.type || '').toLowerCase())
             .join(' ');
           return label.includes(q) || id.includes(q) || type.includes(q) || edgeLabels.includes(q);
         })
@@ -379,12 +378,12 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
               ? `${targetType}:${t.target.id}`
               : t.target.id;
             const previewInbound = t.edges
-              .filter((e) => e.target === nodeId)
-              .map((e) => e.label_long || e.label || e.relationship_type || `← ${e.source}`)
+              .filter((e) => e.to === nodeId)
+              .map((e) => e.detail || e.label || e.type || `← ${e.from}`)
               .filter(Boolean);
             const previewOutbound = t.edges
-              .filter((e) => e.source === nodeId)
-              .map((e) => e.label_long || e.label || e.relationship_type || `→ ${e.target}`)
+              .filter((e) => e.from === nodeId)
+              .map((e) => e.detail || e.label || e.type || `→ ${e.to}`)
               .filter(Boolean);
             return (
               <button
@@ -394,7 +393,7 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
                 onMouseEnter={() => {
                   onHoverTarget?.({ targetId: t.target.id, direction });
                   setPreview({
-                    title: t.target.label || t.target.id,
+                    title: t.target.name || t.target.label || t.target.id,
                     inbound: previewInbound.length > 0 ? previewInbound : undefined,
                     outbound: previewOutbound.length > 0 ? previewOutbound : undefined,
                   });
@@ -417,7 +416,7 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
                 title={typeLine}
               >
                 <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                  <div className={cn('text-xs truncate', t.active ? 'text-white/90' : 'text-white/[0.22]')}>{t.target.label || t.target.id}</div>
+                  <div className={cn('text-xs truncate', t.active ? 'text-white/90' : 'text-white/[0.22]')}>{t.target.name || t.target.label || t.target.id}</div>
                   <div className={cn('text-[10px] truncate', t.active ? 'text-white/40' : 'text-white/[0.15]')}>{typeLine}</div>
                 </div>
                 {t.edges.length > 1 && (

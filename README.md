@@ -564,25 +564,25 @@ Templates that return a graph must produce a single JSON object with this exact 
 ```json
 {
   "nodes": [
-    { "entity": "entity-id", "entity_name": "entity-name" }
+    { "id": "entity-id", "name": "entity-name" }
   ],
   "edges": [
     {
-      "source": "entity-id",
-      "target": "entity-id",
-      "edge_type": "calls",
+      "from": "entity-id",
+      "to": "entity-id",
+      "type": "calls",
       "label": "short human-readable phrase (max 4 words)",
-      "label_long": "the full description of the edge context. Limit to 2 sentences",
+      "detail": "the full description of the edge context. Limit to 2 sentences",
       "source_fact_ids": ["fact-uuid-1"]
     }
   ]
 }
 ```
 
-- `entity` and `edge.source`/`edge.target` must be valid entity identifiers.
-- `edge_type` must be from the allowed set for the dimension.
+- `id` and `edge.from`/`edge.to` must be valid entity identifiers.
+- `type` must be from the allowed set for the dimension.
 - `label` is the short text shown on the graph.
-- `label_long` is the full description shown in the inspector / detail view.
+- `detail` is the full description shown in the inspector / detail view.
 - `source_fact_ids` references the facts that justify the relationship.
 
 For `interface-found`, use the `found:*` edge types and prefix discovered external entity ids with `found:`, e.g. `found:external-system-name`.

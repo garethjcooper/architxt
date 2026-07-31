@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { DerivedMentalModel, MentalModel } from '@/lib/types/index';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Settings2, Activity, Search } from 'lucide-react';
+import { Settings2, Activity, Search, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ interface DerivedModelsPanelProps {
   loading?: boolean;
   onConfigure: (derived: DerivedMentalModel[]) => void;
   onHealth: (derived: DerivedMentalModel[]) => void;
+  onPreviewQuery: (derived: DerivedMentalModel[]) => void;
   className?: string;
 }
 
@@ -26,6 +27,7 @@ export function DerivedModelsPanel({
   loading = false,
   onConfigure,
   onHealth,
+  onPreviewQuery,
   className,
 }: DerivedModelsPanelProps) {
   const [search, setSearch] = useState('');
@@ -97,6 +99,15 @@ export function DerivedModelsPanel({
           >
             <Activity className="h-3.5 w-3.5" />
             Health
+          </Button>
+          <Button
+            onClick={() => onPreviewQuery(derived.filter((d) => isSelected(d.id)))}
+            disabled={selectionCount === 0}
+            title="Preview the composed provisioning query"
+            className="h-7 px-2 text-xs bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Query
           </Button>
           <Button
             onClick={() => onConfigure(derived.filter((d) => isSelected(d.id)))}

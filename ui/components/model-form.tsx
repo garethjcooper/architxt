@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
-import type { MentalModel, StandardDimension } from '@/lib/types/index';
+import type { MentalModel, StandardDimension, MentalModelReturns } from '@/lib/types/index';
+import { MENTAL_MODEL_RETURNS_OPTIONS, toMentalModelReturns } from '@/lib/types/index';
 import { mentalModelsApi } from '@/lib/api/client';
 
 const inputFocusStyle = {
@@ -32,7 +33,7 @@ interface ModelFormProps {
     max_tokens: number;
     tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     dimension: string | null;
-    returns: 'json' | 'narrative';
+    returns: MentalModelReturns;
     concatenation: 'merge' | 'compile';
     is_template: boolean;
   }) => Promise<void>;
@@ -65,7 +66,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
   const [dimension, setDimension] = useState(initial?.dimension || 'none');
-  const [returns, setReturns] = useState<'json' | 'narrative'>(initial?.returns ?? 'narrative');
+  const [returns, setReturns] = useState<MentalModelReturns>(initial?.returns ?? 'narrative');
   const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(initial?.concatenation ?? 'compile');
   const [submitting, setSubmitting] = useState(false);
   const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
@@ -165,11 +166,12 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
               <select
                 id="mm-returns"
                 value={returns}
-                onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
+                onChange={(e) => setReturns(toMentalModelReturns(e.target.value))}
                 className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
               >
-                <option value="json">JSON</option>
-                <option value="narrative">Narrative</option>
+                {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
@@ -335,11 +337,12 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
             <select
               id="mm-returns"
               value={returns}
-              onChange={(e) => setReturns(e.target.value as 'json' | 'narrative')}
+              onChange={(e) => setReturns(toMentalModelReturns(e.target.value))}
               className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
             >
-              <option value="json">JSON</option>
-              <option value="narrative">Narrative</option>
+              {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">

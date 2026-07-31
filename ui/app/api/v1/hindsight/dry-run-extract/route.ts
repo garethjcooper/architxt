@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
 const API_BASE = process.env.ARCHITXT_UI_API_BASE_URL || 'http://localhost:3000';
-const TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 900000;
+const TIMEOUT_MS =
+  Number(process.env.DRY_RUN_EXTRACT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
 export async function POST(request: Request) {
   const controller = new AbortController();

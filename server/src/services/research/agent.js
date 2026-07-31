@@ -34,7 +34,7 @@ function buildCallLog(handlerResult, options, duration_ms) {
 /**
  * Run a single research discovery step.
  *
- * Dispatches to a query-depth handler (prebuilt, recall, reflect, synthesize). The handler returns { narrative, graph }. We store only the narrative
+ * Dispatches to a query-depth handler (prebuilt, recall, reflect, synthesize, models). The handler returns { narrative, graph }. We store only the narrative
  * in rstep_synthesis; findings/seams are no longer part of the contract.
  */
 export async function runDiscoverStep(params) {
@@ -75,7 +75,7 @@ export async function runDiscoverStep(params) {
   try {
     const start = performance.now();
     const handlerOptions = queryDepth === 'prebuilt' ? { ...options, dimension: options.dimension || 'interface' } : options;
-    const handlerResult = await dispatchHandler(queryDepth, serverId, bankId, intentText, handlerOptions);
+    const handlerResult = await dispatchHandler(queryDepth, serverId, bankId, intentText, handlerOptions, db);
     const duration_ms = Math.round(performance.now() - start);
 
     calls.push(...buildCallLog(handlerResult, options, duration_ms));

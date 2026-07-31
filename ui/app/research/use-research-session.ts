@@ -5,6 +5,8 @@ import {
   type ResearchSession,
   type ResearchStepSummary,
   type PrebuiltResponse,
+  type GraphNode,
+  type GraphEdge,
   ApiError,
 } from '@/lib/api/client';
 import { parseQueryTokens, buildSelectionPayload } from './query-tokens';
@@ -13,6 +15,25 @@ import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 
 const logger = createLogger('useResearchSession');
+
+function isGraphObject(g: unknown): g is { nodes?: unknown[]; edges?: unknown[] } {
+  return !!g && typeof g === 'object' && !Array.isArray(g);
+}
+
+function normalizeGraphShape(graph: unknown): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const sources: { nodes?: unknown[]; edges?: unknown[] }[] = [];
+  if (Array.isArray(graph)) {
+    for (const g of graph) {
+      if (isGraphObject(g)) sources.push(g);
+    }
+  } else if (isGraphObject(graph)) {
+    sources.push(graph);
+  }
+  return {
+    nodes: sources.flatMap((g) => (Array.isArray(g.nodes) ? (g.nodes as GraphNode[]) : [])),
+    edges: sources.flatMap((g) => (Array.isArray(g.edges) ? (g.edges as GraphEdge[]) : [])),
+  };
+}
 
 const POLL_INTERVAL_MS = 1500;
 const MAX_POLL_MS = 10 * 60 * 1000;
@@ -39,24 +60,30 @@ export interface ResearchQueryOptions {
     maxTokens?: number;
     factTypes?: string[];
     excludeMentalModels?: boolean;
+    template?: string;
   };
   synthesize?: {
     maxTokens?: number;
+    template?: string;
+  };
+  models?: {
+    selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string; returns?: string; concatenation?: string }>;
   };
 }
 
-const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize'>(['prebuilt', 'recall', 'reflect', 'synthesize']);
+const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models'>(['prebuilt', 'recall', 'reflect', 'synthesize', 'models']);
 
 function buildDiscoverOptions(
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize',
+  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models',
   queryOptions?: ResearchQueryOptions,
 ): Partial<Parameters<typeof researchApi.discover>[0]> {
   if (queryMode === 'recall') {
     const opts = queryOptions?.recall;
     if (!opts) return {};
     return {
-      ...(opts.types?.length && { types: opts.types }),
+      ...(Array.isArray(opts.types) && opts.types.length && { types: opts.types }),
       ...(typeof opts.preferObservations === 'boolean' && { prefer_observations: opts.preferObservations }),
+      ...(typeof opts.includeSourceFacts === 'boolean' && { include_source_facts: opts.includeSourceFacts }),
       ...(typeof opts.includeSourceFacts === 'boolean' && opts.includeSourceFacts && { include: { source_facts: {} } }),
       ...(opts.budget && { budget: opts.budget }),
       ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
@@ -67,11 +94,30 @@ function buildDiscoverOptions(
     const opts = queryOptions?.reflect;
     if (!opts) return {};
     return {
+      ...(typeof opts.includeSourceFacts === 'boolean' && { include_source_facts: opts.includeSourceFacts }),
       ...(typeof opts.includeSourceFacts === 'boolean' && opts.includeSourceFacts && { include: { facts: {} } }),
       ...(opts.budget && { budget: opts.budget }),
       ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
       ...(opts.factTypes?.length && { fact_types: opts.factTypes }),
       ...(typeof opts.excludeMentalModels === 'boolean' && { exclude_mental_models: opts.excludeMentalModels }),
+      ...(opts.template && { template: opts.template }),
+    };
+  }
+
+  if (queryMode === 'synthesize') {
+    const opts = queryOptions?.synthesize;
+    if (!opts) return {};
+    return {
+      ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
+      ...(opts.template && { template: opts.template }),
+    };
+  }
+
+  if (queryMode === 'models') {
+    const opts = queryOptions?.models;
+    if (!opts?.selections?.length) return {};
+    return {
+      selections: opts.selections,
     };
   }
 
@@ -89,21 +135,38 @@ function buildQueryOptionsFromParameters(
     opts.recall = {
       ...(Array.isArray(parameters.types) && { types: parameters.types }),
       ...(typeof parameters.prefer_observations === 'boolean' && { preferObservations: parameters.prefer_observations }),
-      ...(parameters.include?.source_facts != null && { includeSourceFacts: true }),
+      ...(typeof parameters.include_source_facts === 'boolean'
+        ? { includeSourceFacts: parameters.include_source_facts }
+        : parameters.include?.source_facts != null
+          ? { includeSourceFacts: true }
+          : {}),
       ...(['low', 'mid', 'high'].includes(parameters.budget) && { budget: parameters.budget }),
       ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
     };
   } else if (actionType === 'reflect') {
+    const reflectBudget = ['low', 'mid', 'high'].includes(parameters.budget)
+      ? (parameters.budget as 'low' | 'mid' | 'high')
+      : undefined;
     opts.reflect = {
-      ...(parameters.include?.facts != null && { includeSourceFacts: true }),
-      ...(['low', 'mid', 'high'].includes(parameters.budget) && { budget: parameters.budget }),
+      ...(typeof parameters.include_source_facts === 'boolean'
+        ? { includeSourceFacts: parameters.include_source_facts }
+        : parameters.include?.facts != null
+          ? { includeSourceFacts: true }
+          : {}),
+      ...(reflectBudget && { budget: reflectBudget }),
       ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
       ...(Array.isArray(parameters.fact_types) && { factTypes: parameters.fact_types }),
       ...(typeof parameters.exclude_mental_models === 'boolean' && { excludeMentalModels: parameters.exclude_mental_models }),
+      ...(typeof parameters.template === 'string' && { template: parameters.template }),
     };
   } else if (actionType === 'synthesize') {
     opts.synthesize = {
       ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
+      ...(typeof parameters.template === 'string' && { template: parameters.template }),
+    };
+  } else if (actionType === 'models') {
+    opts.models = {
+      ...(Array.isArray(parameters.selections) && { selections: parameters.selections }),
     };
   }
 
@@ -124,9 +187,11 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
     maxTokens: 4096,
     factTypes: ['world', 'observation'],
     excludeMentalModels: false,
+    template: 'narrative-graph-known',
   },
   synthesize: {
     maxTokens: 4096,
+    template: 'narrative-graph-known',
   },
 };
 
@@ -138,7 +203,7 @@ export function useResearchSession({
   availableDimensions = [],
 }: UseResearchSessionOptions) {
   const [query, setQuery] = useState('');
-  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize'>('prebuilt');
+  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models'>('prebuilt');
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
   const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
     recall: { ...DEFAULT_QUERY_OPTIONS.recall },
@@ -167,34 +232,28 @@ export function useResearchSession({
   const focusEntityIds = useMemo(() => {
     const ids = new Set<string>();
     for (const step of trail.filter((s) => selectedStepIds.has(s.id))) {
-      for (const n of step.canvas?.graph?.nodes || []) {
+      for (const n of normalizeGraphShape(step.canvas?.graph).nodes) {
         if (n.source === 'canonical' || n.source === 'alias') ids.add(n.id);
       }
     }
     return ids;
   }, [trail, selectedStepIds]);
 
-  const fetchSessions = useCallback(async (bid: string) => {
+  const fetchSessions = useCallback(async (bid: string): Promise<ResearchSession[]> => {
     setSessionsLoading(true);
     try {
       const data = await researchApi.listSessions(bid);
-      setSessions(Array.isArray(data) ? data : []);
+      const next = Array.isArray(data) ? data : [];
+      setSessions(next);
+      return next;
     } catch (err) {
       logger.error('Failed to fetch sessions', err);
       setSessions([]);
+      return [];
     } finally {
       setSessionsLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (!bankId) {
-      setSessions([]);
-      setActiveSessionId(null);
-      return;
-    }
-    fetchSessions(bankId);
-  }, [bankId, fetchSessions]);
 
   const fetchTrail = useCallback(async (sessionId: number) => {
     setTrailLoading(true);
@@ -214,16 +273,39 @@ export function useResearchSession({
       setTrailLoading(false);
     }
   }, []);
-
-  // Auto-select the most recent session when sessions load and none is active.
   useEffect(() => {
-    if (activeSessionId !== null || sessions.length === 0) return;
-    const latest = sessions[0];
-    if (latest) {
+    if (!bankId) {
+      setSessions([]);
+      setActiveSessionId(null);
+      setTrail([]);
+      setSelectedStepIds(new Set());
+      setActiveStepId(null);
+      setResult(null);
+      setError(null);
+      hasSeededSelectionRef.current = false;
+      return;
+    }
+
+    // Reset all derived state from the previous bank so we cannot briefly
+    // auto-select a stale session while the new bank's sessions are loading.
+    setSessions([]);
+    setActiveSessionId(null);
+    setTrail([]);
+    setSelectedStepIds(new Set());
+    setActiveStepId(null);
+    setResult(null);
+    setError(null);
+    hasSeededSelectionRef.current = false;
+
+    void fetchSessions(bankId).then((loaded) => {
+      if (loaded.length === 0) return;
+      const latest = loaded[0];
       setActiveSessionId(latest.id);
       void fetchTrail(latest.id);
-    }
-  }, [sessions, activeSessionId, fetchTrail]);
+    });
+  }, [bankId, fetchSessions, fetchTrail]);
+
+
 
   // In session/merge mode, seed the selection with all steps when a trail first
   // loads and nothing is selected, so the merged narrative appears immediately.
@@ -489,7 +571,7 @@ export function useResearchSession({
       setQuery(step.intent_text || '');
 
       if (VALID_QUERY_MODES.has(step.action_type as any)) {
-        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize');
+        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models');
       } else {
         logger.warn('Unsupported action_type for use details', { action_type: step.action_type });
       }
@@ -503,6 +585,14 @@ export function useResearchSession({
         const validValues = new Set(availableDimensions.map((d) => d.value));
         const restored = step.parameters.dimensions.filter((d: string) => validValues.has(d));
         setSelectedDimensions(restored);
+      } else if (step.action_type === 'models' && step.parameters && Array.isArray(step.parameters.selections)) {
+        const modelSelections = step.parameters.selections;
+        setQueryOptions((prev) => ({
+          ...prev,
+          models: {
+            selections: modelSelections,
+          },
+        }));
       } else if (step.action_type !== 'prebuilt') {
         setSelectedDimensions([]);
       }
@@ -536,6 +626,9 @@ export function useResearchSession({
         ...(queryOptions.synthesize?.maxTokens != null
           ? { max_tokens: queryOptions.synthesize.maxTokens }
           : {}),
+        ...(queryOptions.synthesize?.template != null
+          ? { template: queryOptions.synthesize.template }
+          : {}),
       });
       setActiveSessionId(response.session_id);
       onViewModeChange?.('step');
@@ -562,7 +655,13 @@ export function useResearchSession({
       toast.error('Select a server and bank first');
       return;
     }
-    if (!query.trim()) {
+    if (queryMode === 'models') {
+      const modelSelections = queryOptions.models?.selections || [];
+      if (modelSelections.length === 0) {
+        toast.error('Select at least one mental model');
+        return;
+      }
+    } else if (!query.trim()) {
       toast.error('Enter a query');
       return;
     }
@@ -575,6 +674,15 @@ export function useResearchSession({
           : [];
       await handleSynthesize(sourceStepIds, query);
       return;
+    }
+
+    if (queryMode === 'models') {
+      const modelSelections = queryOptions.models?.selections || [];
+      if (modelSelections.length === 0) {
+        toast.error('Select at least one mental model');
+        return;
+      }
+      // Models mode uses the discover endpoint like recall/reflect.
     }
 
     const tokens = parseQueryTokens(query);
@@ -627,7 +735,13 @@ export function useResearchSession({
 
     let sessionId = activeSessionId;
     if (!sessionId) {
-      const title = query.trim().slice(0, 80) || 'Untitled session';
+      let title: string;
+      if (queryMode === 'models') {
+        const names = queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`) || [];
+        title = names.slice(0, 3).join(', ').slice(0, 80) || 'Models query';
+      } else {
+        title = query.trim().slice(0, 80) || 'Untitled session';
+      }
       try {
         const created = await researchApi.createSession({
           bank_id: bankId,
@@ -653,9 +767,10 @@ export function useResearchSession({
         session_id: sessionId,
         bank_id: bankId,
         viewpoint_ids: [],
-        intent_text: query.trim(),
+        intent_text: queryMode === 'models'
+          ? 'Mental models: ' + (queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`).join(', ') || '')
+          : query.trim(),
         query_depth: queryMode,
-        selections: buildSelectionPayload(tokens),
         ...buildDiscoverOptions(queryMode, queryOptions),
       });
       // The route returns 202 immediately. Do not treat it as the final result;

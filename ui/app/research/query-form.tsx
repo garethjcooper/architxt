@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useLayoutEffect, useCallback, useMemo } fr
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles } from 'lucide-react';
+import { Play } from 'lucide-react';
 import {
   formatEntityToken,
   formatEdgeToken,
@@ -15,6 +15,7 @@ import {
 } from './query-tokens';
 import { colorForType } from '@/components/research-canvas';
 import { type ResearchQueryOptions } from './use-research-session';
+import { type ResearchStepSummary } from '@/lib/api/client';
 
 export type Server = {
   id: number;
@@ -38,12 +39,21 @@ export interface QueryFormProps {
   availableEntities: EntityLike[];
   availableEdges: EdgeLike[];
   onSubmit: (e: React.FormEvent) => void;
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize';
+  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models';
   dimensions: string[];
   setDimensions: (d: string[]) => void;
   availableDimensions: Array<{ value: string; label: string }>;
   queryOptions: ResearchQueryOptions;
   setQueryOptions: (opts: ResearchQueryOptions | ((prev: ResearchQueryOptions) => ResearchQueryOptions)) => void;
+  availableMentalModels?: Array<{ id: number; ext_id: string; name?: string; returns?: string; concatenation?: string }>;
+  /** Trail for synthesize-mode source step preview. */
+  trail?: ResearchStepSummary[];
+  /** Current step selection state for synthesize-mode preview. */
+  selectedStepIds?: Set<number>;
+  /** Active step id in step mode; used as synthesize fallback. */
+  activeStepId?: number | null;
+  /** Current view mode; used to decide which steps to preview. */
+  viewMode?: 'step' | 'session';
 }
 
 const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
@@ -51,6 +61,7 @@ const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
   recall: 'Returns facts for the given query in a table format. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   reflect: 'Returns a generated narrative for the given query. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
+  models: 'Select one or more mental models and enter a query to explore their content. Type [[ to show list of existing known entities.',
 };
 
 function tokenLabel(token: QueryToken, entities: EntityLike[], edges: EdgeLike[]): string {
@@ -61,11 +72,11 @@ function tokenLabel(token: QueryToken, entities: EntityLike[], edges: EdgeLike[]
   const parts = token.id.split('|');
   const [source, target, label] = parts;
   const edge = edges.find(
-    (e) => e.source === source && e.target === target && (e.label || e.relationship_type || '') === label,
+    (e) => e.from === source && e.to === target && (e.label || e.type || '') === label,
   );
-  const s = edge?.source || source;
-  const t = edge?.target || target;
-  const l = edge?.label || edge?.relationship_type || label || 'edge';
+  const s = edge?.from || source;
+  const t = edge?.to || target;
+  const l = edge?.label || edge?.type || label || 'edge';
   return `${s} — ${l} → ${t}`;
 }
 
@@ -286,6 +297,11 @@ export function QueryForm(props: QueryFormProps) {
     availableDimensions,
     queryOptions,
     setQueryOptions,
+    availableMentalModels = [],
+    trail = [],
+    selectedStepIds = new Set(),
+    activeStepId,
+    viewMode = 'step',
   } = props;
 
   const editorRef = useRef<HTMLDivElement>(null);
@@ -301,6 +317,18 @@ export function QueryForm(props: QueryFormProps) {
   const isComposingRef = useRef(false);
 
 
+  const sourceSteps = useMemo(() => {
+    if (queryMode !== 'synthesize') return [];
+    const ids = selectedStepIds.size > 0
+      ? selectedStepIds
+      : activeStepId != null
+        ? new Set([activeStepId])
+        : new Set<number>();
+    if (ids.size === 0) return [];
+    return trail
+      .filter((s) => ids.has(s.id))
+      .sort((a, b) => trail.indexOf(a) - trail.indexOf(b));
+  }, [queryMode, trail, selectedStepIds, activeStepId]);
   const tokens = useMemo(() => parseQueryTokens(query), [query]);
   const entityMap = useMemo(() => {
     const map = new Map<string, EntityLike>();
@@ -459,21 +487,24 @@ export function QueryForm(props: QueryFormProps) {
         }
         return matchesTokens(hay, rawTerm);
       })
-      .map((e) => ({
-        kind: 'entity' as const,
-        id: e.id,
-        label: e.label || e.id,
-        type: e.type,
-        render: e.label || e.id,
-        sublabel: e.type ? `${e.type}:${e.id}` : e.id,
-        token: formatEntityToken(e.label || e.id, e.id, e.type),
-        icon: (
-          <span
-            className="w-3 h-3 shrink-0"
-            style={{ borderLeftColor: colorForType(e.type || undefined), borderLeftWidth: 3, backgroundColor: 'transparent' }}
-          />
-        ),
-      }))
+      .map((e) => {
+        const qualified = e.type && !e.id.startsWith(`${e.type}:`) ? `${e.type}:${e.id}` : e.id;
+        return {
+          kind: 'entity' as const,
+          id: e.id,
+          label: e.label || e.id,
+          type: e.type,
+          render: e.label || e.id,
+          sublabel: qualified,
+          token: formatEntityToken(e.label || e.id, e.id, e.type),
+          icon: (
+            <span
+              className="w-3 h-3 shrink-0"
+              style={{ borderLeftColor: colorForType(e.type || undefined), borderLeftWidth: 3, backgroundColor: 'transparent' }}
+            />
+          ),
+        };
+      })
       .sort((a, b) => {
         const tokens = termTokens(rawTerm);
         const firstToken = tokens[0] || rawTerm;
@@ -499,23 +530,23 @@ export function QueryForm(props: QueryFormProps) {
     const edgeItems = availableEdges
       .filter((e) => {
         if (!rawTerm) return true;
-        const sourceLabel = entityLabelMap.get(e.source) || e.source;
-        const targetLabel = entityLabelMap.get(e.target) || e.target;
-        const rel = e.label || e.relationship_type || '';
-        const hay = `${sourceLabel} ${e.source} ${targetLabel} ${e.target} ${rel}`.toLowerCase();
+        const sourceLabel = entityLabelMap.get(e.from) || e.from;
+        const targetLabel = entityLabelMap.get(e.to) || e.to;
+        const rel = e.label || e.type || '';
+        const hay = `${sourceLabel} ${e.from} ${targetLabel} ${e.to} ${rel}`.toLowerCase();
         return matchesTokens(hay, rawTerm);
       })
       .map((e) => {
-        const l = e.label || e.relationship_type || 'edge';
-        const sourceLabel = entityLabelMap.get(e.source) || e.source;
-        const targetLabel = entityLabelMap.get(e.target) || e.target;
+        const l = e.label || e.type || 'edge';
+        const sourceLabel = entityLabelMap.get(e.from) || e.from;
+        const targetLabel = entityLabelMap.get(e.to) || e.to;
         return {
           kind: 'edge' as const,
-          id: `${e.source}|${e.target}|${l}`,
+          id: `${e.from}|${e.to}|${l}`,
           label: l,
           render: `${sourceLabel} — ${l} → ${targetLabel}`,
-          sublabel: `${e.source} → ${e.target}`,
-          token: formatEdgeToken(e.source, e.target, l),
+          sublabel: `${e.from} → ${e.to}`,
+          token: formatEdgeToken(e.from, e.to, l),
           icon: <span className="w-3 h-3 shrink-0" style={{ borderLeftColor: colorForType(l), borderLeftWidth: 3, backgroundColor: 'transparent' }} />,
         };
       })
@@ -644,33 +675,34 @@ export function QueryForm(props: QueryFormProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col h-full p-2 gap-2 overflow-hidden">
       <div className="flex flex-1 min-h-0 gap-2">
-        <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0 relative">
-          <div
-            ref={editorRef}
-            contentEditable={!isRunning}
-            suppressContentEditableWarning
-            onInput={handleInput}
-            onKeyDown={handleKeyDown}
-            onClick={syncCursor}
-            onKeyUp={updateAutocompleteState}
-            onPaste={handlePaste}
-            onCompositionStart={() => {
-              isComposingRef.current = true;
-            }}
-            onCompositionEnd={() => {
-              isComposingRef.current = false;
-              handleInput();
-              updateAutocompleteState();
-            }}
-            className={`flex-1 min-h-0 w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-xs text-white overflow-y-auto outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 whitespace-pre-wrap ${
-              isRunning ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            style={{ minHeight: '3rem' }}
-            aria-label="Query"
-            role="textbox"
-            aria-disabled={isRunning}
-            tabIndex={isRunning ? -1 : 0}
-          />
+        {queryMode !== 'models' && (
+          <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0 relative">
+            <div
+              ref={editorRef}
+              contentEditable={!isRunning}
+              suppressContentEditableWarning
+              onInput={handleInput}
+              onKeyDown={handleKeyDown}
+              onClick={syncCursor}
+              onKeyUp={updateAutocompleteState}
+              onPaste={handlePaste}
+              onCompositionStart={() => {
+                isComposingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                isComposingRef.current = false;
+                handleInput();
+                updateAutocompleteState();
+              }}
+              className={`flex-1 min-h-0 w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-xs text-white overflow-y-auto outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 whitespace-pre-wrap ${
+                isRunning ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              style={{ minHeight: '3rem' }}
+              aria-label="Query"
+              role="textbox"
+              aria-disabled={isRunning}
+              tabIndex={isRunning ? -1 : 0}
+            />
 
           {showAutocomplete && autocompleteItems.length > 0 && (
             <div
@@ -709,6 +741,7 @@ export function QueryForm(props: QueryFormProps) {
             </div>
           )}
         </div>
+        )}
 
         {queryMode === 'prebuilt' && availableDimensions.length > 0 && (
           <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
@@ -756,19 +789,90 @@ export function QueryForm(props: QueryFormProps) {
             </div>
           </div>
         )}
+
+        {queryMode === 'models' && availableMentalModels.length > 0 && (
+          <div className={`w-full shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
+            <div className="flex-1 min-h-0 overflow-y-auto px-1 py-1 space-y-1">
+              {availableMentalModels.map((model) => {
+                const selections = queryOptions.models?.selections || [];
+                const selected = selections.some((s) => s.id === String(model.id) || s.ext_id === model.ext_id);
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => {
+                      const next = !selected
+                        ? [...selections, { kind: 'model', id: String(model.id), ext_id: model.ext_id, name: model.name, returns: model.returns, concatenation: model.concatenation }]
+                        : selections.filter((s) => s.id !== String(model.id) && s.ext_id !== model.ext_id);
+                      setQueryOptions((prev) => ({ ...prev, models: { ...prev.models, selections: next } }));
+                    }}
+                    className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
+                      selected
+                        ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
+                        : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
+                    } ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={model.name || model.ext_id || String(model.id)}
+                  >
+                    <Checkbox
+                      disabled={isRunning}
+                      checked={selected}
+                      className="shrink-0"
+                      aria-label={`Select mental model ${model.name || model.ext_id}`}
+                    />
+                    <div className="flex-1 text-left min-w-0 flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between text-xs text-white/90">
+                        <span className="truncate">{model.name || model.ext_id || `Model #${model.id}`}</span>
+                      </div>
+                      <div className="text-[10px] text-white/50 font-mono truncate">
+                        {model.ext_id || `model:${model.id}`}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+        {queryMode === 'synthesize' && (
+          <div className="shrink-0 flex flex-col gap-1 border-t border-white/10 pt-2">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[10px] text-white/70 font-medium">Synthesize source steps</span>
+              <span className="text-[10px] text-white/50">{sourceSteps.length} selected</span>
+            </div>
+            <div className="h-[3.5rem] overflow-y-auto rounded border border-white/10 bg-black/20 px-2 py-1 space-y-1">
+              {sourceSteps.length === 0 ? (
+                <div className="text-[10px] text-white/40 italic">No steps selected. In step mode the active step is used; in merge mode the checked steps are used.</div>
+              ) : (
+                sourceSteps.map((step, idx) => (
+                  <div key={step.id} className="flex items-center gap-1.5 text-[10px] text-white/80">
+                    <span className="px-1 rounded border border-white/10 bg-white/5 text-white/60 uppercase tracking-wide shrink-0">
+                      {step.action_type || 'discover'}
+                    </span>
+                    <span className="truncate">
+                      <span className="text-white/50 mr-1">#{idx + 1}</span>
+                      {step.intent_text || 'Untitled query'}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
       <div className="flex gap-2 shrink-0">
         <Button
           type="submit"
-          disabled={isRunning || loading || !query.trim()}
+          disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : !query.trim())}
           className="flex-1"
           size="sm"
         >
           {isRunning ? 'Running…' : (
             <>
-              <Sparkles className="w-4 h-4 mr-2" />
-              {queryMode === 'synthesize' ? 'Synthesize' : 'Run Query'}
+              <Play className="w-4 h-4 mr-2" />
+              {queryMode === 'synthesize' ? 'Synthesize' : queryMode === 'models' ? 'Run Models' : 'Run Query'}
             </>
           )}
         </Button>
@@ -839,7 +943,46 @@ const BUDGET_OPTIONS = [
   { value: 'high', label: 'High' },
 ] as const;
 
+const TEMPLATE_OPTIONS = [
+  { value: 'narrative', label: 'Narrative' },
+  { value: 'graph-known', label: 'Graph (known nodes)' },
+  { value: 'graph-discovery', label: 'Graph (discovery allowed)' },
+  { value: 'graph-discovered-only', label: 'Graph (discovered only)' },
+  { value: 'narrative-graph-known', label: 'Narrative + graph (known nodes)' },
+  { value: 'narrative-graph-discovery', label: 'Narrative + graph (discovery allowed)' },
+  { value: 'narrative-graph-discovered-only', label: 'Narrative + graph (discovered only)' },
+] as const;
+
 type Budget = 'low' | 'mid' | 'high';
+type ResearchTemplate = typeof TEMPLATE_OPTIONS[number]['value'];
+
+function TemplateSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value?: ResearchTemplate;
+  onChange: (value: ResearchTemplate) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] text-white/60">Output</span>
+      <select
+        disabled={disabled}
+        value={value || 'narrative-graph-known'}
+        onChange={(e) => onChange(e.target.value as ResearchTemplate)}
+        className="h-7 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2 text-[10px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+      >
+        {TEMPLATE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 function BudgetSelect({
   value,
@@ -916,7 +1059,6 @@ function Toggle({
     </label>
   );
 }
-
 function RecallOptions({
   options,
   onChange,
@@ -956,6 +1098,7 @@ function RecallOptions({
   );
 }
 
+
 function ReflectOptions({
   options,
   onChange,
@@ -967,8 +1110,14 @@ function ReflectOptions({
 }) {
   const opts = options || {};
   const factTypes = opts.factTypes || [];
+  const template = (opts.template || 'narrative-graph-known') as ResearchTemplate;
   return (
     <div className="space-y-2">
+      <TemplateSelect
+        value={template}
+        onChange={(template) => onChange({ ...opts, template })}
+        disabled={disabled}
+      />
       <div className="flex flex-col gap-1">
         <span className="text-[10px] text-white/60">Fact types</span>
         <div className="space-y-1">
@@ -987,8 +1136,10 @@ function ReflectOptions({
           ))}
         </div>
       </div>
-      <BudgetSelect value={opts.budget} onChange={(budget) => onChange({ ...opts, budget })} disabled={disabled} />
-      <MaxTokensInput value={opts.maxTokens} onChange={(maxTokens) => onChange({ ...opts, maxTokens })} disabled={disabled} />
+      <div className="grid grid-cols-2 gap-2">
+        <BudgetSelect value={opts.budget} onChange={(budget) => onChange({ ...opts, budget })} disabled={disabled} />
+        <MaxTokensInput value={opts.maxTokens} onChange={(maxTokens) => onChange({ ...opts, maxTokens })} disabled={disabled} />
+      </div>
       <Toggle label="Include source facts" checked={opts.includeSourceFacts} onChange={(checked) => onChange({ ...opts, includeSourceFacts: checked })} disabled={disabled} />
       <Toggle label="Exclude mental models" checked={opts.excludeMentalModels} onChange={(checked) => onChange({ ...opts, excludeMentalModels: checked })} disabled={disabled} />
     </div>
@@ -1005,8 +1156,14 @@ function SynthesizeOptions({
   disabled?: boolean;
 }) {
   const opts = options || {};
+  const template = (opts.template || 'narrative-graph-known') as ResearchTemplate;
   return (
     <div className="space-y-2">
+      <TemplateSelect
+        value={template}
+        onChange={(template) => onChange({ ...opts, template })}
+        disabled={disabled}
+      />
       <MaxTokensInput value={opts.maxTokens} onChange={(maxTokens) => onChange({ ...opts, maxTokens })} disabled={disabled} />
     </div>
   );

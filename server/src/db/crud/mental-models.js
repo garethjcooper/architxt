@@ -3,6 +3,7 @@ import { stmt } from '../../cache.js';
 import { fromJson, requireInt, requireString, dbExec } from '../../utils/db-helpers.js';
 import { getOrCreateTagByName } from './tags.js';
 import { createLogger } from '../../utils/logger.js';
+import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 
 const logger = createLogger('mental-models-crud');
 
@@ -26,7 +27,15 @@ const PLACEHOLDER_PATTERN = new RegExp(
 
 const VALID_REFRESH_MODES = new Set(['full', 'delta']);
 const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any', 'exact']);
-export const VALID_RETURNS = new Set(['json', 'narrative']);
+export const VALID_RETURNS = new Set([
+  'narrative',
+  'graph-known',
+  'graph-discovery',
+  'graph-discovered-only',
+  'narrative-graph-known',
+  'narrative-graph-discovery',
+  'narrative-graph-discovered-only',
+]);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
 export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability'];
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
@@ -226,6 +235,32 @@ export function deriveMentalModels(template) {
       is_derived: true,
     };
   });
+}
+
+/**
+ * Attach the fully composed prompt (fragments + runtime variables) to each
+ * derived mental model row. The raw source_query is preserved so callers can
+ * still compare it with Hindsight's stored source_query.
+ */
+export async function composeDerivedMentalModels(db, derivedRows) {
+  if (!Array.isArray(derivedRows) || derivedRows.length === 0) {
+    return [];
+  }
+  return Promise.all(
+    derivedRows.map(async (row) => {
+      try {
+        const composedQuery = await composeMentalModelPrompt(db, row.returns, row.source_query);
+        return { ...row, composed_query: composedQuery };
+      } catch (err) {
+        logger.warn('Failed to compose derived mental model prompt', {
+          derivedId: row.id,
+          returns: row.returns,
+          error: err.message,
+        });
+        return { ...row, composed_query: null, compose_error: err.message };
+      }
+    })
+  );
 }
 
 const TAGS_SQL = `

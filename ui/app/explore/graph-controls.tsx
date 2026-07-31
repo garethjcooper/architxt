@@ -45,10 +45,10 @@ function generateMermaid(nodes: GraphNode[], edges: GraphEdge[]): string {
 
   const seenEdgeKeys = new Set<string>();
   const visibleEdges = edges.filter((e) => {
-    if (!e?.source || !e?.target) return false;
-    if (!nodeById.has(e.source) || !nodeById.has(e.target)) return false;
-    const label = e.label || e.relationship_type || '';
-    const key = `${e.source}|${e.target}|${label}`;
+    if (!e?.from || !e?.to) return false;
+    if (!nodeById.has(e.from) || !nodeById.has(e.to)) return false;
+    const label = e.label || e.type || '';
+    const key = `${e.from}|${e.to}|${label}`;
     if (seenEdgeKeys.has(key)) return false;
     seenEdgeKeys.add(key);
     return true;
@@ -59,14 +59,14 @@ function generateMermaid(nodes: GraphNode[], edges: GraphEdge[]): string {
 
   for (const n of nodeById.values()) {
     const id = escapeMermaidId(n.id);
-    const label = (n.label || id).replace(/["]/g, '#quot;');
+    const label = (n.name || n.label || id).replace(/["]/g, '#quot;');
     lines.push(`    ${id}(("${label}"))`);
   }
 
   for (const e of visibleEdges) {
-    const source = escapeMermaidId(e.source);
-    const target = escapeMermaidId(e.target);
-    const label = (e.label || e.relationship_type || '').replace(/["]/g, '#quot;');
+    const source = escapeMermaidId(e.from);
+    const target = escapeMermaidId(e.to);
+    const label = (e.label || e.type || '').replace(/["]/g, '#quot;');
     if (label) {
       lines.push(`    ${source} -->|${label}| ${target}`);
     } else {
@@ -118,7 +118,7 @@ export function GraphControls({
   }, [nodes]);
 
   const edgeTypes = useMemo(() => {
-    return Array.from(new Set(edges.map((e) => e.relationship_type).filter((t): t is string => Boolean(t)))).sort();
+    return Array.from(new Set(edges.map((e) => e.type).filter((t): t is string => Boolean(t)))).sort();
   }, [edges]);
 
   const savePng = () => {

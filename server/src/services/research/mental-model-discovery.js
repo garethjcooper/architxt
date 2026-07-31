@@ -20,12 +20,8 @@
 
 import { listMentalModels as listLocalMentalModels, deriveMentalModels } from '../../db/crud/mental-models.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import {
-  extractGraph,
-  extractNarrative,
-  modelMatchesEntities,
-  tryExtractGraph,
-} from './mental-model-results.js';
+import { parseGraphResponse } from '../../prompts/parse-graph-response.js';
+import { modelMatchesEntities } from '../../prompts/graph-parser.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-mental-model-discovery');
@@ -172,13 +168,17 @@ async function mergeDimensionResult(candidates, entityIds) {
 
     const returns = (candidate.returns || 'json').toLowerCase();
     if (returns === 'json') {
-      const { graph, error: graphError } = tryExtractGraph(candidate.content);
-      if (graph) {
+      const { graph, error: graphError } = parseGraphResponse(candidate.content, {
+        mode: 'graph-known',
+        expectGraph: true,
+        defaultSource: 'mental_model',
+      });
+      if (graph.nodes.length > 0 || graph.edges.length > 0) {
         for (const n of graph.nodes) {
           if (!nodeById.has(n.id)) nodeById.set(n.id, n);
         }
         for (const e of graph.edges) {
-          const key = `${e.source}|${e.target}|${e.label}`;
+          const key = `${e.from}|${e.to}|${e.label}`;
           if (edgeKeys.has(key)) continue;
           edgeKeys.add(key);
           edges.push(e);
@@ -187,7 +187,7 @@ async function mergeDimensionResult(candidates, entityIds) {
         errors.push({ model: candidate.name || candidate.ext_id, error: graphError });
       }
     } else if (returns === 'narrative') {
-      const narrative = extractNarrative(candidate.content);
+      const { narrative } = parseGraphResponse(candidate.content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
       if (narrative) {
         narratives.push(narrative);
       }

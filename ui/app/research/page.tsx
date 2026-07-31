@@ -30,14 +30,20 @@ import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { formatEntityToken, formatEdgeToken } from './query-tokens';
 import { QueryTrail } from './query-trail';
 import { CompositeEntities, type EntityTab } from './composite-entities';
-import { CompositeEdges, type EdgeTab } from './composite-edges';
+import { CompositeEdges } from './composite-edges';
 import { SessionList } from './session-list';
 import { ResearchSession } from '@/lib/api/client';
 import {
   useResearchSession,
   type ResearchQueryOptions,
 } from './use-research-session';
-import { useResearchGraph, resolveNodeType, canonicalEntityId } from './use-research-graph';
+import {
+  useResearchGraph,
+} from './use-research-graph';
+import {
+  resolveNodeType,
+  canonicalNodeId,
+} from './graph-utils';
 import { ResearchResultPanel } from './research-result-panel';
 
 const logger = createLogger('ResearchPage');
@@ -56,9 +62,14 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
     maxTokens: 4096,
     factTypes: ['world', 'observation'],
     excludeMentalModels: false,
+    template: 'narrative-graph-known',
   },
   synthesize: {
     maxTokens: 4096,
+    template: 'narrative-graph-known',
+  },
+  models: {
+    selections: [],
   },
 };
 
@@ -82,15 +93,15 @@ export default function ResearchPage() {
   const [allEntities, setAllEntities] = useState<Entity[]>([]);
   const [bankTags, setBankTags] = useState<Array<{ tag: string; count: number }>>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
-  const [globalGraph, setGlobalGraph] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
-  const [globalGraphLoading, setGlobalGraphLoading] = useState(false);
+  const [globalEntities, setGlobalEntities] = useState<GraphNode[]>([]);
+  const [globalEntitiesLoading, setGlobalEntitiesLoading] = useState(false);
 
   const [entityTab, setEntityTab] = useState<EntityTab>('entities');
-  const [edgeTab, setEdgeTab] = useState<EdgeTab>('found');
   const [viewMode, setViewMode] = useState<'step' | 'session'>('step');
   const [availableDimensions, setAvailableDimensions] = useState<Array<{ value: string; label: string }>>([
     { value: 'interface', label: 'Interface' },
   ]);
+  const [availableMentalModels, setAvailableMentalModels] = useState<Array<{ id: number; ext_id: string; name?: string; returns?: string; concatenation?: string }>>([]);
   const resultView: 'narrative' = 'narrative';
   const [canvasView, setCanvasView] = useState<'graph' | 'components'>('graph');
   const [viewLayouts, setViewLayouts] = useState<Record<'graph' | 'components', GraphLayout>>({
@@ -217,24 +228,23 @@ export default function ResearchPage() {
     edges,
     edgeInScopeCount,
     edgeTotalCount,
-    globalEntities,
-    globalCooccurrenceEdges,
+    globalEntities: visibleGlobalEntities,
     selectedStepEdges,
-  } = useResearchGraph(trail, selectedStepIds, globalGraph, result, viewMode, activeStepId);
+  } = useResearchGraph(trail, selectedStepIds, null, globalEntities, result, viewMode, activeStepId);
 
   const visibleEntities = entityTab === 'entities'
     ? entities
     : entityTab === 'global'
-      ? globalEntities
+      ? visibleGlobalEntities
       : [];
 
-  const visibleEdges = edgeTab === 'global' ? globalCooccurrenceEdges : edges;
+  const visibleEdges = edges;
 
   // Edge filters now highlight/dim rather than remove edges, so we pass the
   // full edge set to the diagrams along with the active filter set.
 
   useEffect(() => {
-    const allTypes = Array.from(new Set(graphEdges.map((e) => e.relationship_type).filter((t): t is string => Boolean(t)))).sort();
+    const allTypes = Array.from(new Set(graphEdges.map((e) => e.type).filter((t): t is string => Boolean(t)))).sort();
     setViewEdgeFilters((prev) => {
       let changed = false;
       const next: Record<'graph' | 'components', Set<string>> = { ...prev };
@@ -332,7 +342,7 @@ export default function ResearchPage() {
       if (selection.kind === 'graph' || selection.kind === 'diagram') {
         const node = nodeMap.get(id);
         if (!node) return;
-        handleInsertToken(formatEntityToken(node.label || node.id, node.id, node.type));
+        handleInsertToken(formatEntityToken(node.name || node.id, node.id, node.type));
       } else if (selection.kind === 'edge') {
         if (queryMode === 'prebuilt') {
           toast.info('Edges cannot be added to prebuilt queries');
@@ -340,7 +350,7 @@ export default function ResearchPage() {
         }
         const edge = graphEdges.find((e) => e.id === id);
         if (!edge) return;
-        handleInsertToken(formatEdgeToken(edge.source, edge.target, edge.label || edge.relationship_type || 'edge'));
+        handleInsertToken(formatEdgeToken(edge.from, edge.to, edge.label || edge.type || 'edge'));
       }
     },
     [nodeMap, graphEdges, handleInsertToken, queryMode],
@@ -354,6 +364,21 @@ export default function ResearchPage() {
 
   useEffect(() => {
     fetchServers();
+    mentalModelsApi.list({ limit: 1000 })
+      .then((data) => {
+        const models = (Array.isArray(data) ? data : []).filter((m) => !m.is_template);
+        setAvailableMentalModels(models.map((m) => ({
+          id: m.id,
+          ext_id: m.ext_id,
+          name: m.name || undefined,
+          returns: m.returns,
+          concatenation: m.concatenation,
+        })));
+      })
+      .catch((err) => {
+        logger.error('Failed to fetch mental models for research', err);
+        setAvailableMentalModels([]);
+      });
     // Dimensions come from the local mental-model configuration, not any
     // selected bank/server, so load them once at page startup.
     mentalModelsApi.listStandardDimensions()
@@ -380,32 +405,21 @@ export default function ResearchPage() {
 
   useEffect(() => {
     if (!selectedServerId || !selectedBankId) {
-      setBankTags([]);
-      setGlobalGraph(null);
+      setGlobalEntities([]);
       return;
     }
     const serverId = parseInt(selectedServerId, 10);
-    setTagsLoading(true);
-    serversApi.listBankTags(serverId, selectedBankId)
-      .then((data) => setBankTags(Array.isArray(data?.items) ? data.items : []))
-      .catch((err) => {
-        logger.error('Failed to fetch bank tags', err);
-        setBankTags([]);
-      })
-      .finally(() => setTagsLoading(false));
-
-    setGlobalGraphLoading(true);
-    serversApi.getBankGraph(serverId, selectedBankId)
+    setGlobalEntitiesLoading(true);
+    serversApi.getBankEntities(serverId, selectedBankId)
       .then((data) => {
         const nodes = Array.isArray(data?.nodes) ? data.nodes : [];
-        const edges = Array.isArray(data?.edges) ? data.edges : [];
-        setGlobalGraph({ nodes, edges });
+        setGlobalEntities(nodes);
       })
       .catch((err) => {
-        logger.error('Failed to fetch bank graph', err);
-        setGlobalGraph(null);
+        logger.error('Failed to fetch bank entities', err);
+        setGlobalEntities([]);
       })
-      .finally(() => setGlobalGraphLoading(false));
+      .finally(() => setGlobalEntitiesLoading(false));
   }, [selectedServerId, selectedBankId]);
 
   const fetchServers = async () => {
@@ -615,6 +629,7 @@ export default function ResearchPage() {
                     { key: 'recall', label: 'Recall' },
                     { key: 'reflect', label: 'Reflect' },
                     { key: 'synthesize', label: 'Synthesize' },
+                    { key: 'models', label: 'Models' },
                   ].map((m) => (
                     <button
                       key={m.key}
@@ -642,9 +657,9 @@ export default function ResearchPage() {
                 loading={loading}
                 isRunning={isRunning}
                 availableEntities={allEntities.map((e) => {
-                  const type = resolveNodeType({ id: e.entity_id, label: e.name, type: e.type_name });
+                  const type = resolveNodeType({ id: e.entity_id, name: e.name, type: e.type_name });
                   return {
-                    id: canonicalEntityId(type, e.entity_id),
+                    id: canonicalNodeId({ id: e.entity_id, name: e.name, type: e.type_name }),
                     label: e.name,
                     type,
                   };
@@ -657,6 +672,11 @@ export default function ResearchPage() {
                 availableDimensions={availableDimensions}
                 queryOptions={queryOptions}
                 setQueryOptions={setQueryOptions}
+                availableMentalModels={availableMentalModels}
+                trail={trail}
+                selectedStepIds={selectedStepIds}
+                activeStepId={activeStepId}
+                viewMode={viewMode}
               />
             </div>
           </div>
@@ -668,7 +688,6 @@ export default function ResearchPage() {
                 {[
                   { key: 'entities', label: 'All', count: `${entityInScopeCount}/${entityTotalCount}` },
                   { key: 'global', label: 'Global', count: globalEntities.length },
-                  { key: 'tags', label: 'Tags', count: bankTags.length },
                 ].map((v) => (
                   <button
                     key={v.key}
@@ -690,8 +709,6 @@ export default function ResearchPage() {
                 entityTab={entityTab}
                 entities={entities}
                 globalEntities={globalEntities}
-                bankTags={bankTags}
-                tagsLoading={tagsLoading}
                 onInsertToken={handleInsertToken}
               />
             </div>
@@ -701,30 +718,16 @@ export default function ResearchPage() {
             <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
               <span className="font-medium text-sm">Edges</span>
               <div className="flex items-center gap-1.5 overflow-x-auto">
-                {[
-                  { key: 'found', label: 'All', count: `${edgeInScopeCount}/${edgeTotalCount}` },
-                  { key: 'global', label: 'Global', count: globalCooccurrenceEdges.length },
-                ].map((v) => (
-                  <button
-                    key={v.key}
-                    type="button"
-                    onClick={() => setEdgeTab(v.key as EdgeTab)}
-                    className={`text-[10px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap ${
-                      edgeTab === v.key
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                        : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
-                    }`}
-                  >
-                    {v.label} ({v.count})
-                  </button>
-                ))}
+                <span className="text-[10px] px-2 py-0.5 rounded border bg-emerald-500/20 border-emerald-500/50 text-emerald-300 whitespace-nowrap">
+                  All ({edgeInScopeCount}/{edgeTotalCount})
+                </span>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">
               <CompositeEdges
-                edgeTab={edgeTab}
+                edgeTab="found"
                 edges={visibleEdges}
-                globalEdges={globalCooccurrenceEdges}
+                globalEdges={[]}
                 nodeMap={nodeMap}
                 onInsertToken={handleInsertToken}
               />

@@ -1,7 +1,8 @@
 'use client';
 
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, MoreHorizontal, Play, ClipboardList } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, MoreHorizontal, Play, ClipboardList, RefreshCw, Info } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +55,18 @@ export function QueryTrail(props: QueryTrailProps) {
             const isActive = activeStepId === step.id;
             const isSelected = selectedStepIds.has(step.id);
             const isSynthesize = step.action_type === 'synthesize';
+            const queryType = step.calls?.[0]?.mode || step.action_type || 'discover';
+            const hasNarrative = typeof step.synthesis?.narrative === 'string' && step.synthesis.narrative.length > 0;
+            const hasGraph = !!(step.canvas?.graph?.nodes?.length || step.canvas?.graph?.edges?.length);
+            const createdAt = step.created_at
+              ? new Date(step.created_at).toLocaleString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })
+              : null;
             return (
               <div
                 key={step.id}
@@ -76,30 +89,45 @@ export function QueryTrail(props: QueryTrailProps) {
                 <button
                   type="button"
                   onClick={() => (isMerge ? onToggleStep(step.id) : onActivateStep(step.id))}
-                  onDoubleClick={() => onInspectStep?.(step.id)}
                   className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
                   title={step.intent_text || 'Untitled query'}
                 >
                   <div className="flex items-center justify-between text-xs text-white/90">
-                    <span className="truncate">
-                      #{idx + 1} · {step.calls?.[0]?.mode || step.action_type || 'discover'}
+                    <span className="truncate flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-white/60">#{idx + 1}</span>
+                      {createdAt && (
+                        <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
+                      )}
                       {step.status === 'running' && (
-                        <span className="ml-1.5 text-amber-300 animate-pulse">● running</span>
+                        <span className="text-amber-300 animate-pulse">● running</span>
                       )}
                       {step.status === 'failed' && (
-                        <span className="ml-1.5 text-red-400">● failed</span>
+                        <span className="text-red-400">● failed</span>
                       )}
                     </span>
-                    <span className="text-[10px] text-white/40 whitespace-nowrap">
-                      {step.created_at
-                        ? new Date(step.created_at).toLocaleString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            second: '2-digit',
-                          })
-                        : ''}
+                    <span className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] h-4 px-1.5 border-white/20 text-white/70 font-normal"
+                      >
+                        {queryType}
+                      </Badge>
+                      {hasNarrative && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] h-4 px-1.5 border-white/20 text-white/70 font-normal"
+                        >
+                          narrative
+                        </Badge>
+                      )}
+                      {hasGraph && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] h-4 px-1.5 border-white/20 text-white/70 font-normal"
+                        >
+                          graph
+                        </Badge>
+                      )}
                     </span>
                   </div>
                   <div className="text-[10px] text-white/50 font-mono truncate">
@@ -117,7 +145,7 @@ export function QueryTrail(props: QueryTrailProps) {
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </span>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuContent align="end" className="w-32 bg-[oklch(0.18_0_0)] border-white/10 text-white/90">
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -134,7 +162,15 @@ export function QueryTrail(props: QueryTrailProps) {
                       }}
                       disabled={step.status === 'running' || anyRunning}
                     >
-                      <Play className="h-3 w-3 mr-2" /> Re-run
+                      <RefreshCw className="h-3 w-3 mr-2" /> Re-run
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onInspectStep?.(step.id);
+                      }}
+                    >
+                      <Info className="h-3 w-3 mr-2" /> Provenance
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-rose-400 focus:text-rose-400 focus:bg-rose-950/30"

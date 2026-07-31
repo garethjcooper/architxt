@@ -92,8 +92,8 @@ export async function listMentalModels(serverId, bankId, options = {}) {
   const queryParams = new URLSearchParams();
   const detail = VALID_DETAIL_LEVELS.has(options.detail) ? options.detail : 'content';
   queryParams.set('detail', detail);
-  if (options.limit) queryParams.append('limit', options.limit);
-  if (options.offset) queryParams.append('offset', options.offset);
+  if (options.limit !== undefined) queryParams.append('limit', options.limit);
+  if (options.offset !== undefined) queryParams.append('offset', options.offset);
 
   const queryString = queryParams.toString();
   const url = `${serviceUrl}/v1/default/banks/${encodeURIComponent(bankId)}/mental-models${queryString ? '?' + queryString : ''}`;
@@ -129,6 +129,71 @@ export async function listMentalModels(serverId, bankId, options = {}) {
     logger.error('Hindsight listMentalModels error', { serverId, bankId, error: error.message });
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * List ALL mental models in a bank by paging through Hindsight's 1000-item cap.
+ *
+ * Hindsight rejects limit > 1000 with HTTP 422. Some builds also cap or lie in
+ * body.total, so we page until a page returns no new items (with a safety cap)
+ * instead of trusting body.total.
+ *
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {Object} [options]
+ * @param {string} [options.detail] - 'metadata' | 'content' | 'full' (default 'content')
+ * @param {number} [options.timeoutMs] - Per-page fetch timeout (default 30000)
+ * @returns {Promise<{success: boolean, mentalModels?: Array, total?: number, error?: string}>}
+ */
+export async function listAllMentalModels(serverId, bankId, options = {}) {
+  const pageSize = 1000;
+  const maxPages = 100; // hard safety cap at 100k models
+  const allModels = [];
+  const seenIds = new Set();
+
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+    const offset = pageIndex * pageSize;
+    const page = await listMentalModels(serverId, bankId, { ...options, limit: pageSize, offset });
+    if (!page.success) {
+      logger.error('Hindsight listAllMentalModels page failed', { serverId, bankId, offset, error: page.error });
+      return { success: false, error: `Failed to fetch mental models page at offset ${offset}: ${page.error}` };
+    }
+
+    const pageModels = page.mentalModels || [];
+    const firstId = pageModels[0]?.id ?? null;
+    const lastId = pageModels[pageModels.length - 1]?.id ?? null;
+    const newModels = pageModels.filter((mm) => {
+      if (!mm.id || seenIds.has(mm.id)) return false;
+      seenIds.add(mm.id);
+      return true;
+    });
+
+    logger.info('Hindsight listAllMentalModels page', {
+      serverId,
+      bankId,
+      offset,
+      limit: pageSize,
+      returned: pageModels.length,
+      newIds: newModels.length,
+      total: page.total,
+      firstId,
+      lastId,
+      duplicateIds: pageModels.length - newModels.length,
+    });
+
+    allModels.push(...newModels);
+
+    // Stop when a page is empty or when every item in it was already seen.
+    // Do not trust body.total because some Hindsight builds cap total at 1000
+    // alongside the limit cap, which makes total a lie for larger banks.
+    if (pageModels.length === 0 || newModels.length === 0) {
+      logger.info('Hindsight listAllMentalModels complete', { serverId, bankId, pages: pageIndex + 1, total: page.total, fetched: allModels.length });
+      return { success: true, mentalModels: allModels, total: allModels.length };
+    }
+  }
+
+  logger.warn('Hindsight listAllMentalModels hit safety cap', { serverId, bankId, maxPages, fetched: allModels.length });
+  return { success: true, mentalModels: allModels, total: allModels.length };
 }
 
 /**

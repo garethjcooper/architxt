@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides } from '../types';
+import type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -342,10 +342,10 @@ export const serversApi = {
   // List banks from server
   listBanks: (id: number) =>
     fetchApi<Array<{ bank_id: string; name: string; description?: string }>>(`/servers/${id}/banks`),
-  listBankTags: (serverId: number, bankId: string) =>
-    fetchApi<{ items: Array<{ tag: string; count: number }>; total: number }>(`/hindsight/banks/${encodeURIComponent(bankId)}/tags?server_id=${serverId}`),
   getBankGraph: (serverId: number, bankId: string) =>
     fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/graph?server_id=${serverId}`),
+  getBankEntities: (serverId: number, bankId: string) =>
+    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/entities?server_id=${serverId}`),
 };
 
 // Metadata API
@@ -477,7 +477,7 @@ export const mentalModelsApi = {
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     dimension?: string | null;
-    returns?: 'json' | 'narrative';
+    returns?: MentalModelReturns;
     concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
@@ -495,7 +495,7 @@ export const mentalModelsApi = {
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     dimension?: string | null;
-    returns?: 'json' | 'narrative';
+    returns?: MentalModelReturns;
     concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
@@ -523,7 +523,7 @@ export const mentalModelsApi = {
   healthCheck: (payload: {
     server_id: number;
     bank_id: string;
-    models: { ext_id: string; returns?: 'json' | 'narrative' }[];
+    models: { ext_id: string; returns?: MentalModelReturns }[];
   }) =>
     fetchApi<{
       results: {
@@ -817,17 +817,19 @@ export const hindsightApi = {
     ),
 };
 
+/**
+ * Canonical graph node shape. This is the single source of truth for every
+ * node that crosses an API boundary or is rendered on a graph canvas.
+ * Render-only state (positions, computed color) is stored here too so layout
+ * and persistence stay portable across pages.
+ */
 export interface GraphNode {
   id: string;
-  label: string;
-  label_long?: string;
+  name?: string;
+  label?: string;
   type?: string;
-  category?: string;
-  mention_count?: number;
-  prominence?: number;
-  depth?: number;
   source?: 'canonical' | 'alias' | 'hindsight' | 'mental_model' | 'mental_model_referenced' | string;
-  hindsight_id?: string | null;
+  provenance?: 'known' | 'discovered' | 'inferred' | string;
   mental_model_applied?: boolean;
   x?: number;
   y?: number;
@@ -836,17 +838,27 @@ export interface GraphNode {
   color?: string;
 }
 
+/**
+ * Canonical graph edge shape. All edges use `from`/`to` regardless of their
+ * origin; Cytoscape conversion is the only place where `source`/`target`
+ * terminology is used for the renderer.
+ */
 export interface GraphEdge {
   id: string;
-  source: string;
-  target: string;
+  from: string;
+  to: string;
+  type?: string;
   label?: string;
+  detail?: string;
   weight?: number;
-  link_type?: string;
-  relationship_type?: string;
-  edge_source?: 'co_occurrence' | 'mental_model' | 'synthesize';
+  provenance?: 'known' | 'discovered' | 'inferred' | string;
+  source?: 'co_occurrence' | 'mental_model' | 'synthesize' | 'reflect' | string;
   source_fact_ids?: string[];
-  label_long?: string;
+}
+
+export interface GraphCanvas {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 export interface GraphMeta {
@@ -926,7 +938,7 @@ export interface DiscoverStepResponse {
   status: 'running' | 'completed' | 'failed';
   bank_id: string;
   viewpoint_ids: number[];
-  query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | string;
+  query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | string;
   action_type?: string;
   parameters?: Record<string, any> | null;
   synthesis?: {
@@ -1029,7 +1041,7 @@ export const researchApi = {
     bank_id: string;
     viewpoint_ids: number[];
     intent_text: string;
-    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize';
+    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models';
     dimension?: string;
     selections?: any[];
     budget?: 'low' | 'mid' | 'high';
@@ -1038,6 +1050,9 @@ export const researchApi = {
     prefer_observations?: boolean;
     include?: { facts?: {}; source_facts?: {}; };
     fact_types?: string[];
+    exclude_mental_models?: boolean;
+    include_source_facts?: boolean;
+    template?: string;
     tags?: string[];
     tags_match?: string;
   }) =>
@@ -1074,8 +1089,8 @@ export const researchApi = {
     session_id: number;
     source_step_ids: number[];
     intent_text: string;
-    budget?: 'low' | 'mid' | 'high';
     max_tokens?: number;
+    template?: string;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/synthesize', {
       method: 'POST',

@@ -74,7 +74,10 @@ export function parseAllTokens(query) {
 
 function formatSelectionReference(selection) {
   if (selection.kind !== 'entity') return selection.label || selection.id;
-  if (selection.type) return `${selection.label || selection.id} (${selection.type}:${selection.id})`;
+  if (selection.type) {
+    const qualified = selection.id.startsWith(`${selection.type}:`) ? selection.id : `${selection.type}:${selection.id}`;
+    return `${selection.label || selection.id} (${qualified})`;
+  }
   return selection.label || selection.id;
 }
 

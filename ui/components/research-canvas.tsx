@@ -5,6 +5,15 @@ import cytoscape from 'cytoscape';
 import cytoscapeDagre from 'cytoscape-dagre';
 import cytoscapeFcose from 'cytoscape-fcose';
 import cytoscapeAvsdf from 'cytoscape-avsdf';
+import {
+  type GraphNode,
+  type GraphEdge,
+  type GraphCanvas,
+} from '@/lib/api/client';
+import {
+  toCytoscapeElements,
+  toPreviewCytoscapeElements,
+} from '@/lib/graph/cytoscape-elements';
 
 export type SelectionKind = 'table' | 'graph' | 'diagram' | 'text' | 'anchor' | 'tag' | 'edge';
 
@@ -15,47 +24,11 @@ export interface ResearchSelection {
   context: string;
 }
 
-interface GraphNode {
-  id: string;
-  label: string;
-  label_long?: string;
-  type?: string;
-  category?: string;
-  source?: string;
-  mention_count?: number;
-  prominence?: number;
-  depth?: number;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  color?: string;
-  mental_model_applied?: boolean;
-}
-
-interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label?: string;
-  weight?: number;
-  relationship_type?: string;
-  edge_source?: 'co_occurrence' | 'mental_model' | 'synthesize';
-  confidence?: number;
-  source_fact_ids?: string[];
-  label_long?: string;
-}
-
-export type { GraphNode, GraphEdge, GraphCanvas, InteractiveGraphProps };
+export type { GraphNode, GraphEdge, GraphCanvas };
 
 export type { GraphLayout };
 
 type GraphLayout = 'fcose' | 'avsdf' | 'cose' | 'dagre' | 'breadthfirst' | 'concentric' | 'circle';
-
-interface GraphCanvas {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
 
 interface InteractiveGraphProps {
   graph: GraphCanvas;
@@ -213,9 +186,9 @@ export function colorForType(type?: string | null): string {
   return TYPE_PALETTE[hashString(type) % TYPE_PALETTE.length];
 }
 
-export function colorForEdge(edge?: { edge_source?: string | null; relationship_type?: string | null }): string {
-  const source = edge?.edge_source;
-  const rel = edge?.relationship_type;
+export function colorForEdge(edge?: { source?: string | null; type?: string | null }): string {
+  const source = edge?.source;
+  const rel = edge?.type;
   if (source === 'synthesize') return '#8b5cf6';
   if (source === 'mental_model') {
     if (rel === 'calls') return '#64d2c8';
@@ -233,7 +206,7 @@ export function mapTypeName(type?: string | null): string {
   return type;
 }
 
-function truncateLabel(label: string, max = 18): string {
+export function truncateLabel(label: string, max = 18): string {
   return label.length > max ? `${label.slice(0, max - 1)}…` : label;
 }
 
@@ -293,83 +266,11 @@ export function InteractiveGraph({
   const styleRef = useRef<cytoscape.StylesheetStyle[] | null>(null);
 
   const elements = useMemo(() => {
-    const allNodes = graph.nodes || [];
-    const allEdges = graph.edges || [];
-
-    const nodeIds = new Set(allNodes.map((n) => n.id));
-    const visibleEdges = allEdges.filter(
-      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
-    );
-
-    return {
-      nodes: allNodes.map((n) => ({
-        data: {
-          id: n.id,
-          label: truncateLabel(n.label),
-          fullLabel: n.label,
-          label_long: n.label_long,
-          qualifiedId: n.type ? `${n.type}:${n.id}` : n.id,
-          type: n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other'),
-          category: n.category || mapTypeName(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
-          backgroundColor: n.color || colorForType(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
-          source: n.source || 'hindsight',
-          mental_model_applied: n.mental_model_applied ?? false,
-        },
-      })),
-      edges: visibleEdges.map((e) => ({
-        data: {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          weight: typeof e.weight === 'number' ? e.weight : 1,
-          label: typeof e.label === 'string' ? e.label : '',
-          relationship_type: e.relationship_type,
-          label_long: e.label_long,
-          edge_source: e.edge_source,
-        },
-      })),
-    };
+    return toCytoscapeElements(graph);
   }, [graph]);
 
   const previewElements = useMemo(() => {
-    const previewNodes = previewGraph?.nodes || [];
-    const previewEdges = previewGraph?.edges || [];
-    const realNodeIds = new Set((graph.nodes || []).map((n) => n.id));
-    const allNodeIds = new Set([...realNodeIds, ...previewNodes.map((n) => n.id)]);
-    const visiblePreviewEdges = previewEdges.filter(
-      (e) => allNodeIds.has(e.source) && allNodeIds.has(e.target),
-    );
-
-    return {
-      nodes: previewNodes
-        .filter((n) => !realNodeIds.has(n.id))
-        .map((n) => ({
-          data: {
-            id: n.id,
-            label: truncateLabel(n.label),
-            fullLabel: n.label,
-            label_long: n.label_long,
-            qualifiedId: n.type ? `${n.type}:${n.id}` : n.id,
-            type: n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other'),
-            category: n.category || mapTypeName(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
-            backgroundColor: n.color || colorForType(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
-            source: n.source || 'preview',
-            mental_model_applied: n.mental_model_applied ?? false,
-          },
-        })),
-      edges: visiblePreviewEdges.map((e) => ({
-        data: {
-          id: `preview:${e.id}`,
-          source: e.source,
-          target: e.target,
-          weight: typeof e.weight === 'number' ? e.weight : 1,
-          label: typeof e.label === 'string' ? e.label : '',
-          relationship_type: e.relationship_type,
-          label_long: e.label_long,
-          edge_source: e.edge_source || 'preview',
-        },
-      })),
-    };
+    return toPreviewCytoscapeElements(previewGraph || { nodes: [], edges: [] }, graph);
   }, [previewGraph, graph]);
 
   const prevElementsRef = useRef(elements);
@@ -450,7 +351,7 @@ export function InteractiveGraph({
           },
         },
         {
-          selector: 'edge[edge_source = "synthesize"]',
+          selector: 'edge[source = "synthesize"]',
           style: {
             width: 0.75,
             'line-color': 'rgba(139,92,246,0.4)',
@@ -461,7 +362,7 @@ export function InteractiveGraph({
           },
         },
         {
-          selector: 'edge[edge_source = "mental_model"]',
+          selector: 'edge[source = "mental_model"]',
           style: {
             width: 0.75,
             'line-color': 'rgba(66,165,245,0.4)',
@@ -472,42 +373,42 @@ export function InteractiveGraph({
         },
         // Subtle relationship-type colours for mental-model edges where we know the type.
         {
-          selector: 'edge[edge_source = "mental_model"][relationship_type = "calls"]',
+          selector: 'edge[source = "mental_model"][type = "calls"]',
           style: {
             'line-color': 'rgba(100,210,200,0.45)',
             'target-arrow-color': 'rgba(100,210,200,0.45)',
           },
         },
         {
-          selector: 'edge[edge_source = "mental_model"][relationship_type = "depends_on"]',
+          selector: 'edge[source = "mental_model"][type = "depends_on"]',
           style: {
             'line-color': 'rgba(210,160,120,0.45)',
             'target-arrow-color': 'rgba(210,160,120,0.45)',
           },
         },
         {
-          selector: 'edge[edge_source = "mental_model"][relationship_type = "sends"]',
+          selector: 'edge[source = "mental_model"][type = "sends"]',
           style: {
             'line-color': 'rgba(180,150,210,0.45)',
             'target-arrow-color': 'rgba(180,150,210,0.45)',
           },
         },
         {
-          selector: 'edge[edge_source = "mental_model"][relationship_type = "reads"]',
+          selector: 'edge[source = "mental_model"][type = "reads"]',
           style: {
             'line-color': 'rgba(150,190,160,0.45)',
             'target-arrow-color': 'rgba(150,190,160,0.45)',
           },
         },
         {
-          selector: 'edge[edge_source = "mental_model"][relationship_type = "writes"]',
+          selector: 'edge[source = "mental_model"][type = "writes"]',
           style: {
             'line-color': 'rgba(220,140,150,0.45)',
             'target-arrow-color': 'rgba(220,140,150,0.45)',
           },
         },
         {
-          selector: 'edge[edge_source != "mental_model"]',
+          selector: 'edge[source != "mental_model"]',
           style: {
             width: 0.4,
           },
@@ -747,8 +648,12 @@ export function InteractiveGraph({
     const cy = cyInstance;
     if (!cy) return;
 
-    const nextNodeIds = new Set(elements.nodes.map((n) => n.data.id));
-    const nextEdgeIds = new Set(elements.edges.map((e) => e.data.id));
+    const nextNodeIds = new Set(
+      elements.filter((el) => el.group === 'nodes').map((n) => (n.data as any).id),
+    );
+    const nextEdgeIds = new Set(
+      elements.filter((el) => el.group === 'edges').map((e) => (e.data as any).id),
+    );
     const prev = prevSnapshotRef.current;
 
     cy.elements().forEach((el) => {
@@ -758,21 +663,14 @@ export function InteractiveGraph({
       }
     });
 
-    elements.nodes.forEach((n) => {
-      const existing = cy.getElementById(n.data.id);
+    elements.forEach((el) => {
+      const data = el.data as any;
+      const id = data.id;
+      const existing = cy.getElementById(id);
       if (existing.length === 0) {
-        cy.add({ group: 'nodes', data: n.data });
+        cy.add({ group: el.group, data });
       } else {
-        existing.data(n.data);
-      }
-    });
-
-    elements.edges.forEach((e) => {
-      const existing = cy.getElementById(e.data.id);
-      if (existing.length === 0) {
-        cy.add({ group: 'edges', data: e.data });
-      } else {
-        existing.data(e.data);
+        existing.data(data);
       }
     });
 
@@ -1023,7 +921,7 @@ export function InteractiveGraph({
     let visibleEdges = cy.edges();
     if (hasEdgeFilters) {
       visibleEdges = visibleEdges.filter((e) => {
-        const type = e.data('relationship_type');
+        const type = e.data('type');
         if (!type) return false;
         const inSet = edgeFilters.has(type);
         return isHiddenMode ? !inSet : inSet;
@@ -1072,31 +970,42 @@ export function InteractiveGraph({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || cy.destroyed()) return;
-    const realNodeIds = new Set(elements.nodes.map((n) => n.data.id));
-    const realEdgeIds = new Set(elements.edges.map((e) => e.data.id));
+    const realNodeIds = new Set(
+      elements.filter((el) => el.group === 'nodes').map((n) => (n.data as any).id),
+    );
+    const realEdgeIds = new Set(
+      elements.filter((el) => el.group === 'edges').map((e) => (e.data as any).id),
+    );
+    const previewNodeIds = new Set(
+      previewElements.filter((el) => el.group === 'nodes').map((n) => (n.data as any).id),
+    );
+    const previewEdgeIds = new Set(
+      previewElements.filter((el) => el.group === 'edges').map((e) => (e.data as any).id),
+    );
 
     // Remove any preview elements that are no longer in the preview or that have
     // become real elements.
     cy.nodes().forEach((n) => {
-      if (n.hasClass('preview') && (realNodeIds.has(n.id()) || !previewElements.nodes.some((pn) => pn.data.id === n.id()))) {
+      if (n.hasClass('preview') && (realNodeIds.has(n.id()) || !previewNodeIds.has(n.id()))) {
         n.remove();
       }
     });
     cy.edges().forEach((e) => {
-      if (e.hasClass('preview') && (realEdgeIds.has(e.id()) || !previewElements.edges.some((pe) => pe.data.id === e.id()))) {
+      if (e.hasClass('preview') && (realEdgeIds.has(e.id()) || !previewEdgeIds.has(e.id()))) {
         e.remove();
       }
     });
 
     // Add/update preview nodes.
-    previewElements.nodes.forEach((n) => {
-      const existing = cy.getElementById(n.data.id);
+    previewElements.filter((el) => el.group === 'nodes').forEach((n) => {
+      const data = n.data as any;
+      const existing = cy.getElementById(data.id);
       if (existing.length > 0 && existing.hasClass('preview')) {
-        existing.data(n.data);
+        existing.data(data);
         existing.addClass('preview');
         return;
       }
-      const added = cy.add({ group: 'nodes', data: n.data });
+      const added = cy.add({ group: 'nodes', data });
       added.addClass('preview');
     });
 
@@ -1104,15 +1013,16 @@ export function InteractiveGraph({
     // present in Cytoscape (either as a real or preview node) to avoid crashes
     // during render races.
     const cyNodeIds = new Set(cy.nodes().map((n) => n.id()));
-    previewElements.edges.forEach((e) => {
-      if (!cyNodeIds.has(e.data.source) || !cyNodeIds.has(e.data.target)) return;
-      const existing = cy.getElementById(e.data.id);
+    previewElements.filter((el) => el.group === 'edges').forEach((e) => {
+      const data = e.data as any;
+      if (!cyNodeIds.has(data.source) || !cyNodeIds.has(data.target)) return;
+      const existing = cy.getElementById(data.id);
       if (existing.length > 0 && existing.hasClass('preview')) {
-        existing.data(e.data);
+        existing.data(data);
         existing.addClass('preview');
         return;
       }
-      const added = cy.add({ group: 'edges', data: e.data });
+      const added = cy.add({ group: 'edges', data });
       added.addClass('preview');
     });
 

@@ -176,6 +176,58 @@ function CallRow({ call, index }: { call: ResearchStepCall; index: number }) {
   );
 }
 
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.length === 0 ? '[]' : value.map((v) => (typeof v === 'string' ? v : JSON.stringify(v))).join(', ');
+  return JSON.stringify(value);
+}
+
+function StepProvenance({ step }: { step: ResearchStepSummary | null }) {
+  if (!step) return <p className="text-xs text-white/40 py-2">No step selected.</p>;
+  const params = step.parameters || {};
+  const entries = Object.entries(params);
+  if (entries.length === 0) {
+    return <p className="text-xs text-white/40 py-2">No provenance parameters recorded for this step.</p>;
+  }
+  return (
+    <div className="space-y-2 py-1">
+      <div className="text-[10px] text-white/40 font-medium">Normalized step settings</div>
+      <div className="rounded bg-black/30 border border-white/10 overflow-hidden">
+        <table className="w-full text-[11px]">
+          <tbody>
+            {entries.map(([key, value]) => (
+              <tr key={key} className="border-b border-white/5 last:border-0">
+                <td className="px-2 py-1 text-white/50 font-mono align-top w-1/3">{key}</td>
+                <td className="px-2 py-1 text-white/80 align-top">
+                  {typeof value === 'boolean' ? (
+                    <span className={value ? 'text-emerald-400' : 'text-white/40'}>{value ? 'true' : 'false'}</span>
+                  ) : (
+                    <span className="font-mono">{formatValue(value)}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {step.selections && step.selections.length > 0 && (
+        <div className="rounded bg-black/30 border border-white/10 px-2 py-1">
+          <div className="text-[10px] text-white/40 font-medium mb-1">Selections</div>
+          <ul className="list-disc list-inside text-[11px] text-white/70">
+            {step.selections.map((s, i) => (
+              <li key={i} className="font-mono truncate" title={JSON.stringify(s)}>
+                {typeof s === 'string' ? s : JSON.stringify(s)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function QueryInspectDialog({ open, onOpenChange, step }: Props) {
   const calls = step?.calls ?? [];
   const totalPayload = calls.reduce((sum, c) => sum + (c.request_payload_chars ?? 0), 0);
@@ -201,11 +253,15 @@ export function QueryInspectDialog({ open, onOpenChange, step }: Props) {
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="calls" className="flex flex-col flex-1 min-h-0">
+        <Tabs defaultValue="provenance" className="flex flex-col flex-1 min-h-0">
           <TabsList variant="line" className="shrink-0">
+            <TabsTrigger value="provenance" className="text-xs">Provenance</TabsTrigger>
             <TabsTrigger value="calls" className="text-xs">Tool Calls ({calls.length})</TabsTrigger>
             <TabsTrigger value="json" className="text-xs">Raw JSON</TabsTrigger>
           </TabsList>
+          <TabsContent value="provenance" className="flex-1 min-h-0 mt-0 overflow-y-auto">
+            <StepProvenance step={step} />
+          </TabsContent>
           <TabsContent value="calls" className="flex-1 min-h-0 mt-0 overflow-y-auto">
             {calls.length === 0 ? (
               <p className="text-xs text-white/40 py-2">No tool calls recorded for this step.</p>

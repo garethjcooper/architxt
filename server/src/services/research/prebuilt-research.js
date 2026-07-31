@@ -21,7 +21,7 @@
 
 import { listEligibleMentalModels } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { extractNarrative, tryExtractGraph } from './mental-model-results.js';
+import { parseGraphResponse } from '../../prompts/parse-graph-response.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt');
@@ -81,7 +81,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   }
 
   if (returns === 'narrative') {
-    const narrative = extractNarrative(content) || '';
+    const { narrative, error: parseError } = parseGraphResponse(content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
     logger.info('Prebuilt candidate narrative extracted', {
       serverId,
       bankId,
@@ -89,6 +89,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
       candidateId: candidate.id,
       contentLength,
       narrativeLength: narrative.length,
+      parseError: parseError || null,
     });
     return {
       ...candidate,
@@ -98,7 +99,11 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     };
   }
 
-  const { graph, error: graphError } = tryExtractGraph(content);
+  const { graph, error: graphError } = parseGraphResponse(content, {
+    mode: returns.startsWith('narrative-graph') ? returns : 'graph-known',
+    expectGraph: true,
+    defaultSource: 'mental_model',
+  });
   logger.info('Prebuilt candidate graph extracted', {
     serverId,
     bankId,
@@ -129,7 +134,7 @@ function mergeGraphs(graphs) {
       if (!nodeById.has(n.id)) nodeById.set(n.id, n);
     }
     for (const e of graph.edges || []) {
-      const key = e.id || `${e.source}|${e.target}|${e.label}`;
+      const key = e.id || `${e.from}|${e.to}|${e.type}`;
       if (edgeKeys.has(key)) continue;
       edgeKeys.add(key);
       edges.push(e);
