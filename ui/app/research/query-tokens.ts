@@ -28,15 +28,16 @@ export interface QueryToken {
 
 export interface EntityLike {
   id: string;
+  name?: string | null;
   label?: string | null;
   type?: string | null;
 }
 
 export interface EdgeLike {
-  source: string;
-  target: string;
+  from: string;
+  to: string;
   label?: string | null;
-  relationship_type?: string | null;
+  type?: string | null;
 }
 
 export function formatEntityToken(label: string, id: string, type?: string | null): string {
@@ -85,15 +86,15 @@ export function parseQueryTokens(query: string): QueryToken[] {
     const inner = match[0].slice(2, -2);
     const parts = inner.split(/\s*—\s*|\s*→\s*/);
     if (parts.length >= 3) {
-      const source = parts[0].trim();
+      const from = parts[0].trim();
       const edgeLabel = parts[1].trim();
-      const target = parts.slice(2).join(' → ').trim();
-      const id = `${source}|${target}|${edgeLabel}`;
+      const to = parts.slice(2).join(' → ').trim();
+      const id = `${from}|${to}|${edgeLabel}`;
       tokens.push({
         kind: 'edge',
         raw: match[0],
         id,
-        label: `${source} — ${edgeLabel} → ${target}`,
+        label: `${from} — ${edgeLabel} → ${to}`,
         index: match.index ?? 0,
       });
     }
@@ -121,32 +122,32 @@ export function renderQueryHtml(
   let html = '';
   let lastIndex = 0;
 
-  const entityLabelById = new Map(entities.map((e) => [e.id, e.label || e.id]));
+  const entityLabelById = new Map(entities.map((e) => [e.id, e.name || e.label || e.id]));
   const lowerLabel = (s: string) => s.toLowerCase();
 
   function resolveEdgeType(tokenId: string): string | null {
-    const [sourceId, targetId, relLabel] = tokenId.split('|');
-    const sourceLabel = entityLabelById.get(sourceId);
-    const targetLabel = entityLabelById.get(targetId);
+    const [fromId, toId, relLabel] = tokenId.split('|');
+    const sourceLabel = entityLabelById.get(fromId);
+    const targetLabel = entityLabelById.get(toId);
 
     // Exact endpoint + label match.
     const exact = edges.find(
-      (e) => e.source === sourceId && e.target === targetId && (e.relationship_type === relLabel || e.label === relLabel),
+      (e) => e.from === fromId && e.to === toId && (e.type === relLabel || e.label === relLabel),
     );
-    if (exact?.relationship_type) return exact.relationship_type;
+    if (exact?.type) return exact.type;
 
     // Fallback: match by resolved entity labels in case token ids differ from graph ids.
     if (sourceLabel && targetLabel) {
       const byLabel = edges.find((e) => {
-        const sLabel = entityLabelById.get(e.source);
-        const tLabel = entityLabelById.get(e.target);
+        const sLabel = entityLabelById.get(e.from);
+        const tLabel = entityLabelById.get(e.to);
         return (
-          lowerLabel(sLabel || e.source) === lowerLabel(sourceLabel) &&
-          lowerLabel(tLabel || e.target) === lowerLabel(targetLabel) &&
-          (e.relationship_type === relLabel || e.label === relLabel)
+          lowerLabel(sLabel || e.from) === lowerLabel(sourceLabel) &&
+          lowerLabel(tLabel || e.to) === lowerLabel(targetLabel) &&
+          (e.type === relLabel || e.label === relLabel)
         );
       });
-      if (byLabel?.relationship_type) return byLabel.relationship_type;
+      if (byLabel?.type) return byLabel.type;
     }
 
     return relLabel || null;
@@ -161,9 +162,9 @@ export function renderQueryHtml(
     const fullRaw = token.raw;
     let chipText = token.label || fullRaw;
     if (token.kind === 'edge') {
-      const [sourceId, targetId, relLabel] = token.id.split('|');
-      const sourceLabel = entities.find((e) => e.id === sourceId)?.label || sourceId;
-      const targetLabel = entities.find((e) => e.id === targetId)?.label || targetId;
+      const [fromId, toId, relLabel] = token.id.split('|');
+      const sourceLabel = entities.find((e) => e.id === fromId)?.name || entities.find((e) => e.id === fromId)?.label || fromId;
+      const targetLabel = entities.find((e) => e.id === toId)?.name || entities.find((e) => e.id === toId)?.label || toId;
       chipText = `${sourceLabel} — ${relLabel} → ${targetLabel}`;
     }
 

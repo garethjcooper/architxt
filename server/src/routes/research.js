@@ -4,7 +4,7 @@ import { createLogger } from '../utils/logger.js';
 import { sendResponse, validateId } from '../utils/route-helpers.js';
 import { mapErrorToStatus } from '../utils/db-helpers.js';
 import { runDiscoverStep } from '../services/research/agent.js';
-import { normalizeHindsightGraph } from '../services/research/halo-graph.js';
+import { normalizeHindsightGraph, normalizeHindsightEntities } from '../services/research/halo-graph.js';
 import { isValidQueryDepth } from '../services/research/handlers/index.js';
 import {
   createSession,
@@ -25,7 +25,7 @@ import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../s
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
 import { createPendingOperation } from '../db/crud/pending-operations.js';
-import { tryExtractGraph, extractNarrative } from '../services/research/mental-model-results.js';
+import { parseGraphResponse } from '../prompts/parse-graph-response.js';
 
 const logger = createLogger('research-route');
 const router = Router();
@@ -113,8 +113,8 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
           if (!mergedGraph.nodes.some((x) => x.id === n.id)) mergedGraph.nodes.push(n);
         }
         for (const e of g.edges || []) {
-          const key = e.id || `${e.source}|${e.target}|${e.label}`;
-          if (!mergedGraph.edges.some((x) => (x.id || `${x.source}|${x.target}|${x.label}`) === key)) {
+          const key = e.id || `${e.from}|${e.to}|${e.type}`;
+          if (!mergedGraph.edges.some((x) => (x.id || `${x.from}|${x.to}|${x.type}`) === key)) {
             mergedGraph.edges.push(e);
           }
         }
@@ -220,7 +220,7 @@ const toApiStep = (dbRow) => ({
  *                 type: string
  *               query_depth:
  *                 type: string
- *                 enum: [prebuilt, recall, reflect, synthesize]
+ *                 enum: [prebuilt, recall, reflect, synthesize, models]
  *                 default: prebuilt
  *               selections:
  *                 type: array
@@ -275,8 +275,10 @@ router.post('/discover', async (req, res) => {
       include,
       fact_types,
       exclude_mental_models,
+      include_source_facts,
       tags,
       tags_match,
+      template,
     } = req.body;
 
     if (!bank_id || typeof bank_id !== 'string') {
@@ -306,9 +308,28 @@ router.post('/discover', async (req, res) => {
       ...(include !== undefined && { include }),
       ...(fact_types !== undefined && { fact_types }),
       ...(exclude_mental_models !== undefined && { exclude_mental_models }),
+      ...(include_source_facts !== undefined && { include_source_facts }),
       ...(tags !== undefined && { tags }),
       ...(tags_match !== undefined && { tags_match }),
+      ...(selections !== undefined && { selections }),
+      ...(template !== undefined && { template }),
     };
+
+    // Normalize Reflect provenance so every recorded step has a complete,
+    // reproducible settings snapshot.
+    if (effectiveDepth === 'reflect') {
+      handlerOptions.budget = handlerOptions.budget ?? 'low';
+      handlerOptions.max_tokens = handlerOptions.max_tokens ?? 4096;
+      handlerOptions.fact_types = handlerOptions.fact_types ?? ['world', 'observation'];
+      handlerOptions.exclude_mental_models = handlerOptions.exclude_mental_models ?? false;
+      handlerOptions.template = handlerOptions.template ?? 'narrative-graph-known';
+      handlerOptions.include_source_facts = handlerOptions.include_source_facts ?? false;
+    }
+
+    // Normalize Synthesize provenance to match Reflect.
+    if (effectiveDepth === 'synthesize') {
+      handlerOptions.template = handlerOptions.template ?? 'narrative-graph-known';
+    }
 
     // Get or create session.
     let rsId = session_id;
@@ -634,8 +655,8 @@ router.post('/prebuilt', async (req, res) => {
             if (!mergedGraph.nodes.some((x) => x.id === n.id)) mergedGraph.nodes.push(n);
           }
           for (const e of g.edges || []) {
-            const key = e.id || `${e.source}|${e.target}|${e.label}`;
-            if (!mergedGraph.edges.some((x) => (x.id || `${x.source}|${x.target}|${x.label}`) === key)) {
+            const key = e.id || `${e.from}|${e.to}|${e.type}`;
+            if (!mergedGraph.edges.some((x) => (x.id || `${x.from}|${x.to}|${x.type}`) === key)) {
               mergedGraph.edges.push(e);
             }
           }
@@ -891,7 +912,7 @@ router.post('/mental-models/health', async (req, res) => {
       }
 
       if (returns === 'narrative') {
-        const narrative = extractNarrative(content) || '';
+        const { narrative } = parseGraphResponse(content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
         return {
           ext_id: extId,
           healthy: narrative.length > 0,
@@ -899,18 +920,27 @@ router.post('/mental-models/health', async (req, res) => {
           content,
           content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
           parsed: { narrative },
+          narrative_length: narrative.length,
+          graph_present: false,
           error: narrative.length > 0 ? undefined : 'Narrative content is empty',
         };
       }
 
-      const { graph, error: graphError } = tryExtractGraph(content);
+      const { narrative, graph, error: graphError } = parseGraphResponse(content, {
+        mode: returns.startsWith('narrative-graph') ? returns : 'graph-known',
+        expectGraph: true,
+        defaultSource: 'mental_model',
+      });
+      const healthy = graphError == null;
       return {
         ext_id: extId,
-        healthy: graph != null,
+        healthy,
         found: true,
         content,
         content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
-        parsed: graph ? { graph } : undefined,
+        parsed: healthy ? { graph } : undefined,
+        narrative_length: narrative.length,
+        graph_present: healthy,
         node_count: graph?.nodes.length ?? 0,
         edge_count: graph?.edges.length ?? 0,
         error: graphError,
@@ -1060,8 +1090,8 @@ router.post('/synthesize', async (req, res) => {
       session_id,
       source_step_ids,
       intent_text,
-      budget,
       max_tokens,
+      template,
     } = req.body;
 
     if (!bank_id || typeof bank_id !== 'string') {
@@ -1124,8 +1154,8 @@ router.post('/synthesize', async (req, res) => {
     }
 
     const handlerOptions = {
-      budget: ['low', 'mid', 'high'].includes(budget) ? budget : 'high',
       ...(max_tokens !== undefined && { max_tokens }),
+      ...(template !== undefined && { template }),
       source_steps: sourceSteps.map((s) => ({
         intent_text: s.rstep_intent_text,
         action_type: s.rstep_action_type,
@@ -1620,6 +1650,59 @@ router.get('/banks/:bankId/graph', async (req, res) => {
   } catch (err) {
     logger.error('Research bank graph route error', { serverId, bankId, error: err.message });
     sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+  }
+});
+
+/**
+ * @swagger
+ * /research/banks/{bankId}/entities:
+ *   get:
+ *     summary: Get all entities for a bank
+ *     description: Returns every Hindsight entity for the bank resolved to architxt canonical entities.
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: bankId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Entity list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 nodes:
+ *                   type: array
+ *                 edges:
+ *                   type: array
+ */
+router.get('/banks/:bankId/entities', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.params.bankId;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await normalizeHindsightEntities(serverId, bankId, db, { limit: 1000 });
+    if (!result.success) {
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITIES_FAILED', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+      return;
+    }
+    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Research bank entities route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
   }
 });
 

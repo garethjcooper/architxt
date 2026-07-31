@@ -33,9 +33,13 @@ function normalizeCsv(value) {
 }
 
 function buildPayload(model) {
+  if (typeof model.composed_query !== 'string' || model.composed_query.trim() === '') {
+    throw new Error(`mental model ${model.ext_id || model.name || '(unknown)'} is missing composed_query; refusing to push raw source_query`);
+  }
+
   return {
     name: model.name || null,
-    source_query: model.source_query || null,
+    source_query: model.composed_query,
     tags: Array.isArray(model.tags) ? model.tags : [],
     max_tokens: normaliseMaxTokens(model.max_tokens) ?? DEFAULT_MAX_TOKENS,
     trigger: {

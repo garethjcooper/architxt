@@ -197,7 +197,7 @@ CREATE TABLE mental_models (
   mm_viewp_description TEXT,
   mm_viewp_meta JSON,
   mm_dimension TEXT,
-  mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
+  mm_returns TEXT DEFAULT 'narrative' REFERENCES prompt_templates(pt_name),
   mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
   mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -225,6 +225,24 @@ CREATE TABLE mental_model_entities (
   PRIMARY KEY (ent_id, mm_id),
   FOREIGN KEY (ent_id) REFERENCES entities(ent_id) ON DELETE CASCADE,
   FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
+);
+
+-- ============================================================================
+-- PROMPT TEMPLATES — reusable prompt compositions for graph/narrative output
+-- ============================================================================
+
+CREATE TABLE prompt_templates (
+  pt_name TEXT PRIMARY KEY,
+  pt_mode TEXT NOT NULL,
+  pt_description TEXT,
+  pt_body TEXT NOT NULL,
+  pt_fragments JSON NOT NULL,
+  pt_variables JSON NOT NULL,
+  pt_examples_heuristic TEXT,
+  pt_is_builtin INTEGER NOT NULL DEFAULT 0 CHECK (pt_is_builtin IN (0, 1)),
+  pt_version TEXT,
+  pt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  pt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE directives (

@@ -11,7 +11,8 @@ import {
   deleteBank,
 } from '../services/hindsight/index.js';
 import { pushEntities, pushEntityTypes, pullEntities, pullEntityTypes } from '../services/hindsight/entities.js';
-import { listMentalModels as hindsightListMentalModels } from '../services/hindsight/mental-models.js';
+import { listAllMentalModels as hindsightListAllMentalModels } from '../services/hindsight/mental-models.js';
+import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import { listDirectives as hindsightListDirectives } from '../services/hindsight/directives.js';
 import { pushDirective as pushHindsightDirective } from '../services/hindsight/push-directive.js';
 import { pullDirective as pullHindsightDirective } from '../services/hindsight/pull-directive.js';
@@ -83,7 +84,7 @@ function arraySetEqual(a, b) {
 
 function buildMentalModelDivergence(arch, hind) {
   const nameDiffers = arch.name !== (hind.name ?? null);
-  const sourceQueryDiffers = arch.source_query !== (hind.source_query ?? null);
+  const sourceQueryDiffers = arch.composed_query !== (hind.source_query ?? null);
   const maxTokensDiffers = Number(arch.max_tokens) !== Number(hind.max_tokens);
   const refreshModeDiffers = arch.refresh_mode !== hind.refresh_mode;
   const refreshAfterConsolidationDiffers = !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation;
@@ -109,17 +110,6 @@ function buildMentalModelDivergence(arch, hind) {
     exclude_mental_model_list_differs: excludeListDiffers,
     tags_match_mode_differs: tagsMatchModeDiffers,
   };
-}
-
-/**
- * Derived mental models inherit template fields, but the effective architxt
- * values already substitute entity placeholders and can diverge from the bank
- * when the template changes. Use the same full comparison as plain models so
- * every badge reflects real sync state. Pull still skips derived rows; Push
- * handles them.
- */
-function buildDerivedMentalModelDivergence(arch, hind) {
-  return buildMentalModelDivergence(arch, hind);
 }
 
 function substituteDerived(template, entity) {
@@ -163,6 +153,7 @@ function deriveMentalModelsForDiff(template) {
       ext_id: substituteDerived(template.mm_ext_id, entity),
       name: substituteDerived(template.mm_name, entity),
       source_query: substituteDerived(template.mm_source_query, entity),
+      returns: template.mm_returns,
       refresh_after_consolidation: refreshAfterConsolidation,
       refresh_mode: overrides.refresh_mode || template.mm_refresh_mode || DEFAULT_REFRESH_MODE,
       exclude_all_mental_models: excludeAll,
@@ -223,7 +214,6 @@ router.get('/diff', async (req, res) => {
   const bankId = req.query.bank_id;
   const object = req.query.object || 'documents';
   const summaryMode = req.query.summary === 'true';
-  logger.warn('Hindsight diff: start', { serverId, bankId, object, summaryMode });
 
   if (!serverId || !bankId) {
     return res.status(400).json({
@@ -440,8 +430,8 @@ router.get('/diff', async (req, res) => {
   // ── Mental Models branch ──
   if (object === 'mental-models') {
     try {
-      // 1. Fetch Hindsight mental models with detail=content
-      const hindResult = await hindsightListMentalModels(serverId, bankId, { limit: 1000, detail: 'content' });
+      // 1. Fetch Hindsight mental models with detail=content (paginated; Hindsight caps limit at 1000)
+      const hindResult = await hindsightListAllMentalModels(serverId, bankId, { detail: 'content' });
       if (!hindResult.success) {
         return res.status(502).json({ error: hindResult.error, code: 'REMOTE_ERROR' });
       }
@@ -477,34 +467,47 @@ router.get('/diff', async (req, res) => {
 
       const derivedRows = [];
       for (const template of templates) {
-        derivedRows.push(...deriveMentalModelsForDiff(template));
+        const templateDerived = deriveMentalModelsForDiff(template);
+        derivedRows.push(...templateDerived);
       }
 
-      logger.info('Mental models diff raw inputs', {
-        hindsightCount: hindMap.size,
-        architxtRowCount: archRows.length,
-        plainCount: plainRows.length,
-        templateCount: templates.length,
-        derivedCount: derivedRows.length,
-        hindsightKeys: [...hindMap.keys()],
-        plainExtIds: plainRows.map((r) => r.mm_ext_id),
-        derivedExtIds: derivedRows.map((r) => ({ extId: r.ext_id, mmId: r.derived_entity?.mm_id, entId: r.derived_entity?.id })),
-      });
+      // Compose prompts for plain and derived rows in a single batch.
+      // composeMentalModelPromptBatch builds the entity catalog once and caches
+      // templates/examples, so this is much faster than per-row composition.
+      const allComposeInputs = [
+        ...plainRows.map((r) => ({ returns: r.mm_returns, source_query: r.mm_source_query })),
+        ...derivedRows.map((r) => ({ returns: r.returns, source_query: r.source_query })),
+      ];
+      const allComposed = await composeMentalModelPromptBatch(db, allComposeInputs);
 
-      const plainCandidates = plainRows.map((r) => ({
-        id: r.mm_id,
-        ext_id: r.mm_ext_id,
-        name: r.mm_name,
-        source_query: r.mm_source_query,
-        refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
-        refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
-        exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
-        exclude_mental_model_list: r.mm_exclude_mental_model_list,
-        max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
-        tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
-        tags: r.mm_tag_names || [],
-        is_derived: false,
-      }));
+      const plainComposed = allComposed.slice(0, plainRows.length);
+      const derivedComposed = allComposed.slice(plainRows.length);
+      for (let i = 0; i < derivedRows.length; i += 1) {
+        derivedRows[i].composed_query = derivedComposed[i].composed_query;
+        if (derivedComposed[i].compose_error) {
+          derivedRows[i].compose_error = derivedComposed[i].compose_error;
+        }
+      }
+
+      const plainCandidates = plainRows.map((r, i) => {
+        const composed = plainComposed[i];
+        return {
+          id: r.mm_id,
+          ext_id: r.mm_ext_id,
+          name: r.mm_name,
+          source_query: r.mm_source_query,
+          refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
+          refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
+          exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
+          exclude_mental_model_list: r.mm_exclude_mental_model_list,
+          max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+          tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
+          tags: r.mm_tag_names || [],
+          is_derived: false,
+          composed_query: composed.composed_query,
+          ...(composed.compose_error ? { compose_error: composed.compose_error } : {}),
+        };
+      });
 
       // 3. Categorise. Keep plain and derived candidates in separate buckets so a
       // plain model and a derived instance with the same ext_id do not shadow
@@ -560,7 +563,7 @@ router.get('/diff', async (req, res) => {
         }
 
         if (derivedArch) {
-          const divergence = buildDerivedMentalModelDivergence(derivedArch, hind);
+          const divergence = buildMentalModelDivergence(derivedArch, hind);
           const anyDiffers = Object.values(divergence).some(Boolean);
           const row = {
             ext_id: extId,
@@ -568,10 +571,8 @@ router.get('/diff', async (req, res) => {
             hindsight: summaryMode ? { ext_id: extId } : hind,
             divergence,
           };
-          logger.info('Derived mental model comparison', { extId, hasHind: !!hind, divergence, archRefreshAfter: derivedArch.refresh_after_consolidation, hindRefreshAfter: hind?.refresh_after_consolidation, rawOverrides: derivedArch.__rawOverrides });
           if (anyDiffers) {
             different.push(row);
-            logger.info('Derived mental model differs', { extId, divergence, arch: derivedArch, hind });
           } else {
             same.push(row);
           }
@@ -745,14 +746,12 @@ router.get('/diff', async (req, res) => {
     }
 
     const hindsightDocs = hindsightResult.documents || [];
-    logger.warn('Hindsight diff: raw docs count', { count: hindsightDocs.length, sampleKeys: hindsightDocs.slice(0,3).map(d => Object.keys(d)) });
 
     const hindMap = new Map();
     for (const doc of hindsightDocs) {
       // Contract: Hindsight items use 'id' as the external document identifier
       const extId = doc.id;
       if (!extId) {
-        logger.warn('Hindsight diff: item missing id, skipping', { keys: Object.keys(doc) });
         continue;
       }
 
@@ -767,9 +766,9 @@ router.get('/diff', async (req, res) => {
         timestamp: doc.timestamp || null,
       });
     }
-    logger.warn('Hindsight diff: mapped count', { mapped: hindMap.size });
 
     // 2b. Fetch all architxt tags for fast comparison
+    const archResult = await listDocumentsForDiff(db);
     const tagResult = await getAllDocumentTags(db);
     if (!tagResult.success) {
       return res.status(500).json({ error: tagResult.error, code: tagResult.code });

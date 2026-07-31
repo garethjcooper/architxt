@@ -48,8 +48,6 @@ export async function buildVerifiedEntitySeed(db, findings, narrative) {
       id: g.entity_id,
       label: canonicalName,
       type: g.type_name,
-      category: mapTypeName(g.type_name),
-      mention_count: g.count,
       source: matches.some((m) => m.entity_id === g.entity_id && m.fromTag) ? 'canonical' : 'alias',
     });
   }
@@ -68,18 +66,4 @@ export async function buildVerifiedEntitySeed(db, findings, narrative) {
     sourceIds: nodes.map((n) => n.id),
     nameById: Object.fromEntries(entities.map((e) => [e.entity_id, e.name])),
   };
-}
-
-export function mapTypeName(typeName) {
-  // Maps common English type names to a broad category. Short codes like
-  // 'a-com' are passed through unchanged and colored individually in the UI.
-  if (!typeName) return 'system';
-  const lower = String(typeName).toLowerCase().replace(/\s+/g, ' ');
-  if (lower.includes('database') || lower.includes('data store')) return 'database';
-  if (lower.includes('queue') || lower.includes('message')) return 'queue';
-  if (lower.includes('actor') || lower.includes('user') || lower.includes('role')) return 'actor';
-  if (lower.includes('component') || lower.includes('module')) return 'component';
-  if (lower.includes('service')) return 'service';
-  if (lower.includes('system') || lower.includes('product') || lower.includes('platform')) return 'system';
-  return 'system';
 }

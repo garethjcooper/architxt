@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import { cn } from '@/lib/utils';
@@ -25,42 +26,43 @@ import {
 } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
-import { InteractiveGraph, type GraphCanvas, type GraphNode, type GraphEdge, type GraphLayout, colorForType, colorForEdge } from '@/components/research-canvas';
-import { transformPrebuiltToDiscoverResponse } from '@/app/research/prebuilt';
+import { InteractiveGraph, type GraphCanvas, type GraphNode, type GraphEdge, type GraphLayout, colorForType } from '@/components/research-canvas';
+import {
+  transformPrebuiltToDiscoverResponse,
+  synthesizeMissingNodesForGraph,
+} from '@/app/research/prebuilt';
+import {
+  normalizeGraphShape,
+  mergeGraphs,
+  qualifyGraph,
+  qualifiedId,
+  normalizeNode,
+} from '@/app/research/graph-utils';
+import { Plus, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { ExploreToolbox, type TargetSelection, type PrebuiltDimensionStatus } from './toolbox';
 import { GraphControls } from './graph-controls';
 import { CardControls } from './card-controls';
+import { ResearchImportDialog } from './research-import-dialog';
 
 const logger = createLogger('ExplorePage');
 
 const EXPLORE_DIMENSIONS = ['summary', 'interface', 'interface-found'];
 
-function qualifiedId(id: string, type?: string | null): string {
-  if (id.includes(':')) return id;
-  if (type) return `${type}:${id}`;
-  return id;
+function normalizeGlobalEntity(n: GraphNode): GraphNode {
+  const type = n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other');
+  return normalizeNode({ ...n, type });
 }
 
 function qualifyNode(node: GraphNode): GraphNode {
   return { ...node, id: qualifiedId(node.id, node.type) };
-}
-
-function qualifyGraph(graph: GraphCanvas): GraphCanvas {
-  const nodeTypeById = new Map(graph.nodes.map((n) => [n.id, n.type]));
-  const nodes = graph.nodes.map((n) => qualifyNode(n));
-  const edges = graph.edges.map((e) => ({
-    ...e,
-    source: qualifiedId(e.source, nodeTypeById.get(e.source)),
-    target: qualifiedId(e.target, nodeTypeById.get(e.target)),
-    edge_source: e.edge_source || 'mental_model',
-    id: e.id || `${qualifiedId(e.source, nodeTypeById.get(e.source))}|${qualifiedId(e.target, nodeTypeById.get(e.target))}|${e.label || e.relationship_type || 'edge'}`,
-  }));
-  return { nodes, edges };
-}
-
-function normalizeGlobalEntity(n: GraphNode): GraphNode {
-  const type = n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other');
-  return qualifyNode({ ...n, type });
 }
 
 function stripMarkdown(text: string): string {
@@ -93,10 +95,10 @@ function buildEntityCompiledMarkdown(entities: GraphNode[]): string {
 function buildEdgeMarkdownTable(edges: GraphEdge[], nodeById: Map<string, GraphNode>): string {
   const rows = ['| Source name | Target name | Label long | Source entity | Target entity |', '| --- | --- | --- | --- | --- |'];
   for (const e of edges) {
-    const sourceNode = nodeById.get(e.source);
-    const targetNode = nodeById.get(e.target);
+    const sourceNode = nodeById.get(e.from);
+    const targetNode = nodeById.get(e.to);
     rows.push(
-      `| ${escapeMdCell(sourceNode?.label || e.source)} | ${escapeMdCell(targetNode?.label || e.target)} | ${escapeMdCell(e.label_long || e.label || e.relationship_type || '')} | ${escapeMdCell(e.source)} | ${escapeMdCell(e.target)} |`
+      `| ${escapeMdCell(sourceNode?.name || sourceNode?.label || e.from)} | ${escapeMdCell(targetNode?.name || targetNode?.label || e.to)} | ${escapeMdCell(e.detail || e.label || e.type || '')} | ${escapeMdCell(e.from)} | ${escapeMdCell(e.to)} |`
     );
   }
   return rows.join('\n');
@@ -133,7 +135,7 @@ function mergeNodeData(existing: GraphNode, incoming: GraphNode): GraphNode {
   return merged;
 }
 
-function mergeGraphs(base: GraphCanvas, incoming: GraphCanvas): GraphCanvas {
+function mergeGraphsLocal(base: GraphCanvas, incoming: GraphCanvas): GraphCanvas {
   const nodeById = new Map(base.nodes.map((n) => [n.id, n]));
   for (const incomingNode of incoming.nodes) {
     const existing = nodeById.get(incomingNode.id);
@@ -162,8 +164,8 @@ function removeEdgesAndOrphanNodes(
   const nextEdges = graph.edges.filter((e) => !edgeIdsToRemove.has(e.id));
   const remainingNodeIds = new Set<string>(protectedNodeIds);
   for (const e of nextEdges) {
-    remainingNodeIds.add(e.source);
-    remainingNodeIds.add(e.target);
+    remainingNodeIds.add(e.from);
+    remainingNodeIds.add(e.to);
   }
   const nextNodes = graph.nodes.filter((n) => remainingNodeIds.has(n.id));
   return { nodes: nextNodes, edges: nextEdges };
@@ -171,7 +173,7 @@ function removeEdgesAndOrphanNodes(
 
 function removeNodeAndOrphanedNeighbors(graph: GraphCanvas, nodeId: string): GraphCanvas {
   const edgeIdsToRemove = new Set(
-    graph.edges.filter((e) => e.source === nodeId || e.target === nodeId).map((e) => e.id)
+    graph.edges.filter((e) => e.from === nodeId || e.to === nodeId).map((e) => e.id)
   );
   return removeEdgesAndOrphanNodes(graph, edgeIdsToRemove, new Set());
 }
@@ -240,6 +242,8 @@ export default function ExplorePage() {
   const [dimensionLabels, setDimensionLabels] = useState<Map<string, string>>(new Map());
   const [showToolbox, setShowToolbox] = useState(true);
   const [showControls, setShowControls] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [autoScrollEntities, setAutoScrollEntities] = useState(true);
   const [autoScrollEdges, setAutoScrollEdges] = useState(true);
   const [graphLayout, setGraphLayout] = useState<GraphLayout>('cose');
@@ -278,17 +282,17 @@ export default function ExplorePage() {
     return map;
   }, [graph.nodes]);
 
-  const canvasEdges = useMemo(() => {
+  const canvasEdgeViews = useMemo(() => {
     return graph.edges
       .map((e) => ({
-        ...e,
-        sourceNode: nodeById.get(e.source),
-        targetNode: nodeById.get(e.target),
+        edge: e,
+        sourceNode: nodeById.get(e.from),
+        targetNode: nodeById.get(e.to),
       }))
-      .filter((e) => e.sourceNode && e.targetNode)
+      .filter((v) => v.sourceNode && v.targetNode)
       .sort((a, b) => {
-        const aKey = `${a.source}|${a.target}`;
-        const bKey = `${b.source}|${b.target}`;
+        const aKey = `${a.edge.from}|${a.edge.to}`;
+        const bKey = `${b.edge.from}|${b.edge.to}`;
         return aKey.localeCompare(bKey);
       });
   }, [graph.edges, nodeById]);
@@ -325,13 +329,13 @@ export default function ExplorePage() {
     }
     const serverId = parseInt(selectedServerId, 10);
     setGlobalGraphLoading(true);
-    serversApi.getBankGraph(serverId, selectedBankId)
+    serversApi.getBankEntities(serverId, selectedBankId)
       .then((data) => {
         const nodes = Array.isArray(data?.nodes) ? data.nodes : [];
         setGlobalGraph({ nodes, edges: [] });
       })
       .catch((err) => {
-        logger.error('Failed to fetch bank graph', err);
+        logger.error('Failed to fetch bank entities', err);
         toast.error('Failed to load bank entities');
         setGlobalGraph(null);
       })
@@ -352,6 +356,37 @@ export default function ExplorePage() {
     setHoveredTargetDirection(null);
     setPlacementSourceNodeId(null);
   }, [selectedServerId, selectedBankId]);
+
+  const handleImportResearchGraph = useCallback((incoming: { nodes: GraphNode[]; edges: GraphEdge[] }) => {
+    if (!selectedBankId) return;
+    const qualified = qualifyGraph({
+      nodes: incoming.nodes.map((n) => normalizeGlobalEntity(n)),
+      edges: incoming.edges,
+    });
+    const enriched = {
+      nodes: qualified.nodes.map((n) => {
+        const label = n.label || n.name || n.id;
+        const summaryText =
+          (n as any).summaryText ||
+          (n.name && n.name !== n.id ? `Imported ${n.type || 'entity'} ${n.name}.` : undefined);
+        return { ...n, label, summaryText };
+      }),
+      edges: qualified.edges,
+    };
+    setGraph((prev) => mergeGraphsLocal(prev, enriched));
+    toast.success(`Added ${enriched.nodes.length} nodes and ${enriched.edges.length} edges from research`);
+  }, [selectedBankId]);
+
+  const handleResetGraph = useCallback(() => {
+    setGraph({ nodes: [], edges: [] });
+    setDiscoveries(new Map());
+    setDiscovering(new Set());
+    setDiscoveryErrors(new Map());
+    setToolboxNodeId(null);
+    setPlacementSourceNodeId(null);
+    setShowResetConfirm(false);
+    toast.info('Canvas cleared');
+  }, []);
 
   const globalEntities = useMemo(() => {
     if (!globalGraph) return [];
@@ -434,7 +469,11 @@ export default function ExplorePage() {
         throw new Error(prebuilt.error || 'Prebuilt research failed');
       }
       const transformed = transformPrebuiltToDiscoverResponse(prebuilt, selectedBankId);
-      const qualifiedGraph = qualifyGraph(transformed.canvas?.graph || { nodes: [], edges: [] });
+      const graphWithSynthesized = synthesizeMissingNodesForGraph(
+        transformed.canvas?.graph || { nodes: [], edges: [] },
+        globalGraph
+      );
+      const qualifiedGraph = qualifyGraph(graphWithSynthesized);
       const cached: DiscoverStepResponse = {
         ...transformed,
         canvas: { ...(transformed.canvas || { graph: { nodes: [], edges: [] } }), graph: qualifiedGraph },
@@ -472,7 +511,7 @@ export default function ExplorePage() {
       if (nodeWithSummary) {
         setGraph((prev) => {
           if (!prev.nodes.some((n) => n.id === qualifiedId)) return prev;
-          return mergeGraphs(prev, { nodes: [nodeWithSummary], edges: [] });
+          return mergeGraphsLocal(prev, { nodes: [nodeWithSummary], edges: [] });
         });
       }
 
@@ -517,7 +556,7 @@ export default function ExplorePage() {
         return next;
       });
     }
-  }, [selectedServerId, selectedBankId, dimensionLabels]);
+  }, [selectedServerId, selectedBankId, dimensionLabels, globalGraph]);
 
   const handleClickEntity = useCallback((entity: GraphNode) => {
     const qualified = qualifiedId(entity.id, entity.type);
@@ -533,7 +572,7 @@ export default function ExplorePage() {
         setPlacementSourceNodeId(null);
       }
     } else {
-      setGraph((prev) => mergeGraphs(prev, { nodes: [nodeToAdd], edges: [] }));
+      setGraph((prev) => mergeGraphsLocal(prev, { nodes: [nodeToAdd], edges: [] }));
       setPlacementSourceNodeId(nodeToAdd.id);
       runPrebuiltData(nodeToAdd.id);
     }
@@ -709,10 +748,10 @@ export default function ExplorePage() {
       const toolboxPreviewEdges = discoveryEdges.filter((e) => {
         const matchesDirection = hoveredTargetDirection
           ? hoveredTargetDirection === 'outbound'
-            ? e.source === toolboxNodeId && e.target === hoveredEntityId
-            : e.target === toolboxNodeId && e.source === hoveredEntityId
-          : (e.source === toolboxNodeId && e.target === hoveredEntityId) ||
-            (e.target === toolboxNodeId && e.source === hoveredEntityId);
+            ? e.from === toolboxNodeId && e.to === hoveredEntityId
+            : e.to === toolboxNodeId && e.from === hoveredEntityId
+          : (e.from === toolboxNodeId && e.to === hoveredEntityId) ||
+            (e.to === toolboxNodeId && e.from === hoveredEntityId);
         return matchesDirection && !existingEdgeIds.has(e.id);
       });
 
@@ -735,8 +774,8 @@ export default function ExplorePage() {
       const edges = discovery?.canvas?.graph?.edges || [];
       for (const e of edges) {
         if (existingEdgeIds.has(e.id)) continue;
-        const connectsHovered = e.source === hoveredEntityId || e.target === hoveredEntityId;
-        const otherEnd = e.source === hoveredEntityId ? e.target : e.source;
+        const connectsHovered = e.from === hoveredEntityId || e.to === hoveredEntityId;
+        const otherEnd = e.from === hoveredEntityId ? e.to : e.from;
         if (connectsHovered && graph.nodes.some((n) => n.id === otherEnd)) {
           previewEdges.push(e);
         }
@@ -784,7 +823,7 @@ export default function ExplorePage() {
       toast.error('No discovery data for selected node.');
       return;
     }
-    const discoveryGraph = discovery.canvas.graph;
+    const discoveryGraph = synthesizeMissingNodesForGraph(discovery.canvas.graph, globalGraph);
     const discoveryNodeById = new Map(discoveryGraph.nodes.map((n) => [n.id, n]));
     const globalNodeById = new Map(globalEntities.map((n) => [n.id, n]));
     const graphEdgeIds = new Set(graph.edges.map((e) => e.id));
@@ -802,9 +841,9 @@ export default function ExplorePage() {
     for (const sel of selections) {
       const neighborEdges = discoveryGraph.edges.filter((e) => {
         if (sel.direction === 'outbound') {
-          return e.source === nodeId && e.target === sel.targetId;
+          return e.from === nodeId && e.to === sel.targetId;
         }
-        return e.target === nodeId && e.source === sel.targetId;
+        return e.to === nodeId && e.from === sel.targetId;
       });
       if (neighborEdges.length === 0) continue;
 
@@ -815,7 +854,7 @@ export default function ExplorePage() {
         if (!graph.nodes.some((n) => n.id === sel.targetId)) {
           const discoveryNode = discoveryNodeById.get(sel.targetId);
           const globalNode = globalNodeById.get(sel.targetId);
-          const baseNode = globalNode || discoveryNode || { id: sel.targetId, label: sel.targetId };
+          const baseNode = discoveryNode || globalNode || { id: sel.targetId, name: sel.targetId };
           const nodeToAdd = qualifyNode({ ...baseNode });
           if (nodeToAdd.id) {
             nodesToAdd.set(sel.targetId, nodeToAdd);
@@ -839,7 +878,7 @@ export default function ExplorePage() {
 
     setGraph((prev) => {
       if (!prev.nodes.some((n) => n.id === nodeId)) return prev;
-      const merged = mergeGraphs(prev, { nodes: Array.from(nodesToAdd.values()), edges: edgesToAdd });
+      const merged = mergeGraphsLocal(prev, { nodes: Array.from(nodesToAdd.values()), edges: edgesToAdd });
       if (edgeIdsToRemove.size === 0) return merged;
       return { ...merged, edges: merged.edges.filter((e) => !edgeIdsToRemove.has(e.id)) };
     });
@@ -854,20 +893,42 @@ export default function ExplorePage() {
       addedEdges: edgesToAdd.length,
       removedEdges: edgeIdsToRemove.size,
     });
-  }, [discoveries, globalEntities, graph, runPrebuiltData]);
+  }, [discoveries, globalEntities, globalGraph, graph, runPrebuiltData]);
 
   return (
     <PageShell title="Explore" loading={false}>
-      <div className="flex items-center gap-3 mb-3 pb-3 border-b border-white/10">
-        <ServerBankSelectors
-          servers={servers}
-          selectedServerId={selectedServerId}
-          setSelectedServerId={setSelectedServerId}
-          banks={banks}
-          selectedBankId={selectedBankId}
-          setSelectedBankId={setSelectedBankId}
-          loadingBanks={loadingBanks}
-        />
+      <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <ServerBankSelectors
+            servers={servers}
+            selectedServerId={selectedServerId}
+            setSelectedServerId={setSelectedServerId}
+            banks={banks}
+            selectedBankId={selectedBankId}
+            setSelectedBankId={setSelectedBankId}
+            loadingBanks={loadingBanks}
+          />
+        </div>
+        {selectedServerId && selectedBankId && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => setShowResetConfirm(true)}
+              title="Clear canvas"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setShowImportDialog(true)}
+              title="Import from Research"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 flex">
@@ -1000,7 +1061,7 @@ export default function ExplorePage() {
                   scroll={autoScrollEdges}
                   onScrollChange={(checked) => setAutoScrollEdges(Boolean(checked))}
                   onCopy={() => {
-                    if (canvasEdges.length === 0) {
+                    if (canvasEdgeViews.length === 0) {
                       toast.info('No edges to copy');
                       return;
                     }
@@ -1008,7 +1069,7 @@ export default function ExplorePage() {
                       .then(() => toast.success('Edges copied to clipboard'));
                   }}
                   onSaveMd={() => {
-                    if (canvasEdges.length === 0) {
+                    if (canvasEdgeViews.length === 0) {
                       toast.info('No edges to save');
                       return;
                     }
@@ -1026,25 +1087,25 @@ export default function ExplorePage() {
                     toast.success(`Edges saved as ${filename}`);
                   }}
                 />
-                <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono h-5 inline-flex items-center">
-                  {canvasEdges.length}
+                <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-modo h-5 inline-flex items-center">
+                  {canvasEdgeViews.length}
                 </span>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-              {canvasEdges.length === 0 && (
+              {canvasEdgeViews.length === 0 && (
                 <div className="text-[11px] text-white/40 px-2 py-3">No edges on the canvas yet.</div>
               )}
-              {canvasEdges.map((e) => {
-                const active = hoveredEdgeId === e.id;
-                const edgeColor = colorForEdge(e);
+              {canvasEdgeViews.map(({ edge, sourceNode, targetNode }) => {
+                const active = hoveredEdgeId === edge.id;
+                const edgeColor = colorForType(edge.type || undefined);
                 return (
                   <button
-                    key={e.id}
+                    key={edge.id}
                     type="button"
-                    data-edge-id={e.id}
-                    onClick={() => handleSelectEdge(e)}
-                    onMouseEnter={() => setHoveredEdgeId(e.id)}
+                    data-edge-id={edge.id}
+                    onClick={() => handleSelectEdge(edge)}
+                    onMouseEnter={() => setHoveredEdgeId(edge.id)}
                     onMouseLeave={() => setHoveredEdgeId(null)}
                     className={cn(
                       'w-full text-left rounded border px-2 py-1.5 transition-colors',
@@ -1054,9 +1115,9 @@ export default function ExplorePage() {
                     )}
                     style={{ borderLeftColor: edgeColor, borderLeftWidth: 3 }}
                   >
-                    <div className="text-xs text-white/90 whitespace-normal break-words leading-snug">{e.label_long || e.label || e.relationship_type || 'Edge'}</div>
+                    <div className="text-xs text-white/90 whitespace-normal break-words leading-snug">{edge.detail || edge.label || edge.type || 'Edge'}</div>
                     <div className="text-[10px] text-white/40 truncate">
-                      {e.sourceNode?.label || e.source} → {e.targetNode?.label || e.target}
+                      {sourceNode?.name || sourceNode?.label || edge.from} → {targetNode?.name || targetNode?.label || edge.to}
                     </div>
                   </button>
                 );
@@ -1162,6 +1223,28 @@ export default function ExplorePage() {
           </CardContent>
         </Card>
       </div>
+      <ResearchImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        bankId={selectedBankId}
+        globalGraph={globalGraph}
+        onImport={handleImportResearchGraph}
+      />
+
+      <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clear canvas?</DialogTitle>
+            <DialogDescription>
+              This will remove all nodes, edges, and discovery data from the Explore canvas. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleResetGraph}>Clear canvas</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

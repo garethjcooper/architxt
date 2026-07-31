@@ -29,6 +29,7 @@ import {
   batchUpdateMentalModelConfig,
   validateEntityTemplateEligibility,
   deriveMentalModels,
+  composeDerivedMentalModels,
   updateMentalModelEntityOverrides,
   deleteMentalModelEntityOverrides,
   batchUpdateMentalModelEntityOverrides,
@@ -301,6 +302,22 @@ router.post('/', async (req, res) => {
     return sendResponse({ res, status: 400, error: eligibility.error, code: eligibility.code, logger, method: 'POST', path, duration });
   }
 
+  const returns = normaliseReturns(body.returns) ?? 'narrative';
+  const templateExists = db.prepare("SELECT 1 FROM prompt_templates WHERE pt_name = ?").get(returns);
+  if (!templateExists) {
+    const duration = Date.now() - start;
+    return sendResponse({
+      res,
+      status: 400,
+      error: `No prompt template found for returns='${returns}'. Restart the server to apply built-in template migrations.`,
+      code: 'TEMPLATE_NOT_FOUND',
+      logger,
+      method: 'POST',
+      path,
+      duration,
+    });
+  }
+
   const result = await createMentalModel(db, {
     mm_ext_id: extIdCheck.value,
     mm_name: body.name ?? null,
@@ -313,7 +330,7 @@ router.post('/', async (req, res) => {
     mm_is_template: isTemplate,
     mm_max_tokens: normaliseMaxTokens(body.max_tokens) ?? DEFAULT_MAX_TOKENS,
     mm_dimension: body.dimension ?? null,
-    mm_returns: normaliseReturns(body.returns) ?? 'narrative',
+    mm_returns: returns,
     mm_concatenation: normaliseConcatenation(body.concatenation) ?? 'compile',
   });
 
@@ -422,7 +439,22 @@ router.put('/:id', async (req, res) => {
     data.mm_dimension = body.dimension === '' ? null : body.dimension;
   }
   if (body.returns !== undefined) {
-    data.mm_returns = normaliseReturns(body.returns);
+    const returns = normaliseReturns(body.returns);
+    const templateExists = db.prepare("SELECT 1 FROM prompt_templates WHERE pt_name = ?").get(returns);
+    if (!templateExists) {
+      const duration = Date.now() - start;
+      return sendResponse({
+        res,
+        status: 400,
+        error: `No prompt template found for returns='${returns}'. Restart the server to apply built-in template migrations.`,
+        code: 'TEMPLATE_NOT_FOUND',
+        logger,
+        method: 'PUT',
+        path,
+        duration,
+      });
+    }
+    data.mm_returns = returns;
   }
   if (body.concatenation !== undefined) {
     data.mm_concatenation = normaliseConcatenation(body.concatenation);
@@ -487,7 +519,8 @@ router.get('/:id/derived', async (req, res) => {
 
   const template = toApiMentalModel(result.data);
   const derived = deriveMentalModels(template);
-  sendResponse({ res, status: 200, data: derived, logger, method: 'GET', path, duration: Date.now() - start });
+  const composed = await composeDerivedMentalModels(db, derived);
+  sendResponse({ res, status: 200, data: composed, logger, method: 'GET', path, duration: Date.now() - start });
 });
 
 /**

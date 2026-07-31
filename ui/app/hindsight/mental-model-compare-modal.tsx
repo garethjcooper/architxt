@@ -19,6 +19,7 @@ interface MentalModelValues {
   ext_id: string;
   name?: string | null;
   source_query?: string | null;
+  composed_query?: string | null;
   tags?: string[];
   max_tokens?: number;
   refresh_mode?: string;
@@ -26,6 +27,8 @@ interface MentalModelValues {
   exclude_all_mental_models?: boolean;
   exclude_mental_model_list?: string;
   tags_match_mode?: string;
+  is_derived?: boolean;
+  compose_error?: string | null;
 }
 
 interface MentalModelCompareModalProps {
@@ -39,7 +42,7 @@ interface MentalModelCompareModalProps {
 
 const FIELD_DEFS = [
   { key: 'name_differs', label: 'Name', archKey: 'name', hindKey: 'name' },
-  { key: 'source_query_differs', label: 'Source Query', archKey: 'source_query', hindKey: 'source_query' },
+  { key: 'source_query_differs', label: 'Composed Query', archKey: 'composed_query', hindKey: 'source_query' },
   { key: 'tags_differs', label: 'Tags', archKey: 'tags', hindKey: 'tags' },
   { key: 'max_tokens_differs', label: 'Max Tokens', archKey: 'max_tokens', hindKey: 'max_tokens' },
   { key: 'refresh_mode_differs', label: 'Refresh Mode', archKey: 'refresh_mode', hindKey: 'refresh_mode' },
@@ -54,6 +57,16 @@ function formatValue(val: any): string {
   if (Array.isArray(val)) return val.length === 0 ? '(none)' : val.join(', ');
   if (typeof val === 'boolean') return val ? 'true' : 'false';
   return String(val);
+}
+
+function ComposeErrorBanner({ error }: { error?: string | null }) {
+  if (!error) return null;
+  return (
+    <div className="px-3 py-2 border-b border-red-500/10 bg-red-900/20">
+      <div className="text-[10px] text-red-300 font-medium">Compose error (architxt)</div>
+      <div className="text-[11px] text-red-200/70 break-all leading-relaxed">{error}</div>
+    </div>
+  );
 }
 
 export default function MentalModelCompareModal({
@@ -130,6 +143,9 @@ export default function MentalModelCompareModal({
                 <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
                   <div className="px-3 py-2">
                     <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">architxt</div>
+                    {field.key === 'source_query_differs' && arch?.compose_error && (
+                      <ComposeErrorBanner error={arch.compose_error} />
+                    )}
                     <div className="text-[11px] text-white/60 break-all leading-relaxed">{field.archVal}</div>
                   </div>
                   <div className="px-3 py-2">
@@ -142,6 +158,9 @@ export default function MentalModelCompareModal({
               {/* Single value when same */}
               {!field.differs && (
                 <div className="px-3 py-2">
+                  {field.key === 'source_query_differs' && arch?.compose_error && (
+                    <ComposeErrorBanner error={arch.compose_error} />
+                  )}
                   <div className="text-[11px] text-white/50 break-all leading-relaxed">{field.archVal}</div>
                 </div>
               )}

@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import cytoscapeDagre from 'cytoscape-dagre';
-import { colorForType, mapTypeName, type ResearchSelection, type GraphNode, type GraphEdge, type GraphLayout } from './research-canvas';
+import { type ResearchSelection, type GraphNode, type GraphEdge, type GraphLayout, truncateLabel } from './research-canvas';
+import { toCytoscapeElements, applyParallelEdgeOffsets } from '@/lib/graph/cytoscape-elements';
 
 export interface ComponentDiagramProps {
   nodes: GraphNode[];
@@ -20,10 +21,6 @@ export interface ComponentDiagramProps {
   onCyReady?: (cy: cytoscape.Core) => void;
   /** Called when the user hovers over a node or edge. */
   onHover?: (info: { kind: 'node' | 'edge'; data: any }) => void;
-}
-
-function truncateLabel(label: string, max = 22): string {
-  return label.length > max ? `${label.slice(0, max - 1)}…` : label;
 }
 
 const RELATIONSHIP_COLOURS: Record<string, string> = {
@@ -67,29 +64,20 @@ export function ComponentDiagram({
     }
 
     const seenEdgeKeys = new Set<string>();
-    const visibleEdges: { id: string; source: string; target: string; label: string; label_long?: string; relationship_type?: string; edge_source?: string; weight?: number }[] = [];
+    const visibleEdges: GraphEdge[] = [];
     for (const e of edges) {
-      if (!e?.source || !e?.target) continue;
-      if (!nodeById.has(e.source) || !nodeById.has(e.target)) continue;
-      const label = e.label || e.relationship_type || '';
+      if (!e?.from || !e?.to) continue;
+      if (!nodeById.has(e.from) || !nodeById.has(e.to)) continue;
+      const label = e.label || e.type || '';
       if (!label) continue;
-      const key = `${e.source}|${e.target}|${label}`;
+      const key = `${e.from}|${e.to}|${label}`;
       if (seenEdgeKeys.has(key)) continue;
       seenEdgeKeys.add(key);
-      visibleEdges.push({
-        id: e.id || key,
-        source: e.source,
-        target: e.target,
-        label,
-        label_long: e.label_long,
-        relationship_type: e.relationship_type,
-        edge_source: e.edge_source,
-        weight: e.weight,
-      });
+      visibleEdges.push(e);
     }
 
     // Compute a uniform box width from the average label length.
-    const labels = Array.from(nodeById.values()).map((n) => truncateLabel(n.label));
+    const labels = Array.from(nodeById.values()).map((n) => truncateLabel(n.name || n.label || n.id, 22));
     const avgChars = labels.length > 0
       ? labels.reduce((sum, l) => sum + l.length, 0) / labels.length
       : 0;
@@ -98,46 +86,8 @@ export function ComponentDiagram({
     // Clamp to a sensible range.
     const nodeWidth = `${Math.min(computedWidth, 200)}px`;
 
-    const cyNodes: cytoscape.ElementDefinition[] = Array.from(nodeById.values()).map((n) => ({
-      group: 'nodes',
-      data: {
-        id: n.id,
-        label: truncateLabel(n.label),
-        fullLabel: n.label,
-        label_long: n.label_long,
-        qualifiedId: n.type ? `${n.type}:${n.id}` : n.id,
-        type: n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other'),
-        category: n.category || mapTypeName(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
-        backgroundColor: n.color || colorForType(n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : undefined)),
-        source: n.source || 'hindsight',
-      },
-    }));
-
-    const edgeOffsetCount = new Map<string, number>();
-    const cyEdges: cytoscape.ElementDefinition[] = visibleEdges.map((e, i) => {
-      const pairKey = `${e.source}<->${e.target}`;
-      const count = edgeOffsetCount.get(pairKey) || 0;
-      edgeOffsetCount.set(pairKey, count + 1);
-      // Alternating offsets: 0, +24, -24, +48, -48, ... for parallel/shared edges.
-      const sign = count % 2 === 0 ? 1 : -1;
-      const offset = count === 0 ? 0 : sign * Math.ceil(count / 2) * 28;
-      return {
-        group: 'edges',
-        data: {
-          id: e.id || `edge-${i}`,
-          source: e.source,
-          target: e.target,
-          label: e.label,
-          label_long: e.label_long,
-          relationship_type: e.relationship_type || e.label,
-          edge_source: e.edge_source,
-          weight: e.weight ?? 1,
-          cpDistance: offset,
-        },
-      };
-    });
-
-    return { elements: [...cyNodes, ...cyEdges], nodeWidth };
+    const elements = toCytoscapeElements({ nodes: Array.from(nodeById.values()), edges: visibleEdges });
+    return { elements: applyParallelEdgeOffsets(elements), nodeWidth };
   }, [nodes, edges]);
 
   useEffect(() => {
@@ -208,7 +158,7 @@ export function ComponentDiagram({
           },
         },
         {
-          selector: 'edge[edge_source = "synthesize"]',
+          selector: 'edge[source = "synthesize"]',
           style: {
             width: 0.75,
             'line-color': 'rgba(139,92,246,0.4)',
@@ -218,7 +168,7 @@ export function ComponentDiagram({
           },
         },
         {
-          selector: 'edge[edge_source = "mental_model"]',
+          selector: 'edge[source = "mental_model"]',
           style: {
             width: 0.75,
             'line-color': 'rgba(66,165,245,0.4)',
@@ -226,7 +176,7 @@ export function ComponentDiagram({
           },
         },
         ...Object.entries(RELATIONSHIP_COLOURS).map(([type, colour]) => ({
-          selector: `edge[edge_source = "mental_model"][relationship_type = "${type}"]`,
+          selector: `edge[source = "mental_model"][type = "${type}"]`,
           style: {
             'line-color': colour,
             'target-arrow-color': colour,
@@ -579,7 +529,7 @@ export function ComponentDiagram({
     let activeEdges = cy.edges();
     if (edgeFilters) {
       activeEdges = activeEdges.filter((e) => {
-        const type = e.data('relationship_type');
+        const type = e.data('type');
         return type ? edgeFilters.has(type) : false;
       });
     }

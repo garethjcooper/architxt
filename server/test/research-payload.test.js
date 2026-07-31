@@ -69,6 +69,15 @@ describe('intent.buildTopicQuery size', () => {
     assert.ok(!q.includes('Selected entities:'), 'should not repeat entities already in topic.text');
     assert.equal(q, query, 'query with only redundant selections stays unchanged');
   });
+
+  it('does not double-prefix an already-qualified entity id', () => {
+    const query = 'What is the billing service?';
+    const topic = makeTopic(query, [{ id: 'a-com:COM-001', kind: 'entity', type: 'a-com', label: 'Billing Engine' }]);
+
+    const q = buildTopicQuery(topic, {});
+    assert.ok(q.includes('Selected entities: Billing Engine (a-com:COM-001)'), 'should use qualified id as-is');
+    assert.ok(!q.includes('a-com:a-com:COM-001'), 'should not duplicate the type prefix');
+  });
 });
 
 describe('tool-plan research call', () => {
@@ -97,6 +106,12 @@ describe('tool-plan research call', () => {
     assert.ok(call.args.query.includes('Filter by tags:'));
     assert.equal(call.args.types.join(','), 'service');
     assert.equal(call.args.tags_match, 'all');
+  });
+
+  it('makeResearchCall does not double-prefix an already-qualified entity id', () => {
+    const call = makeResearchCall('Explain billing.', [{ id: 'a-com:COM-001', kind: 'entity', type: 'a-com', label: 'Billing' }], {});
+    assert.ok(call.args.query.includes('Selected entities: Billing (a-com:COM-001)'), 'should use qualified id as-is');
+    assert.ok(!call.args.query.includes('a-com:a-com:COM-001'), 'should not duplicate the type prefix');
   });
 });
 

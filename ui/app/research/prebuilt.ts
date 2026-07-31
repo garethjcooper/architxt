@@ -6,55 +6,14 @@ import type {
   GraphNode,
   GraphEdge,
 } from '@/lib/api/client';
-
-function isGraph(value: unknown): value is { nodes: GraphNode[]; edges: GraphEdge[] } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    Array.isArray((value as any).nodes) &&
-    Array.isArray((value as any).edges)
-  );
-}
-
-function mergeGraphs(graphs: { nodes: GraphNode[]; edges: GraphEdge[] }[]): {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-} {
-  const nodeById = new Map<string, GraphNode>();
-  const edgeKeys = new Set<string>();
-  const edges: GraphEdge[] = [];
-
-  for (const graph of graphs) {
-    for (const n of graph.nodes) {
-      if (!nodeById.has(n.id)) nodeById.set(n.id, n);
-    }
-    for (const e of graph.edges) {
-      const key = e.id || `${e.source}|${e.target}|${e.label}`;
-      if (edgeKeys.has(key)) continue;
-      edgeKeys.add(key);
-      edges.push({ ...e, edge_source: e.edge_source || 'mental_model' });
-    }
-  }
-
-  return {
-    nodes: Array.from(nodeById.values()),
-    edges,
-  };
-}
-
-function extractGraphFromJsonResult(
-  jsonResult: PrebuiltResponse['dimensions'][number]['result']['json_result'],
-): { nodes: GraphNode[]; edges: GraphEdge[] } | null {
-  if (!jsonResult) return null;
-
-  if (Array.isArray(jsonResult)) {
-    const graphs = jsonResult.filter(isGraph);
-    if (graphs.length === 0) return null;
-    return graphs.length === 1 ? graphs[0] : mergeGraphs(graphs);
-  }
-
-  return isGraph(jsonResult) ? jsonResult : null;
-}
+import {
+  isGraph,
+  mergeGraphs,
+  normalizeGraphShape,
+  normalizeNode,
+  synthesizeMissingNodesForGraph,
+  canonicalNodeId,
+} from './graph-utils';
 
 /**
  * Convert a prebuilt research response into the existing DiscoverStepResponse
@@ -113,7 +72,7 @@ export function transformPrebuiltToDiscoverResponse(
       narrative: narrativeParts.join('\n'),
     },
     canvas: {
-      graph: graphs.length > 0 ? mergeGraphs(graphs) : { nodes: [], edges: [] },
+      graph: graphs.length > 0 ? mergeGraphs(...graphs) : { nodes: [], edges: [] },
       meta: {
         mental_model_applied_to: response.entities,
         mental_model_missing: response.entity_summary
@@ -125,3 +84,25 @@ export function transformPrebuiltToDiscoverResponse(
     tool_calls_used: 0,
   };
 }
+
+function extractGraphFromJsonResult(
+  jsonResult: PrebuiltResponse['dimensions'][number]['result']['json_result'],
+): { nodes: GraphNode[]; edges: GraphEdge[] } | null {
+  if (!jsonResult) return null;
+
+  if (Array.isArray(jsonResult)) {
+    const graphs = jsonResult.filter(isGraph);
+    if (graphs.length === 0) return null;
+    return graphs.length === 1 ? graphs[0] : mergeGraphs(...graphs);
+  }
+
+  return isGraph(jsonResult) ? jsonResult : null;
+}
+
+export {
+  normalizeNode,
+  canonicalNodeId,
+  synthesizeMissingNodesForGraph,
+  normalizeGraphShape,
+  mergeGraphs,
+};

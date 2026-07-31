@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi } from '@/lib/api/client';
-import type {
-  MentalModel,
-  DerivedMentalModel,
-  Entity,
-  MentalModelEntityOverrides,
+import {
+  MENTAL_MODEL_RETURNS_OPTIONS,
+  MentalModelReturns,
   StandardDimension,
+  toMentalModelReturns,
+  type DerivedMentalModel,
+  type Entity,
+  type MentalModel,
+  type MentalModelEntityOverrides,
 } from '@/lib/types/index';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -22,6 +25,7 @@ import { DerivedModelsPanel } from '@/components/derived-models-panel';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DerivedModelHealthDialog } from '@/components/derived-model-health-dialog';
+import { DerivedModelQueryPreviewDialog } from '@/components/derived-model-query-preview-dialog';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -44,7 +48,7 @@ export interface BaseConfig {
   exclude_all_mental_models: boolean;
   max_tokens: number;
   dimension: string | null;
-  returns: 'json' | 'narrative';
+  returns: MentalModelReturns;
   concatenation: 'merge' | 'compile';
 }
 
@@ -144,7 +148,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
   const [dimension, setDimension] = useState(model.dimension || 'none');
-  const [returns, setReturns] = useState<'json' | 'narrative'>(model.returns ?? 'narrative');
+  const [returns, setReturns] = useState<MentalModelReturns>(model.returns ?? 'narrative');
   const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(model.concatenation ?? 'compile');
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
     buildDerivedRows(model, buildBaseConfig(model))
@@ -152,6 +156,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
   const [derivedHealthOpen, setDerivedHealthOpen] = useState(false);
+  const [derivedQueryPreviewOpen, setDerivedQueryPreviewOpen] = useState(false);
   const [confirmTemplateOffOpen, setConfirmTemplateOffOpen] = useState(false);
   const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
 
@@ -207,6 +212,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
     setDerivedHealthOpen(false);
+    setDerivedQueryPreviewOpen(false);
   }, [open]);
 
   // If entities are added/removed while the modal is open, rebuild derived
@@ -341,7 +347,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setDerived((prev) => prev.map((d) => ({ ...d, dimension: value.trim() || null })));
   };
 
-  const handleReturnsChange = (value: 'json' | 'narrative') => {
+  const handleReturnsChange = (value: MentalModelReturns) => {
     setReturns(value);
     setDerived((prev) => prev.map((d) => ({ ...d, returns: value })));
   };
@@ -409,14 +415,25 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       }
 
       if (isTemplate && derived.length > 0) {
+        const groups = new Map<string, { entityIds: number[]; overrides: MentalModelEntityOverrides }>();
         for (const d of derived) {
-          await mentalModelsApi.batchUpdateEntityOverrides(model.id, [d.derived_entity.id], {
+          const overrides: MentalModelEntityOverrides = {
             refresh_mode: d.refresh_mode,
             refresh_after_consolidation: d.refresh_after_consolidation,
             exclude_all_mental_models: d.exclude_all_mental_models,
             max_tokens: d.max_tokens,
-          });
+          };
+          const key = JSON.stringify(overrides);
+          if (!groups.has(key)) {
+            groups.set(key, { entityIds: [], overrides });
+          }
+          groups.get(key)!.entityIds.push(d.derived_entity.id);
         }
+        await Promise.all(
+          Array.from(groups.values()).map((group) =>
+            mentalModelsApi.batchUpdateEntityOverrides(model.id, group.entityIds, group.overrides)
+          )
+        );
         toast.success('Derived instance settings updated');
       }
 
@@ -467,11 +484,12 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               <select
                 id="mm-detail-returns"
                 value={returns}
-                onChange={(e) => handleReturnsChange(e.target.value as 'json' | 'narrative')}
+                onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
                 className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
               >
-                <option value="json">JSON</option>
-                <option value="narrative">Narrative</option>
+                {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
@@ -702,7 +720,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && (derivedConfigOpen || derivedHealthOpen)) return;
+    if (!nextOpen && (derivedConfigOpen || derivedHealthOpen || derivedQueryPreviewOpen)) return;
     onOpenChange(nextOpen);
   };
 
@@ -747,11 +765,12 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                         <select
                           id="mm-detail-returns"
                           value={returns}
-                          onChange={(e) => handleReturnsChange(e.target.value as 'json' | 'narrative')}
+                          onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
                           className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
                         >
-                          <option value="json">JSON</option>
-                          <option value="narrative">Narrative</option>
+                          {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -782,6 +801,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                     onHealth={(selected) => {
                       setSelectedDerived(selected);
                       setDerivedHealthOpen(true);
+                    }}
+                    onPreviewQuery={(selected) => {
+                      setSelectedDerived(selected);
+                      setDerivedQueryPreviewOpen(true);
                     }}
                   />
                 </div>
@@ -819,6 +842,16 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           setDerivedHealthOpen(false);
           setSelectedDerived([]);
         }}
+        derived={selectedDerived}
+      />
+
+      <DerivedModelQueryPreviewDialog
+        isOpen={derivedQueryPreviewOpen}
+        onClose={() => {
+          setDerivedQueryPreviewOpen(false);
+          setSelectedDerived([]);
+        }}
+        modelId={model.id}
         derived={selectedDerived}
       />
 

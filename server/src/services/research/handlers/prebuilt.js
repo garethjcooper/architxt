@@ -8,7 +8,7 @@
 
 import { db } from '../../../db/connection.js';
 import { extractEntityIds } from '../tokens.js';
-import { fetchPrebuiltMentalModels } from '../mental-model-results.js';
+import { fetchPrebuiltMentalModels } from '../prebuilt-fetch.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('research-handler-prebuilt');

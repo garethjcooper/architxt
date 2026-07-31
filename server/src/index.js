@@ -232,6 +232,12 @@ const server = app.listen(config.server.port, config.server.host, () => {
   }
 });
 
+// Allow long-running Hindsight research calls (e.g. reflect, dry-run extract) to
+// wait for LLM completion. Node defaults: requestTimeout=300s, headersTimeout=60s.
+// Bump both to match the 15-minute UI proxy and Hindsight client timeout.
+server.requestTimeout = 900000;
+server.headersTimeout = 120000;
+
 // Spawn daemons after server starts
 daemon = spawnDaemon();
 hindsightPollDaemon = spawnHindsightPollDaemon();

@@ -152,19 +152,37 @@ export async function resolveChildOperationId(serverId, bankId, parentOperationI
 /**
  * List operations for a bank - GET {server_url}/v1/default/banks/{bank_id}/operations
  *
+ * Supports pagination, status filtering, and excluding parent batch_retain rows
+ * so callers only receive the child operations they actually track.
+ *
  * @param {number} serverId - Server ID from servers table
  * @param {string} bankId - Bank identifier
+ * @param {Object} [options]
+ * @param {string} [options.status] - Optional status filter (e.g. 'pending', 'processing')
+ * @param {number} [options.limit=100] - Page size (Hindsight caps at 100)
+ * @param {number} [options.offset=0] - Page offset
+ * @param {boolean} [options.excludeParents=false] - If true, add exclude_parents=true
  * @returns {Promise<{success: boolean, operations?: Array, error?: string}>}
  */
-export async function listOperations(serverId, bankId) {
+export async function listOperations(serverId, bankId, { status, limit = 100, offset = 0, excludeParents = false } = {}) {
   const configResult = await getServerConfig(serverId);
   if (!configResult.success) return configResult;
   if (!bankId) return { success: false, error: 'bankId is required' };
 
   const { serviceUrl } = configResult.config;
 
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  if (status) {
+    params.set('status', status);
+  }
+  if (excludeParents) {
+    params.set('exclude_parents', 'true');
+  }
+
   try {
-    const response = await fetch(`${serviceUrl}/v1/default/banks/${encodeURIComponent(bankId)}/operations?limit=100`, {
+    const response = await fetch(`${serviceUrl}/v1/default/banks/${encodeURIComponent(bankId)}/operations?${params.toString()}`, {
       method: 'GET',
       headers: buildHeaders(configResult.config),
     });
@@ -176,10 +194,10 @@ export async function listOperations(serverId, bankId) {
     }
 
     const data = await response.json();
-    logger.debug('Hindsight listOperations complete', { serverId, bankId, count: data.operations?.length || 0 });
+    logger.debug('Hindsight listOperations complete', { serverId, bankId, status, offset, excludeParents, count: data.operations?.length || 0 });
     return { success: true, operations: data.operations || [] };
   } catch (error) {
-    logger.error('Hindsight listOperations error', { serverId, bankId, error: error.message });
+    logger.error('Hindsight listOperations error', { serverId, bankId, status, offset, excludeParents, error: error.message });
     return { success: false, error: error.message };
   }
 }

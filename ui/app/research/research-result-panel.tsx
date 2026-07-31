@@ -53,10 +53,10 @@ function generateMermaid(
 
   const seenEdgeKeys = new Set<string>();
   const visibleEdges = edges.filter((e) => {
-    if (!e?.source || !e?.target) return false;
-    if (!nodeById.has(e.source) || !nodeById.has(e.target)) return false;
-    const label = e.label || e.relationship_type || '';
-    const key = `${e.source}|${e.target}|${label}`;
+    if (!e?.from || !e?.to) return false;
+    if (!nodeById.has(e.from) || !nodeById.has(e.to)) return false;
+    const label = e.label || e.type || '';
+    const key = `${e.from}|${e.to}|${label}`;
     if (seenEdgeKeys.has(key)) return false;
     seenEdgeKeys.add(key);
     return true;
@@ -67,7 +67,7 @@ function generateMermaid(
 
   for (const n of nodeById.values()) {
     const id = escapeMermaidId(n.id);
-    const label = (n.label || id).replace(/["]/g, '#quot;');
+    const label = (n.name || n.label || id).replace(/["]/g, '#quot;');
     if (canvasView === 'components') {
       lines.push(`    ${id}["${label}"]`);
     } else {
@@ -76,9 +76,9 @@ function generateMermaid(
   }
 
   for (const e of visibleEdges) {
-    const source = escapeMermaidId(e.source);
-    const target = escapeMermaidId(e.target);
-    const label = (e.label || e.relationship_type || '').replace(/["]/g, '#quot;');
+    const source = escapeMermaidId(e.from);
+    const target = escapeMermaidId(e.to);
+    const label = (e.label || e.type || '').replace(/["]/g, '#quot;');
     if (label) {
       lines.push(`    ${source} -->|${label}| ${target}`);
     } else {
@@ -170,7 +170,7 @@ export function ResearchResultPanel({
 
   const edgeTypes = useMemo(() => {
     const source = allGraphEdges ?? graphEdges;
-    return Array.from(new Set(source.map((e) => e.relationship_type).filter((t): t is string => Boolean(t)))).sort();
+    return Array.from(new Set(source.map((e) => e.type).filter((t): t is string => Boolean(t)))).sort();
   }, [allGraphEdges, graphEdges]);
 
   const hasActiveFilters = edgeTypes.length > 0;
@@ -587,24 +587,22 @@ export function ResearchResultPanel({
               {hoveredInfo?.kind === 'node' && (
                 <div className="flex flex-col gap-0.5 text-[10px] text-white/70">
                   <div className="font-mono truncate" title={hoveredInfo.data.id}>id: {hoveredInfo.data.id}</div>
-                  <div className="whitespace-normal break-words">label: {hoveredInfo.data.fullLabel || hoveredInfo.data.label}</div>
-                  {hoveredInfo.data.label_long && <div className="whitespace-normal break-words text-white/50">{hoveredInfo.data.label_long}</div>}
+                  <div className="whitespace-normal break-words">label: {hoveredInfo.data.fullLabel || hoveredInfo.data.name || hoveredInfo.data.label}</div>
+                  {hoveredInfo.data.detail && <div className="whitespace-normal break-words text-white/50">{hoveredInfo.data.detail}</div>}
                   <div className="truncate">type: {hoveredInfo.data.type}</div>
-                  <div className="truncate">category: {hoveredInfo.data.category}</div>
-                  <div className="truncate">color: {hoveredInfo.data.backgroundColor}</div>
-                  <div className="truncate">source: {hoveredInfo.data.source}</div>
+                  {hoveredInfo.data.source && <div className="truncate">source: {hoveredInfo.data.source}</div>}
                   {hoveredInfo.data.mental_model_applied && <div className="text-emerald-300/80">mental model applied</div>}
                 </div>
               )}
               {hoveredInfo?.kind === 'edge' && (
                 <div className="flex flex-col gap-0.5 text-[10px] text-white/70">
                   <div className="font-mono truncate" title={hoveredInfo.data.id}>id: {hoveredInfo.data.id}</div>
-                  <div className="truncate">source: {hoveredInfo.data.source}</div>
-                  <div className="truncate">target: {hoveredInfo.data.target}</div>
+                  <div className="truncate">from: {hoveredInfo.data.from}</div>
+                  <div className="truncate">to: {hoveredInfo.data.to}</div>
                   <div className="whitespace-normal break-words">label: {hoveredInfo.data.label}</div>
-                  <div className="truncate">type: {hoveredInfo.data.relationship_type}</div>
-                  {hoveredInfo.data.edge_source && <div className="truncate">source: {hoveredInfo.data.edge_source}</div>}
-                  {hoveredInfo.data.label_long && <div className="whitespace-normal break-words text-white/50">{hoveredInfo.data.label_long}</div>}
+                  <div className="truncate">type: {hoveredInfo.data.type}</div>
+                  {hoveredInfo.data.source && <div className="truncate">source: {hoveredInfo.data.source}</div>}
+                  {hoveredInfo.data.detail && <div className="whitespace-normal break-words text-white/50">{hoveredInfo.data.detail}</div>}
                 </div>
               )}
             </div>

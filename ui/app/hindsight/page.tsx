@@ -655,16 +655,13 @@ export default function HindsightPage() {
             item.ext_id,
             item.arch?.name,
             item.hindsight?.name,
-            item.arch?.source_query,
-            item.hindsight?.source_query,
           ]
         : isDirectiveMode
         ? [
             item.ext_id,
-            item.arch?.statement,
-            item.hindsight?.statement,
+            item.arch?.name,
             item.hindsight?.name,
-            item.hindsight?.content,
+            item.arch?.statement,
           ]
         : [
             item.ext_id,

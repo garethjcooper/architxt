@@ -34,6 +34,7 @@ export {
   reflect,
   reflectWithBudgetFallback,
   getEntityGraph,
+  listBankEntities,
   listMemories,
   entityCooccurrence,
   dryRunExtract,

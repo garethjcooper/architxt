@@ -10,12 +10,23 @@ import { getServerConfig } from './config.js';
 
 const logger = createLogger('hindsight-research');
 
+// Match the UI dry-run proxy timeout (15 minutes). All research Hindsight calls
+// share this long timeout because they are LLM-bound and can run for many minutes
+// on larger documents.
+const DEFAULT_TIMEOUT_MS = 900000;
+
 function buildHeaders(serverConfig) {
   const headers = { 'Content-Type': 'application/json' };
   if (serverConfig.apiKey) {
     headers.Authorization = `Bearer ${serverConfig.apiKey}`;
   }
   return headers;
+}
+
+function fetchWithTimeout(url, fetchOptions, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...fetchOptions, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
 }
 
 /**
@@ -50,7 +61,7 @@ export async function recall(serverId, bankId, body) {
 
   try {
     const url = buildUrl(resolved.serviceUrl, bankId, '/memories/recall');
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: buildHeaders(resolved.config),
       body: JSON.stringify(body),
@@ -85,7 +96,7 @@ export async function reflect(serverId, bankId, body) {
   const request = { method: 'POST', url, body };
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: buildHeaders(resolved.config),
       body: JSON.stringify(body),
@@ -128,6 +139,61 @@ export async function reflectWithBudgetFallback(serverId, bankId, body) {
 }
 
 /**
+ * GET /v1/default/banks/{bank_id}/entities
+ * Paginated list of all entities known to the bank, ordered by mention count.
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {Object} options
+ */
+export async function listBankEntities(serverId, bankId, options = {}) {
+  const resolved = await resolveServer(serverId);
+  if (!resolved.success) return resolved;
+
+  const pageSize = options.limit || 1000;
+  const allItems = [];
+  const seenIds = new Set();
+
+  for (let offset = 0; ; offset += pageSize) {
+    const params = new URLSearchParams();
+    params.append('limit', String(pageSize));
+    params.append('offset', String(offset));
+
+    try {
+      const url = buildUrl(resolved.serviceUrl, bankId, `/entities?${params.toString()}`);
+      const response = await fetchWithTimeout(url, {
+        method: 'GET',
+        headers: buildHeaders(resolved.config),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('Hindsight list entities failed', { serverId, bankId, status: response.status, error: errorText });
+        return { success: false, error: `HTTP ${response.status}: ${errorText}`, code: 'HINDSIGHT_LIST_ENTITIES_FAILED' };
+      }
+
+      const data = await response.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const newItems = items.filter((item) => item?.id && !seenIds.has(item.id));
+      if (newItems.length === 0) break;
+
+      for (const item of newItems) {
+        seenIds.add(item.id);
+      }
+      allItems.push(...newItems);
+
+      // If we got fewer items than the page size, we've reached the end.
+      if (items.length < pageSize) break;
+    } catch (error) {
+      logger.error('Hindsight list entities error', { serverId, bankId, error: error.message });
+      return { success: false, error: error.message, code: 'HINDSIGHT_LIST_ENTITIES_ERROR' };
+    }
+  }
+
+  logger.info('Hindsight list entities OK', { serverId, bankId, count: allItems.length });
+  return { success: true, data: { items: allItems, total: allItems.length } };
+}
+
+/**
  * GET /v1/default/banks/{bank_id}/entities/graph
  * @param {number} serverId
  * @param {string} bankId
@@ -143,7 +209,7 @@ export async function getEntityGraph(serverId, bankId, options = {}) {
 
   try {
     const url = buildUrl(resolved.serviceUrl, bankId, `/entities/graph?${params.toString()}`);
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: buildHeaders(resolved.config),
     });
@@ -180,7 +246,7 @@ export async function listMemories(serverId, bankId, options = {}) {
 
   try {
     const url = buildUrl(resolved.serviceUrl, bankId, `/memories/list?${params.toString()}`);
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: buildHeaders(resolved.config),
     });
@@ -213,7 +279,7 @@ export async function entityCooccurrence(serverId, bankId, body) {
 
   try {
     const url = buildUrl(resolved.serviceUrl, bankId, '/memories/cooccurrence');
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: buildHeaders(resolved.config),
       body: JSON.stringify(body),
@@ -247,7 +313,7 @@ export async function dryRunExtract(serverId, bankId, body) {
   const url = buildUrl(resolved.serviceUrl, bankId, '/memories/dry-run-extract');
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: buildHeaders(resolved.config),
       body: JSON.stringify(body),
@@ -262,7 +328,12 @@ export async function dryRunExtract(serverId, bankId, body) {
     const data = await response.json();
     const factCount = Array.isArray(data.facts) ? data.facts.length : 0;
     const totalTokens = data.usage?.total_tokens ?? 0;
-    logger.info('Hindsight dry-run extract OK', { serverId, bankId, factCount, totalTokens });
+    logger.info('Hindsight dry-run extract OK', {
+      serverId,
+      bankId,
+      factCount,
+      totalTokens,
+    });
     return { success: true, data };
   } catch (error) {
     logger.error('Hindsight dry-run extract error', { serverId, bankId, error: error.message });

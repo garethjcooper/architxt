@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useId } from "react";
 import {
   Dialog,
   DialogContent,
@@ -96,6 +96,7 @@ export function DryRunExtractDialog({
   const [error, setError] = useState<string | null>(null);
   const [contexts, setContexts] = useState<MinimalContext[]>(propContexts);
   const [contextPickerOpen, setContextPickerOpen] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const contextComboRef = useRef<HTMLDivElement>(null);
   const contextTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [contextComboWidth, setContextComboWidth] = useState<
@@ -129,6 +130,7 @@ export function DryRunExtractDialog({
     string | null
   >(null);
   const [retainMission, setRetainMission] = useState("");
+  const freeFormSwitchId = useId();
 
   useEffect(() => {
     if (open) {
@@ -138,6 +140,7 @@ export function DryRunExtractDialog({
       setContext(newContext);
       setTimestamp(initialTimestamp || "");
       setEntityLabelSource("bank");
+      setEntitiesAllowFreeForm(false);
       setBankLabels([]);
       setRetainMission("");
       setResults(null);
@@ -356,6 +359,14 @@ export function DryRunExtractDialog({
     }
   };
 
+  const requestClose = () => {
+    if (running) {
+      setConfirmCloseOpen(true);
+    } else {
+      onOpenChange(false);
+    }
+  };
+
   const canRun =
     !!selectedServerId && !!selectedBankId && content.trim().length > 0;
 
@@ -480,13 +491,14 @@ export function DryRunExtractDialog({
   }, [results, selectedResultEntity]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[85vw] !max-w-none h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
-            Dry-Run Extraction
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={requestClose}>
+        <DialogContent className="!w-[85vw] !max-w-none h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-white">
+              Dry-Run Extraction
+            </DialogTitle>
+          </DialogHeader>
 
         <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
           {/* Controls */}
@@ -633,8 +645,12 @@ export function DryRunExtractDialog({
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
                     )}
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
+                  <label
+                    htmlFor={freeFormSwitchId}
+                    className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none"
+                  >
                     <Switch
+                      id={freeFormSwitchId}
                       checked={entitiesAllowFreeForm}
                       onCheckedChange={setEntitiesAllowFreeForm}
                       aria-label="Allow free-form entities"
@@ -1085,7 +1101,7 @@ export function DryRunExtractDialog({
         <div className="flex justify-end gap-3 pt-4 border-t border-white/10 shrink-0">
           <Button
             variant="ghost"
-            onClick={() => onOpenChange(false)}
+            onClick={requestClose}
             className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
           >
             <X className="h-4 w-4" />
@@ -1106,5 +1122,38 @@ export function DryRunExtractDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+      <Dialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+        <DialogContent className="!w-auto max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-white">
+              Close while running?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-white/70">
+            A dry-run is currently in progress. Closing will not cancel the
+            Hindsight request, but you will lose the in-progress results preview.
+          </p>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmCloseOpen(false)}
+              className="text-white/70 hover:text-white hover:bg-white/5"
+            >
+              Keep running
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmCloseOpen(false);
+                onOpenChange(false);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+            >
+              Close anyway
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -19,7 +19,7 @@ import path from 'path';
 
 import { createLogger } from '../../utils/logger.js';
 import { config } from '../../config.js';
-import { listOperations } from '../../services/hindsight/memories.js';
+import { listOperations, getOperation } from '../../services/hindsight/memories.js';
 import {
   updatePendingOperationStatus,
   getPendingOperationsForPoll,
@@ -29,6 +29,10 @@ const logger = createLogger('hindsight-poll-daemon');
 
 const POLL_INTERVAL_MS = config.hindsightPollDaemon?.poll_interval_ms || 5000;
 const STALE_THRESHOLD_MS = config.hindsightPollDaemon?.stale_threshold_ms || 300000; // 5 min
+
+const PAGE_SIZE = 100;
+const MAX_PAGES_PER_STATUS = 100; // emergency circuit breaker (10k ops per status)
+const PER_OP_LOOKUP_CONCURRENCY = 10;
 
 let db = null;
 let isRunning = false;
@@ -97,6 +101,95 @@ function groupByServerBank(ops) {
 }
 
 /**
+ * Hindsight OperationResponse uses 'id' for child operations.
+ */
+function remoteOpId(op) {
+  return op && (op.id || op.operation_id);
+}
+
+/**
+ * Fetch all operations for a bank/status that are needed to cover a set of
+ * tracked operation IDs. Pages through Hindsight's 100-item limit and stops
+ * early once every tracked ID is found or the list ends.
+ *
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {string} status
+ * @param {Set<string>} trackedIds
+ * @param {boolean} [excludeParents=false]
+ * @returns {Promise<{success: boolean, opMap?: Map<string, Object>, error?: string}>}
+ */
+async function fetchStatusPage(serverId, bankId, status, trackedIds, excludeParents = false) {
+  const opMap = new Map();
+  let offset = 0;
+  let pageCount = 0;
+
+  while (pageCount < MAX_PAGES_PER_STATUS) {
+    pageCount += 1;
+    const result = await listOperations(serverId, bankId, { status, limit: PAGE_SIZE, offset, excludeParents });
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    const operations = result.operations || [];
+    for (const op of operations) {
+      const opId = remoteOpId(op);
+      if (opId) {
+        opMap.set(opId, op);
+      }
+    }
+
+    const allFound = trackedIds.size > 0 && Array.from(trackedIds).every(id => opMap.has(id));
+    if (operations.length < PAGE_SIZE || allFound) {
+      break;
+    }
+
+    offset += PAGE_SIZE;
+  }
+
+  if (pageCount >= MAX_PAGES_PER_STATUS) {
+    logger.error('Hindsight status pagination hit emergency cap', {
+      serverId,
+      bankId,
+      status,
+      trackedCount: trackedIds.size,
+    });
+  }
+
+  return { success: true, opMap };
+}
+
+/**
+ * Run a limited-concurrency batch of getOperation calls.
+ *
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {string[]} operationIds
+ * @returns {Promise<Map<string, Object|null>>} map of operationId to operation or null
+ */
+async function lookupOperations(serverId, bankId, operationIds) {
+  const results = new Map();
+  let index = 0;
+
+  async function worker() {
+    while (index < operationIds.length) {
+      const currentIndex = index;
+      index += 1;
+      const operationId = operationIds[currentIndex];
+      const result = await getOperation(serverId, bankId, operationId);
+      if (result.success) {
+        results.set(operationId, result.operation || null);
+      } else {
+        results.set(operationId, null);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: PER_OP_LOOKUP_CONCURRENCY }, worker));
+  return results;
+}
+
+/**
  * Single poll iteration
  */
 async function pollOnce() {
@@ -105,20 +198,20 @@ async function pollOnce() {
     return 0;
   }
 
-    // 1. Fetch all pending ops from local DB (across all servers/banks)
-    let pendingOpsResult;
-    try {
-      pendingOpsResult = getPendingOperationsForPoll(db);
-    } catch (err) {
-      logger.error('Failed to query pending operations', { error: err.message });
-      return 0;
-    }
+  // 1. Fetch all pending ops from local DB (across all servers/banks)
+  let pendingOpsResult;
+  try {
+    pendingOpsResult = getPendingOperationsForPoll(db);
+  } catch (err) {
+    logger.error('Failed to query pending operations', { error: err.message });
+    return 0;
+  }
 
-    const pendingOps = pendingOpsResult.success ? pendingOpsResult.data : [];
-    if (pendingOps.length === 0) {
-      logger.debug('No pending operations to poll');
-      return 0;
-    }
+  const pendingOps = pendingOpsResult.success ? pendingOpsResult.data : [];
+  if (pendingOps.length === 0) {
+    logger.debug('No pending operations to poll');
+    return 0;
+  }
 
   logger.info('Polling Hindsight for pending operations', { count: pendingOps.length });
 
@@ -128,134 +221,196 @@ async function pollOnce() {
 
   for (const group of groups) {
     const { serverId, bankId, ops } = group;
+    const trackedIds = new Set(ops.map(op => op.pop_operation_id));
 
-    // 3. Call Hindsight listOperations for this bank
-    const hindResult = await listOperations(serverId, bankId);
-    if (!hindResult.success) {
-      logger.error('Hindsight listOperations failed', {
-        serverId, bankId, error: hindResult.error
+    // 3. Fetch active statuses in priority order: processing first (most time-sensitive),
+    //    then pending. Stop paginating each status once all tracked IDs are found.
+    const processingResult = await fetchStatusPage(serverId, bankId, 'processing', trackedIds, true);
+    if (!processingResult.success) {
+      logger.error('Hindsight listOperations failed for processing', {
+        serverId, bankId, error: processingResult.error
       });
-      // Don't mark ops as failed on remote error — they'll be retried next loop
       continue;
     }
 
-    const opMap = new Map();
-    for (const op of (hindResult.operations || [])) {
-      // Hindsight OperationResponse uses 'id' not 'operation_id'
-      const opId = op.id || op.operation_id;
-      if (op && opId) {
-        opMap.set(opId, op);
+    const pendingResult = await fetchStatusPage(serverId, bankId, 'pending', trackedIds, true);
+    if (!pendingResult.success) {
+      logger.error('Hindsight listOperations failed for pending', {
+        serverId, bankId, error: pendingResult.error
+      });
+      continue;
+    }
+
+    // 4. Build union active map
+    const activeMap = new Map(processingResult.opMap);
+    for (const [opId, op] of pendingResult.opMap.entries()) {
+      if (!activeMap.has(opId)) {
+        activeMap.set(opId, op);
       }
     }
 
-    // 4. Match local ops to remote states
+    // 5. Match local ops to remote states found in active lists
+    const missingFromActive = [];
     for (const localOp of ops) {
-      const remoteOp = opMap.get(localOp.pop_operation_id);
+      const remoteOp = activeMap.get(localOp.pop_operation_id);
 
       if (remoteOp) {
-        const remoteStatus = remoteOp.status;
-        const remoteError = remoteOp.error_message || remoteOp.message || null;
-
-        if (remoteStatus === 'completed') {
-          const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
-            pop_status: 'completed',
-            pop_error_message: null,
-          });
-          if (updateResult.success) {
-            logger.info('Operation completed', {
-              popId: localOp.pop_id,
-              operationId: localOp.pop_operation_id,
-            });
-            updatedCount++;
-          } else {
-            logger.error('Failed to update completed op', {
-              popId: localOp.pop_id,
-              error: updateResult.error,
-            });
-          }
-        } else if (remoteStatus === 'failed') {
-          const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
-            pop_status: 'failed',
-            pop_error_message: remoteError,
-          });
-          if (updateResult.success) {
-            logger.warn('Operation failed on Hindsight', {
-              popId: localOp.pop_id,
-              operationId: localOp.pop_operation_id,
-              error: remoteError,
-            });
-            updatedCount++;
-          }
-        } else if (remoteStatus === 'cancelled' || remoteStatus === 'canceled') {
-          const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
-            pop_status: 'failed',
-            pop_error_message: remoteError || 'Operation was cancelled on server',
-          });
-          if (updateResult.success) {
-            logger.warn('Operation cancelled on Hindsight', {
-              popId: localOp.pop_id,
-              operationId: localOp.pop_operation_id,
-              error: remoteError,
-            });
-            updatedCount++;
-          }
-        } else {
-          // Hindsight reports an intermediate status (e.g. 'processing', 'pending') —
-          // mirror it into our DB so the frontend shows the real remote state.
-          if (remoteStatus !== localOp.pop_status) {
-            const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
-              pop_status: remoteStatus,
-              pop_error_message: null,
-            });
-            if (updateResult.success) {
-              logger.info('Operation status updated', {
-                popId: localOp.pop_id,
-                operationId: localOp.pop_operation_id,
-                fromStatus: localOp.pop_status,
-                toStatus: remoteStatus,
-              });
-              updatedCount++;
-            }
-          } else {
-            logger.debug('Operation status unchanged', {
-              popId: localOp.pop_id,
-              operationId: localOp.pop_operation_id,
-              remoteStatus,
-            });
-          }
-        }
+        updatedCount += applyRemoteStatus(localOp, remoteOp);
       } else {
-        // Remote doesn't know this operation_id anymore
-        // Check if it's stale enough to mark failed
-        const createdAt = new Date(localOp.pop_created_at).getTime();
-        const now = Date.now();
-        const elapsed = now - createdAt;
+        missingFromActive.push(localOp);
+      }
+    }
 
-        if (elapsed > STALE_THRESHOLD_MS) {
-          const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
-            pop_status: 'failed',
-            pop_error_message: 'Operation not found on server after threshold — may have expired or been cleaned up',
-          });
-          if (updateResult.success) {
-            logger.warn('Operation expired (stale)', {
-              popId: localOp.pop_id,
-              operationId: localOp.pop_operation_id,
-              elapsedMs: elapsed,
-            });
-            updatedCount++;
-          }
+    // 6. Per-op lookup for tracked ops that disappeared from active lists.
+    //    These are likely terminal; a single getOperation tells us the outcome
+    //    without scanning Hindsight's potentially huge terminal operation history.
+    if (missingFromActive.length > 0) {
+      logger.debug('Looking up terminal state for missing active ops', {
+        serverId,
+        bankId,
+        count: missingFromActive.length,
+      });
+
+      const missingIds = missingFromActive.map(op => op.pop_operation_id);
+      const terminalMap = await lookupOperations(serverId, bankId, missingIds);
+
+      const stillMissing = [];
+      for (const localOp of missingFromActive) {
+        const remoteOp = terminalMap.get(localOp.pop_operation_id);
+        if (remoteOp) {
+          updatedCount += applyRemoteStatus(localOp, remoteOp);
         } else {
-          logger.debug('Operation not yet visible on server', {
-            popId: localOp.pop_id,
-            operationId: localOp.pop_operation_id,
-            elapsedMs: elapsed,
-          });
+          stillMissing.push(localOp);
         }
+      }
+
+      // 7. Anything still missing after active + terminal lookup waits for stale threshold
+      for (const localOp of stillMissing) {
+        updatedCount += handleMissingOperation(localOp);
       }
     }
   }
 
   return updatedCount;
+}
+
+/**
+ * Apply a remote operation's status to the local pending_operations row.
+ * @returns {number} 1 if a DB update occurred, 0 otherwise
+ */
+function applyRemoteStatus(localOp, remoteOp) {
+  const remoteStatus = remoteOp.status;
+  const remoteError = remoteOp.error_message || remoteOp.message || null;
+
+  if (remoteStatus === 'completed') {
+    const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
+      pop_status: 'completed',
+      pop_error_message: null,
+    });
+    if (updateResult.success) {
+      logger.info('Operation completed', {
+        popId: localOp.pop_id,
+        operationId: localOp.pop_operation_id,
+      });
+      return 1;
+    }
+    logger.error('Failed to update completed op', {
+      popId: localOp.pop_id,
+      error: updateResult.error,
+    });
+    return 0;
+  }
+
+  if (remoteStatus === 'failed') {
+    const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
+      pop_status: 'failed',
+      pop_error_message: remoteError,
+    });
+    if (updateResult.success) {
+      logger.warn('Operation failed on Hindsight', {
+        popId: localOp.pop_id,
+        operationId: localOp.pop_operation_id,
+        error: remoteError,
+      });
+      return 1;
+    }
+    return 0;
+  }
+
+  if (remoteStatus === 'cancelled' || remoteStatus === 'canceled') {
+    const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
+      pop_status: 'failed',
+      pop_error_message: remoteError || 'Operation was cancelled on server',
+    });
+    if (updateResult.success) {
+      logger.warn('Operation cancelled on Hindsight', {
+        popId: localOp.pop_id,
+        operationId: localOp.pop_operation_id,
+        error: remoteError,
+      });
+      return 1;
+    }
+    return 0;
+  }
+
+  // Intermediate status (e.g. 'processing', 'pending') — mirror it if changed.
+  if (remoteStatus !== localOp.pop_status) {
+    const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
+      pop_status: remoteStatus,
+      pop_error_message: null,
+    });
+    if (updateResult.success) {
+      logger.info('Operation status updated', {
+        popId: localOp.pop_id,
+        operationId: localOp.pop_operation_id,
+        fromStatus: localOp.pop_status,
+        toStatus: remoteStatus,
+      });
+      return 1;
+    }
+    return 0;
+  }
+
+  logger.debug('Operation status unchanged', {
+    popId: localOp.pop_id,
+    operationId: localOp.pop_operation_id,
+    remoteStatus,
+  });
+  return 0;
+}
+
+/**
+ * Handle a tracked operation that is not visible in Hindsight's active or
+ * terminal lookups. If it has exceeded the stale threshold, mark it failed.
+ * Otherwise, leave it for the next poll cycle.
+ * @returns {number} 1 if a DB update occurred, 0 otherwise
+ */
+function handleMissingOperation(localOp) {
+  const createdAt = new Date(localOp.pop_created_at).getTime();
+  const elapsed = Date.now() - createdAt;
+
+  if (elapsed > STALE_THRESHOLD_MS) {
+    const updateResult = updatePendingOperationStatus(db, localOp.pop_id, {
+      pop_status: 'failed',
+      pop_error_message: 'Operation not found on server after threshold — may have expired or been cleaned up',
+    });
+    if (updateResult.success) {
+      logger.warn('Operation expired (stale)', {
+        popId: localOp.pop_id,
+        operationId: localOp.pop_operation_id,
+        elapsedMs: elapsed,
+      });
+      return 1;
+    }
+    return 0;
+  }
+
+  logger.debug('Operation not yet visible on server', {
+    popId: localOp.pop_id,
+    operationId: localOp.pop_operation_id,
+    elapsedMs: elapsed,
+  });
+  return 0;
 }
 
 /**

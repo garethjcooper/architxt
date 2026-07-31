@@ -182,6 +182,22 @@ function ensureMissingTables(db) {
         FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
         FOREIGN KEY (rstep_id) REFERENCES research_steps(rstep_id) ON DELETE CASCADE
       )`
+    },
+    {
+      name: 'prompt_templates',
+      ddl: `CREATE TABLE IF NOT EXISTS prompt_templates (
+        pt_name TEXT PRIMARY KEY,
+        pt_mode TEXT NOT NULL,
+        pt_description TEXT,
+        pt_body TEXT NOT NULL,
+        pt_fragments JSON NOT NULL,
+        pt_variables JSON NOT NULL,
+        pt_examples_heuristic TEXT,
+        pt_is_builtin INTEGER NOT NULL DEFAULT 0 CHECK (pt_is_builtin IN (0, 1)),
+        pt_version TEXT,
+        pt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        pt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      )`
     }
   ];
 
@@ -195,6 +211,190 @@ function ensureMissingTables(db) {
     }
   }
   return createdCount;
+}
+
+/**
+ * Ensure the built-in prompt templates required by v0.3.5 exist in prompt_templates.
+ * Runs after seed data and is idempotent via INSERT OR IGNORE.
+ */
+const BUILTIN_TEMPLATES = [
+  {
+    name: 'narrative',
+    mode: 'narrative',
+    description: 'Narrative-only output.',
+    body: 'Answer the topic below as a focused Markdown narrative. Do not return a graph section.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '[]',
+    variables: '["ARCHITXT_TOPIC"]',
+    examplesHeuristic: null,
+  },
+  {
+    name: 'graph-known',
+    mode: 'graph-known',
+    description: 'Graph-only output using known entities only.',
+    body: 'Return only the graph section for the topic below. Use only entity ids from the provided catalog. Do not invent new entities.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
+    examplesHeuristic: 'top-n',
+  },
+  {
+    name: 'graph-discovery',
+    mode: 'graph-discovery',
+    description: 'Graph-only output allowing discovered nodes.',
+    body: 'Return only the graph section for the topic below. Prefer known entities from the catalog; you may add found: nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-allowed.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
+    examplesHeuristic: 'top-n',
+  },
+  {
+    name: 'graph-discovered-only',
+    mode: 'graph-discovered-only',
+    description: 'Graph-only output returning discovered nodes and edges only.',
+    body: 'Return only the graph section for the topic below. Emit only discovered nodes and edges. Known entities may appear only as endpoints of discovered edges; do not return them as standalone nodes.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-discovered-only.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
+    examplesHeuristic: 'top-n',
+  },
+  {
+    name: 'narrative-graph-known',
+    mode: 'narrative-graph-known',
+    description: 'Narrative + graph using known entities only.',
+    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section. Use only entity ids from the provided catalog. Do not invent new entities.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
+    examplesHeuristic: 'top-n',
+  },
+  {
+    name: 'narrative-graph-discovery',
+    mode: 'narrative-graph-discovery',
+    description: 'Narrative + graph allowing discovered nodes.',
+    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section. Prefer known entities from the catalog; you may add found: nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-allowed.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
+    examplesHeuristic: 'top-n',
+  },
+  {
+    name: 'narrative-graph-discovered-only',
+    mode: 'narrative-graph-discovered-only',
+    description: 'Narrative + graph returning discovered nodes and edges only.',
+    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section containing only discovered nodes and edges. Known entities may appear only as endpoints of discovered edges; do not return them as standalone nodes.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-discovered-only.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
+    examplesHeuristic: 'top-n',
+  },
+];
+
+function ensureBuiltinPromptTemplates(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'prompt_templates'").get();
+  if (!tableExists) return 0;
+
+  const existingRows = db.prepare('SELECT pt_name, pt_is_builtin FROM prompt_templates').all();
+  const existingByName = new Map(existingRows.map((r) => [r.pt_name, r.pt_is_builtin]));
+
+  // Coerce any row that uses a built-in name to the official built-in definition.
+  // This handles seed-data or user rows that were inserted with pt_is_builtin = 0.
+  let coerced = 0;
+  const coerce = db.prepare(`
+    UPDATE prompt_templates
+    SET pt_is_builtin = 1,
+        pt_mode = ?,
+        pt_description = ?,
+        pt_body = ?,
+        pt_fragments = ?,
+        pt_variables = ?,
+        pt_examples_heuristic = ?
+    WHERE pt_name = ?
+  `);
+  for (const t of BUILTIN_TEMPLATES) {
+    if (existingByName.get(t.name) !== 1) {
+      try {
+        const result = coerce.run(
+          t.mode,
+          t.description,
+          t.body,
+          t.fragments,
+          t.variables,
+          t.examplesHeuristic ?? null,
+          t.name
+        );
+        coerced += result.changes;
+      } catch (err) {
+        logger.error('Failed to coerce built-in prompt template', { name: t.name, mode: t.mode, error: err.message });
+      }
+    }
+  }
+
+  const missing = BUILTIN_TEMPLATES.filter((t) => !existingByName.has(t.name));
+
+  let seeded = 0;
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO prompt_templates
+      (pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_examples_heuristic, pt_is_builtin)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+  `);
+  for (const t of missing) {
+    try {
+      const result = insert.run(t.name, t.mode, t.description, t.body, t.fragments, t.variables, t.examplesHeuristic);
+      seeded += result.changes;
+    } catch (err) {
+      logger.error('Failed to insert built-in prompt template', { name: t.name, mode: t.mode, error: err.message });
+    }
+  }
+
+  // Patch existing built-ins so canonical body, fragments, variables and metadata stay current.
+  let patched = 0;
+  const update = db.prepare(`
+    UPDATE prompt_templates
+    SET pt_mode = ?,
+        pt_description = ?,
+        pt_body = ?,
+        pt_fragments = ?,
+        pt_variables = ?,
+        pt_examples_heuristic = ?
+    WHERE pt_name = ?
+      AND pt_is_builtin = 1
+      AND (pt_mode != ? OR pt_description != ? OR pt_body != ? OR pt_fragments != ? OR pt_variables != ? OR IFNULL(pt_examples_heuristic, '') != IFNULL(?, ''))
+  `);
+  for (const t of BUILTIN_TEMPLATES) {
+    const heuristic = t.examplesHeuristic ?? null;
+    const result = update.run(
+      t.mode,
+      t.description,
+      t.body,
+      t.fragments,
+      t.variables,
+      heuristic,
+      t.name,
+      t.mode,
+      t.description,
+      t.body,
+      t.fragments,
+      t.variables,
+      heuristic
+    );
+    patched += result.changes;
+  }
+
+  if (missing.length === 0 && coerced === 0 && patched === 0) {
+    logger.info('Built-in prompt templates already present', {
+      total: existingRows.length,
+      builtin: existingRows.filter((r) => r.pt_is_builtin === 1).length,
+    });
+    return 0;
+  }
+
+  logger.info('Ensured built-in prompt templates', {
+    missing: missing.length,
+    inserted: seeded,
+    coerced,
+    patched,
+    names: missing.map((t) => t.name),
+  });
+
+  if (patched > 0) {
+    logger.info(`Patched ${patched} built-in prompt template(s)`);
+  }
+
+  return seeded + coerced + patched;
 }
 
 function relaxResearchStepsParentCascade(db) {
@@ -280,18 +480,8 @@ function relaxResearchStepsParentCascade(db) {
  * junction rows into temp tables before recreating the parents.
  */
 function removeMentalModelCheckConstraints(db) {
-  // If dependent tables are missing, we cannot safely recreate tables with FK references.
-  // This can happen on partially-initialized databases; the base schema should be applied first.
-  const requiredTables = ['mental_models', 'mental_model_entities', 'entities'];
-  const missing = requiredTables.filter((name) => {
-    const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(name);
-    return !row;
-  });
-  if (missing.length > 0) {
-    logger.warn('Skipping mental model CHECK constraint removal — missing dependent tables', { missing });
-    return 0;
-  }
-
+  // Existing installs may still have the old CHECK ('json','narrative') on mm_returns.
+  // We recreate the table with a foreign-key reference to prompt_templates instead.
   const mentalModelsInfo = {
     name: 'mental_models',
     newDdl: `CREATE TABLE mental_models_new (
@@ -306,13 +496,15 @@ function removeMentalModelCheckConstraints(db) {
       mm_tags_match_mode TEXT DEFAULT 'all_strict',
       mm_is_template TEXT DEFAULT 'false',
       mm_max_tokens INTEGER DEFAULT 2048,
+      mm_viewp_description TEXT,
+      mm_viewp_meta JSON,
       mm_dimension TEXT,
-      mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
+      mm_returns TEXT DEFAULT 'narrative' REFERENCES prompt_templates(pt_name),
       mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
       mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
     )`,
-    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
+    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_viewp_description', 'mm_viewp_meta', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
   };
 
   const mentalModelEntitiesInfo = {
@@ -343,7 +535,7 @@ function removeMentalModelCheckConstraints(db) {
     const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").pluck().get(name);
     if (typeof sql !== 'string') return false;
 
-    return ['mm_refresh_mode', 'mm_tags_match_mode', 'mm_ent_refresh_mode'].some((colName) => {
+    return ['mm_refresh_mode', 'mm_tags_match_mode', 'mm_ent_refresh_mode', 'mm_returns'].some((colName) => {
       const checkPattern = new RegExp(`CHECK\\s*\\(\\s*${colName}\\s+IN`, 'i');
       return checkPattern.test(sql);
     });
@@ -364,14 +556,11 @@ function removeMentalModelCheckConstraints(db) {
   db.exec(`DROP TABLE IF EXISTS _temp_mm_entities`);
 
   // Save junction rows BEFORE dropping the parent table so CASCADE doesn't delete them.
-  if (needsModels) {
-    logger.warn('Saving mental_model_tags before recreating mental_models');
+  const needsJunctionBackup = needsModels || needsEntities;
+  if (needsJunctionBackup) {
+    logger.warn('Saving mental_model_tags and mental_model_entities before recreating mental model tables');
     db.exec(`DROP TABLE IF EXISTS _temp_mm_tags`);
     db.exec(`CREATE TABLE _temp_mm_tags AS SELECT * FROM mental_model_tags`);
-  }
-
-  if (needsEntities) {
-    logger.warn('Saving mental_model_entities before recreating mental_model_entities');
     db.exec(`DROP TABLE IF EXISTS _temp_mm_entities`);
     db.exec(`CREATE TABLE _temp_mm_entities AS SELECT * FROM mental_model_entities`);
   }
@@ -387,7 +576,14 @@ function removeMentalModelCheckConstraints(db) {
     logger.warn(`Recreating ${name} without CHECK constraints`);
     db.exec(newDdl);
     const colList = columns.join(', ');
-    db.exec(`INSERT INTO ${name}_new (${colList}) SELECT ${colList} FROM ${name}`);
+    if (name === 'mental_models') {
+      const mappedColList = columns.map((c) =>
+        c === 'mm_returns' ? "CASE mm_returns WHEN 'json' THEN 'graph-known' WHEN 'narrative' THEN 'narrative' ELSE mm_returns END AS mm_returns" : c
+      ).join(', ');
+      db.exec(`INSERT INTO ${name}_new (${colList}) SELECT ${mappedColList} FROM ${name}`);
+    } else {
+      db.exec(`INSERT INTO ${name}_new (${colList}) SELECT ${colList} FROM ${name}`);
+    }
     db.exec(`DROP TABLE ${name}`);
     db.exec(`ALTER TABLE ${name}_new RENAME TO ${name}`);
     migrated++;
@@ -395,15 +591,12 @@ function removeMentalModelCheckConstraints(db) {
   }
 
   // Restore saved junction rows now that both parent tables exist.
-  if (needsModels) {
-    logger.warn('Restoring mental_model_tags');
+  if (needsJunctionBackup) {
+    logger.warn('Restoring mental_model_tags and mental_model_entities');
     db.exec(`INSERT INTO mental_model_tags (tag_id, mm_id, mm_tag_created_at, mm_tag_updated_at)
              SELECT tag_id, mm_id, mm_tag_created_at, mm_tag_updated_at FROM _temp_mm_tags`);
     db.exec(`DROP TABLE _temp_mm_tags`);
-  }
 
-  if (needsEntities) {
-    logger.warn('Restoring mental_model_entities');
     db.exec(`INSERT INTO mental_model_entities (ent_id, mm_id, mm_ent_refresh_mode, mm_ent_refresh_after_consolidation, mm_ent_exclude_all_mental_models, mm_ent_max_tokens, mm_ent_created_at, mm_ent_updated_at)
              SELECT ent_id, mm_id, mm_ent_refresh_mode, mm_ent_refresh_after_consolidation, mm_ent_exclude_all_mental_models, mm_ent_max_tokens, mm_ent_created_at, mm_ent_updated_at FROM _temp_mm_entities`);
     db.exec(`DROP TABLE _temp_mm_entities`);
@@ -411,6 +604,80 @@ function removeMentalModelCheckConstraints(db) {
 
   return migrated;
 }
+
+/**
+ * Remove the restrictive pt_mode CHECK constraint from prompt_templates.
+ * The application validates template modes in code; the database CHECK
+ * prevents adding new modes without a full schema migration, which is why
+ * it is being dropped.
+ */
+function removePromptTemplateModeCheck(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_templates'").get();
+  if (!tableExists) return 0;
+
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='prompt_templates'").pluck().get();
+  if (typeof sql !== 'string') return 0;
+
+  const hasModeCheck = /CHECK\s*\(\s*pt_mode\s+IN/i.test(sql);
+  const hasDiscoveryColumn = /pt_discovery_allowed/i.test(sql);
+  if (!hasModeCheck && !hasDiscoveryColumn) {
+    return 0;
+  }
+
+  if (hasDiscoveryColumn) {
+    logger.warn('Recreating prompt_templates without pt_discovery_allowed column');
+  }
+  if (hasModeCheck) {
+    logger.warn('Recreating prompt_templates without pt_mode CHECK constraint');
+  }
+
+  try {
+    db.pragma('foreign_keys = OFF');
+
+    db.exec(`CREATE TABLE prompt_templates_new (
+      pt_name TEXT PRIMARY KEY,
+      pt_mode TEXT NOT NULL,
+      pt_description TEXT,
+      pt_body TEXT NOT NULL,
+      pt_fragments JSON NOT NULL,
+      pt_variables JSON NOT NULL,
+      pt_examples_heuristic TEXT,
+      pt_is_builtin INTEGER NOT NULL DEFAULT 0 CHECK (pt_is_builtin IN (0, 1)),
+      pt_version TEXT,
+      pt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      pt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    )`);
+
+    db.exec(`INSERT INTO prompt_templates_new
+      (pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_examples_heuristic, pt_is_builtin, pt_version, pt_created_at, pt_updated_at)
+      SELECT pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_examples_heuristic, pt_is_builtin, pt_version, pt_created_at, pt_updated_at
+      FROM prompt_templates`);
+
+    db.exec('DROP TABLE prompt_templates');
+    db.exec('ALTER TABLE prompt_templates_new RENAME TO prompt_templates');
+
+    const fkCheck = db.pragma('foreign_key_check');
+    if (fkCheck && fkCheck.length > 0) {
+      logger.warn('Foreign key check found issues after prompt_templates migration', { issues: fkCheck });
+    }
+
+    logger.info('Recreated prompt_templates without pt_mode CHECK constraint or pt_discovery_allowed column');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
+ * Ensure the FTS index for documents exists and is backfilled.
+ * Delegates to the search adapter so the migration engine stays free of
+ * SQLite FTS5 specifics.
+ */
+function ensureDocumentsFts(db) {
+  const result = createFtsIndex(db);
+  return result.success ? result.data : false;
+}
+
 function ensureMissingColumns(db) {
   const migrations = [
     {
@@ -468,7 +735,7 @@ function ensureMissingColumns(db) {
         },
         {
           name: 'mm_returns',
-          ddl: "ALTER TABLE mental_models ADD COLUMN mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative'))"
+          ddl: "ALTER TABLE mental_models ADD COLUMN mm_returns TEXT DEFAULT 'narrative'"
         },
         {
           name: 'mm_concatenation',
@@ -668,16 +935,6 @@ function ensurePendingOpsNullableDocId(db) {
 }
 
 /**
- * Ensure the FTS index for documents exists and is backfilled.
- * Delegates to the search adapter so the migration engine stays free of
- * SQLite FTS5 specifics.
- */
-function ensureDocumentsFts(db) {
-  const result = createFtsIndex(db);
-  return result.success ? result.data : false;
-}
-
-/**
  * Apply the DDL schema to a fresh database.
  * Called automatically by db/connection.js when no tables exist.
  */
@@ -686,18 +943,20 @@ export function ensureSchema(db) {
 
   if (hadSchema) {
     const created = ensureMissingTables(db);
+    const templatesSeeded = ensureBuiltinPromptTemplates(db);
     const added = ensureMissingColumns(db);
     const removed = removeMentalModelCheckConstraints(db);
+    const promptTemplateFixed = removePromptTemplateModeCheck(db);
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
-    if (created > 0 || added > 0 || removed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}`);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
@@ -717,6 +976,7 @@ export function ensureSchema(db) {
 
   db.exec(cleaned);
   logger.info('Schema applied successfully');
+  const templatesSeeded = ensureBuiltinPromptTemplates(db);
   return true;
 }
 

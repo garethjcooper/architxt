@@ -205,12 +205,29 @@ export async function generateCompletion(messages, options = {}) {
 
     const parsed = parseResponse(result, providerConfig.chat_style);
 
+    const firstChoice = result.choices?.[0];
+    const message = firstChoice?.message;
+    const responseKeys = message ? Object.keys(message) : [];
+    const finishReason = firstChoice?.finish_reason;
+
     logger.info('LLM response', {
       durationMs: duration,
       model: parsed.model,
       contentLength: parsed.content.length,
+      finishReason,
+      responseKeys,
       usage: parsed.usage,
     });
+
+    if (parsed.content.length === 0) {
+      logger.warn('LLM response content is empty', {
+        model: parsed.model,
+        finishReason,
+        hasReasoningContent: responseKeys.includes('reasoning_content'),
+        hasToolCalls: responseKeys.includes('tool_calls'),
+        responseKeys,
+      });
+    }
 
     return {
       success: true,
