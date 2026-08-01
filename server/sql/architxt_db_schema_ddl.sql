@@ -275,12 +275,14 @@ CREATE TABLE research_sessions (
   rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
   rs_title TEXT NOT NULL,
   rs_description TEXT,
+  rs_server_id INTEGER,
   rs_bank_id TEXT NOT NULL,
   rs_viewpoint_ids JSON NOT NULL,
   rs_status TEXT NOT NULL DEFAULT 'active',
   rs_current_step_id INTEGER,
   rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
   FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
 );
 

@@ -1226,6 +1226,7 @@ export default function ExplorePage() {
       <ResearchImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
+        serverId={parseInt(selectedServerId, 10)}
         bankId={selectedBankId}
         globalGraph={globalGraph}
         onImport={handleImportResearchGraph}

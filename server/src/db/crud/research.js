@@ -81,7 +81,7 @@ export const deleteStepWithSession = (db, stepId) => dbExec(() => {
 /**
  * Create a research session.
  * @param {Object} db
- * @param {Object} data - DB field names (rs_title, rs_bank_id, rs_viewpoint_ids, rs_description)
+ * @param {Object} data - DB field names (rs_title, rs_server_id, rs_bank_id, rs_viewpoint_ids, rs_description)
  */
 export const createSession = (db, data) => dbExec(() => {
   requireString('rs_title', data.rs_title);
@@ -94,12 +94,13 @@ export const createSession = (db, data) => dbExec(() => {
 
   const prepared = toJson(data, SESSION_JSON_FIELDS);
   const sql = `INSERT INTO ${SESSION_TABLE} (
-    rs_title, rs_description, rs_bank_id, rs_viewpoint_ids, rs_status, rs_current_step_id
-  ) VALUES (?, ?, ?, ?, ?, ?)`;
+    rs_title, rs_description, rs_server_id, rs_bank_id, rs_viewpoint_ids, rs_status, rs_current_step_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     prepared.rs_title ?? '',
     prepared.rs_description ?? null,
+    prepared.rs_server_id ?? null,
     prepared.rs_bank_id,
     prepared.rs_viewpoint_ids,
     prepared.rs_status ?? 'active',
@@ -107,6 +108,17 @@ export const createSession = (db, data) => dbExec(() => {
   );
   return result.lastInsertRowid;
 }, 'research.createSession');
+
+export const listSessionsByServerBank = (db, serverId, bankId) => dbExec(() => {
+  const sid = requireInt('serverId', serverId);
+  const bid = requireString('bankId', bankId);
+  // Legacy rows created before the rs_server_id migration have a NULL server id.
+  // Show them as a fallback so existing sessions remain visible until they are
+  // re-associated with a specific server.
+  const sql = `SELECT * FROM ${SESSION_TABLE} WHERE rs_bank_id = ? AND (rs_server_id = ? OR rs_server_id IS NULL) ORDER BY rs_updated_at DESC, rs_id DESC`;
+  const rows = stmt(db, sql).all(bid, sid);
+  return rows.map(r => fromJson(r, SESSION_JSON_FIELDS));
+}, 'research.listSessionsByServerBank');
 
 /**
  * Update session's current step pointer.
@@ -139,13 +151,6 @@ export const updateSession = (db, sessionId, data) => dbExec(() => {
   const result = stmt(db, sql).run(...values, id);
   return result.changes > 0 ? true : null;
 }, 'research.updateSession');
-
-export const listSessionsByBank = (db, bankId) => dbExec(() => {
-  const id = requireString('bankId', bankId);
-  const sql = `SELECT * FROM ${SESSION_TABLE} WHERE rs_bank_id = ? ORDER BY rs_updated_at DESC, rs_id DESC`;
-  const rows = stmt(db, sql).all(id);
-  return rows.map(r => fromJson(r, SESSION_JSON_FIELDS));
-}, 'research.listSessionsByBank');
 
 /**
  * Delete a research session and cascade delete its steps.

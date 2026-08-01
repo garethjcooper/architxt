@@ -35,6 +35,7 @@ const EMPTY_GLOBAL_ENTITIES: GraphNode[] = [];
 export interface ResearchImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  serverId: number;
   bankId: string;
   globalGraph?: { nodes: GraphNode[]; edges: GraphEdge[] } | null;
   onImport: (graph: { nodes: GraphNode[]; edges: GraphEdge[] }) => void;
@@ -43,6 +44,7 @@ export interface ResearchImportDialogProps {
 export function ResearchImportDialog({
   open,
   onOpenChange,
+  serverId,
   bankId,
   globalGraph = null,
   onImport,
@@ -66,7 +68,7 @@ export function ResearchImportDialog({
     setSessionsLoading(true);
     didAutoSelectRef.current = false;
     try {
-      const data = await researchApi.listSessions(bankId);
+      const data = await researchApi.listSessions(serverId, bankId);
       const list = Array.isArray(data) ? data : [];
       setSessions(list);
       if (list.length > 0) {
