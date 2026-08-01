@@ -1,10 +1,12 @@
 import { createLogger } from '../../utils/logger.js';
 import { importHindsightSkeleton } from './import-hindsight-skeleton.js';
-import { listNodes, listEdges, upsertNode, upsertEdge, getNode } from '../../db/crud/contextual-graph.js';
+import { listNodes, listEdges, upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
 import { dedupeCandidates, buildEdgeId } from './identity.js';
-import { composeEntityContextModel } from './prompts/entity-ctx.js';
-import { composeEdgeContextModel } from './prompts/edge-ctx.js';
-import { composeDiscoverModel } from './prompts/discover.js';
+import {
+  deriveEntityContextModel,
+  deriveEdgeContextModel,
+  deriveDiscoverContextModel,
+} from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
 
 const logger = createLogger('contextual-graph-add-context');
@@ -19,13 +21,14 @@ const DEFAULT_NEIGHBORHOOD = {
 /**
  * Add context to the working graph for a given Hindsight bank.
  *
- * This is a user-led job (not a daemon) that:
+ * User-led job that:
  * 1. Imports the current Hindsight entity graph skeleton.
- * 2. Queues `entity-ctx` models for any new or refreshed Hindsight nodes.
- * 3. Queues `edge-ctx` models for any new or refreshed Hindsight edges.
- * 4. Optionally runs `discover` models around prominent active/uncanonical nodes.
- * 5. Deploys all queued mental models to Hindsight and records provenance on
- *    the working graph nodes/edges.
+ * 2. Derives and deploys `entity-ctx` mental models for active nodes.
+ * 3. Derives and deploys `edge-ctx` mental models for active undirected edges.
+ * 4. Optionally derives and deploys `discover` mental models around seeds.
+ *
+ * Derived models are rendered from system templates (mm_template_role) and pushed
+ * directly to Hindsight; no per-instance mental_models rows are created.
  *
  * Existing working-graph nodes that are absent from the import are never deleted.
  *
@@ -40,9 +43,9 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {number} [options.neighborhood.top_k_neighbors]
  * @param {boolean} [options.neighborhood.run_discovery]
  * @param {Function} [options.fetchGraph] - override for testing
- * @param {Function} [options.runDiscovery] - override for testing
+ * @param {Function} [options.runDiscovery] - override for testing; receives spec, returns { candidates }
  * @param {Function} [options.deployBatch] - override for testing; receives (db, serverId, bankId, specs)
- * @returns {Promise<{success: boolean, queued?: {entity: number, edge: number, discover: number}, deployed?: string[], failed?: {ext_id: string, error: string}[], error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, queued?: {entity: number, edge: number, discover: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], error?: string, code?: string}>}
  */
 export async function addContext(
   db,
@@ -68,7 +71,7 @@ export async function addContext(
     return importResult;
   }
 
-  // Step 2: load existing working graph and build canonical lookups.
+  // Step 2: load existing working graph.
   const [existingNodesResult, existingEdgesResult] = await Promise.all([
     listNodes(db, serverId, bankId, { limit: 10000 }),
     listEdges(db, serverId, bankId, { limit: 10000 }),
@@ -78,25 +81,21 @@ export async function addContext(
   const existingEdges = existingEdgesResult.data || [];
 
   const existingNodeIds = new Set(existingNodes.map((n) => n.cgn_id));
-  const existingEdgeIds = new Set(existingEdges.map((e) => e.cge_id));
-  const existingEdgePairs = new Set(existingEdges.map((e) => pairKey(e.cge_source_id, e.cge_target_id)));
 
-  // Step 3: queue entity-ctx models for any node that is missing a cached model.
+  // Step 3: derive entity-ctx models for active nodes without provenance.
   const entitySpecs = [];
   for (const node of existingNodes) {
     if (node.cgn_properties?.provenance?.model_id) continue;
     if (!node.cgn_labels?.includes('active')) continue;
 
-    const spec = composeEntityContextModel({
-      nodeId: node.cgn_id,
-      bankId,
+    const spec = await deriveEntityContextModel(db, {
+      id: node.cgn_id,
       displayName: node.cgn_properties?.display_name || node.cgn_id,
-      labels: node.cgn_labels || [],
     });
     entitySpecs.push(spec);
   }
 
-  // Step 4: queue edge-ctx models for any active edge pair that is missing a model.
+  // Step 4: derive edge-ctx models for active undirected edge pairs without provenance.
   const edgeSpecs = [];
   const seenEdgePairs = new Set();
   for (const edge of existingEdges) {
@@ -106,7 +105,6 @@ export async function addContext(
     // candidate hypotheses). Directed edges are produced by edge-ctx itself.
     if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
 
-    // Both endpoints must be active in the working graph.
     const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active'));
     const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active'));
     if (!sourceActive || !targetActive) continue;
@@ -118,28 +116,26 @@ export async function addContext(
     const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
     const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
 
-    const spec = composeEdgeContextModel({
-      sourceId: edge.cge_source_id,
-      targetId: edge.cge_target_id,
-      bankId,
-      sourceName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
-      targetName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
+    const spec = await deriveEdgeContextModel(db, {
+      id: edge.cge_source_id,
+      displayName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
+    }, {
+      id: edge.cge_target_id,
+      displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
     });
     edgeSpecs.push(spec);
   }
 
-  // Step 5: optionally run discovery around prominent or manual seed nodes.
+  // Step 5: optionally derive discover models around seeds.
   const discoverSpecs = [];
   const discoverQueue = new Set();
 
-  // Always include manual seeds if provided.
   if (Array.isArray(options.seed_node_ids)) {
     for (const seedId of options.seed_node_ids) {
       if (existingNodeIds.has(seedId)) discoverQueue.add(seedId);
     }
   }
 
-  // Add top-K prominent uncanonical/active nodes by degree.
   if (neighborhood.run_discovery) {
     const nodeDegrees = new Map();
     for (const edge of existingEdges) {
@@ -165,15 +161,12 @@ export async function addContext(
       .map((e) => (e.cge_source_id === seedId ? e.cge_target_id : e.cge_source_id))
       .slice(0, neighborhood.top_k_neighbors);
 
-    const spec = composeDiscoverModel({
-      seedId,
-      bankId,
-      seedName: seedNode?.cgn_properties?.display_name || seedId,
-      neighborIds: neighbors,
-    });
+    const spec = await deriveDiscoverContextModel(db, {
+      id: seedId,
+      displayName: seedNode?.cgn_properties?.display_name || seedId,
+    }, neighbors);
     discoverSpecs.push(spec);
 
-    // Process any discovery results if a runner was supplied.
     if (options.runDiscovery) {
       const discoveryResult = await options.runDiscovery(db, serverId, bankId, spec, { existingNodes, existingEdges });
       if (discoveryResult?.success && Array.isArray(discoveryResult.candidates)) {
@@ -209,7 +202,6 @@ export async function addContext(
     });
   }
 
-  // Record provenance for successfully deployed models.
   const now = new Date().toISOString();
   for (const modelId of deployResult.deployed) {
     await recordModelProvenance(db, serverId, bankId, modelId, refreshedNodes, refreshedEdges, now);
@@ -230,37 +222,33 @@ export async function addContext(
 async function recordModelProvenance(db, serverId, bankId, modelId, existingNodes, existingEdges, now) {
   const provenance = { model_id: modelId, source: 'contextual-graph', updated_at: now };
 
-  // entity-ctx model
   if (modelId.startsWith('entity-ctx-')) {
     const nodeId = modelId.slice('entity-ctx-'.length);
     const node = existingNodes.find((n) => n.cgn_id === nodeId);
     if (!node) return;
 
-    const properties = {
-      ...node.cgn_properties,
-      provenance: { ...(node.cgn_properties?.provenance || {}), ...provenance },
-      updated_at: now,
-    };
+    const properties = mergeProperties(node.cgn_properties, provenance, now);
     upsertNode(db, serverId, bankId, nodeId, node.cgn_labels, properties);
     return;
   }
 
-  // edge-ctx model
   if (modelId.startsWith('edge-ctx-')) {
     const pairPart = modelId.slice('edge-ctx-'.length);
     const edge = existingEdges.find((e) => pairKey(e.cge_source_id, e.cge_target_id) === pairPart);
     if (!edge) return;
 
-    const properties = {
-      ...edge.cge_properties,
-      provenance: { ...(edge.cge_properties?.provenance || {}), ...provenance },
-      updated_at: now,
-    };
+    const properties = mergeProperties(edge.cge_properties, provenance, now);
     upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
     return;
   }
+}
 
-  // discover model provenance is not recorded on a specific node/edge by default.
+function mergeProperties(current, provenance, now) {
+  return {
+    ...current,
+    provenance: { ...(current?.provenance || {}), ...provenance },
+    updated_at: now,
+  };
 }
 
 function pairKey(a, b) {
@@ -273,10 +261,10 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
   const edgeSpecs = [];
   const now = new Date().toISOString();
 
-  const { unique } = await dedupeCandidates(db, serverId, bankId, { find: () => undefined }, candidates);
+  const lookups = buildLookupsFromGraph(existingNodes);
+  const { unique, mergedIntoExisting } = await dedupeCandidates(db, serverId, bankId, lookups, candidates);
 
   for (const candidate of unique) {
-    // Upsert candidate node with candidate labels.
     const labels = ['uncanonical', 'candidate', 'active'];
     const properties = {
       display_name: candidate.displayName,
@@ -287,29 +275,64 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
     };
     upsertNode(db, serverId, bankId, candidate.id, labels, properties);
 
-    entitySpecs.push(composeEntityContextModel({
-      nodeId: candidate.id,
-      bankId,
+    entitySpecs.push(await deriveEntityContextModel(db, {
+      id: candidate.id,
       displayName: candidate.displayName,
-      labels,
     }));
 
-    // Queue edge-ctx for hypothesized edges to known nodes.
     if (Array.isArray(candidate.hypothesizedEdges)) {
       for (const he of candidate.hypothesizedEdges) {
         if (!existingNodes.some((n) => n.cgn_id === he.target)) continue;
 
         const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
 
-        edgeSpecs.push(composeEdgeContextModel({
-          sourceId: candidate.id,
-          targetId: he.target,
-          bankId,
-          sourceName: candidate.displayName,
-          targetName: targetNode?.cgn_properties?.display_name || he.target,
+        edgeSpecs.push(await deriveEdgeContextModel(db, {
+          id: candidate.id,
+          displayName: candidate.displayName,
+        }, {
+          id: he.target,
+          displayName: targetNode?.cgn_properties?.display_name || he.target,
         }));
 
-        // Also create an undirected candidate edge so the graph shows the hypothesis.
+        const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
+        const edgeProperties = {
+          directed: false,
+          type: he.type || 'co-occurs',
+          weight: 0.5,
+          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence },
+          last_seen_at: now,
+          updated_at: now,
+        };
+        upsertEdge(db, serverId, bankId, edgeId, candidate.id, he.target, null, edgeProperties);
+      }
+    }
+  }
+
+  // Candidates that merged into existing nodes should still get entity-ctx if missing,
+  // and edge-ctx for their hypothesized edges.
+  for (const { candidate } of mergedIntoExisting) {
+    const existingId = existingNodes.find((n) => n.cgn_id === candidate.id)?.cgn_id;
+    const existing = existingId ? existingNodes.find((n) => n.cgn_id === existingId) : null;
+    if (existing && !existing.cgn_properties?.provenance?.model_id) {
+      entitySpecs.push(await deriveEntityContextModel(db, {
+        id: existing.cgn_id,
+        displayName: existing.cgn_properties?.display_name || existing.cgn_id,
+      }));
+    }
+
+    if (Array.isArray(candidate.hypothesized_edges)) {
+      for (const he of candidate.hypothesized_edges) {
+        if (!existingNodes.some((n) => n.cgn_id === he.target)) continue;
+        const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
+
+        edgeSpecs.push(await deriveEdgeContextModel(db, {
+          id: candidate.id,
+          displayName: candidate.displayName || candidate.id,
+        }, {
+          id: he.target,
+          displayName: targetNode?.cgn_properties?.display_name || he.target,
+        }));
+
         const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
           directed: false,
@@ -325,4 +348,25 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
   }
 
   return { entity: entitySpecs, edge: edgeSpecs };
+}
+
+function buildLookupsFromGraph(nodes) {
+  const byName = new Map();
+  const byId = new Map();
+  for (const n of nodes) {
+    const display = n.cgn_properties?.display_name;
+    if (display) byName.set(display.toLowerCase(), n.cgn_id);
+    for (const alias of n.cgn_properties?.aliases || []) {
+      if (alias) byName.set(alias.toLowerCase(), n.cgn_id);
+    }
+    byId.set(n.cgn_id, n.cgn_id);
+  }
+  return {
+    find: (nameOrId) => {
+      if (!nameOrId) return undefined;
+      const id = byId.get(nameOrId) || byName.get(String(nameOrId).toLowerCase());
+      if (!id) return undefined;
+      return { id };
+    },
+  };
 }

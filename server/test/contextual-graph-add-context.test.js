@@ -221,7 +221,7 @@ describe('addContext', () => {
     assert.equal(result.queued.entity, 2); // SVC-005 + candidate
     assert.equal(result.queued.edge, 1);
     assert.ok(deployed.includes('entity-ctx-candidate:payment-bridge'));
-    assert.ok(deployed.includes('edge-ctx-SVC-005|candidate:payment-bridge'));
+    assert.ok(deployed.includes('edge-ctx-candidate:payment-bridge|SVC-005'));
   });
 
   it('records provenance on deployed models', async () => {
