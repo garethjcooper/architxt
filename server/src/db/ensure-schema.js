@@ -507,7 +507,7 @@ function ensureContextualGraphTemplates(db) {
   const existingRoles = new Set(existing.map((r) => r.mm_template_role));
 
   let seeded = 0;
-  const insert = db.prepare(`
+  const upsert = db.prepare(`
     INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
     VALUES (?, ?, ?, 'true', ?, ?, ?, ?)
     ON CONFLICT(mm_ext_id) DO UPDATE SET
@@ -519,23 +519,32 @@ function ensureContextualGraphTemplates(db) {
       mm_max_tokens = excluded.mm_max_tokens
   `);
   const tagInsert = db.prepare(`INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)`);
+  const getMmId = db.prepare('SELECT mm_id FROM mental_models WHERE mm_ext_id = ?');
+  const tagIdByName = db.prepare('SELECT tag_id FROM tags WHERE tag_name = ?');
+  const createTagStmt = db.prepare(`INSERT INTO tags (tag_name, tag_generated_by) VALUES (?, ?)`);
 
   for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
     try {
-      const result = insert.run(t.extId, t.name, t.sourceQuery, t.role, t.returns, t.dimension, t.maxTokens);
-      const mmId = result.lastInsertRowid;
+      upsert.run(t.extId, t.name, t.sourceQuery, t.role, t.returns, t.dimension, t.maxTokens);
+      // lastInsertRowid is unreliable for upserts (0 on UPDATE path), so look it up.
+      const mmId = getMmId.pluck().get(t.extId);
+      if (!mmId) {
+        throw new Error(`Template row missing after upsert: ${t.extId}`);
+      }
 
       for (const tagName of t.tags) {
-        const existingTag = getTagByName(db, tagName)?.data;
-        if (existingTag?.tag_id) {
-          tagInsert.run(mmId, existingTag.tag_id);
+        // Use db.prepare directly instead of getTagByName/createTag because the
+        // global stmt cache is keyed by SQL only and can return statements
+        // bound to a different database instance when tests use multiple DBs.
+        let tagId = tagIdByName.pluck().get(tagName);
+        if (!tagId) {
+          const created = createTagStmt.run(tagName, 'import');
+          tagId = created.lastInsertRowid;
+        }
+        if (tagId) {
+          tagInsert.run(mmId, tagId);
         } else {
-          const tagResult = createTag(db, { tag_name: tagName, tag_generated_by: 'import' });
-          if (tagResult?.success && typeof tagResult.data === 'number') {
-            tagInsert.run(mmId, tagResult.data);
-          } else {
-            logger.warn('Could not create contextual-graph template tag', { extId: t.extId, tagName, tagResult });
-          }
+          logger.warn('Could not create contextual-graph template tag', { extId: t.extId, tagName });
         }
       }
 
