@@ -149,7 +149,7 @@ export async function dedupeCandidates(db, serverId, bankId, lookups, candidates
   const seenBatchIds = new Set();
 
   for (const candidate of candidates) {
-    const candidateName = candidate.name || candidate.id;
+    const candidateName = candidate.summary || candidate.name || candidate.id;
     const names = [candidateName, ...(candidate.aliases || [])];
     const normalizedName = normalizeNodeId(candidateName);
     const candidateId = `candidate:${normalizedName}`;
@@ -198,7 +198,7 @@ export async function dedupeCandidates(db, serverId, bankId, lookups, candidates
       displayName: candidateName,
       aliases: [normalizedName],
       hypothesizedEdges: candidate.hypothesized_edges || [],
-      blurb: candidate.blurb || '',
+      summary: candidate.summary || '',
     });
   }
 
