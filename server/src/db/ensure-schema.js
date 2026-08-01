@@ -1030,6 +1030,56 @@ function ensurePendingOpsNullableDocId(db) {
 }
 
 /**
+ * Recreate contextual graph tables if they still use the old cg_* schema.
+ * This is a one-time destructive migration for the experimental pre-v36 tables.
+ */
+function ensureContextualGraphSchema(db) {
+  const nodesInfo = db.prepare("PRAGMA table_info(contextual_graph_nodes)").all();
+  const hasOldNodes = nodesInfo.some((c) => c.name === 'cg_id');
+  const edgesInfo = db.prepare("PRAGMA table_info(contextual_graph_edges)").all();
+  const hasOldEdges = edgesInfo.some((c) => c.name === 'cg_id');
+
+  if (!hasOldNodes && !hasOldEdges) return 0;
+
+  logger.warn('Recreating contextual graph tables to align with v36 schema');
+  db.pragma('foreign_keys = OFF');
+  try {
+    if (hasOldNodes) db.exec('DROP TABLE IF EXISTS contextual_graph_nodes');
+    if (hasOldEdges) db.exec('DROP TABLE IF EXISTS contextual_graph_edges');
+
+    db.exec(`CREATE TABLE contextual_graph_nodes (
+      cgn_id TEXT NOT NULL,
+      cgn_server_id INTEGER NOT NULL,
+      cgn_bank_id TEXT NOT NULL,
+      cgn_labels TEXT NOT NULL,
+      cgn_properties TEXT NOT NULL,
+      cgn_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      cgn_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      PRIMARY KEY (cgn_server_id, cgn_bank_id, cgn_id),
+      FOREIGN KEY (cgn_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+    )`);
+
+    db.exec(`CREATE TABLE contextual_graph_edges (
+      cge_id TEXT NOT NULL,
+      cge_server_id INTEGER NOT NULL,
+      cge_bank_id TEXT NOT NULL,
+      cge_source_id TEXT NOT NULL,
+      cge_target_id TEXT NOT NULL,
+      cge_type TEXT,
+      cge_properties TEXT NOT NULL,
+      cge_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      cge_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      PRIMARY KEY (cge_server_id, cge_bank_id, cge_id),
+      FOREIGN KEY (cge_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+    )`);
+
+    return 2;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
  * Ensure contextual graph edge indexes exist. Runs during additive migration
  * in case the table was created before the indexes were added.
  */
@@ -1037,18 +1087,25 @@ function ensureContextualGraphIndexes(db) {
   const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'contextual_graph_edges'").get();
   if (!tableExists) return 0;
 
+  const columns = new Set(
+    db.prepare("PRAGMA table_info(contextual_graph_edges)").all().map((r) => r.name)
+  );
+  const needsServerBank = columns.has('cge_server_id') && columns.has('cge_bank_id') && columns.has('cge_source_id') && columns.has('cge_target_id');
+  const needsSource = columns.has('cge_source_id');
+  const needsTarget = columns.has('cge_target_id');
+
   const existing = new Set(
     db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name = 'contextual_graph_edges'").all().map((r) => r.name)
   );
   const indexes = [
-    { name: 'idx_cge_server_bank_source_target', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_server_bank_source_target ON contextual_graph_edges(cge_server_id, cge_bank_id, cge_source_id, cge_target_id)' },
-    { name: 'idx_cge_source', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_source ON contextual_graph_edges(cge_source_id)' },
-    { name: 'idx_cge_target', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_target ON contextual_graph_edges(cge_target_id)' },
+    { name: 'idx_cge_server_bank_source_target', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_server_bank_source_target ON contextual_graph_edges(cge_server_id, cge_bank_id, cge_source_id, cge_target_id)', needed: needsServerBank },
+    { name: 'idx_cge_source', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_source ON contextual_graph_edges(cge_source_id)', needed: needsSource },
+    { name: 'idx_cge_target', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_target ON contextual_graph_edges(cge_target_id)', needed: needsTarget },
   ];
 
   let created = 0;
-  for (const { name, ddl } of indexes) {
-    if (!existing.has(name)) {
+  for (const { name, ddl, needed } of indexes) {
+    if (needed && !existing.has(name)) {
       db.exec(ddl);
       created++;
     }
@@ -1059,6 +1116,7 @@ export function ensureSchema(db) {
   const hadSchema = hasSchema(db);
 
   if (hadSchema) {
+    const cgSchemaFixed = ensureContextualGraphSchema(db);
     const created = ensureMissingTables(db);
     const templatesSeeded = ensureBuiltinPromptTemplates(db);
     const added = ensureMissingColumns(db);
@@ -1070,12 +1128,12 @@ export function ensureSchema(db) {
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph indexes created: ${cgIndexes}`);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
