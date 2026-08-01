@@ -239,10 +239,10 @@ export function useResearchSession({
     return ids;
   }, [trail, selectedStepIds]);
 
-  const fetchSessions = useCallback(async (bid: string): Promise<ResearchSession[]> => {
+  const fetchSessions = useCallback(async (sid: number, bid: string): Promise<ResearchSession[]> => {
     setSessionsLoading(true);
     try {
-      const data = await researchApi.listSessions(bid);
+      const data = await researchApi.listSessions(sid, bid);
       const next = Array.isArray(data) ? data : [];
       setSessions(next);
       return next;
@@ -297,7 +297,7 @@ export function useResearchSession({
     setError(null);
     hasSeededSelectionRef.current = false;
 
-    void fetchSessions(bankId).then((loaded) => {
+    void fetchSessions(parseInt(serverId, 10), bankId).then((loaded) => {
       if (loaded.length === 0) return;
       const latest = loaded[0];
       setActiveSessionId(latest.id);
@@ -394,6 +394,7 @@ export function useResearchSession({
   const handleCreateSession = useCallback(async (title: string) => {
     try {
       const created = await researchApi.createSession({
+        server_id: parseInt(serverId, 10),
         bank_id: bankId,
         viewpoint_ids: [],
         title,
@@ -401,7 +402,7 @@ export function useResearchSession({
       const sessionId = created.session_id;
       setActiveSessionId(sessionId);
       setCreatingSession(false);
-      await fetchSessions(bankId);
+      await fetchSessions(parseInt(serverId, 10), bankId);
       return sessionId;
     } catch (err) {
       const message = err instanceof ApiError ? err.message : String(err);
@@ -409,7 +410,7 @@ export function useResearchSession({
       toast.error(`Failed to create session: ${message}`);
       throw err;
     }
-  }, [bankId, fetchSessions]);
+  }, [bankId, serverId, fetchSessions]);
 
   const handleRenameSession = useCallback(async (sessionId: number, title: string) => {
     try {
@@ -719,7 +720,7 @@ export function useResearchSession({
             setActiveStepId(prebuilt.step_id ?? null);
             setSelectedStepIds(prebuilt.step_id ? new Set([prebuilt.step_id]) : new Set());
           }
-          await fetchSessions(bankId);
+          await fetchSessions(parseInt(serverId, 10), bankId);
           await fetchTrail(prebuilt.session_id);
         }
       } catch (err) {
@@ -744,13 +745,14 @@ export function useResearchSession({
       }
       try {
         const created = await researchApi.createSession({
+          server_id: parseInt(serverId, 10),
           bank_id: bankId,
           viewpoint_ids: [],
           title,
         });
         sessionId = created.session_id;
         setActiveSessionId(sessionId);
-        await fetchSessions(bankId);
+        await fetchSessions(parseInt(serverId, 10), bankId);
       } catch (err) {
         const message = err instanceof ApiError ? err.message : String(err);
         logger.error('Failed to auto-create session', err);

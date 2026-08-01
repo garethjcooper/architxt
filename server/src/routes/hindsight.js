@@ -1637,95 +1637,227 @@ router.post('/entities/pull', async (req, res) => {
   }
 });
 
-router.post('/banks/:bankId/recall', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/recall:
+ *   post:
+ *     summary: Recall memories from a Hindsight bank
+ *     description: |
+ *       Proxies a recall request to Hindsight. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, query]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *               bank_id:
+ *                 type: string
+ *               query:
+ *                 type: string
+ *               limit:
+ *                 type: integer
+ *               trace:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Recall results
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.post('/recall', async (req, res) => {
   const start = Date.now();
-  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await recall(serverId, bankId, req.body);
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'RECALL_FAILED', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'RECALL_FAILED', logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
   } catch (err) {
     logger.error('Recall route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
   }
 });
 
-router.post('/banks/:bankId/reflect', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/reflect:
+ *   post:
+ *     summary: Reflect on a Hindsight bank
+ *     description: |
+ *       Proxies a reflect request to Hindsight. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, query]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *               bank_id:
+ *                 type: string
+ *               query:
+ *                 type: string
+ *               budget:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Reflect results
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.post('/reflect', async (req, res) => {
   const start = Date.now();
-  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await reflectWithBudgetFallback(serverId, bankId, req.body);
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'REFLECT_FAILED', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'REFLECT_FAILED', logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
   } catch (err) {
     logger.error('Reflect route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
   }
 });
 
-router.get('/banks/:bankId/tags', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/bank-tags:
+ *   get:
+ *     summary: List tags for a Hindsight bank
+ *     description: |
+ *       Returns tags from a Hindsight bank. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Tag list
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.get('/bank-tags', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await listBankTags(serverId, bankId);
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: 'BANK_TAGS_FAILED', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: 'BANK_TAGS_FAILED', logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: { items: result.items || [], total: result.total ?? 0 }, logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: { items: result.items || [], total: result.total ?? 0 }, logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
   } catch (err) {
     logger.error('Bank tags route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
   }
 });
 
-router.get('/banks/:bankId/graph', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/entity-graph:
+ *   get:
+ *     summary: Get entity graph for a Hindsight bank
+ *     description: |
+ *       Returns the Hindsight entity graph for a bank. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: min_count
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Graph data
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.get('/entity-graph', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await getEntityGraph(serverId, bankId, { limit: req.query.limit, min_count: req.query.min_count });
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITY_GRAPH_FAILED', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITY_GRAPH_FAILED', logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
   } catch (err) {
     logger.error('Entity graph route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
   }
 });
 

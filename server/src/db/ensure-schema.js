@@ -112,12 +112,14 @@ function ensureMissingTables(db) {
         rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
         rs_title TEXT NOT NULL,
         rs_description TEXT,
+        rs_server_id INTEGER,
         rs_bank_id TEXT NOT NULL,
         rs_viewpoint_ids JSON NOT NULL,
         rs_status TEXT NOT NULL DEFAULT 'active',
         rs_current_step_id INTEGER,
         rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
         FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
       )`
     },
@@ -694,6 +696,15 @@ function ensureMissingColumns(db) {
       ]
     },
     {
+      table: 'research_sessions',
+      columns: [
+        {
+          name: 'rs_server_id',
+          ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_server_id INTEGER REFERENCES servers(svr_id) ON DELETE SET NULL'
+        }
+      ]
+    },
+    {
       table: 'research_steps',
       columns: [
         {
@@ -878,6 +889,56 @@ function normalizeEntityMatchInheritance(db) {
 }
 
 /**
+ * Repair a broken rs_server_id foreign key created by the original v0.3.6
+ * migration that referenced servers(server_id) instead of servers(svr_id).
+ * SQLite only reports the mismatch on insert, so we recreate the table with
+ * the correct FK, preserving all existing rows and related child tables.
+ */
+function ensureResearchSessionsServerFk(db) {
+  const fkList = db.prepare("PRAGMA foreign_key_list(research_sessions)").all();
+  const serverFk = fkList.find((fk) => fk.from === 'rs_server_id');
+  if (!serverFk) return 0;
+  if (serverFk.table === 'servers' && serverFk.to === 'svr_id') return 0;
+
+  logger.warn('Recreating research_sessions to fix rs_server_id foreign key target');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`
+      CREATE TABLE _research_sessions_new (
+        rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rs_title TEXT NOT NULL,
+        rs_description TEXT,
+        rs_server_id INTEGER,
+        rs_bank_id TEXT NOT NULL,
+        rs_viewpoint_ids JSON NOT NULL,
+        rs_status TEXT NOT NULL DEFAULT 'active',
+        rs_current_step_id INTEGER,
+        rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
+        FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+      )
+    `);
+
+    const columns = [
+      'rs_id', 'rs_title', 'rs_description', 'rs_server_id', 'rs_bank_id',
+      'rs_viewpoint_ids', 'rs_status', 'rs_current_step_id', 'rs_created_at', 'rs_updated_at'
+    ];
+    const colList = columns.join(', ');
+    db.exec(`INSERT INTO _research_sessions_new (${colList}) SELECT ${colList} FROM research_sessions`);
+    db.exec('DROP TABLE research_sessions');
+    db.exec('ALTER TABLE _research_sessions_new RENAME TO research_sessions');
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_sessions_bank_id ON research_sessions(rs_bank_id)');
+
+    logger.info('research_sessions recreated with rs_server_id -> servers(svr_id)');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
  * Ensure pending_operations.pop_doc_id is nullable. Older schemas created it
  * as NOT NULL, but document-less async operations (e.g. mental-model refresh)
  * need to leave it null. Recreate the table preserving existing rows only when
@@ -949,14 +1010,15 @@ export function ensureSchema(db) {
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
+    const researchFkFixed = ensureResearchSessionsServerFk(db);
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}`);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

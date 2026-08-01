@@ -343,9 +343,9 @@ export const serversApi = {
   listBanks: (id: number) =>
     fetchApi<Array<{ bank_id: string; name: string; description?: string }>>(`/servers/${id}/banks`),
   getBankGraph: (serverId: number, bankId: string) =>
-    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/graph?server_id=${serverId}`),
+    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/graph?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`),
   getBankEntities: (serverId: number, bankId: string) =>
-    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/entities?server_id=${serverId}`),
+    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/entities?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`),
 };
 
 // Metadata API
@@ -754,15 +754,15 @@ export const hindsightApi = {
     }>('/hindsight/operations/all'),
 
   recall: (serverId: number, bankId: string, body: { query: string; limit?: number; trace?: boolean }) =>
-    fetchApi<any>(`/hindsight/banks/${encodeURIComponent(bankId)}/recall?server_id=${serverId}`, {
+    fetchApi<any>('/hindsight/recall', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...body }),
     }, { timeoutMs: 60000 }),
 
   reflect: (serverId: number, bankId: string, body: { query: string; budget?: string }) =>
-    fetchApi<any>(`/hindsight/banks/${encodeURIComponent(bankId)}/reflect?server_id=${serverId}`, {
+    fetchApi<any>('/hindsight/reflect', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...body }),
     }, { timeoutMs: 120000 }),
 
   reflectWithBudgetFallback: async (serverId: number, bankId: string, body: { query: string; budget?: string }) => {
@@ -924,6 +924,7 @@ export interface ResearchSession {
   id: number;
   title: string;
   description: string | null;
+  server_id: number | null;
   bank_id: string;
   viewpoint_ids: number[];
   status: 'active' | 'closed' | 'archived';
@@ -1111,10 +1112,11 @@ export const researchApi = {
       body: JSON.stringify(payload),
     }),
 
-  listSessions: (bankId: string) =>
-    fetchApi<ResearchSession[]>(`/research/banks/${encodeURIComponent(bankId)}/sessions`),
+  listSessions: (serverId: number, bankId: string) =>
+    fetchApi<ResearchSession[]>(`/research/sessions?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`),
 
   createSession: (payload: {
+    server_id: number;
     bank_id: string;
     viewpoint_ids: number[];
     title?: string;

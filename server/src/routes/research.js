@@ -16,7 +16,7 @@ import {
   listStepsForSession,
   getStep,
   deleteStepWithSession,
-  listSessionsByBank,
+  listSessionsByServerBank,
   updateSession,
   deleteSessionWithSteps,
 } from '../db/crud/research.js';
@@ -148,6 +148,7 @@ const toApiSession = (dbRow) => ({
   id: dbRow.rs_id,
   title: dbRow.rs_title,
   description: dbRow.rs_description,
+  server_id: dbRow.rs_server_id,
   bank_id: dbRow.rs_bank_id,
   viewpoint_ids: dbRow.rs_viewpoint_ids,
   status: dbRow.rs_status,
@@ -1251,12 +1252,14 @@ router.post('/synthesize', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [bank_id, viewpoint_ids]
+ *             required: [server_id, bank_id, viewpoint_ids]
  *             properties:
  *               title:
  *                 type: string
  *               description:
  *                 type: string
+ *               server_id:
+ *                 type: integer
  *               bank_id:
  *                 type: string
  *               viewpoint_ids:
@@ -1265,8 +1268,12 @@ router.post('/synthesize', async (req, res) => {
  */
 router.post('/sessions', async (req, res) => {
   const start = Date.now();
-  const { title, description, bank_id, viewpoint_ids } = req.body;
+  const { title, description, server_id, bank_id, viewpoint_ids } = req.body;
 
+  if (!server_id || typeof server_id !== 'number') {
+    sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions', duration: Date.now() - start });
+    return;
+  }
   if (!bank_id || typeof bank_id !== 'string') {
     sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions', duration: Date.now() - start });
     return;
@@ -1279,6 +1286,7 @@ router.post('/sessions', async (req, res) => {
   const result = await createSession(db, {
     rs_title: typeof title === 'string' && title.trim() ? title.trim() : 'Untitled session',
     rs_description: typeof description === 'string' && description.trim() ? description.trim() : null,
+    rs_server_id: server_id,
     rs_bank_id: bank_id,
     rs_viewpoint_ids: viewpoint_ids,
     rs_status: 'active',
@@ -1293,25 +1301,37 @@ router.post('/sessions', async (req, res) => {
 
 /**
  * @openapi
- * /research/banks/{bankId}/sessions:
+ * /research/sessions:
  *   get:
- *     summary: List research sessions for a bank
+ *     summary: List research sessions for a server and bank
  *     tags: [Research]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
  */
-router.get('/banks/:bankId/sessions', async (req, res) => {
+router.get('/sessions', async (req, res) => {
   const start = Date.now();
-  const bankId = req.params.bankId;
-  if (!bankId || typeof bankId !== 'string') {
-    sendResponse({ res, status: 400, error: 'bankId is required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/banks/:bankId/sessions', duration: Date.now() - start });
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.query.bank_id;
+  if (!serverId || !bankId || typeof bankId !== 'string') {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/sessions', duration: Date.now() - start });
     return;
   }
 
-  const result = await listSessionsByBank(db, bankId);
+  const result = await listSessionsByServerBank(db, serverId, bankId);
   if (!result.success) {
-    sendResponse({ res, status: 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'GET', path: '/research/banks/:bankId/sessions', duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'GET', path: '/research/sessions', duration: Date.now() - start });
     return;
   }
-  sendResponse({ res, status: 200, data: (result.data || []).map(toApiSession), logger, method: 'GET', path: '/research/banks/:bankId/sessions', duration: Date.now() - start });
+  sendResponse({ res, status: 200, data: (result.data || []).map(toApiSession), logger, method: 'GET', path: '/research/sessions', duration: Date.now() - start });
 });
 
 /**
@@ -1589,22 +1609,22 @@ router.post('/steps/:id/rerun', async (req, res) => {
 
 /**
  * @openapi
- * /research/banks/{bankId}/graph:
+ * /research/graph:
  *   get:
- *     summary: Get the global entity graph for a bank
- *     description: Returns the normalized Hindsight entity graph for the selected bank, with architxt entity labels/types resolved.
+ *     summary: Get the global entity graph for a server/bank
+ *     description: Returns the normalized Hindsight entity graph for the selected server and bank, with architxt entity labels/types resolved.
  *     tags: [Research]
  *     parameters:
- *       - in: path
- *         name: bankId
- *         required: true
- *         schema:
- *           type: string
  *       - in: query
  *         name: server_id
  *         required: true
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
  *       - in: query
  *         name: limit
  *         schema:
@@ -1626,14 +1646,14 @@ router.post('/steps/:id/rerun', async (req, res) => {
  *                 edges:
  *                   type: array
  */
-router.get('/banks/:bankId/graph', async (req, res) => {
+router.get('/graph', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
   const { limit, min_count } = req.query;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
     return;
   }
 
@@ -1643,30 +1663,31 @@ router.get('/banks/:bankId/graph', async (req, res) => {
       min_count: min_count ? Number.parseInt(min_count, 10) : undefined,
     });
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'GRAPH_FAILED', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'GRAPH_FAILED', logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
   } catch (err) {
-    logger.error('Research bank graph route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+    logger.error('Research graph route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
   }
 });
 
 /**
- * @swagger
- * /research/banks/{bankId}/entities:
+ * @openapi
+ * /research/entities:
  *   get:
- *     summary: Get all entities for a bank
- *     description: Returns every Hindsight entity for the bank resolved to architxt canonical entities.
+ *     summary: Get all entities for a server/bank
+ *     description: Returns every Hindsight entity for the server and bank resolved to architxt canonical entities.
+ *     tags: [Research]
  *     parameters:
  *       - in: query
  *         name: server_id
  *         required: true
  *         schema:
  *           type: integer
- *       - in: path
- *         name: bankId
+ *       - in: query
+ *         name: bank_id
  *         required: true
  *         schema:
  *           type: string
@@ -1683,26 +1704,26 @@ router.get('/banks/:bankId/graph', async (req, res) => {
  *                 edges:
  *                   type: array
  */
-router.get('/banks/:bankId/entities', async (req, res) => {
+router.get('/entities', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await normalizeHindsightEntities(serverId, bankId, db, { limit: 1000 });
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITIES_FAILED', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITIES_FAILED', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
   } catch (err) {
-    logger.error('Research bank entities route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    logger.error('Research entities route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
   }
 });
 
