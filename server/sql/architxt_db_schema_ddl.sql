@@ -124,6 +124,42 @@ CREATE INDEX idx_pending_ops_research_session ON pending_operations(pop_rs_id);
 CREATE INDEX idx_pending_ops_research_step ON pending_operations(pop_rstep_id);
 
 -- ============================================================================
+-- CONTEXTUAL GRAPH — property-graph working view for Hindsight skeleton
+-- enrichment. SQLite-first: labels and properties stored as JSON text.
+-- ============================================================================
+
+CREATE TABLE contextual_graph_nodes (
+  cgn_id TEXT NOT NULL,
+  cgn_server_id INTEGER NOT NULL,
+  cgn_bank_id TEXT NOT NULL,
+  cgn_labels TEXT NOT NULL,
+  cgn_properties TEXT NOT NULL,
+  cgn_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  cgn_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (cgn_server_id, cgn_bank_id, cgn_id),
+  FOREIGN KEY (cgn_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE TABLE contextual_graph_edges (
+  cge_id TEXT NOT NULL,
+  cge_server_id INTEGER NOT NULL,
+  cge_bank_id TEXT NOT NULL,
+  cge_source_id TEXT NOT NULL,
+  cge_target_id TEXT NOT NULL,
+  cge_type TEXT,
+  cge_properties TEXT NOT NULL,
+  cge_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  cge_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (cge_server_id, cge_bank_id, cge_id),
+  FOREIGN KEY (cge_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_cge_server_bank_source_target
+  ON contextual_graph_edges(cge_server_id, cge_bank_id, cge_source_id, cge_target_id);
+CREATE INDEX idx_cge_source ON contextual_graph_edges(cge_source_id);
+CREATE INDEX idx_cge_target ON contextual_graph_edges(cge_target_id);
+
+-- ============================================================================
 -- ENTITY TYPES — classification groups (e.g. Application Component, Service)
 -- ============================================================================
 
