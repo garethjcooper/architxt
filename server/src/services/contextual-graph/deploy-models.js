@@ -1,16 +1,14 @@
-import { createMentalModel as createMentalModelRow, getMentalModelIdByExtId, updateMentalModel } from '../../db/crud/mental-models.js';
-import { syncMentalModelTags, addMentalModelEntity } from '../../db/crud/mental-models.js';
-import { createMentalModel as createHindsightModel, pushMentalModel } from '../../services/hindsight/push-mental-model.js';
+import { createMentalModel, pushMentalModel } from '../../services/hindsight/push-mental-model.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('contextual-graph-deploy-models');
 
 /**
- * Ensure a mental model row exists in Architxt and push it to Hindsight.
+ * Deploy a single contextual-graph mental model to Hindsight.
  *
- * If the model already exists (by ext_id), update the source_query and push an
- * update. Otherwise create a new row + push to Hindsight.
+ * No local mental_models row is created per instance; the working graph node/edge
+ * properties record the model ext_id as provenance.
  *
  * @param {Object} db
  * @param {number} serverId
@@ -41,35 +39,7 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
       tags_match_mode: 'any',
     };
 
-    const existingId = getMentalModelIdByExtId(db, spec.ext_id);
-    if (existingId) {
-      updateMentalModel(db, existingId, {
-        mm_name: spec.name,
-        mm_source_query: spec.source_query,
-        mm_returns: spec.returns,
-        mm_dimension: spec.dimension,
-        mm_max_tokens: spec.max_tokens,
-      });
-      await syncMentalModelTags(db, existingId, spec.tags);
-
-      const pushResult = await pushMentalModel(serverId, bankId, modelForPush);
-      if (!pushResult.success) {
-        return { success: false, error: pushResult.error, code: 'HINDSIGHT_PUSH_FAILED' };
-      }
-      return { success: true, model_id: spec.ext_id };
-    }
-
-    const mmId = createMentalModelRow(db, {
-      mm_ext_id: spec.ext_id,
-      mm_name: spec.name,
-      mm_source_query: spec.source_query,
-      mm_returns: spec.returns,
-      mm_dimension: spec.dimension,
-      mm_max_tokens: spec.max_tokens,
-    });
-    await syncMentalModelTags(db, mmId, spec.tags);
-
-    const pushResult = await createHindsightModel(serverId, bankId, modelForPush);
+    const pushResult = await createMentalModel(serverId, bankId, modelForPush);
     if (!pushResult.success) {
       return { success: false, error: pushResult.error, code: 'HINDSIGHT_CREATE_FAILED' };
     }
@@ -81,9 +51,9 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
 }
 
 /**
- * Deploy a batch of mental model specs.
+ * Deploy a batch of mental model specs to Hindsight.
  *
- * @returns {Promise<{success: true, deployed: string[], failed: {ext_id: string, error: string}[]}>}
+ * @returns {Promise<{success: true, deployed: string[], failed: {ext_id: string, error: string, code?: string}[]}>}
  */
 export async function deployMentalModelBatch(db, serverId, bankId, specs) {
   const deployed = [];

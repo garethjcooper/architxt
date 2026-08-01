@@ -6,6 +6,7 @@ import { stmt } from '../cache.js';
 import { createLogger } from '../utils/logger.js';
 import { createFtsIndex } from '../services/search/full-text.js';
 import { resetSeedData } from './ensure-seed.js';
+import { getTagByName, createTag } from './crud/tags.js';
 
 const logger = createLogger('schema');
 
@@ -46,6 +47,7 @@ function ensureMissingTables(db) {
         mm_exclude_mental_model_list TEXT,
         mm_tags_match_mode TEXT DEFAULT 'all_strict',
         mm_is_template TEXT DEFAULT 'false',
+        mm_template_role TEXT,
         mm_max_tokens INTEGER DEFAULT 2048,
         mm_viewp_description TEXT,
         mm_viewp_meta JSON,
@@ -313,6 +315,33 @@ const BUILTIN_TEMPLATES = [
     variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
     examplesHeuristic: 'top-n',
   },
+  {
+    name: 'entity-ctx',
+    mode: 'entity-ctx',
+    description: 'Contextual graph entity-context template.',
+    body: 'You are an architectural context extractor. Given the entity below, return a concise JSON summary with aliases, artifacts, mentions, summary, and evidence.\n\n## Entity\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '[]',
+    variables: '["ARCHITXT_TOPIC"]',
+    examplesHeuristic: null,
+  },
+  {
+    name: 'edge-ctx',
+    mode: 'edge-ctx',
+    description: 'Contextual graph edge-context template.',
+    body: 'You are an architectural relationship extractor. Given the two related entities below, return a JSON list of directed relationships with type, source_id, target_id, confidence, label, and evidence.\n\n## Relationship\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '[]',
+    variables: '["ARCHITXT_TOPIC"]',
+    examplesHeuristic: null,
+  },
+  {
+    name: 'discover-ctx',
+    mode: 'discover-ctx',
+    description: 'Contextual graph discovery template.',
+    body: 'You are an architectural discovery assistant. Given the seed entity and its neighbors below, suggest new candidate nodes and hypothesized edges. Return JSON with candidates containing id, summary, and hypothesized_edges.\n\n## Seed\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '[]',
+    variables: '["ARCHITXT_TOPIC"]',
+    examplesHeuristic: null,
+  },
 ];
 
 function ensureBuiltinPromptTemplates(db) {
@@ -429,6 +458,102 @@ function ensureBuiltinPromptTemplates(db) {
   return seeded + coerced + patched;
 }
 
+/**
+ * Ensure the built-in contextual-graph system mental-model templates exist.
+ * These are template rows (mm_is_template = 'true') with a reserved system role.
+ * They are never derived from mental_model_entities; instead add-context derives
+ * instances from the working graph.
+ */
+const CONTEXTUAL_GRAPH_TEMPLATES = [
+  {
+    extId: 'entity-ctx-{entity-id}',
+    name: 'Entity context: {entity-name}',
+    role: 'sys_entity_context',
+    returns: 'entity-ctx',
+    dimension: 'contextual-graph',
+    sourceQuery: 'Return a concise JSON summary for entity {entity-id} ({entity-name}). Include aliases, artifacts, mentions, summary, and evidence.',
+    maxTokens: 4096,
+    tags: ['contextual-graph', 'entity-ctx'],
+  },
+  {
+    extId: 'edge-ctx-{source-id}|{target-id}',
+    name: 'Edge context: {source-name} ↔ {target-name}',
+    role: 'sys_edge_context',
+    returns: 'edge-ctx',
+    dimension: 'contextual-graph',
+    sourceQuery: 'Return a JSON list of directed relationships between {source-id} ({source-name}) and {target-id} ({target-name}). Include type, source_id, target_id, confidence, label, and evidence.',
+    maxTokens: 4096,
+    tags: ['contextual-graph', 'edge-ctx'],
+  },
+  {
+    extId: 'discover-{seed-id}-{batch}',
+    name: 'Discover around {seed-name}',
+    role: 'sys_discovery_context',
+    returns: 'discover-ctx',
+    dimension: 'contextual-graph',
+    sourceQuery: 'Given seed entity {seed-id} ({seed-name}) and its neighbors, suggest new candidate nodes and hypothesized edges. Return JSON with candidates containing id, summary, and hypothesized_edges.',
+    maxTokens: 4096,
+    tags: ['contextual-graph', 'discover-ctx'],
+  },
+];
+
+function ensureContextualGraphTemplates(db) {
+  const mmTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
+  const ptTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'prompt_templates'").get();
+  if (!mmTableExists || !ptTableExists) return 0;
+
+  const existing = db.prepare('SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = ?').all('true');
+  const existingByExtId = new Map(existing.map((r) => [r.mm_ext_id, r]));
+  const existingRoles = new Set(existing.map((r) => r.mm_template_role));
+
+  let seeded = 0;
+  const insert = db.prepare(`
+    INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
+    VALUES (?, ?, ?, 'true', ?, ?, ?, ?)
+    ON CONFLICT(mm_ext_id) DO UPDATE SET
+      mm_name = excluded.mm_name,
+      mm_source_query = excluded.mm_source_query,
+      mm_template_role = excluded.mm_template_role,
+      mm_returns = excluded.mm_returns,
+      mm_dimension = excluded.mm_dimension,
+      mm_max_tokens = excluded.mm_max_tokens
+  `);
+  const tagInsert = db.prepare(`INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)`);
+
+  for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
+    try {
+      const result = insert.run(t.extId, t.name, t.sourceQuery, t.role, t.returns, t.dimension, t.maxTokens);
+      const mmId = result.lastInsertRowid;
+
+      for (const tagName of t.tags) {
+        const existingTag = getTagByName(db, tagName)?.data;
+        if (existingTag?.tag_id) {
+          tagInsert.run(mmId, existingTag.tag_id);
+        } else {
+          const tagResult = createTag(db, { tag_name: tagName, tag_generated_by: 'import' });
+          if (tagResult?.success && typeof tagResult.data === 'number') {
+            tagInsert.run(mmId, tagResult.data);
+          } else {
+            logger.warn('Could not create contextual-graph template tag', { extId: t.extId, tagName, tagResult });
+          }
+        }
+      }
+
+      if (!existingByExtId.has(t.extId) || !existingRoles.has(t.role)) {
+        seeded++;
+      }
+    } catch (err) {
+      logger.error('Failed to ensure contextual-graph template', { extId: t.extId, role: t.role, error: err.message });
+    }
+  }
+
+  if (seeded > 0) {
+    logger.info('Ensured contextual-graph system templates', { seeded, roles: CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role) });
+  }
+
+  return seeded;
+}
+
 function relaxResearchStepsParentCascade(db) {
   const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'research_steps'").get();
   if (!tableExists) {
@@ -527,6 +652,7 @@ function removeMentalModelCheckConstraints(db) {
       mm_exclude_mental_model_list TEXT,
       mm_tags_match_mode TEXT DEFAULT 'all_strict',
       mm_is_template TEXT DEFAULT 'false',
+      mm_template_role TEXT,
       mm_max_tokens INTEGER DEFAULT 2048,
       mm_viewp_description TEXT,
       mm_viewp_meta JSON,
@@ -536,7 +662,7 @@ function removeMentalModelCheckConstraints(db) {
       mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
     )`,
-    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_viewp_description', 'mm_viewp_meta', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
+    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_template_role', 'mm_max_tokens', 'mm_viewp_description', 'mm_viewp_meta', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
   };
 
   const mentalModelEntitiesInfo = {
@@ -781,6 +907,10 @@ function ensureMissingColumns(db) {
         {
           name: 'mm_concatenation',
           ddl: "ALTER TABLE mental_models ADD COLUMN mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile'))"
+        },
+        {
+          name: 'mm_template_role',
+          ddl: 'ALTER TABLE mental_models ADD COLUMN mm_template_role TEXT'
         }
       ]
     },
@@ -1128,12 +1258,13 @@ export function ensureSchema(db) {
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}`);
+    const cgTemplates = ensureContextualGraphTemplates(db);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
@@ -1154,6 +1285,7 @@ export function ensureSchema(db) {
   db.exec(cleaned);
   logger.info('Schema applied successfully');
   const templatesSeeded = ensureBuiltinPromptTemplates(db);
+  const cgTemplates = ensureContextualGraphTemplates(db);
   return true;
 }
 
