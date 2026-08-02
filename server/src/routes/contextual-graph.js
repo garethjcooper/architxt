@@ -15,6 +15,7 @@ import {
 } from '../db/crud/contextual-graph.js';
 import { importHindsightSkeleton as defaultImportSkeleton } from '../services/contextual-graph/import-hindsight-skeleton.js';
 import { addContext as defaultAddContext } from '../services/contextual-graph/add-context.js';
+import { deleteGeneratedModels } from '../services/contextual-graph/delete-generated-models.js';
 
 const BASE_PATH = '/contextual-graph';
 
@@ -370,6 +371,73 @@ export function createContextualGraphRouter({
       res,
       status: 200,
       data: { success: true, cleared: counts },
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/delete-generated:
+   *   post:
+   *     summary: Delete generated contextual-graph mental models from Hindsight and clear local provenance
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               dry_run: { type: boolean }
+   *     responses:
+   *       200: { description: Models deleted or previewed }
+   *       400: { description: Missing or invalid scope }
+   */
+  router.post('/delete-generated', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const dryRun = req.body.dry_run === true;
+
+    const result = await deleteGeneratedModels(db, serverId, bankId, { dry_run: dryRun });
+
+    const duration = Date.now() - start;
+    logger.info('Delete generated models', { serverId, bankId, dryRun, total: result.deleted?.length ?? 0, failed: result.failed?.length ?? 0 });
+
+    const responseData = {
+      success: result.success,
+      dry_run: dryRun,
+      total: result.deleted?.length ?? 0,
+      ids: result.deleted ?? [],
+      failed: result.failed ?? [],
+      cleared: result.cleared ?? { nodes: 0, edges: 0 },
+    };
+
+    if (!result.success) {
+      sendResponse({
+        res,
+        status: 500,
+        data: { ...responseData, error: result.error, code: result.code },
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: responseData,
       logger,
       method: req.method,
       path: req.path,

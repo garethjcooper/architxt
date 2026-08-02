@@ -1237,6 +1237,9 @@ export const contextualGraphApi = {
     min_count?: number;
     min_weight?: number;
     seed_node_ids?: string[];
+    node_ids?: string[];
+    run_discovery?: boolean;
+    import_skeleton?: boolean;
     neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number; run_discovery?: boolean };
   }) =>
     fetchApi<{ success: boolean; queued?: { entity: number; edge: number; discover: number }; deployed?: string[]; failed?: { ext_id: string; error: string; code?: string }[]; error?: string; code?: string }>('/contextual-graph/add-context', {
@@ -1304,5 +1307,22 @@ export const contextualGraphApi = {
     fetchApi<{ success: boolean; cleared?: { nodes: number; edges: number }; error?: string; code?: string }>('/contextual-graph/clear', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
+
+  deleteGenerated: (serverId: number, bankId: string, options?: { dry_run?: boolean }) =>
+    fetchApi<{
+      success: boolean;
+      dry_run?: boolean;
+      total?: number;
+      ids?: string[];
+      failed?: { ext_id: string; error: string }[];
+      by_role?: Record<string, number>;
+      deleted?: Array<{ ext_id: string; success: boolean; error?: string }>;
+      cleared?: { nodes: number; edges: number };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/delete-generated', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
     }),
 };
