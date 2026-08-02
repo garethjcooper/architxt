@@ -54,6 +54,7 @@ function validateMaxTokens(value: string): { valid: true; value: number } | { va
 }
 
 export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFormProps) {
+  const isSystemTemplate = initial?.is_system_template ?? false;
   const [extId, setExtId] = useState(initial?.ext_id ?? '');
   const [name, setName] = useState(initial?.name ?? '');
   const [sourceQuery, setSourceQuery] = useState(initial?.source_query ?? '');
@@ -83,11 +84,17 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
+    if (isSystemTemplate) return null;
     if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(`${extId}${name}`)) {
       return "Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.";
     }
     return null;
-  }, [isTemplate, extId, name]);
+  }, [isTemplate, isSystemTemplate, extId, name]);
+
+  const handleIsTemplateChange = (v: boolean) => {
+    if (isSystemTemplate) return;
+    setIsTemplate(v);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,7 +140,14 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
     <form onSubmit={handleSubmit} className="space-y-6 py-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
+            {isSystemTemplate && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-700/40 text-white/70 border-slate-600">
+                System template
+              </span>
+            )}
+          </div>
           <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
           {templateValidation && (
             <p className="text-[10px] text-red-400 mt-0.5">{templateValidation}</p>
@@ -141,7 +155,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
         </div>
         <Switch
           checked={isTemplate}
-          onCheckedChange={(v) => setIsTemplate(!!v)}
+          onCheckedChange={(v) => handleIsTemplateChange(!!v)}
+          disabled={isSystemTemplate}
         />
       </div>
 
@@ -154,7 +169,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
                 id="mm-dimension"
                 value={dimension}
                 onChange={(e) => setDimension(e.target.value)}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                disabled={isSystemTemplate}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {standardDimensions.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
@@ -167,7 +183,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
                 id="mm-returns"
                 value={returns}
                 onChange={(e) => setReturns(toMentalModelReturns(e.target.value))}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                disabled={isSystemTemplate}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -180,7 +197,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
                 id="mm-concatenation"
                 value={concatenation}
                 onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                disabled={isSystemTemplate}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="merge">Merge</option>
                 <option value="compile">Compile</option>
@@ -325,7 +343,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
               id="mm-dimension"
               value={dimension}
               onChange={(e) => setDimension(e.target.value)}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              disabled={isSystemTemplate}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {standardDimensions.map((d) => (
                 <option key={d.value} value={d.value}>{d.label}</option>
@@ -338,7 +357,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
               id="mm-returns"
               value={returns}
               onChange={(e) => setReturns(toMentalModelReturns(e.target.value))}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              disabled={isSystemTemplate}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -351,7 +371,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
               id="mm-concatenation"
               value={concatenation}
               onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              disabled={isSystemTemplate}
+              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="merge">Merge</option>
               <option value="compile">Compile</option>

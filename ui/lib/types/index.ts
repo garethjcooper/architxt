@@ -180,6 +180,8 @@ export interface MentalModel {
   returns: MentalModelReturns;
   concatenation: 'merge' | 'compile';
   is_template: boolean;
+  template_role?: string | null;
+  is_system_template: boolean;
   tags: Tag[];
   entities: Entity[];
   created_at: string;
