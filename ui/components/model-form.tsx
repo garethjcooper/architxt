@@ -83,8 +83,8 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    if (!/\{entity-(id|name|type)\}/.test(`${extId}${name}`)) {
-      return "Template mode requires {entity-id}, {entity-name} or {entity-type} to be present in Template Id (External ID) or Name at a minimum. Source Query can also use entity tags.";
+    if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(`${extId}${name}`)) {
+      return "Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.";
     }
     return null;
   }, [isTemplate, extId, name]);

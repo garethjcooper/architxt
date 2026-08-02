@@ -275,8 +275,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    if (!/\{entity-(id|name|type)\}/.test(model.ext_id ?? '')) {
-      return 'Template mode requires {entity-id}, {entity-name} or {entity-type} to be present in External ID at a minimum. Name or Source Query can also use entity tags.';
+    if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(model.ext_id ?? '')) {
+      return 'Template mode requires a supported placeholder in External ID. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.';
     }
     return null;
   }, [isTemplate, model.ext_id]);

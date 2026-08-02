@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ensureSchema } from '../src/db/ensure-schema.js';
 import { composeMentalModelPrompt } from '../src/prompts/template-service.js';
+import { validateEntityTemplateEligibility } from '../src/db/crud/mental-models.js';
 
 const RETURNS_MODES = [
   'narrative',
@@ -40,5 +41,48 @@ describe('composeMentalModelPrompt', () => {
       db.close();
       fs.unlinkSync(file);
     }
+  });
+});
+
+describe('validateEntityTemplateEligibility', () => {
+  it('accepts legacy entity placeholders', () => {
+    const result = validateEntityTemplateEligibility({
+      mm_is_template: 'true',
+      mm_name: 'Summary for {entity-name}',
+      mm_ext_id: 'summary-{entity-id}',
+      mm_source_query: '',
+    });
+    assert.equal(result.valid, true);
+  });
+
+  it('accepts contextual-graph placeholders', () => {
+    const result = validateEntityTemplateEligibility({
+      mm_is_template: 'true',
+      mm_name: 'Edge context: {source-name} ↔ {target-name}',
+      mm_ext_id: 'edge-ctx-{source-id}|{target-id}',
+      mm_source_query: '',
+    });
+    assert.equal(result.valid, true);
+  });
+
+  it('rejects templates with no supported placeholders', () => {
+    const result = validateEntityTemplateEligibility({
+      mm_is_template: 'true',
+      mm_name: 'Static name',
+      mm_ext_id: 'static-id',
+      mm_source_query: '',
+    });
+    assert.equal(result.valid, false);
+    assert.equal(result.code, 'VALIDATION_ERROR');
+  });
+
+  it('does not validate non-templates', () => {
+    const result = validateEntityTemplateEligibility({
+      mm_is_template: 'false',
+      mm_name: 'Static name',
+      mm_ext_id: 'static-id',
+      mm_source_query: '',
+    });
+    assert.equal(result.valid, true);
   });
 });
