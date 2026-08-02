@@ -300,6 +300,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleNameChange = (value: string) => {
+    if (isSystemTemplate) return;
     setName(value);
     updateDerivedPlaceholders({
       ...baseConfig,
@@ -543,6 +544,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
             <Input
               id="mm-detail-name"
               value={name}
+              disabled={isSystemTemplate}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="Display name"
               className={inputClass}
