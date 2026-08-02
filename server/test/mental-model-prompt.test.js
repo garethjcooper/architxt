@@ -13,6 +13,9 @@ const RETURNS_MODES = [
   'graph-discovery',
   'narrative-graph-known',
   'narrative-graph-discovery',
+  'entity-ctx',
+  'edge-ctx',
+  'discover-ctx',
 ];
 
 describe('composeMentalModelPrompt', () => {

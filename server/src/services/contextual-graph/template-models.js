@@ -44,7 +44,7 @@ export function substituteTemplateFields(template, values) {
 /**
  * Derive an entity-ctx mental model spec from the system template + graph node.
  */
-export async function deriveEntityContextModel(db, node) {
+export async function deriveEntityContextModel(db, node, bankId) {
   const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.entity)?.data;
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.entity}`);
 
@@ -61,14 +61,14 @@ export async function deriveEntityContextModel(db, node) {
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
-    tags: template.tags,
+    tags: [`ctx-${bankId}`, `entity-ctx`, `node-${node.id}`],
   };
 }
 
 /**
  * Derive an edge-ctx mental model spec from the system template + graph edge.
  */
-export async function deriveEdgeContextModel(db, sourceNode, targetNode) {
+export async function deriveEdgeContextModel(db, sourceNode, targetNode, bankId) {
   const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.edge)?.data;
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.edge}`);
 
@@ -87,14 +87,14 @@ export async function deriveEdgeContextModel(db, sourceNode, targetNode) {
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
-    tags: template.tags,
+    tags: [`ctx-${bankId}`, `edge-ctx`, `pair-${sourceNode.id}|${targetNode.id}`],
   };
 }
 
 /**
  * Derive a discover-ctx mental model spec from the system template + seed node.
  */
-export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], batch = Date.now()) {
+export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], batch = Date.now(), bankId) {
   const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.discover)?.data;
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.discover}`);
 
@@ -112,7 +112,7 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], b
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
-    tags: template.tags,
+    tags: [`ctx-${bankId}`, `discover`, `seed-${seedNode.id}`],
     // Pass neighbors to the deploy layer so it can include them in the prompt topic.
     neighbor_ids: neighbors.map((n) => (typeof n === 'string' ? n : n.id)),
   };

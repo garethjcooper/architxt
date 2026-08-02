@@ -91,7 +91,7 @@ export async function addContext(
     const spec = await deriveEntityContextModel(db, {
       id: node.cgn_id,
       displayName: node.cgn_properties?.display_name || node.cgn_id,
-    });
+    }, bankId);
     entitySpecs.push(spec);
   }
 
@@ -122,7 +122,7 @@ export async function addContext(
     }, {
       id: edge.cge_target_id,
       displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
-    });
+    }, bankId);
     edgeSpecs.push(spec);
   }
 
@@ -164,7 +164,7 @@ export async function addContext(
     const spec = await deriveDiscoverContextModel(db, {
       id: seedId,
       displayName: seedNode?.cgn_properties?.display_name || seedId,
-    }, neighbors);
+    }, neighbors, Date.now(), bankId);
     discoverSpecs.push(spec);
 
     if (options.runDiscovery) {
@@ -278,7 +278,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
     entitySpecs.push(await deriveEntityContextModel(db, {
       id: candidate.id,
       displayName: candidate.displayName,
-    }));
+    }, bankId));
 
     if (Array.isArray(candidate.hypothesizedEdges)) {
       for (const he of candidate.hypothesizedEdges) {
@@ -292,7 +292,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
         }, {
           id: he.target,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
-        }));
+        }, bankId));
 
         const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
@@ -317,7 +317,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
       entitySpecs.push(await deriveEntityContextModel(db, {
         id: existing.cgn_id,
         displayName: existing.cgn_properties?.display_name || existing.cgn_id,
-      }));
+      }, bankId));
     }
 
     if (Array.isArray(candidate.hypothesized_edges)) {
@@ -331,7 +331,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
         }, {
           id: he.target,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
-        }));
+        }, bankId));
 
         const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {

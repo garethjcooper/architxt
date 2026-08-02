@@ -43,7 +43,7 @@ describe('contextual graph template models', () => {
   });
 
   it('derives an entity context model from a node', async () => {
-    const spec = await deriveEntityContextModel(db, { id: 'svc-001', displayName: 'Billing Service' });
+    const spec = await deriveEntityContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, 'bank-1');
 
     assert.equal(spec.ext_id, 'entity-ctx-svc-001');
     assert.equal(spec.name, 'Entity context: Billing Service');
@@ -51,13 +51,15 @@ describe('contextual graph template models', () => {
     assert.equal(spec.role, 'sys_entity_context');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
+    assert.deepEqual(spec.tags, ['ctx-bank-1', 'entity-ctx', 'node-svc-001']);
   });
 
   it('derives an edge context model from source and target nodes', async () => {
     const spec = await deriveEdgeContextModel(
       db,
       { id: 'svc-001', displayName: 'Billing Service' },
-      { id: 'svc-002', displayName: 'Payment API' }
+      { id: 'svc-002', displayName: 'Payment API' },
+      'bank-1'
     );
 
     assert.equal(spec.ext_id, 'edge-ctx-svc-001|svc-002');
@@ -65,14 +67,30 @@ describe('contextual graph template models', () => {
     assert.equal(spec.returns, 'edge-ctx');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Payment API'));
+    assert.deepEqual(spec.tags, ['ctx-bank-1', 'edge-ctx', 'pair-svc-001|svc-002']);
   });
 
   it('derives a discover model from a seed node and batch id', async () => {
-    const spec = await deriveDiscoverContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, [], 3);
+    const spec = await deriveDiscoverContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, [], 3, 'bank-1');
 
     assert.equal(spec.ext_id, 'discover-svc-001-3');
     assert.equal(spec.name, 'Discover around Billing Service');
     assert.equal(spec.returns, 'discover-ctx');
     assert.ok(spec.source_query.includes('svc-001'));
+    assert.deepEqual(spec.tags, ['ctx-bank-1', 'discover', 'seed-svc-001']);
+  });
+
+  it('system templates have no tags', () => {
+    const rows = db.prepare(`
+      SELECT m.mm_id
+      FROM mental_models m
+      WHERE m.mm_is_template = 'true'
+        AND m.mm_template_role LIKE 'sys_%'
+    `).all();
+    assert.ok(rows.length > 0);
+    for (const { mm_id } of rows) {
+      const tagCount = db.prepare('SELECT COUNT(*) AS c FROM mental_model_tags WHERE mm_id = ?').pluck().get(mm_id);
+      assert.equal(tagCount, 0, `system template ${mm_id} should not have user tags`);
+    }
   });
 });
