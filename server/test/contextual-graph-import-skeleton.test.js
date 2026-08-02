@@ -89,8 +89,8 @@ describe('importHindsightSkeleton', () => {
     assert.equal(result.success, true);
     assert.equal(result.imported.nodes, 2);
 
-    const canonical = getNode(db, serverId, 'Mozart-API', 'SVC-005').data;
-    assert.equal(canonical.cgn_id, 'SVC-005');
+    const canonical = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
+    assert.equal(canonical.cgn_id, 'svc:SVC-005');
     assert.deepEqual(canonical.cgn_labels, ['canonical', 'active', 'svc']);
     assert.equal(canonical.cgn_properties.provenance.source, 'hindsight');
 
@@ -125,7 +125,7 @@ describe('importHindsightSkeleton', () => {
     assert.equal(result.imported.nodes, 3);
     assert.equal(result.imported.edges, 2);
 
-    const edge = getEdge(db, serverId, 'Mozart-API', 'hindsight:SVC-005|SVC-006').data;
+    const edge = getEdge(db, serverId, 'Mozart-API', 'hindsight:svc:SVC-005|svc:SVC-006').data;
     assert.equal(edge.cge_type, null);
     assert.equal(edge.cge_properties.directed, false);
     assert.equal(edge.cge_properties.weight, 3);
@@ -134,7 +134,7 @@ describe('importHindsightSkeleton', () => {
     const edges = listEdges(db, serverId, 'Mozart-API', { undirected: true }).data;
     assert.equal(edges.length, 2);
 
-    const ghost = getNode(db, serverId, 'Mozart-API', 'uncanonical:unknown-ghost-001').data;
+    const ghost = getNode(db, serverId, 'Mozart-API', 'unknown:ghost-001').data;
     assert.equal(ghost.cgn_labels.includes('grounded'), true);
     assert.equal(ghost.cgn_labels.includes('unknown'), true);
     assert.equal(ghost.cgn_properties.display_name, 'unknown:GHOST-001');
@@ -166,11 +166,11 @@ describe('importHindsightSkeleton', () => {
     ]);
 
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
-    upsertNode(db, serverId, 'Mozart-API', 'SVC-005', ['canonical', 'active'], {
+    upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       display_name: 'Billing Service',
       provenance: {
         source: 'entity-ctx',
-        model_id: 'entity-ctx-SVC-005',
+        model_id: 'entity-ctx-svc:SVC-005',
         summary: 'Original summary',
       },
     });
@@ -185,9 +185,9 @@ describe('importHindsightSkeleton', () => {
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', {}, fetchGraph);
     assert.equal(result.imported.nodes, 1);
 
-    const node = getNode(db, serverId, 'Mozart-API', 'SVC-005').data;
+    const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
     assert.equal(node.cgn_properties.provenance.source, 'hindsight');
-    assert.equal(node.cgn_properties.provenance.model_id, 'entity-ctx-SVC-005');
+    assert.equal(node.cgn_properties.provenance.model_id, 'entity-ctx-svc:SVC-005');
     assert.equal(node.cgn_properties.provenance.summary, 'Original summary');
   });
 
