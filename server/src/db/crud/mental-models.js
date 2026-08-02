@@ -14,7 +14,51 @@ const JSON_FIELDS = [];
 const base = createBaseCrud(TABLE, PK, JSON_FIELDS, { pkType: 'integer' });
 
 export const getMentalModel = base.get;
-export const deleteMentalModel = base.del;
+
+/** Roles owned by the system. User actions must not mutate these rows. */
+export const SYSTEM_TEMPLATE_ROLES = new Set([
+  'sys_entity_context',
+  'sys_edge_context',
+  'sys_discovery_context',
+]);
+
+/** Returns values used by contextual-graph system templates. */
+export const CONTEXTUAL_RETURNS = new Set(['entity-ctx', 'edge-ctx', 'discover-ctx']);
+
+export function isSystemTemplateRole(role) {
+  return SYSTEM_TEMPLATE_ROLES.has(role);
+}
+
+/** Read the template role for a mental model directly from the current DB. */
+function getMentalModelTemplateRole(db, id) {
+  const row = db.prepare(`SELECT mm_template_role FROM ${TABLE} WHERE ${PK} = ?`).get(requireInt(PK, id));
+  return row ? row.mm_template_role : null;
+}
+
+/** Reusable guard result for system-template mutations. */
+function systemTemplateGuard(role, action) {
+  if (!isSystemTemplateRole(role)) return { blocked: false };
+  return {
+    blocked: true,
+    error: `System template cannot be ${action}.`,
+    code: 'SYSTEM_TEMPLATE_IMMUTABLE',
+  };
+}
+
+export function getMentalModelSystemTemplateGuard(db, id, action) {
+  const role = getMentalModelTemplateRole(db, id);
+  return systemTemplateGuard(role, action);
+}
+
+export const deleteMentalModel = (db, id) => dbExec(() => {
+  const guard = getMentalModelSystemTemplateGuard(db, id, 'deleted');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
+  return base.del(db, id);
+}, 'mentalModels.delete');
 
 /** Placeholders supported in template fields (ext_id, name, source_query). */
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
@@ -51,6 +95,9 @@ export const VALID_RETURNS = new Set([
   'narrative-graph-known',
   'narrative-graph-discovery',
   'narrative-graph-discovered-only',
+  'entity-ctx',
+  'edge-ctx',
+  'discover-ctx',
 ]);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
 export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability', 'contextual-graph'];
@@ -184,8 +231,14 @@ export function validateEntityTemplateEligibility({
   mm_name,
   mm_ext_id,
   mm_source_query,
+  mm_template_role,
 }) {
   if (mm_is_template !== 'true') {
+    return { valid: true };
+  }
+
+  // System templates are pre-seeded and do not require user entity placeholders.
+  if (isSystemTemplateRole(mm_template_role)) {
     return { valid: true };
   }
 
@@ -207,6 +260,12 @@ export function validateEntityTemplateEligibility({
 export function deriveMentalModels(template) {
   const entities = template?.entities;
   if (template?.is_template !== true || !Array.isArray(entities) || entities.length === 0) {
+    return [];
+  }
+
+  // System templates are never derived from entities; contextual-graph service
+  // derives effective models from graph state instead.
+  if (isSystemTemplateRole(template.template_role)) {
     return [];
   }
 
@@ -446,7 +505,19 @@ export const getMentalModelIdByExtId = (db, extId) => dbExec(() => {
 export const createMentalModel = (db, data) => dbExec(() => {
   requireString('mm_ext_id', data.mm_ext_id);
 
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation'];
+  // Prevent anyone from minting a new system-template row via the API.
+  if (isSystemTemplateRole(data.mm_template_role)) {
+    const err = new Error('Reserved system template role cannot be assigned.');
+    err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+    throw err;
+  }
+  if (SYSTEM_TEMPLATE_ROLES.has(data.mm_ext_id)) {
+    const err = new Error('Reserved system template external id cannot be used.');
+    err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+    throw err;
+  }
+
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_template_role'];
   const presentCols = cols.filter(c => data[c] !== undefined && data[c] !== null);
   const placeholders = presentCols.map(() => '?').join(',');
   const values = presentCols.map(c => data[c]);
@@ -460,9 +531,30 @@ export const createMentalModel = (db, data) => dbExec(() => {
  * Update mental model. Only present fields are updated.
  */
 export const updateMentalModel = (db, id, data) => dbExec(() => {
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation'];
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_template_role'];
   const updates = [];
   const values = [];
+
+  const role = getMentalModelTemplateRole(db, id);
+  if (isSystemTemplateRole(role)) {
+    // System templates cannot stop being templates, change role, or change
+    // their reserved ext_id. Other configurable fields remain editable.
+    if (data.mm_is_template === 'false') {
+      const err = new Error('System template cannot be converted to a non-template.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+    if (data.mm_template_role !== undefined && data.mm_template_role !== role) {
+      const err = new Error('System template role cannot be changed.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+    if (data.mm_ext_id !== undefined && data.mm_ext_id !== role) {
+      const err = new Error('System template external id cannot be changed.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+  }
 
   for (const c of cols) {
     if (data[c] !== undefined && data[c] !== null) {
@@ -502,6 +594,12 @@ export const getMentalModelTags = (db, mmId) => dbExec(() => {
  */
 export const addMentalModelTag = (db, mmId, tagId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const tId = requireInt('tag_id', tagId);
   const sql = `INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)`;
   stmt(db, sql).run(mId, tId);
@@ -513,6 +611,12 @@ export const addMentalModelTag = (db, mmId, tagId) => dbExec(() => {
  */
 export const removeMentalModelTag = (db, mmId, tagId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const tId = requireInt('tag_id', tagId);
   const sql = `DELETE FROM mental_model_tags WHERE mm_id = ? AND tag_id = ?`;
   const result = stmt(db, sql).run(mId, tId);
@@ -531,6 +635,12 @@ export const removeMentalModelTag = (db, mmId, tagId) => dbExec(() => {
  */
 export const syncMentalModelTags = (db, mmId, tagNames) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
 
   // Remove existing tags
   const deleteSql = `DELETE FROM mental_model_tags WHERE mm_id = ?`;
@@ -598,6 +708,12 @@ function getMentalModelTemplateValues(db, mmId) {
  */
 export const addMentalModelEntity = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity associations are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const template = getMentalModelTemplateValues(db, mId);
 
@@ -654,6 +770,12 @@ export const getMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() => {
  */
 export const updateMentalModelEntityOverrides = (db, mmId, entId, overrides) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
 
   const updates = [];
@@ -741,6 +863,12 @@ export const updateMentalModelEntityOverrides = (db, mmId, entId, overrides) => 
  */
 export const deleteMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const sql = `UPDATE mental_model_entities SET mm_ent_refresh_mode = NULL, mm_ent_refresh_after_consolidation = NULL, mm_ent_exclude_all_mental_models = NULL, mm_ent_max_tokens = NULL, mm_ent_updated_at = CURRENT_TIMESTAMP WHERE mm_id = ? AND ent_id = ?`;
   const result = stmt(db, sql).run(mId, eId);
@@ -752,6 +880,12 @@ export const deleteMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() =
  */
 export const clearMentalModelEntityOverrides = (db, mmId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const sql = `UPDATE mental_model_entities SET mm_ent_refresh_mode = NULL, mm_ent_refresh_after_consolidation = NULL, mm_ent_exclude_all_mental_models = NULL, mm_ent_max_tokens = NULL, mm_ent_updated_at = CURRENT_TIMESTAMP WHERE mm_id = ?`;
   const result = stmt(db, sql).run(mId);
   return { cleared: result.changes };
@@ -762,6 +896,12 @@ export const clearMentalModelEntityOverrides = (db, mmId) => dbExec(() => {
  */
 export const batchUpdateMentalModelEntityOverrides = (db, mmId, entityIds, overrides) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   if (!Array.isArray(entityIds) || entityIds.length === 0) {
     throw new Error('At least one entity_id is required');
   }
@@ -785,6 +925,12 @@ export const batchUpdateMentalModelEntityOverrides = (db, mmId, entityIds, overr
  */
 export const removeMentalModelEntity = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity associations are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const sql = `DELETE FROM mental_model_entities WHERE mm_id = ? AND ent_id = ?`;
   const result = stmt(db, sql).run(mId, eId);
@@ -796,6 +942,14 @@ export const removeMentalModelEntity = (db, mmId, entId) => dbExec(() => {
  */
 export const batchUpdateMentalModelTags = (db, mmIds, tagsToAdd, tagsToRemove) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
   let tagsAdded = 0;
   let tagsRemoved = 0;
 
@@ -831,6 +985,14 @@ export const batchUpdateMentalModelTags = (db, mmIds, tagsToAdd, tagsToRemove) =
  */
 export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitiesToRemove) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity associations are managed by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
   let entitiesAdded = 0;
   let entitiesRemoved = 0;
 
@@ -886,6 +1048,14 @@ export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitie
  */
 export const batchUpdateMentalModelConfig = (db, mmIds, config) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: system templates are configured by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
 
   const updates = [];
   const values = [];
