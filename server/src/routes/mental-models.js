@@ -44,6 +44,7 @@ import {
   DEFAULT_REFRESH_MODE,
   DEFAULT_TAGS_MATCH_MODE,
   DEFAULT_BOOL,
+  isSystemTemplateRole,
 } from '../db/crud/mental-models.js';
 const logger = createLogger('mental-models-route');
 const router = Router();
@@ -87,6 +88,8 @@ const toApiMentalModel = (dbRow) => ({
   max_tokens: dbRow.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
   tags_match_mode: dbRow.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
   is_template: dbRow.mm_is_template === 'true',
+  template_role: dbRow.mm_template_role ?? null,
+  is_system_template: isSystemTemplateRole(dbRow.mm_template_role),
   dimension: dbRow.mm_dimension ?? null,
   returns: dbRow.mm_returns ?? 'narrative',
   concatenation: dbRow.mm_concatenation ?? 'compile',
@@ -410,6 +413,7 @@ router.put('/:id', async (req, res) => {
       mm_name: data.mm_name ?? row?.mm_name ?? null,
       mm_ext_id: data.mm_ext_id ?? row?.mm_ext_id ?? null,
       mm_source_query: data.mm_source_query ?? row?.mm_source_query ?? null,
+      mm_template_role: row?.mm_template_role ?? null,
     });
     if (!eligibility.valid) {
       const duration = Date.now() - start;
