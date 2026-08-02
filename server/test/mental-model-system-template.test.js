@@ -112,6 +112,12 @@ describe('system template hygiene', () => {
     expectBlocked(result);
   });
 
+  it('cannot change a system template name', () => {
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const result = updateMentalModel(db, mm_id, { mm_name: 'Hacked name' });
+    expectBlocked(result);
+  });
+
   it('can still edit benign config fields on a system template', () => {
     const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
     const result = updateMentalModel(db, mm_id, { mm_max_tokens: 4096 });

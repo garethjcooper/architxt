@@ -226,6 +226,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           <Input
             id="mm-name"
             value={name}
+            disabled={isSystemTemplate}
             onChange={(e) => setName(e.target.value)}
             placeholder="Display name"
             className={inputClass}

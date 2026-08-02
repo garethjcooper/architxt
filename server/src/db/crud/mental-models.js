@@ -537,8 +537,8 @@ export const updateMentalModel = (db, id, data) => dbExec(() => {
 
   const role = getMentalModelTemplateRole(db, id);
   if (isSystemTemplateRole(role)) {
-    // System templates cannot stop being templates, change role, or change
-    // their reserved ext_id. Other configurable fields remain editable.
+    // System templates cannot stop being templates, change role, change
+    // their reserved ext_id, or be renamed. Other configurable fields remain editable.
     if (data.mm_is_template === 'false') {
       const err = new Error('System template cannot be converted to a non-template.');
       err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
@@ -551,6 +551,11 @@ export const updateMentalModel = (db, id, data) => dbExec(() => {
     }
     if (data.mm_ext_id !== undefined && data.mm_ext_id !== role) {
       const err = new Error('System template external id cannot be changed.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+    if (data.mm_name !== undefined) {
+      const err = new Error('System template name cannot be changed.');
       err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
       throw err;
     }
