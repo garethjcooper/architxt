@@ -283,7 +283,7 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
   }
 
   if (modelId.startsWith('discover-')) {
-    const match = modelId.match(/^discover-(.+?)-\d+$/);
+    const match = modelId.match(/^discover-(.+)-(\d+)$/);
     const seedId = match ? match[1] : null;
     if (!seedId) return;
 
