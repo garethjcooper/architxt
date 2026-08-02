@@ -22,6 +22,7 @@ import {
   Layers,
   Microscope,
   Globe,
+  Network,
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
@@ -36,6 +37,7 @@ const navItems = [
   { href: '/explore', label: 'Explore', icon: Globe },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
+  { href: '/contextual-graph', label: 'Contextual Graph', icon: Network },
   { href: '/tags', label: 'Tags', icon: Tags },
   { href: '/entities', label: 'Entities', icon: Users },
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
