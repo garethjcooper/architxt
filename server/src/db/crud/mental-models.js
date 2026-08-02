@@ -20,8 +20,24 @@ export const deleteMentalModel = base.del;
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
 const ENTITY_TYPE_PLACEHOLDER = '{entity-type}';
+
+/** Contextual-graph placeholders that can also satisfy template eligibility. */
+const CONTEXTUAL_PLACEHOLDERS = [
+  '{node-id}',
+  '{node-name}',
+  '{source-id}',
+  '{source-name}',
+  '{target-id}',
+  '{target-name}',
+  '{seed-id}',
+  '{seed-name}',
+  '{batch}',
+];
+
 const PLACEHOLDER_PATTERN = new RegExp(
-  `\\${ENTITY_NAME_PLACEHOLDER}|\\${ENTITY_ID_PLACEHOLDER}|\\${ENTITY_TYPE_PLACEHOLDER}`,
+  [ENTITY_NAME_PLACEHOLDER, ENTITY_ID_PLACEHOLDER, ENTITY_TYPE_PLACEHOLDER, ...CONTEXTUAL_PLACEHOLDERS]
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$\u0026'))
+    .join('|'),
   'g'
 );
 
@@ -37,7 +53,7 @@ export const VALID_RETURNS = new Set([
   'narrative-graph-discovered-only',
 ]);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
-export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability'];
+export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability', 'contextual-graph'];
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
 const MIN_MAX_TOKENS = 256;
 const MAX_MAX_TOKENS = 8192;
@@ -176,7 +192,7 @@ export function validateEntityTemplateEligibility({
   if (!hasEntityPlaceholders(mm_name, mm_ext_id, '')) {
     return {
       valid: false,
-      error: `Template mode requires '${ENTITY_ID_PLACEHOLDER}' or '${ENTITY_NAME_PLACEHOLDER}' in Template Id (External ID) or Name`,
+      error: `Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.`,
       code: 'VALIDATION_ERROR',
     };
   }
@@ -365,6 +381,7 @@ const DISPLAY_LABELS = {
   summary: 'Summary',
   'interface-found': 'Interface-Discovered',
   capability: 'Capability',
+  'contextual-graph': 'Contextual Graph',
 };
 
 export const listStandardDimensions = () => {

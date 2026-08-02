@@ -117,6 +117,7 @@ function seedOldSchema(db) {
   `);
 
   // Seed the built-in templates so ensureSchema has them for FK reference.
+  // Also include the contextual-graph templates that the migration expects.
   db.exec(`
     INSERT INTO prompt_templates
       (pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_is_builtin)
@@ -127,7 +128,10 @@ function seedOldSchema(db) {
       ('narrative-graph-known', 'narrative-graph-known', 'Narrative + graph known.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
       ('narrative-graph-discovery', 'narrative-graph-discovery', 'Narrative + graph discovery.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
       ('graph-discovered-only', 'graph-discovered-only', 'Graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-discovered-only', 'narrative-graph-discovered-only', 'Narrative + graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1)
+      ('narrative-graph-discovered-only', 'narrative-graph-discovered-only', 'Narrative + graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('entity-ctx', 'entity-ctx', 'Entity context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('edge-ctx', 'edge-ctx', 'Edge context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('discover-ctx', 'discover-ctx', 'Discover context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1)
   `);
 
   // Create a mental model with one entity linked to it.
@@ -171,6 +175,48 @@ describe('ensureSchema preserves mental_model_entities across CHECK constraint r
       // The parent model must still exist with the returns mapped to a valid template name.
       const model = db.prepare('SELECT mm_returns FROM mental_models WHERE mm_id = ?').get(mmId);
       assert.equal(model.mm_returns, 'narrative');
+    } finally {
+      closeAndDelete({ db, file });
+    }
+  });
+});
+
+describe('ensureSchema backfills user template roles and validates contextual placeholders', () => {
+  it('backfills mm_template_role for legacy user templates', () => {
+    const { db, file } = tempDb();
+    try {
+      seedOldSchema(db);
+
+      // Insert a legacy user template without a role.
+      db.prepare(`
+        INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_returns)
+        VALUES ('user-template-{entity-id}', 'User Template {entity-name}', 'Query for {entity-type}', 'true', 'narrative')
+      `).run();
+
+      ensureSchema(db);
+
+      const row = db.prepare(`
+        SELECT mm_template_role, mm_ext_id FROM mental_models WHERE mm_ext_id = ?
+      `).get('user-template-{entity-id}');
+      assert.equal(row.mm_template_role, 'user_entity_derived');
+    } finally {
+      closeAndDelete({ db, file });
+    }
+  });
+
+  it('does not overwrite existing system template roles', () => {
+    const { db, file } = tempDb();
+    try {
+      seedOldSchema(db);
+      ensureSchema(db);
+
+      // The system templates should have their reserved roles.
+      const rows = db.prepare(`
+        SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true'
+      `).all();
+      const entity = rows.find((r) => r.mm_ext_id === 'entity-ctx-{entity-id}');
+      assert.ok(entity);
+      assert.equal(entity.mm_template_role, 'sys_entity_context');
     } finally {
       closeAndDelete({ db, file });
     }

@@ -459,6 +459,34 @@ function ensureBuiltinPromptTemplates(db) {
 }
 
 /**
+ * Backfill legacy user-created mental-model templates with the default role
+ * 'user_entity_derived'. Anything that is marked as a template but has no role
+ * and is not one of the reserved system ext_ids is a user template.
+ */
+function backfillUserTemplateRoles(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mental_models'").get();
+  if (!tableExists) return 0;
+
+  const cols = new Set(db.prepare("PRAGMA table_info(mental_models)").all().map((r) => r.name));
+  if (!cols.has('mm_template_role')) return 0;
+
+  const reservedExtIds = new Set(CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.extId));
+
+  const stmt = db.prepare(`
+    UPDATE mental_models
+    SET mm_template_role = 'user_entity_derived'
+    WHERE mm_is_template = 'true'
+      AND (mm_template_role IS NULL OR mm_template_role = '')
+      AND mm_ext_id NOT IN (${Array.from(reservedExtIds).map(() => '?').join(',')})
+  `);
+  const result = stmt.run(...reservedExtIds);
+  if (result.changes > 0) {
+    logger.info(`Backfilled ${result.changes} user template(s) with role 'user_entity_derived'`);
+  }
+  return result.changes;
+}
+
+/**
  * Ensure the built-in contextual-graph system mental-model templates exist.
  * These are template rows (mm_is_template = 'true') with a reserved system role.
  * They are never derived from mental_model_entities; instead add-context derives
@@ -1259,6 +1287,7 @@ export function ensureSchema(db) {
     const created = ensureMissingTables(db);
     const templatesSeeded = ensureBuiltinPromptTemplates(db);
     const added = ensureMissingColumns(db);
+    const userRolesBackfilled = backfillUserTemplateRoles(db);
     const removed = removeMentalModelCheckConstraints(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
     const relaxed = relaxResearchStepsParentCascade(db);
@@ -1268,12 +1297,12 @@ export function ensureSchema(db) {
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
     const cgTemplates = ensureContextualGraphTemplates(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}`);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
