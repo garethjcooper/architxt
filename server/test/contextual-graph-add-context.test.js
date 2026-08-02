@@ -84,8 +84,8 @@ describe('addContext', () => {
     assert.equal(result.queued.entity, 2);
     assert.equal(result.queued.edge, 0);
     assert.equal(result.queued.discover, 0);
-    assert.ok(deployed.includes('entity-ctx-SVC-005'));
-    assert.ok(deployed.includes('entity-ctx-SVC-006'));
+    assert.ok(deployed.includes('entity-ctx-svc:SVC-005'));
+    assert.ok(deployed.includes('entity-ctx-svc:SVC-006'));
   });
 
   it('queues edge-ctx models for undirected edges', async () => {
@@ -119,7 +119,7 @@ describe('addContext', () => {
     assert.equal(result.success, true);
     assert.equal(result.queued.entity, 2);
     assert.equal(result.queued.edge, 1);
-    assert.ok(deployed.includes('edge-ctx-SVC-005|SVC-006'));
+    assert.ok(deployed.includes('edge-ctx-svc:SVC-005|svc:SVC-006'));
   });
 
   it('does not queue entity-ctx for nodes that already have a model_id', async () => {
@@ -128,9 +128,9 @@ describe('addContext', () => {
     ]);
 
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
-    upsertNode(db, serverId, 'Mozart-API', 'SVC-005', ['canonical', 'active'], {
+    upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       display_name: 'Billing Service',
-      provenance: { source: 'entity-ctx', model_id: 'entity-ctx-SVC-005' },
+      provenance: { source: 'entity-ctx', model_id: 'entity-ctx-svc:SVC-005' },
     });
 
     const fetchGraph = makeFetchGraph({
@@ -173,13 +173,13 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      seed_node_ids: ['SVC-005'],
+      seed_node_ids: ['svc:SVC-005'],
       neighborhood: { run_discovery: true, top_k_neighbors: 5 },
     });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 1);
-    assert.ok(queued.some((id) => id.startsWith('discover-SVC-005-')));
+    assert.ok(queued.some((id) => id.startsWith('discover-svc:SVC-005-')));
   });
 
   it('processes discovery candidates and queues entity-ctx + edge-ctx', async () => {
@@ -198,7 +198,7 @@ describe('addContext', () => {
         {
           id: 'candidate-payment-bridge',
           summary: 'Payment Bridge',
-          hypothesized_edges: [{ target: 'SVC-005', type: 'depends-on', evidence: 'mem-001' }],
+          hypothesized_edges: [{ target: 'svc:SVC-005', type: 'depends-on', evidence: 'mem-001' }],
         },
       ],
     });
@@ -212,7 +212,7 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      seed_node_ids: ['SVC-005'],
+      seed_node_ids: ['svc:SVC-005'],
       neighborhood: { run_discovery: true, top_k_neighbors: 5 },
       runDiscovery,
     });
@@ -221,7 +221,7 @@ describe('addContext', () => {
     assert.equal(result.queued.entity, 2); // SVC-005 + candidate
     assert.equal(result.queued.edge, 1);
     assert.ok(deployed.includes('entity-ctx-candidate:payment-bridge'));
-    assert.ok(deployed.includes('edge-ctx-candidate:payment-bridge|SVC-005'));
+    assert.ok(deployed.includes('edge-ctx-candidate:payment-bridge|svc:SVC-005'));
   });
 
   it('records provenance on deployed models', async () => {
@@ -247,8 +247,8 @@ describe('addContext', () => {
     });
 
     const { getNode } = await import('../src/db/crud/contextual-graph.js');
-    const node = getNode(db, serverId, 'Mozart-API', 'SVC-005').data;
-    assert.equal(node.cgn_properties.provenance.model_id, 'entity-ctx-SVC-005');
+    const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
+    assert.equal(node.cgn_properties.provenance.model_id, 'entity-ctx-svc:SVC-005');
     assert.equal(node.cgn_properties.provenance.source, 'contextual-graph');
   });
 });

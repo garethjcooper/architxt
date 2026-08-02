@@ -66,7 +66,8 @@ describe('contextual graph identity', () => {
   });
 
   it('builds canonical node id when canonical entity is resolved', () => {
-    assert.equal(buildNodeId({ label: 'a-com:COM-001', canonicalId: 'COM-001' }), 'COM-001');
+    assert.equal(buildNodeId({ label: 'a-com:COM-001', canonicalId: 'COM-001', typeLabel: 'a-com' }), 'a-com:COM-001');
+    assert.equal(buildNodeId({ label: 'app-com:COM-001', canonicalId: 'COM-001', typeLabel: 'app-com' }), 'app-com:COM-001');
     assert.equal(buildNodeId({ label: 'Payment Gateway' }), 'uncanonical:payment-gateway');
   });
 
@@ -76,22 +77,23 @@ describe('contextual graph identity', () => {
     ]);
     const lookups = await buildArchitxtLookups(db);
 
-    const byId = await resolveHindsightNode(db, serverId, 'Mozart-API', lookups, { label: 'a-com:COM-001' });
+    const byId = await resolveHindsightNode(db, serverId, 'Mozart-API', lookups, { label: 'app-com:COM-001' });
     assert.equal(byId.taxonomy, 'canonical');
-    assert.equal(byId.id, 'COM-001');
+    assert.equal(byId.id, 'app-com:COM-001');
 
     const byAlias = await resolveHindsightNode(db, serverId, 'Mozart-API', lookups, { label: 'alpha-component' });
     assert.equal(byAlias.taxonomy, 'canonical');
+    assert.equal(byAlias.id, 'app-com:COM-001');
   });
 
   it('resolves existing uncanonical-grounded node', async () => {
     seedEntities(db, []);
-    upsertNode(db, serverId, 'Mozart-API', 'uncanonical:payment-gateway', ['uncanonical', 'grounded', 'active'], {});
+    upsertNode(db, serverId, 'Mozart-API', 'payment:payment-gateway', ['uncanonical', 'grounded', 'active'], {});
     const lookups = await buildArchitxtLookups(db);
 
-    const result = await resolveHindsightNode(db, serverId, 'Mozart-API', lookups, { label: 'Payment Gateway' });
+    const result = await resolveHindsightNode(db, serverId, 'Mozart-API', lookups, { label: 'payment:Payment Gateway' });
     assert.equal(result.taxonomy, 'uncanonical-grounded');
-    assert.equal(result.id, 'uncanonical:payment-gateway');
+    assert.equal(result.id, 'payment:payment-gateway');
     assert.equal(result.existingNode.labels.includes('grounded'), true);
   });
 

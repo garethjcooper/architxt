@@ -67,9 +67,23 @@ export function normalizeNodeId(label) {
  * @param {string} [options.canonicalId] - resolved canonical entity id
  * @returns {string}
  */
-export function buildNodeId({ label, canonicalId }) {
-  if (canonicalId) return canonicalId;
-  return `uncanonical:${normalizeNodeId(label)}`;
+export function buildNodeId({ label, canonicalId, typeLabel }) {
+  const inferredType = typeLabel || extractTypeLabel(label);
+  if (canonicalId) {
+    const localId = stripTypePrefix(canonicalId, inferredType);
+    return inferredType ? `${inferredType}:${localId}` : canonicalId;
+  }
+  const localLabel = inferredType ? stripTypePrefix(label, inferredType) : label;
+  const normalized = normalizeNodeId(localLabel);
+  if (inferredType) return `${inferredType}:${normalized}`;
+  return `uncanonical:${normalized}`;
+}
+
+function stripTypePrefix(value, typeLabel) {
+  if (!typeLabel || !value) return value;
+  const prefix = `${typeLabel}:`;
+  const lowered = String(value).toLowerCase();
+  return lowered.startsWith(prefix) ? value.slice(prefix.length) : value;
 }
 
 /**
@@ -99,17 +113,17 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
   const candidateEntityId = parts.length >= 2 ? parts.slice(1).join(':') : label;
   const canonicalEntity = lookups.find(candidateEntityId, label);
   if (canonicalEntity) {
+    const typeLabel = canonicalEntity.et_type_name || rawTypeLabel || null;
     return {
-      id: canonicalEntity.ent_entity_id,
+      id: buildNodeId({ canonicalId: canonicalEntity.ent_entity_id, typeLabel }),
       taxonomy: 'canonical',
       canonicalEntity,
       displayName: canonicalEntity.ent_name,
-      typeLabel: canonicalEntity.et_type_name || rawTypeLabel || null,
+      typeLabel,
     };
   }
 
-  // 2. Existing uncanonical-grounded or uncanonical-discovered node
-  const normalizedId = buildNodeId({ label });
+  const normalizedId = buildNodeId({ label, typeLabel: rawTypeLabel });
   const existingNode = await getNode(db, serverId, bankId, normalizedId);
   if (existingNode?.data) {
     const node = existingNode.data;
@@ -181,7 +195,7 @@ export async function dedupeCandidates(db, serverId, bankId, lookups, candidates
     for (const name of names) {
       if (!canonicalMatch) canonicalMatch = lookups.find(null, name);
       if (!existingMatch) {
-        const match = await getNode(db, serverId, bankId, buildNodeId({ label: name }));
+        const match = await getNode(db, serverId, bankId, buildNodeId({ label: name, typeLabel: extractTypeLabel(name) }));
         if (match?.data) {
           existingMatch = match.data;
         }
