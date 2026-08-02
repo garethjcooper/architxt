@@ -231,7 +231,11 @@ export function createContextualGraphRouter({
     sendResponse({
       res,
       status: 200,
-      data: result.imported,
+      data: {
+        success: true,
+        imported: result.imported,
+        raw: result.raw,
+      },
       logger,
       method: req.method,
       path: req.path,
@@ -308,6 +312,7 @@ export function createContextualGraphRouter({
       res,
       status: 200,
       data: {
+        success: true,
         queued: result.queued,
         deployed: result.deployed,
         failed: result.failed,
