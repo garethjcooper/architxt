@@ -672,7 +672,7 @@ export const hindsightApi = {
     }),
 
   pushMentalModel: (serverId: number, bankId: string, model: any, create = false) =>
-    fetchApi<{ success: boolean; created?: boolean }>('/hindsight/push-mental-model', {
+    fetchApi<{ success: boolean; created?: boolean; operation_id?: string | null; status?: string | null; pop_id?: number | null }>('/hindsight/push-mental-model', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create }),
     }),

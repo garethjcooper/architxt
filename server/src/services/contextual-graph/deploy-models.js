@@ -21,7 +21,7 @@ const logger = createLogger('contextual-graph-deploy-models');
  * @param {string} spec.dimension
  * @param {number} spec.max_tokens
  * @param {string[]} spec.tags
- * @returns {Promise<{success: boolean, model_id?: string, error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, model_id?: string, operationId?: string|null, status?: string|null, popId?: number|null, error?: string, code?: string}>}
  */
 export async function deployMentalModel(db, serverId, bankId, spec) {
   if (!spec?.ext_id) {
@@ -39,11 +39,17 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
       tags_match_mode: 'any',
     };
 
-    const pushResult = await createMentalModel(serverId, bankId, modelForPush);
+    const pushResult = await createMentalModel(serverId, bankId, modelForPush, db);
     if (!pushResult.success) {
       return { success: false, error: pushResult.error, code: 'HINDSIGHT_CREATE_FAILED' };
     }
-    return { success: true, model_id: spec.ext_id };
+    return {
+      success: true,
+      model_id: spec.ext_id,
+      operationId: pushResult.operationId || null,
+      status: pushResult.status || null,
+      popId: pushResult.popId || null,
+    };
   } catch (err) {
     logger.error('deployMentalModel failed', { extId: spec.ext_id, error: err.message });
     return { success: false, error: err.message, code: 'DEPLOY_FAILED' };

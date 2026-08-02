@@ -1076,12 +1076,18 @@ router.post('/push-mental-model', async (req, res) => {
 
   try {
     const result = create
-      ? await createMentalModel(serverId, bankId, model)
-      : await pushMentalModel(serverId, bankId, model);
+      ? await createMentalModel(serverId, bankId, model, db)
+      : await pushMentalModel(serverId, bankId, model, db);
     if (!result.success) {
       return res.status(502).json({ error: result.error, code: 'PUSH_FAILED' });
     }
-    res.json({ success: true, created: create });
+    res.json({
+      success: true,
+      created: create,
+      operation_id: result.operationId || null,
+      status: result.status || null,
+      pop_id: result.popId || null,
+    });
   } catch (err) {
     logger.error('Push mental model failed', { serverId, bankId, extId: model?.ext_id, error: err.message, stack: err.stack });
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });

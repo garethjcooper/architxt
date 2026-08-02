@@ -7,6 +7,7 @@
 
 import { createLogger } from '../../utils/logger.js';
 import { getServerConfig } from './config.js';
+import { createPendingOperation } from '../../db/crud/pending-operations.js';
 import {
   normaliseRefreshMode,
   normaliseTagsMatchMode,
@@ -30,6 +31,43 @@ function buildHeaders(serverConfig) {
 function normalizeCsv(value) {
   if (value == null || value === '') return [];
   return String(value).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Record a Hindsight operation in pending_operations so the poll daemon and UI
+ * can track async build progress. Silently skips if no operation id or db.
+ *
+ * @param {Object|null} db
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {string} extId
+ * @param {string|null|undefined} operationId
+ * @param {string|null|undefined} status
+ * @param {string} action
+ * @returns {{success: boolean, popId?: number|null, error?: string}}
+ */
+function trackPendingOperation(db, serverId, bankId, extId, operationId, status, action) {
+  if (!db || !operationId) {
+    return { success: true, popId: null };
+  }
+
+  const pendingResult = createPendingOperation(db, {
+    pop_operation_id: operationId,
+    pop_server_id: serverId,
+    pop_bank_id: bankId,
+    pop_ext_id: extId,
+    pop_action: action,
+    pop_status: status || 'pending',
+  });
+
+  if (!pendingResult.success) {
+    logger.warn('Failed to persist pending operation for mental model push', {
+      serverId, bankId, extId, operationId, error: pendingResult.error, code: pendingResult.code,
+    });
+    return { success: false, error: pendingResult.error, popId: null };
+  }
+
+  return { success: true, popId: pendingResult.data };
 }
 
 function buildPayload(model) {
@@ -79,8 +117,14 @@ async function getConfig(serverId, bankId, model, label) {
 
 /**
  * Update an existing mental model on Hindsight (PATCH by id).
+ *
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {Object} model
+ * @param {Object} [db] - Optional database connection; if provided, a pending_operations row is created for async tracking.
+ * @returns {Promise<{success: boolean, operationId?: string|null, status?: string|null, popId?: number|null, error?: string}>}
  */
-export async function pushMentalModel(serverId, bankId, model) {
+export async function pushMentalModel(serverId, bankId, model, db) {
   const setup = await getConfig(serverId, bankId, model, 'Updating');
   if (!setup.success) return setup;
 
@@ -100,7 +144,18 @@ export async function pushMentalModel(serverId, bankId, model) {
     }
 
     logger.info('Hindsight pushMentalModel OK', { serverId, bankId, extId: model.ext_id });
-    return { success: true };
+    const data = await response.json().catch(() => ({}));
+    const operationId = data.operation_id || data.operationId || null;
+    const status = data.status || null;
+
+    const tracking = trackPendingOperation(db, serverId, bankId, model.ext_id, operationId, status, 'push');
+
+    return {
+      success: true,
+      operationId,
+      status,
+      popId: tracking.popId ?? null,
+    };
   } catch (error) {
     logger.error('Hindsight pushMentalModel error', { serverId, bankId, extId: model.ext_id, error: error.message });
     return { success: false, error: error.message };
@@ -125,8 +180,14 @@ function isConflictResponse(status, errorText) {
  * local caller can treat the operation as a relink/update rather than a hard
  * failure. This prevents contextual-graph Add Context from orphaning nodes/edges
  * when the generated mental model is already present on Hindsight.
+ *
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {Object} model
+ * @param {Object} [db] - Optional database connection; if provided, pending rows are created for async tracking.
+ * @returns {Promise<{success: boolean, operationId?: string|null, status?: string|null, popId?: number|null, error?: string}>}
  */
-export async function createMentalModel(serverId, bankId, model) {
+export async function createMentalModel(serverId, bankId, model, db) {
   const setup = await getConfig(serverId, bankId, model, 'Creating');
   if (!setup.success) return setup;
 
@@ -145,7 +206,7 @@ export async function createMentalModel(serverId, bankId, model) {
 
       if (isConflictResponse(response.status, errorText)) {
         logger.info('Hindsight createMentalModel conflict; falling back to PATCH', { serverId, bankId, extId: model.ext_id, status: response.status });
-        return pushMentalModel(serverId, bankId, model);
+        return pushMentalModel(serverId, bankId, model, db);
       }
 
       logger.error('Hindsight createMentalModel failed', { serverId, bankId, extId: model.ext_id, status: response.status, error: preview });
@@ -153,7 +214,18 @@ export async function createMentalModel(serverId, bankId, model) {
     }
 
     logger.info('Hindsight createMentalModel OK', { serverId, bankId, extId: model.ext_id });
-    return { success: true };
+    const data = await response.json().catch(() => ({}));
+    const operationId = data.operation_id || data.operationId || null;
+    const status = data.status || null;
+
+    const tracking = trackPendingOperation(db, serverId, bankId, model.ext_id, operationId, status, 'push');
+
+    return {
+      success: true,
+      operationId,
+      status,
+      popId: tracking.popId ?? null,
+    };
   } catch (error) {
     logger.error('Hindsight createMentalModel error', { serverId, bankId, extId: model.ext_id, error: error.message });
     return { success: false, error: error.message };
