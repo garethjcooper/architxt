@@ -16,7 +16,6 @@ const DEFAULT_NEIGHBORHOOD = {
   top_k_neighbors: 5,
   min_weight: 0,
   min_count: 1,
-  run_discovery: true,
 };
 
 /**
@@ -39,10 +38,13 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {Object} [options]
  * @param {number} [options.min_count] - passed to Hindsight /entities/graph
  * @param {number} [options.min_weight] - minimum edge weight to import
+ * @param {string[]} [options.node_ids] - explicit subset of working-graph nodes to contextualize
+ * @param {boolean} [options.run_discovery] - whether to run discovery around seeds/subset
+ * @param {boolean} [options.import_skeleton] - whether to re-import the Hindsight skeleton first
  * @param {string[]} [options.seed_node_ids] - manual seed nodes to discover around
  * @param {Object} [options.neighborhood] - discovery scope
  * @param {number} [options.neighborhood.top_k_neighbors]
- * @param {boolean} [options.neighborhood.run_discovery]
+ * @param {boolean} [options.run_discovery] - deprecated alias for top-level option
  * @param {Function} [options.fetchGraph] - override for testing
  * @param {Function} [options.runDiscovery] - override for testing; receives spec, returns { candidates }
  * @param {Function} [options.deployBatch] - override for testing; receives (db, serverId, bankId, specs)
@@ -58,18 +60,29 @@ export async function addContext(
     return { success: false, error: 'server_id and bank_id are required', code: 'MISSING_PARAMS' };
   }
 
+  const importSkeleton = options.import_skeleton !== false;
+  let runDiscovery = options.run_discovery !== false;
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
+  if (options.neighborhood?.run_discovery !== undefined) {
+    // Deprecated nesting: top-level option wins.
+    if (options.run_discovery === undefined) {
+      runDiscovery = options.neighborhood.run_discovery;
+    }
+  }
 
-  // Step 1: import current Hindsight skeleton.
-  const importResult = await importHindsightSkeleton(
-    db,
-    serverId,
-    bankId,
-    { min_count: options.min_count, min_weight: options.min_weight },
-    options.fetchGraph,
-  );
-  if (!importResult.success) {
-    return importResult;
+  // Step 1: optionally import current Hindsight skeleton.
+  let importResult = { success: true, imported: { nodes: 0, edges: 0 } };
+  if (importSkeleton) {
+    importResult = await importHindsightSkeleton(
+      db,
+      serverId,
+      bankId,
+      { min_count: options.min_count, min_weight: options.min_weight },
+      options.fetchGraph,
+    );
+    if (!importResult.success) {
+      return importResult;
+    }
   }
 
   // Step 2: load existing working graph.
@@ -83,9 +96,22 @@ export async function addContext(
 
   const existingNodeIds = new Set(existingNodes.map((n) => n.cgn_id));
 
+  // Subset filter. If node_ids is provided, only operate on those nodes and
+  // edges whose both endpoints are in the subset.
+  const subsetNodeIds = Array.isArray(options.node_ids)
+    ? new Set(options.node_ids.filter((id) => existingNodeIds.has(id)))
+    : null;
+  const inSubset = (id) => (subsetNodeIds ? subsetNodeIds.has(id) : true);
+  const filteredNodes = subsetNodeIds
+    ? existingNodes.filter((n) => subsetNodeIds.has(n.cgn_id))
+    : existingNodes;
+  const filteredEdges = subsetNodeIds
+    ? existingEdges.filter((e) => subsetNodeIds.has(e.cge_source_id) && subsetNodeIds.has(e.cge_target_id))
+    : existingEdges;
+
   // Step 3: derive entity-ctx models for active nodes without an entity-ctx ref.
   const entitySpecs = [];
-  for (const node of existingNodes) {
+  for (const node of filteredNodes) {
     if (hasModelRef(node.cgn_properties, 'entity-ctx')) continue;
     if (!node.cgn_labels?.includes('active')) continue;
 
@@ -99,15 +125,15 @@ export async function addContext(
   // Step 4: derive edge-ctx models for active undirected edge pairs without an edge-ctx ref.
   const edgeSpecs = [];
   const seenEdgePairs = new Set();
-  for (const edge of existingEdges) {
+  for (const edge of filteredEdges) {
     if (hasModelRef(edge.cge_properties, 'edge-ctx')) continue;
 
     // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
     // candidate hypotheses). Directed edges are produced by edge-ctx itself.
     if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
 
-    const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active'));
-    const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active'));
+    const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active') && inSubset(n.cgn_id));
+    const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active') && inSubset(n.cgn_id));
     if (!sourceActive || !targetActive) continue;
 
     const pk = pairKey(edge.cge_source_id, edge.cge_target_id);
@@ -133,18 +159,18 @@ export async function addContext(
 
   if (Array.isArray(options.seed_node_ids)) {
     for (const seedId of options.seed_node_ids) {
-      if (existingNodeIds.has(seedId)) discoverQueue.add(seedId);
+      if (existingNodeIds.has(seedId) && inSubset(seedId)) discoverQueue.add(seedId);
     }
   }
 
-  if (neighborhood.run_discovery) {
+  if (runDiscovery) {
     const nodeDegrees = new Map();
-    for (const edge of existingEdges) {
+    for (const edge of filteredEdges) {
       nodeDegrees.set(edge.cge_source_id, (nodeDegrees.get(edge.cge_source_id) || 0) + 1);
       nodeDegrees.set(edge.cge_target_id, (nodeDegrees.get(edge.cge_target_id) || 0) + 1);
     }
 
-    const ranked = existingNodes
+    const ranked = filteredNodes
       .filter((n) => n.cgn_labels?.includes('uncanonical') || n.cgn_labels?.includes('active'))
       .map((n) => ({ id: n.cgn_id, degree: nodeDegrees.get(n.cgn_id) || 0 }))
       .sort((a, b) => b.degree - a.degree)
@@ -157,7 +183,7 @@ export async function addContext(
 
   for (const seedId of discoverQueue) {
     const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
-    const neighbors = existingEdges
+    const neighbors = filteredEdges
       .filter((e) => e.cge_source_id === seedId || e.cge_target_id === seedId)
       .map((e) => (e.cge_source_id === seedId ? e.cge_target_id : e.cge_source_id))
       .slice(0, neighborhood.top_k_neighbors);
@@ -168,7 +194,7 @@ export async function addContext(
     }, neighbors, Date.now(), bankId);
     discoverSpecs.push(spec);
 
-    if (neighborhood.run_discovery) {
+    if (runDiscovery) {
       const discoveryFn = typeof options.runDiscovery === 'function'
         ? options.runDiscovery
         : defaultRunDiscovery;
@@ -179,7 +205,7 @@ export async function addContext(
           serverId,
           bankId,
           discoveryResult.candidates,
-          { seedId, existingNodes, existingEdges },
+          { seedId, existingNodes: filteredNodes, existingEdges: filteredEdges },
         );
         entitySpecs.push(...candidateSpecs.entity);
         edgeSpecs.push(...candidateSpecs.edge);
