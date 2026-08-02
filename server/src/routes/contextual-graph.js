@@ -415,8 +415,8 @@ export function createContextualGraphRouter({
     const responseData = {
       success: result.success,
       dry_run: dryRun,
-      total: result.deleted?.length ?? 0,
-      ids: result.deleted ?? [],
+      total: (dryRun ? result.ext_ids?.length : result.deleted?.length) ?? 0,
+      ids: dryRun ? (result.ext_ids ?? []) : (result.deleted ?? []),
       failed: result.failed ?? [],
       cleared: result.cleared ?? { nodes: 0, edges: 0 },
     };

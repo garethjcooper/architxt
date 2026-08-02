@@ -47,12 +47,16 @@ async function fetchApi<T>(
     return undefined as T;
   }
 
-  const data = await response.json().catch((err) => {
-    throw new ApiError(
-      `Invalid JSON response from ${endpoint}: ${err.message}`,
-      response.status,
-      'INVALID_JSON'
-    );
+  const data = await response.text().then((text) => {
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch (err) {
+      throw new ApiError(
+        `Invalid JSON response from ${endpoint}: ${(err as Error).message}. Body: ${text.slice(0, 200)}`,
+        response.status,
+        'INVALID_JSON'
+      );
+    }
   });
 
   if (!response.ok) {

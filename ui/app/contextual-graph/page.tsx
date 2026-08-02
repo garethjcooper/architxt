@@ -297,7 +297,7 @@ export default function ContextualGraphPage() {
       const result = await contextualGraphApi.deleteGenerated(serverId, bankId, { dry_run: true });
       setDeleteGeneratedDryRun(result);
     } catch (err: any) {
-      logger.error('Failed to preview generated-model deletion', { error: err, serverId, bankId });
+      logger.error('Failed to preview generated-model deletion', { error: err instanceof Error ? err.message : String(err), serverId, bankId });
       addLog(`Generated-model preview error: ${err.message || err}`, 'error');
       setDeleteGeneratedDryRun({ success: false, dry_run: true, total: 0, error: err.message || String(err) });
     }
@@ -792,8 +792,8 @@ export default function ContextualGraphPage() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-white/70 py-2">
-            This deletes generated mental models (<span className="font-mono text-white">entity-ctx-*</span>,
-            <span className="font-mono text-white">edge-ctx-*</span>, and
+            This deletes generated mental models (<span className="font-mono text-white">entity-ctx-*</span>,{' '}
+            <span className="font-mono text-white">edge-ctx-*</span>, and{' '}
             <span className="font-mono text-white">discover-*</span>) from Hindsight and clears their
             references from the local working graph for
             <span className="text-white font-mono"> {bankId || 'this bank'}</span>.
