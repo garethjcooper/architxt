@@ -62,12 +62,48 @@ interface GraphEdge {
   properties: Record<string, any>;
 }
 
+interface ModelRef {
+  role?: string;
+  ext_id?: string;
+  attached_at?: string;
+}
+
 interface LogEntry {
   id: string;
   time: string;
   message: string;
   type: 'info' | 'success' | 'error' | 'warning';
   details?: any;
+}
+
+function getModelRefs(properties?: Record<string, any>): ModelRef[] {
+  const refs = properties?.provenance?.model_refs;
+  return Array.isArray(refs) ? refs.filter((r) => r?.ext_id) : [];
+}
+
+function roleColor(role?: string): string {
+  if (role?.startsWith('entity-ctx')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+  if (role?.startsWith('edge-ctx')) return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+  if (role?.startsWith('discover-ctx')) return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+  return 'bg-white/10 text-white/80';
+}
+
+function ModelRefBadges({ refs }: { refs: ModelRef[] }) {
+  if (refs.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {refs.map((ref, idx) => (
+        <Badge
+          key={`${ref.ext_id}-${idx}`}
+          variant="secondary"
+          className={`text-[10px] ${roleColor(ref.role)}`}
+          title={`${ref.role || 'model'} • ${ref.ext_id}${ref.attached_at ? ` • attached ${ref.attached_at}` : ''}`}
+        >
+          {ref.ext_id}
+        </Badge>
+      ))}
+    </div>
+  );
 }
 
 export default function ContextualGraphPage() {
@@ -627,6 +663,7 @@ export default function ContextualGraphPage() {
                     </TableHead>
                     <TableHead className="text-white/50">ID</TableHead>
                     <TableHead className="text-white/50">Labels</TableHead>
+                    <TableHead className="text-white/50">Model refs</TableHead>
                     <TableHead className="text-white/50">Properties</TableHead>
                     <TableHead className="text-white/50 w-[100px]">Actions</TableHead>
                   </TableRow>
@@ -634,7 +671,7 @@ export default function ContextualGraphPage() {
                 <TableBody>
                   {nodes.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-white/40 py-8">
+                      <TableCell colSpan={6} className="text-center text-white/40 py-8">
                         No nodes for this scope. Import a skeleton or add one manually.
                       </TableCell>
                     </TableRow>
@@ -661,7 +698,10 @@ export default function ContextualGraphPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <pre className="text-[10px] text-white/60 max-w-[300px] truncate">
+                        <ModelRefBadges refs={getModelRefs(node.properties)} />
+                      </TableCell>
+                      <TableCell>
+                        <pre className="text-[10px] text-white/60 max-w-[250px] truncate">
                           {JSON.stringify(node.properties)}
                         </pre>
                       </TableCell>
@@ -704,6 +744,7 @@ export default function ContextualGraphPage() {
                     <TableHead className="text-white/50">Source</TableHead>
                     <TableHead className="text-white/50">Target</TableHead>
                     <TableHead className="text-white/50">Type</TableHead>
+                    <TableHead className="text-white/50">Model refs</TableHead>
                     <TableHead className="text-white/50">Properties</TableHead>
                     <TableHead className="text-white/50 w-[100px]">Actions</TableHead>
                   </TableRow>
@@ -711,7 +752,7 @@ export default function ContextualGraphPage() {
                 <TableBody>
                   {edges.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-white/40 py-8">
+                      <TableCell colSpan={7} className="text-center text-white/40 py-8">
                         No edges for this scope. Import a skeleton or add one manually.
                       </TableCell>
                     </TableRow>
@@ -729,7 +770,10 @@ export default function ContextualGraphPage() {
                       </TableCell>
                       <TableCell className="text-xs text-white/70">{edge.type || '-'}</TableCell>
                       <TableCell>
-                        <pre className="text-[10px] text-white/60 max-w-[250px] truncate">
+                        <ModelRefBadges refs={getModelRefs(edge.properties)} />
+                      </TableCell>
+                      <TableCell>
+                        <pre className="text-[10px] text-white/60 max-w-[200px] truncate">
                           {JSON.stringify(edge.properties)}
                         </pre>
                       </TableCell>
