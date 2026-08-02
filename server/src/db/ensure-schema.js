@@ -318,8 +318,8 @@ const BUILTIN_TEMPLATES = [
   {
     name: 'entity-ctx',
     mode: 'entity-ctx',
-    description: 'Contextual graph entity-context template.',
-    body: 'You are an architectural context extractor. Given the entity below, return a concise JSON summary with aliases, artifacts, mentions, summary, and evidence.\n\n## Entity\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    description: 'System template: enrich one contextual-graph node with aliases, artifacts, mentions, summary, and evidence.',
+    body: 'You are an architectural context extractor. Your task is to enrich a single entity from the source material.\n\n## Entity\n\n{{ARCHITXT_TOPIC}}\n\n## Instructions\n\nReturn ONLY a JSON object with this exact shape (no markdown fences, no extra prose):\n\n{\n  "aliases": ["alternate name 1", "abbreviation"],\n  "artifacts": [\n    {\n      "name": "artifact name",\n      "artifact_type": "endpoint|table|file|function|schema|event|queue|dependency",\n      "evidence": ["memory-id"]\n    }\n  ],\n  "mentions": [\n    {\n      "node_id": "id of a related node",\n      "context": "brief co-occurrence context",\n      "evidence": ["memory-id"]\n    }\n  ],\n  "summary": "evidence-backed summary of the entity",\n  "evidence": ["memory-id-1", "memory-id-2"]\n}\n\nUse stable lower-kebab-case for any IDs you create. Only include facts supported by the source material. Empty arrays are acceptable if no evidence exists.\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
     fragments: '[]',
     variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
@@ -327,8 +327,8 @@ const BUILTIN_TEMPLATES = [
   {
     name: 'edge-ctx',
     mode: 'edge-ctx',
-    description: 'Contextual graph edge-context template.',
-    body: 'You are an architectural relationship extractor. Given the two related entities below, return a JSON list of directed relationships with type, source_id, target_id, confidence, label, and evidence.\n\n## Relationship\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    description: 'System template: characterize directed relationships between two contextual-graph nodes.',
+    body: 'You are an architectural relationship extractor. Your task is to characterize the relationship between two entities from the source material.\n\n## Relationship\n\n{{ARCHITXT_TOPIC}}\n\n## Instructions\n\nReturn ONLY a JSON object with this exact shape (no markdown fences, no extra prose):\n\n{\n  "relationships": [\n    {\n      "type": "calls|sends|reads|writes|depends-on",\n      "source_id": "source node id",\n      "target_id": "target node id",\n      "confidence": 0.85,\n      "label": "human-readable label",\n      "evidence": ["memory-id"]\n    }\n  ]\n}\n\nEmit one record per distinct directed interaction. If the interaction is bidirectional, emit two records with reversed source_id and target_id. Confidence must be a number between 0 and 1. Use only stable lower-kebab-case IDs.\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
     fragments: '[]',
     variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
@@ -336,8 +336,8 @@ const BUILTIN_TEMPLATES = [
   {
     name: 'discover-ctx',
     mode: 'discover-ctx',
-    description: 'Contextual graph discovery template.',
-    body: 'You are an architectural discovery assistant. Given the seed entity and its neighbors below, suggest new candidate nodes and hypothesized edges. Return JSON with candidates containing id, summary, and hypothesized_edges.\n\n## Seed\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    description: 'System template: suggest new contextual-graph nodes and edges around a seed node.',
+    body: 'You are an architectural discovery assistant. Your task is to suggest new named architectural elements and their relationships around a seed entity from the source material.\n\n## Seed\n\n{{ARCHITXT_TOPIC}}\n\n## Instructions\n\nReturn ONLY a JSON object with this exact shape (no markdown fences, no extra prose):\n\n{\n  "candidates": [\n    {\n      "id": "stable-normalized-id",\n      "summary": "short evidence-backed summary of the candidate",\n      "hypothesized_edges": [\n        {\n          "target": "id of an existing related node",\n          "type": "calls|sends|reads|writes|depends-on|co-occurs",\n          "evidence": "memory-id or short corpus evidence"\n        }\n      ]\n    }\n  ]\n}\n\nCandidate IDs must be lower-kebab-case and stable across runs. Only suggest persistent named architectural elements (services, APIs, tables, queues, schemas, files). Do not suggest transient variables, generic concepts, or entities already listed as direct neighbors of the seed. Each hypothesized edge must point to an existing neighbor of the seed.\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
     fragments: '[]',
     variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
@@ -487,10 +487,11 @@ function backfillUserTemplateRoles(db) {
 }
 
 /**
- * Ensure the built-in contextual-graph system mental-model templates exist.
- * These are template rows (mm_is_template = 'true') with a reserved system role.
- * They are never derived from mental_model_entities; instead add-context derives
- * instances from the working graph.
+ * System-owned contextual-graph mental-model templates.
+ *
+ * These rows are identified by mm_template_role, not by tags. They are never
+ * derived from mental_model_entities; add-context renders instances from the
+ * working graph and pushes them directly to Hindsight.
  */
 const CONTEXTUAL_GRAPH_TEMPLATES = [
   {
@@ -499,9 +500,8 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_entity_context',
     returns: 'entity-ctx',
     dimension: 'contextual-graph',
-    sourceQuery: 'Return a concise JSON summary for entity {entity-id} ({entity-name}). Include aliases, artifacts, mentions, summary, and evidence.',
+    sourceQuery: 'Entity: {entity-id} ({entity-name}). Return a concise JSON summary with aliases, artifacts, mentions, summary, and evidence.',
     maxTokens: 4096,
-    tags: ['contextual-graph', 'entity-ctx'],
   },
   {
     extId: 'edge-ctx-{source-id}|{target-id}',
@@ -509,9 +509,8 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_edge_context',
     returns: 'edge-ctx',
     dimension: 'contextual-graph',
-    sourceQuery: 'Return a JSON list of directed relationships between {source-id} ({source-name}) and {target-id} ({target-name}). Include type, source_id, target_id, confidence, label, and evidence.',
+    sourceQuery: 'Relationship between {source-id} ({source-name}) and {target-id} ({target-name}). Return a JSON list of directed relationships with type, source_id, target_id, confidence, label, and evidence.',
     maxTokens: 4096,
-    tags: ['contextual-graph', 'edge-ctx'],
   },
   {
     extId: 'discover-{seed-id}-{batch}',
@@ -519,9 +518,8 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_discovery_context',
     returns: 'discover-ctx',
     dimension: 'contextual-graph',
-    sourceQuery: 'Given seed entity {seed-id} ({seed-name}) and its neighbors, suggest new candidate nodes and hypothesized edges. Return JSON with candidates containing id, summary, and hypothesized_edges.',
+    sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest new candidate nodes and hypothesized edges. Return JSON with candidates containing id, summary, and hypothesized_edges.',
     maxTokens: 4096,
-    tags: ['contextual-graph', 'discover-ctx'],
   },
 ];
 
@@ -546,35 +544,10 @@ function ensureContextualGraphTemplates(db) {
       mm_dimension = excluded.mm_dimension,
       mm_max_tokens = excluded.mm_max_tokens
   `);
-  const tagInsert = db.prepare(`INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)`);
-  const getMmId = db.prepare('SELECT mm_id FROM mental_models WHERE mm_ext_id = ?');
-  const tagIdByName = db.prepare('SELECT tag_id FROM tags WHERE tag_name = ?');
-  const createTagStmt = db.prepare(`INSERT INTO tags (tag_name, tag_generated_by) VALUES (?, ?)`);
 
   for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
     try {
       upsert.run(t.extId, t.name, t.sourceQuery, t.role, t.returns, t.dimension, t.maxTokens);
-      // lastInsertRowid is unreliable for upserts (0 on UPDATE path), so look it up.
-      const mmId = getMmId.pluck().get(t.extId);
-      if (!mmId) {
-        throw new Error(`Template row missing after upsert: ${t.extId}`);
-      }
-
-      for (const tagName of t.tags) {
-        // Use db.prepare directly instead of getTagByName/createTag because the
-        // global stmt cache is keyed by SQL only and can return statements
-        // bound to a different database instance when tests use multiple DBs.
-        let tagId = tagIdByName.pluck().get(tagName);
-        if (!tagId) {
-          const created = createTagStmt.run(tagName, 'import');
-          tagId = created.lastInsertRowid;
-        }
-        if (tagId) {
-          tagInsert.run(mmId, tagId);
-        } else {
-          logger.warn('Could not create contextual-graph template tag', { extId: t.extId, tagName });
-        }
-      }
 
       if (!existingByExtId.has(t.extId) || !existingRoles.has(t.role)) {
         seeded++;

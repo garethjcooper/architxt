@@ -14,7 +14,12 @@ const VALID_MODES = new Set([
   'narrative-graph-known',
   'narrative-graph-discovery',
   'narrative-graph-discovered-only',
+  'entity-ctx',
+  'edge-ctx',
+  'discover-ctx',
 ]);
+
+const CONTEXTUAL_MODES = new Set(['entity-ctx', 'edge-ctx', 'discover-ctx']);
 
 /**
  * Load a prompt template row from the database by name.
@@ -168,6 +173,17 @@ function formatNodeExamples({ include, exclude }) {
  * @returns {Promise<string>}
  */
 export async function composeMentalModelPrompt(db, templateName, topic) {
+  if (CONTEXTUAL_MODES.has(templateName)) {
+    const template = getTemplateByName(db, templateName);
+    if (!template) {
+      throw new Error(`Prompt template not found: ${templateName}`);
+    }
+    const { prompt } = composePrompt(template, {
+      ARCHITXT_TOPIC: topic || '',
+    });
+    return prompt;
+  }
+
   const { prompt } = await loadAndComposeWithCatalog(db, templateName, {
     ARCHITXT_TOPIC: topic || '',
   });
@@ -190,10 +206,6 @@ export async function composeMentalModelPromptBatch(db, items) {
     return [];
   }
 
-  // Shared, expensive lookups done exactly once.
-  const entityCatalog = await buildEntityCatalogVariable(db);
-  let entities = null; // only loaded if a template needs heuristic examples
-
   const templatesByName = new Map();
   const examplesByTemplate = new Map();
 
@@ -204,6 +216,11 @@ export async function composeMentalModelPromptBatch(db, items) {
     if (template) templatesByName.set(name, template);
   }
 
+  // Shared, expensive lookups done exactly once, and only if a non-contextual
+  // template actually needs them.
+  let entityCatalog = null;
+  let entities = null;
+
   const results = [];
   for (const item of items) {
     const template = templatesByName.get(item.returns);
@@ -213,25 +230,33 @@ export async function composeMentalModelPromptBatch(db, items) {
     }
 
     try {
-      let examples = '';
-      if (template.pt_examples_heuristic) {
-        if (!examplesByTemplate.has(template.pt_name)) {
-          if (entities === null) {
-            entities = await loadEntityCatalog(db);
-          }
-          const result = applyHeuristic(template.pt_examples_heuristic, entities);
-          examples = formatNodeExamples(result);
-          examplesByTemplate.set(template.pt_name, examples);
-        } else {
-          examples = examplesByTemplate.get(template.pt_name);
+      const variables = {
+        ARCHITXT_TOPIC: item.source_query || '',
+      };
+
+      if (!CONTEXTUAL_MODES.has(item.returns)) {
+        if (entityCatalog === null) {
+          entityCatalog = await buildEntityCatalogVariable(db);
         }
+        variables.ARCHITXT_ENTITIES = entityCatalog;
+
+        let examples = '';
+        if (template.pt_examples_heuristic) {
+          if (!examplesByTemplate.has(template.pt_name)) {
+            if (entities === null) {
+              entities = await loadEntityCatalog(db);
+            }
+            const result = applyHeuristic(template.pt_examples_heuristic, entities);
+            examples = formatNodeExamples(result);
+            examplesByTemplate.set(template.pt_name, examples);
+          } else {
+            examples = examplesByTemplate.get(template.pt_name);
+          }
+        }
+        variables.ARCHITXT_NODE_EXAMPLES = examples;
       }
 
-      const { prompt } = composePrompt(template, {
-        ARCHITXT_ENTITIES: entityCatalog,
-        ARCHITXT_NODE_EXAMPLES: examples,
-        ARCHITXT_TOPIC: item.source_query || '',
-      });
+      const { prompt } = composePrompt(template, variables);
       results.push({ composed_query: prompt });
     } catch (err) {
       logger.warn('Failed to compose mental model prompt in batch', {
