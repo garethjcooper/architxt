@@ -271,7 +271,10 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
 
   if (modelId.startsWith('edge-ctx-')) {
     const pairPart = modelId.slice('edge-ctx-'.length);
-    const edge = existingEdges.find((e) => pairKey(e.cge_source_id, e.cge_target_id) === pairPart);
+    const edge = existingEdges.find((e) => {
+      const raw = `${e.cge_source_id}|${e.cge_target_id}`;
+      return raw === pairPart || pairKey(e.cge_source_id, e.cge_target_id) === pairPart;
+    });
     if (!edge) return;
 
     const properties = mergeProperties(edge.cge_properties, modelId, role, now);
