@@ -18,6 +18,7 @@ import configRoute from './routes/config.js';
 import mentalModelsRoute from './routes/mental-models.js';
 import directivesRoute from './routes/directives.js';
 import researchRoute from './routes/research.js';
+import contextualGraphRoute from './routes/contextual-graph.js';
 import swaggerSpecs, { swaggerUi } from './swagger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -187,6 +188,7 @@ app.use('/api/v1/config', configRoute);
 app.use('/api/v1/mentalmodels', mentalModelsRoute);
 app.use('/api/v1/directives', directivesRoute);
 app.use('/api/v1/research', researchRoute);
+app.use('/api/v1/contextual-graph', contextualGraphRoute);
 
 // Health check
 app.get('/health', (req, res) => {
