@@ -65,8 +65,8 @@ export async function importHindsightSkeleton(
 
     const isCanonical = resolved.taxonomy === 'canonical';
     const labels = isCanonical
-      ? ['canonical', 'active']
-      : ['uncanonical', 'grounded', 'active'];
+      ? ['canonical', 'active', resolved.typeLabel].filter(Boolean)
+      : ['uncanonical', 'grounded', 'active', resolved.typeLabel].filter(Boolean);
 
     const properties = {
       display_name: resolved.displayName,

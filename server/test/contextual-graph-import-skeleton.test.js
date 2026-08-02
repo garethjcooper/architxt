@@ -91,7 +91,7 @@ describe('importHindsightSkeleton', () => {
 
     const canonical = getNode(db, serverId, 'Mozart-API', 'SVC-005').data;
     assert.equal(canonical.cgn_id, 'SVC-005');
-    assert.deepEqual(canonical.cgn_labels, ['canonical', 'active']);
+    assert.deepEqual(canonical.cgn_labels, ['canonical', 'active', 'svc']);
     assert.equal(canonical.cgn_properties.provenance.source, 'hindsight');
 
     const uncanonical = getNode(db, serverId, 'Mozart-API', 'uncanonical:payment-gateway').data;
@@ -136,6 +136,7 @@ describe('importHindsightSkeleton', () => {
 
     const ghost = getNode(db, serverId, 'Mozart-API', 'uncanonical:unknown-ghost-001').data;
     assert.equal(ghost.cgn_labels.includes('grounded'), true);
+    assert.equal(ghost.cgn_labels.includes('unknown'), true);
     assert.equal(ghost.cgn_properties.display_name, 'unknown:GHOST-001');
   });
 
