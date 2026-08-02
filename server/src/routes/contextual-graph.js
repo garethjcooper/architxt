@@ -262,6 +262,9 @@ export function createContextualGraphRouter({
    *               bank_id: { type: string }
    *               min_count: { type: integer }
    *               min_weight: { type: number }
+   *               import_skeleton: { type: boolean, default: true }
+   *               run_discovery: { type: boolean, default: true }
+   *               node_ids: { type: array, items: { type: string } }
    *               seed_node_ids: { type: array, items: { type: string } }
    *               neighborhood:
    *                 type: object
@@ -285,7 +288,13 @@ export function createContextualGraphRouter({
       min_count: parseIntParam(req.body.min_count),
       min_weight: typeof req.body.min_weight === 'number' ? req.body.min_weight : undefined,
       neighborhood: req.body.neighborhood,
+      import_skeleton: parseBoolParam(req.body.import_skeleton),
+      run_discovery: parseBoolParam(req.body.run_discovery),
     };
+
+    if (Array.isArray(req.body.node_ids)) {
+      options.node_ids = req.body.node_ids.filter((id) => typeof id === 'string');
+    }
 
     if (Array.isArray(req.body.seed_node_ids)) {
       options.seed_node_ids = req.body.seed_node_ids.filter((id) => typeof id === 'string');

@@ -41,6 +41,46 @@ const VALID_DETAIL_LEVELS = new Set(['metadata', 'content', 'full']);
  * @returns {Promise<{success: boolean, mentalModels?: Array, total?: number, error?: string}>}
  */
 /**
+ * Delete a mental model from Hindsight - DELETE {server_url}/v1/default/banks/{bank_id}/mental-models/{ext_id}
+ *
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {string} extId
+ * @param {Object} [options]
+ * @param {number} [options.timeoutMs]
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function deleteMentalModel(serverId, bankId, extId, options = {}) {
+  const configResult = await getServerConfig(serverId);
+  if (!configResult.success) return configResult;
+  if (!bankId) return { success: false, error: 'bankId is required' };
+  if (!extId) return { success: false, error: 'extId is required' };
+
+  const { serviceUrl } = configResult.config;
+  const url = `${serviceUrl}/v1/default/banks/${encodeURIComponent(bankId)}/mental-models/${encodeURIComponent(extId)}`;
+
+  try {
+    const response = await fetchWithTimeout(url, {
+      method: 'DELETE',
+      headers: buildHeaders(configResult.config),
+    }, options.timeoutMs);
+
+    // Hindsight returns 204 on success; treat 404 as success (already gone).
+    if (!response.ok && response.status !== 404) {
+      const errorText = await response.text();
+      logger.error('Hindsight deleteMentalModel failed', { serverId, bankId, extId, status: response.status, error: errorText });
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+    }
+
+    logger.info('Hindsight deleteMentalModel OK', { serverId, bankId, extId, status: response.status });
+    return { success: true };
+  } catch (error) {
+    logger.error('Hindsight deleteMentalModel error', { serverId, bankId, extId, error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Refresh a mental model - POST {server_url}/v1/default/banks/{bank_id}/mental-models/{mental_model_id}/refresh
  *
  * @param {number} serverId - Server ID from servers table
