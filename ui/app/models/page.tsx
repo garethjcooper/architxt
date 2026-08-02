@@ -291,7 +291,11 @@ function ModelsPageContent() {
                       </TableCell>
                       <TableCell className="py-1.5 px-4 font-mono text-xs">{model.id}</TableCell>
                       <TableCell className="py-1.5 px-4 text-xs">
-                        {model.is_template ? (
+                        {model.is_system_template ? (
+                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-slate-700/40 text-white/70 border-slate-600">
+                            System
+                          </Badge>
+                        ) : model.is_template ? (
                           <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-purple-800/15 text-purple-400 border-purple-700/20">
                             Template
                           </Badge>

@@ -118,6 +118,7 @@ function buildDerivedRow(
     returns: baseConfig.returns,
     concatenation: baseConfig.concatenation,
     is_template: false,
+    is_system_template: false,
     is_derived: true,
     derived_entity: entity,
     tags: [],
@@ -273,13 +274,16 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     concatenation !== (model.concatenation ?? 'compile') ||
     derivedChanged;
 
+  const isSystemTemplate = model.is_system_template;
+
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
+    if (isSystemTemplate) return null;
     if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(model.ext_id ?? '')) {
       return 'Template mode requires a supported placeholder in External ID. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.';
     }
     return null;
-  }, [isTemplate, model.ext_id]);
+  }, [isTemplate, isSystemTemplate, model.ext_id]);
 
   const willDisableTemplateOnSave =
     model.is_template === true && isTemplate === false && (model.entities?.length ?? 0) > 0;
@@ -336,6 +340,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleIsTemplateChange = (value: boolean) => {
+    if (isSystemTemplate) return;
     setIsTemplate(value);
     if (value && derived.length === 0) {
       setDerived(buildDerivedRows(model, baseConfig));
@@ -343,16 +348,19 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleDimensionChange = (value: string) => {
+    if (isSystemTemplate) return;
     setDimension(value);
     setDerived((prev) => prev.map((d) => ({ ...d, dimension: value.trim() || null })));
   };
 
   const handleReturnsChange = (value: MentalModelReturns) => {
+    if (isSystemTemplate) return;
     setReturns(value);
     setDerived((prev) => prev.map((d) => ({ ...d, returns: value })));
   };
 
   const handleConcatenationChange = (value: 'merge' | 'compile') => {
+    if (isSystemTemplate) return;
     setConcatenation(value);
     setDerived((prev) => prev.map((d) => ({ ...d, concatenation: value })));
   };
@@ -451,13 +459,20 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       <div className="space-y-6 shrink-0">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
+              {isSystemTemplate && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-700/40 text-white/70 border-slate-600">
+                  System template
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
             {templateValidation && (
               <p className="text-[10px] text-red-400 mt-0.5">{templateValidation}</p>
             )}
           </div>
-          <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} />
+          <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} disabled={isSystemTemplate} />
         </div>
 
         {!isTemplate && (
@@ -470,7 +485,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                 id="mm-detail-dimension"
                 value={dimension}
                 onChange={(e) => handleDimensionChange(e.target.value)}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                disabled={isSystemTemplate}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {standardDimensions.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
@@ -485,7 +501,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                 id="mm-detail-returns"
                 value={returns}
                 onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                disabled={isSystemTemplate}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -500,7 +517,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                 id="mm-detail-concatenation"
                 value={concatenation}
                 onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                disabled={isSystemTemplate}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="merge">Merge</option>
                 <option value="compile">Compile</option>
