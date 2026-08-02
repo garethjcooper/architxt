@@ -79,7 +79,7 @@ export function extractModelRefs(graph, options = {}) {
 
   for (const edge of edges) {
     const id = edge.id ?? edge.cge_id;
-    const properties = edge.properties ?? edge.cge_properties;
+    const properties = edge.cge_properties ?? edge.properties;
     const refs = extractRefsFromProperties(properties, options);
     if (refs.length > 0) {
       byEdgeId.set(id, refs);
