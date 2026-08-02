@@ -11,6 +11,7 @@ import {
   getEdge,
   upsertEdge,
   deleteEdge,
+  deleteAllContextualGraphNodesAndEdges,
 } from '../db/crud/contextual-graph.js';
 import { importHindsightSkeleton as defaultImportSkeleton } from '../services/contextual-graph/import-hindsight-skeleton.js';
 import { addContext as defaultAddContext } from '../services/contextual-graph/add-context.js';
@@ -317,6 +318,49 @@ export function createContextualGraphRouter({
         deployed: result.deployed,
         failed: result.failed,
       },
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/clear:
+   *   post:
+   *     summary: Delete every working-graph node and edge for a server/bank scope
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *     responses:
+   *       200: { description: Working graph cleared }
+   *       400: { description: Missing or invalid scope }
+   */
+  router.post('/clear', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const result = deleteAllContextualGraphNodesAndEdges(db, serverId, bankId);
+    const counts = result.success ? result.data : { nodes: 0, edges: 0 };
+
+    const duration = Date.now() - start;
+    logger.info('Cleared contextual graph', { serverId, bankId, nodes: counts.nodes, edges: counts.edges });
+
+    sendResponse({
+      res,
+      status: 200,
+      data: { success: true, cleared: counts },
       logger,
       method: req.method,
       path: req.path,

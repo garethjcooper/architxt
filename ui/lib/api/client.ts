@@ -1299,4 +1299,10 @@ export const contextualGraphApi = {
 
   deleteEdge: (id: string, serverId: number, bankId: string) =>
     fetchApi<void>(`/contextual-graph/edges/${encodeURIComponent(id)}?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}`, { method: 'DELETE' }),
+
+  clear: (serverId: number, bankId: string) =>
+    fetchApi<{ success: boolean; cleared?: { nodes: number; edges: number }; error?: string; code?: string }>('/contextual-graph/clear', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
 };
