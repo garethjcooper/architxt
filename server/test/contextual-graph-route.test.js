@@ -70,8 +70,9 @@ describe('contextual-graph route', () => {
         .send({ server_id: serverId, bank_id: bankId });
 
       assert.equal(res.status, 200);
-      assert.equal(res.body.nodes, 3);
-      assert.equal(res.body.edges, 2);
+      assert.equal(res.body.success, true);
+      assert.equal(res.body.imported.nodes, 3);
+      assert.equal(res.body.imported.edges, 2);
     });
 
     it('returns 502 when Hindsight import fails', async () => {
@@ -121,6 +122,7 @@ describe('contextual-graph route', () => {
         });
 
       assert.equal(res.status, 200);
+      assert.equal(res.body.success, true);
       assert.equal(res.body.queued.entity, 2);
       assert.equal(res.body.deployed.length, 3);
     });
