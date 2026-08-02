@@ -82,10 +82,10 @@ export async function addContext(
 
   const existingNodeIds = new Set(existingNodes.map((n) => n.cgn_id));
 
-  // Step 3: derive entity-ctx models for active nodes without provenance.
+  // Step 3: derive entity-ctx models for active nodes without an entity-ctx ref.
   const entitySpecs = [];
   for (const node of existingNodes) {
-    if (node.cgn_properties?.provenance?.model_id) continue;
+    if (hasModelRef(node.cgn_properties, 'entity-ctx')) continue;
     if (!node.cgn_labels?.includes('active')) continue;
 
     const spec = await deriveEntityContextModel(db, {
@@ -95,11 +95,11 @@ export async function addContext(
     entitySpecs.push(spec);
   }
 
-  // Step 4: derive edge-ctx models for active undirected edge pairs without provenance.
+  // Step 4: derive edge-ctx models for active undirected edge pairs without an edge-ctx ref.
   const edgeSpecs = [];
   const seenEdgePairs = new Set();
   for (const edge of existingEdges) {
-    if (edge.cge_properties?.provenance?.model_id) continue;
+    if (hasModelRef(edge.cge_properties, 'edge-ctx')) continue;
 
     // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
     // candidate hypotheses). Directed edges are produced by edge-ctx itself.
@@ -220,14 +220,19 @@ export async function addContext(
 }
 
 async function recordModelProvenance(db, serverId, bankId, modelId, existingNodes, existingEdges, now) {
-  const provenance = { model_id: modelId, source: 'contextual-graph', updated_at: now };
+  const role = modelIdToRole(modelId);
+  const provenance = {
+    model_id: modelId,
+    source: 'contextual-graph',
+    updated_at: now,
+  };
 
   if (modelId.startsWith('entity-ctx-')) {
     const nodeId = modelId.slice('entity-ctx-'.length);
     const node = existingNodes.find((n) => n.cgn_id === nodeId);
     if (!node) return;
 
-    const properties = mergeProperties(node.cgn_properties, provenance, now);
+    const properties = mergeProperties(node.cgn_properties, modelId, role, now);
     upsertNode(db, serverId, bankId, nodeId, node.cgn_labels, properties);
     return;
   }
@@ -237,16 +242,46 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
     const edge = existingEdges.find((e) => pairKey(e.cge_source_id, e.cge_target_id) === pairPart);
     if (!edge) return;
 
-    const properties = mergeProperties(edge.cge_properties, provenance, now);
+    const properties = mergeProperties(edge.cge_properties, modelId, role, now);
     upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
     return;
   }
 }
 
-function mergeProperties(current, provenance, now) {
+function hasModelRef(properties, rolePrefix) {
+  const refs = properties?.provenance?.model_refs;
+  if (Array.isArray(refs)) {
+    if (refs.some((ref) => ref?.role?.startsWith?.(rolePrefix))) return true;
+  }
+  // Backward compatibility: legacy single-model_id provenance.
+  const legacyModelId = properties?.provenance?.model_id;
+  if (legacyModelId && typeof legacyModelId === 'string') {
+    const legacyRole = modelIdToRole(legacyModelId);
+    return legacyRole.startsWith(rolePrefix);
+  }
+  return false;
+}
+
+function modelIdToRole(modelId) {
+  if (modelId.startsWith('entity-ctx-')) return 'entity-ctx';
+  if (modelId.startsWith('edge-ctx-')) return 'edge-ctx';
+  if (modelId.startsWith('discover-')) return 'discover-ctx';
+  return 'model';
+}
+
+function mergeProperties(current, modelId, role, now) {
+  const existingRefs = current?.provenance?.model_refs || [];
+  const dedupedRefs = existingRefs.filter((ref) => ref?.ext_id !== modelId);
+  const modelRefs = [...dedupedRefs, { role, ext_id: modelId, attached_at: now }];
   return {
     ...current,
-    provenance: { ...(current?.provenance || {}), ...provenance },
+    provenance: {
+      ...(current?.provenance || {}),
+      model_id: modelId,
+      model_refs: modelRefs,
+      source: 'contextual-graph',
+      updated_at: now,
+    },
     updated_at: now,
   };
 }
@@ -268,7 +303,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
     const labels = ['uncanonical', 'candidate', 'active'];
     const properties = {
       display_name: candidate.displayName,
-      provenance: { source: 'discover', seed_id: seedId, discovered_at: now },
+      provenance: { source: 'discover', seed_id: seedId, discovered_at: now, model_refs: [] },
       aliases: candidate.displayName ? [candidate.displayName] : [],
       last_seen_at: now,
       updated_at: now,
@@ -299,7 +334,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
           directed: false,
           type: he.type || 'co-occurs',
           weight: 0.5,
-          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence },
+          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence, model_refs: [] },
           last_seen_at: now,
           updated_at: now,
         };
@@ -313,7 +348,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
   for (const { candidate } of mergedIntoExisting) {
     const existingId = existingNodes.find((n) => n.cgn_id === candidate.id)?.cgn_id;
     const existing = existingId ? existingNodes.find((n) => n.cgn_id === existingId) : null;
-    if (existing && !existing.cgn_properties?.provenance?.model_id) {
+    if (existing && !hasModelRef(existing.cgn_properties, 'entity-ctx')) {
       entitySpecs.push(await deriveEntityContextModel(db, {
         id: existing.cgn_id,
         displayName: existing.cgn_properties?.display_name || existing.cgn_id,
@@ -338,7 +373,7 @@ async function processDiscoveryCandidates(db, serverId, bankId, candidates, cont
           directed: false,
           type: he.type || 'co-occurs',
           weight: 0.5,
-          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence },
+          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence, model_refs: [] },
           last_seen_at: now,
           updated_at: now,
         };

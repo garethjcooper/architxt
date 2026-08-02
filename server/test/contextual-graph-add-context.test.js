@@ -122,7 +122,7 @@ describe('addContext', () => {
     assert.ok(deployed.includes('edge-ctx-svc:SVC-005|svc:SVC-006'));
   });
 
-  it('does not queue entity-ctx for nodes that already have a model_id', async () => {
+  it('does not queue entity-ctx for nodes that already have a model_ref', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
     ]);
@@ -130,7 +130,7 @@ describe('addContext', () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       display_name: 'Billing Service',
-      provenance: { source: 'entity-ctx', model_id: 'entity-ctx-svc:SVC-005' },
+      provenance: { source: 'entity-ctx', model_id: 'entity-ctx-svc:SVC-005', model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }] },
     });
 
     const fetchGraph = makeFetchGraph({
@@ -249,6 +249,9 @@ describe('addContext', () => {
     const { getNode } = await import('../src/db/crud/contextual-graph.js');
     const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
     assert.equal(node.cgn_properties.provenance.model_id, 'entity-ctx-svc:SVC-005');
+    assert.equal(node.cgn_properties.provenance.model_refs.length, 1);
+    assert.equal(node.cgn_properties.provenance.model_refs[0].role, 'entity-ctx');
+    assert.equal(node.cgn_properties.provenance.model_refs[0].ext_id, 'entity-ctx-svc:SVC-005');
     assert.equal(node.cgn_properties.provenance.source, 'contextual-graph');
   });
 });
