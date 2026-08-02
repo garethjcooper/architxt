@@ -266,3 +266,15 @@ export const deleteEdge = (db, serverId, bankId, id) => dbExec(() => {
   const result = stmt(db, sql).run(serverId, bankId, id);
   return { deleted: result.changes > 0 };
 }, `${EDGE_TABLE}.deleteEdge`);
+
+/**
+ * Delete every node and edge for a given (server_id, bank_id) scope.
+ * Returns counts of deleted nodes and edges.
+ */
+export const deleteAllContextualGraphNodesAndEdges = (db, serverId, bankId) => dbExec(() => {
+  const edgeSql = `DELETE FROM ${EDGE_TABLE} WHERE cge_server_id = ? AND cge_bank_id = ?`;
+  const nodeSql = `DELETE FROM ${NODE_TABLE} WHERE cgn_server_id = ? AND cgn_bank_id = ?`;
+  const edges = stmt(db, edgeSql).run(serverId, bankId);
+  const nodes = stmt(db, nodeSql).run(serverId, bankId);
+  return { nodes: nodes.changes, edges: edges.changes };
+}, `${NODE_TABLE}.deleteAllContextualGraphNodesAndEdges`);

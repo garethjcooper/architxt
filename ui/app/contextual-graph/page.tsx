@@ -99,6 +99,8 @@ export default function ContextualGraphPage() {
   const [edgeForm, setEdgeForm] = useState({ id: '', source_id: '', target_id: '', type: '', properties: '{}' });
 
   const [runDiscovery, setRunDiscovery] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const serverId = selectedServerId ? Number(selectedServerId) : 0;
   const bankId = selectedBankId;
@@ -243,6 +245,34 @@ export default function ContextualGraphPage() {
       toast.error('Add-context error');
     } finally {
       setRunningAddContext(false);
+    }
+  };
+
+  const handleClear = async () => {
+    if (!serverId || !bankId) {
+      toast.error('Select a server and bank first');
+      return;
+    }
+    try {
+      setClearing(true);
+      addLog(`Clearing working graph for ${bankId}...`, 'warning');
+      const result = await contextualGraphApi.clear(serverId, bankId);
+      if (result.success) {
+        const clearedNodes = result.cleared?.nodes ?? 0;
+        const clearedEdges = result.cleared?.edges ?? 0;
+        addLog(`Cleared ${clearedNodes} nodes and ${clearedEdges} edges for ${bankId}`, 'success', result);
+        toast.success(`Cleared ${clearedNodes} nodes and ${clearedEdges} edges`);
+        await loadGraph();
+      } else {
+        addLog(`Clear failed: ${result.error}`, 'error', result);
+        toast.error(result.error || 'Clear failed');
+      }
+    } catch (err: any) {
+      addLog(`Clear error: ${err.message || err}`, 'error');
+      toast.error('Clear error');
+    } finally {
+      setClearing(false);
+      setClearConfirmOpen(false);
     }
   };
 
@@ -448,6 +478,16 @@ export default function ContextualGraphPage() {
               >
                 <RefreshCw className={`h-4 w-4 ${loadingGraph ? 'animate-spin' : ''}`} />
               </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setClearConfirmOpen(true)}
+                disabled={!scopeReady || runningImport || runningAddContext || clearing}
+                className="border-red-400/30 text-red-400 hover:bg-red-400/10 hover:text-red-300"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {clearing ? 'Clearing...' : 'Clear Working Graph'}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -619,6 +659,31 @@ export default function ContextualGraphPage() {
           </Card>
         )}
       </div>
+
+      {/* Clear Working Graph Confirmation Dialog */}
+      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <DialogContent className="bg-[oklch(0.24_0_0)] border-white/10 text-foreground max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <Trash2 className="h-5 w-5" />
+              Clear Working Graph?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-white/70 py-2">
+            This will permanently delete every node and edge in the working graph for
+            <span className="text-white font-mono"> {bankId || 'this bank'}</span>.
+            This does not affect Hindsight, mental models, or the catalog.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearConfirmOpen(false)} className="border-white/10" disabled={clearing}>
+              Cancel
+            </Button>
+            <Button onClick={handleClear} className="bg-red-600 hover:bg-red-700" disabled={clearing}>
+              {clearing ? 'Clearing...' : 'Clear Working Graph'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Node Dialog */}
       <Dialog open={nodeDialogOpen} onOpenChange={setNodeDialogOpen}>

@@ -318,4 +318,44 @@ describe('contextual-graph route', () => {
       assert.equal(res.status, 204);
     });
   });
+
+  describe('POST /clear', () => {
+    it('returns 400 when server_id or bank_id is missing', async () => {
+      const app = makeApp({ db });
+      const res = await request(app)
+        .post('/api/v1/contextual-graph/clear')
+        .send({ server_id: serverId });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.code, 'MISSING_PARAMS');
+    });
+
+    it('deletes all nodes and edges scoped to (server_id, bank_id)', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['active'], {});
+      upsertNode(db, serverId, bankId, 'B', ['active'], {});
+      upsertNode(db, serverId, 'Other-Bank', 'C', ['active'], {});
+      upsertEdge(db, serverId, bankId, 'e1', 'A', 'B', null, { directed: false });
+      upsertEdge(db, serverId, 'Other-Bank', 'e2', 'A', 'B', null, { directed: false });
+
+      const app = makeApp({ db });
+      const res = await request(app)
+        .post('/api/v1/contextual-graph/clear')
+        .send({ server_id: serverId, bank_id: bankId });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.success, true);
+      assert.equal(res.body.cleared.nodes, 2);
+      assert.equal(res.body.cleared.edges, 1);
+
+      const nodesRes = await request(app)
+        .get('/api/v1/contextual-graph/nodes')
+        .query({ server_id: serverId, bank_id: bankId });
+      assert.equal(nodesRes.body.length, 0);
+
+      const otherNodesRes = await request(app)
+        .get('/api/v1/contextual-graph/nodes')
+        .query({ server_id: serverId, bank_id: 'Other-Bank' });
+      assert.equal(otherNodesRes.body.length, 1);
+    });
+  });
 });
