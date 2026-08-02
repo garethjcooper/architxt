@@ -107,8 +107,24 @@ export async function pushMentalModel(serverId, bankId, model) {
   }
 }
 
+function isConflictResponse(status, errorText) {
+  if (status === 409) return true;
+  if (typeof errorText !== 'string') return false;
+  const normalised = errorText.toLowerCase();
+  return (
+    normalised.includes('already exists') ||
+    normalised.includes('conflict') ||
+    normalised.includes('duplicate')
+  );
+}
+
 /**
  * Create a new mental model on Hindsight (POST).
+ *
+ * If the model already exists, fall back to pushMentalModel (PATCH) so the
+ * local caller can treat the operation as a relink/update rather than a hard
+ * failure. This prevents contextual-graph Add Context from orphaning nodes/edges
+ * when the generated mental model is already present on Hindsight.
  */
 export async function createMentalModel(serverId, bankId, model) {
   const setup = await getConfig(serverId, bankId, model, 'Creating');
@@ -125,8 +141,15 @@ export async function createMentalModel(serverId, bankId, model) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error('Hindsight createMentalModel failed', { serverId, bankId, extId: model.ext_id, status: response.status, error: errorText });
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      const preview = errorText.slice(0, 500);
+
+      if (isConflictResponse(response.status, errorText)) {
+        logger.info('Hindsight createMentalModel conflict; falling back to PATCH', { serverId, bankId, extId: model.ext_id, status: response.status });
+        return pushMentalModel(serverId, bankId, model);
+      }
+
+      logger.error('Hindsight createMentalModel failed', { serverId, bankId, extId: model.ext_id, status: response.status, error: preview });
+      return { success: false, error: `HTTP ${response.status}: ${preview}` };
     }
 
     logger.info('Hindsight createMentalModel OK', { serverId, bankId, extId: model.ext_id });
