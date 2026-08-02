@@ -281,6 +281,37 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
     upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
     return;
   }
+
+  if (modelId.startsWith('discover-')) {
+    const match = modelId.match(/^discover-(.+?)-\d+$/);
+    const seedId = match ? match[1] : null;
+    if (!seedId) return;
+
+    // Attach to the seed node that triggered discovery.
+    const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
+    if (seedNode) {
+      const properties = mergeProperties(seedNode.cgn_properties, modelId, role, now);
+      upsertNode(db, serverId, bankId, seedId, seedNode.cgn_labels, properties);
+    }
+
+    // Attach to every candidate node/edge discovered from this seed.
+    for (const node of existingNodes) {
+      const prov = node.cgn_properties?.provenance;
+      if (prov?.source === 'discover' && prov?.seed_id === seedId) {
+        const properties = mergeProperties(node.cgn_properties, modelId, role, now);
+        upsertNode(db, serverId, bankId, node.cgn_id, node.cgn_labels, properties);
+      }
+    }
+
+    for (const edge of existingEdges) {
+      const prov = edge.cge_properties?.provenance;
+      if (prov?.source === 'discover' && prov?.seed_id === seedId) {
+        const properties = mergeProperties(edge.cge_properties, modelId, role, now);
+        upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
+      }
+    }
+    return;
+  }
 }
 
 function hasModelRef(properties, rolePrefix) {
