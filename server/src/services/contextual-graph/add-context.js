@@ -8,6 +8,7 @@ import {
   deriveDiscoverContextModel,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
+import { runDiscovery as defaultRunDiscovery } from './discovery.js';
 
 const logger = createLogger('contextual-graph-add-context');
 
@@ -167,8 +168,11 @@ export async function addContext(
     }, neighbors, Date.now(), bankId);
     discoverSpecs.push(spec);
 
-    if (options.runDiscovery) {
-      const discoveryResult = await options.runDiscovery(db, serverId, bankId, spec, { existingNodes, existingEdges });
+    if (neighborhood.run_discovery) {
+      const discoveryFn = typeof options.runDiscovery === 'function'
+        ? options.runDiscovery
+        : defaultRunDiscovery;
+      const discoveryResult = await discoveryFn(db, serverId, bankId, spec, { existingNodes, existingEdges, generateCompletion: options.generateCompletion });
       if (discoveryResult?.success && Array.isArray(discoveryResult.candidates)) {
         const candidateSpecs = await processDiscoveryCandidates(
           db,
@@ -190,7 +194,9 @@ export async function addContext(
   const refreshedEdges = refreshedEdgesResult.data || [];
 
   // Step 6: deploy all queued models to Hindsight and record provenance.
-  const allSpecs = [...entitySpecs, ...edgeSpecs, ...discoverSpecs];
+  const dedupedEntitySpecs = dedupeSpecsByExtId(entitySpecs);
+  const dedupedEdgeSpecs = dedupeSpecsByExtId(edgeSpecs);
+  const allSpecs = [...dedupedEntitySpecs, ...dedupedEdgeSpecs, ...discoverSpecs];
   const deployFn = options.deployBatch || deployMentalModelBatch;
   const deployResult = await deployFn(db, serverId, bankId, allSpecs);
 
@@ -210,8 +216,8 @@ export async function addContext(
   return {
     success: true,
     queued: {
-      entity: entitySpecs.length,
-      edge: edgeSpecs.length,
+      entity: dedupedEntitySpecs.length,
+      edge: dedupedEdgeSpecs.length,
       discover: discoverSpecs.length,
     },
     deployed: deployResult.deployed,
@@ -288,6 +294,15 @@ function mergeProperties(current, modelId, role, now) {
 
 function pairKey(a, b) {
   return [a, b].sort().join('|');
+}
+
+function dedupeSpecsByExtId(specs) {
+  const seen = new Set();
+  return specs.filter((spec) => {
+    if (!spec?.ext_id || seen.has(spec.ext_id)) return false;
+    seen.add(spec.ext_id);
+    return true;
+  });
 }
 
 async function processDiscoveryCandidates(db, serverId, bankId, candidates, context) {
