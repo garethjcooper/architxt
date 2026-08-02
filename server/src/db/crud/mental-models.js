@@ -29,10 +29,16 @@ export function isSystemTemplateRole(role) {
   return SYSTEM_TEMPLATE_ROLES.has(role);
 }
 
+/** Read the template role and external id for a mental model directly from the current DB. */
+function getMentalModelTemplateIdentity(db, id) {
+  const row = db.prepare(`SELECT mm_template_role, mm_ext_id FROM ${TABLE} WHERE ${PK} = ?`).get(requireInt(PK, id));
+  return row ? { role: row.mm_template_role, extId: row.mm_ext_id } : null;
+}
+
 /** Read the template role for a mental model directly from the current DB. */
 function getMentalModelTemplateRole(db, id) {
-  const row = db.prepare(`SELECT mm_template_role FROM ${TABLE} WHERE ${PK} = ?`).get(requireInt(PK, id));
-  return row ? row.mm_template_role : null;
+  const identity = getMentalModelTemplateIdentity(db, id);
+  return identity ? identity.role : null;
 }
 
 /** Reusable guard result for system-template mutations. */
@@ -535,7 +541,8 @@ export const updateMentalModel = (db, id, data) => dbExec(() => {
   const updates = [];
   const values = [];
 
-  const role = getMentalModelTemplateRole(db, id);
+  const identity = getMentalModelTemplateIdentity(db, id);
+  const role = identity?.role ?? null;
   if (isSystemTemplateRole(role)) {
     // System templates cannot stop being templates, change role, change
     // their reserved ext_id, or be renamed. Other configurable fields remain editable.
@@ -549,7 +556,7 @@ export const updateMentalModel = (db, id, data) => dbExec(() => {
       err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
       throw err;
     }
-    if (data.mm_ext_id !== undefined && data.mm_ext_id !== role) {
+    if (data.mm_ext_id !== undefined && data.mm_ext_id !== identity.extId) {
       const err = new Error('System template external id cannot be changed.');
       err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
       throw err;

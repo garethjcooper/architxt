@@ -298,6 +298,7 @@ router.post('/', async (req, res) => {
     mm_name: body.name,
     mm_ext_id: extIdCheck.value,
     mm_source_query: body.source_query,
+    mm_template_role: body.template_role ?? null,
   });
 
   if (!eligibility.valid) {

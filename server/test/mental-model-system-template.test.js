@@ -106,10 +106,16 @@ describe('system template hygiene', () => {
     expectBlocked(result);
   });
 
-  it('cannot change a system template external id', () => {
+  it('cannot change a system template external id to a different value', () => {
     const { mm_id, mm_ext_id } = getSystemTemplate(db, 'sys_entity_context');
     const result = updateMentalModel(db, mm_id, { mm_ext_id: `${mm_ext_id}-hacked` });
     expectBlocked(result);
+  });
+
+  it('allows a system template external id to be set to its current value', () => {
+    const { mm_id, mm_ext_id } = getSystemTemplate(db, 'sys_entity_context');
+    const result = updateMentalModel(db, mm_id, { mm_ext_id: mm_ext_id });
+    assert.equal(result.success, true, result.error);
   });
 
   it('cannot change a system template name', () => {
