@@ -92,6 +92,7 @@ export function buildNodeId({ label, canonicalId }) {
  */
 export async function resolveHindsightNode(db, serverId, bankId, lookups, { label }) {
   const displayName = label;
+  const rawTypeLabel = extractTypeLabel(label);
 
   // 1. Canonical match
   const parts = String(label).split(':');
@@ -103,6 +104,7 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
       taxonomy: 'canonical',
       canonicalEntity,
       displayName: canonicalEntity.ent_name,
+      typeLabel: canonicalEntity.et_type_name || rawTypeLabel || null,
     };
   }
 
@@ -116,6 +118,7 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
       taxonomy: node.labels?.includes('grounded') ? 'uncanonical-grounded' : 'uncanonical-discovered',
       existingNode: node,
       displayName,
+      typeLabel: rawTypeLabel,
     };
   }
 
@@ -124,7 +127,25 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
     id: normalizedId,
     taxonomy: 'new',
     displayName,
+    typeLabel: rawTypeLabel,
   };
+}
+
+/**
+ * Extract a type prefix from a Hindsight label such as "svc:SVC-005".
+ * Returns null if there is no prefix.
+ *
+ * @param {string} label
+ * @returns {string|null}
+ */
+function extractTypeLabel(label) {
+  if (!label || typeof label !== 'string') return null;
+  const parts = label.split(':');
+  if (parts.length >= 2) {
+    const prefix = parts[0].trim();
+    if (prefix) return prefix.toLowerCase();
+  }
+  return null;
 }
 
 /**
