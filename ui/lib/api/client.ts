@@ -1224,3 +1224,79 @@ export const settingsApi = {
       method: 'POST',
     }),
 };
+
+// Contextual Graph API
+export const contextualGraphApi = {
+  import: (serverId: number, bankId: string, options?: { min_count?: number; min_weight?: number }) =>
+    fetchApi<{ success: boolean; imported?: { nodes: number; edges: number }; raw?: { nodes: number; edges: number }; error?: string; code?: string }>('/contextual-graph/import', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
+    }),
+
+  addContext: (serverId: number, bankId: string, options?: {
+    min_count?: number;
+    min_weight?: number;
+    seed_node_ids?: string[];
+    neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number; run_discovery?: boolean };
+  }) =>
+    fetchApi<{ success: boolean; queued?: { entity: number; edge: number; discover: number }; deployed?: string[]; failed?: { ext_id: string; error: string; code?: string }[]; error?: string; code?: string }>('/contextual-graph/add-context', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
+    }),
+
+  listNodes: (serverId: number, bankId: string, options?: { labels?: string[]; idPrefix?: string; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    if (options?.labels?.length) params.set('labels', options.labels.join(','));
+    if (options?.idPrefix) params.set('idPrefix', options.idPrefix);
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    return fetchApi<Array<{ id: string; labels: string[]; properties: Record<string, any> }>>(`/contextual-graph/nodes?${params.toString()}`);
+  },
+
+  getNode: (id: string, serverId: number, bankId: string) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    return fetchApi<{ id: string; labels: string[]; properties: Record<string, any> }>(`/contextual-graph/nodes/${encodeURIComponent(id)}?${params.toString()}`);
+  },
+
+  upsertNode: (id: string, serverId: number, bankId: string, data: { labels?: string[]; properties?: Record<string, any> }) =>
+    fetchApi<{ id: string; labels: string[]; properties: Record<string, any> }>(`/contextual-graph/nodes/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, labels: data.labels, properties: data.properties }),
+    }),
+
+  deleteNode: (id: string, serverId: number, bankId: string) =>
+    fetchApi<void>(`/contextual-graph/nodes/${encodeURIComponent(id)}?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}`, { method: 'DELETE' }),
+
+  listEdges: (serverId: number, bankId: string, options?: { sourceId?: string; targetId?: string; type?: string | null; undirected?: boolean; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    if (options?.sourceId) params.set('source_id', options.sourceId);
+    if (options?.targetId) params.set('target_id', options.targetId);
+    if (options?.type !== undefined) params.set('type', options.type ?? '');
+    if (options?.undirected) params.set('undirected', 'true');
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    return fetchApi<Array<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>>(`/contextual-graph/edges?${params.toString()}`);
+  },
+
+  getEdge: (id: string, serverId: number, bankId: string) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    return fetchApi<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>(`/contextual-graph/edges/${encodeURIComponent(id)}?${params.toString()}`);
+  },
+
+  upsertEdge: (id: string, serverId: number, bankId: string, data: { source_id: string; target_id: string; type?: string | null; properties?: Record<string, any> }) =>
+    fetchApi<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>(`/contextual-graph/edges/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, source_id: data.source_id, target_id: data.target_id, type: data.type ?? null, properties: data.properties }),
+    }),
+
+  deleteEdge: (id: string, serverId: number, bankId: string) =>
+    fetchApi<void>(`/contextual-graph/edges/${encodeURIComponent(id)}?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}`, { method: 'DELETE' }),
+};
