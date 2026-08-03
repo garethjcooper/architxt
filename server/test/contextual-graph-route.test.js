@@ -26,12 +26,12 @@ function seedServer(db) {
   return Number(db.prepare('SELECT svr_id FROM servers').get().svr_id);
 }
 
-function makeApp({ db, importHindsightSkeleton, addContext }) {
+function makeApp({ db, importHindsightSkeleton, addContext, refreshPatches }) {
   const app = express();
   app.use(express.json());
   app.use(
     '/api/v1/contextual-graph',
-    createContextualGraphRouter({ db, importHindsightSkeleton, addContext }),
+    createContextualGraphRouter({ db, importHindsightSkeleton, addContext, refreshPatches }),
   );
   return app;
 }
@@ -309,6 +309,60 @@ describe('contextual-graph route', () => {
         .query({ server_id: serverId, bank_id: bankId });
 
       assert.equal(res.status, 204);
+    });
+  });
+
+  describe('POST /refresh', () => {
+    it('returns 400 when server_id or bank_id is missing', async () => {
+      const app = makeApp({ db });
+      const res = await request(app)
+        .post('/api/v1/contextual-graph/refresh')
+        .send({ server_id: serverId });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.code, 'MISSING_PARAMS');
+    });
+
+    it('returns refresh stats and dry_run flag on success', async () => {
+      const refreshPatches = async () => ({
+        success: true,
+        stats: {
+          fetched: 1,
+          matched: 1,
+          applied: 1,
+          skippedDisabled: 0,
+          skippedUnchanged: 0,
+          failed: 0,
+          errors: [],
+        },
+      });
+
+      const app = makeApp({ db, refreshPatches });
+      const res = await request(app)
+        .post('/api/v1/contextual-graph/refresh')
+        .send({ server_id: serverId, bank_id: bankId, dry_run: true });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.success, true);
+      assert.equal(res.body.dry_run, true);
+      assert.equal(res.body.stats.applied, 1);
+    });
+
+    it('returns 500 when refresh fails', async () => {
+      const refreshPatches = async () => ({
+        success: false,
+        error: 'Hindsight unreachable',
+        stats: { fetched: 0, matched: 0, applied: 0 },
+      });
+
+      const app = makeApp({ db, refreshPatches });
+      const res = await request(app)
+        .post('/api/v1/contextual-graph/refresh')
+        .send({ server_id: serverId, bank_id: bankId });
+
+      assert.equal(res.status, 500);
+      assert.equal(res.body.success, false);
+      assert.equal(res.body.error, 'Hindsight unreachable');
     });
   });
 
