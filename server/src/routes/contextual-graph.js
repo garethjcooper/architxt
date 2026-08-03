@@ -16,6 +16,10 @@ import {
 import { importHindsightSkeleton as defaultImportSkeleton } from '../services/contextual-graph/import-hindsight-skeleton.js';
 import { addContext as defaultAddContext } from '../services/contextual-graph/add-context.js';
 import { deleteGeneratedModels } from '../services/contextual-graph/delete-generated-models.js';
+import {
+  fetchCandidatesFromModel as defaultFetchCandidates,
+  ingestCandidates as defaultIngestCandidates,
+} from '../services/contextual-graph/discovery.js';
 
 const BASE_PATH = '/contextual-graph';
 
@@ -37,6 +41,8 @@ export function createContextualGraphRouter({
   logger = createLogger('contextual-graph-route'),
   importHindsightSkeleton = defaultImportSkeleton,
   addContext = defaultAddContext,
+  fetchCandidates = defaultFetchCandidates,
+  ingestCandidates = defaultIngestCandidates,
 } = {}) {
   const router = Router();
 
@@ -371,6 +377,185 @@ export function createContextualGraphRouter({
       res,
       status: 200,
       data: { success: true, cleared: counts },
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/discover-candidates:
+   *   post:
+   *     summary: Fetch discovery candidates from a discover-ctx mental model
+   *     description: |
+   *       Reads the content of an existing discover-ctx mental model on Hindsight
+   *       and returns the candidate list. This is a lightweight read; no LLM call.
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id, ext_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               ext_id: { type: string }
+   *     responses:
+   *       200: { description: Candidates returned }
+   *       400: { description: Missing or invalid scope }
+   *       502: { description: Hindsight call failed }
+   */
+  router.post('/discover-candidates', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const extId = typeof req.body.ext_id === 'string' ? req.body.ext_id.trim() : '';
+    if (!extId) {
+      sendResponse({
+        res,
+        status: 400,
+        error: 'ext_id is required',
+        code: 'MISSING_EXT_ID',
+        logger,
+        method: req.method,
+        path: req.path,
+        duration: Date.now() - start,
+      });
+      return;
+    }
+
+    const result = await fetchCandidates(serverId, bankId, extId);
+    const duration = Date.now() - start;
+
+    if (!result.success) {
+      sendResponse({
+        res,
+        status: 502,
+        error: result.error,
+        code: result.code || 'FETCH_FAILED',
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: { success: true, ext_id: extId, candidates: result.candidates },
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/ingest-candidates:
+   *   post:
+   *     summary: Ingest approved discovery candidates into the working graph
+   *     description: |
+   *       Upserts candidate nodes/edges into the working graph and returns the
+   *       entity-ctx / edge-ctx mental-model specs derived for them. The caller
+   *       can then queue/deploy those specs separately or pass deploy=true to do it
+   *       inline.
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id, seed_id, candidates]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               seed_id: { type: string }
+   *               candidates:
+   *                 type: array
+   *                 items:
+   *                   type: object
+   *     responses:
+   *       200: { description: Candidates ingested }
+   *       400: { description: Missing or invalid scope }
+   *       502: { description: Hindsight call failed }
+   */
+  router.post('/ingest-candidates', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const seedId = typeof req.body.seed_id === 'string' ? req.body.seed_id.trim() : '';
+    const candidates = Array.isArray(req.body.candidates) ? req.body.candidates : [];
+
+    if (!seedId) {
+      sendResponse({
+        res,
+        status: 400,
+        error: 'seed_id is required',
+        code: 'MISSING_SEED_ID',
+        logger,
+        method: req.method,
+        path: req.path,
+        duration: Date.now() - start,
+      });
+      return;
+    }
+
+    if (candidates.length === 0) {
+      sendResponse({
+        res,
+        status: 400,
+        error: 'candidates must be a non-empty array',
+        code: 'MISSING_CANDIDATES',
+        logger,
+        method: req.method,
+        path: req.path,
+        duration: Date.now() - start,
+      });
+      return;
+    }
+
+    const nodesResult = listNodes(db, serverId, bankId, { limit: 10000 });
+    const existingNodes = nodesResult.success ? nodesResult.data : [];
+
+    const ingestResult = await ingestCandidates(db, serverId, bankId, seedId, candidates, { existingNodes });
+    const duration = Date.now() - start;
+
+    if (!ingestResult.success) {
+      sendResponse({
+        res,
+        status: 502,
+        error: ingestResult.error,
+        code: ingestResult.code || 'INGEST_FAILED',
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        success: true,
+        seed_id: seedId,
+        upserted: ingestResult.upserted,
+        entity_specs: ingestResult.entity,
+        edge_specs: ingestResult.edge,
+      },
       logger,
       method: req.method,
       path: req.path,
