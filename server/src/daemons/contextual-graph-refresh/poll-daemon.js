@@ -13,7 +13,8 @@ import path from 'path';
 
 import { createLogger } from '../../utils/logger.js';
 import { config } from '../../config.js';
-import { refreshContextualGraphPatches, extractModelRefsFromDb } from '../../services/contextual-graph/refresh-patches.js';
+import { refreshContextualGraphPatches } from '../../services/contextual-graph/refresh-patches.js';
+import { listContextualGraphScopes } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-refresh-daemon');
 
@@ -51,19 +52,11 @@ function sleep(ms) {
 
 /**
  * Find all (server_id, bank_id) scopes that have at least one contextual-graph
- * model_ref attached to a node or edge.
+ * node or edge.
  */
 function discoverScopes() {
-  const sql = `
-    SELECT DISTINCT cgn_server_id AS server_id, cgn_bank_id AS bank_id
-    FROM contextual_graph_nodes
-    WHERE cgn_properties LIKE '%"model_refs"%'
-    UNION
-    SELECT DISTINCT cge_server_id AS server_id, cge_bank_id AS bank_id
-    FROM contextual_graph_edges
-    WHERE cge_properties LIKE '%"model_refs"%'
-  `;
-  return db.prepare(sql).all();
+  const scopesResult = listContextualGraphScopes(db);
+  return scopesResult?.success ? scopesResult.data : [];
 }
 
 async function runRefreshCycle() {
@@ -75,8 +68,6 @@ async function runRefreshCycle() {
 
   for (const scope of scopes) {
     const { server_id: serverId, bank_id: bankId } = scope;
-    const hasRefs = extractModelRefsFromDb(db, serverId, bankId).size > 0;
-    if (!hasRefs) continue;
 
     logger.info('Refreshing contextual-graph patches', { serverId, bankId });
     const result = await refreshContextualGraphPatches(db, serverId, bankId);

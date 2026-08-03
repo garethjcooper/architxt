@@ -13,7 +13,9 @@ import {
   upsertEdge,
   getEdge,
   listEdges,
-  deleteEdge } from '../src/db/crud/contextual-graph.js';
+  deleteEdge,
+  listContextualGraphScopes,
+} from '../src/db/crud/contextual-graph.js';
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-contextual-graph-${Date.now()}.db`);
@@ -126,5 +128,19 @@ describe('contextual graph CRUD', () => {
     assert.equal(result.data.deleted, true);
     assert.equal(getEdge(db, serverId, 'Mozart-API', 'e1').data, null);
     assert.notEqual(getNode(db, serverId, 'Mozart-API', 'a').data, null);
+  });
+
+  it('lists distinct scopes from nodes and edges', () => {
+    upsertNode(db, serverId, 'bank-a', 'a', [], {});
+    upsertNode(db, serverId, 'bank-a', 'b', [], {});
+    upsertNode(db, serverId, 'bank-b', 'c', [], {});
+    upsertEdge(db, serverId, 'bank-b', 'e1', 'c', 'a', 'calls', {});
+
+    const scopes = listContextualGraphScopes(db).data;
+    assert.equal(scopes.length, 2);
+    assert.deepEqual(
+      scopes.map((s) => ({ server_id: s.server_id, bank_id: s.bank_id })).sort((a, b) => a.bank_id.localeCompare(b.bank_id)),
+      [{ server_id: serverId, bank_id: 'bank-a' }, { server_id: serverId, bank_id: 'bank-b' }],
+    );
   });
 });
