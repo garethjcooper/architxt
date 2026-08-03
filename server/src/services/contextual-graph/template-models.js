@@ -31,12 +31,16 @@ export function getContextualGraphTemplate(db, role) {
 
 /**
  * Substitute placeholder tokens in a template string.
+ * Throws if a placeholder is present but has no value provided.
  */
 export function substituteTemplateFields(template, values) {
   if (typeof template !== 'string') return '';
   let text = template;
   for (const [key, val] of Object.entries(values)) {
-    text = text.replaceAll(key, String(val ?? ''));
+    if (text.includes(key) && (val === undefined || val === null)) {
+      throw new Error(`Missing template value for placeholder ${key}`);
+    }
+    text = text.replaceAll(key, String(val));
   }
   return text;
 }

@@ -42,7 +42,7 @@ export async function fetchCandidatesFromModel(serverId, bankId, extId) {
   }
 
   const mentalModel = result.mentalModel;
-  const content = mentalModel?.content ?? mentalModel?.reflect_response?.content ?? null;
+  const content = mentalModel?.content ?? null;
   if (!content) {
     return { success: false, error: 'discover-ctx model has no content yet', code: 'MODEL_NOT_READY' };
   }
@@ -237,16 +237,4 @@ function hasEntityCtxRef(properties) {
     return refs.some((ref) => ref?.role?.startsWith('entity-ctx'));
   }
   return false;
-}
-
-/**
- * Backwards-compatible alias used by older tests.
- * @deprecated use fetchCandidatesFromModel()
- */
-export async function runDiscovery(db, serverId, bankId, spec, context = {}) {
-  logger.warn('runDiscovery() is deprecated; discovery now reads from the discover-ctx mental model content', { seed: spec?.ext_id });
-  if (!spec?.ext_id) {
-    return { success: false, error: 'spec.ext_id is required', code: 'MISSING_SPEC' };
-  }
-  return fetchCandidatesFromModel(serverId, bankId, spec.ext_id);
 }

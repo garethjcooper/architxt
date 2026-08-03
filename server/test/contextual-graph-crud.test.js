@@ -13,8 +13,7 @@ import {
   upsertEdge,
   getEdge,
   listEdges,
-  deleteEdge,
-} from '../src/db/crud/contextual-graph.js';
+  deleteEdge } from '../src/db/crud/contextual-graph.js';
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-contextual-graph-${Date.now()}.db`);
@@ -46,8 +45,7 @@ describe('contextual graph CRUD', () => {
 
   it('upserts and retrieves a node with parsed labels/properties', () => {
     const result = upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
-      provenance: { source: 'hindsight' },
-    });
+      provenance: { source: 'hindsight' } });
     assert.equal(result.success, true);
 
     const row = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
@@ -74,8 +72,7 @@ describe('contextual graph CRUD', () => {
 
     const result = upsertEdge(db, serverId, 'Mozart-API', 'edge-1', 'svc:SVC-005', 'svc:SVC-006', 'calls', {
       directed: true,
-      provenance: { source: 'edge-ctx' },
-    });
+      provenance: { source: 'edge-ctx' } });
     assert.equal(result.success, true);
 
     const row = getEdge(db, serverId, 'Mozart-API', 'edge-1').data;

@@ -68,8 +68,7 @@ describe('addContext subset options', () => {
       edges: [
         { data: { source: 'h1', target: 'h2', weight: 3 } },
         { data: { source: 'h2', target: 'h3', weight: 3 } },
-      ],
-    });
+      ] });
 
     const { deployed, deployBatch } = collectDeployBatch();
 
@@ -78,8 +77,7 @@ describe('addContext subset options', () => {
       deployBatch,
       node_ids: ['svc:SVC-005', 'svc:SVC-006'],
       run_discovery: false,
-      import_skeleton: true,
-    });
+      import_skeleton: true });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.entity, 2, 'only 2 entity-ctx specs');
@@ -99,12 +97,10 @@ describe('addContext subset options', () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       display_name: 'Billing Service',
-      provenance: { source: 'hindsight' },
-    });
+      provenance: { source: 'hindsight' } });
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-006', ['canonical', 'active'], {
       display_name: 'Invoice Service',
-      provenance: { source: 'hindsight' },
-    });
+      provenance: { source: 'hindsight' } });
 
     const fetchGraph = makeFetchGraph({ nodes: [], edges: [] });
     const { deployed, deployBatch } = collectDeployBatch();
@@ -113,8 +109,7 @@ describe('addContext subset options', () => {
       fetchGraph,
       deployBatch,
       import_skeleton: false,
-      run_discovery: false,
-    });
+      run_discovery: false });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.entity, 2);

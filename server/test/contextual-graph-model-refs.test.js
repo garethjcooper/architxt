@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import {
   extractRefsFromProperties,
   extractModelRefs,
-  stripModelRefsFromProperties,
-} from '../src/services/contextual-graph/graph-model-refs.js';
+  stripModelRefsFromProperties } from '../src/services/contextual-graph/graph-model-refs.js';
 
 describe('graph-model-refs', () => {
   it('extracts model_refs from properties', () => {
@@ -13,9 +12,7 @@ describe('graph-model-refs', () => {
         model_refs: [
           { role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-01' },
           { role: 'edge-ctx', ext_id: 'edge-ctx-svc:SVC-005|svc:SVC-006', attached_at: '2026-08-02' },
-        ],
-      },
-    };
+        ] } };
 
     const refs = extractRefsFromProperties(properties);
     assert.deepEqual(refs.sort(), [
@@ -30,9 +27,7 @@ describe('graph-model-refs', () => {
         model_refs: [
           { role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' },
           { role: 'edge-ctx', ext_id: 'edge-ctx-svc:SVC-005|svc:SVC-006' },
-        ],
-      },
-    };
+        ] } };
 
     assert.deepEqual(extractRefsFromProperties(properties, { rolePrefix: 'edge-ctx' }), [
       'edge-ctx-svc:SVC-005|svc:SVC-006',
@@ -47,8 +42,7 @@ describe('graph-model-refs', () => {
       ],
       edges: [
         { id: 'edge-1', properties: { provenance: { model_refs: [{ role: 'edge-ctx', ext_id: 'edge-ctx-pair' }] } } },
-      ],
-    };
+      ] };
 
     const { extIds, byNodeId, byEdgeId } = extractModelRefs(graph);
     assert.deepEqual(extIds.sort(), ['edge-ctx-pair', 'entity-ctx-svc:SVC-005', 'entity-ctx-svc:SVC-006']);
@@ -66,9 +60,7 @@ describe('graph-model-refs', () => {
           { role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' },
           { role: 'edge-ctx', ext_id: 'edge-ctx-pair' },
         ],
-        updated_at: '2026-08-01',
-      },
-    };
+        updated_at: '2026-08-01' } };
 
     const next = stripModelRefsFromProperties(properties, new Set(['entity-ctx-svc:SVC-005']));
     assert.deepEqual(next.provenance.model_refs, [{ role: 'edge-ctx', ext_id: 'edge-ctx-pair' }]);
@@ -79,9 +71,7 @@ describe('graph-model-refs', () => {
   it('removes empty provenance block when all refs are stripped', () => {
     const properties = {
       provenance: {
-        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' }],
-      },
-    };
+        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' }] } };
 
     const next = stripModelRefsFromProperties(properties, new Set(['entity-ctx-svc:SVC-005']));
     assert.equal(next.provenance, undefined);

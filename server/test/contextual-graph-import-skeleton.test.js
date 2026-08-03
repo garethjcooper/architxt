@@ -10,8 +10,7 @@ import {
   getNode,
   listNodes,
   getEdge,
-  listEdges,
-} from '../src/db/crud/contextual-graph.js';
+  listEdges } from '../src/db/crud/contextual-graph.js';
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-contextual-import-${Date.now()}.db`);
@@ -50,8 +49,7 @@ function makeFetchGraph(graph) {
   return async (serverId, bankId, options) => ({
     success: true,
     data: graph,
-    request: { serverId, bankId, options },
-  });
+    request: { serverId, bankId, options } });
 }
 
 describe('importHindsightSkeleton', () => {
@@ -81,8 +79,7 @@ describe('importHindsightSkeleton', () => {
         { data: { id: 'h1', label: 'svc:SVC-005' } },
         { data: { id: 'h2', label: 'Payment Gateway' } },
       ],
-      edges: [],
-    });
+      edges: [] });
 
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', {}, fetchGraph);
 
@@ -116,8 +113,7 @@ describe('importHindsightSkeleton', () => {
         { data: { source: 'h1', target: 'h2', weight: 3 } },
         { data: { source: 'h2', target: 'h1', weight: 3 } },
         { data: { source: 'h1', target: 'h3', weight: 1 } },
-      ],
-    });
+      ] });
 
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', { min_weight: 1 }, fetchGraph);
 
@@ -153,8 +149,7 @@ describe('importHindsightSkeleton', () => {
       ],
       edges: [
         { data: { source: 'h1', target: 'h2', weight: 1 } },
-      ],
-    });
+      ] });
 
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', { min_weight: 2 }, fetchGraph);
     assert.equal(result.imported.edges, 0);
@@ -171,16 +166,13 @@ describe('importHindsightSkeleton', () => {
       provenance: {
         source: 'entity-ctx',
         summary: 'Original summary',
-        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }],
-      },
-    });
+        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }] } });
 
     const fetchGraph = makeFetchGraph({
       nodes: [
         { data: { id: 'h1', label: 'svc:SVC-005' } },
       ],
-      edges: [],
-    });
+      edges: [] });
 
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', {}, fetchGraph);
     assert.equal(result.imported.nodes, 1);
@@ -198,13 +190,11 @@ describe('importHindsightSkeleton', () => {
 
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'uncanonical:existing-node', ['uncanonical', 'discovered', 'active'], {
-      display_name: 'Existing Node',
-    });
+      display_name: 'Existing Node' });
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
-      edges: [],
-    });
+      edges: [] });
 
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', {}, fetchGraph);
     assert.equal(result.imported.nodes, 1);

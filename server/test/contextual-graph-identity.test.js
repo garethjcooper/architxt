@@ -12,8 +12,7 @@ import {
   buildNodeId,
   resolveHindsightNode,
   dedupeCandidates,
-  buildEdgeId,
-} from '../src/services/contextual-graph/identity.js';
+  buildEdgeId } from '../src/services/contextual-graph/identity.js';
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-contextual-identity-${Date.now()}.db`);
