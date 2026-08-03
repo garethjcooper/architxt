@@ -19,6 +19,7 @@ import { pullDirective as pullHindsightDirective } from '../services/hindsight/p
 import { pushMentalModel, createMentalModel } from '../services/hindsight/push-mental-model.js';
 import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import { getBankConfig } from '../services/hindsight/bank-config.js';
+import { buildMentalModelDivergence } from '../services/mental-model-divergence.js';
 import { db } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
 import { getExpandedDocumentMetadata } from '../db/crud/document-metadata.js';
@@ -80,36 +81,6 @@ function arraySetEqual(a, b) {
   if (a.length !== b.length) return false;
   const setB = new Set(b);
   return a.every((x) => setB.has(x));
-}
-
-function buildMentalModelDivergence(arch, hind) {
-  const nameDiffers = arch.name !== (hind.name ?? null);
-  const sourceQueryDiffers = arch.composed_query !== (hind.source_query ?? null);
-  const maxTokensDiffers = Number(arch.max_tokens) !== Number(hind.max_tokens);
-  const refreshModeDiffers = arch.refresh_mode !== hind.refresh_mode;
-  const refreshAfterConsolidationDiffers = !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation;
-  const excludeAllDiffers = !!arch.exclude_all_mental_models !== !!hind.exclude_all_mental_models;
-  const excludeListDiffers = !arraySetEqual(
-    normalizeCsv(arch.exclude_mental_model_list),
-    hind.exclude_mental_model_ids || []
-  );
-  const tagsMatchModeDiffers = arch.tags_match_mode !== hind.tags_match_mode;
-  const tagsDiffers = !arraySetEqual(
-    (arch.tags || []).slice().sort(),
-    (hind.tags || []).slice().sort()
-  );
-
-  return {
-    name_differs: nameDiffers,
-    source_query_differs: sourceQueryDiffers,
-    tags_differs: tagsDiffers,
-    max_tokens_differs: maxTokensDiffers,
-    refresh_mode_differs: refreshModeDiffers,
-    refresh_after_consolidation_differs: refreshAfterConsolidationDiffers,
-    exclude_all_mental_models_differs: excludeAllDiffers,
-    exclude_mental_model_list_differs: excludeListDiffers,
-    tags_match_mode_differs: tagsMatchModeDiffers,
-  };
 }
 
 function substituteDerived(template, entity) {
