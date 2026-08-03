@@ -278,3 +278,23 @@ export const deleteAllContextualGraphNodesAndEdges = (db, serverId, bankId) => d
   const nodes = stmt(db, nodeSql).run(serverId, bankId);
   return { nodes: nodes.changes, edges: edges.changes };
 }, `${NODE_TABLE}.deleteAllContextualGraphNodesAndEdges`);
+
+/**
+ * List all distinct (server_id, bank_id) scopes that have at least one
+ * contextual-graph node or edge.
+ *
+ * @returns {Array<{server_id: number, bank_id: string}>}
+ */
+export const listContextualGraphScopes = (db) => dbExec(() => {
+  const sql = `
+    SELECT cgn_server_id AS server_id, cgn_bank_id AS bank_id
+    FROM ${NODE_TABLE}
+    GROUP BY cgn_server_id, cgn_bank_id
+    UNION
+    SELECT cge_server_id AS server_id, cge_bank_id AS bank_id
+    FROM ${EDGE_TABLE}
+    GROUP BY cge_server_id, cge_bank_id
+    ORDER BY server_id, bank_id
+  `;
+  return stmt(db, sql).all();
+}, `${NODE_TABLE}.listContextualGraphScopes`);
