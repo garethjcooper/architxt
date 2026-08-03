@@ -1,139 +1,63 @@
 import { createLogger } from '../../utils/logger.js';
-import { generateCompletion } from '../llm/client.js';
-import { config } from '../../config.js';
-import { loadAndCompose } from '../../prompts/template-service.js';
+import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { parseJsonString } from '../../prompts/graph-parser.js';
+import {
+  deriveEntityContextModel,
+  deriveEdgeContextModel,
+} from './template-models.js';
+import { dedupeCandidates, buildEdgeId } from './identity.js';
+import { upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-discovery');
 
-const DEFAULT_DISCOVERY_CONFIG = {
-  provider: 'ollama_cloud',
-  model: 'kimi-k2.5:cloud',
-  temperature: 0.2,
-  max_tokens: 4096,
-};
-
 /**
- * Default LLM discovery runner for contextual-graph Add Context.
+ * Fetch candidates from an existing discover-ctx mental model on Hindsight.
  *
- * Composes the `discover-ctx` prompt using the seed node + its neighbors as the
- * topic, calls the configured LLM, and returns normalized candidate nodes/edges.
+ * The discover-ctx model's content is expected to be the JSON object produced by
+ * the discover-ctx prompt template:
  *
- * @param {object} db
+ *   { "candidates": [{ id, summary, hypothesized_edges: [{ target, type, evidence }] }] }
+ *
+ * This is a lightweight, read-only call. No LLM is invoked; the generative work
+ * has already been done when Hindsight built the mental model.
+ *
  * @param {number} serverId
  * @param {string} bankId
- * @param {object} spec - discover-ctx mental model spec from deriveDiscoverContextModel()
- * @param {object} context
- * @param {object[]} context.existingNodes - working graph nodes
- * @param {object[]} context.existingEdges - working graph edges
- * @param {Function} [context.generateCompletion] - test override
+ * @param {string} extId - discover-ctx model external id, e.g. "discover-svc:SVC-005"
  * @returns {Promise<{success: boolean, candidates?: Array, error?: string, code?: string}>}
  */
-export async function runDiscovery(db, serverId, bankId, spec, context = {}) {
-  if (!spec?.source_query) {
-    return { success: false, error: 'discovery spec missing source_query', code: 'MISSING_SPEC' };
+export async function fetchCandidatesFromModel(serverId, bankId, extId) {
+  if (!extId) {
+    return { success: false, error: 'extId is required', code: 'MISSING_EXT_ID' };
   }
 
-  const discoveryConfig = {
-    provider: config.contextual_graph?.discovery?.provider ?? DEFAULT_DISCOVERY_CONFIG.provider,
-    model: config.contextual_graph?.discovery?.model ?? DEFAULT_DISCOVERY_CONFIG.model,
-    temperature: config.contextual_graph?.discovery?.temperature ?? DEFAULT_DISCOVERY_CONFIG.temperature,
-    max_tokens: config.contextual_graph?.discovery?.max_tokens ?? DEFAULT_DISCOVERY_CONFIG.max_tokens,
-  };
-
-  let template;
-  try {
-    template = loadAndCompose(db, 'discover-ctx', {
-      ARCHITXT_TOPIC: spec.source_query,
-      ARCHITXT_CORPUS: buildCorpus(context, spec),
-    });
-  } catch (err) {
-    logger.error('Failed to compose discover-ctx prompt', { error: err.message, seed: spec.ext_id });
-    return { success: false, error: err.message, code: 'PROMPT_COMPOSE_FAILED' };
-  }
-
-  const messages = [
-    { role: 'system', content: template.prompt },
-    { role: 'user', content: 'Suggest new candidate architectural elements and relationships. Return only the JSON object specified above.' },
-  ];
-
-  const completionFn = typeof context.generateCompletion === 'function'
-    ? context.generateCompletion
-    : generateCompletion;
-
-  logger.info('Discovery LLM request', {
-    serverId,
-    bankId,
-    seed: spec.ext_id,
-    provider: discoveryConfig.provider,
-    model: discoveryConfig.model,
+  const result = await getHindsightMentalModel(serverId, bankId, extId, {
+    detail: 'content',
+    timeoutMs: 15000,
   });
 
-  const llmResult = await completionFn(messages, discoveryConfig);
-
-  if (!llmResult.success) {
-    logger.error('Discovery LLM call failed', {
-      serverId,
-      bankId,
-      seed: spec.ext_id,
-      error: llmResult.error,
-      code: llmResult.code,
-    });
-    return { success: false, error: llmResult.error, code: llmResult.code || 'LLM_FAILED' };
+  if (!result.success) {
+    logger.error('Failed to fetch discover-ctx model content', { serverId, bankId, extId, error: result.error });
+    return { success: false, error: result.error, code: 'FETCH_FAILED' };
   }
 
-  const content = llmResult.data?.content || '';
-  logger.info('Discovery LLM response', { serverId, bankId, seed: spec.ext_id, contentLength: content.length });
+  const mentalModel = result.mentalModel;
+  const content = mentalModel?.content ?? mentalModel?.reflect_response?.content ?? null;
+  if (!content) {
+    return { success: false, error: 'discover-ctx model has no content yet', code: 'MODEL_NOT_READY' };
+  }
 
   const parsed = parseJsonString(content);
   if (!parsed || typeof parsed !== 'object') {
-    logger.warn('Discovery response was not valid JSON', { serverId, bankId, seed: spec.ext_id, content });
-    return { success: false, error: 'LLM response was not valid JSON', code: 'PARSE_FAILED' };
+    logger.warn('discover-ctx model content was not valid JSON', { serverId, bankId, extId, content: String(content).slice(0, 500) });
+    return { success: false, error: 'discover-ctx content was not valid JSON', code: 'PARSE_FAILED' };
   }
 
-  const candidates = normalizeCandidates(parsed.candidates, spec);
-
-  return {
-    success: true,
-    candidates,
-  };
+  const candidates = normalizeCandidates(parsed.candidates);
+  return { success: true, candidates };
 }
 
-function buildCorpus(context, spec) {
-  const existingNodes = context.existingNodes || [];
-  const existingEdges = context.existingEdges || [];
-  const seedNode = existingNodes.find((n) => n.cgn_id === spec.seedId) || null;
-
-  const neighborIds = new Set(spec.neighbor_ids || []);
-  const neighbors = existingNodes.filter((n) => neighborIds.has(n.cgn_id));
-
-  const lines = [
-    '## Seed node',
-    formatNode(seedNode, spec),
-    '',
-    '## Direct neighbors',
-    ...neighbors.map((n) => formatNode(n, spec)),
-    '',
-    '## Existing edges touching the seed',
-    ...existingEdges
-      .filter((e) => e.cge_source_id === spec.seedId || e.cge_target_id === spec.seedId)
-      .map(formatEdge),
-  ];
-
-  return lines.join('\n');
-}
-
-function formatNode(node, spec) {
-  if (!node) return `(seed ${spec.seedId})`;
-  const display = node.cgn_properties?.display_name || node.cgn_id;
-  return `- ${node.cgn_id}: ${display} ${(node.cgn_labels || []).join(',')}`;
-}
-
-function formatEdge(edge) {
-  return `- ${edge.cge_source_id} ↔ ${edge.cge_target_id} ${edge.cge_type ? `(${edge.cge_type})` : ''}`;
-}
-
-function normalizeCandidates(rawCandidates, spec) {
+function normalizeCandidates(rawCandidates) {
   if (!Array.isArray(rawCandidates)) return [];
 
   return rawCandidates
@@ -162,4 +86,171 @@ function normalizeCandidates(rawCandidates, spec) {
       };
     })
     .filter(Boolean);
+}
+
+/**
+ * Ingest a list of approved candidates into the working graph.
+ *
+ * - Creates or updates candidate nodes.
+ * - Creates hypothesized edges to existing targets.
+ * - Derives entity-ctx / edge-ctx mental-model specs for the new nodes and edges.
+ * - Does NOT deploy the derived specs; the caller decides whether to queue them.
+ *
+ * @param {Object} db
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {string} seedId
+ * @param {Array} candidates - normalized candidate objects from fetchCandidatesFromModel()
+ * @param {Object} context
+ * @param {object[]} context.existingNodes - working graph nodes for deduplication
+ * @returns {Promise<{success: boolean, entity: Array, edge: Array, upserted: { nodes: string[], edges: string[] }, error?: string, code?: string}>}
+ */
+export async function ingestCandidates(db, serverId, bankId, seedId, candidates, context = {}) {
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return { success: true, entity: [], edge: [], upserted: { nodes: [], edges: [] } };
+  }
+
+  const existingNodes = context.existingNodes || [];
+  const now = new Date().toISOString();
+  const entitySpecs = [];
+  const edgeSpecs = [];
+  const upsertedNodes = [];
+  const upsertedEdges = [];
+
+  const lookups = buildLookupsFromGraph(existingNodes);
+  const { unique, mergedIntoExisting } = await dedupeCandidates(db, serverId, bankId, lookups, candidates);
+
+  for (const candidate of unique) {
+    const labels = ['uncanonical', 'candidate', 'active'];
+    const properties = {
+      display_name: candidate.displayName,
+      provenance: { source: 'discover', seed_id: seedId, discovered_at: now, model_refs: [] },
+      aliases: candidate.displayName ? [candidate.displayName] : [],
+      last_seen_at: now,
+      updated_at: now,
+    };
+    upsertNode(db, serverId, bankId, candidate.id, labels, properties);
+    upsertedNodes.push(candidate.id);
+
+    entitySpecs.push(await deriveEntityContextModel(db, {
+      id: candidate.id,
+      displayName: candidate.displayName,
+    }, bankId));
+
+    if (Array.isArray(candidate.hypothesizedEdges)) {
+      for (const he of candidate.hypothesizedEdges) {
+        if (!existingNodes.some((n) => n.cgn_id === he.target)) continue;
+        const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
+
+        edgeSpecs.push(await deriveEdgeContextModel(db, {
+          id: candidate.id,
+          displayName: candidate.displayName,
+        }, {
+          id: he.target,
+          displayName: targetNode?.cgn_properties?.display_name || he.target,
+        }, bankId));
+
+        const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
+        const edgeProperties = {
+          directed: false,
+          type: he.type || 'co-occurs',
+          weight: 0.5,
+          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence, model_refs: [] },
+          last_seen_at: now,
+          updated_at: now,
+        };
+        upsertEdge(db, serverId, bankId, edgeId, candidate.id, he.target, null, edgeProperties);
+        upsertedEdges.push(edgeId);
+      }
+    }
+  }
+
+  for (const { candidate } of mergedIntoExisting) {
+    const existing = existingNodes.find((n) => n.cgn_id === candidate.id);
+    if (existing && !hasEntityCtxRef(existing.cgn_properties)) {
+      entitySpecs.push(await deriveEntityContextModel(db, {
+        id: existing.cgn_id,
+        displayName: existing.cgn_properties?.display_name || existing.cgn_id,
+      }, bankId));
+    }
+
+    if (Array.isArray(candidate.hypothesized_edges)) {
+      for (const he of candidate.hypothesized_edges) {
+        if (!existingNodes.some((n) => n.cgn_id === he.target)) continue;
+        const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
+
+        edgeSpecs.push(await deriveEdgeContextModel(db, {
+          id: candidate.id,
+          displayName: candidate.displayName || candidate.id,
+        }, {
+          id: he.target,
+          displayName: targetNode?.cgn_properties?.display_name || he.target,
+        }, bankId));
+
+        const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
+        const edgeProperties = {
+          directed: false,
+          type: he.type || 'co-occurs',
+          weight: 0.5,
+          provenance: { source: 'discover', seed_id: seedId, evidence: he.evidence, model_refs: [] },
+          last_seen_at: now,
+          updated_at: now,
+        };
+        upsertEdge(db, serverId, bankId, edgeId, candidate.id, he.target, null, edgeProperties);
+        upsertedEdges.push(edgeId);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    entity: entitySpecs,
+    edge: edgeSpecs,
+    upserted: { nodes: upsertedNodes, edges: upsertedEdges },
+  };
+}
+
+function buildLookupsFromGraph(nodes) {
+  const byName = new Map();
+  const byId = new Map();
+  for (const n of nodes) {
+    const display = n.cgn_properties?.display_name;
+    if (display) byName.set(display.toLowerCase(), n.cgn_id);
+    for (const alias of n.cgn_properties?.aliases || []) {
+      if (alias) byName.set(alias.toLowerCase(), n.cgn_id);
+    }
+    byId.set(n.cgn_id, n.cgn_id);
+  }
+  return {
+    find: (nameOrId) => {
+      if (!nameOrId) return undefined;
+      const id = byId.get(nameOrId) || byName.get(String(nameOrId).toLowerCase());
+      if (!id) return undefined;
+      return { id };
+    },
+  };
+}
+
+function hasEntityCtxRef(properties) {
+  const refs = properties?.provenance?.model_refs;
+  if (Array.isArray(refs)) {
+    return refs.some((ref) => ref?.role?.startsWith('entity-ctx'));
+  }
+  const legacyModelId = properties?.provenance?.model_id;
+  if (legacyModelId && typeof legacyModelId === 'string') {
+    return legacyModelId.startsWith('entity-ctx-');
+  }
+  return false;
+}
+
+/**
+ * Backwards-compatible alias used by older tests.
+ * @deprecated use fetchCandidatesFromModel()
+ */
+export async function runDiscovery(db, serverId, bankId, spec, context = {}) {
+  logger.warn('runDiscovery() is deprecated; discovery now reads from the discover-ctx mental model content', { seed: spec?.ext_id });
+  if (!spec?.ext_id) {
+    return { success: false, error: 'spec.ext_id is required', code: 'MISSING_SPEC' };
+  }
+  return fetchCandidatesFromModel(serverId, bankId, spec.ext_id);
 }
