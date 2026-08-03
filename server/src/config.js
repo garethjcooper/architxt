@@ -229,6 +229,11 @@ export const config = {
       // Discovery is disabled by default until the candidate-approval UI exists.
       sys_discovery_context: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_DISCOVERY_CONTEXT', 'false') === 'true',
     },
+    // Background refresh poll. Disabled by default until the manual refresh path is stable.
+    background_refresh: {
+      enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_BACKGROUND_ENABLED', 'false') === 'true',
+      poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_POLL_INTERVAL_MS', 300000),
+    },
   },
 
 };

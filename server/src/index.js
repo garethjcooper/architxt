@@ -39,8 +39,10 @@ try {
 // Daemon state
 let daemon = null;
 let hindsightPollDaemon = null;
+let contextualGraphRefreshDaemon = null;
 let daemonRestartTimer = null;
 let hindsightPollRestartTimer = null;
+let contextualGraphRefreshRestartTimer = null;
 const DAEMON_RESTART_DELAY_MS = 5000;
 
 
@@ -127,6 +129,46 @@ function spawnHindsightPollDaemon() {
 }
 
 /**
+ * Spawn the contextual-graph refresh daemon as a child process
+ * Controlled by config.contextualGraph.background_refresh.enabled (default: false)
+ */
+function spawnContextualGraphRefreshDaemon() {
+  if (!config.contextualGraph?.background_refresh?.enabled) {
+    logger.info('Contextual-graph refresh daemon disabled via config');
+    return null;
+  }
+
+  const daemonPath = path.join(__dirname, 'daemons', 'contextual-graph-refresh', 'poll-daemon.js');
+  const child = fork(daemonPath, [], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  logger.info('Contextual-graph refresh daemon spawned', { pid: child.pid, path: daemonPath });
+
+  child.on('exit', (code, signal) => {
+    logger.warn('Contextual-graph refresh daemon exited', { code, signal, pid: child.pid });
+
+    if (contextualGraphRefreshDaemon === child) {
+      contextualGraphRefreshDaemon = null;
+    }
+
+    if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
+      logger.info(`Contextual-graph refresh daemon restart scheduled in ${DAEMON_RESTART_DELAY_MS}ms`);
+      contextualGraphRefreshRestartTimer = setTimeout(() => {
+        contextualGraphRefreshDaemon = spawnContextualGraphRefreshDaemon();
+      }, DAEMON_RESTART_DELAY_MS);
+    }
+  });
+
+  child.on('error', (err) => {
+    logger.error('Contextual-graph refresh daemon error', { error: err.message, pid: child.pid });
+  });
+
+  return child;
+}
+
+/**
  * Stop a specific daemon by child process ref
  */
 function stopChildDaemon(child, name, signal = 'SIGTERM') {
@@ -160,9 +202,14 @@ function stopDaemon(signal = 'SIGTERM') {
     clearTimeout(hindsightPollRestartTimer);
     hindsightPollRestartTimer = null;
   }
+  if (contextualGraphRefreshRestartTimer) {
+    clearTimeout(contextualGraphRefreshRestartTimer);
+    contextualGraphRefreshRestartTimer = null;
+  }
   const promises = [
     stopChildDaemon(daemon, 'Extract daemon', signal),
     stopChildDaemon(hindsightPollDaemon, 'Hindsight poll daemon', signal),
+    stopChildDaemon(contextualGraphRefreshDaemon, 'Contextual-graph refresh daemon', signal),
   ];
   return Promise.all(promises);
 }
@@ -243,6 +290,7 @@ server.headersTimeout = 120000;
 // Spawn daemons after server starts
 daemon = spawnDaemon();
 hindsightPollDaemon = spawnHindsightPollDaemon();
+contextualGraphRefreshDaemon = spawnContextualGraphRefreshDaemon();
 
 // Graceful shutdown
 let isShuttingDown = false;

@@ -1,0 +1,156 @@
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import Database from 'better-sqlite3';
+import { ensureSchema } from '../src/db/ensure-schema.js';
+import { upsertNode, getNode } from '../src/db/crud/contextual-graph.js';
+import { refreshContextualGraphPatches, extractModelRefsFromDb } from '../src/services/contextual-graph/refresh-patches.js';
+import { contentHash } from '../src/services/contextual-graph/normalize-model-output.js';
+import { clearCache } from '../src/cache.js';
+import { config } from '../src/config.js';
+
+function createDb() {
+  clearCache();
+  const db = new Database(':memory:');
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  ensureSchema(db);
+  db.prepare('INSERT INTO servers (svr_name, svr_base_url) VALUES (?, ?)').run('Test', 'http://hindsight');
+  return db;
+}
+
+describe('refreshContextualGraphPatches', () => {
+  let db;
+  const serverId = 1;
+  const bankId = 'bank-1';
+  let originalRoles;
+
+  beforeEach(() => {
+    db = createDb();
+    originalRoles = { ...(config.contextualGraph?.patchRoles || {}) };
+    if (!config.contextualGraph) config.contextualGraph = { patchRoles: {} };
+    config.contextualGraph.patchRoles = {
+      sys_entity_summary: true,
+      sys_entity_capabilities: true,
+      sys_edge_context: true,
+      sys_discovery_context: true,
+    };
+  });
+
+  it('returns early when no model_refs exist', async () => {
+    const result = await refreshContextualGraphPatches(db, serverId, bankId);
+    assert.equal(result.success, true);
+    assert.equal(result.stats.matched, 0);
+  });
+
+  it('extracts model refs from nodes', () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      provenance: {
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash' }],
+      },
+    });
+
+    const refs = extractModelRefsFromDb(db, serverId, bankId);
+    assert.equal(refs.has('entity-summary-svc-001'), true);
+    const scope = refs.get('entity-summary-svc-001');
+    assert.equal(scope.type, 'node');
+    assert.equal(scope.id, 'svc-001');
+  });
+
+  it('applies output when content hash changes', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const newContent = JSON.stringify({ narrative: 'Updated summary.', graph: { nodes: [], edges: [] }, tables: [] });
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{
+        id: 'entity-summary-svc-001',
+        content: newContent,
+      }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, {
+      listAllMentalModels: injectedList,
+    });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.applied, 1);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, 'Updated summary.');
+    assert.notEqual(node.properties.provenance.model_refs[0].content_hash, 'oldhash');
+  });
+
+  it('skips application when content hash is unchanged', async () => {
+    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [] });
+    const hash = contentHash(content);
+
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedUnchanged, 1);
+    assert.equal(result.stats.applied, 0);
+  });
+
+  it('skips disabled roles but updates fetched_at', async () => {
+    config.contextualGraph.patchRoles.sys_entity_summary = false;
+
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [] }) }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedDisabled, 1);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.notEqual(node.properties.provenance.model_refs[0].fetched_at, '2026-01-01T00:00:00Z');
+  });
+
+  it('supports dry-run without applying', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [] }) }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { dryRun: true, listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.applied, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, undefined);
+  });
+});
