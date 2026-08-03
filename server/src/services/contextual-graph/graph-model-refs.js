@@ -5,7 +5,7 @@ const logger = createLogger('contextual-graph-model-refs');
 /**
  * Extract generated mental-model ext_ids from a single properties object.
  *
- * Reads `provenance.model_id` and every `provenance.model_refs[].ext_id`.
+ * Reads every `provenance.model_refs[].ext_id`.
  * Optionally filters by role prefix (e.g. 'entity-ctx') or a matching predicate.
  *
  * @param {Object} properties
@@ -21,10 +21,6 @@ export function extractRefsFromProperties(properties, options = {}) {
   if (!provenance || typeof provenance !== 'object') return [];
 
   const refs = [];
-
-  if (typeof provenance.model_id === 'string' && provenance.model_id) {
-    refs.push({ role: guessRole(provenance.model_id), ext_id: provenance.model_id });
-  }
 
   if (Array.isArray(provenance.model_refs)) {
     for (const ref of provenance.model_refs) {
@@ -97,8 +93,8 @@ export function extractModelRefs(graph, options = {}) {
 /**
  * Clear generated mental-model references from working-graph properties.
  *
- * Removes `provenance.model_id` and any `model_refs` entries whose ext_id is
- * in the removal set. If no refs remain, deletes the `provenance` block.
+ * Removes any `model_refs` entries whose ext_id is in the removal set.
+ * If no refs remain, deletes the `provenance` block.
  *
  * @param {Object} properties
  * @param {Set<string>} extIdsToRemove
@@ -110,29 +106,21 @@ export function stripModelRefsFromProperties(properties, extIdsToRemove) {
   if (!provenance || typeof provenance !== 'object') return null;
 
   const removeSet = new Set(extIdsToRemove);
-  const modelId = provenance.model_id;
-  const hasModelId = typeof modelId === 'string' && removeSet.has(modelId);
 
   const remainingRefs = (provenance.model_refs || []).filter(
     (ref) => ref && typeof ref.ext_id === 'string' && !removeSet.has(ref.ext_id),
   );
 
-  if (!hasModelId && remainingRefs.length === (provenance.model_refs?.length || 0)) {
+  if (remainingRefs.length === (provenance.model_refs?.length || 0)) {
     return null;
   }
 
-  const nextProvenance = { ...provenance };
-  if (hasModelId) {
-    delete nextProvenance.model_id;
-  }
-  if (provenance.model_refs) {
-    nextProvenance.model_refs = remainingRefs;
-  }
-  if (!nextProvenance.model_refs?.length && !nextProvenance.model_id) {
-    delete nextProvenance.model_refs;
-  }
+  const nextProvenance = { ...provenance, model_refs: remainingRefs };
 
   const nextProperties = { ...properties, provenance: nextProvenance };
+  if (remainingRefs.length === 0) {
+    delete nextProvenance.model_refs;
+  }
   if (Object.keys(nextProvenance).length === 0) {
     delete nextProperties.provenance;
   }

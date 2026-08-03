@@ -236,10 +236,6 @@ function hasEntityCtxRef(properties) {
   if (Array.isArray(refs)) {
     return refs.some((ref) => ref?.role?.startsWith('entity-ctx'));
   }
-  const legacyModelId = properties?.provenance?.model_id;
-  if (legacyModelId && typeof legacyModelId === 'string') {
-    return legacyModelId.startsWith('entity-ctx-');
-  }
   return false;
 }
 

@@ -235,11 +235,6 @@ export async function addContext(
 
 async function recordModelProvenance(db, serverId, bankId, modelId, existingNodes, existingEdges, now) {
   const role = modelIdToRole(modelId);
-  const provenance = {
-    model_id: modelId,
-    source: 'contextual-graph',
-    updated_at: now,
-  };
 
   if (modelId.startsWith('entity-ctx-')) {
     const nodeId = modelId.slice('entity-ctx-'.length);
@@ -282,13 +277,7 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
 function hasModelRef(properties, rolePrefix) {
   const refs = properties?.provenance?.model_refs;
   if (Array.isArray(refs)) {
-    if (refs.some((ref) => ref?.role?.startsWith?.(rolePrefix))) return true;
-  }
-  // Backward compatibility: legacy single-model_id provenance.
-  const legacyModelId = properties?.provenance?.model_id;
-  if (legacyModelId && typeof legacyModelId === 'string') {
-    const legacyRole = modelIdToRole(legacyModelId);
-    return legacyRole.startsWith(rolePrefix);
+    return refs.some((ref) => ref?.role?.startsWith?.(rolePrefix));
   }
   return false;
 }
@@ -308,7 +297,6 @@ function mergeProperties(current, modelId, role, now) {
     ...current,
     provenance: {
       ...(current?.provenance || {}),
-      model_id: modelId,
       model_refs: modelRefs,
       source: 'contextual-graph',
       updated_at: now,

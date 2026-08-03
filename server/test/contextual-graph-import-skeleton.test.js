@@ -170,8 +170,8 @@ describe('importHindsightSkeleton', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'entity-ctx',
-        model_id: 'entity-ctx-svc:SVC-005',
         summary: 'Original summary',
+        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }],
       },
     });
 
@@ -187,8 +187,8 @@ describe('importHindsightSkeleton', () => {
 
     const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
     assert.equal(node.cgn_properties.provenance.source, 'hindsight');
-    assert.equal(node.cgn_properties.provenance.model_id, 'entity-ctx-svc:SVC-005');
     assert.equal(node.cgn_properties.provenance.summary, 'Original summary');
+    assert.equal(node.cgn_properties.provenance.model_refs[0].ext_id, 'entity-ctx-svc:SVC-005');
   });
 
   it('does not delete existing nodes absent from the import', async () => {
