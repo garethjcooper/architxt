@@ -179,7 +179,7 @@ describe('addContext', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 1);
-    assert.ok(queued.some((id) => id.startsWith('discover-svc:SVC-005-')));
+    assert.ok(queued.includes('discover-svc:SVC-005'));
   });
 
   it('processes discovery candidates and queues entity-ctx + edge-ctx', async () => {
@@ -278,8 +278,8 @@ describe('addContext', () => {
       neighborhood: { run_discovery: true, top_k_neighbors: 5 },
     });
 
-    const discoverExtId = firstDeployed.find((id) => id.startsWith('discover-svc:SVC-005-'));
-    assert.ok(discoverExtId, 'first run should deploy a discover-ctx model');
+    const discoverExtId = firstDeployed.find((id) => id === 'discover-svc:SVC-005');
+    assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover-ctx model');
 
     // Simulate the provenance update that the real deploy path performs.
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
@@ -290,6 +290,17 @@ describe('addContext', () => {
         model_id: discoverExtId,
         model_refs: [{ role: 'discover-ctx', ext_id: discoverExtId, attached_at: '2026-08-02T00:00:00.000Z' }],
       },
+    });
+
+    const secondRunDiscovery = async () => ({
+      success: true,
+      candidates: [
+        {
+          id: 'anything',
+          summary: 'New Candidate',
+          hypothesized_edges: [{ target: 'svc:SVC-005', type: 'depends-on', evidence: 'mem-rerun' }],
+        },
+      ],
     });
 
     const secondQueued = [];
@@ -303,10 +314,13 @@ describe('addContext', () => {
       deployBatch: secondDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
       neighborhood: { run_discovery: true, top_k_neighbors: 5 },
+      runDiscovery: secondRunDiscovery,
     });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 0);
-    assert.ok(!secondQueued.some((id) => id.startsWith('discover-svc:SVC-005-')));
+    assert.ok(!secondQueued.includes('discover-svc:SVC-005'));
+    assert.ok(secondQueued.includes('entity-ctx-candidate:new-candidate'));
+    assert.ok(secondQueued.includes('edge-ctx-candidate:new-candidate|svc:SVC-005'));
   });
 });

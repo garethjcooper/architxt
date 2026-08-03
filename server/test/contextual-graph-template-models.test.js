@@ -70,10 +70,10 @@ describe('contextual graph template models', () => {
     assert.deepEqual(spec.tags, ['ctx-bank-1', 'edge-ctx', 'pair-svc-001|svc-002']);
   });
 
-  it('derives a discover model from a seed node and batch id', async () => {
-    const spec = await deriveDiscoverContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, [], 3, 'bank-1');
+  it('derives a discover model from a seed node', async () => {
+    const spec = await deriveDiscoverContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, [], 'bank-1');
 
-    assert.equal(spec.ext_id, 'discover-svc-001-3');
+    assert.equal(spec.ext_id, 'discover-svc-001');
     assert.equal(spec.name, 'Discover around Billing Service');
     assert.equal(spec.returns, 'discover-ctx');
     assert.ok(spec.source_query.includes('svc-001'));

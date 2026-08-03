@@ -94,14 +94,13 @@ export async function deriveEdgeContextModel(db, sourceNode, targetNode, bankId)
 /**
  * Derive a discover-ctx mental model spec from the system template + seed node.
  */
-export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], batch = Date.now(), bankId) {
+export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], bankId) {
   const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.discover)?.data;
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.discover}`);
 
   const values = {
     '{seed-id}': seedNode.id,
     '{seed-name}': seedNode.displayName || seedNode.id,
-    '{batch}': batch,
   };
 
   return {
