@@ -221,4 +221,31 @@ describe('ensureSchema backfills user template roles and validates contextual pl
       closeAndDelete({ db, file });
     }
   });
+
+  it('replaces stale contextual-graph templates with the canonical ones', () => {
+    const { db, file } = tempDb();
+    try {
+      seedOldSchema(db);
+
+      // Run migration once so the mm_template_role column exists.
+      ensureSchema(db);
+
+      // Insert a stale discover-ctx template that predates the deterministic ext_id.
+      db.prepare(`
+        INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
+        VALUES ('discover-a-com:COM-001-{batch}', 'Old discover template', 'Old query', 'true', 'sys_discovery_context', 'discover-ctx', 'contextual-graph', 4096)
+      `).run();
+
+      // Re-run migration: it should delete the stale row and upsert the canonical one.
+      ensureSchema(db);
+
+      const rows = db.prepare(`
+        SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true' AND mm_template_role = 'sys_discovery_context'
+      `).all();
+      assert.equal(rows.length, 1, 'stale discover-ctx template was not cleaned up');
+      assert.equal(rows[0].mm_ext_id, 'discover-{seed-id}');
+    } finally {
+      closeAndDelete({ db, file });
+    }
+  });
 });
