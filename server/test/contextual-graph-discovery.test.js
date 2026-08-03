@@ -7,8 +7,7 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { clearCache } from '../src/cache.js';
 import {
   fetchCandidatesFromModel,
-  ingestCandidates,
-} from '../src/services/contextual-graph/discovery.js';
+  ingestCandidates } from '../src/services/contextual-graph/discovery.js';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -62,8 +61,7 @@ describe('addContext discovery integration', () => {
         { data: { id: 'h1', label: 'svc:SVC-005' } },
         { data: { id: 'h2', label: 'svc:SVC-006' } },
       ],
-      edges: [{ data: { source: 'h1', target: 'h2', weight: 1 } }],
-    });
+      edges: [{ data: { source: 'h1', target: 'h2', weight: 1 } }] });
 
     const queued = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -75,9 +73,9 @@ describe('addContext discovery integration', () => {
       fetchGraph,
       deployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      neighborhood: { run_discovery: false, top_k_neighbors: 5 },
-      import_skeleton: false,
-    });
+      run_discovery: false,
+ neighborhood: { top_k_neighbors: 5 },
+      import_skeleton: false });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 1);
@@ -97,8 +95,7 @@ describe('addContext discovery integration', () => {
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
-      edges: [],
-    });
+      edges: [] });
 
     const firstDeployed = [];
     const firstDeployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -110,9 +107,9 @@ describe('addContext discovery integration', () => {
       fetchGraph,
       deployBatch: firstDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      neighborhood: { run_discovery: false, top_k_neighbors: 5 },
-      import_skeleton: false,
-    });
+      run_discovery: false,
+ neighborhood: { top_k_neighbors: 5 },
+      import_skeleton: false });
 
     const discoverExtId = firstDeployed.find((id) => id === 'discover-svc:SVC-005');
     assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover-ctx model');
@@ -127,9 +124,9 @@ describe('addContext discovery integration', () => {
       fetchGraph,
       deployBatch: secondDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      neighborhood: { run_discovery: false, top_k_neighbors: 5 },
-      import_skeleton: false,
-    });
+      run_discovery: false,
+ neighborhood: { top_k_neighbors: 5 },
+      import_skeleton: false });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 0);
@@ -157,10 +154,8 @@ describe('fetchCandidatesFromModel', () => {
           summary: 'Invoice processing gateway',
           hypothesized_edges: [
             { target: 'svc:SVC-005', type: 'depends-on', evidence: 'mem-001' },
-          ],
-        },
-      ],
-    });
+          ] },
+      ] });
 
     const fetchCandidates = async (_serverId, _bankId, _extId) => ({
       success: true,
@@ -171,10 +166,8 @@ describe('fetchCandidatesFromModel', () => {
           aliases: [],
           hypothesizedEdges: [
             { target: 'svc:SVC-005', type: 'depends-on', evidence: 'mem-001' },
-          ],
-        },
-      ],
-    });
+          ] },
+      ] });
 
     const result = await fetchCandidates(svrId, 'Mozart-API', 'discover-svc:SVC-005');
 
@@ -191,8 +184,7 @@ describe('fetchCandidatesFromModel', () => {
     const fetchCandidates = async (_serverId, _bankId, _extId) => ({
       success: false,
       error: 'Server 1 not found',
-      code: 'FETCH_FAILED',
-    });
+      code: 'FETCH_FAILED' });
 
     const result = await fetchCandidates(svrId, 'Mozart-API', 'discover-svc:SVC-005');
 
@@ -204,8 +196,7 @@ describe('fetchCandidatesFromModel', () => {
     const fetchCandidates = async (_serverId, _bankId, _extId) => ({
       success: false,
       error: 'discover-ctx content was not valid JSON',
-      code: 'PARSE_FAILED',
-    });
+      code: 'PARSE_FAILED' });
 
     const result = await fetchCandidates(svrId, 'Mozart-API', 'discover-svc:SVC-005');
 
@@ -230,8 +221,7 @@ describe('ingestCandidates', () => {
 
     const { upsertNode, listNodes } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
-      display_name: 'Billing Service',
-    });
+      display_name: 'Billing Service' });
 
     const candidates = [
       {
@@ -239,8 +229,7 @@ describe('ingestCandidates', () => {
         summary: 'Payment Bridge',
         hypothesized_edges: [
           { target: 'svc:SVC-005', type: 'depends-on', evidence: 'mem-001' },
-        ],
-      },
+        ] },
     ];
 
     const existingNodes = listNodes(db, serverId, 'Mozart-API', { limit: 10000 }).data;

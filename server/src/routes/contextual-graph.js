@@ -279,7 +279,6 @@ export function createContextualGraphRouter({
    *                   top_k_neighbors: { type: integer }
    *                   min_weight: { type: number }
    *                   min_count: { type: integer }
-   *                   run_discovery: { type: boolean }
    *     responses:
    *       200: { description: Context added }
    *       400: { description: Missing or invalid scope }

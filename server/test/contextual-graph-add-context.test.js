@@ -65,8 +65,7 @@ describe('addContext', () => {
         { data: { id: 'h1', label: 'svc:SVC-005' } },
         { data: { id: 'h2', label: 'svc:SVC-006' } },
       ],
-      edges: [],
-    });
+      edges: [] });
 
     const deployed = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -77,8 +76,8 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      neighborhood: { run_discovery: false },
-    });
+      run_discovery: false,
+ neighborhood: {} });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.entity, 2);
@@ -101,8 +100,7 @@ describe('addContext', () => {
       ],
       edges: [
         { data: { source: 'h1', target: 'h2', weight: 3 } },
-      ],
-    });
+      ] });
 
     const deployed = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -113,8 +111,8 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      neighborhood: { run_discovery: false },
-    });
+      run_discovery: false,
+ neighborhood: {} });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.entity, 2);
@@ -130,25 +128,22 @@ describe('addContext', () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       display_name: 'Billing Service',
-      provenance: { source: 'entity-ctx', model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }] },
-    });
+      provenance: { source: 'entity-ctx', model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }] } });
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
-      edges: [],
-    });
+      edges: [] });
 
     const deployBatch = async (_db, _serverId, _bankId, specs) => ({
       success: true,
       deployed: specs.map((s) => s.ext_id),
-      failed: [],
-    });
+      failed: [] });
 
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      neighborhood: { run_discovery: false },
-    });
+      run_discovery: false,
+ neighborhood: {} });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.entity, 0);
@@ -161,8 +156,7 @@ describe('addContext', () => {
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
-      edges: [],
-    });
+      edges: [] });
 
     const queued = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -174,8 +168,8 @@ describe('addContext', () => {
       fetchGraph,
       deployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      neighborhood: { run_discovery: true, top_k_neighbors: 5 },
-    });
+      run_discovery: false,
+ neighborhood: { top_k_neighbors: 5 } });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 1);
@@ -189,20 +183,18 @@ describe('addContext', () => {
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
-      edges: [],
-    });
+      edges: [] });
 
     const deployBatch = async (_db, _serverId, _bankId, specs) => ({
       success: true,
       deployed: specs.map((s) => s.ext_id),
-      failed: [],
-    });
+      failed: [] });
 
     await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      neighborhood: { run_discovery: false },
-    });
+      run_discovery: false,
+ neighborhood: {} });
 
     const { getNode } = await import('../src/db/crud/contextual-graph.js');
     const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
@@ -219,8 +211,7 @@ describe('addContext', () => {
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
-      edges: [],
-    });
+      edges: [] });
 
     const firstDeployed = [];
     const firstDeployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -232,8 +223,8 @@ describe('addContext', () => {
       fetchGraph,
       deployBatch: firstDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      neighborhood: { run_discovery: true, top_k_neighbors: 5 },
-    });
+      run_discovery: false,
+ neighborhood: { top_k_neighbors: 5 } });
 
     const discoverExtId = firstDeployed.find((id) => id === 'discover-svc:SVC-005');
     assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover-ctx model');
@@ -248,9 +239,9 @@ describe('addContext', () => {
       fetchGraph,
       deployBatch: secondDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      neighborhood: { run_discovery: false, top_k_neighbors: 5 },
-      import_skeleton: false,
-    });
+      run_discovery: false,
+ neighborhood: { top_k_neighbors: 5 },
+      import_skeleton: false });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 0);

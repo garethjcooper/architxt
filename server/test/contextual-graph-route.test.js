@@ -61,8 +61,7 @@ describe('contextual-graph route', () => {
     it('returns imported counts on success', async () => {
       const importHindsightSkeleton = async () => ({
         success: true,
-        imported: { nodes: 3, edges: 2 },
-      });
+        imported: { nodes: 3, edges: 2 } });
 
       const app = makeApp({ db, importHindsightSkeleton });
       const res = await request(app)
@@ -79,8 +78,7 @@ describe('contextual-graph route', () => {
       const importHindsightSkeleton = async () => ({
         success: false,
         error: 'Hindsight unreachable',
-        code: 'HINDSIGHT_ENTITY_GRAPH_FAILED',
-      });
+        code: 'HINDSIGHT_ENTITY_GRAPH_FAILED' });
 
       const app = makeApp({ db, importHindsightSkeleton });
       const res = await request(app)
@@ -108,8 +106,7 @@ describe('contextual-graph route', () => {
         success: true,
         queued: { entity: 2, edge: 1, discover: 0 },
         deployed: ['entity-ctx-A', 'entity-ctx-B', 'edge-ctx-A|B'],
-        failed: [],
-      });
+        failed: [] });
 
       const app = makeApp({ db, addContext });
       const res = await request(app)
@@ -118,8 +115,7 @@ describe('contextual-graph route', () => {
           server_id: serverId,
           bank_id: bankId,
           seed_node_ids: ['node-A'],
-          neighborhood: { run_discovery: false },
-        });
+          neighborhood: {} });
 
       assert.equal(res.status, 200);
       assert.equal(res.body.success, true);
@@ -141,8 +137,7 @@ describe('contextual-graph route', () => {
           server_id: serverId,
           bank_id: bankId,
           seed_node_ids: ['node-A', 'node-B'],
-          neighborhood: { top_k_neighbors: 3, run_discovery: false },
-        });
+          neighborhood: { top_k_neighbors: 3, run_discovery: false } });
 
       assert.deepEqual(captured.seed_node_ids, ['node-A', 'node-B']);
       assert.equal(captured.neighborhood.top_k_neighbors, 3);
@@ -206,8 +201,7 @@ describe('contextual-graph route', () => {
           server_id: serverId,
           bank_id: bankId,
           labels: ['active', 'canonical'],
-          properties: { display_name: 'Billing Service' },
-        });
+          properties: { display_name: 'Billing Service' } });
 
       assert.equal(res.status, 200);
       assert.equal(res.body.id, 'svc:SVC-005');
@@ -293,8 +287,7 @@ describe('contextual-graph route', () => {
           source_id: 'A',
           target_id: 'B',
           type: 'depends-on',
-          properties: { weight: 3 },
-        });
+          properties: { weight: 3 } });
 
       assert.equal(res.status, 200);
       assert.equal(res.body.id, 'e1');

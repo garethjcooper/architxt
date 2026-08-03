@@ -37,14 +37,12 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {number} [options.min_count] - passed to Hindsight /entities/graph
  * @param {number} [options.min_weight] - minimum edge weight to import
  * @param {string[]} [options.node_ids] - explicit subset of working-graph nodes to contextualize
- * @param {boolean} [options.run_discovery] - whether to run discovery around seeds/subset
+ * @param {boolean} [options.run_discovery] - whether to auto-rank high-degree nodes as discovery seeds
  * @param {boolean} [options.import_skeleton] - whether to re-import the Hindsight skeleton first
  * @param {string[]} [options.seed_node_ids] - manual seed nodes to discover around
  * @param {Object} [options.neighborhood] - discovery scope
  * @param {number} [options.neighborhood.top_k_neighbors]
- * @param {boolean} [options.run_discovery] - deprecated alias for top-level option
  * @param {Function} [options.fetchGraph] - override for testing
- * @param {Function} [options.runDiscovery] - override for testing; receives spec, returns { candidates }
  * @param {Function} [options.deployBatch] - override for testing; receives (db, serverId, bankId, specs)
  * @returns {Promise<{success: boolean, queued?: {entity: number, edge: number, discover: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], error?: string, code?: string}>}
  */
@@ -61,12 +59,6 @@ export async function addContext(
   const importSkeleton = options.import_skeleton !== false;
   let runDiscovery = options.run_discovery !== false;
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
-  if (options.neighborhood?.run_discovery !== undefined) {
-    // Deprecated nesting: top-level option wins.
-    if (options.run_discovery === undefined) {
-      runDiscovery = options.neighborhood.run_discovery;
-    }
-  }
 
   // Step 1: optionally import current Hindsight skeleton.
   let importResult = { success: true, imported: { nodes: 0, edges: 0 } };
