@@ -183,6 +183,14 @@ export async function addContext(
 
   for (const seedId of discoverQueue) {
     const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
+
+    // Discovery is idempotent at the seed level: don't mint a new discover-ctx
+    // mental model (with a fresh timestamp) if this seed already carries one.
+    if (hasModelRef(seedNode?.cgn_properties, 'discover-ctx')) {
+      logger.info('Skipping duplicate discover-ctx model for seed', { serverId, bankId, seedId });
+      continue;
+    }
+
     const neighbors = filteredEdges
       .filter((e) => e.cge_source_id === seedId || e.cge_target_id === seedId)
       .map((e) => (e.cge_source_id === seedId ? e.cge_target_id : e.cge_source_id))
