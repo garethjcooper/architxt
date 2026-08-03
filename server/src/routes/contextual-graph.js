@@ -20,6 +20,7 @@ import {
   fetchCandidatesFromModel as defaultFetchCandidates,
   ingestCandidates as defaultIngestCandidates,
 } from '../services/contextual-graph/discovery.js';
+import { refreshContextualGraphPatches as defaultRefreshPatches } from '../services/contextual-graph/refresh-patches.js';
 
 const BASE_PATH = '/contextual-graph';
 
@@ -34,6 +35,9 @@ const BASE_PATH = '/contextual-graph';
  * @param {import('winston').Logger} [deps.logger]
  * @param {Function} [deps.importHindsightSkeleton]
  * @param {Function} [deps.addContext]
+ * @param {Function} [deps.fetchCandidates]
+ * @param {Function} [deps.ingestCandidates]
+ * @param {Function} [deps.refreshPatches]
  * @returns {import('express').Router}
  */
 export function createContextualGraphRouter({
@@ -43,6 +47,7 @@ export function createContextualGraphRouter({
   addContext = defaultAddContext,
   fetchCandidates = defaultFetchCandidates,
   ingestCandidates = defaultIngestCandidates,
+  refreshPatches = defaultRefreshPatches,
 } = {}) {
   const router = Router();
 
@@ -622,6 +627,65 @@ export function createContextualGraphRouter({
       res,
       status: 200,
       data: responseData,
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/refresh:
+   *   post:
+   *     summary: Refresh contextual-graph patches from Hindsight
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               dry_run: { type: boolean }
+   *     responses:
+   *       200: { description: Refresh completed or previewed }
+   *       400: { description: Missing or invalid scope }
+   *       500: { description: Hindsight fetch or apply failed }
+   */
+  router.post('/refresh', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const dryRun = req.body.dry_run === true;
+
+    const result = await refreshPatches(db, serverId, bankId, { dryRun });
+
+    const duration = Date.now() - start;
+    logger.info('Refresh contextual patches', { serverId, bankId, dryRun, success: result.success, ...result.stats });
+
+    if (!result.success) {
+      sendResponse({
+        res,
+        status: 500,
+        data: { success: false, error: result.error, stats: result.stats },
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: { success: true, dry_run: dryRun, stats: result.stats },
       logger,
       method: req.method,
       path: req.path,
