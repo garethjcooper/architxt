@@ -175,8 +175,8 @@ function buildAliases(resolved, rawLabel) {
 function mergeProperties(existing, incoming) {
   const merged = { ...existing, ...incoming };
 
-  // Deep-merge provenance so model-derived metadata (model_id, summary,
-  // confidence, evidence) is preserved while the source is refreshed.
+  // Deep-merge provenance so model-derived metadata (summary, confidence,
+  // evidence, model_refs) is preserved while the source is refreshed.
   const existingProvenance = existing?.provenance || {};
   const incomingProvenance = incoming?.provenance || {};
   merged.provenance = {

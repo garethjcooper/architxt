@@ -40,7 +40,6 @@ describe('deleteGeneratedModels', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'contextual-graph',
-        model_id: 'entity-ctx-svc:SVC-005',
         model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-01' }],
         updated_at: '2026-08-01',
       },
@@ -62,15 +61,15 @@ describe('deleteGeneratedModels', () => {
 
     const { getNode } = await import('../src/db/crud/contextual-graph.js');
     const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
-    assert.equal(node.cgn_properties.provenance?.model_id, undefined);
-    assert.equal(node.cgn_properties.provenance?.model_refs?.length, undefined);
+    assert.equal(node.cgn_properties.provenance.model_refs, undefined);
+    assert.equal(node.cgn_properties.provenance.source, 'contextual-graph');
   });
 
   it('supports dry-run without deleting', async () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       provenance: {
-        model_id: 'entity-ctx-svc:SVC-005',
+        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' }],
       },
     });
 
@@ -87,7 +86,7 @@ describe('deleteGeneratedModels', () => {
   it('can delete explicit ext_ids without parsing', async () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
-      provenance: { model_id: 'entity-ctx-svc:SVC-005' },
+      provenance: { model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' }] },
     });
 
     const deletedRemote = [];

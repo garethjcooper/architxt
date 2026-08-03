@@ -15,8 +15,8 @@ const logger = createLogger('contextual-graph-delete-generated');
  *
  * This is intentionally a user-led iteration helper, not an automatic lifecycle
  * operation. It removes remote models by `ext_id` and strips the matching
- * `provenance.model_id` / `model_refs` entries from node/edge properties so
- * re-running `addContext` will recreate them.
+ * `provenance.model_refs` entries from node/edge properties so re-running
+ * `addContext` will recreate them.
  *
  * @param {Object} db
  * @param {number} serverId
