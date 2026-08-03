@@ -1,6 +1,6 @@
 import { createLogger } from '../../utils/logger.js';
 import { importHindsightSkeleton } from './import-hindsight-skeleton.js';
-import { listNodes, listEdges, upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
+import { listNodes, listEdges, upsertNode, upsertEdge, getNode, getEdge } from '../../db/crud/contextual-graph.js';
 import {
   deriveEntityContextModel,
   deriveEdgeContextModel,
@@ -210,7 +210,7 @@ export async function addContext(
 
   const now = new Date().toISOString();
   for (const modelId of deployResult.deployed) {
-    await recordModelProvenance(db, serverId, bankId, modelId, existingNodes, existingEdges, now);
+    await recordModelProvenance(db, serverId, bankId, modelId, now);
   }
 
   return {
@@ -225,12 +225,12 @@ export async function addContext(
   };
 }
 
-async function recordModelProvenance(db, serverId, bankId, modelId, existingNodes, existingEdges, now) {
+async function recordModelProvenance(db, serverId, bankId, modelId, now) {
   const role = modelIdToRole(modelId);
 
   if (modelId.startsWith('entity-ctx-')) {
     const nodeId = modelId.slice('entity-ctx-'.length);
-    const node = existingNodes.find((n) => n.cgn_id === nodeId);
+    const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) return;
 
     const properties = mergeProperties(node.cgn_properties, modelId, role, now);
@@ -240,7 +240,7 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
 
   if (modelId.startsWith('edge-ctx-')) {
     const pairPart = modelId.slice('edge-ctx-'.length);
-    const edge = existingEdges.find((e) => {
+    const edge = listEdges(db, serverId, bankId)?.data?.find((e) => {
       const raw = `${e.cge_source_id}|${e.cge_target_id}`;
       return raw === pairPart || pairKey(e.cge_source_id, e.cge_target_id) === pairPart;
     });
@@ -256,7 +256,7 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
     if (!seedId) return;
 
     // Attach to the seed node that triggered discovery.
-    const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
+    const seedNode = getNode(db, serverId, bankId, seedId)?.data;
     if (seedNode) {
       const properties = mergeProperties(seedNode.cgn_properties, modelId, role, now);
       upsertNode(db, serverId, bankId, seedId, seedNode.cgn_labels, properties);
