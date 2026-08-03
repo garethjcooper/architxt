@@ -183,30 +183,37 @@ export async function addContext(
 
   for (const seedId of discoverQueue) {
     const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
-
-    // Discovery is idempotent at the seed level: don't mint a new discover-ctx
-    // mental model (with a fresh timestamp) if this seed already carries one.
-    if (hasModelRef(seedNode?.cgn_properties, 'discover-ctx')) {
-      logger.info('Skipping duplicate discover-ctx model for seed', { serverId, bankId, seedId });
-      continue;
-    }
+    const hasExistingDiscoverModel = hasModelRef(seedNode?.cgn_properties, 'discover-ctx');
 
     const neighbors = filteredEdges
       .filter((e) => e.cge_source_id === seedId || e.cge_target_id === seedId)
       .map((e) => (e.cge_source_id === seedId ? e.cge_target_id : e.cge_source_id))
       .slice(0, neighborhood.top_k_neighbors);
 
-    const spec = await deriveDiscoverContextModel(db, {
-      id: seedId,
-      displayName: seedNode?.cgn_properties?.display_name || seedId,
-    }, neighbors, Date.now(), bankId);
-    discoverSpecs.push(spec);
+    // Only mint a new discover-ctx mental model the first time a seed is run.
+    // Re-runs keep the existing discover-ctx model as the canonical one and still
+    // discover new candidates/edges if discovery is enabled.
+    if (!hasExistingDiscoverModel) {
+      discoverSpecs.push(await deriveDiscoverContextModel(db, {
+        id: seedId,
+        displayName: seedNode?.cgn_properties?.display_name || seedId,
+      }, neighbors, bankId));
+    } else {
+      logger.info('Skipping duplicate discover-ctx model for seed', { serverId, bankId, seedId });
+    }
 
     if (runDiscovery) {
       const discoveryFn = typeof options.runDiscovery === 'function'
         ? options.runDiscovery
         : defaultRunDiscovery;
-      const discoveryResult = await discoveryFn(db, serverId, bankId, spec, { existingNodes, existingEdges, generateCompletion: options.generateCompletion });
+      const discoverSpec = hasExistingDiscoverModel
+        ? await deriveDiscoverContextModel(db, {
+            id: seedId,
+            displayName: seedNode?.cgn_properties?.display_name || seedId,
+          }, neighbors, bankId)
+        : discoverSpecs[discoverSpecs.length - 1];
+
+      const discoveryResult = await discoveryFn(db, serverId, bankId, discoverSpec, { existingNodes, existingEdges, generateCompletion: options.generateCompletion });
       if (discoveryResult?.success && Array.isArray(discoveryResult.candidates)) {
         const candidateSpecs = await processDiscoveryCandidates(
           db,
@@ -291,8 +298,7 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
   }
 
   if (modelId.startsWith('discover-')) {
-    const match = modelId.match(/^discover-(.+)-(\d+)$/);
-    const seedId = match ? match[1] : null;
+    const seedId = modelId.slice('discover-'.length);
     if (!seedId) return;
 
     // Attach to the seed node that triggered discovery.
@@ -302,22 +308,6 @@ async function recordModelProvenance(db, serverId, bankId, modelId, existingNode
       upsertNode(db, serverId, bankId, seedId, seedNode.cgn_labels, properties);
     }
 
-    // Attach to every candidate node/edge discovered from this seed.
-    for (const node of existingNodes) {
-      const prov = node.cgn_properties?.provenance;
-      if (prov?.source === 'discover' && prov?.seed_id === seedId) {
-        const properties = mergeProperties(node.cgn_properties, modelId, role, now);
-        upsertNode(db, serverId, bankId, node.cgn_id, node.cgn_labels, properties);
-      }
-    }
-
-    for (const edge of existingEdges) {
-      const prov = edge.cge_properties?.provenance;
-      if (prov?.source === 'discover' && prov?.seed_id === seedId) {
-        const properties = mergeProperties(edge.cge_properties, modelId, role, now);
-        upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
-      }
-    }
     return;
   }
 }

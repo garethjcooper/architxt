@@ -513,7 +513,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     maxTokens: 4096,
   },
   {
-    extId: 'discover-{seed-id}-{batch}',
+    extId: 'discover-{seed-id}',
     name: 'Discover around {seed-name}',
     role: 'sys_discovery_context',
     returns: 'discover-ctx',

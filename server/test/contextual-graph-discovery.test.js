@@ -67,7 +67,7 @@ describe('contextual-graph discovery runner', () => {
     });
 
     const spec = {
-      ext_id: 'discover-svc:SVC-005-12345',
+      ext_id: 'discover-svc:SVC-005',
       seedId: 'svc:SVC-005',
       source_query: 'Seed entity: svc:SVC-005 (Billing Service). Suggest new candidate nodes and hypothesized edges.',
       neighbor_ids: ['svc:SVC-006'],
@@ -118,7 +118,7 @@ describe('contextual-graph discovery runner', () => {
     });
 
     const spec = {
-      ext_id: 'discover-svc:SVC-005-12345',
+      ext_id: 'discover-svc:SVC-005',
       seedId: 'svc:SVC-005',
       source_query: 'Seed entity: svc:SVC-005 (Billing Service).',
       neighbor_ids: [],
@@ -142,7 +142,7 @@ describe('contextual-graph discovery runner', () => {
     });
 
     const spec = {
-      ext_id: 'discover-svc:SVC-005-12345',
+      ext_id: 'discover-svc:SVC-005',
       seedId: 'svc:SVC-005',
       source_query: 'Seed entity: svc:SVC-005 (Billing Service).',
       neighbor_ids: [],
@@ -205,6 +205,6 @@ describe('contextual-graph discovery runner', () => {
     // 1 canonical undirected edge-ctx + 1 candidate edge-ctx
     assert.equal(result.queued.edge, 1, 'expected edge count: ' + result.queued.edge);
     assert.equal(result.queued.discover, 2, 'expected discover count: ' + result.queued.discover);
-    assert.ok(result.deployed.some((id) => id.startsWith('discover-svc:SVC-005-') || id.startsWith('discover-svc:SVC-005.')));
+    assert.ok(result.deployed.includes('discover-svc:SVC-005') && result.deployed.includes('discover-svc:SVC-006'));
   });
 });
