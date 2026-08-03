@@ -2,7 +2,8 @@ import { createLogger } from '../../utils/logger.js';
 import { importHindsightSkeleton } from './import-hindsight-skeleton.js';
 import { listNodes, listEdges, upsertNode, upsertEdge, getNode, getEdge } from '../../db/crud/contextual-graph.js';
 import {
-  deriveEntityContextModel,
+  deriveEntitySummaryModel,
+  deriveEntityCapabilitiesModel,
   deriveEdgeContextModel,
   deriveDiscoverContextModel,
 } from './template-models.js';
@@ -21,7 +22,7 @@ const DEFAULT_NEIGHBORHOOD = {
  *
  * User-led job that:
  * 1. Imports the current Hindsight entity graph skeleton.
- * 2. Derives and deploys `entity-ctx` mental models for active nodes.
+ * 2. Derives and deploys `entity-summary` and `entity-capabilities` mental models for active nodes.
  * 3. Derives and deploys `edge-ctx` mental models for active undirected edges.
  * 4. Optionally derives and deploys `discover` mental models around seeds.
  *
@@ -99,24 +100,35 @@ export async function addContext(
     ? existingEdges.filter((e) => subsetNodeIds.has(e.cge_source_id) && subsetNodeIds.has(e.cge_target_id))
     : existingEdges;
 
-  // Step 3: derive entity-ctx models for active nodes without an entity-ctx ref.
-  const entitySpecs = [];
+  // Step 3: derive entity-summary and entity-capabilities models for active nodes
+  // without an existing ref for the same role.
+  const entitySummarySpecs = [];
+  const entityCapabilitiesSpecs = [];
   for (const node of filteredNodes) {
-    if (hasModelRef(node.cgn_properties, 'entity-ctx')) continue;
     if (!node.cgn_labels?.includes('active')) continue;
 
-    const spec = await deriveEntityContextModel(db, {
-      id: node.cgn_id,
-      displayName: node.cgn_properties?.display_name || node.cgn_id,
-    }, bankId);
-    entitySpecs.push(spec);
+    if (!hasModelRef(node.cgn_properties, 'sys_entity_summary')) {
+      const summarySpec = await deriveEntitySummaryModel(db, {
+        id: node.cgn_id,
+        displayName: node.cgn_properties?.display_name || node.cgn_id,
+      }, bankId);
+      entitySummarySpecs.push(summarySpec);
+    }
+
+    if (!hasModelRef(node.cgn_properties, 'sys_entity_capabilities')) {
+      const capabilitiesSpec = await deriveEntityCapabilitiesModel(db, {
+        id: node.cgn_id,
+        displayName: node.cgn_properties?.display_name || node.cgn_id,
+      }, bankId);
+      entityCapabilitiesSpecs.push(capabilitiesSpec);
+    }
   }
 
   // Step 4: derive edge-ctx models for active undirected edge pairs without an edge-ctx ref.
   const edgeSpecs = [];
   const seenEdgePairs = new Set();
   for (const edge of filteredEdges) {
-    if (hasModelRef(edge.cge_properties, 'edge-ctx')) continue;
+    if (hasModelRef(edge.cge_properties, 'sys_edge_context')) continue;
 
     // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
     // candidate hypotheses). Directed edges are produced by edge-ctx itself.
@@ -175,9 +187,9 @@ export async function addContext(
 
   for (const seedId of discoverQueue) {
     const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
-    const hasExistingDiscoverModel = hasModelRef(seedNode?.cgn_properties, 'discover-ctx');
+    const hasExistingDiscoverModel = hasModelRef(seedNode?.cgn_properties, 'sys_discovery_context');
 
-    // Only mint a new discover-ctx mental model the first time a seed is run.
+    // Only mint a new discover mental model the first time a seed is run.
     if (!hasExistingDiscoverModel) {
       const neighbors = filteredEdges
         .filter((e) => e.cge_source_id === seedId || e.cge_target_id === seedId)
@@ -189,14 +201,15 @@ export async function addContext(
         displayName: seedNode?.cgn_properties?.display_name || seedId,
       }, neighbors, bankId));
     } else {
-      logger.info('Skipping duplicate discover-ctx model for seed', { serverId, bankId, seedId });
+      logger.info('Skipping duplicate discover model for seed', { serverId, bankId, seedId });
     }
   }
 
   // Step 5: deploy all queued models to Hindsight and record provenance.
-  const dedupedEntitySpecs = dedupeSpecsByExtId(entitySpecs);
+  const dedupedSummarySpecs = dedupeSpecsByExtId(entitySummarySpecs);
+  const dedupedCapabilitiesSpecs = dedupeSpecsByExtId(entityCapabilitiesSpecs);
   const dedupedEdgeSpecs = dedupeSpecsByExtId(edgeSpecs);
-  const allSpecs = [...dedupedEntitySpecs, ...dedupedEdgeSpecs, ...discoverSpecs];
+  const allSpecs = [...dedupedSummarySpecs, ...dedupedCapabilitiesSpecs, ...dedupedEdgeSpecs, ...discoverSpecs];
   const deployFn = options.deployBatch || deployMentalModelBatch;
   const deployResult = await deployFn(db, serverId, bankId, allSpecs);
 
@@ -216,7 +229,8 @@ export async function addContext(
   return {
     success: true,
     queued: {
-      entity: dedupedEntitySpecs.length,
+      entitySummary: dedupedSummarySpecs.length,
+      entityCapabilities: dedupedCapabilitiesSpecs.length,
       edge: dedupedEdgeSpecs.length,
       discover: discoverSpecs.length,
     },
@@ -228,8 +242,18 @@ export async function addContext(
 async function recordModelProvenance(db, serverId, bankId, modelId, now) {
   const role = modelIdToRole(modelId);
 
-  if (modelId.startsWith('entity-ctx-')) {
-    const nodeId = modelId.slice('entity-ctx-'.length);
+  if (modelId.startsWith('entity-summary-')) {
+    const nodeId = modelId.slice('entity-summary-'.length);
+    const node = getNode(db, serverId, bankId, nodeId)?.data;
+    if (!node) return;
+
+    const properties = mergeProperties(node.cgn_properties, modelId, role, now);
+    upsertNode(db, serverId, bankId, nodeId, node.cgn_labels, properties);
+    return;
+  }
+
+  if (modelId.startsWith('entity-capabilities-')) {
+    const nodeId = modelId.slice('entity-capabilities-'.length);
     const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) return;
 
@@ -275,9 +299,10 @@ function hasModelRef(properties, rolePrefix) {
 }
 
 function modelIdToRole(modelId) {
-  if (modelId.startsWith('entity-ctx-')) return 'entity-ctx';
-  if (modelId.startsWith('edge-ctx-')) return 'edge-ctx';
-  if (modelId.startsWith('discover-')) return 'discover-ctx';
+  if (modelId.startsWith('entity-summary-')) return 'sys_entity_summary';
+  if (modelId.startsWith('entity-capabilities-')) return 'sys_entity_capabilities';
+  if (modelId.startsWith('edge-ctx-')) return 'sys_edge_context';
+  if (modelId.startsWith('discover-')) return 'sys_discovery_context';
   return 'model';
 }
 

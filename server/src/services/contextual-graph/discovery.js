@@ -2,7 +2,8 @@ import { createLogger } from '../../utils/logger.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { parseJsonString } from '../../prompts/graph-parser.js';
 import {
-  deriveEntityContextModel,
+  deriveEntitySummaryModel,
+  deriveEntityCapabilitiesModel,
   deriveEdgeContextModel,
 } from './template-models.js';
 import { dedupeCandidates, buildEdgeId } from './identity.js';
@@ -11,19 +12,18 @@ import { upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
 const logger = createLogger('contextual-graph-discovery');
 
 /**
- * Fetch candidates from an existing discover-ctx mental model on Hindsight.
+ * Fetch candidates from an existing discover mental model on Hindsight.
  *
- * The discover-ctx model's content is expected to be the JSON object produced by
- * the discover-ctx prompt template:
+ * The discover model's content is expected to be the JSON object produced by
+ * the discover prompt template:
  *
  *   { "candidates": [{ id, summary, hypothesized_edges: [{ target, type, evidence }] }] }
  *
- * This is a lightweight, read-only call. No LLM is invoked; the generative work
- * has already been done when Hindsight built the mental model.
+ * This function is async because it reads from the remote Hindsight server.
  *
  * @param {number} serverId
  * @param {string} bankId
- * @param {string} extId - discover-ctx model external id, e.g. "discover-svc:SVC-005"
+ * @param {string} extId - discover model external id, e.g. "discover-svc:SVC-005"
  * @returns {Promise<{success: boolean, candidates?: Array, error?: string, code?: string}>}
  */
 export async function fetchCandidatesFromModel(serverId, bankId, extId) {
@@ -93,7 +93,7 @@ function normalizeCandidates(rawCandidates) {
  *
  * - Creates or updates candidate nodes.
  * - Creates hypothesized edges to existing targets.
- * - Derives entity-ctx / edge-ctx mental-model specs for the new nodes and edges.
+ * - Derives entity-summary, entity-capabilities and edge-ctx mental-model specs for the new nodes and edges.
  * - Does NOT deploy the derived specs; the caller decides whether to queue them.
  *
  * @param {Object} db
@@ -132,7 +132,11 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
     upsertNode(db, serverId, bankId, candidate.id, labels, properties);
     upsertedNodes.push(candidate.id);
 
-    entitySpecs.push(await deriveEntityContextModel(db, {
+    entitySpecs.push(await deriveEntitySummaryModel(db, {
+      id: candidate.id,
+      displayName: candidate.displayName,
+    }, bankId));
+    entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
       id: candidate.id,
       displayName: candidate.displayName,
     }, bankId));
@@ -167,8 +171,12 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
 
   for (const { candidate } of mergedIntoExisting) {
     const existing = existingNodes.find((n) => n.cgn_id === candidate.id);
-    if (existing && !hasEntityCtxRef(existing.cgn_properties)) {
-      entitySpecs.push(await deriveEntityContextModel(db, {
+    if (existing && !hasEntitySummaryRef(existing.cgn_properties)) {
+      entitySpecs.push(await deriveEntitySummaryModel(db, {
+        id: existing.cgn_id,
+        displayName: existing.cgn_properties?.display_name || existing.cgn_id,
+      }, bankId));
+      entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
         id: existing.cgn_id,
         displayName: existing.cgn_properties?.display_name || existing.cgn_id,
       }, bankId));
@@ -231,10 +239,10 @@ function buildLookupsFromGraph(nodes) {
   };
 }
 
-function hasEntityCtxRef(properties) {
+function hasEntitySummaryRef(properties) {
   const refs = properties?.provenance?.model_refs;
   if (Array.isArray(refs)) {
-    return refs.some((ref) => ref?.role?.startsWith('entity-ctx'));
+    return refs.some((ref) => ref?.role?.startsWith('sys_entity_summary'));
   }
   return false;
 }

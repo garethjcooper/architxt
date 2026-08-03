@@ -80,12 +80,15 @@ describe('addContext subset options', () => {
       import_skeleton: true });
 
     assert.equal(result.success, true);
-    assert.equal(result.queued.entity, 2, 'only 2 entity-ctx specs');
+    assert.equal(result.queued.entitySummary, 2, 'only 2 entity-summary specs');
+    assert.equal(result.queued.entityCapabilities, 2, 'only 2 entity-capabilities specs');
     assert.equal(result.queued.edge, 1, 'only 1 edge-ctx spec for the pair inside subset');
     assert.equal(result.queued.discover, 0, 'discovery disabled');
-    assert.ok(deployed.includes('entity-ctx-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-ctx-svc:SVC-006'));
-    assert.ok(!deployed.includes('entity-ctx-svc:SVC-007'));
+    assert.ok(deployed.includes('entity-summary-svc:SVC-005'));
+    assert.ok(deployed.includes('entity-capabilities-svc:SVC-005'));
+    assert.ok(deployed.includes('entity-summary-svc:SVC-006'));
+    assert.ok(deployed.includes('entity-capabilities-svc:SVC-006'));
+    assert.ok(!deployed.includes('entity-summary-svc:SVC-007'));
   });
 
   it('skips skeleton import and contextualizes the current working graph', async () => {
@@ -112,8 +115,9 @@ describe('addContext subset options', () => {
       run_discovery: false });
 
     assert.equal(result.success, true);
-    assert.equal(result.queued.entity, 2);
-    assert.ok(deployed.includes('entity-ctx-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-ctx-svc:SVC-006'));
+    assert.equal(result.queued.entitySummary, 2);
+    assert.equal(result.queued.entityCapabilities, 2);
+    assert.ok(deployed.includes('entity-summary-svc:SVC-005'));
+    assert.ok(deployed.includes('entity-summary-svc:SVC-006'));
   });
 });

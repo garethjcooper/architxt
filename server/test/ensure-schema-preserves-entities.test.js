@@ -129,9 +129,10 @@ function seedOldSchema(db) {
       ('narrative-graph-discovery', 'narrative-graph-discovery', 'Narrative + graph discovery.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
       ('graph-discovered-only', 'graph-discovered-only', 'Graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
       ('narrative-graph-discovered-only', 'narrative-graph-discovered-only', 'Narrative + graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('entity-ctx', 'entity-ctx', 'Entity context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('edge-ctx', 'edge-ctx', 'Edge context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('discover-ctx', 'discover-ctx', 'Discover context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1)
+      ('sys_entity_summary', 'sys_entity_summary', 'Entity summary.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('sys_entity_capabilities', 'sys_entity_capabilities', 'Entity capabilities.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('sys_edge_context', 'sys_edge_context', 'Edge context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('sys_discovery_context', 'sys_discovery_context', 'Discovery context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1)
   `);
 
   // Create a mental model with one entity linked to it.
@@ -204,19 +205,19 @@ describe('ensureSchema backfills user template roles and validates contextual pl
     }
   });
 
-  it('does not overwrite existing system template roles', () => {
+  it('replaces legacy system template rows with canonical v36 rows', () => {
     const { db, file } = tempDb();
     try {
       seedOldSchema(db);
       ensureSchema(db);
 
-      // The system templates should have their reserved roles.
+      // The system templates should have their new reserved roles.
       const rows = db.prepare(`
         SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true'
       `).all();
-      const entity = rows.find((r) => r.mm_ext_id === 'entity-ctx-{entity-id}');
-      assert.ok(entity);
-      assert.equal(entity.mm_template_role, 'sys_entity_context');
+      const summary = rows.find((r) => r.mm_ext_id === 'entity-summary-{id}');
+      assert.ok(summary);
+      assert.equal(summary.mm_template_role, 'sys_entity_summary');
     } finally {
       closeAndDelete({ db, file });
     }
@@ -230,10 +231,10 @@ describe('ensureSchema backfills user template roles and validates contextual pl
       // Run migration once so the mm_template_role column exists.
       ensureSchema(db);
 
-      // Insert a stale discover-ctx template that predates the deterministic ext_id.
+      // Insert a stale discover template that predates the deterministic ext_id.
       db.prepare(`
         INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
-        VALUES ('discover-a-com:COM-001-{batch}', 'Old discover template', 'Old query', 'true', 'sys_discovery_context', 'discover-ctx', 'contextual-graph', 4096)
+        VALUES ('discover-a-com:COM-001-{batch}', 'Old discover template', 'Old query', 'true', 'sys_discovery_context', 'sys_patch', 'sys_discovery_context', 4096)
       `).run();
 
       // Re-run migration: it should delete the stale row and upsert the canonical one.
@@ -242,7 +243,7 @@ describe('ensureSchema backfills user template roles and validates contextual pl
       const rows = db.prepare(`
         SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true' AND mm_template_role = 'sys_discovery_context'
       `).all();
-      assert.equal(rows.length, 1, 'stale discover-ctx template was not cleaned up');
+      assert.equal(rows.length, 1, 'stale discover template was not cleaned up');
       assert.equal(rows[0].mm_ext_id, 'discover-{seed-id}');
     } finally {
       closeAndDelete({ db, file });

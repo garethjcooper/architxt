@@ -29,7 +29,8 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
   }
 
   try {
-    const composed = await composeMentalModelPrompt(db, spec.returns, spec.source_query);
+    // Contextual-graph prompts are looked up by mm_template_role, not by mm_returns.
+    const composed = await composeMentalModelPrompt(db, spec.role, spec.source_query);
     const modelForPush = {
       ...spec,
       composed_query: composed,

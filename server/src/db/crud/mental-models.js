@@ -17,13 +17,14 @@ export const getMentalModel = base.get;
 
 /** Roles owned by the system. User actions must not mutate these rows. */
 export const SYSTEM_TEMPLATE_ROLES = new Set([
-  'sys_entity_context',
+  'sys_entity_summary',
+  'sys_entity_capabilities',
   'sys_edge_context',
   'sys_discovery_context',
 ]);
 
 /** Returns values used by contextual-graph system templates. */
-export const CONTEXTUAL_RETURNS = new Set(['entity-ctx', 'edge-ctx', 'discover-ctx']);
+export const CONTEXTUAL_RETURNS = new Set(['sys_patch']);
 
 export function isSystemTemplateRole(role) {
   return SYSTEM_TEMPLATE_ROLES.has(role);
@@ -101,9 +102,7 @@ export const VALID_RETURNS = new Set([
   'narrative-graph-known',
   'narrative-graph-discovery',
   'narrative-graph-discovered-only',
-  'entity-ctx',
-  'edge-ctx',
-  'discover-ctx',
+  'sys_patch',
 ]);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
 export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability', 'contextual-graph'];

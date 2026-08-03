@@ -81,11 +81,12 @@ describe('addContext discovery integration', () => {
     assert.equal(result.queued.discover, 1);
     assert.ok(queued.includes('discover-svc:SVC-005'));
     // No candidates were ingested during addContext.
-    assert.equal(result.queued.entity, 2); // both canonical nodes
+    assert.equal(result.queued.entitySummary, 2);
+    assert.equal(result.queued.entityCapabilities, 2);
     assert.equal(result.queued.edge, 0); // auto-ranking is disabled
   });
 
-  it('does not queue a second discover-ctx model for a seed that already has one', async () => {
+  it('does not queue a second discover model for a seed that already has one', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
     ]);
@@ -112,7 +113,7 @@ describe('addContext discovery integration', () => {
       import_skeleton: false });
 
     const discoverExtId = firstDeployed.find((id) => id === 'discover-svc:SVC-005');
-    assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover-ctx model');
+    assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover model');
 
     const secondQueued = [];
     const secondDeployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -131,8 +132,8 @@ describe('addContext discovery integration', () => {
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 0);
     assert.ok(!secondQueued.includes('discover-svc:SVC-005'));
-    // Real deploy path records provenance; mocks don't, so entity-ctx re-queues
-    // deterministically because the seed lacks an entity-ctx ref. This is a
+    // Real deploy path records provenance; mocks don't, so entity-summary re-queues
+    // deterministically because the seed lacks a sys_entity_summary ref. This is a
     // test artifact; the behavior under real deployBatch is idempotent.
   });
 });
@@ -236,9 +237,10 @@ describe('ingestCandidates', () => {
     const result = await ingestCandidates(db, serverId, 'Mozart-API', 'svc:SVC-005', candidates, { existingNodes });
 
     assert.equal(result.success, true);
-    assert.equal(result.entity.length, 1);
+    assert.equal(result.entity.length, 2); // summary + capabilities
     assert.equal(result.edge.length, 1);
-    assert.equal(result.entity[0].ext_id, 'entity-ctx-candidate:payment-bridge');
+    assert.equal(result.entity[0].ext_id, 'entity-summary-candidate:payment-bridge');
+    assert.equal(result.entity[1].ext_id, 'entity-capabilities-candidate:payment-bridge');
     assert.equal(result.edge[0].ext_id, 'edge-ctx-candidate:payment-bridge|svc:SVC-005');
     assert.ok(result.upserted.nodes.includes('candidate:payment-bridge'));
     assert.equal(result.upserted.edges.length, 1);

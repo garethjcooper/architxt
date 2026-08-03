@@ -40,7 +40,7 @@ describe('deleteGeneratedModels', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-01' }],
+        model_refs: [{ role: 'sys_entity_summary', ext_id: 'entity-summary-svc:SVC-005', attached_at: '2026-08-01' }],
         updated_at: '2026-08-01' } });
 
     const deletedRemote = [];
@@ -52,8 +52,8 @@ describe('deleteGeneratedModels', () => {
     const result = await deleteGeneratedModels(db, serverId, 'Mozart-API', { deleteFromHindsight });
 
     assert.equal(result.success, true);
-    assert.deepEqual(result.deleted, ['entity-ctx-svc:SVC-005']);
-    assert.deepEqual(deletedRemote, ['entity-ctx-svc:SVC-005']);
+    assert.deepEqual(result.deleted, ['entity-summary-svc:SVC-005']);
+    assert.deepEqual(deletedRemote, ['entity-summary-svc:SVC-005']);
     assert.equal(result.cleared.nodes, 1);
     assert.equal(result.cleared.edges, 0);
 
@@ -67,7 +67,7 @@ describe('deleteGeneratedModels', () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       provenance: {
-        model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' }] } });
+        model_refs: [{ role: 'sys_entity_summary', ext_id: 'entity-summary-svc:SVC-005' }] } });
 
     const deleteFromHindsight = async () => { throw new Error('should not be called'); };
 
@@ -75,14 +75,14 @@ describe('deleteGeneratedModels', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.dry_run, true);
-    assert.deepEqual(result.ext_ids, ['entity-ctx-svc:SVC-005']);
+    assert.deepEqual(result.ext_ids, ['entity-summary-svc:SVC-005']);
     assert.deepEqual(result.deleted, []);
   });
 
   it('can delete explicit ext_ids without parsing', async () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
-      provenance: { model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005' }] } });
+      provenance: { model_refs: [{ role: 'sys_entity_summary', ext_id: 'entity-summary-svc:SVC-005' }] } });
 
     const deletedRemote = [];
     const deleteFromHindsight = async (_serverId, _bankId, extId) => {
@@ -91,10 +91,10 @@ describe('deleteGeneratedModels', () => {
     };
 
     const result = await deleteGeneratedModels(db, serverId, 'Mozart-API', {
-      ext_ids: ['entity-ctx-svc:SVC-005', 'entity-ctx-svc:SVC-006'],
+      ext_ids: ['entity-summary-svc:SVC-005', 'entity-summary-svc:SVC-006'],
       deleteFromHindsight });
 
-    assert.deepEqual(result.deleted.sort(), ['entity-ctx-svc:SVC-005', 'entity-ctx-svc:SVC-006']);
+    assert.deepEqual(result.deleted.sort(), ['entity-summary-svc:SVC-005', 'entity-summary-svc:SVC-006']);
     assert.equal(result.cleared.nodes, 1);
   });
 });

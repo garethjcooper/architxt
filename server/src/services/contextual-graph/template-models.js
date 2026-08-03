@@ -2,7 +2,8 @@ import { dbExec } from '../../utils/db-helpers.js';
 import { stmt } from '../../cache.js';
 
 export const CONTEXTUAL_GRAPH_ROLES = {
-  entity: 'sys_entity_context',
+  entitySummary: 'sys_entity_summary',
+  entityCapabilities: 'sys_entity_capabilities',
   edge: 'sys_edge_context',
   discover: 'sys_discovery_context',
 };
@@ -46,14 +47,14 @@ export function substituteTemplateFields(template, values) {
 }
 
 /**
- * Derive an entity-ctx mental model spec from the system template + graph node.
+ * Derive an entity-summary mental model spec from the system template + graph node.
  */
-export async function deriveEntityContextModel(db, node, bankId) {
-  const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.entity)?.data;
-  if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.entity}`);
+export async function deriveEntitySummaryModel(db, node, bankId) {
+  const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.entitySummary)?.data;
+  if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.entitySummary}`);
 
   const values = {
-    '{entity-id}': node.id,
+    '{id}': node.id,
     '{entity-name}': node.displayName || node.id,
   };
 
@@ -65,7 +66,31 @@ export async function deriveEntityContextModel(db, node, bankId) {
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
-    tags: [`ctx-${bankId}`, `entity-ctx`, `node-${node.id}`],
+    tags: [`ctx-${bankId}`, template.role, `node-${node.id}`],
+  };
+}
+
+/**
+ * Derive an entity-capabilities mental model spec from the system template + graph node.
+ */
+export async function deriveEntityCapabilitiesModel(db, node, bankId) {
+  const template = getContextualGraphTemplate(db, CONTEXTUAL_GRAPH_ROLES.entityCapabilities)?.data;
+  if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.entityCapabilities}`);
+
+  const values = {
+    '{id}': node.id,
+    '{entity-name}': node.displayName || node.id,
+  };
+
+  return {
+    role: template.role,
+    ext_id: substituteTemplateFields(template.ext_id, values),
+    name: substituteTemplateFields(template.name, values),
+    source_query: substituteTemplateFields(template.source_query, values),
+    returns: template.returns,
+    dimension: template.dimension,
+    max_tokens: template.max_tokens,
+    tags: [`ctx-${bankId}`, template.role, `node-${node.id}`],
   };
 }
 
@@ -91,7 +116,7 @@ export async function deriveEdgeContextModel(db, sourceNode, targetNode, bankId)
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
-    tags: [`ctx-${bankId}`, `edge-ctx`, `pair-${sourceNode.id}|${targetNode.id}`],
+    tags: [`ctx-${bankId}`, template.role, `pair-${sourceNode.id}|${targetNode.id}`],
   };
 }
 
@@ -115,7 +140,7 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], b
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
-    tags: [`ctx-${bankId}`, `discover`, `seed-${seedNode.id}`],
+    tags: [`ctx-${bankId}`, template.role, `seed-${seedNode.id}`],
     // Pass neighbors to the deploy layer so it can include them in the prompt topic.
     neighbor_ids: neighbors.map((n) => (typeof n === 'string' ? n : n.id)),
   };

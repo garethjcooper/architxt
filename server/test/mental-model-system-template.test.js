@@ -70,7 +70,7 @@ describe('system template hygiene', () => {
     try { fs.unlinkSync(file); } catch {}
   });
 
-  it('has the three reserved system template roles', () => {
+  it('has the four reserved system template roles', () => {
     for (const role of SYSTEM_TEMPLATE_ROLES) {
       const row = getSystemTemplate(db, role);
       assert.equal(row.mm_is_template, 'true');
@@ -89,97 +89,97 @@ describe('system template hygiene', () => {
   });
 
   it('cannot delete a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = deleteMentalModel(db, mm_id);
     expectBlocked(result);
   });
 
   it('cannot convert a system template to a non-template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = updateMentalModel(db, mm_id, { mm_is_template: 'false' });
     expectBlocked(result);
   });
 
   it('cannot change a system template role', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = updateMentalModel(db, mm_id, { mm_template_role: 'user_entity_derived' });
     expectBlocked(result);
   });
 
   it('cannot change a system template external id to a different value', () => {
-    const { mm_id, mm_ext_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id, mm_ext_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = updateMentalModel(db, mm_id, { mm_ext_id: `${mm_ext_id}-hacked` });
     expectBlocked(result);
   });
 
   it('allows a system template external id to be set to its current value', () => {
-    const { mm_id, mm_ext_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id, mm_ext_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = updateMentalModel(db, mm_id, { mm_ext_id: mm_ext_id });
     assert.equal(result.success, true, result.error);
   });
 
   it('cannot change a system template name', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = updateMentalModel(db, mm_id, { mm_name: 'Hacked name' });
     expectBlocked(result);
   });
 
   it('can still edit benign config fields on a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = updateMentalModel(db, mm_id, { mm_max_tokens: 4096 });
     assert.equal(result.success, true, result.error);
   });
 
   it('cannot add a tag to a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const tagId = makeTag(db);
     const result = addMentalModelTag(db, mm_id, tagId);
     expectBlocked(result);
   });
 
   it('cannot remove a tag from a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const tagId = makeTag(db);
     const result = removeMentalModelTag(db, mm_id, tagId);
     expectBlocked(result);
   });
 
   it('cannot sync tags on a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = syncMentalModelTags(db, mm_id, ['some-tag']);
     expectBlocked(result);
   });
 
   it('cannot add an entity to a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const { entId } = makeEntity(db);
     const result = addMentalModelEntity(db, mm_id, entId);
     expectBlocked(result);
   });
 
   it('cannot remove an entity from a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const { entId } = makeEntity(db);
     const result = removeMentalModelEntity(db, mm_id, entId);
     expectBlocked(result);
   });
 
   it('cannot batch update tags on a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const tagId = makeTag(db);
     const result = batchUpdateMentalModelTags(db, [mm_id], [tagId], []);
     expectBlocked(result);
   });
 
   it('cannot batch update entities on a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const { entId } = makeEntity(db);
     const result = batchUpdateMentalModelEntities(db, [mm_id], [entId], []);
     expectBlocked(result);
   });
 
   it('cannot batch update config on a system template', () => {
-    const { mm_id } = getSystemTemplate(db, 'sys_entity_context');
+    const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
     const result = batchUpdateMentalModelConfig(db, [mm_id], { max_tokens: 1024 });
     expectBlocked(result);
   });
@@ -188,9 +188,9 @@ describe('system template hygiene', () => {
     const derived = deriveMentalModels({
       id: 1,
       is_template: true,
-      template_role: 'sys_entity_context',
-      ext_id: 'sys_entity_context',
-      name: 'Entity context',
+      template_role: 'sys_entity_summary',
+      ext_id: 'sys_entity_summary',
+      name: 'Entity summary',
       source_query: '',
       refresh_after_consolidation: false,
       refresh_mode: 'full',
@@ -199,7 +199,7 @@ describe('system template hygiene', () => {
       max_tokens: 2048,
       tags_match_mode: 'all_strict',
       dimension: 'contextual-graph',
-      returns: 'entity-ctx',
+      returns: 'sys_patch',
       concatenation: 'compile',
       tags: [],
       entities: [{ id: 99, name: 'some-entity', entity_id: 'ent-99' }],

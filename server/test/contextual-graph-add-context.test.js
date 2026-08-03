@@ -54,7 +54,7 @@ describe('addContext', () => {
     assert.equal(result.code, 'MISSING_PARAMS');
   });
 
-  it('imports skeleton and queues entity-ctx models for active nodes', async () => {
+  it('imports skeleton and queues entity models for active nodes', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
       { type: 'svc', entityId: 'SVC-006', name: 'Invoice Service' },
@@ -80,11 +80,14 @@ describe('addContext', () => {
  neighborhood: {} });
 
     assert.equal(result.success, true);
-    assert.equal(result.queued.entity, 2);
+    assert.equal(result.queued.entitySummary, 2);
+    assert.equal(result.queued.entityCapabilities, 2);
     assert.equal(result.queued.edge, 0);
     assert.equal(result.queued.discover, 0);
-    assert.ok(deployed.includes('entity-ctx-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-ctx-svc:SVC-006'));
+    assert.ok(deployed.includes('entity-summary-svc:SVC-005'));
+    assert.ok(deployed.includes('entity-capabilities-svc:SVC-005'));
+    assert.ok(deployed.includes('entity-summary-svc:SVC-006'));
+    assert.ok(deployed.includes('entity-capabilities-svc:SVC-006'));
   });
 
   it('queues edge-ctx models for undirected edges', async () => {
@@ -115,12 +118,13 @@ describe('addContext', () => {
  neighborhood: {} });
 
     assert.equal(result.success, true);
-    assert.equal(result.queued.entity, 2);
+    assert.equal(result.queued.entitySummary, 2);
+    assert.equal(result.queued.entityCapabilities, 2);
     assert.equal(result.queued.edge, 1);
     assert.ok(deployed.includes('edge-ctx-svc:SVC-005|svc:SVC-006'));
   });
 
-  it('does not queue entity-ctx for nodes that already have a model_ref', async () => {
+  it('does not queue entity models for nodes that already have a model_ref', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
     ]);
@@ -128,7 +132,10 @@ describe('addContext', () => {
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
       display_name: 'Billing Service',
-      provenance: { source: 'entity-ctx', model_refs: [{ role: 'entity-ctx', ext_id: 'entity-ctx-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }] } });
+      provenance: {
+        source: 'sys_entity_summary',
+        model_refs: [{ role: 'sys_entity_summary', ext_id: 'entity-summary-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }, { role: 'sys_entity_capabilities', ext_id: 'entity-capabilities-svc:SVC-005', attached_at: '2026-08-02T00:00:00.000Z' }],
+      } });
 
     const fetchGraph = makeFetchGraph({
       nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
@@ -146,7 +153,8 @@ describe('addContext', () => {
  neighborhood: {} });
 
     assert.equal(result.success, true);
-    assert.equal(result.queued.entity, 0);
+    assert.equal(result.queued.entitySummary, 0);
+    assert.equal(result.queued.entityCapabilities, 0);
   });
 
   it('includes manual seed_node_ids in discovery queue', async () => {
@@ -198,13 +206,13 @@ describe('addContext', () => {
 
     const { getNode } = await import('../src/db/crud/contextual-graph.js');
     const node = getNode(db, serverId, 'Mozart-API', 'svc:SVC-005').data;
-    assert.equal(node.cgn_properties.provenance.model_refs.length, 1);
-    assert.equal(node.cgn_properties.provenance.model_refs[0].role, 'entity-ctx');
-    assert.equal(node.cgn_properties.provenance.model_refs[0].ext_id, 'entity-ctx-svc:SVC-005');
+    assert.equal(node.cgn_properties.provenance.model_refs.length, 2);
+    const roles = node.cgn_properties.provenance.model_refs.map((r) => r.role).sort();
+    assert.deepEqual(roles, ['sys_entity_capabilities', 'sys_entity_summary']);
     assert.equal(node.cgn_properties.provenance.source, 'contextual-graph');
   });
 
-  it('does not queue a second discover-ctx model for a seed that already has one', async () => {
+  it('does not queue a second discover model for a seed that already has one', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
     ]);
@@ -227,7 +235,7 @@ describe('addContext', () => {
  neighborhood: { top_k_neighbors: 5 } });
 
     const discoverExtId = firstDeployed.find((id) => id === 'discover-svc:SVC-005');
-    assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover-ctx model');
+    assert.equal(discoverExtId, 'discover-svc:SVC-005', 'first run should deploy deterministic discover model');
 
     const secondQueued = [];
     const secondDeployBatch = async (_db, _serverId, _bankId, specs) => {
@@ -246,8 +254,8 @@ describe('addContext', () => {
     assert.equal(result.success, true);
     assert.equal(result.queued.discover, 0);
     assert.ok(!secondQueued.includes('discover-svc:SVC-005'));
-    // Real deploy path records provenance; mocks don't, so entity-ctx re-queues
-    // deterministically because the seed lacks an entity-ctx ref. This is a
+    // Real deploy path records provenance; mocks don't, so entity-summary re-queues
+    // deterministically because the seed lacks a sys_entity_summary ref. This is a
     // test artifact; the behavior under real deployBatch is idempotent.
   });
 });
