@@ -52,7 +52,7 @@ function ensureMissingTables(db) {
         mm_viewp_description TEXT,
         mm_viewp_meta JSON,
         mm_dimension TEXT,
-        mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
+        mm_returns TEXT DEFAULT 'narrative',
         mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
         mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -316,30 +316,112 @@ const BUILTIN_TEMPLATES = [
     examplesHeuristic: 'top-n',
   },
   {
-    name: 'entity-ctx',
-    mode: 'entity-ctx',
-    description: 'System template: enrich one contextual-graph node with aliases, artifacts, mentions, summary, and evidence.',
-    body: 'You are an architectural context extractor. Your task is to enrich a single entity from the source material.\n\n## Entity\n\n{{ARCHITXT_TOPIC}}\n\n## Instructions\n\nReturn ONLY a JSON object with this exact shape (no markdown fences, no extra prose):\n\n{\n  "aliases": ["alternate name 1", "abbreviation"],\n  "artifacts": [\n    {\n      "name": "artifact name",\n      "artifact_type": "endpoint|table|file|function|schema|event|queue|dependency",\n      "evidence": ["memory-id"]\n    }\n  ],\n  "mentions": [\n    {\n      "node_id": "id of a related node",\n      "context": "brief co-occurrence context",\n      "evidence": ["memory-id"]\n    }\n  ],\n  "summary": "evidence-backed summary of the entity",\n  "evidence": ["memory-id-1", "memory-id-2"]\n}\n\nUse stable lower-kebab-case for any IDs you create. Only include facts supported by the source material. Empty arrays are acceptable if no evidence exists.\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '[]',
-    variables: '["ARCHITXT_TOPIC"]',
+    name: 'sys_entity_summary',
+    mode: 'sys_entity_summary',
+    description: 'System template: concise evidence-backed summary for one contextual-graph node.',
+    body: `You are summarising a single known architectural entity for an architecture graph.
+
+## Entity
+
+{{ARCHITXT_TOPIC}}
+
+## Instructions
+
+Describe the core role that the entity plays in the architecture. Return the summary in the \`narrative\` field of the JSON envelope.
+
+Rules:
+- Use only facts supported by the source material.
+- Do not invent aliases, artifacts, or related entities.
+- Evidence is implicit in the source query scope; do not enumerate memory IDs inside the narrative.
+- Keep the narrative short enough to fit within the model token budget.
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_CORPUS"]',
     examplesHeuristic: null,
   },
   {
-    name: 'edge-ctx',
-    mode: 'edge-ctx',
+    name: 'sys_entity_capabilities',
+    mode: 'sys_entity_capabilities',
+    description: 'System template: capabilities table for one contextual-graph node.',
+    body: `You are listing the major architectural capabilities of a single known entity.
+
+## Entity
+
+{{ARCHITXT_TOPIC}}
+
+## Instructions
+
+Return the capabilities in a single table named \`capabilities\` with columns \`name\`, \`responsibility\`, \`purpose\`, \`business_capability_mapping\`, and \`evidence\`.
+
+Rules:
+- Each capability must be a stable, high-level responsibility, not a one-off mention.
+- \`responsibility\` describes what the entity does for this capability.
+- \`purpose\` explains why the capability matters.
+- \`business_capability_mapping\` places the capability in a business domain.
+- \`evidence\` must be an array of memory IDs that support the capability.
+- Do not include capabilities that are not backed by evidence.
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","output-format-table-contextual.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_CORPUS"]',
+    examplesHeuristic: null,
+  },
+  {
+    name: 'sys_edge_context',
+    mode: 'sys_edge_context',
     description: 'System template: characterize directed relationships between two contextual-graph nodes.',
-    body: 'You are an architectural relationship extractor. Your task is to characterize the relationship between two entities from the source material.\n\n## Relationship\n\n{{ARCHITXT_TOPIC}}\n\n## Instructions\n\nReturn ONLY a JSON object with this exact shape (no markdown fences, no extra prose):\n\n{\n  "relationships": [\n    {\n      "type": "calls|sends|reads|writes|depends-on",\n      "source_id": "source node id",\n      "target_id": "target node id",\n      "confidence": 0.85,\n      "label": "human-readable label",\n      "evidence": ["memory-id"]\n    }\n  ]\n}\n\nEmit one record per distinct directed interaction. If the interaction is bidirectional, emit two records with reversed source_id and target_id. Confidence must be a number between 0 and 1. Use only stable lower-kebab-case IDs.\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '[]',
-    variables: '["ARCHITXT_TOPIC"]',
+    body: `You are describing the directed interaction between two known entities in an architecture graph.
+
+## Relationship
+
+{{ARCHITXT_TOPIC}}
+
+## Instructions
+
+Both endpoints already exist in the graph. Do not introduce new nodes. Return the interaction as a directed edge in \`graph.edges\`.
+
+Rules:
+- If the interaction is bidirectional, emit two edges with \`from\`/\`to\` swapped.
+- Do not include edges to nodes that are not one of the two endpoints.
+- Drop any edge that lacks evidence.
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_CORPUS"]',
     examplesHeuristic: null,
   },
   {
-    name: 'discover-ctx',
-    mode: 'discover-ctx',
+    name: 'sys_discovery_context',
+    mode: 'sys_discovery_context',
     description: 'System template: suggest new contextual-graph nodes and edges around a seed node.',
-    body: 'You are an architectural discovery assistant. Your task is to suggest new named architectural elements and their relationships around a seed entity from the source material.\n\n## Seed\n\n{{ARCHITXT_TOPIC}}\n\n## Instructions\n\nReturn ONLY a JSON object with this exact shape (no markdown fences, no extra prose):\n\n{\n  "candidates": [\n    {\n      "id": "stable-normalized-id",\n      "summary": "short evidence-backed summary of the candidate",\n      "hypothesized_edges": [\n        {\n          "target": "id of an existing related node",\n          "type": "calls|sends|reads|writes|depends-on|co-occurs",\n          "evidence": "memory-id or short corpus evidence"\n        }\n      ]\n    }\n  ]\n}\n\nCandidate IDs must be lower-kebab-case and stable across runs. Only suggest persistent named architectural elements (services, APIs, tables, queues, schemas, files). Do not suggest transient variables, generic concepts, or entities already listed as direct neighbors of the seed. Each hypothesized edge must point to an existing neighbor of the seed.\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '[]',
-    variables: '["ARCHITXT_TOPIC"]',
+    body: `You are discovering candidate entities and relationships around a seed entity in the corpus.
+
+## Seed
+
+{{ARCHITXT_TOPIC}}
+
+## Instructions
+
+Return candidate nodes and edges in \`graph.nodes\` and \`graph.edges\`. This output is an internal working-graph input only; do not surface it as user-facing prose.
+
+Rules:
+- Candidate node IDs must use the \`found:{slug}\` form.
+- Existing known nodes must use their canonical \`TYPE:ID\` id.
+- Every candidate and edge must be backed by evidence.
+- Do not return candidates that are already known canonical nodes.
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_CORPUS"]',
     examplesHeuristic: null,
   },
 ];
@@ -495,30 +577,39 @@ function backfillUserTemplateRoles(db) {
  */
 const CONTEXTUAL_GRAPH_TEMPLATES = [
   {
-    extId: 'entity-ctx-{entity-id}',
-    name: 'Entity context: {entity-name}',
-    role: 'sys_entity_context',
-    returns: 'entity-ctx',
-    dimension: 'contextual-graph',
-    sourceQuery: 'Entity: {entity-id} ({entity-name}). Return a concise JSON summary with aliases, artifacts, mentions, summary, and evidence.',
+    extId: 'entity-summary-{id}',
+    name: 'Entity summary: {entity-name}',
+    role: 'sys_entity_summary',
+    returns: 'sys_patch',
+    dimension: 'sys_entity_summary',
+    sourceQuery: 'Entity: {id} ({entity-name}). Return a concise JSON summary in the narrative field of the standard envelope.',
+    maxTokens: 4096,
+  },
+  {
+    extId: 'entity-capabilities-{id}',
+    name: 'Entity capabilities: {entity-name}',
+    role: 'sys_entity_capabilities',
+    returns: 'sys_patch',
+    dimension: 'sys_entity_capabilities',
+    sourceQuery: 'Entity: {id} ({entity-name}). Return a capabilities table in the standard envelope.',
     maxTokens: 4096,
   },
   {
     extId: 'edge-ctx-{source-id}|{target-id}',
     name: 'Edge context: {source-name} ↔ {target-name}',
     role: 'sys_edge_context',
-    returns: 'edge-ctx',
-    dimension: 'contextual-graph',
-    sourceQuery: 'Relationship between {source-id} ({source-name}) and {target-id} ({target-name}). Return a JSON list of directed relationships with type, source_id, target_id, confidence, label, and evidence.',
+    returns: 'sys_patch',
+    dimension: 'sys_edge_context',
+    sourceQuery: 'Relationship between {source-id} ({source-name}) and {target-id} ({target-name}). Return directed edges in the standard envelope.',
     maxTokens: 4096,
   },
   {
     extId: 'discover-{seed-id}',
     name: 'Discover around {seed-name}',
     role: 'sys_discovery_context',
-    returns: 'discover-ctx',
-    dimension: 'contextual-graph',
-    sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest new candidate nodes and hypothesized edges. Return JSON with candidates containing id, summary, and hypothesized_edges.',
+    returns: 'sys_patch',
+    dimension: 'sys_discovery_context',
+    sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest candidate nodes and edges in the standard envelope.',
     maxTokens: 4096,
   },
 ];
@@ -548,6 +639,19 @@ function ensureContextualGraphTemplates(db) {
   for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
     const result = deleteStale.run('true', t.role, t.extId);
     deleted += result.changes;
+  }
+
+  // Delete deprecated contextual-graph roles that are no longer canonical
+  // (e.g. sys_entity_context was replaced by sys_entity_summary).
+  const deprecatedRoles = ['sys_entity_context'];
+  if (deprecatedRoles.length > 0) {
+    const deleteDeprecated = db.prepare(`
+      DELETE FROM mental_models
+      WHERE mm_is_template = ?
+        AND mm_template_role IN (${deprecatedRoles.map(() => '?').join(',')})
+    `);
+    const deprecatedResult = deleteDeprecated.run('true', ...deprecatedRoles);
+    deleted += deprecatedResult.changes;
   }
 
   let seeded = 0;
@@ -685,7 +789,7 @@ function removeMentalModelCheckConstraints(db) {
       mm_viewp_description TEXT,
       mm_viewp_meta JSON,
       mm_dimension TEXT,
-      mm_returns TEXT DEFAULT 'narrative' REFERENCES prompt_templates(pt_name),
+      mm_returns TEXT DEFAULT 'narrative',
       mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
       mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -723,7 +827,10 @@ function removeMentalModelCheckConstraints(db) {
 
     return ['mm_refresh_mode', 'mm_tags_match_mode', 'mm_ent_refresh_mode', 'mm_returns'].some((colName) => {
       const checkPattern = new RegExp(`CHECK\\s*\\(\\s*${colName}\\s+IN`, 'i');
-      return checkPattern.test(sql);
+      const fkPattern = colName === 'mm_returns'
+        ? new RegExp(`${colName}\\s+[^,]*REFERENCES`, 'i')
+        : null;
+      return checkPattern.test(sql) || (fkPattern && fkPattern.test(sql));
     });
   }
 

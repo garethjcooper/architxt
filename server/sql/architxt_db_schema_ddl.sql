@@ -234,7 +234,7 @@ CREATE TABLE mental_models (
   mm_viewp_description TEXT,
   mm_viewp_meta JSON,
   mm_dimension TEXT,
-  mm_returns TEXT DEFAULT 'narrative' REFERENCES prompt_templates(pt_name),
+  mm_returns TEXT DEFAULT 'narrative',
   mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
   mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL

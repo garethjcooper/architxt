@@ -220,6 +220,15 @@ export const config = {
     normalize_whitespace: getEnv('ARCHITXT_DENOISE_NORMALIZE_WS', 'true') === 'true',
     remove_non_ascii: getEnv('ARCHITXT_DENOISE_REMOVE_NON_ASCII', 'true') === 'true',
     max_consecutive_newlines: getInt('ARCHITXT_DENOISE_MAX_NEWLINES', 3)
-  }
+  },
+  contextualGraph: {
+    patchRoles: {
+      sys_entity_summary: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_ENTITY_SUMMARY', 'true') === 'true',
+      sys_entity_capabilities: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_ENTITY_CAPABILITIES', 'true') === 'true',
+      sys_edge_context: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_EDGE_CONTEXT', 'true') === 'true',
+      // Discovery is disabled by default until the candidate-approval UI exists.
+      sys_discovery_context: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_DISCOVERY_CONTEXT', 'false') === 'true',
+    },
+  },
 
 };

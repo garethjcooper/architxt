@@ -129,9 +129,10 @@ export function stripModelRefsFromProperties(properties, extIdsToRemove) {
 
 function guessRole(extId) {
   if (typeof extId !== 'string') return 'model';
-  if (extId.startsWith('entity-ctx-')) return 'entity-ctx';
-  if (extId.startsWith('edge-ctx-')) return 'edge-ctx';
-  if (extId.startsWith('discover-')) return 'discover-ctx';
+  if (extId.startsWith('entity-summary-')) return 'sys_entity_summary';
+  if (extId.startsWith('entity-capabilities-')) return 'sys_entity_capabilities';
+  if (extId.startsWith('edge-ctx-')) return 'sys_edge_context';
+  if (extId.startsWith('discover-')) return 'sys_discovery_context';
   return 'model';
 }
 

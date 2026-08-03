@@ -14,12 +14,18 @@ const VALID_MODES = new Set([
   'narrative-graph-known',
   'narrative-graph-discovery',
   'narrative-graph-discovered-only',
-  'entity-ctx',
-  'edge-ctx',
-  'discover-ctx',
+  'sys_entity_summary',
+  'sys_entity_capabilities',
+  'sys_edge_context',
+  'sys_discovery_context',
 ]);
 
-const CONTEXTUAL_MODES = new Set(['entity-ctx', 'edge-ctx', 'discover-ctx']);
+const CONTEXTUAL_MODES = new Set([
+  'sys_entity_summary',
+  'sys_entity_capabilities',
+  'sys_edge_context',
+  'sys_discovery_context',
+]);
 
 /**
  * Load a prompt template row from the database by name.
@@ -168,11 +174,14 @@ function formatNodeExamples({ include, exclude }) {
  * Compose a full prompt for a derived mental model.
  *
  * @param {object} db
- * @param {string} templateName - value from mental_models.mm_returns
+ * @param {string} templateName - value from mental_models.mm_template_role for
+ *   contextual-graph system templates, or mental_models.mm_returns for all others.
  * @param {string} topic - rendered mm_source_query after single-brace substitution
  * @returns {Promise<string>}
  */
 export async function composeMentalModelPrompt(db, templateName, topic) {
+  // Contextual-graph system templates are keyed by mm_template_role, not by
+  // mm_returns (which is now the generic 'sys_patch' placeholder).
   if (CONTEXTUAL_MODES.has(templateName)) {
     const template = getTemplateByName(db, templateName);
     if (!template) {
@@ -198,7 +207,7 @@ export async function composeMentalModelPrompt(db, templateName, topic) {
  * derived mental models.
  *
  * @param {object} db
- * @param {Array<{returns: string, source_query: string}>} items
+ * @param {Array<{returns: string, source_query: string, role?: string, template_role?: string}>} items
  * @returns {Promise<Array<{composed_query: string|null, compose_error?: string}>>}
  */
 export async function composeMentalModelPromptBatch(db, items) {
@@ -210,7 +219,9 @@ export async function composeMentalModelPromptBatch(db, items) {
   const examplesByTemplate = new Map();
 
   // Pre-load every unique template so we don't query per row.
-  const uniqueNames = new Set(items.map((i) => i.returns).filter(Boolean));
+  // For contextual-graph rows the lookup key is role/template_role; for all
+  // others it is mm_returns.
+  const uniqueNames = new Set(items.map((i) => i.role || i.template_role || i.returns).filter(Boolean));
   for (const name of uniqueNames) {
     const template = getTemplateByName(db, name);
     if (template) templatesByName.set(name, template);
@@ -223,9 +234,10 @@ export async function composeMentalModelPromptBatch(db, items) {
 
   const results = [];
   for (const item of items) {
-    const template = templatesByName.get(item.returns);
+    const lookupKey = item.role || item.template_role || item.returns;
+    const template = templatesByName.get(lookupKey);
     if (!template) {
-      results.push({ composed_query: null, compose_error: `Prompt template not found: ${item.returns}` });
+      results.push({ composed_query: null, compose_error: `Prompt template not found: ${lookupKey}` });
       continue;
     }
 
@@ -234,7 +246,7 @@ export async function composeMentalModelPromptBatch(db, items) {
         ARCHITXT_TOPIC: item.source_query || '',
       };
 
-      if (!CONTEXTUAL_MODES.has(item.returns)) {
+      if (!CONTEXTUAL_MODES.has(lookupKey)) {
         if (entityCatalog === null) {
           entityCatalog = await buildEntityCatalogVariable(db);
         }
@@ -260,7 +272,7 @@ export async function composeMentalModelPromptBatch(db, items) {
       results.push({ composed_query: prompt });
     } catch (err) {
       logger.warn('Failed to compose mental model prompt in batch', {
-        template: item.returns,
+        template: lookupKey,
         error: err.message,
       });
       results.push({ composed_query: null, compose_error: err.message });
