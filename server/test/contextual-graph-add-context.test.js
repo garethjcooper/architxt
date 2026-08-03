@@ -254,4 +254,59 @@ describe('addContext', () => {
     assert.equal(node.cgn_properties.provenance.model_refs[0].ext_id, 'entity-ctx-svc:SVC-005');
     assert.equal(node.cgn_properties.provenance.source, 'contextual-graph');
   });
+
+  it('does not queue a second discover-ctx model for a seed that already has one', async () => {
+    seedEntities(db, [
+      { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
+    ]);
+
+    const fetchGraph = makeFetchGraph({
+      nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
+      edges: [],
+    });
+
+    const firstDeployed = [];
+    const firstDeployBatch = async (_db, _serverId, _bankId, specs) => {
+      for (const spec of specs) firstDeployed.push(spec.ext_id);
+      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+    };
+
+    await addContext(db, serverId, 'Mozart-API', {
+      fetchGraph,
+      deployBatch: firstDeployBatch,
+      seed_node_ids: ['svc:SVC-005'],
+      neighborhood: { run_discovery: true, top_k_neighbors: 5 },
+    });
+
+    const discoverExtId = firstDeployed.find((id) => id.startsWith('discover-svc:SVC-005-'));
+    assert.ok(discoverExtId, 'first run should deploy a discover-ctx model');
+
+    // Simulate the provenance update that the real deploy path performs.
+    const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
+    upsertNode(db, serverId, 'Mozart-API', 'svc:SVC-005', ['canonical', 'active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_id: discoverExtId,
+        model_refs: [{ role: 'discover-ctx', ext_id: discoverExtId, attached_at: '2026-08-02T00:00:00.000Z' }],
+      },
+    });
+
+    const secondQueued = [];
+    const secondDeployBatch = async (_db, _serverId, _bankId, specs) => {
+      for (const spec of specs) secondQueued.push(spec.ext_id);
+      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+    };
+
+    const result = await addContext(db, serverId, 'Mozart-API', {
+      fetchGraph,
+      deployBatch: secondDeployBatch,
+      seed_node_ids: ['svc:SVC-005'],
+      neighborhood: { run_discovery: true, top_k_neighbors: 5 },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued.discover, 0);
+    assert.ok(!secondQueued.some((id) => id.startsWith('discover-svc:SVC-005-')));
+  });
 });
