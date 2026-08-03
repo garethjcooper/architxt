@@ -532,6 +532,24 @@ function ensureContextualGraphTemplates(db) {
   const existingByExtId = new Map(existing.map((r) => [r.mm_ext_id, r]));
   const existingRoles = new Set(existing.map((r) => r.mm_template_role));
 
+  const canonicalExtIds = new Set(CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.extId));
+  const canonicalRoles = new Set(CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role));
+
+  // Delete stale contextual-graph template rows whose role is one of ours but
+  // whose ext_id no longer matches the canonical shape. This prevents old
+  // deployed templates (e.g. discover-*-{batch}) from shadowing the new ones.
+  let deleted = 0;
+  const deleteStale = db.prepare(`
+    DELETE FROM mental_models
+    WHERE mm_is_template = ?
+      AND mm_template_role = ?
+      AND mm_ext_id != ?
+  `);
+  for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
+    const result = deleteStale.run('true', t.role, t.extId);
+    deleted += result.changes;
+  }
+
   let seeded = 0;
   const upsert = db.prepare(`
     INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
@@ -557,8 +575,8 @@ function ensureContextualGraphTemplates(db) {
     }
   }
 
-  if (seeded > 0) {
-    logger.info('Ensured contextual-graph system templates', { seeded, roles: CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role) });
+  if (seeded > 0 || deleted > 0) {
+    logger.info('Ensured contextual-graph system templates', { seeded, deleted, roles: CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role) });
   }
 
   return seeded;
