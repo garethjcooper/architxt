@@ -37,6 +37,73 @@ function buildLocalModel(model) {
   };
 }
 
+function arraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function edgeContentEqual(props, modelEdge) {
+  const label = modelEdge.label ?? '';
+  const detail = modelEdge.detail ?? '';
+  return (props.label ?? '') === label && (props.detail ?? '') === detail;
+}
+
+/**
+ * Compare the normalized model output against the current working-graph state.
+ * Returns true when the working graph does not match the model (i.e. should apply).
+ *
+ * @param {object} db
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {{type: 'node'|'edge', node?: object, edge?: object, ref: object}} scope
+ * @param {object} output - normalized model output
+ * @returns {boolean}
+ */
+function hasDivergence(db, serverId, bankId, scope, output) {
+  const role = scope.ref.role;
+
+  if (role === 'sys_entity_summary') {
+    if (scope.type !== 'node') return false;
+    const current = scope.node?.properties?.summary ?? '';
+    return current !== (output.narrative || '');
+  }
+
+  if (role === 'sys_entity_capabilities') {
+    if (scope.type !== 'node') return false;
+    const current = scope.node?.properties?.capabilities || [];
+    const modelCapabilities = output.tables.find((t) => t.name === 'capabilities')?.rows || [];
+    return !arraysEqual(current, modelCapabilities);
+  }
+
+  if (role === 'sys_edge_context') {
+    if (output.graph.edges.length === 0) return true;
+    const allEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
+    const allEdges = allEdgesResult?.success ? allEdgesResult.data : [];
+
+    for (const modelEdge of output.graph.edges) {
+      if (!modelEdge.from || !modelEdge.to) continue;
+      const existing = allEdges.find((e) =>
+        (e.cge_source_id === modelEdge.from && e.cge_target_id === modelEdge.to) ||
+        (e.cge_source_id === modelEdge.to && e.cge_target_id === modelEdge.from)
+      );
+      if (!existing) return true;
+      if (!edgeContentEqual(existing.cge_properties || {}, modelEdge)) return true;
+    }
+    return false;
+  }
+
+  if (role === 'sys_discovery_context') {
+    // Discovery replaces a scoped subgraph; always consider it diverged until apply runs.
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Extract all contextual-graph model_refs attached to nodes and edges in the bank.
  *
@@ -107,36 +174,18 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
   upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
 }
 
-function needsReapply(scope) {
-  const ref = scope.ref;
-  if (ref.role === 'sys_entity_summary') {
-    const summary = scope.type === 'node' ? scope.node?.properties?.summary : undefined;
-    return summary === undefined || summary === null || summary === '';
-  }
-  if (ref.role === 'sys_entity_capabilities') {
-    const capabilities = scope.type === 'node' ? scope.node?.properties?.capabilities : undefined;
-    return !Array.isArray(capabilities) || capabilities.length === 0;
-  }
-  if (ref.role === 'sys_edge_context') {
-    if (scope.type !== 'edge') return false;
-    const props = scope.edge?.cge_properties || {};
-    return !props.detail || !props.label;
-  }
-  return false;
-}
-
 /**
  * Refresh contextual-graph patches from Hindsight.
  *
- * Fetches mental models (detail=full) for every model_ref attached to the local
- * graph, compares content_hash, normalizes the output, and applies it when it
- * has changed. Disabled roles are skipped but still get their fetched_at updated.
+ * Fetches mental models (detail=content) for every model_ref attached to the local
+ * graph, compares normalized output against current working-graph state, and applies
+ * only when they diverge. Disabled roles are skipped but still get fetched_at updated.
  *
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
  * @param {object} [options]
- * @param {boolean} [options.dryRun=false] - when true, compare hashes but do not apply.
+ * @param {boolean} [options.dryRun=false] - when true, compare but do not apply.
  * @returns {Promise<{success: boolean, stats: object, error?: string}>}
  */
 export async function refreshContextualGraphPatches(db, serverId, bankId, options = {}) {
@@ -185,23 +234,13 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
       const content = getModelContent(model);
       const newHash = contentHash(content);
-      const oldHash = scope.ref.content_hash;
 
-      const contentChanged = !oldHash || oldHash !== newHash;
-
-      if (!contentChanged && !needsReapply(scope)) {
-        stats.skippedUnchanged += 1;
-        updateRefTimestampOnScope(db, serverId, bankId, scope, scope.ref, timestamp);
-        continue;
-      }
-
-      // Dry-run still fetches and compares, but never applies.
+      // Dry-run still fetches and normalizes, but never applies.
       if (dryRun) {
-        updateRefTimestampOnScope(db, serverId, bankId, scope, scope.ref, timestamp);
+        updateRefTimestampOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp);
         continue;
       }
 
-      const localModel = buildLocalModel(model);
       const output = normalizeModelOutput(content);
       if (output.errors.length > 0) {
         stats.failed += 1;
@@ -210,6 +249,17 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
+      const oldHash = scope.ref.content_hash;
+      const hashChanged = !oldHash || oldHash !== newHash;
+      const diverged = hasDivergence(db, serverId, bankId, scope, output);
+
+      if (!hashChanged && !diverged) {
+        stats.skippedUnchanged += 1;
+        updateRefTimestampOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp);
+        continue;
+      }
+
+      const localModel = buildLocalModel(model);
       const applyResult = await applyModelOutput(db, serverId, bankId, localModel, output, { now: timestamp });
       if (!applyResult.success) {
         stats.failed += 1;
