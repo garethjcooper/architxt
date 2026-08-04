@@ -375,7 +375,7 @@ Rules:
     name: 'sys_edge_context',
     mode: 'sys_edge_context',
     description: 'System template: characterize directed relationships between two contextual-graph nodes.',
-    body: `You are describing the directed interaction between two known entities in an architecture graph.
+    body: `You are identifying concrete flows between two known architectural entities.
 
 ## Relationship
 
@@ -383,18 +383,28 @@ Rules:
 
 ## Instructions
 
-Both endpoints already exist in the graph. Do not introduce new nodes. Return the interaction as a directed edge in \`graph.edges\`.
+Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct flow between these two endpoints as its own directed edge in \`graph.edges\`.
+
+Look for:
+- APIs or service calls
+- Data reads or writes
+- File or message exchanges
+- Events or notifications
+- Dependencies that are not covered by a more specific type
 
 Rules:
-- If the interaction is bidirectional, emit two edges with \`from\`/\`to\` swapped.
+- Emit one edge per distinct flow. If the source material describes multiple kinds of exchange between these two entities (for example, one system reads master data from the other and also sends usage events), return each as its own edge with a distinct \`type\` and \`label\`.
+- Direction matters: \`from\` is the initiator or sender, \`to\` is the receiver or target.
+- For bidirectional flows, emit two separate directed edges with \`from\`/\`to\` swapped rather than a single combined edge.
 - Do not include edges to nodes that are not one of the two endpoints.
 - Drop any edge that lacks evidence.
+- Use the most specific vocabulary type that fits.
 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_CORPUS"]',
     examplesHeuristic: null,
   },
   {
