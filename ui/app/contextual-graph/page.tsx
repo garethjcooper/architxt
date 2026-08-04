@@ -127,6 +127,13 @@ export default function ContextualGraphPage() {
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [autoScrollEntities, setAutoScrollEntities] = useState(true);
   const [autoScrollEdges, setAutoScrollEdges] = useState(true);
+  const [leftFlex, setLeftFlex] = useState(1.0);
+  const rightFlex = 5 - leftFlex;
+  const leftPaneRef = useRef<HTMLDivElement>(null);
+  const isHorizontalDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startLeftFlexRef = useRef(1.0);
+  const containerWidthRef = useRef(0);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const entityListRef = useRef<HTMLDivElement>(null);
   const edgeListRef = useRef<HTMLDivElement>(null);
@@ -267,6 +274,46 @@ export default function ContextualGraphPage() {
     if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [hoveredEdgeId, autoScrollEdges]);
 
+  const handleHorizontalResizeStart = useCallback((e: React.MouseEvent) => {
+    isHorizontalDraggingRef.current = true;
+    startXRef.current = e.clientX;
+    startLeftFlexRef.current = leftFlex;
+    const container = leftPaneRef.current?.parentElement;
+    if (container) {
+      containerWidthRef.current = container.getBoundingClientRect().width;
+    }
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [leftFlex]);
+
+  const handleHorizontalResizeMove = useCallback((e: MouseEvent) => {
+    if (!isHorizontalDraggingRef.current) return;
+    const deltaX = e.clientX - startXRef.current;
+    const containerWidth = containerWidthRef.current;
+    if (containerWidth > 0) {
+      const deltaFlex = (deltaX / containerWidth) * 5;
+      const nextLeftFlex = Math.min(Math.max(startLeftFlexRef.current + deltaFlex, 0.5), 4.5);
+      setLeftFlex(nextLeftFlex);
+    }
+  }, []);
+
+  const handleHorizontalResizeEnd = useCallback(() => {
+    isHorizontalDraggingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => handleHorizontalResizeMove(e);
+    const up = () => handleHorizontalResizeEnd();
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+  }, [handleHorizontalResizeMove, handleHorizontalResizeEnd]);
+
   return (
     <PageShell
       title="Contextual Graph"
@@ -294,7 +341,7 @@ export default function ContextualGraphPage() {
 
         <div className="flex-1 min-h-0 flex mt-2 gap-2">
           {/* Left: entity list */}
-          <div className="min-w-0 flex flex-col" style={{ flex: 1.1 }}>
+          <div ref={leftPaneRef} className="min-w-0 flex flex-col" style={{ flex: leftFlex }}>
             <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: 1.5 }}>
               <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
                 <span className="font-medium text-sm truncate">Entities</span>
@@ -458,8 +505,17 @@ export default function ContextualGraphPage() {
             </div>
           </div>
 
+          <div
+            onMouseDown={handleHorizontalResizeStart}
+            onDoubleClick={() => setLeftFlex(1.0)}
+            className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
+            title="Drag to resize left and right panels; double-click to reset"
+          >
+            <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+          </div>
+
           {/* Right: graph canvas */}
-          <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: 1.9 }}>
+          <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
             <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
               <span className="font-medium text-sm">Graph</span>
             </div>
