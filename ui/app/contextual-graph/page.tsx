@@ -339,9 +339,9 @@ export default function ContextualGraphPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex mt-2 gap-2">
+        <div className="flex-1 min-h-0 flex mt-2">
           {/* Left: entity list */}
-          <div ref={leftPaneRef} className="min-w-0 flex flex-col" style={{ flex: leftFlex }}>
+          <div ref={leftPaneRef} className="min-w-0 flex flex-col gap-1" style={{ flex: leftFlex }}>
             <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: 1.5 }}>
               <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
                 <span className="font-medium text-sm truncate">Entities</span>
@@ -436,7 +436,7 @@ export default function ContextualGraphPage() {
               </div>
             </div>
 
-            <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col mt-2" style={{ flex: 1 }}>
+            <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col mt-1" style={{ flex: 1 }}>
               <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
                 <span className="font-medium text-sm">Edges</span>
                 <div className="flex items-center gap-2">
