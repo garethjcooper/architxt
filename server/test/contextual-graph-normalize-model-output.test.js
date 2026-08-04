@@ -100,8 +100,8 @@ describe('normalizeModelOutput', () => {
     assert.equal(out.narrative, '');
   });
 
-  it('extracts JSON buried after narrative prose and smart quotes', () => {
-    const inner = JSON.stringify({
+  it('extracts JSON buried after narrative prose and ignores smart-quoted asides inside string values', () => {
+    const raw = JSON.stringify({
       narrative: 'Context.',
       graph: {
         nodes: [{ id: 'a-com:COM-002', name: 'ICMS', type: 'component' }, { id: 'a-com:COM-001', name: 'Singleview', type: 'component' }],
@@ -109,12 +109,17 @@ describe('normalizeModelOutput', () => {
       },
       tables: [],
     });
-    const smartQuoted = inner.replace(/"/g, '\u201C');
-    const raw = `Here is the contextual analysis.\n\n${smartQuoted}`;
     const out = normalizeModelOutput(raw);
     assert.equal(out.errors.length, 0);
     assert.equal(out.graph.nodes.length, 2);
     assert.equal(out.graph.edges.length, 1);
+  });
+
+  it('handles smart quotes inside JSON string values without breaking the envelope', () => {
+    const content = '{\n  "narrative": "Uses \u201cFile: DBnnnn00\u201d interface.",\n  "graph": {"nodes": [], "edges": []},\n  "tables": []\n}';
+    const out = normalizeModelOutput(content);
+    assert.equal(out.errors.length, 0);
+    assert.ok(out.narrative.includes('File: DBnnnn00'));
   });
 
   it('contentHash returns a 16-char hex string', () => {

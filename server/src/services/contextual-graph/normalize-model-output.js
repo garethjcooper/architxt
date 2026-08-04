@@ -104,8 +104,8 @@ function extractValidJson(text) {
 }
 
 const SMART_QUOTES = {
-  '\u201C': '"',
-  '\u201D': '"',
+  '\u201C': "'", // left double quotation mark -> apostrophe (avoid breaking JSON strings)
+  '\u201D': "'", // right double quotation mark -> apostrophe
   '\u2018': "'",
   '\u2019': "'",
   '\u201A': ',',
@@ -156,6 +156,88 @@ function unescapeStringifiedJson(text) {
 
 function preprocessModelText(text) {
   return stripMarkdownHeadings(stripOuterCodeFences(text));
+}
+
+/**
+ * Detect a Markdown table anywhere in the text.
+ */
+function looksLikeMarkdownTable(text) {
+  return /^\s*\|.*\|\s*$/m.test(text) && /^\s*\|[-:\s|]+\|\s*$/m.test(text);
+}
+
+function extractProseBeforeTable(text) {
+  const tableStart = text.search(/^\s*\|.*\|\s*$/m);
+  if (tableStart === -1) return '';
+  return text.slice(0, tableStart).replace(/^#{1,6}\s+/gm, '').trim();
+}
+
+/**
+ * Parse a Markdown table into the normalized table shape.
+ * Column names are normalized and mapped onto the canonical capability columns.
+ */
+function parseMarkdownTable(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const rows = [];
+  let rawColumns = [];
+  let foundHeader = false;
+  for (const line of lines) {
+    if (!line.startsWith('|') || !line.endsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (!foundHeader) {
+      if (cells.some((c) => /^[-:\s]+$/.test(c))) {
+        foundHeader = true;
+        continue;
+      }
+      rawColumns = cells;
+      continue;
+    }
+    if (cells.some((c) => /^[-:\s]+$/.test(c))) continue;
+
+    const row = {};
+    rawColumns.forEach((rawCol, idx) => {
+      const key = canonicalCapabilityColumn(rawCol);
+      if (!key) return;
+      const cell = cells[idx] ?? '';
+      if (key === 'evidence') {
+        row[key] = cell ? cell.split(/,\s*/).filter(Boolean) : [];
+      } else {
+        row[key] = cell;
+      }
+    });
+    rows.push(row);
+  }
+
+  if (rawColumns.length === 0 || rows.length === 0) return null;
+
+  const columns = CANONICAL_CAPABILITY_COLUMNS.filter((c) => rows.some((r) => Object.prototype.hasOwnProperty.call(r, c)));
+  if (columns.length === 0) return null;
+
+  return { name: 'capabilities', columns, rows };
+}
+
+const CANONICAL_CAPABILITY_COLUMNS = ['name', 'responsibility', 'purpose', 'business_capability_mapping', 'evidence'];
+
+const CAPABILITY_COLUMN_ALIASES = {
+  capability: 'name',
+  capability_name: 'name',
+  name: 'name',
+  responsibility: 'responsibility',
+  resp: 'responsibility',
+  purpose: 'purpose',
+  business_capability_mapping: 'business_capability_mapping',
+  business_capability: 'business_capability_mapping',
+  mapping: 'business_capability_mapping',
+  evidence: 'evidence',
+  evidence_ids: 'evidence',
+  source: 'evidence',
+};
+
+function canonicalCapabilityColumn(raw) {
+  const normalized = String(raw || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return CAPABILITY_COLUMN_ALIASES[normalized] || null;
 }
 
 function normalizeNode(n) {
@@ -245,10 +327,27 @@ export function normalizeModelOutput(raw) {
         errors.push(`Failed to parse extracted JSON: ${err.message}`);
       }
     }
-    if (!parsed) {
-      errors.push('Unable to parse JSON envelope from model output');
-      return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], errors, raw: rawString };
+  }
+
+  // 3. If still no envelope but the content looks like a Markdown table, synthesize
+  //    a minimal envelope with the table under `tables`. Log a warning because the
+  //    model ignored the required JSON envelope.
+  if (!parsed && looksLikeMarkdownTable(preprocessed)) {
+    const table = parseMarkdownTable(preprocessed);
+    if (table) {
+      logger.warn('Model output ignored JSON envelope and returned a Markdown table; synthesizing envelope', { tableName: table.name, rows: table.rows.length });
+      parsed = {
+        narrative: extractProseBeforeTable(preprocessed),
+        graph: { nodes: [], edges: [] },
+        tables: [table],
+      };
+      jsonText = JSON.stringify(parsed);
     }
+  }
+
+  if (!parsed) {
+    errors.push('Unable to parse JSON envelope from model output');
+    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], errors, raw: rawString };
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
