@@ -160,4 +160,74 @@ describe('applyModelOutput', () => {
     assert.equal(result.success, true);
     assert.ok(result.warnings.length > 0);
   });
+
+  it('creates missing nodes and edges from edge-context model output', async () => {
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [
+          { id: 'svc-001', name: 'Billing Service', type: 'service' },
+          { id: 'svc-002', name: 'Payment API', type: 'service' },
+        ],
+        edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'A sends usage data to B', evidence: ['mem-2'] }],
+      },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 2);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const sourceNode = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(sourceNode.properties.display_name, 'Billing Service');
+    assert.equal(sourceNode.properties.provenance.inferred, 'edge-context');
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'svc-001');
+    assert.equal(edge.cge_target_id, 'svc-002');
+    assert.equal(edge.cge_type, 'sends');
+    assert.equal(edge.properties.label, 'usage data');
+    assert.equal(edge.properties.directed, true);
+    assert.deepEqual(edge.properties.evidence, ['mem-2']);
+  });
+
+  it('creates a missing edge when endpoint nodes already exist', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], { display_name: 'Payment API' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [{ id: 'svc-001', name: 'Billing Service', type: 'service' }, { id: 'svc-002', name: 'Payment API', type: 'service' }],
+        edges: [{ from: 'svc-001', to: 'svc-002', type: 'reads', label: 'account data', detail: 'Reads account data', evidence: ['mem-5'] }],
+      },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'svc-001');
+    assert.equal(edge.cge_target_id, 'svc-002');
+    assert.equal(edge.cge_type, 'reads');
+  });
+
+  it('fails when edge-context model returns no edges', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {});
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], {});
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: { nodes: [], edges: [] },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, false);
+    assert.equal(result.code, 'NO_EDGES');
+  });
 });
