@@ -237,4 +237,15 @@ describe('applyModelOutput', () => {
     assert.equal(output.errors.length, 0);
     assert.equal(output.narrative, 'payment-method and account-merge routing');
   });
+
+  it('parses real Hindsight content envelope for edge-context model', async () => {
+    const realContent = '## Overview\n\n{ \\"narrative\\": \\"Singleview (a-com:COM-001) is the emerging canonical source for customer agreement, payment‑method and usage information. ICMS (a-com:COM-002) reads account and payment data from Singleview, depends on Singleview for account‑merge and transaction routing, and receives usage data forwarded by Singleview for rating and billing.\\", \\"graph\\": { \\"nodes\\": [ { \\"id\\": \\"a-com:COM-002\\", \\"name\\": \\"ICMS\\", \\"type\\": \\"component\\" }, { \\"id\\": \\"a-com:COM-001\\", \\"name\\": \\"Singleview\\", \\"type\\": \\"component\\" } ], \\"edges\\": [ { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"reads\\", \\"label\\": \\"account data\\", \\"detail\\": \\"ICMS reads account and payment‑method information from Singleview to populate credit‑account identifiers.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-capabilities-txt-COM-002\\"] }, { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"depends-on\\", \\"label\\": \\"account merge\\", \\"detail\\": \\"ICMS depends on Singleview for account‑merge and transaction routing in the future AR‑master role.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-summary-txt-COM-001\\"] }, { \\"from\\": \\"a-com:COM-001\\", \\"to\\": \\"a-com:COM-002\\", \\"type\\": \\"sends\\", \\"label\\": \\"usage data\\", \\"detail\\": \\"Singleview forwards product‑usage records to ICMS for rating and billing processing.\\", \\"evidence\\": [\\"architxt-summary-txt-COM-001\\"] } ] }, \\"tables\\": [] }';
+    const output = normalizeModelOutput(realContent);
+    assert.equal(output.errors.length, 0);
+    assert.equal(output.graph.edges.length, 3);
+    assert.equal(output.graph.nodes.length, 2);
+    const reads = output.graph.edges.find((e) => e.type === 'reads');
+    assert.equal(reads.label, 'account data');
+    assert.ok(reads.detail.includes('payment-method'));
+  });
 });

@@ -1,6 +1,8 @@
 ### Output format
 
-Return ONLY a JSON object in this exact envelope (no markdown fences, no extra prose):
+Return ONLY a valid, parseable JSON object. No Markdown fences, no Markdown headings, no code blocks, no surrounding prose, and no escaped quotes (`\"`). The output must be raw JSON that `JSON.parse` can consume directly.
+
+Required envelope:
 
 {"narrative":"Markdown prose with paragraphs, or empty string.","graph":{"nodes":[],"edges":[]},"tables":[]}
 
@@ -10,7 +12,7 @@ All three top-level keys are required. Empty arrays or an empty string are accep
 - `graph` is for nodes and edges. Graph generation rules live in `output-format-graph-contextual.md`.
 - `tables` is for structured tables. Table generation rules live in `output-format-table-contextual.md`.
 
-Example of a fully populated envelope:
+The example below is shown inside a code fence only for readability. Your actual response must NOT include the fence, the triple backticks, or any backslash-escaped quotes:
 
 ```json
 {
@@ -28,3 +30,5 @@ Example of a fully populated envelope:
   ]
 }
 ```
+
+Before finishing, verify that the response starts with `{` and ends with `}` and contains no unescaped control characters.

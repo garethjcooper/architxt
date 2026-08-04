@@ -130,8 +130,32 @@ function sanitizeJsonText(text) {
 
 function stripOuterCodeFences(text) {
   const trimmed = text.trim();
-  const match = trimmed.match(/^```(?:markdown|json)?\\s*\\n?([\\s\\S]*?)\\n?```\\s*$/);
+  const match = trimmed.match(/^```(?:markdown|json)?\s*\n?([\s\S]*?)\n?```\s*$/);
   return match ? match[1].trim() : trimmed;
+}
+
+/**
+ * Strip leading Markdown headings (e.g. "## Overview\n\n") so prose before the JSON envelope
+ * does not break balanced-brace scanning or direct JSON.parse.
+ */
+function stripMarkdownHeadings(text) {
+  return text.replace(/^(#{1,6}\s+.*\n+)+/, '').trim();
+}
+
+/**
+ * Detect JSON that has been embedded as a string-escaped literal (`\"` instead of `"`).
+ * When the text is not valid JSON but contains `{ \"` or `[ \"` we unescape the quotes
+ * so the envelope becomes parseable.
+ */
+function unescapeStringifiedJson(text) {
+  const hasEscapedObject = /\{\s*\\"/.test(text);
+  const hasEscapedArray = /\[\s*\\"/.test(text);
+  if (!hasEscapedObject && !hasEscapedArray) return text;
+  return text.replace(/\\"/g, '"');
+}
+
+function preprocessModelText(text) {
+  return stripMarkdownHeadings(stripOuterCodeFences(text));
 }
 
 function normalizeNode(n) {
@@ -204,13 +228,15 @@ export function normalizeModelOutput(raw) {
   let parsed = null;
   let jsonText = null;
 
-  // 1. Try direct JSON.parse on the whole string (after stripping fences and smart quotes).
+  const preprocessed = preprocessModelText(rawString);
+
+  // 1. Try direct JSON.parse on the whole string (after stripping fences, headings, smart quotes).
   try {
-    jsonText = sanitizeJsonText(stripOuterCodeFences(rawString));
+    jsonText = unescapeStringifiedJson(sanitizeJsonText(preprocessed));
     parsed = JSON.parse(jsonText);
   } catch {
     // 2. Fallback: find the first balanced JSON object that actually parses.
-    const extracted = extractValidJson(sanitizeJsonText(stripOuterCodeFences(rawString)));
+    const extracted = extractValidJson(unescapeStringifiedJson(sanitizeJsonText(preprocessed)));
     if (extracted) {
       try {
         parsed = JSON.parse(extracted);
