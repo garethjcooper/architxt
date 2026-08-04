@@ -859,6 +859,7 @@ export interface GraphEdge {
   weight?: number;
   provenance?: 'known' | 'discovered' | 'inferred' | string;
   source?: 'co_occurrence' | 'mental_model' | 'synthesize' | 'reflect' | string;
+  mental_model_applied?: boolean;
   source_fact_ids?: string[];
   /** Attached contextual mental-model refs, if any. */
   modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
