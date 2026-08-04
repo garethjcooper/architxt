@@ -1340,4 +1340,22 @@ export const contextualGraphApi = {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
     }),
+
+  refresh: (serverId: number, bankId: string, options?: { dry_run?: boolean }) =>
+    fetchApi<{
+      success: boolean;
+      stats?: {
+        fetched: number;
+        matched: number;
+        skippedDisabled: number;
+        skippedUnchanged: number;
+        applied: number;
+        failed: number;
+      };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
+    }),
 };
