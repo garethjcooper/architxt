@@ -288,7 +288,37 @@ describe('applyModelOutput', () => {
 
     const sendsEdge = allEdges.find((e) => e.cge_type === 'sends');
     assert.ok(sendsEdge);
-    assert.equal(sendsEdge.cge_id, 'edge-ctx-a-com:COM-001-a-com:COM-002-sends');
+    assert.ok(sendsEdge.cge_id.startsWith('edge-ctx-a-com:COM-001-a-com:COM-002-sends-'));
+  });
+
+  it('keeps parallel edges with the same type but different labels distinct', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'usage detail', evidence: ['m1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'events', detail: 'events detail', evidence: ['m2'] },
+        ],
+      },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-001|a-com:COM-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 2);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 2);
+
+    const byLabel = Object.fromEntries(allEdges.map((e) => [e.properties.label, e.cge_id]));
+    assert.ok(byLabel['usage data']);
+    assert.ok(byLabel.events);
+    assert.notEqual(byLabel['usage data'], byLabel.events);
+    assert.ok(byLabel['usage data'].startsWith('edge-ctx-a-com:COM-001-a-com:COM-002-sends-'));
   });
 
   it('synthesizes envelope from Markdown capability table', () => {

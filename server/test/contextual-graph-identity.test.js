@@ -12,7 +12,9 @@ import {
   buildNodeId,
   resolveHindsightNode,
   dedupeCandidates,
-  buildEdgeId } from '../src/services/contextual-graph/identity.js';
+  buildDirectedEdgeId,
+  buildUndirectedEdgeId,
+} from '../src/services/contextual-graph/identity.js';
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-contextual-identity-${Date.now()}.db`);
@@ -118,12 +120,22 @@ describe('contextual graph identity', () => {
   });
 
   it('builds deterministic edge ids', () => {
-    const id1 = buildEdgeId('a', 'b', 'calls', 'hindsight');
-    const id2 = buildEdgeId('b', 'a', 'calls', 'hindsight');
-    assert.equal(id1, id2);
-    assert.ok(id1.startsWith('hindsight:'));
+    const undirected = buildUndirectedEdgeId('a', 'b', 'calls', 'hindsight');
+    const reversed = buildUndirectedEdgeId('b', 'a', 'calls', 'hindsight');
+    assert.equal(undirected, reversed);
+    assert.ok(undirected.startsWith('hindsight-'));
 
-    const typed = buildEdgeId('a', 'b', 'sends', 'edge-ctx');
-    assert.notEqual(id1, typed);
+    const directed = buildDirectedEdgeId('a', 'b', 'calls', 'sync', 'edge-ctx');
+    const directedReversed = buildDirectedEdgeId('b', 'a', 'calls', 'sync', 'edge-ctx');
+    assert.notEqual(directed, directedReversed);
+    assert.ok(directed.startsWith('edge-ctx-'));
+
+    const differentType = buildDirectedEdgeId('a', 'b', 'sends', 'sync', 'edge-ctx');
+    assert.notEqual(directed, differentType);
+
+    const sameTypeDifferentLabel = buildDirectedEdgeId('a', 'b', 'sends', 'events', 'edge-ctx');
+    const sameTypeSameLabel = buildDirectedEdgeId('a', 'b', 'sends', 'events', 'edge-ctx');
+    assert.notEqual(directed, sameTypeDifferentLabel);
+    assert.equal(sameTypeDifferentLabel, sameTypeSameLabel);
   });
 });

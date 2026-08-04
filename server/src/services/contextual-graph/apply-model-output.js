@@ -1,12 +1,14 @@
 import {
-  getNode,
   upsertNode,
+  upsertEdge,
   listNodes,
   listEdges,
-  upsertEdge,
+  getNode,
+  getEdge,
   deleteEdge,
   deleteNode,
 } from '../../db/crud/contextual-graph.js';
+import { buildDirectedEdgeId } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
 import { contentHash } from './normalize-model-output.js';
 
@@ -275,7 +277,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
         updated_at: timestamp,
       };
     } else {
-      edgeId = `edge-ctx-${modelEdge.from}-${modelEdge.to}-${modelEdge.type}`;
+      edgeId = buildDirectedEdgeId(modelEdge.from, modelEdge.to, modelEdge.type, modelEdge.label, 'edge-ctx');
       source = modelEdge.from;
       target = modelEdge.to;
       properties = {

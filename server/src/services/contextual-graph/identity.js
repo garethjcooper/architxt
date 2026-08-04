@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { listEntitiesWithType } from '../../db/crud/entities.js';
 import { getNode, listNodes } from '../../db/crud/contextual-graph.js';
 
@@ -241,15 +242,46 @@ export async function dedupeCandidates(db, serverId, bankId, lookups, candidates
 }
 
 /**
- * Build a deterministic edge id.
+ * Build a short deterministic hash from edge payload fields so parallel
+ * edges that share the same source/target/type but differ in label/detail
+ * get distinct ids.
+ *
+ * @param {string} label
+ * @param {string} [detail]
+ * @returns {string}
+ */
+function buildEdgeContentHash(label) {
+  return createHash('sha256').update(String(label || '')).digest('hex').slice(0, 8);
+}
+
+/**
+ * Build a deterministic edge id for a directed edge.
+ * Direction is preserved: source -> target is different from target -> source.
+ * Parallel edges of the same type are separated by a hash of their label.
  *
  * @param {string} sourceId
  * @param {string} targetId
  * @param {string|null} type
- * @param {string} [provenance] - e.g. 'hindsight', 'edge-ctx', 'discover'
+ * @param {string} [label] - used to differentiate parallel edges
+ * @param {string} [provenance] - e.g. 'edge-ctx', 'manual'
  */
-export function buildEdgeId(sourceId, targetId, type = null, provenance = 'manual') {
+export function buildDirectedEdgeId(sourceId, targetId, type = null, label = '', provenance = 'edge-ctx') {
+  const typePart = type ? `-${type}` : '';
+  const hash = type ? `-${buildEdgeContentHash(label)}` : '';
+  return `${provenance}-${sourceId}-${targetId}${typePart}${hash}`;
+}
+
+/**
+ * Build a deterministic edge id for an undirected edge.
+ * Endpoints are sorted so direction does not matter.
+ *
+ * @param {string} sourceId
+ * @param {string} targetId
+ * @param {string|null} type
+ * @param {string} [provenance] - e.g. 'hindsight', 'discover', 'manual'
+ */
+export function buildUndirectedEdgeId(sourceId, targetId, type = null, provenance = 'manual') {
   const sorted = [sourceId, targetId].sort();
-  const typePart = type ? `:${type}` : '';
-  return `${provenance}:${sorted[0]}|${sorted[1]}${typePart}`;
+  const typePart = type ? `-${type}` : '';
+  return `${provenance}-${sorted[0]}-${sorted[1]}${typePart}`;
 }

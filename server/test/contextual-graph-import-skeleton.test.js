@@ -121,7 +121,7 @@ describe('importHindsightSkeleton', () => {
     assert.equal(result.imported.nodes, 3);
     assert.equal(result.imported.edges, 2);
 
-    const edge = getEdge(db, serverId, 'Mozart-API', 'hindsight:svc:SVC-005|svc:SVC-006').data;
+    const edge = getEdge(db, serverId, 'Mozart-API', 'hindsight-svc:SVC-005-svc:SVC-006').data;
     assert.equal(edge.cge_type, null);
     assert.equal(edge.cge_properties.directed, false);
     assert.equal(edge.cge_properties.weight, 3);
