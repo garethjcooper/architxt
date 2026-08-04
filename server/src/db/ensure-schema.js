@@ -404,7 +404,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_CORPUS"]',
+    variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
   },
   {
