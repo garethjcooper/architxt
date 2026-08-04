@@ -835,6 +835,8 @@ export interface GraphNode {
   source?: 'canonical' | 'alias' | 'hindsight' | 'mental_model' | 'mental_model_referenced' | string;
   provenance?: 'known' | 'discovered' | 'inferred' | string;
   mental_model_applied?: boolean;
+  /** Attached contextual mental-model refs, if any. */
+  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
   x?: number;
   y?: number;
   width?: number;
@@ -858,6 +860,8 @@ export interface GraphEdge {
   provenance?: 'known' | 'discovered' | 'inferred' | string;
   source?: 'co_occurrence' | 'mental_model' | 'synthesize' | 'reflect' | string;
   source_fact_ids?: string[];
+  /** Attached contextual mental-model refs, if any. */
+  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
 }
 
 export interface GraphCanvas {
@@ -1171,6 +1175,16 @@ export const configApi = {
         }
       >;
     }>('/config/entity-format'),
+
+  settings: () => fetchApi<SettingsSnapshot>('/config/settings'),
+
+  /** Safe read-only snapshot of enabled contextual-graph patch roles. */
+  contextualGraph: () => fetchApi<ContextualGraphConfig>('/config/contextual-graph'),
+};
+
+// Settings API (legacy alias — prefer configApi.settings for new code)
+export const settingsApi = {
+  get: () => configApi.settings(),
 };
 
 export interface PromptSection {
@@ -1221,13 +1235,9 @@ export interface SettingsSnapshot {
   };
 }
 
-export const settingsApi = {
-  get: () => fetchApi<SettingsSnapshot>('/config/settings'),
-  restart: () =>
-    fetchApi<{ success: boolean; message: string; method: string }>('/config/restart', {
-      method: 'POST',
-    }),
-};
+export interface ContextualGraphConfig {
+  patchRoles: Record<string, boolean>;
+}
 
 // Contextual Graph API
 export const contextualGraphApi = {
