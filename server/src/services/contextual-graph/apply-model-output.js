@@ -198,17 +198,6 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     return { success: false, error: 'edge-ctx ext_id does not contain a node pair', code: 'BAD_EXT_ID' };
   }
 
-  const allEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
-  const allEdges = allEdgesResult?.success ? allEdgesResult.data : [];
-  const matchingEdges = allEdges.filter((e) =>
-    (e.cge_source_id === sourceId && e.cge_target_id === targetId) ||
-    (e.cge_source_id === targetId && e.cge_target_id === sourceId)
-  );
-
-  if (matchingEdges.length === 0) {
-    return { success: false, error: `No edge found for pair ${sourceId}|${targetId}`, code: 'EDGE_NOT_FOUND' };
-  }
-
   const warnings = [];
   if (output.narrative.trim()) {
     warnings.push('edge-ctx model returned narrative; ignoring');
@@ -217,54 +206,102 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     warnings.push('edge-ctx model returned tables; ignoring');
   }
 
-  // The model should return at least one edge whose from/to match the scope.
-  // If multiple edges are returned, prefer one matching the scope direction.
-  const candidateEdges = output.graph.edges.filter((edge) =>
-    (edge.from === sourceId && edge.to === targetId) ||
-    (edge.from === targetId && edge.to === sourceId)
-  );
-
-  if (candidateEdges.length === 0 && output.graph.edges.length > 0) {
-    warnings.push(`edge-ctx model returned ${output.graph.edges.length} edge(s) that do not match the scope; ignoring`);
+  if (output.graph.edges.length === 0) {
+    return { success: false, error: 'edge-ctx model returned no edges', code: 'NO_EDGES' };
   }
 
-  const modelRef = buildModelRef(model, output.raw, timestamp);
-  const appliedEdges = [];
+  const allEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
+  const allEdges = allEdgesResult?.success ? allEdgesResult.data : [];
+  const allNodesResult = listNodes(db, serverId, bankId, { limit: 10000 });
+  const allNodes = allNodesResult?.success ? allNodesResult.data : [];
+  const existingNodeIds = new Set(allNodes.map((n) => n.cgn_id));
 
-  for (const edgeRow of matchingEdges) {
-    const scoped = candidateEdges.find((e) => e.from === edgeRow.cge_source_id && e.to === edgeRow.cge_target_id);
+  const modelRef = buildModelRef(model, output.raw, timestamp);
+
+  // Ensure endpoint nodes emitted by the model exist in the working graph.
+  // If a node is missing, create it from the model output so asserted edges have endpoints.
+  let createdNodes = 0;
+  for (const node of output.graph.nodes) {
+    if (existingNodeIds.has(node.id)) continue;
     const properties = {
-      ...edgeRow.cge_properties,
+      display_name: node.name,
+      type: node.type,
       provenance: {
-        ...(edgeRow.cge_properties?.provenance || {}),
         source: 'contextual-graph',
-        model_refs: mergeModelRefs(edgeRow.cge_properties?.provenance?.model_refs, modelRef),
+        inferred: 'edge-context',
+        model_refs: [modelRef],
         updated_at: timestamp,
       },
       updated_at: timestamp,
     };
-
-    if (scoped) {
-      properties.label = scoped.label;
-      properties.detail = scoped.detail;
-      properties.evidence = scoped.evidence;
-    }
-
-    upsertEdge(
-      db,
-      serverId,
-      bankId,
-      edgeRow.cge_id,
-      edgeRow.cge_source_id,
-      edgeRow.cge_target_id,
-      scoped ? scoped.type : edgeRow.cge_type,
-      properties,
-    );
-
-    appliedEdges.push(edgeRow.cge_id);
+    upsertNode(db, serverId, bankId, node.id, ['active'], properties);
+    existingNodeIds.add(node.id);
+    createdNodes += 1;
   }
 
-  return { success: true, applied: { edgeIds: appliedEdges }, warnings };
+  const appliedEdges = [];
+
+  for (const modelEdge of output.graph.edges) {
+    if (!modelEdge.from || !modelEdge.to || !modelEdge.type) {
+      warnings.push('Skipping malformed model edge missing from/to/type');
+      continue;
+    }
+
+    // Prefer an existing edge in either direction between the same endpoints,
+    // regardless of the ext_id scope. This lets us annotate undirected skeleton edges
+    // even when the model states the relationship in the reverse direction.
+    const existing = allEdges.find((e) =>
+      (e.cge_source_id === modelEdge.from && e.cge_target_id === modelEdge.to) ||
+      (e.cge_source_id === modelEdge.to && e.cge_target_id === modelEdge.from)
+    );
+
+    let edgeId;
+    let source;
+    let target;
+    let properties;
+
+    if (existing) {
+      edgeId = existing.cge_id;
+      source = existing.cge_source_id;
+      target = existing.cge_target_id;
+      properties = {
+        ...existing.cge_properties,
+        provenance: {
+          ...(existing.cge_properties?.provenance || {}),
+          source: 'contextual-graph',
+          model_refs: mergeModelRefs(existing.cge_properties?.provenance?.model_refs, modelRef),
+          updated_at: timestamp,
+        },
+        updated_at: timestamp,
+      };
+    } else {
+      edgeId = `edge-ctx-${modelEdge.from}-${modelEdge.to}-${modelEdge.type}`;
+      source = modelEdge.from;
+      target = modelEdge.to;
+      properties = {
+        directed: true,
+        label: modelEdge.label,
+        detail: modelEdge.detail,
+        evidence: modelEdge.evidence,
+        provenance: {
+          source: 'contextual-graph',
+          model_refs: [modelRef],
+          updated_at: timestamp,
+        },
+        updated_at: timestamp,
+      };
+    }
+
+    // Always overwrite label/detail/evidence with the model's values when present.
+    if (modelEdge.label !== undefined) properties.label = modelEdge.label;
+    if (modelEdge.detail !== undefined) properties.detail = modelEdge.detail;
+    if (modelEdge.evidence !== undefined) properties.evidence = modelEdge.evidence;
+
+    upsertEdge(db, serverId, bankId, edgeId, source, target, modelEdge.type, properties);
+    appliedEdges.push(edgeId);
+  }
+
+  return { success: true, applied: { edgeIds: appliedEdges, createdNodes }, warnings };
 }
 
 function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
