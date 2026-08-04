@@ -109,10 +109,15 @@ const SMART_QUOTES = {
   '\u2018': "'",
   '\u2019': "'",
   '\u201A': ',',
-  '\u2013': '-',
-  '\u2014': '-',
+  '\u2011': '-', // non-breaking hyphen
+  '\u2013': '-', // en dash
+  '\u2014': '-', // em dash
   '\u2026': '...',
   '\u00A0': ' ',
+  '\u2007': ' ', // figure space
+  '\u202F': ' ', // narrow no-break space
+  '\u2060': '',  // word joiner
+  '\uFEFF': '',  // zero-width no-break space (BOM handled separately, but be defensive)
 };
 
 function sanitizeJsonText(text) {

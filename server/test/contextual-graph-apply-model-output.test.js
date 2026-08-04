@@ -230,4 +230,11 @@ describe('applyModelOutput', () => {
     assert.equal(result.success, false);
     assert.equal(result.code, 'NO_EDGES');
   });
+
+  it('parses JSON containing non-breaking hyphens and no-break spaces', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    const output = normalizeModelOutput('Some prose before the envelope.\n\n{\n  "narrative": "payment‑method and account‑merge routing",\n  "graph": { "nodes": [], "edges": [] },\n  "tables": []\n}\n\nTrailing prose.');
+    assert.equal(output.errors.length, 0);
+    assert.equal(output.narrative, 'payment-method and account-merge routing');
+  });
 });
