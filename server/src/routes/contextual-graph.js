@@ -21,7 +21,6 @@ import {
   ingestCandidates as defaultIngestCandidates,
 } from '../services/contextual-graph/discovery.js';
 import { refreshContextualGraphPatches as defaultRefreshPatches } from '../services/contextual-graph/refresh-patches.js';
-import { refreshContextualGraphWithRerun } from '../services/contextual-graph/refresh-with-rerun.js';
 import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from '../services/contextual-graph/sync-mental-model-config.js';
 
 const BASE_PATH = '/contextual-graph';
@@ -666,11 +665,8 @@ export function createContextualGraphRouter({
 
     const { serverId, bankId } = scope;
     const dryRun = req.body.dry_run === true;
-    const rerun = req.body.rerun === true;
 
-    const result = rerun
-      ? await refreshContextualGraphWithRerun(db, serverId, bankId, { dryRun })
-      : await refreshPatches(db, serverId, bankId, { dryRun });
+    const result = await refreshPatches(db, serverId, bankId, { dryRun });
 
     const duration = Date.now() - start;
     logger.info('Refresh contextual patches', { serverId, bankId, dryRun, success: result.success, ...result.stats });
