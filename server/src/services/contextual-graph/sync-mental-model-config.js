@@ -1,42 +1,13 @@
 import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
 import { pushMentalModel } from '../../services/hindsight/push-mental-model.js';
-import { getNode, listNodes, listEdges } from '../../db/crud/contextual-graph.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 import { buildMentalModelDivergence, hasDivergence } from '../../services/mental-model-divergence.js';
 import { createLogger } from '../../utils/logger.js';
-import {
-  getContextualGraphTemplate,
-  deriveEntitySummaryModel,
-  deriveEntityCapabilitiesModel,
-  deriveEdgeContextModel,
-  deriveDiscoverContextModel,
-} from './template-models.js';
+import { getContextualGraphTemplate } from './template-models.js';
 import { extractModelRefsFromDb } from './refresh-patches.js';
+import { deriveSpecsForRefs } from './specs.js';
 
 const logger = createLogger('contextual-graph-sync-mental-model-config');
-
-const ROLE_HANDLERS = [
-  { role: 'sys_entity_summary', prefix: 'entity-summary-' },
-  { role: 'sys_entity_capabilities', prefix: 'entity-capabilities-' },
-  { role: 'sys_edge_context', prefix: 'edge-ctx-' },
-  { role: 'sys_discovery_context', prefix: 'discover-' },
-];
-
-function inferRole(extId) {
-  for (const { role, prefix } of ROLE_HANDLERS) {
-    if (extId?.startsWith(prefix)) return role;
-  }
-  return null;
-}
-
-function parseNodeIdFromExtId(extId, prefix) {
-  if (!extId?.startsWith(prefix)) return null;
-  return extId.slice(prefix.length);
-}
-
-function pairKey(a, b) {
-  return [a, b].sort().join('|');
-}
 
 function buildArchCandidate(spec, composed) {
   return {
@@ -66,61 +37,6 @@ function buildHindCandidate(hind) {
   };
 }
 
-async function deriveSpecFromRef(db, ref, bankId) {
-  const role = inferRole(ref.ext_id);
-  const template = getContextualGraphTemplate(db, role);
-  if (!template?.data) {
-    throw new Error(`Missing system template for role ${role}`);
-  }
-
-  if (role === 'sys_entity_summary') {
-    const nodeId = parseNodeIdFromExtId(ref.ext_id, 'entity-summary-');
-    const node = getNode(db, ref.server_id, bankId, nodeId)?.data;
-    return deriveEntitySummaryModel(db, {
-      id: nodeId,
-      displayName: node?.cgn_properties?.display_name || nodeId,
-    }, bankId);
-  }
-
-  if (role === 'sys_entity_capabilities') {
-    const nodeId = parseNodeIdFromExtId(ref.ext_id, 'entity-capabilities-');
-    const node = getNode(db, ref.server_id, bankId, nodeId)?.data;
-    return deriveEntityCapabilitiesModel(db, {
-      id: nodeId,
-      displayName: node?.cgn_properties?.display_name || nodeId,
-    }, bankId);
-  }
-
-  if (role === 'sys_edge_context') {
-    const pairPart = parseNodeIdFromExtId(ref.ext_id, 'edge-ctx-');
-    if (!pairPart?.includes('|')) {
-      throw new Error(`edge-ctx ext_id does not contain a node pair: ${ref.ext_id}`);
-    }
-    const [sourceId, targetId] = pairPart.split('|');
-    const nodes = listNodes(db, ref.server_id, bankId, { limit: 10000 })?.data || [];
-    const sourceNode = nodes.find((n) => n.cgn_id === sourceId);
-    const targetNode = nodes.find((n) => n.cgn_id === targetId);
-    return deriveEdgeContextModel(db, {
-      id: sourceId,
-      displayName: sourceNode?.cgn_properties?.display_name || sourceId,
-    }, {
-      id: targetId,
-      displayName: targetNode?.cgn_properties?.display_name || targetId,
-    }, bankId);
-  }
-
-  if (role === 'sys_discovery_context') {
-    const seedId = parseNodeIdFromExtId(ref.ext_id, 'discover-');
-    const seedNode = getNode(db, ref.server_id, bankId, seedId)?.data;
-    return deriveDiscoverContextModel(db, {
-      id: seedId,
-      displayName: seedNode?.cgn_properties?.display_name || seedId,
-    }, [], bankId);
-  }
-
-  throw new Error(`Unsupported contextual-graph role: ${role}`);
-}
-
 /**
  * Sync the Hindsight-side configuration of all contextual mental models that
  * are referenced by the local working graph. Re-derives each spec from the
@@ -134,7 +50,7 @@ async function deriveSpecFromRef(db, ref, bankId) {
  * @param {boolean} [options.dryRun=false]
  * @param {Function} [options.listAllMentalModels]
  * @param {Function} [options.pushMentalModel]
- * @returns {Promise<{success: boolean, stats: object, error?: string}>}
+ * @returns {Promise<{success: boolean, stats: object, updatedExtIds: string[], error?: string}>}
  */
 export async function syncContextualMentalModelConfig(db, serverId, bankId, options = {}) {
   const dryRun = options.dryRun === true;
@@ -146,20 +62,22 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
     skippedNoChange: 0,
     skippedMissingRemote: 0,
     skippedNoTemplate: 0,
+    skippedNoSpec: 0,
     updated: 0,
     failed: 0,
     errors: [],
   };
+  const updatedExtIds = [];
 
   try {
     const refs = extractModelRefsFromDb(db, serverId, bankId);
     if (refs.size === 0) {
-      return { success: true, stats };
+      return { success: true, stats, updatedExtIds };
     }
 
     const listResult = await listModels(serverId, bankId, { detail: 'content' });
     if (!listResult.success) {
-      return { success: false, error: listResult.error, stats };
+      return { success: false, error: listResult.error, stats, updatedExtIds };
     }
 
     const hindByExtId = new Map();
@@ -167,10 +85,10 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       if (mm.id) hindByExtId.set(mm.id, mm);
     }
 
-    for (const [extId, scope] of refs) {
-      const role = inferRole(extId);
-      if (!role) continue;
+    const derived = await deriveSpecsForRefs(db, serverId, bankId, refs);
 
+    for (const { extId, spec } of derived) {
+      const role = spec.role;
       stats.checked += 1;
 
       const template = getContextualGraphTemplate(db, role);
@@ -186,7 +104,6 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       }
 
       try {
-        const spec = await deriveSpecFromRef(db, { ext_id: extId, server_id: serverId }, bankId);
         const composed = await composeMentalModelPrompt(db, role, spec.source_query);
         const archCandidate = buildArchCandidate(spec, composed);
         const hindCandidate = buildHindCandidate(hind);
@@ -199,6 +116,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
 
         if (dryRun) {
           stats.updated += 1;
+          updatedExtIds.push(extId);
           continue;
         }
 
@@ -211,6 +129,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
         }
 
         stats.updated += 1;
+        updatedExtIds.push(extId);
         logger.info('Pushed contextual mental model config update', { extId, role });
       } catch (err) {
         stats.failed += 1;
@@ -219,9 +138,10 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       }
     }
 
-    return { success: true, stats };
+    stats.skippedNoSpec = refs.size - derived.length;
+    return { success: true, stats, updatedExtIds };
   } catch (err) {
     logger.error('syncContextualMentalModelConfig failed', { serverId, bankId, error: err.message });
-    return { success: false, error: err.message, stats };
+    return { success: false, error: err.message, stats, updatedExtIds };
   }
 }

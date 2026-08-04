@@ -666,16 +666,40 @@ export function createContextualGraphRouter({
     const { serverId, bankId } = scope;
     const dryRun = req.body.dry_run === true;
 
-    const result = await refreshPatches(db, serverId, bankId, { dryRun });
+    // Single user-facing refresh flow: sync config, then explicitly request fresh
+    // Hindsight output for any models whose config changed, then fetch and apply.
+    // A prompt/config change does not auto-regenerate content, so we pass the
+    // changed ext_ids into refresh as rerunExtIds.
+    let syncResult = { success: true, stats: {}, updatedExtIds: [] };
+    if (!dryRun) {
+      syncResult = await syncMentalModelConfig(db, serverId, bankId, { dryRun });
+      if (!syncResult.success) {
+        const duration = Date.now() - start;
+        logger.error('Refresh aborted: config sync failed', { serverId, bankId, error: syncResult.error });
+        sendResponse({
+          res,
+          status: 500,
+          data: { success: false, error: syncResult.error, stats: syncResult.stats },
+          logger,
+          method: req.method,
+          path: req.path,
+          duration,
+        });
+        return;
+      }
+    }
+
+    const result = await refreshPatches(db, serverId, bankId, { dryRun, rerunExtIds: syncResult.updatedExtIds });
 
     const duration = Date.now() - start;
-    logger.info('Refresh contextual patches', { serverId, bankId, dryRun, success: result.success, ...result.stats });
+    const combinedStats = { ...result.stats, sync: syncResult.stats };
+    logger.info('Refresh contextual patches', { serverId, bankId, dryRun, success: result.success, ...combinedStats });
 
     if (!result.success) {
       sendResponse({
         res,
         status: 500,
-        data: { success: false, error: result.error, stats: result.stats },
+        data: { success: false, error: result.error, stats: combinedStats },
         logger,
         method: req.method,
         path: req.path,
@@ -687,7 +711,7 @@ export function createContextualGraphRouter({
     sendResponse({
       res,
       status: 200,
-      data: { success: true, dry_run: dryRun, stats: result.stats },
+      data: { success: true, dry_run: dryRun, stats: combinedStats },
       logger,
       method: req.method,
       path: req.path,
