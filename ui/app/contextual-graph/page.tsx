@@ -9,13 +9,24 @@ import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-ba
 import { InteractiveGraph, type GraphLayout, colorForType } from '@/components/research-canvas';
 import { GraphControls } from '@/app/explore/graph-controls';
 import { CardControls } from '@/app/explore/card-controls';
-import { serversApi, contextualGraphApi, type GraphNode, type GraphEdge, type GraphCanvas } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, configApi, type GraphNode, type GraphEdge, type GraphCanvas } from '@/lib/api/client';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const logger = createLogger('ContextualGraphPage');
+
+type PatchRole = 'sys_entity_summary' | 'sys_entity_capabilities' | 'sys_edge_context' | 'sys_discovery_context' | string;
+
+type PatchHealth = 'green' | 'orange' | 'red';
+
+const ROLE_LABELS: Record<string, string> = {
+  sys_entity_summary: 'summary',
+  sys_entity_capabilities: 'capabilities',
+  sys_edge_context: 'edge context',
+  sys_discovery_context: 'discovery',
+};
 
 type BackendNode = {
   id: string;
@@ -31,6 +42,44 @@ type BackendEdge = {
   properties: Record<string, any>;
 };
 
+function getModelRefRoles(item: GraphNode | GraphEdge): string[] {
+  if (!item.modelRefs || !Array.isArray(item.modelRefs)) return [];
+  return item.modelRefs.map((r) => r.role).filter((r): r is string => Boolean(r));
+}
+
+function computePatchHealth(
+  item: GraphNode | GraphEdge,
+  enabledRoles: Record<string, boolean>
+): { health: PatchHealth; missing: string[]; present: string[] } {
+  const activeRoles = Object.entries(enabledRoles)
+    .filter(([_, enabled]) => enabled)
+    .map(([role]) => role);
+
+  if (activeRoles.length === 0) {
+    return { health: 'green', missing: [], present: [] };
+  }
+
+  const presentRoles = getModelRefRoles(item);
+  const present = activeRoles.filter((role) => presentRoles.includes(role));
+  const missing = activeRoles.filter((role) => !presentRoles.includes(role));
+
+  if (missing.length === 0) return { health: 'green', missing, present };
+  if (present.length === 0) return { health: 'red', missing, present };
+  return { health: 'orange', missing, present };
+}
+
+function healthColorClass(health: PatchHealth): string {
+  switch (health) {
+    case 'green':
+      return 'bg-emerald-500';
+    case 'orange':
+      return 'bg-orange-500';
+    case 'red':
+    default:
+      return 'bg-red-500';
+  }
+}
+
 function backendNodeToGraphNode(node: BackendNode): GraphNode {
   const inferredType = node.labels[0] ?? (typeof node.id === 'string' && node.id.includes(':') ? node.id.split(':')[0] : 'entity');
   return {
@@ -41,6 +90,7 @@ function backendNodeToGraphNode(node: BackendNode): GraphNode {
     provenance: node.properties.provenance ?? 'known',
     source: node.properties.generated_by === 'contextual_graph' ? 'mental_model' : 'hindsight',
     mental_model_applied: !!node.properties.model_refs && Array.isArray(node.properties.model_refs) && node.properties.model_refs.length > 0,
+    modelRefs: node.properties.model_refs,
   };
 }
 
@@ -55,6 +105,7 @@ function backendEdgeToGraphEdge(edge: BackendEdge): GraphEdge {
     weight: typeof edge.properties.weight === 'number' ? edge.properties.weight : 1,
     provenance: edge.properties.provenance ?? 'known',
     source: edge.properties.generated_by === 'contextual_graph' ? 'mental_model' : 'hindsight',
+    modelRefs: edge.properties.model_refs,
   };
 }
 
@@ -129,6 +180,12 @@ export default function ContextualGraphPage() {
   const [autoScrollEntities, setAutoScrollEntities] = useState(false);
   const [autoScrollEdges, setAutoScrollEdges] = useState(false);
   const [leftFlex, setLeftFlex] = useState(1.0);
+  const [patchRoles, setPatchRoles] = useState<Record<string, boolean>>({
+    sys_entity_summary: true,
+    sys_entity_capabilities: true,
+    sys_edge_context: true,
+    sys_discovery_context: false,
+  });
   const rightFlex = 5 - leftFlex;
   const leftPaneRef = useRef<HTMLDivElement>(null);
   const isHorizontalDraggingRef = useRef(false);
@@ -184,6 +241,18 @@ export default function ContextualGraphPage() {
     }
     loadBanks();
   }, [serverId]);
+
+  useEffect(() => {
+    async function loadPatchRoles() {
+      try {
+        const cfg = await configApi.contextualGraph();
+        setPatchRoles(cfg.patchRoles);
+      } catch (err) {
+        logger.error('Failed to load contextual graph config', { error: err });
+      }
+    }
+    loadPatchRoles();
+  }, []);
 
   const loadGraph = useCallback(async () => {
     if (!serverId || !bankId) return;
@@ -359,6 +428,23 @@ export default function ContextualGraphPage() {
             disabled={loadingServers}
           />
           <div className="flex items-center gap-3 text-sm text-white/60">
+            {Object.entries(patchRoles).filter(([_, enabled]) => enabled).length > 0 && (
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="text-white/40">Health:</span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>all</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-orange-500" />
+                  <span>some</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+                  <span>none</span>
+                </span>
+              </div>
+            )}
             <span>{graph.edges.length} edge{graph.edges.length !== 1 ? 's' : ''}</span>
           </div>
         </div>
@@ -418,6 +504,7 @@ export default function ContextualGraphPage() {
                     const type = entity.type || (typeof entity.id === 'string' && entity.id.includes(':') ? entity.id.split(':')[0] : 'entity');
                     const typeLine = type && !entity.id.startsWith(`${type}:`) ? `${type}:${entity.id}` : entity.id;
                     const summary = entitySummaryText(entity);
+                    const { health, missing, present } = computePatchHealth(entity, patchRoles);
                     return (
                       <div
                         key={entity.id}
@@ -439,9 +526,23 @@ export default function ContextualGraphPage() {
                         )}
                         style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
                       >
-                        <div className="min-w-0 flex flex-col gap-0.5">
-                          <div className="text-xs text-white/90 truncate">{entity.label || entity.name || entity.id}</div>
-                          <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                        <div className="min-w-0 flex items-start justify-between gap-2">
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="text-xs text-white/90 truncate">{entity.label || entity.name || entity.id}</div>
+                            <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))} />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" sideOffset={6} className="max-w-[200px] text-[11px] bg-black/90 border border-white/10 text-white/90 p-2">
+                              <div className="space-y-1">
+                                <div className="capitalize">{health.replace('-', ' ')}</div>
+                                {present.length > 0 && <div>Present: {present.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
+                                {missing.length > 0 && <div>Missing: {missing.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                         <Tooltip>
                           <TooltipTrigger>
@@ -504,6 +605,7 @@ export default function ContextualGraphPage() {
                 {edgeViews.map(({ edge, sourceNode, targetNode }) => {
                   const active = hoveredEdgeId === edge.id;
                   const edgeColor = colorForType(edge.type || undefined);
+                  const { health, missing, present } = computePatchHealth(edge, patchRoles);
                   return (
                     <button
                       key={edge.id}
@@ -518,7 +620,21 @@ export default function ContextualGraphPage() {
                       )}
                       style={{ borderLeftColor: edgeColor, borderLeftWidth: 3 }}
                     >
-                      <div className="text-xs text-white/90 whitespace-normal break-words leading-snug">{edge.detail || edge.label || edge.type || 'Edge'}</div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-xs text-white/90 whitespace-normal break-words leading-snug min-w-0">{edge.detail || edge.label || edge.type || 'Edge'}</div>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))} />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6} className="max-w-[200px] text-[11px] bg-black/90 border border-white/10 text-white/90 p-2">
+                            <div className="space-y-1">
+                              <div className="capitalize">{health.replace('-', ' ')}</div>
+                              {present.length > 0 && <div>Present: {present.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
+                              {missing.length > 0 && <div>Missing: {missing.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <div className="text-[10px] text-white/40 truncate">
                         {sourceNode?.name || sourceNode?.label || edge.from} → {targetNode?.name || targetNode?.label || edge.to}
                       </div>
