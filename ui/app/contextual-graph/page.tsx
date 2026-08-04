@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { InteractiveGraph, type GraphLayout, colorForType } from '@/components/research-canvas';
+import { GraphControls } from '@/app/explore/graph-controls';
 import { CardControls } from '@/app/explore/card-controls';
 import { serversApi, contextualGraphApi, type GraphNode, type GraphEdge, type GraphCanvas } from '@/lib/api/client';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
@@ -125,8 +126,8 @@ export default function ContextualGraphPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [autoScrollEntities, setAutoScrollEntities] = useState(true);
-  const [autoScrollEdges, setAutoScrollEdges] = useState(true);
+  const [autoScrollEntities, setAutoScrollEntities] = useState(false);
+  const [autoScrollEdges, setAutoScrollEdges] = useState(false);
   const [leftFlex, setLeftFlex] = useState(1.0);
   const rightFlex = 5 - leftFlex;
   const leftPaneRef = useRef<HTMLDivElement>(null);
@@ -232,8 +233,31 @@ export default function ContextualGraphPage() {
       });
   }, [graph.edges, nodeById]);
 
-  const nodeFilters = useMemo(() => new Set(graph.nodes.map((n) => n.type).filter((t): t is string => Boolean(t))), [graph.nodes]);
-  const edgeFilters = useMemo(() => new Set(graph.edges.map((e) => e.type).filter((t): t is string => Boolean(t))), [graph.edges]);
+  const [nodeFilters, setNodeFilters] = useState<Set<string>>(new Set());
+  const [edgeFilters, setEdgeFilters] = useState<Set<string>>(new Set());
+
+  const toggleNodeFilter = useCallback((type: string) => {
+    setNodeFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
+
+  const toggleEdgeFilter = useCallback((type: string) => {
+    setEdgeFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setNodeFilters(new Set());
+    setEdgeFilters(new Set());
+  }, [selectedBankId]);
 
   const selectOnCanvas = useCallback((id: string) => {
     setSelectedIds([id]);
@@ -522,6 +546,23 @@ export default function ContextualGraphPage() {
             <CardContent className="flex-1 min-h-0 p-0 relative">
               {serverId && bankId ? (
                 <div className="absolute inset-0">
+                  <GraphControls
+                    cy={cyRef.current}
+                    nodes={graph.nodes}
+                    edges={graph.edges}
+                    layout={layout}
+                    setLayout={setLayout}
+                    layoutAnimate={layoutAnimate}
+                    setLayoutAnimate={setLayoutAnimate}
+                    showEdgeLabels={showEdgeLabels}
+                    setShowEdgeLabels={setShowEdgeLabels}
+                    nodeFilters={nodeFilters}
+                    toggleNodeFilter={toggleNodeFilter}
+                    edgeFilters={edgeFilters}
+                    toggleEdgeFilter={toggleEdgeFilter}
+                    hideMode={false}
+                    sessionName="contextual-graph"
+                  />
                   <InteractiveGraph
                     graph={graph}
                     selectedIds={selectedIds}
