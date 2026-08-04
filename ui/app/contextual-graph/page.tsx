@@ -347,6 +347,27 @@ export default function ContextualGraphPage() {
     }
   }, [serverId, bankId, loadGraph]);
 
+  const handleRefreshPatches = useCallback(async () => {
+    if (!serverId || !bankId) return;
+    if (!window.confirm(`Refresh contextual patches for ${bankId}? This re-applies any Hindsight mental-model outputs that have changed.`)) return;
+    try {
+      setActionLoading('refresh');
+      const result = await contextualGraphApi.refresh(serverId, bankId);
+      if (result.success) {
+        const stats = result.stats;
+        toast.success(`Refresh complete — fetched ${stats?.fetched ?? 0}, applied ${stats?.applied ?? 0}, unchanged ${stats?.skippedUnchanged ?? 0}, failed ${stats?.failed ?? 0}`);
+      } else {
+        toast.error(`Refresh failed: ${result.error || result.code || 'unknown'}`);
+      }
+      await loadGraph();
+    } catch (err: any) {
+      logger.error('Failed to refresh contextual patches', { error: err, serverId, bankId });
+      toast.error(`Refresh failed: ${err.message || err}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [serverId, bankId, loadGraph]);
+
   useEffect(() => {
     if (serverId && bankId) {
       loadGraph();
@@ -577,6 +598,14 @@ export default function ContextualGraphPage() {
               onClick={handleClearMentalModels}
             >
               {actionLoading === 'delete-generated' ? 'Deleting…' : 'Clear mental models'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!serverId || !bankId || actionLoading === 'refresh'}
+              onClick={handleRefreshPatches}
+            >
+              {actionLoading === 'refresh' ? 'Refreshing…' : 'Refresh'}
             </Button>
           </div>
         </div>
