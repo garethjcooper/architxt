@@ -176,17 +176,13 @@ function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp)
   return { success: true, applied: { nodeId, capabilities }, warnings };
 }
 
-function pairKey(a, b) {
-  return [a, b].sort().join('|');
-}
-
 function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   const pairPart = parseNodeIdFromExtId(model.mm_ext_id, 'edge-ctx-');
   if (!pairPart) {
     return { success: false, error: 'Cannot resolve pair from edge-ctx ext_id', code: 'BAD_EXT_ID' };
   }
 
-  // The ext_id may be source|target or a sorted pair key.
+  // The ext_id uses raw source|target (canonical form from system template).
   let sourceId;
   let targetId;
   if (pairPart.includes('|')) {

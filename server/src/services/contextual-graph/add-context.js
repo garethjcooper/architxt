@@ -8,6 +8,7 @@ import {
   deriveDiscoverContextModel,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
+import { inferRole } from './specs.js';
 
 const logger = createLogger('contextual-graph-add-context');
 
@@ -138,7 +139,7 @@ export async function addContext(
     const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active') && inSubset(n.cgn_id));
     if (!sourceActive || !targetActive) continue;
 
-    const pk = pairKey(edge.cge_source_id, edge.cge_target_id);
+    const pk = `${edge.cge_source_id}|${edge.cge_target_id}`;
     if (seenEdgePairs.has(pk)) continue;
     seenEdgePairs.add(pk);
 
@@ -266,7 +267,7 @@ async function recordModelProvenance(db, serverId, bankId, modelId, now) {
     const pairPart = modelId.slice('edge-ctx-'.length);
     const edge = listEdges(db, serverId, bankId)?.data?.find((e) => {
       const raw = `${e.cge_source_id}|${e.cge_target_id}`;
-      return raw === pairPart || pairKey(e.cge_source_id, e.cge_target_id) === pairPart;
+      return raw === pairPart;
     });
     if (!edge) return;
 
@@ -290,20 +291,16 @@ async function recordModelProvenance(db, serverId, bankId, modelId, now) {
   }
 }
 
-function hasModelRef(properties, rolePrefix) {
+function hasModelRef(properties, role) {
   const refs = properties?.provenance?.model_refs;
   if (Array.isArray(refs)) {
-    return refs.some((ref) => ref?.role?.startsWith?.(rolePrefix));
+    return refs.some((ref) => ref?.role === role);
   }
   return false;
 }
 
 function modelIdToRole(modelId) {
-  if (modelId.startsWith('entity-summary-')) return 'sys_entity_summary';
-  if (modelId.startsWith('entity-capabilities-')) return 'sys_entity_capabilities';
-  if (modelId.startsWith('edge-ctx-')) return 'sys_edge_context';
-  if (modelId.startsWith('discover-')) return 'sys_discovery_context';
-  return 'model';
+  return inferRole(modelId) || 'model';
 }
 
 function mergeProperties(current, modelId, role, now) {
@@ -320,10 +317,6 @@ function mergeProperties(current, modelId, role, now) {
     },
     updated_at: now,
   };
-}
-
-function pairKey(a, b) {
-  return [a, b].sort().join('|');
 }
 
 function dedupeSpecsByExtId(specs) {

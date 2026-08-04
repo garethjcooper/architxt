@@ -1,25 +1,13 @@
 import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
+import { refreshMentalModel } from '../../services/hindsight/mental-models.js';
 import { listNodes, listEdges, upsertNode, upsertEdge, getNode, getEdge } from '../../db/crud/contextual-graph.js';
 import { normalizeModelOutput, contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { config } from '../../config.js';
 import { createLogger } from '../../utils/logger.js';
+import { inferRole } from './specs.js';
 
 const logger = createLogger('contextual-graph-refresh-patches');
-
-const ROLE_PREFIXES = [
-  { role: 'sys_entity_summary', prefix: 'entity-summary-' },
-  { role: 'sys_entity_capabilities', prefix: 'entity-capabilities-' },
-  { role: 'sys_edge_context', prefix: 'edge-ctx-' },
-  { role: 'sys_discovery_context', prefix: 'discover-' },
-];
-
-function inferRole(extId) {
-  for (const { role, prefix } of ROLE_PREFIXES) {
-    if (extId?.startsWith(prefix)) return role;
-  }
-  return null;
-}
 
 function getModelContent(model) {
   if (typeof model?.content === 'string' && model.content.length > 0) {
@@ -59,7 +47,7 @@ function edgeContentEqual(props, modelEdge) {
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
- * @param {{type: 'node'|'edge', node?: object, edge?: object, ref: object}} scope
+ * @param {{type: 'node'|'edge', id: string, ref: object}} scope
  * @param {object} output - normalized model output
  * @returns {boolean}
  */
@@ -181,18 +169,28 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
  * graph, compares normalized output against current working-graph state, and applies
  * only when they diverge. Disabled roles are skipped but still get fetched_at updated.
  *
+ * If `rerunExtIds` is provided, the function asks Hindsight to regenerate those
+ * models before fetching their content. This is the explicit step required when the
+ * prompt/config changed: pushing a config update does not automatically produce new
+ * content, so the caller must request a refresh for changed models.
+ *
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
  * @param {object} [options]
  * @param {boolean} [options.dryRun=false] - when true, compare but do not apply.
+ * @param {string[]} [options.rerunExtIds=[]] - ext_ids to refresh in Hindsight before fetch.
+ * @param {Function} [options.listAllMentalModels]
+ * @param {Function} [options.refreshMentalModel]
  * @returns {Promise<{success: boolean, stats: object, error?: string}>}
  */
 export async function refreshContextualGraphPatches(db, serverId, bankId, options = {}) {
   const dryRun = options.dryRun === true;
+  const rerunExtIds = Array.isArray(options.rerunExtIds) ? options.rerunExtIds : [];
   const timestamp = new Date().toISOString();
   const patchRoles = config.contextualGraph?.patchRoles || {};
   const listModels = options.listAllMentalModels || listAllMentalModels;
+  const refreshFn = options.refreshMentalModel || refreshMentalModel;
 
   const stats = {
     fetched: 0,
@@ -201,6 +199,10 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     skippedUnchanged: 0,
     applied: 0,
     failed: 0,
+    rerunRequested: 0,
+    rerunCompleted: 0,
+    rerunFailed: 0,
+    rerunPending: 0,
     errors: [],
   };
 
@@ -210,6 +212,37 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       return { success: true, stats };
     }
 
+    // Explicitly request fresh Hindsight output for models whose config just changed.
+    // A prompt/config change does not automatically regenerate content; this is the
+    // caller's way of saying "these models need to run under the new config".
+    // Mental-model refresh is long-running and async; refreshMentalModel records a
+    // pending_operations row so the existing Hindsight poll daemon monitors it.
+    // We do not inline-poll here; the UI should poll pending operations (or simply
+    // call refresh again after a reasonable delay) to fetch the refreshed content.
+    for (const extId of rerunExtIds) {
+      if (!localRefs.has(extId)) continue;
+      stats.rerunRequested += 1;
+      const refreshResult = await refreshFn(serverId, bankId, extId);
+      if (!refreshResult.success) {
+        stats.rerunFailed += 1;
+        stats.errors.push({ extId, error: refreshResult.error, phase: 'rerun' });
+        logger.error('Failed to queue contextual mental model re-run', { extId, error: refreshResult.error });
+        continue;
+      }
+
+      // If the refresh already completed synchronously (unusual, but possible if
+      // Hindsight returns a terminal status), reflect that. Otherwise it is
+      // pending and the daemon will update it.
+      if (['completed', 'success', 'done'].includes(refreshResult.status)) {
+        stats.rerunCompleted += 1;
+      } else {
+        stats.rerunPending += 1;
+      }
+    }
+
+    // We now fetch whatever content is currently available. Re-run operations that
+    // are still pending will not yet have fresh content; the caller can refresh
+    // again once the daemon marks those operations completed.
     const listResult = await listModels(serverId, bankId, { detail: 'content' });
     if (!listResult.success) {
       return { success: false, error: listResult.error, stats };

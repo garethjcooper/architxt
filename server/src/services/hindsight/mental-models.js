@@ -7,6 +7,9 @@
 
 import { createLogger } from '../../utils/logger.js';
 import { getServerConfig } from './config.js';
+import { getOperation } from './memories.js';
+import { createPendingOperation } from '../../db/crud/pending-operations.js';
+import { db } from '../../db/connection.js';
 
 const logger = createLogger('hindsight-mental-models-client');
 
@@ -83,10 +86,13 @@ export async function deleteMentalModel(serverId, bankId, extId, options = {}) {
 /**
  * Refresh a mental model - POST {server_url}/v1/default/banks/{bank_id}/mental-models/{mental_model_id}/refresh
  *
+ * This is a long-running async operation. The Hindsight response contains an
+ * operation_id which is tracked in pending_operations for the existing poll daemon.
+ *
  * @param {number} serverId - Server ID from servers table
  * @param {string} bankId - Bank identifier
  * @param {string} mentalModelId - Mental model id on Hindsight
- * @returns {Promise<{success: boolean, operationId?: string, status?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, operationId?: string, status?: string, popId?: number|null, error?: string}>}
  */
 export async function refreshMentalModel(serverId, bankId, mentalModelId) {
   const configResult = await getServerConfig(serverId);
@@ -112,10 +118,25 @@ export async function refreshMentalModel(serverId, bankId, mentalModelId) {
 
     const data = await response.json();
     logger.info('Hindsight refreshMentalModel OK', { serverId, bankId, mentalModelId, operationId: data.operation_id, status: data.status });
+
+    // Track long-running refresh so the existing poll daemon monitors it.
+    const pendingResult = createPendingOperation(db, {
+      pop_operation_id: data.operation_id,
+      pop_server_id: serverId,
+      pop_bank_id: bankId,
+      pop_ext_id: mentalModelId,
+      pop_action: 'mental_model_refresh',
+      pop_status: data.status || 'pending',
+    });
+    if (!pendingResult.success) {
+      logger.warn('Failed to track mental-model refresh operation', { serverId, bankId, mentalModelId, operationId: data.operation_id, error: pendingResult.error });
+    }
+
     return {
       success: true,
       operationId: data.operation_id,
       status: data.status,
+      popId: pendingResult.success ? pendingResult.data : null,
     };
   } catch (error) {
     logger.error('Hindsight refreshMentalModel error', { serverId, bankId, mentalModelId, error: error.message });

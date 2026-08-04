@@ -103,6 +103,22 @@ describe('syncContextualMentalModelConfig', () => {
     assert.equal(result.stats.updated, 0);
   });
 
+  it('returns updatedExtIds when config diverges', async () => {
+    seedNodeWithRef(db);
+    db.prepare("UPDATE mental_models SET mm_refresh_mode = 'delta' WHERE mm_template_role = 'sys_entity_summary'").run();
+
+    const result = await syncContextualMentalModelConfig(db, serverId, bankId, {
+      listAllMentalModels: async () => ({
+        success: true,
+        mentalModels: [makeRemoteModel()],
+      }),
+      pushMentalModel: async () => ({ success: true }),
+    });
+
+    assert.equal(result.success, true);
+    assert.deepEqual(result.updatedExtIds, [EXT_ID]);
+  });
+
   it('pushes update when refresh_mode diverges', async () => {
     seedNodeWithRef(db);
     db.prepare("UPDATE mental_models SET mm_refresh_mode = 'delta' WHERE mm_template_role = 'sys_entity_summary'").run();
