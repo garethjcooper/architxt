@@ -349,14 +349,21 @@ export default function ContextualGraphPage() {
 
   const handleRefreshPatches = useCallback(async () => {
     if (!serverId || !bankId) return;
-    const message = `Refresh contextual patches for ${bankId}? This re-applies any Hindsight mental-model outputs whose content has changed.`;
+    const message = `Refresh contextual patches for ${bankId}? This will sync mental-model config, re-run the models in Hindsight, and apply any changed outputs.`;
     if (!window.confirm(message)) return;
     try {
       setActionLoading('refresh');
       const result = await contextualGraphApi.refresh(serverId, bankId);
       if (result.success) {
         const stats = result.stats;
-        toast.success(`Refresh complete — fetched ${stats?.fetched ?? 0}, applied ${stats?.applied ?? 0}, unchanged ${stats?.skippedUnchanged ?? 0}, failed ${stats?.failed ?? 0}`);
+        const rerunParts = [
+          stats?.synced != null && `synced ${stats.synced}`,
+          stats?.rerunCompleted != null && `re-ran ${stats.rerunCompleted}`,
+          stats?.rerunFailed != null && stats.rerunFailed > 0 && `${stats.rerunFailed} re-run failed`,
+          stats?.rerunTimedOut != null && stats.rerunTimedOut > 0 && `${stats.rerunTimedOut} re-run timed out`,
+        ].filter(Boolean);
+        const base = `Refresh complete — fetched ${stats?.fetched ?? 0}, applied ${stats?.applied ?? 0}, unchanged ${stats?.skippedUnchanged ?? 0}, failed ${stats?.failed ?? 0}`;
+        toast.success(rerunParts.length > 0 ? `${base} (${rerunParts.join(', ')})` : base);
       } else {
         toast.error(`Refresh failed: ${result.error || result.code || 'unknown'}`);
       }
