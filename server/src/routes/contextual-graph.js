@@ -21,6 +21,7 @@ import {
   ingestCandidates as defaultIngestCandidates,
 } from '../services/contextual-graph/discovery.js';
 import { refreshContextualGraphPatches as defaultRefreshPatches } from '../services/contextual-graph/refresh-patches.js';
+import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from '../services/contextual-graph/sync-mental-model-config.js';
 
 const BASE_PATH = '/contextual-graph';
 
@@ -48,6 +49,7 @@ export function createContextualGraphRouter({
   fetchCandidates = defaultFetchCandidates,
   ingestCandidates = defaultIngestCandidates,
   refreshPatches = defaultRefreshPatches,
+  syncMentalModelConfig = defaultSyncMentalModelConfig,
 } = {}) {
   const router = Router();
 
@@ -668,6 +670,70 @@ export function createContextualGraphRouter({
 
     const duration = Date.now() - start;
     logger.info('Refresh contextual patches', { serverId, bankId, dryRun, success: result.success, ...result.stats });
+
+    if (!result.success) {
+      sendResponse({
+        res,
+        status: 500,
+        data: { success: false, error: result.error, stats: result.stats },
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: { success: true, dry_run: dryRun, stats: result.stats },
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/sync-config:
+   *   post:
+   *     summary: Push updated mental-model config from local system templates to Hindsight
+   *     description: |
+   *       Re-derives the configuration of every contextual mental model referenced
+   *       by the working graph from the current DB system template, compares it to
+   *       the live Hindsight model, and pushes an update for any model that has
+   *       diverged. Use dry_run=true to preview changes without applying them.
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               dry_run: { type: boolean }
+   *     responses:
+   *       200: { description: Config sync completed or previewed }
+   *       400: { description: Missing or invalid scope }
+   *       500: { description: Hindsight fetch or push failed }
+   */
+  router.post('/sync-config', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const dryRun = req.body.dry_run === true;
+
+    const result = await syncMentalModelConfig(db, serverId, bankId, { dryRun });
+
+    const duration = Date.now() - start;
+    logger.info('Sync contextual mental model config', { serverId, bankId, dryRun, success: result.success, ...result.stats });
 
     if (!result.success) {
       sendResponse({
