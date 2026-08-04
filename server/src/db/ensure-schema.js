@@ -600,7 +600,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_edge_context',
     returns: 'sys_patch',
     dimension: 'sys_edge_context',
-    sourceQuery: 'Relationship between {source-id} ({source-name}) and {target-id} ({target-name}). Return directed edges in the standard envelope.',
+    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-name} ({source-id}) and {target-name} ({target-id})? Return every distinct flow as a directed edge in the standard envelope.',
     maxTokens: 4096,
   },
   {
