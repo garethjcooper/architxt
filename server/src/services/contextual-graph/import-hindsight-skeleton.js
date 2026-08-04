@@ -1,6 +1,6 @@
 import { createLogger } from '../../utils/logger.js';
 import { getEntityGraph } from '../hindsight/research.js';
-import { buildArchitxtLookups, resolveHindsightNode, buildEdgeId } from './identity.js';
+import { buildArchitxtLookups, resolveHindsightNode, buildUndirectedEdgeId } from './identity.js';
 import { upsertNode, upsertEdge, listNodes } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-import');
@@ -116,7 +116,7 @@ export async function importHindsightSkeleton(
     const weight = typeof data.weight === 'number' ? data.weight : 1;
     if (weight < minWeight) continue;
 
-    const edgeId = buildEdgeId(sourceId, targetId, null, 'hindsight');
+    const edgeId = buildUndirectedEdgeId(sourceId, targetId, null, 'hindsight');
     if (seenEdgeIds.has(edgeId)) continue;
     seenEdgeIds.add(edgeId);
 

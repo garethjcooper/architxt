@@ -6,7 +6,7 @@ import {
   deriveEntityCapabilitiesModel,
   deriveEdgeContextModel,
 } from './template-models.js';
-import { dedupeCandidates, buildEdgeId } from './identity.js';
+import { dedupeCandidates, buildUndirectedEdgeId } from './identity.js';
 import { upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-discovery');
@@ -154,7 +154,7 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
         }, bankId));
 
-        const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
+        const edgeId = buildUndirectedEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
           directed: false,
           type: he.type || 'co-occurs',
@@ -195,7 +195,7 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
         }, bankId));
 
-        const edgeId = buildEdgeId(candidate.id, he.target, null, 'discover');
+        const edgeId = buildUndirectedEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
           directed: false,
           type: he.type || 'co-occurs',
