@@ -100,6 +100,23 @@ describe('normalizeModelOutput', () => {
     assert.equal(out.narrative, '');
   });
 
+  it('extracts JSON buried after narrative prose and smart quotes', () => {
+    const inner = JSON.stringify({
+      narrative: 'Context.',
+      graph: {
+        nodes: [{ id: 'a-com:COM-002', name: 'ICMS', type: 'component' }, { id: 'a-com:COM-001', name: 'Singleview', type: 'component' }],
+        edges: [{ from: 'a-com:COM-002', to: 'a-com:COM-001', type: 'reads', label: 'account data', detail: 'reads account data', evidence: ['entity-summary-a-com:COM-001'] }],
+      },
+      tables: [],
+    });
+    const smartQuoted = inner.replace(/"/g, '\u201C');
+    const raw = `Here is the contextual analysis.\n\n${smartQuoted}`;
+    const out = normalizeModelOutput(raw);
+    assert.equal(out.errors.length, 0);
+    assert.equal(out.graph.nodes.length, 2);
+    assert.equal(out.graph.edges.length, 1);
+  });
+
   it('contentHash returns a 16-char hex string', () => {
     const h1 = contentHash('hello');
     const h2 = contentHash('hello');

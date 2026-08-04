@@ -52,6 +52,77 @@ function extractFirstJson(text) {
   return null;
 }
 
+/**
+ * Find the first substring that looks like a JSON object/array and actually parses.
+ * Handles narrative text before the real envelope and skips brace pairs that are not JSON.
+ */
+function extractValidJson(text) {
+  const sanitized = sanitizeJsonText(text);
+  const re = /[\\{\\[]/g;
+  let match;
+  while ((match = re.exec(sanitized)) !== null) {
+    const start = match.index;
+    const stack = [];
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < sanitized.length; i += 1) {
+      const ch = sanitized[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\\\') {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (ch === '{' || ch === '[') {
+        stack.push(ch);
+      } else if (ch === '}' || ch === ']') {
+        const open = stack.pop();
+        if (!open) break;
+        if ((open === '{' && ch !== '}') || (open === '[' && ch !== ']')) break;
+        if (stack.length === 0) {
+          const candidate = sanitized.slice(start, i + 1);
+          try {
+            JSON.parse(candidate);
+            return candidate;
+          } catch {
+            // Not valid JSON; continue scanning from after this candidate.
+            re.lastIndex = i + 1;
+            break;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+const SMART_QUOTES = {
+  '\u201C': '"',
+  '\u201D': '"',
+  '\u2018': "'",
+  '\u2019': "'",
+  '\u201A': ',',
+  '\u2013': '-',
+  '\u2014': '-',
+  '\u2026': '...',
+  '\u00A0': ' ',
+};
+
+function sanitizeJsonText(text) {
+  return text
+    .replace(/^\uFEFF/, '')
+    .split('')
+    .map((ch) => SMART_QUOTES[ch] || ch)
+    .join('');
+}
+
 function stripOuterCodeFences(text) {
   const trimmed = text.trim();
   const match = trimmed.match(/^```(?:markdown|json)?\\s*\\n?([\\s\\S]*?)\\n?```\\s*$/);
@@ -128,13 +199,13 @@ export function normalizeModelOutput(raw) {
   let parsed = null;
   let jsonText = null;
 
-  // 1. Try direct JSON.parse on the whole string.
+  // 1. Try direct JSON.parse on the whole string (after stripping fences and smart quotes).
   try {
-    jsonText = stripOuterCodeFences(rawString);
+    jsonText = sanitizeJsonText(stripOuterCodeFences(rawString));
     parsed = JSON.parse(jsonText);
   } catch {
-    // 2. Fallback: extract the first balanced JSON object.
-    const extracted = extractFirstJson(stripOuterCodeFences(rawString));
+    // 2. Fallback: find the first balanced JSON object that actually parses.
+    const extracted = extractValidJson(sanitizeJsonText(stripOuterCodeFences(rawString)));
     if (extracted) {
       try {
         parsed = JSON.parse(extracted);
