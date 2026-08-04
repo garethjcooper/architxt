@@ -117,6 +117,7 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
  * @param {string} bankId
  * @param {object} [options]
  * @param {boolean} [options.dryRun=false] - when true, compare hashes but do not apply.
+ * @param {boolean} [options.force=false] - when true, re-apply even if the content hash has not changed.
  * @returns {Promise<{success: boolean, stats: object, error?: string}>}
  */
 export async function refreshContextualGraphPatches(db, serverId, bankId, options = {}) {
@@ -167,12 +168,16 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const newHash = contentHash(content);
       const oldHash = scope.ref.content_hash;
 
-      if (oldHash && oldHash === newHash) {
+      const contentChanged = !oldHash || oldHash !== newHash;
+      const force = options.force === true;
+
+      if (!force && !contentChanged) {
         stats.skippedUnchanged += 1;
         updateRefTimestampOnScope(db, serverId, bankId, scope, scope.ref, timestamp);
         continue;
       }
 
+      // Dry-run still fetches and compares, but never applies.
       if (dryRun) {
         updateRefTimestampOnScope(db, serverId, bankId, scope, scope.ref, timestamp);
         continue;
@@ -181,7 +186,10 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const localModel = buildLocalModel(model);
       const output = normalizeModelOutput(content);
       if (output.errors.length > 0) {
-        logger.warn('Normalized output has errors', { extId: model.id, errors: output.errors });
+        stats.failed += 1;
+        stats.errors.push({ extId: model.id, errors: output.errors });
+        logger.warn('Normalized output has errors; treating as failed', { extId: model.id, errors: output.errors });
+        continue;
       }
 
       const applyResult = await applyModelOutput(db, serverId, bankId, localModel, output, { now: timestamp });
