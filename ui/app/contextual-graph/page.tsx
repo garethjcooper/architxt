@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { InteractiveGraph, type GraphLayout, colorForType } from '@/components/research-canvas';
 import { GraphControls } from '@/app/explore/graph-controls';
@@ -185,6 +186,7 @@ export default function ContextualGraphPage() {
     sys_edge_context: true,
     sys_discovery_context: false,
   });
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const rightFlex = 5 - leftFlex;
   const leftPaneRef = useRef<HTMLDivElement>(null);
   const isHorizontalDraggingRef = useRef(false);
@@ -271,6 +273,66 @@ export default function ContextualGraphPage() {
       setGraphLoading(false);
     }
   }, [serverId, bankId]);
+
+  const handleImportGraph = useCallback(async () => {
+    if (!serverId || !bankId) return;
+    if (!window.confirm(`Import Hindsight skeleton into ${bankId}? This will add nodes and edges to the working graph.`)) return;
+    try {
+      setActionLoading('import');
+      const result = await contextualGraphApi.import(serverId, bankId);
+      if (result.success) {
+        toast.success(`Imported ${result.imported?.nodes ?? 0} nodes, ${result.imported?.edges ?? 0} edges`);
+      } else {
+        toast.error(`Import failed: ${result.error || result.code || 'unknown'}`);
+      }
+      await loadGraph();
+    } catch (err: any) {
+      logger.error('Failed to import contextual graph', { error: err, serverId, bankId });
+      toast.error(`Import failed: ${err.message || err}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [serverId, bankId, loadGraph]);
+
+  const handleClearGraph = useCallback(async () => {
+    if (!serverId || !bankId) return;
+    if (!window.confirm(`Clear the working graph for ${bankId}? This removes all contextual nodes and edges but leaves Hindsight mental models intact.`)) return;
+    try {
+      setActionLoading('clear');
+      const result = await contextualGraphApi.clear(serverId, bankId);
+      if (result.success) {
+        toast.success(`Cleared ${result.cleared?.nodes ?? 0} nodes, ${result.cleared?.edges ?? 0} edges`);
+      } else {
+        toast.error(`Clear failed: ${result.error || result.code || 'unknown'}`);
+      }
+      await loadGraph();
+    } catch (err: any) {
+      logger.error('Failed to clear contextual graph', { error: err, serverId, bankId });
+      toast.error(`Clear failed: ${err.message || err}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [serverId, bankId, loadGraph]);
+
+  const handleClearMentalModels = useCallback(async () => {
+    if (!serverId || !bankId) return;
+    if (!window.confirm(`Delete attached mental models for ${bankId}? This removes generated models from Hindsight and clears the working graph.`)) return;
+    try {
+      setActionLoading('delete-generated');
+      const result = await contextualGraphApi.deleteGenerated(serverId, bankId, { dry_run: false });
+      if (result.success) {
+        toast.success(`Deleted ${result.total ?? 0} mental models; cleared ${result.cleared?.nodes ?? 0} nodes, ${result.cleared?.edges ?? 0} edges`);
+      } else {
+        toast.error(`Delete failed: ${result.error || result.code || 'unknown'}`);
+      }
+      await loadGraph();
+    } catch (err: any) {
+      logger.error('Failed to delete generated mental models', { error: err, serverId, bankId });
+      toast.error(`Delete failed: ${err.message || err}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [serverId, bankId, loadGraph]);
 
   useEffect(() => {
     if (serverId && bankId) {
@@ -426,6 +488,35 @@ export default function ContextualGraphPage() {
             loadingBanks={loadingBanks}
             disabled={loadingServers}
           />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!serverId || !bankId || actionLoading === 'import'}
+              onClick={handleImportGraph}
+            >
+              {actionLoading === 'import' ? 'Importing…' : 'Import'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!serverId || !bankId || actionLoading === 'clear'}
+              onClick={handleClearGraph}
+            >
+              {actionLoading === 'clear' ? 'Clearing…' : 'Clear graph'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!serverId || !bankId || actionLoading === 'delete-generated'}
+              onClick={handleClearMentalModels}
+            >
+              {actionLoading === 'delete-generated' ? 'Deleting…' : 'Clear mental models'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 py-2 shrink-0">
           <div className="flex items-center gap-3 text-sm text-white/60">
             {Object.entries(patchRoles).filter(([_, enabled]) => enabled).length > 0 && (
               <div className="flex items-center gap-2 text-[11px]">
