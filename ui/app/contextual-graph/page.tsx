@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { InteractiveGraph, type GraphLayout, colorForType } from '@/components/research-canvas';
 import { GraphControls } from '@/app/explore/graph-controls';
@@ -506,22 +505,15 @@ export default function ContextualGraphPage() {
                     const summary = entitySummaryText(entity);
                     const { health, missing, present } = computePatchHealth(entity, patchRoles);
                     return (
-                      <div
+                      <button
                         key={entity.id}
-                        role="button"
-                        tabIndex={0}
+                        type="button"
                         data-node-id={entity.id}
                         onClick={() => handleNodeClick(entity.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleNodeClick(entity.id);
-                          }
-                        }}
                         onMouseEnter={() => handleNodeHover(entity.id)}
                         onMouseLeave={() => handleNodeHover(null)}
                         className={cn(
-                          'w-full flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors cursor-pointer',
+                          'w-full flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors',
                           active ? 'border-emerald-500/30 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
                         )}
                         style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
@@ -531,30 +523,22 @@ export default function ContextualGraphPage() {
                             <div className="text-xs text-white/90 truncate">{entity.label || entity.name || entity.id}</div>
                             <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
                           </div>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <div className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))} />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" sideOffset={6} className="max-w-[200px] text-[11px] bg-black/90 border border-white/10 text-white/90 p-2">
-                              <div className="space-y-1">
-                                <div className="capitalize">{health.replace('-', ' ')}</div>
-                                {present.length > 0 && <div>Present: {present.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
-                                {missing.length > 0 && <div>Missing: {missing.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
+                          <span
+                            title={[
+                              health.replace('-', ' '),
+                              present.length > 0 ? `Present: ${present.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
+                              missing.length > 0 ? `Missing: ${missing.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
+                            ].filter(Boolean).join(' | ')}
+                            className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))}
+                          />
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div className="text-[11px] text-white/70 leading-snug line-clamp-4 whitespace-normal break-words text-left w-full">
-                              {summary}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" sideOffset={8} className="max-w-xs text-xs bg-black/90 border border-white/10 text-white/90 p-2">
-                            {summary}
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
+                        <span
+                          title={summary.length > 100 ? summary.slice(0, 200) + (summary.length > 200 ? '…' : '') : summary}
+                          className="text-[11px] text-white/70 leading-snug line-clamp-4 whitespace-normal break-words text-left w-full"
+                        >
+                          {summary}
+                        </span>
+                      </button>
                     );
                   })
                 )}
@@ -622,18 +606,14 @@ export default function ContextualGraphPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="text-xs text-white/90 whitespace-normal break-words leading-snug min-w-0">{edge.detail || edge.label || edge.type || 'Edge'}</div>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))} />
-                          </TooltipTrigger>
-                          <TooltipContent side="top" sideOffset={6} className="max-w-[200px] text-[11px] bg-black/90 border border-white/10 text-white/90 p-2">
-                            <div className="space-y-1">
-                              <div className="capitalize">{health.replace('-', ' ')}</div>
-                              {present.length > 0 && <div>Present: {present.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
-                              {missing.length > 0 && <div>Missing: {missing.map((r) => ROLE_LABELS[r] || r).join(', ')}</div>}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
+                        <span
+                          title={[
+                            health.replace('-', ' '),
+                            present.length > 0 ? `Present: ${present.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
+                            missing.length > 0 ? `Missing: ${missing.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
+                          ].filter(Boolean).join(' | ')}
+                          className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))}
+                        />
                       </div>
                       <div className="text-[10px] text-white/40 truncate">
                         {sourceNode?.name || sourceNode?.label || edge.from} → {targetNode?.name || targetNode?.label || edge.to}
