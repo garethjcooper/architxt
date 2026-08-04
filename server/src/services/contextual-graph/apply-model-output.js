@@ -247,12 +247,12 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       continue;
     }
 
-    // Prefer an existing edge in either direction between the same endpoints,
-    // regardless of the ext_id scope. This lets us annotate undirected skeleton edges
-    // even when the model states the relationship in the reverse direction.
+    // Prefer an existing edge only when source, target, and type match the model.
+    // If the model asserts a different type between the same endpoints, it is a
+    // distinct edge and should not overwrite the existing one.
     const existing = allEdges.find((e) =>
-      (e.cge_source_id === modelEdge.from && e.cge_target_id === modelEdge.to) ||
-      (e.cge_source_id === modelEdge.to && e.cge_target_id === modelEdge.from)
+      (e.cge_source_id === modelEdge.from && e.cge_target_id === modelEdge.to && e.cge_type === modelEdge.type) ||
+      (e.cge_source_id === modelEdge.to && e.cge_target_id === modelEdge.from && e.cge_type === modelEdge.type)
     );
 
     let edgeId;

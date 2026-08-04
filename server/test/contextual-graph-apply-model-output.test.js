@@ -81,7 +81,7 @@ describe('applyModelOutput', () => {
   it('applies edge context to matching edges', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {});
     upsertNode(db, serverId, bankId, 'svc-002', ['active'], {});
-    upsertEdge(db, serverId, bankId, 'edge-001', 'svc-001', 'svc-002', null, { directed: false });
+    upsertEdge(db, serverId, bankId, 'edge-001', 'svc-001', 'svc-002', 'sends', { directed: false });
 
     const output = normalizeModelOutput(JSON.stringify({
       narrative: '',
@@ -254,6 +254,41 @@ describe('applyModelOutput', () => {
     const output = normalizeModelOutput(content);
     assert.equal(output.errors.length, 0);
     assert.ok(output.narrative.includes('File: DBnnnn00'));
+  });
+
+  it('does not overwrite an existing edge of a different type between the same endpoints', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+    upsertEdge(db, serverId, bankId, 'original-edge', 'a-com:COM-002', 'a-com:COM-001', 'reads', {
+      directed: true, label: 'account data', detail: 'original detail', provenance: { source: 'contextual-graph', model_refs: [] },
+    });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-002', to: 'a-com:COM-001', type: 'reads', label: 'account data', detail: 'updated detail', evidence: ['m1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'sends usage data', evidence: ['m1'] },
+        ],
+      },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-002|a-com:COM-001', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 2);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 2);
+
+    const readsEdge = allEdges.find((e) => e.cge_type === 'reads');
+    assert.ok(readsEdge);
+    assert.equal(readsEdge.cge_properties.detail, 'updated detail');
+
+    const sendsEdge = allEdges.find((e) => e.cge_type === 'sends');
+    assert.ok(sendsEdge);
+    assert.equal(sendsEdge.cge_id, 'edge-ctx-a-com:COM-001-a-com:COM-002-sends');
   });
 
   it('synthesizes envelope from Markdown capability table', () => {
