@@ -189,7 +189,6 @@ export async function composeMentalModelPrompt(db, templateName, topic) {
     }
     const { prompt } = composePrompt(template, {
       ARCHITXT_TOPIC: topic || '',
-      ARCHITXT_CORPUS: '',
     });
     return prompt;
   }
@@ -245,7 +244,6 @@ export async function composeMentalModelPromptBatch(db, items) {
     try {
       const variables = {
         ARCHITXT_TOPIC: item.source_query || '',
-        ARCHITXT_CORPUS: '',
       };
 
       if (!CONTEXTUAL_MODES.has(lookupKey)) {
