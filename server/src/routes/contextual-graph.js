@@ -651,7 +651,6 @@ export function createContextualGraphRouter({
    *               server_id: { type: integer }
    *               bank_id: { type: string }
    *               dry_run: { type: boolean }
-   *               force: { type: boolean }
    *     responses:
    *       200: { description: Refresh completed or previewed }
    *       400: { description: Missing or invalid scope }
@@ -664,12 +663,11 @@ export function createContextualGraphRouter({
 
     const { serverId, bankId } = scope;
     const dryRun = req.body.dry_run === true;
-    const force = req.body.force === true;
 
-    const result = await refreshPatches(db, serverId, bankId, { dryRun, force });
+    const result = await refreshPatches(db, serverId, bankId, { dryRun });
 
     const duration = Date.now() - start;
-    logger.info('Refresh contextual patches', { serverId, bankId, dryRun, force, success: result.success, ...result.stats });
+    logger.info('Refresh contextual patches', { serverId, bankId, dryRun, success: result.success, ...result.stats });
 
     if (!result.success) {
       sendResponse({
@@ -687,7 +685,7 @@ export function createContextualGraphRouter({
     sendResponse({
       res,
       status: 200,
-      data: { success: true, dry_run: dryRun, force, stats: result.stats },
+      data: { success: true, dry_run: dryRun, stats: result.stats },
       logger,
       method: req.method,
       path: req.path,

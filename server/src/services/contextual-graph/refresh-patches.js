@@ -51,7 +51,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
     const refs = node.properties?.provenance?.model_refs || [];
     for (const ref of refs) {
       if (!ref?.ext_id || !inferRole(ref.ext_id)) continue;
-      byExtId.set(ref.ext_id, { type: 'node', id: node.cgn_id, ref });
+      byExtId.set(ref.ext_id, { type: 'node', id: node.cgn_id, ref, node });
     }
   }
 
@@ -61,7 +61,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
     const refs = edge.cge_properties?.provenance?.model_refs || [];
     for (const ref of refs) {
       if (!ref?.ext_id || !inferRole(ref.ext_id)) continue;
-      byExtId.set(ref.ext_id, { type: 'edge', id: edge.cge_id, ref });
+      byExtId.set(ref.ext_id, { type: 'edge', id: edge.cge_id, ref, edge });
     }
   }
 
@@ -73,6 +73,7 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
     const nodeResult = getNode(db, serverId, bankId, scope.id);
     const node = nodeResult?.success ? nodeResult.data : null;
     if (!node) return;
+    scope.node = node;
     const provenance = { ...(node.properties?.provenance || {}) };
     const refs = provenance.model_refs || [];
     const existing = refs.find((r) => r.ext_id === ref.ext_id);
@@ -91,6 +92,7 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
   const edgeResult = getEdge(db, serverId, bankId, scope.id);
   const edge = edgeResult?.success ? edgeResult.data : null;
   if (!edge) return;
+  scope.edge = edge;
   const provenance = { ...(edge.cge_properties?.provenance || {}) };
   const refs = provenance.model_refs || [];
   const existing = refs.find((r) => r.ext_id === ref.ext_id);
@@ -105,6 +107,24 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
   upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
 }
 
+function needsReapply(scope) {
+  const ref = scope.ref;
+  if (ref.role === 'sys_entity_summary') {
+    const summary = scope.type === 'node' ? scope.node?.properties?.summary : undefined;
+    return summary === undefined || summary === null || summary === '';
+  }
+  if (ref.role === 'sys_entity_capabilities') {
+    const capabilities = scope.type === 'node' ? scope.node?.properties?.capabilities : undefined;
+    return !Array.isArray(capabilities) || capabilities.length === 0;
+  }
+  if (ref.role === 'sys_edge_context') {
+    if (scope.type !== 'edge') return false;
+    const props = scope.edge?.cge_properties || {};
+    return !props.detail || !props.label;
+  }
+  return false;
+}
+
 /**
  * Refresh contextual-graph patches from Hindsight.
  *
@@ -117,7 +137,6 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
  * @param {string} bankId
  * @param {object} [options]
  * @param {boolean} [options.dryRun=false] - when true, compare hashes but do not apply.
- * @param {boolean} [options.force=false] - when true, re-apply even if the content hash has not changed.
  * @returns {Promise<{success: boolean, stats: object, error?: string}>}
  */
 export async function refreshContextualGraphPatches(db, serverId, bankId, options = {}) {
@@ -169,9 +188,8 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const oldHash = scope.ref.content_hash;
 
       const contentChanged = !oldHash || oldHash !== newHash;
-      const force = options.force === true;
 
-      if (!force && !contentChanged) {
+      if (!contentChanged && !needsReapply(scope)) {
         stats.skippedUnchanged += 1;
         updateRefTimestampOnScope(db, serverId, bankId, scope, scope.ref, timestamp);
         continue;
