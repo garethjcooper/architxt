@@ -63,6 +63,10 @@ describe('contextual graph template models', () => {
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
     assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_entity_summary', 'node-svc-001']);
+    assert.equal(spec.refresh_mode, 'full');
+    assert.equal(spec.refresh_after_consolidation, false);
+    assert.equal(spec.exclude_all_mental_models, false);
+    assert.equal(spec.tags_match_mode, 'all_strict');
   });
 
   it('derives an entity-capabilities model from a node', async () => {
@@ -75,6 +79,8 @@ describe('contextual graph template models', () => {
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
     assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_entity_capabilities', 'node-svc-001']);
+    assert.equal(spec.refresh_mode, 'full');
+    assert.equal(spec.tags_match_mode, 'all_strict');
   });
 
   it('derives an edge context model from source and target nodes', async () => {
@@ -92,6 +98,8 @@ describe('contextual graph template models', () => {
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Payment API'));
     assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_edge_context', 'pair-svc-001|svc-002']);
+    assert.equal(spec.refresh_mode, 'full');
+    assert.equal(spec.tags_match_mode, 'all_strict');
   });
 
   it('derives a discover model from a seed node', async () => {
@@ -103,6 +111,8 @@ describe('contextual graph template models', () => {
     assert.equal(spec.role, 'sys_discovery_context');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_discovery_context', 'seed-svc-001']);
+    assert.equal(spec.refresh_mode, 'full');
+    assert.equal(spec.tags_match_mode, 'all_strict');
   });
 
   it('system templates have no tags', () => {
