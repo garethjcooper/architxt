@@ -594,6 +594,10 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     dimension: 'sys_entity_summary',
     sourceQuery: 'Entity: {id} ({entity-name}). Return a concise JSON summary in the narrative field of the standard envelope.',
     maxTokens: 4096,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'false',
+    tagsMatchMode: 'all_strict',
   },
   {
     extId: 'entity-capabilities-{id}',
@@ -603,6 +607,10 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     dimension: 'sys_entity_capabilities',
     sourceQuery: 'Entity: {id} ({entity-name}). Return a capabilities table in the standard envelope.',
     maxTokens: 4096,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'false',
+    tagsMatchMode: 'all_strict',
   },
   {
     extId: 'edge-ctx-{source-id}|{target-id}',
@@ -612,6 +620,10 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     dimension: 'sys_edge_context',
     sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-name} ({source-id}) and {target-name} ({target-id})? Return every distinct flow as a directed edge in the standard envelope.',
     maxTokens: 4096,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'false',
+    tagsMatchMode: 'all_strict',
   },
   {
     extId: 'discover-{seed-id}',
@@ -621,6 +633,10 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     dimension: 'sys_discovery_context',
     sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest candidate nodes and edges in the standard envelope.',
     maxTokens: 4096,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'false',
+    tagsMatchMode: 'all_strict',
   },
 ];
 
@@ -666,20 +682,36 @@ function ensureContextualGraphTemplates(db) {
 
   let seeded = 0;
   const upsert = db.prepare(`
-    INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
-    VALUES (?, ?, ?, 'true', ?, ?, ?, ?)
+    INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens, mm_refresh_mode, mm_refresh_after_consolidation, mm_exclude_all_mental_models, mm_tags_match_mode)
+    VALUES (?, ?, ?, 'true', ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(mm_ext_id) DO UPDATE SET
       mm_name = excluded.mm_name,
       mm_source_query = excluded.mm_source_query,
       mm_template_role = excluded.mm_template_role,
       mm_returns = excluded.mm_returns,
       mm_dimension = excluded.mm_dimension,
-      mm_max_tokens = excluded.mm_max_tokens
+      mm_max_tokens = excluded.mm_max_tokens,
+      mm_refresh_mode = excluded.mm_refresh_mode,
+      mm_refresh_after_consolidation = excluded.mm_refresh_after_consolidation,
+      mm_exclude_all_mental_models = excluded.mm_exclude_all_mental_models,
+      mm_tags_match_mode = excluded.mm_tags_match_mode
   `);
 
   for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
     try {
-      upsert.run(t.extId, t.name, t.sourceQuery, t.role, t.returns, t.dimension, t.maxTokens);
+      upsert.run(
+        t.extId,
+        t.name,
+        t.sourceQuery,
+        t.role,
+        t.returns,
+        t.dimension,
+        t.maxTokens,
+        t.refreshMode,
+        t.refreshAfterConsolidation,
+        t.excludeAllMentalModels,
+        t.tagsMatchMode,
+      );
 
       if (!existingByExtId.has(t.extId) || !existingRoles.has(t.role)) {
         seeded++;

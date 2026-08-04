@@ -66,6 +66,11 @@ export async function deriveEntitySummaryModel(db, node, bankId) {
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
+    refresh_mode: template.refresh_mode,
+    refresh_after_consolidation: template.refresh_after_consolidation,
+    exclude_all_mental_models: template.exclude_all_mental_models,
+    exclude_mental_model_list: template.exclude_mental_model_list,
+    tags_match_mode: template.tags_match_mode,
     tags: [`ctx-${bankId}`, template.role, `node-${node.id}`],
   };
 }
@@ -90,6 +95,11 @@ export async function deriveEntityCapabilitiesModel(db, node, bankId) {
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
+    refresh_mode: template.refresh_mode,
+    refresh_after_consolidation: template.refresh_after_consolidation,
+    exclude_all_mental_models: template.exclude_all_mental_models,
+    exclude_mental_model_list: template.exclude_mental_model_list,
+    tags_match_mode: template.tags_match_mode,
     tags: [`ctx-${bankId}`, template.role, `node-${node.id}`],
   };
 }
@@ -116,6 +126,11 @@ export async function deriveEdgeContextModel(db, sourceNode, targetNode, bankId)
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
+    refresh_mode: template.refresh_mode,
+    refresh_after_consolidation: template.refresh_after_consolidation,
+    exclude_all_mental_models: template.exclude_all_mental_models,
+    exclude_mental_model_list: template.exclude_mental_model_list,
+    tags_match_mode: template.tags_match_mode,
     tags: [`ctx-${bankId}`, template.role, `pair-${sourceNode.id}|${targetNode.id}`],
   };
 }
@@ -140,6 +155,11 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = [], b
     returns: template.returns,
     dimension: template.dimension,
     max_tokens: template.max_tokens,
+    refresh_mode: template.refresh_mode,
+    refresh_after_consolidation: template.refresh_after_consolidation,
+    exclude_all_mental_models: template.exclude_all_mental_models,
+    exclude_mental_model_list: template.exclude_mental_model_list,
+    tags_match_mode: template.tags_match_mode,
     tags: [`ctx-${bankId}`, template.role, `seed-${seedNode.id}`],
     // Pass neighbors to the deploy layer so it can include them in the prompt topic.
     neighbor_ids: neighbors.map((n) => (typeof n === 'string' ? n : n.id)),
@@ -157,6 +177,11 @@ function normalizeTemplateRow(row) {
     returns: row.mm_returns,
     dimension: row.mm_dimension,
     max_tokens: row.mm_max_tokens,
+    refresh_mode: row.mm_refresh_mode,
+    refresh_after_consolidation: row.mm_refresh_after_consolidation === 'true',
+    exclude_all_mental_models: row.mm_exclude_all_mental_models === 'true',
+    exclude_mental_model_list: row.mm_exclude_mental_model_list,
+    tags_match_mode: row.mm_tags_match_mode,
     tags: parseJsonArray(row.tags),
   };
 }

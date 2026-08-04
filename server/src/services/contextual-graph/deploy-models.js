@@ -39,11 +39,11 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
       name: spec.name || null,
       composed_query: composed,
       max_tokens: spec.max_tokens || 2048,
-      refresh_mode: 'delta',
-      refresh_after_consolidation: false,
-      exclude_all_mental_models: false,
-      exclude_mental_model_list: '',
-      tags_match_mode: 'any',
+      refresh_mode: spec.refresh_mode || 'delta',
+      refresh_after_consolidation: spec.refresh_after_consolidation ?? false,
+      exclude_all_mental_models: spec.exclude_all_mental_models ?? false,
+      exclude_mental_model_list: spec.exclude_mental_model_list || '',
+      tags_match_mode: spec.tags_match_mode || 'any',
       tags: Array.isArray(spec.tags) ? spec.tags : [],
     };
 
@@ -72,10 +72,10 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
     const modelForPush = {
       ...spec,
       composed_query: composed,
-      refresh_mode: 'delta',
-      refresh_after_consolidation: false,
-      exclude_all_mental_models: false,
-      tags_match_mode: 'any',
+      refresh_mode: spec.refresh_mode || 'delta',
+      refresh_after_consolidation: spec.refresh_after_consolidation ?? false,
+      exclude_all_mental_models: spec.exclude_all_mental_models ?? false,
+      tags_match_mode: spec.tags_match_mode || 'any',
     };
 
     const pushResult = await createMentalModel(serverId, bankId, modelForPush, db);
