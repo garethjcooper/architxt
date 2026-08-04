@@ -65,7 +65,7 @@ export function composePrompt(template, variables = {}) {
   const fragments = JSON.parse(template.pt_fragments || '[]');
   const fragmentText = composeFragments(fragments);
   const body = template.pt_body || '';
-  const composed = fragmentText ? `${fragmentText}\n\n${body}` : body;
+  const composed = fragmentText ? `${body}\n\n${fragmentText}` : body;
   if (composed.trim() === '') {
     throw new Error(`Composed prompt for template ${template.pt_name} is empty`);
   }
