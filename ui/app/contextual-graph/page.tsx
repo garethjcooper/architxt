@@ -5,6 +5,7 @@ import { PageShell } from '@/app/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { InteractiveGraph, type GraphLayout, colorForType } from '@/components/research-canvas';
 import { GraphControls } from '@/app/explore/graph-controls';
@@ -365,6 +366,8 @@ export default function ContextualGraphPage() {
 
   const [nodeFilters, setNodeFilters] = useState<Set<string>>(new Set());
   const [edgeFilters, setEdgeFilters] = useState<Set<string>>(new Set());
+  const [entitySelectMode, setEntitySelectMode] = useState(false);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
 
   const toggleNodeFilter = useCallback((type: string) => {
     setNodeFilters((prev) => {
@@ -387,6 +390,8 @@ export default function ContextualGraphPage() {
   useEffect(() => {
     setNodeFilters(new Set());
     setEdgeFilters(new Set());
+    setSelectedEntityIds(new Set());
+    setEntitySelectMode(false);
   }, [selectedBankId]);
 
   const selectOnCanvas = useCallback((id: string) => {
@@ -401,12 +406,60 @@ export default function ContextualGraphPage() {
   }, []);
 
   const handleNodeClick = useCallback((nodeId: string) => {
+    if (entitySelectMode) {
+      setSelectedEntityIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(nodeId)) next.delete(nodeId);
+        else next.add(nodeId);
+        return next;
+      });
+      return;
+    }
     selectOnCanvas(nodeId);
-  }, [selectOnCanvas]);
+  }, [entitySelectMode, selectOnCanvas]);
+
+  const handleDeployModels = useCallback(async () => {
+    if (!serverId || !bankId || selectedEntityIds.size === 0) return;
+    if (!window.confirm(`Deploy contextual models for ${selectedEntityIds.size} selected entity${selectedEntityIds.size !== 1 ? 'ies' : 'y'}?`)) return;
+    try {
+      setActionLoading('deploy');
+      const result = await contextualGraphApi.addContext(serverId, bankId, {
+        node_ids: Array.from(selectedEntityIds),
+        import_skeleton: false,
+        run_discovery: false,
+      });
+      if (result.success) {
+        const deployed = result.deployed?.length ?? 0;
+        const failed = result.failed?.length ?? 0;
+        if (failed > 0) {
+          toast.warning(`Deployed ${deployed} models; ${failed} failed`);
+        } else {
+          toast.success(`Deployed ${deployed} models`);
+        }
+      } else {
+        toast.error(`Deploy failed: ${result.error || result.code || 'unknown'}`);
+      }
+      setSelectedEntityIds(new Set());
+      setEntitySelectMode(false);
+      await loadGraph();
+    } catch (err: any) {
+      logger.error('Failed to deploy contextual models', { error: err, serverId, bankId });
+      toast.error(`Deploy failed: ${err.message || err}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [serverId, bankId, selectedEntityIds, loadGraph]);
 
   const handleSelectEdge = useCallback((edge: GraphEdge) => {
     selectOnCanvas(edge.id);
   }, [selectOnCanvas]);
+
+  const toggleEntitySelectMode = useCallback(() => {
+    setEntitySelectMode((prev) => {
+      if (prev) setSelectedEntityIds(new Set());
+      return !prev;
+    });
+  }, []);
 
   const handleNodeHover = useCallback((nodeId: string | null) => {
     setHoveredNodeId(nodeId);
@@ -544,8 +597,35 @@ export default function ContextualGraphPage() {
           <div ref={leftPaneRef} className="min-w-0 flex flex-col gap-1" style={{ flex: leftFlex }}>
             <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: 1.5 }}>
               <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
-                <span className="font-medium text-sm truncate">Entities</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-medium text-sm truncate">Entities</span>
+                  {sortedNodes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleEntitySelectMode}
+                      className={cn(
+                        'text-[10px] px-2 py-0.5 rounded border h-5 inline-flex items-center transition-colors',
+                        entitySelectMode
+                          ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
+                          : 'border-white/10 bg-black/20 text-white/60 hover:text-white/80'
+                      )}
+                    >
+                      {entitySelectMode ? 'Done' : 'Select'}
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
+                  {entitySelectMode && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px] px-2"
+                      disabled={selectedEntityIds.size === 0 || actionLoading === 'deploy'}
+                      onClick={handleDeployModels}
+                    >
+                      {actionLoading === 'deploy' ? 'Deploying…' : `Deploy models (${selectedEntityIds.size})`}
+                    </Button>
+                  )}
                   <CardControls
                     scroll={autoScrollEntities}
                     onScrollChange={(checked) => setAutoScrollEntities(Boolean(checked))}
@@ -595,6 +675,7 @@ export default function ContextualGraphPage() {
                     const typeLine = type && !entity.id.startsWith(`${type}:`) ? `${type}:${entity.id}` : entity.id;
                     const summary = entitySummaryText(entity);
                     const { health, missing, present } = computePatchHealth(entity, patchRoles);
+                    const selected = selectedEntityIds.has(entity.id);
                     return (
                       <button
                         key={entity.id}
@@ -605,14 +686,42 @@ export default function ContextualGraphPage() {
                         onMouseLeave={() => handleNodeHover(null)}
                         className={cn(
                           'w-full flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors',
-                          active ? 'border-emerald-500/30 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
+                          active ? 'border-emerald-500/30 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5',
+                          entitySelectMode && selected ? 'bg-emerald-900/20' : ''
                         )}
                         style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
                       >
                         <div className="min-w-0 flex items-start justify-between gap-2">
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <div className="text-xs text-white/90 truncate">{entity.label || entity.name || entity.id}</div>
-                            <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {entitySelectMode && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEntityIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(entity.id)) next.delete(entity.id);
+                                    else next.add(entity.id);
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <Checkbox
+                                  checked={selected}
+                                  onCheckedChange={() => {
+                                    setSelectedEntityIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(entity.id)) next.delete(entity.id);
+                                      else next.add(entity.id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </span>
+                            )}
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="text-xs text-white/90 truncate">{entity.label || entity.name || entity.id}</div>
+                              <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                            </div>
                           </div>
                           <span
                             title={[
