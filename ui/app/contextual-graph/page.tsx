@@ -22,12 +22,26 @@ type PatchRole = 'sys_entity_summary' | 'sys_entity_capabilities' | 'sys_edge_co
 
 type PatchHealth = 'green' | 'orange' | 'red';
 
+const ENTITY_ROLES = ['sys_entity_summary', 'sys_entity_capabilities'];
+const EDGE_ROLES = ['sys_edge_context'];
+const DISCOVERY_ROLES = ['sys_discovery_context'];
+
 const ROLE_LABELS: Record<string, string> = {
   sys_entity_summary: 'summary',
   sys_entity_capabilities: 'capabilities',
   sys_edge_context: 'edge context',
   sys_discovery_context: 'discovery',
 };
+
+function expectedRolesForItem(
+  item: GraphNode | GraphEdge,
+  enabledRoles: Record<string, boolean>
+): string[] {
+  if ('from' in item && 'to' in item) {
+    return EDGE_ROLES.filter((role) => enabledRoles[role]);
+  }
+  return ENTITY_ROLES.filter((role) => enabledRoles[role]);
+}
 
 type BackendNode = {
   id: string;
@@ -51,22 +65,20 @@ function getModelRefRoles(item: GraphNode | GraphEdge): string[] {
 function computePatchHealth(
   item: GraphNode | GraphEdge,
   enabledRoles: Record<string, boolean>
-): { health: PatchHealth; missing: string[]; present: string[] } {
-  const activeRoles = Object.entries(enabledRoles)
-    .filter(([_, enabled]) => enabled)
-    .map(([role]) => role);
+): { health: PatchHealth; missing: string[]; present: string[]; expected: string[] } {
+  const expected = expectedRolesForItem(item, enabledRoles);
 
-  if (activeRoles.length === 0) {
-    return { health: 'green', missing: [], present: [] };
+  if (expected.length === 0) {
+    return { health: 'green', missing: [], present: [], expected };
   }
 
   const presentRoles = getModelRefRoles(item);
-  const present = activeRoles.filter((role) => presentRoles.includes(role));
-  const missing = activeRoles.filter((role) => !presentRoles.includes(role));
+  const present = expected.filter((role) => presentRoles.includes(role));
+  const missing = expected.filter((role) => !presentRoles.includes(role));
 
-  if (missing.length === 0) return { health: 'green', missing, present };
-  if (present.length === 0) return { health: 'red', missing, present };
-  return { health: 'orange', missing, present };
+  if (missing.length === 0) return { health: 'green', missing, present, expected };
+  if (present.length === 0) return { health: 'red', missing, present, expected };
+  return { health: 'orange', missing, present, expected };
 }
 
 function healthColorClass(health: PatchHealth): string {
@@ -572,7 +584,10 @@ export default function ContextualGraphPage() {
         <div className="flex items-center justify-between gap-3 border-b border-white/10 py-2 shrink-0">
           <div className="flex items-center gap-3 text-sm text-white/60">
             {Object.entries(patchRoles).filter(([_, enabled]) => enabled).length > 0 && (
-              <div className="flex items-center gap-2 text-[11px]">
+              <span
+                className="flex items-center gap-2 text-[11px] cursor-help"
+                title="Entity health checks summary+capabilities. Edge health checks edge context. Discovery is a separate graph-wide action."
+              >
                 <span className="text-white/40">Health:</span>
                 <span className="flex items-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
@@ -586,7 +601,7 @@ export default function ContextualGraphPage() {
                   <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
                   <span>none</span>
                 </span>
-              </div>
+              </span>
             )}
             <span>{graph.edges.length} edge{graph.edges.length !== 1 ? 's' : ''}</span>
           </div>
@@ -674,7 +689,7 @@ export default function ContextualGraphPage() {
                     const type = entity.type || (typeof entity.id === 'string' && entity.id.includes(':') ? entity.id.split(':')[0] : 'entity');
                     const typeLine = type && !entity.id.startsWith(`${type}:`) ? `${type}:${entity.id}` : entity.id;
                     const summary = entitySummaryText(entity);
-                    const { health, missing, present } = computePatchHealth(entity, patchRoles);
+                    const { health, missing, present, expected } = computePatchHealth(entity, patchRoles);
                     const selected = selectedEntityIds.has(entity.id);
                     return (
                       <button
@@ -725,7 +740,7 @@ export default function ContextualGraphPage() {
                           </div>
                           <span
                             title={[
-                              health.replace('-', ' '),
+                              `${health.replace('-', ' ')} — checking ${expected.length} role${expected.length === 1 ? '' : 's'}`,
                               present.length > 0 ? `Present: ${present.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
                               missing.length > 0 ? `Missing: ${missing.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
                             ].filter(Boolean).join(' | ')}
@@ -789,7 +804,7 @@ export default function ContextualGraphPage() {
                 {edgeViews.map(({ edge, sourceNode, targetNode }) => {
                   const active = hoveredEdgeId === edge.id;
                   const edgeColor = colorForType(edge.type || undefined);
-                  const { health, missing, present } = computePatchHealth(edge, patchRoles);
+                  const { health, missing, present, expected } = computePatchHealth(edge, patchRoles);
                   return (
                     <button
                       key={edge.id}
@@ -808,7 +823,7 @@ export default function ContextualGraphPage() {
                         <div className="text-xs text-white/90 whitespace-normal break-words leading-snug min-w-0">{edge.detail || edge.label || edge.type || 'Edge'}</div>
                         <span
                           title={[
-                            health.replace('-', ' '),
+                            `${health.replace('-', ' ')} — checking ${expected.length} role${expected.length === 1 ? '' : 's'}`,
                             present.length > 0 ? `Present: ${present.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
                             missing.length > 0 ? `Missing: ${missing.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
                           ].filter(Boolean).join(' | ')}
