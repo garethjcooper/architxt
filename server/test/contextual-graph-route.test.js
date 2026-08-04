@@ -351,35 +351,6 @@ describe('contextual-graph route', () => {
       assert.equal(res.body.dry_run, true);
       assert.equal(res.body.stats.applied, 1);
       assert.equal(receivedOptions.dryRun, true);
-      assert.equal(receivedOptions.force, false);
-    });
-
-    it('passes force flag to refresh service', async () => {
-      let receivedOptions;
-      const refreshPatches = async (_db, _serverId, _bankId, options) => {
-        receivedOptions = options;
-        return {
-          success: true,
-          stats: {
-            fetched: 1,
-            matched: 1,
-            applied: 1,
-            skippedDisabled: 0,
-            skippedUnchanged: 0,
-            failed: 0,
-            errors: [],
-          },
-        };
-      };
-
-      const app = makeApp({ db, refreshPatches });
-      const res = await request(app)
-        .post('/api/v1/contextual-graph/refresh')
-        .send({ server_id: serverId, bank_id: bankId, force: true });
-
-      assert.equal(res.status, 200);
-      assert.equal(res.body.force, true);
-      assert.equal(receivedOptions.force, true);
     });
 
     it('returns 500 when refresh fails', async () => {

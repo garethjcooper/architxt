@@ -1341,7 +1341,7 @@ export const contextualGraphApi = {
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
     }),
 
-  refresh: (serverId: number, bankId: string, options?: { dry_run?: boolean; force?: boolean }) =>
+  refresh: (serverId: number, bankId: string, options?: { dry_run?: boolean }) =>
     fetchApi<{
       success: boolean;
       stats?: {
@@ -1360,7 +1360,6 @@ export const contextualGraphApi = {
         server_id: serverId,
         bank_id: bankId,
         dry_run: options?.dry_run ?? false,
-        force: options?.force ?? false,
       }),
     }),
 };
