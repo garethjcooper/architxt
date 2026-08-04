@@ -153,4 +153,54 @@ describe('refreshContextualGraphPatches', () => {
     const node = getNode(db, serverId, bankId, 'svc-001').data;
     assert.equal(node.properties.summary, undefined);
   });
+
+  it('treats normalization errors as failures and does not update hash', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content: 'not valid json' }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.failed, 1);
+    assert.equal(result.stats.applied, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.provenance.model_refs[0].content_hash, 'oldhash');
+  });
+
+  it('force flag re-applies even when hash is unchanged', async () => {
+    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [] });
+    const hash = contentHash(content);
+
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { force: true, listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedUnchanged, 0);
+    assert.equal(result.stats.applied, 1);
+    assert.equal(result.stats.failed, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, 'Same summary.');
+  });
 });

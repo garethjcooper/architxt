@@ -347,22 +347,25 @@ export default function ContextualGraphPage() {
     }
   }, [serverId, bankId, loadGraph]);
 
-  const handleRefreshPatches = useCallback(async () => {
+  const handleRefreshPatches = useCallback(async (force = false) => {
     if (!serverId || !bankId) return;
-    if (!window.confirm(`Refresh contextual patches for ${bankId}? This re-applies any Hindsight mental-model outputs that have changed.`)) return;
+    const message = force
+      ? `Force refresh ${bankId}? This will re-apply every attached Hindsight mental-model output, even if its content hash has not changed.`
+      : `Refresh contextual patches for ${bankId}? This re-applies any Hindsight mental-model outputs whose content has changed.`;
+    if (!window.confirm(message)) return;
     try {
-      setActionLoading('refresh');
-      const result = await contextualGraphApi.refresh(serverId, bankId);
+      setActionLoading(force ? 'force-refresh' : 'refresh');
+      const result = await contextualGraphApi.refresh(serverId, bankId, { force });
       if (result.success) {
         const stats = result.stats;
-        toast.success(`Refresh complete — fetched ${stats?.fetched ?? 0}, applied ${stats?.applied ?? 0}, unchanged ${stats?.skippedUnchanged ?? 0}, failed ${stats?.failed ?? 0}`);
+        toast.success(`${force ? 'Force refresh' : 'Refresh'} complete — fetched ${stats?.fetched ?? 0}, applied ${stats?.applied ?? 0}, unchanged ${stats?.skippedUnchanged ?? 0}, failed ${stats?.failed ?? 0}`);
       } else {
-        toast.error(`Refresh failed: ${result.error || result.code || 'unknown'}`);
+        toast.error(`${force ? 'Force refresh' : 'Refresh'} failed: ${result.error || result.code || 'unknown'}`);
       }
       await loadGraph();
     } catch (err: any) {
-      logger.error('Failed to refresh contextual patches', { error: err, serverId, bankId });
-      toast.error(`Refresh failed: ${err.message || err}`);
+      logger.error(`${force ? 'Force refresh' : 'Refresh'} failed`, { error: err, serverId, bankId });
+      toast.error(`${force ? 'Force refresh' : 'Refresh'} failed: ${err.message || err}`);
     } finally {
       setActionLoading(null);
     }
@@ -603,9 +606,17 @@ export default function ContextualGraphPage() {
               variant="outline"
               size="sm"
               disabled={!serverId || !bankId || actionLoading === 'refresh'}
-              onClick={handleRefreshPatches}
+              onClick={() => { handleRefreshPatches(false); }}
             >
               {actionLoading === 'refresh' ? 'Refreshing…' : 'Refresh'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!serverId || !bankId || actionLoading === 'force-refresh'}
+              onClick={() => { handleRefreshPatches(true); }}
+            >
+              {actionLoading === 'force-refresh' ? 'Force refreshing…' : 'Force refresh'}
             </Button>
           </div>
         </div>
