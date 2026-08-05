@@ -426,6 +426,7 @@ Rules:
 - Existing known nodes must use their canonical \`TYPE:ID\` id.
 - Every candidate and edge must be backed by evidence.
 - Do not return candidates that are already known canonical nodes.
+- Discovery output is for new candidate nodes only: every edge in \`graph.edges\` must have at least one endpoint that is a \`found:{slug}\` candidate. Do not emit edges between two already-known canonical nodes; those belong in the skeleton or edge-context models, not here.
 
 ## Source material
 
