@@ -91,10 +91,20 @@ export interface GraphControlsProps {
   toggleNodeFilter: (type: string) => void;
   edgeFilters: Set<string>;
   toggleEdgeFilter: (type: string) => void;
+  /** Filter nodes/edges by contextual-graph patch health. */
+  healthFilters?: Set<'green' | 'orange' | 'red'>;
+  toggleHealthFilter?: (health: 'green' | 'orange' | 'red') => void;
   /** If true, the filter set represents types to hide rather than show. */
   hideMode?: boolean;
   sessionName?: string;
 }
+
+const HEALTH_LABELS: Record<'green' | 'orange' | 'red', { label: string; color: string; bg: string; border: string; text: string }> = {
+  green: { label: 'all', color: '#10b981', bg: 'bg-emerald-500/20', border: 'border-emerald-500/50', text: 'text-emerald-300' },
+  orange: { label: 'some', color: '#f97316', bg: 'bg-orange-500/20', border: 'border-orange-500/50', text: 'text-orange-300' },
+  red: { label: 'none', color: '#ef4444', bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-300' },
+};
+const HEALTH_ORDER: Array<'green' | 'orange' | 'red'> = ['green', 'orange', 'red'];
 
 export function GraphControls({
   cy,
@@ -110,6 +120,8 @@ export function GraphControls({
   toggleNodeFilter,
   edgeFilters,
   toggleEdgeFilter,
+  healthFilters,
+  toggleHealthFilter,
   hideMode = false,
   sessionName = 'explore',
 }: GraphControlsProps) {
@@ -311,6 +323,54 @@ export function GraphControls({
                   title={active ? (hideMode ? 'Show this edge type' : 'Hide this edge type') : (hideMode ? 'Hide this edge type' : 'Show this edge type')}
                 >
                   {type}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {toggleHealthFilter && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-white/50">Health:</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => HEALTH_ORDER.forEach((h) => {
+                  if (!healthFilters?.has(h)) toggleHealthFilter(h);
+                })}
+                className="text-[9px] text-emerald-300/80 hover:text-emerald-300"
+              >
+                all
+              </button>
+              <span className="text-white/20">|</span>
+              <button
+                type="button"
+                onClick={() => HEALTH_ORDER.forEach((h) => {
+                  if (healthFilters?.has(h)) toggleHealthFilter(h);
+                })}
+                className="text-[9px] text-white/50 hover:text-white/70"
+              >
+                none
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {HEALTH_ORDER.map((health) => {
+              const active = !!healthFilters?.has(health);
+              const style = HEALTH_LABELS[health];
+              return (
+                <button
+                  key={health}
+                  type="button"
+                  onClick={() => toggleHealthFilter(health)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                    active ? `${style.bg} ${style.border} ${style.text}` : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
+                  }`}
+                  style={{ borderLeftColor: style.color, borderLeftWidth: 3 }}
+                  title={active ? 'Hide this health state' : 'Show this health state'}
+                >
+                  {style.label}
                 </button>
               );
             })}
