@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Grip, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tableToMarkdown } from '@/lib/table-to-markdown';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
 
 export type DataBoxTab = 'data' | 'patch-config';
@@ -75,11 +76,9 @@ function ModelRefSection({ ref, index, item }: { ref: ModelRef; index: number; i
       capabilities.length === 0 ? (
         <span className="text-white/40 italic">No capabilities stored.</span>
       ) : (
-        <ul className="list-disc pl-4 space-y-1">
-          {capabilities.map((cap, i) => (
-            <li key={i} className="text-[11px] text-white/80">{renderValue(cap)}</li>
-          ))}
-        </ul>
+        <pre className="text-[11px] text-white/80 whitespace-pre-wrap bg-black/20 rounded p-1.5 overflow-x-auto">
+          {tableToMarkdown({ name: 'capabilities', columns: Object.keys(capabilities[0] || {}), rows: capabilities })}
+        </pre>
       );
   } else if (role === 'sys_edge_context') {
     const hasContent = properties.detail || properties.evidence || properties.label;
@@ -344,11 +343,13 @@ export function ContextualGraphDataBox({
                     {Array.isArray(rawProperties.capabilities) && rawProperties.capabilities.length > 0 && (
                       <div>
                         <div className="text-[10px] uppercase tracking-wider text-white/40">capabilities</div>
-                        <ul className="list-disc pl-4 space-y-1">
-                          {rawProperties.capabilities.map((cap, i) => (
-                            <li key={i} className="text-[11px] text-white/80">{renderValue(cap)}</li>
-                          ))}
-                        </ul>
+                        <pre className="text-[11px] text-white/80 whitespace-pre-wrap bg-black/20 rounded p-1.5 overflow-x-auto">
+                          {tableToMarkdown({
+                            name: 'capabilities',
+                            columns: Object.keys(rawProperties.capabilities[0] || {}),
+                            rows: rawProperties.capabilities,
+                          })}
+                        </pre>
                       </div>
                     )}
                     {(rawProperties.detail || rawProperties.evidence || rawProperties.label) && (
