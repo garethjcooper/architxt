@@ -417,6 +417,7 @@ export default function ContextualGraphPage() {
 
   const [nodeFilters, setNodeFilters] = useState<Set<string>>(new Set());
   const [edgeFilters, setEdgeFilters] = useState<Set<string>>(new Set());
+  const [healthFilters, setHealthFilters] = useState<Set<'green' | 'orange' | 'red'>>(new Set());
   const [entitySelectMode, setEntitySelectMode] = useState(false);
   const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
   const [dataBoxOpen, setDataBoxOpen] = useState(false);
@@ -443,9 +444,19 @@ export default function ContextualGraphPage() {
     });
   }, []);
 
+  const toggleHealthFilter = useCallback((health: 'green' | 'orange' | 'red') => {
+    setHealthFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(health)) next.delete(health);
+      else next.add(health);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     setNodeFilters(new Set());
     setEdgeFilters(new Set());
+    setHealthFilters(new Set());
     setSelectedEntityIds(new Set());
     setEntitySelectMode(false);
     setDataBoxOpen(false);
@@ -945,6 +956,8 @@ export default function ContextualGraphPage() {
                       toggleNodeFilter={toggleNodeFilter}
                       edgeFilters={edgeFilters}
                       toggleEdgeFilter={toggleEdgeFilter}
+                      healthFilters={healthFilters}
+                      toggleHealthFilter={toggleHealthFilter}
                       hideMode={false}
                       sessionName="contextual-graph"
                     />
@@ -956,6 +969,7 @@ export default function ContextualGraphPage() {
                     layoutAnimate={layoutAnimate}
                     nodeFilters={nodeFilters}
                     edgeFilters={edgeFilters}
+                    healthFilters={healthFilters}
                     filterMode="active"
                     showEdgeLabels={showEdgeLabels}
                     preserveLayoutOnUpdate

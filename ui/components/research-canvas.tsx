@@ -41,6 +41,8 @@ interface InteractiveGraphProps {
   showEdgeLabels?: boolean;
   edgeFilters?: Set<string>;
   nodeFilters?: Set<string>;
+  /** Filter nodes/edges by contextual-graph patch health. Empty means no health filtering. */
+  healthFilters?: Set<'green' | 'orange' | 'red'>;
   /** How to interpret `nodeFilters`/`edgeFilters`.
    *  - 'active' (default): filters list types that should stay visible.
    *  - 'hidden': filters list types that should be dimmed. */
@@ -246,6 +248,7 @@ export function InteractiveGraph({
   showEdgeLabels = false,
   edgeFilters,
   nodeFilters,
+  healthFilters,
   filterMode = 'active',
   onCyReady,
   onHover,
@@ -914,6 +917,7 @@ export function InteractiveGraph({
     const isHiddenMode = filterMode === 'hidden';
     const hasNodeFilters = nodeFilters && nodeFilters.size > 0;
     const hasEdgeFilters = edgeFilters && edgeFilters.size > 0;
+    const hasHealthFilters = healthFilters && healthFilters.size > 0;
 
     let visibleNodes = cy.nodes();
     if (hasNodeFilters) {
@@ -922,6 +926,13 @@ export function InteractiveGraph({
         if (!type) return false;
         const inSet = nodeFilters.has(type);
         return isHiddenMode ? !inSet : inSet;
+      });
+    }
+
+    if (hasHealthFilters) {
+      visibleNodes = visibleNodes.filter((n) => {
+        const health = n.data('health') as 'green' | 'orange' | 'red' | undefined;
+        return health ? healthFilters.has(health) : false;
       });
     }
 
@@ -937,6 +948,13 @@ export function InteractiveGraph({
       });
     }
     visibleEdges = visibleEdges.filter((e) => visibleNodeIds.has(e.source().id()) && visibleNodeIds.has(e.target().id()));
+
+    if (hasHealthFilters) {
+      visibleEdges = visibleEdges.filter((e) => {
+        const health = e.data('health') as 'green' | 'orange' | 'red' | undefined;
+        return health ? healthFilters.has(health) : false;
+      });
+    }
 
     const visibleEdgeIds = new Set(visibleEdges.map((e) => e.id()));
 
@@ -954,7 +972,7 @@ export function InteractiveGraph({
         e.addClass('dimmed-edge');
       }
     });
-  }, [elements, edgeFilters, nodeFilters, filterMode]);
+  }, [elements, edgeFilters, nodeFilters, healthFilters, filterMode]);
 
   useEffect(() => {
     const cy = cyRef.current;
