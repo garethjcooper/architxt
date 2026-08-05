@@ -24,7 +24,12 @@ interface ContextualGraphDataBoxProps {
   onTabChange: (tab: DataBoxTab) => void;
 }
 
-const STORAGE_KEY = 'contextual-graph-data-box-position';
+const STORAGE_KEY = 'contextual-graph-data-box-state';
+
+const DEFAULT_WIDTH = 416; // 26rem
+const DEFAULT_HEIGHT = 280;
+const MIN_WIDTH = 240;
+const MIN_HEIGHT = 160;
 
 const ROLE_LABELS: Record<string, string> = {
   sys_entity_summary: 'Summary',
@@ -178,53 +183,88 @@ export function ContextualGraphDataBox({
   onTabChange,
 }: ContextualGraphDataBoxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
+  const [boxState, setBoxState] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') return parsed;
+        if (
+          typeof parsed?.x === 'number' &&
+          typeof parsed?.y === 'number' &&
+          typeof parsed?.width === 'number' &&
+          typeof parsed?.height === 'number'
+        ) {
+          return parsed;
+        }
       }
     } catch {
       // ignore corrupt storage
     }
     return null;
   });
-  const latestPositionRef = useRef(position);
+  const latestBoxStateRef = useRef(boxState);
   const [dragState, setDragState] = useState<{
     dragging: boolean;
     startMouse: { x: number; y: number };
     startPos: { x: number; y: number };
   } | null>(null);
+  const [resizeState, setResizeState] = useState<{
+    resizing: boolean;
+    startMouse: { x: number; y: number };
+    startSize: { width: number; height: number };
+  } | null>(null);
+
+  const position = boxState ? { x: boxState.x, y: boxState.y } : null;
+  const size = boxState ? { width: boxState.width, height: boxState.height } : { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
 
   const item = (node || edge) as (GraphNode | GraphEdge) | null;
 
   useEffect(() => {
-    latestPositionRef.current = position;
-  }, [position]);
+    latestBoxStateRef.current = boxState;
+  }, [boxState]);
 
   useEffect(() => {
     return () => {
-      const pos = latestPositionRef.current;
-      if (!pos) return;
+      const state = latestBoxStateRef.current;
+      if (!state) return;
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch {
         // storage may be unavailable
       }
     };
   }, []);
 
-  const clampPosition = (x: number, y: number): { x: number; y: number } => {
+  const clampPosition = (x: number, y: number, width: number, height: number): { x: number; y: number } => {
     const panel = panelRef.current;
     const parent = panel?.offsetParent as HTMLElement | null;
     if (!panel || !parent) return { x, y };
     const parentRect = parent.getBoundingClientRect();
-    const panelRect = panel.getBoundingClientRect();
-    const maxX = Math.max(0, parentRect.width - panelRect.width);
-    const maxY = Math.max(0, parentRect.height - panelRect.height);
+    const maxX = Math.max(0, parentRect.width - width);
+    const maxY = Math.max(0, parentRect.height - height);
     return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) };
+  };
+
+  const clampSize = (width: number, height: number): { width: number; height: number } => {
+    const panel = panelRef.current;
+    const parent = panel?.offsetParent as HTMLElement | null;
+    if (!panel || !parent) {
+      return {
+        width: Math.max(MIN_WIDTH, width),
+        height: Math.max(MIN_HEIGHT, height),
+      };
+    }
+    const parentRect = parent.getBoundingClientRect();
+    return {
+      width: Math.min(Math.max(MIN_WIDTH, width), parentRect.width),
+      height: Math.min(Math.max(MIN_HEIGHT, height), parentRect.height),
+    };
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -236,25 +276,52 @@ export function ContextualGraphDataBox({
     const panelRect = panel.getBoundingClientRect();
     const parentRect = parent.getBoundingClientRect();
     const startPos = { x: panelRect.left - parentRect.left, y: panelRect.top - parentRect.top };
-    setPosition(startPos);
+    setBoxState((prev) => (prev ? { ...prev, x: startPos.x, y: startPos.y } : { x: startPos.x, y: startPos.y, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT }));
     setDragState({ dragging: true, startMouse: { x: e.clientX, y: e.clientY }, startPos });
+  };
+
+  const handleResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setResizeState({
+      resizing: true,
+      startMouse: { x: e.clientX, y: e.clientY },
+      startSize: { width: size.width, height: size.height },
+    });
   };
 
   useEffect(() => {
     if (!dragState?.dragging) return;
     const handleMove = (e: MouseEvent) => {
-      setPosition(
-        clampPosition(
-          dragState.startPos.x + (e.clientX - dragState.startMouse.x),
-          dragState.startPos.y + (e.clientY - dragState.startMouse.y)
-        )
+      const nextPos = clampPosition(
+        dragState.startPos.x + (e.clientX - dragState.startMouse.x),
+        dragState.startPos.y + (e.clientY - dragState.startMouse.y),
+        size.width,
+        size.height
       );
+      setBoxState((prev) => (prev ? { ...prev, x: nextPos.x, y: nextPos.y } : { x: nextPos.x, y: nextPos.y, width: size.width, height: size.height }));
     };
     const handleUp = () => setDragState(null);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp, { once: true });
     return () => window.removeEventListener('mousemove', handleMove);
-  }, [dragState]);
+  }, [dragState, size.width, size.height]);
+
+  useEffect(() => {
+    if (!resizeState?.resizing) return;
+    const handleMove = (e: MouseEvent) => {
+      const nextSize = clampSize(
+        resizeState.startSize.width + (e.clientX - resizeState.startMouse.x),
+        resizeState.startSize.height + (e.clientY - resizeState.startMouse.y)
+      );
+      setBoxState((prev) => (prev ? { ...prev, ...nextSize } : { x: position?.x ?? 16, y: position?.y ?? 16, ...nextSize }));
+    };
+    const handleUp = () => setResizeState(null);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp, { once: true });
+    return () => window.removeEventListener('mousemove', handleMove);
+  }, [resizeState, position?.x, position?.y]);
 
   const modelRefs: ModelRef[] = item?.modelRefs || (item as any)?.properties?.provenance?.model_refs || [];
 
@@ -297,13 +364,18 @@ export function ContextualGraphDataBox({
     <div
       ref={panelRef}
       className={cn(
-        'absolute z-20 w-[26rem] rounded-xl border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm shadow-2xl overflow-hidden',
-        dragState?.dragging ? 'cursor-grabbing select-none' : 'cursor-default'
+        'absolute z-20 rounded-xl border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm shadow-2xl overflow-hidden flex flex-col',
+        dragState?.dragging ? 'cursor-grabbing select-none' : 'cursor-default',
+        resizeState?.resizing ? 'pointer-events-none' : ''
       )}
-      style={position ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' } : { left: 16, top: 16 }}
+      style={
+        position
+          ? { left: position.x, top: position.y, width: size.width, height: size.height, right: 'auto', bottom: 'auto' }
+          : { left: 16, top: 16, width: size.width, height: size.height, right: 'auto', bottom: 'auto' }
+      }
     >
       <div
-        className="relative h-6 px-2 border-b border-white/5 bg-black/20 flex items-center cursor-grab active:cursor-grabbing"
+        className="relative h-6 px-2 border-b border-white/5 bg-black/20 flex items-center cursor-grab active:cursor-grabbing shrink-0"
         onMouseDown={handleHeaderMouseDown}
       >
         <Grip className="w-3.5 h-3.5 text-white/20 mx-auto" />
@@ -345,12 +417,12 @@ export function ContextualGraphDataBox({
         </div>
       </div>
 
-      <div className="px-2.5 py-1.5 border-b border-white/5 bg-black/20">
+      <div className="px-2.5 py-1.5 border-b border-white/5 bg-black/20 shrink-0">
         <div className="text-xs text-white/90 truncate" title={title}>{title}</div>
         <div className="text-[10px] text-white/40 truncate" title={subtitle}>{subtitle}</div>
       </div>
 
-      <div className="max-h-[min(360px,55vh)] overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
         {!item && (
           <div className="text-[11px] text-white/50 italic">Select a node or edge to view details.</div>
         )}
@@ -454,6 +526,18 @@ export function ContextualGraphDataBox({
           </div>
         )}
       </div>
+
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className={cn(
+          'absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize z-30',
+          'hover:before:opacity-100 before:opacity-60',
+          'before:absolute before:bottom-1 before:right-1 before:w-1.5 before:h-1.5',
+          'before:border-b-2 before:border-r-2 before:border-white/40 before:rounded-br-sm',
+          'before:transition-opacity'
+        )}
+        aria-label="Resize data box"
+      />
     </div>
   );
 }
