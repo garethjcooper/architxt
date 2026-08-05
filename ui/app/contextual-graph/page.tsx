@@ -416,6 +416,7 @@ export default function ContextualGraphPage() {
   const [dataBoxTab, setDataBoxTab] = useState<DataBoxTab>('data');
   const [dataBoxNodeId, setDataBoxNodeId] = useState<string | null>(null);
   const [dataBoxEdgeId, setDataBoxEdgeId] = useState<string | null>(null);
+  const [showControls, setShowControls] = useState(true);
 
   const toggleNodeFilter = useCallback((type: string) => {
     setNodeFilters((prev) => {
@@ -908,31 +909,39 @@ export default function ContextualGraphPage() {
           <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
             <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
               <span className="font-medium text-sm">Graph</span>
-              <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                <Switch checked={dataBoxOpen} onCheckedChange={(checked) => setDataBoxOpen(Boolean(checked))} size="sm" />
-                Data
-              </label>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+                  <Switch checked={showControls} onCheckedChange={(checked) => setShowControls(Boolean(checked))} size="sm" />
+                  Controls
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+                  <Switch checked={dataBoxOpen} onCheckedChange={(checked) => setDataBoxOpen(Boolean(checked))} size="sm" />
+                  Data
+                </label>
+              </div>
             </div>
             <CardContent className="flex-1 min-h-0 p-0 relative">
               {serverId && bankId ? (
                 <div className="absolute inset-0">
-                  <GraphControls
-                    cy={cyRef.current}
-                    nodes={graph.nodes}
-                    edges={graph.edges}
-                    layout={layout}
-                    setLayout={setLayout}
-                    layoutAnimate={layoutAnimate}
-                    setLayoutAnimate={setLayoutAnimate}
-                    showEdgeLabels={showEdgeLabels}
-                    setShowEdgeLabels={setShowEdgeLabels}
-                    nodeFilters={nodeFilters}
-                    toggleNodeFilter={toggleNodeFilter}
-                    edgeFilters={edgeFilters}
-                    toggleEdgeFilter={toggleEdgeFilter}
-                    hideMode={false}
-                    sessionName="contextual-graph"
-                  />
+                  {showControls && (
+                    <GraphControls
+                      cy={cyRef.current}
+                      nodes={graph.nodes}
+                      edges={graph.edges}
+                      layout={layout}
+                      setLayout={setLayout}
+                      layoutAnimate={layoutAnimate}
+                      setLayoutAnimate={setLayoutAnimate}
+                      showEdgeLabels={showEdgeLabels}
+                      setShowEdgeLabels={setShowEdgeLabels}
+                      nodeFilters={nodeFilters}
+                      toggleNodeFilter={toggleNodeFilter}
+                      edgeFilters={edgeFilters}
+                      toggleEdgeFilter={toggleEdgeFilter}
+                      hideMode={false}
+                      sessionName="contextual-graph"
+                    />
+                  )}
                   <InteractiveGraph
                     graph={graph}
                     selectedIds={selectedIds}
