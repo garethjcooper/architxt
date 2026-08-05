@@ -839,6 +839,8 @@ export interface GraphNode {
   modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
   /** Raw contextual-graph properties stored on this node. */
   properties?: Record<string, any>;
+  /** Patch health status (green = all roles present, orange = some, red = none). */
+  health?: 'green' | 'orange' | 'red';
   x?: number;
   y?: number;
   width?: number;
@@ -867,6 +869,8 @@ export interface GraphEdge {
   modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
   /** Raw contextual-graph properties stored on this edge. */
   properties?: Record<string, any>;
+  /** Patch health status (green = all roles present, orange = some, red = none). */
+  health?: 'green' | 'orange' | 'red';
 }
 
 export interface GraphCanvas {

@@ -408,6 +408,13 @@ export default function ContextualGraphPage() {
       });
   }, [graph.edges, nodeById]);
 
+  const displayGraph = useMemo(() => {
+    return {
+      nodes: graph.nodes.map((n) => ({ ...n, health: computePatchHealth(n, patchRoles).health })),
+      edges: graph.edges.map((e) => ({ ...e, health: computePatchHealth(e, patchRoles).health })),
+    };
+  }, [graph.nodes, graph.edges, patchRoles]);
+
   const [nodeFilters, setNodeFilters] = useState<Set<string>>(new Set());
   const [edgeFilters, setEdgeFilters] = useState<Set<string>>(new Set());
   const [entitySelectMode, setEntitySelectMode] = useState(false);
@@ -926,8 +933,8 @@ export default function ContextualGraphPage() {
                   {showControls && (
                     <GraphControls
                       cy={cyRef.current}
-                      nodes={graph.nodes}
-                      edges={graph.edges}
+                      nodes={displayGraph.nodes}
+                      edges={displayGraph.edges}
                       layout={layout}
                       setLayout={setLayout}
                       layoutAnimate={layoutAnimate}
@@ -943,7 +950,7 @@ export default function ContextualGraphPage() {
                     />
                   )}
                   <InteractiveGraph
-                    graph={graph}
+                    graph={displayGraph}
                     selectedIds={selectedIds}
                     layoutName={layout}
                     layoutAnimate={layoutAnimate}
