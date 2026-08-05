@@ -837,6 +837,8 @@ export interface GraphNode {
   mental_model_applied?: boolean;
   /** Attached contextual mental-model refs, if any. */
   modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
+  /** Raw contextual-graph properties stored on this node. */
+  properties?: Record<string, any>;
   x?: number;
   y?: number;
   width?: number;
@@ -863,6 +865,8 @@ export interface GraphEdge {
   source_fact_ids?: string[];
   /** Attached contextual mental-model refs, if any. */
   modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
+  /** Raw contextual-graph properties stored on this edge. */
+  properties?: Record<string, any>;
 }
 
 export interface GraphCanvas {
