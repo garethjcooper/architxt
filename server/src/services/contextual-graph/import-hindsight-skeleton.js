@@ -1,7 +1,7 @@
 import { createLogger } from '../../utils/logger.js';
 import { getEntityGraph } from '../hindsight/research.js';
 import { buildArchitxtLookups, resolveHindsightNode, buildUndirectedEdgeId } from './identity.js';
-import { upsertNode, upsertEdge, listNodes } from '../../db/crud/contextual-graph.js';
+import { upsertNode, upsertEdge, listNodes, listEdges } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-import');
 
@@ -54,6 +54,7 @@ export async function importHindsightSkeleton(
   const lookups = await buildArchitxtLookups(db);
 
   const hindsightIdToResolved = new Map();
+  const seenNodeIds = new Set();
   let importedNodes = 0;
 
   for (const n of rawNodes) {
@@ -99,6 +100,7 @@ export async function importHindsightSkeleton(
     }
 
     hindsightIdToResolved.set(data.id, resolved.id);
+    seenNodeIds.add(resolved.id);
     importedNodes += 1;
   }
 
@@ -143,11 +145,105 @@ export async function importHindsightSkeleton(
     importedEdges += 1;
   }
 
+  // Mark Hindsight-sourced nodes/edges absent from this import as stale;
+  // restore active for ones that reappeared.
+  let staleNodes = 0;
+  let staleEdges = 0;
+  let restoredNodes = 0;
+  let restoredEdges = 0;
+
+  const existingNodesResult = listNodes(db, serverId, bankId, { limit: 100000 });
+  const existingEdgesResult = listEdges(db, serverId, bankId, { limit: 100000 });
+
+  if (existingNodesResult.success) {
+    for (const row of existingNodesResult.data) {
+      const id = row.cgn_id;
+      const labels = Array.isArray(row.cgn_labels) ? row.cgn_labels : [];
+      const source = row.cgn_properties?.provenance?.source;
+      if (source !== 'hindsight') continue;
+
+      const isSeen = seenNodeIds.has(id);
+      const hasStale = labels.includes('stale');
+      const hasActive = labels.includes('active');
+
+      if (!isSeen && !hasStale) {
+        const newLabels = labels.filter((l) => l !== 'active').concat('stale');
+        const newProperties = {
+          ...row.cgn_properties,
+          updated_at: now,
+        };
+        upsertNode(db, serverId, bankId, id, newLabels, newProperties);
+        staleNodes += 1;
+      } else if (isSeen && hasStale) {
+        const newLabels = labels.filter((l) => l !== 'stale').concat('active');
+        const newProperties = {
+          ...row.cgn_properties,
+          updated_at: now,
+        };
+        upsertNode(db, serverId, bankId, id, newLabels, newProperties);
+        restoredNodes += 1;
+      } else if (isSeen && !hasActive) {
+        const newLabels = labels.includes('active') ? labels : labels.concat('active');
+        const newProperties = {
+          ...row.cgn_properties,
+          updated_at: now,
+        };
+        upsertNode(db, serverId, bankId, id, newLabels, newProperties);
+      }
+    }
+  }
+
+  if (existingEdgesResult.success) {
+    for (const row of existingEdgesResult.data) {
+      const id = row.cge_id;
+      const source = row.cge_properties?.provenance?.source;
+      if (source !== 'hindsight') continue;
+
+      const isSeen = seenEdgeIds.has(id);
+      const properties = row.cge_properties || {};
+      const labels = Array.isArray(properties.labels) ? properties.labels : [];
+      const hasStale = labels.includes('stale');
+      const hasActive = labels.includes('active');
+
+      if (!isSeen && !hasStale) {
+        const newLabels = labels.filter((l) => l !== 'active').concat('stale');
+        const newProperties = {
+          ...properties,
+          labels: newLabels,
+          updated_at: now,
+        };
+        upsertEdge(db, serverId, bankId, id, row.cge_source_id, row.cge_target_id, row.cge_type, newProperties);
+        staleEdges += 1;
+      } else if (isSeen && hasStale) {
+        const newLabels = labels.filter((l) => l !== 'stale').concat('active');
+        const newProperties = {
+          ...properties,
+          labels: newLabels,
+          updated_at: now,
+        };
+        upsertEdge(db, serverId, bankId, id, row.cge_source_id, row.cge_target_id, row.cge_type, newProperties);
+        restoredEdges += 1;
+      } else if (isSeen && !hasActive) {
+        const newLabels = labels.includes('active') ? labels : labels.concat('active');
+        const newProperties = {
+          ...properties,
+          labels: newLabels,
+          updated_at: now,
+        };
+        upsertEdge(db, serverId, bankId, id, row.cge_source_id, row.cge_target_id, row.cge_type, newProperties);
+      }
+    }
+  }
+
   logger.info('Imported Hindsight skeleton', {
     serverId,
     bankId,
     importedNodes,
     importedEdges,
+    staleNodes,
+    staleEdges,
+    restoredNodes,
+    restoredEdges,
     rawNodes: rawNodes.length,
     rawEdges: rawEdges.length,
   });
@@ -155,6 +251,8 @@ export async function importHindsightSkeleton(
   return {
     success: true,
     imported: { nodes: importedNodes, edges: importedEdges },
+    stale: { nodes: staleNodes, edges: staleEdges },
+    restored: { nodes: restoredNodes, edges: restoredEdges },
   };
 }
 

@@ -22,6 +22,12 @@ import {
 } from '../services/contextual-graph/discovery.js';
 import { refreshContextualGraphPatches as defaultRefreshPatches } from '../services/contextual-graph/refresh-patches.js';
 import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from '../services/contextual-graph/sync-mental-model-config.js';
+import {
+  startContextualGraphSyncJob as defaultStartSyncJob,
+  getContextualGraphSyncJob as defaultGetSyncJob,
+  listContextualGraphSyncJobs as defaultListSyncJobs,
+  cancelContextualGraphSyncJob as defaultCancelSyncJob,
+} from '../services/contextual-graph/sync-job.js';
 
 const BASE_PATH = '/contextual-graph';
 
@@ -50,6 +56,10 @@ export function createContextualGraphRouter({
   ingestCandidates = defaultIngestCandidates,
   refreshPatches = defaultRefreshPatches,
   syncMentalModelConfig = defaultSyncMentalModelConfig,
+  startSyncJob = defaultStartSyncJob,
+  getSyncJob = defaultGetSyncJob,
+  listSyncJobs = defaultListSyncJobs,
+  cancelSyncJob = defaultCancelSyncJob,
 } = {}) {
   const router = Router();
 
@@ -1238,6 +1248,230 @@ export function createContextualGraphRouter({
       res,
       status: 204,
       data: null,
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/sync-jobs:
+   *   post:
+   *     summary: Start a tracked contextual-graph sync job
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               run_discovery: { type: boolean, default: true }
+   *               node_ids: { type: array, items: { type: string } }
+   *               seed_node_ids: { type: array, items: { type: string } }
+   *               min_count: { type: integer }
+   *               min_weight: { type: number }
+   *     responses:
+   *       202: { description: Job started }
+   *       400: { description: Missing or invalid scope }
+   *       409: { description: A sync job is already running for this server/bank }
+   */
+  router.post('/sync-jobs', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const options = {
+      run_discovery: parseBoolParam(req.body.run_discovery) !== false,
+      node_ids: Array.isArray(req.body.node_ids) ? req.body.node_ids.filter((id) => typeof id === 'string') : undefined,
+      seed_node_ids: Array.isArray(req.body.seed_node_ids) ? req.body.seed_node_ids.filter((id) => typeof id === 'string') : undefined,
+      min_count: parseIntParam(req.body.min_count),
+      min_weight: typeof req.body.min_weight === 'number' ? req.body.min_weight : undefined,
+      neighborhood: req.body.neighborhood,
+    };
+
+    const result = await startSyncJob(db, serverId, bankId, options);
+    const duration = Date.now() - start;
+
+    if (!result.success) {
+      const status = result.code === 'ALREADY_RUNNING' ? 409 : 500;
+      sendResponse({
+        res,
+        status,
+        error: result.error,
+        code: result.code,
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 202,
+      data: { success: true, job: result.job },
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/sync-jobs:
+   *   get:
+   *     summary: List sync jobs
+   *     tags: [Contextual Graph]
+   *     parameters:
+   *       - in: query
+   *         name: server_id
+   *         schema: { type: integer }
+   *       - in: query
+   *         name: bank_id
+   *         schema: { type: string }
+   *       - in: query
+   *         name: status
+   *         schema: { type: string }
+   *       - in: query
+   *         name: limit
+   *         schema: { type: integer }
+   *       - in: query
+   *         name: offset
+   *         schema: { type: integer }
+   *     responses:
+   *       200: { description: Jobs list }
+   */
+  router.get('/sync-jobs', async (req, res) => {
+    const start = Date.now();
+    const options = {
+      serverId: parseIntParam(req.query.server_id),
+      bankId: typeof req.query.bank_id === 'string' ? req.query.bank_id : undefined,
+      status: typeof req.query.status === 'string' ? req.query.status : undefined,
+      limit: parseIntParam(req.query.limit) ?? 50,
+      offset: parseIntParam(req.query.offset) ?? 0,
+    };
+
+    const result = listSyncJobs(db, options);
+    const duration = Date.now() - start;
+    sendResponse({
+      res,
+      status: 200,
+      data: result.success ? result.data : [],
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/sync-jobs/{id}:
+   *   get:
+   *     summary: Get a sync job and its logs
+   *     tags: [Contextual Graph]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: string }
+   *       - in: query
+   *         name: limit
+   *         schema: { type: integer }
+   *       - in: query
+   *         name: offset
+   *         schema: { type: integer }
+   *     responses:
+   *       200: { description: Job found }
+   *       404: { description: Job not found }
+   */
+  router.get('/sync-jobs/:id', async (req, res) => {
+    const start = Date.now();
+    const idCheck = validateStringId(req, res, start);
+    if (!idCheck.valid) return;
+
+    const limit = parseIntParam(req.query.limit) ?? 200;
+    const offset = parseIntParam(req.query.offset) ?? 0;
+    const result = getSyncJob(db, idCheck.id, { limit, offset });
+    const duration = Date.now() - start;
+
+    if (!result.success) {
+      sendResponse({
+        res,
+        status: 404,
+        error: result.error,
+        code: result.code,
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: result.job,
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/sync-jobs/{id}/cancel:
+   *   post:
+   *     summary: Cancel a pending or running sync job
+   *     tags: [Contextual Graph]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: string }
+   *     responses:
+   *       200: { description: Cancel requested }
+   *       400: { description: Job not active }
+   *       404: { description: Job not found }
+   */
+  router.post('/sync-jobs/:id/cancel', async (req, res) => {
+    const start = Date.now();
+    const idCheck = validateStringId(req, res, start);
+    if (!idCheck.valid) return;
+
+    const result = cancelSyncJob(db, idCheck.id);
+    const duration = Date.now() - start;
+
+    if (!result.success) {
+      const status = result.code === 'NOT_FOUND' ? 404 : 400;
+      sendResponse({
+        res,
+        status,
+        error: result.error,
+        code: result.code,
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: { success: true },
       logger,
       method: req.method,
       path: req.path,
