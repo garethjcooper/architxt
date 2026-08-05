@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Server as ServerIcon, Activity, Loader2, CheckCircle, XCircle, RefreshCw, TableIcon } from 'lucide-react';
+import { Plus, Trash2, Server as ServerIcon, Activity, Loader2, CheckCircle, XCircle, RefreshCw, TableIcon, Network } from 'lucide-react';
 import { serversApi } from '@/lib/api/client';
 import { useMultiSelect } from '@/hooks/useMultiSelect';
 import { CreateServerDialog } from '@/components/create-server-dialog';
 import { ViewServerDialog } from '@/components/view-server-dialog';
+import { ServerGraphBanksDialog } from '@/components/server-graph-banks-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
@@ -23,6 +24,7 @@ export default function ServersPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
+  const [graphBanksOpen, setGraphBanksOpen] = useState(false);
   const [healthStatus, setHealthStatus] = useState<Record<number, { status: 'ok' | 'error'; message: string; data?: any } | null>>({});
   const [checkingHealth, setCheckingHealth] = useState<Set<number>>(new Set());
   const [freeze, setFreeze] = useState(false);
@@ -75,6 +77,12 @@ export default function ServersPage() {
     setViewOpen(true);
   };
 
+  const openGraphBanks = (server: Server, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedServer(server);
+    setGraphBanksOpen(true);
+  };
+
   const handleCheckHealth = async (serverId?: number) => {
     const ids = serverId ? [serverId] : Array.from(selected);
     if (ids.length === 0) return;
@@ -117,6 +125,14 @@ export default function ServersPage() {
           Health
         </Button>
 
+        <Button
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add Server
+        </Button>
+
         <div className="flex-1" />
         <div className="w-px h-5 bg-white/10 mx-1" />
 
@@ -129,14 +145,6 @@ export default function ServersPage() {
           title="Delete"
         >
           <Trash2 className="h-4 w-4" />
-        </Button>
-
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
-          title="Add"
-        >
-          <Plus className="h-4 w-4" />
         </Button>
       </div>
 
@@ -171,13 +179,15 @@ export default function ServersPage() {
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Server ID</th>
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</th>
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Base URL</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-32", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Graph Banks</th>
               <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-24", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Health</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}></th>
             </tr>
           </thead>
           <tbody>
             {servers.length === 0 && !loading ? (
               <tr key="empty-state">
-                <td colSpan={5} className="text-center py-8 text-white/70">
+                <td colSpan={7} className="text-center py-8 text-white/70">
                   <div className="flex flex-col items-center gap-2">
                     <ServerIcon className="h-8 w-8 opacity-50" />
                     <p>No servers found.</p>
@@ -213,6 +223,28 @@ export default function ServersPage() {
                     {server.base_url}
                   </td>
                   <td className="py-1.5 px-4">
+                    <div className="flex flex-wrap gap-1">
+                      {(server.contextual_graph_banks || []).length === 0 ? (
+                        <span className="text-[11px] text-white/20">—</span>
+                      ) : (
+                        (server.contextual_graph_banks || []).map((cfg) => (
+                          <span
+                            key={cfg.bank_id}
+                            className={[
+                              "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border",
+                              cfg.mode === 'auto'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                : 'bg-neutral-500/10 text-neutral-300 border-neutral-500/30',
+                            ].join(' ')}
+                            title={cfg.mode === 'auto' ? `Auto sync${cfg.refresh_interval ? ` (${cfg.refresh_interval})` : ''}` : 'Manual only'}
+                          >
+                            {cfg.mode === 'auto' ? 'A' : 'M'} {cfg.bank_id}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-1.5 px-4">
                     <div className="flex items-center gap-2">
                       {healthStatus[server.id] && (
                         healthStatus[server.id]?.status === 'ok' ? (
@@ -235,6 +267,18 @@ export default function ServersPage() {
                       )}
                     </div>
                   </td>
+                  <td className="py-1.5 px-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => openGraphBanks(server, e)}
+                      className="h-7 px-2 text-[11px] text-white/70 hover:text-white hover:bg-white/5"
+                      title="Configure graph banks"
+                    >
+                      <Network className="h-3.5 w-3.5 mr-1" />
+                      Banks
+                    </Button>
+                  </td>
                 </tr>
               ))
             )}
@@ -256,6 +300,13 @@ export default function ServersPage() {
         server={selectedServer}
         open={viewOpen}
         onOpenChange={setViewOpen}
+        onServerUpdated={fetchServers}
+      />
+
+      <ServerGraphBanksDialog
+        server={selectedServer}
+        open={graphBanksOpen}
+        onOpenChange={setGraphBanksOpen}
         onServerUpdated={fetchServers}
       />
 
