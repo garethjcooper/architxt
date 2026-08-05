@@ -1,6 +1,12 @@
 import { createLogger } from '../../utils/logger.js';
 import { listAllMentalModels, deleteMentalModel } from '../hindsight/mental-models.js';
-import { listNodes, listEdges, upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
+import {
+  listNodes,
+  listEdges,
+  upsertNode,
+  upsertEdge,
+  deleteAllContextualGraphNodesAndEdges,
+} from '../../db/crud/contextual-graph.js';
 import { getServer, updateServer } from '../../db/crud/servers.js';
 import { stripModelRefsFromProperties } from './graph-model-refs.js';
 
@@ -21,20 +27,24 @@ const GENERATED_MODEL_PREFIXES = Object.freeze([
  * - Disables auto-sync for the bank (sets mode to manual).
  * - Lists every mental model in the Hindsight bank and deletes any whose id
  *   matches the contextual-graph generated prefixes.
- * - Strips provenance.model_refs from local nodes/edges.
- * - Marks all Hindsight-sourced nodes/edges in the working graph as stale.
+ * - Optionally deletes the entire local working graph for the bank via
+ *   `options.delete_local_graph`. When true, no local stale state is kept.
+ * - When `delete_local_graph` is false, it strips provenance.model_refs from
+ *   local nodes/edges and marks all Hindsight-sourced nodes/edges as stale.
  *
  * It never deletes user-created nodes/edges or non-contextual-graph mental
- * models.
+ * models, unless `delete_local_graph` is true which removes the whole scoped
+ * working graph.
  *
  * @param {Object} db
  * @param {number} serverId
  * @param {string} bankId
  * @param {Object} [options]
  * @param {boolean} [options.dry_run] - if true, return preview without deleting
+ * @param {boolean} [options.delete_local_graph] - if true, also delete all local nodes/edges for the bank
  * @param {Function} [options.listModels] - override for testing
  * @param {Function} [options.deleteModel] - override for testing
- * @returns {Promise<{success: boolean, dry_run?: boolean, stopped_auto_sync?: boolean, deleted?: string[], failed?: {ext_id: string, error: string}[], cleared?: {nodes: number, edges: number}, marked_stale?: {nodes: number, edges: number}, error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, dry_run?: boolean, stopped_auto_sync?: boolean, deleted?: string[], failed?: {ext_id: string, error: string}[], cleared?: {nodes: number, edges: number}, marked_stale?: {nodes: number, edges: number}, deleted_local_graph?: {nodes: number, edges: number}, error?: string, code?: string}>}
  */
 export async function undeployContextualGraphBank(
   db,
@@ -98,6 +108,7 @@ export async function undeployContextualGraphBank(
       stopped_auto_sync: stoppedAutoSync,
       target_count: targetIds.length,
       target_ids: targetIds,
+      delete_local_graph: options.delete_local_graph === true,
     };
   }
 
@@ -116,12 +127,18 @@ export async function undeployContextualGraphBank(
   }
 
   // 4. Clear local model_refs for the ids we attempted to remove.
-  const removeSet = new Set(targetIds);
-  const cleared = await clearLocalModelRefs(db, serverId, bankId, removeSet);
-
-  // 5. Mark Hindsight-sourced nodes/edges as stale. User-created content is
-  //    untouched because its provenance.source is not 'hindsight'.
-  const markedStale = await markHindsightStale(db, serverId, bankId);
+  let cleared;
+  let markedStale;
+  let deletedLocalGraph;
+  if (options.delete_local_graph === true) {
+    deletedLocalGraph = deleteAllContextualGraphNodesAndEdges(db, serverId, bankId);
+    cleared = { nodes: 0, edges: 0 };
+    markedStale = { nodes: 0, edges: 0 };
+  } else {
+    const removeSet = new Set(targetIds);
+    cleared = await clearLocalModelRefs(db, serverId, bankId, removeSet);
+    markedStale = await markHindsightStale(db, serverId, bankId);
+  }
 
   logger.info('Undeployed contextual graph bank', {
     serverId,
@@ -132,6 +149,8 @@ export async function undeployContextualGraphBank(
     failed: failed.length,
     cleared,
     markedStale,
+    deletedLocalGraph,
+    deleteLocalGraph: options.delete_local_graph === true,
   });
 
   return {
@@ -141,6 +160,7 @@ export async function undeployContextualGraphBank(
     failed,
     cleared,
     marked_stale: markedStale,
+    deleted_local_graph: deletedLocalGraph,
   };
 }
 

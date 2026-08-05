@@ -665,6 +665,7 @@ export function createContextualGraphRouter({
    *               server_id: { type: integer }
    *               bank_id: { type: string }
    *               dry_run: { type: boolean }
+   *               delete_local_graph: { type: boolean }
    *     responses:
    *       200: { description: Bank undeployed or previewed }
    *       400: { description: Missing or invalid scope }
@@ -676,14 +677,19 @@ export function createContextualGraphRouter({
 
     const { serverId, bankId } = scope;
     const dryRun = req.body.dry_run === true;
+    const deleteLocalGraph = req.body.delete_local_graph === true;
 
-    const result = await undeployBank(db, serverId, bankId, { dry_run: dryRun });
+    const result = await undeployBank(db, serverId, bankId, {
+      dry_run: dryRun,
+      delete_local_graph: deleteLocalGraph,
+    });
 
     const duration = Date.now() - start;
     logger.info('Undeploy contextual graph bank', {
       serverId,
       bankId,
       dryRun,
+      deleteLocalGraph,
       targetCount: result.target_count ?? result.deleted?.length ?? 0,
       deleted: result.deleted?.length ?? 0,
       failed: result.failed?.length ?? 0,
@@ -699,6 +705,7 @@ export function createContextualGraphRouter({
       failed: result.failed ?? [],
       cleared: result.cleared ?? { nodes: 0, edges: 0 },
       marked_stale: result.marked_stale ?? { nodes: 0, edges: 0 },
+      deleted_local_graph: result.deleted_local_graph ?? { nodes: 0, edges: 0 },
     };
 
     if (!result.success) {

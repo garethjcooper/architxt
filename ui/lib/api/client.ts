@@ -1391,10 +1391,11 @@ export const contextualGraphApi = {
       }),
     }),
 
-  undeployBank: (serverId: number, bankId: string, options?: { dry_run?: boolean }) =>
+  undeployBank: (serverId: number, bankId: string, options?: { dry_run?: boolean; delete_local_graph?: boolean }) =>
     fetchApi<{
       success: boolean;
       dry_run?: boolean;
+      delete_local_graph?: boolean;
       stopped_auto_sync?: boolean;
       target_count?: number;
       deleted_count?: number;
@@ -1402,10 +1403,16 @@ export const contextualGraphApi = {
       failed?: { ext_id: string; error: string }[];
       cleared?: { nodes: number; edges: number };
       marked_stale?: { nodes: number; edges: number };
+      deleted_local_graph?: { nodes: number; edges: number };
       error?: string;
       code?: string;
     }>('/contextual-graph/undeploy-bank', {
       method: 'POST',
-      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
+      body: JSON.stringify({
+        server_id: serverId,
+        bank_id: bankId,
+        dry_run: options?.dry_run ?? false,
+        delete_local_graph: options?.delete_local_graph ?? false,
+      }),
     }),
 };
