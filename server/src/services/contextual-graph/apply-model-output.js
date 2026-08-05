@@ -350,6 +350,12 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
   for (const node of allNodes) {
     if (node.cgn_id === seedId) continue;
     const refs = node.cgn_properties?.provenance?.model_refs || [];
+    // Preserve nodes that are seeds for their own discovery model; they are not
+    // disposable discovered nodes for this ref.
+    const isOwnSeed = refs.some((ref) =>
+      ref?.role === 'sys_discovery_context' && ref?.ext_id === `discover-${node.cgn_id}`
+    );
+    if (isOwnSeed) continue;
     if (refs.some((ref) => ref?.ext_id === model.mm_ext_id)) {
       deleteNode(db, serverId, bankId, node.cgn_id);
     }
@@ -362,18 +368,25 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
 
   for (const node of output.graph.nodes) {
     nodeIds.add(node.id);
+    const existingNodeResult = getNode(db, serverId, bankId, node.id);
+    const existingNode = existingNodeResult?.success ? existingNodeResult.data : null;
+    const existingProperties = existingNode?.properties || {};
+    const existingLabels = existingNode?.labels || [];
+
     const discoveredProperties = {
+      ...existingProperties,
       display_name: node.name,
       type: node.type,
       provenance: {
+        ...(existingProperties.provenance || {}),
         source: 'contextual-graph',
         discovery: 'discovered',
-        model_refs: [modelRef],
+        model_refs: mergeModelRefs(existingProperties.provenance?.model_refs, modelRef),
         updated_at: timestamp,
       },
       updated_at: timestamp,
     };
-    upsertNode(db, serverId, bankId, node.id, ['candidate', 'active'], discoveredProperties);
+    upsertNode(db, serverId, bankId, node.id, [...new Set([...existingLabels, 'candidate', 'active'])], discoveredProperties);
     createdNodes += 1;
   }
 
@@ -384,14 +397,19 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     }
 
     const edgeId = `discovered-${seedId}-${edge.from}-${edge.to}-${edge.type}`;
+    const existingEdgeResult = getEdge(db, serverId, bankId, edgeId);
+    const existingEdge = existingEdgeResult?.success ? existingEdgeResult.data : null;
+    const existingProperties = existingEdge?.cge_properties || {};
     const edgeProperties = {
+      ...existingProperties,
       label: edge.label,
       detail: edge.detail,
       evidence: edge.evidence,
       provenance: {
+        ...(existingProperties.provenance || {}),
         source: 'contextual-graph',
         discovery: 'discovered',
-        model_refs: [modelRef],
+        model_refs: mergeModelRefs(existingProperties.provenance?.model_refs, modelRef),
         updated_at: timestamp,
       },
       updated_at: timestamp,
