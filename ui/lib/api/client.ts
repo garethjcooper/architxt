@@ -841,6 +841,8 @@ export interface GraphNode {
   properties?: Record<string, any>;
   /** Patch health status (green = all roles present, orange = some, red = none). */
   health?: 'green' | 'orange' | 'red';
+  /** Pre-rendered, stripped summary text for cards/lists. */
+  summaryText?: string;
   x?: number;
   y?: number;
   width?: number;
