@@ -38,6 +38,7 @@ const navItems = [
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/contextual-graph', label: 'Contextual Graph', icon: Network },
+  { href: '/contextual-graph/manager', label: 'Context Manager', icon: Layers },
   { href: '/tags', label: 'Tags', icon: Tags },
   { href: '/entities', label: 'Entities', icon: Users },
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
