@@ -11,7 +11,7 @@ export interface TableLike {
 function escapeMdCell(value: unknown): string {
   if (value === undefined || value === null) return '';
   return String(value)
-    .replace(/\\|/g, '\\\\|')
+    .replace(/(?<!\\\\)\|/g, '\\\\|')
     .replace(/\\n/g, ' ')
     .replace(/\\r/g, '')
     .trim();

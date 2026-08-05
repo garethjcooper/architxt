@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Grip, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { tableToMarkdown } from '@/lib/table-to-markdown';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
 
 export type DataBoxTab = 'data' | 'patch-config';
@@ -40,10 +39,6 @@ function formatDate(value?: string): string | null {
   return isNaN(d.getTime()) ? value : d.toLocaleString();
 }
 
-function isObject(value: unknown): value is Record<string, any> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function renderValue(value: unknown): React.ReactNode {
   if (value === undefined || value === null) return <span className="text-white/40 italic">null</span>;
   if (typeof value === 'string') {
@@ -58,6 +53,46 @@ function renderValue(value: unknown): React.ReactNode {
     <pre className="text-[11px] text-white/70 bg-black/20 rounded p-1.5 overflow-x-auto">
       {JSON.stringify(value, null, 2)}
     </pre>
+  );
+}
+
+function inferColumns(rows: Array<Record<string, any> | any[]>): string[] {
+  if (rows.length === 0) return [];
+  const first = rows[0];
+  if (first && typeof first === 'object' && !Array.isArray(first)) return Object.keys(first);
+  if (Array.isArray(first)) return first.map((_, i) => `col ${i + 1}`);
+  return [];
+}
+
+function TableView({ rows, columns }: { rows: Array<Record<string, any> | any[]>; columns?: string[] }) {
+  const cols = columns && columns.length > 0 ? columns : inferColumns(rows);
+  if (cols.length === 0) return <span className="text-white/40 italic">No columns.</span>;
+  return (
+    <div className="overflow-x-auto rounded border border-white/5 bg-black/10">
+      <table className="w-full text-[11px] text-left">
+        <thead>
+          <tr className="border-b border-white/10 bg-black/20">
+            {cols.map((col) => (
+              <th key={col} className="px-2 py-1 text-white/60 font-medium whitespace-nowrap">{col}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b border-white/5 last:border-0">
+              {cols.map((col, j) => {
+                const value = Array.isArray(row) ? row[j] : row?.[col];
+                return (
+                  <td key={`${col}-${j}`} className="px-2 py-1 text-white/80 align-top">
+                    {typeof value === 'string' ? value : renderValue(value)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -76,9 +111,7 @@ function ModelRefSection({ ref, index, item }: { ref: ModelRef; index: number; i
       capabilities.length === 0 ? (
         <span className="text-white/40 italic">No capabilities stored.</span>
       ) : (
-        <pre className="text-[11px] text-white/80 whitespace-pre-wrap bg-black/20 rounded p-1.5 overflow-x-auto">
-          {tableToMarkdown({ name: 'capabilities', columns: Object.keys(capabilities[0] || {}), rows: capabilities })}
-        </pre>
+        <TableView rows={capabilities} />
       );
   } else if (role === 'sys_edge_context') {
     const hasContent = properties.detail || properties.evidence || properties.label;
@@ -343,13 +376,7 @@ export function ContextualGraphDataBox({
                     {Array.isArray(rawProperties.capabilities) && rawProperties.capabilities.length > 0 && (
                       <div>
                         <div className="text-[10px] uppercase tracking-wider text-white/40">capabilities</div>
-                        <pre className="text-[11px] text-white/80 whitespace-pre-wrap bg-black/20 rounded p-1.5 overflow-x-auto">
-                          {tableToMarkdown({
-                            name: 'capabilities',
-                            columns: Object.keys(rawProperties.capabilities[0] || {}),
-                            rows: rawProperties.capabilities,
-                          })}
-                        </pre>
+                        <TableView rows={rawProperties.capabilities} />
                       </div>
                     )}
                     {(rawProperties.detail || rawProperties.evidence || rawProperties.label) && (
