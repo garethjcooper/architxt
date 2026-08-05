@@ -232,6 +232,39 @@ function ensureMissingTables(db) {
         PRIMARY KEY (cge_server_id, cge_bank_id, cge_id),
         FOREIGN KEY (cge_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
       )`
+    },
+    {
+      name: 'contextual_graph_jobs',
+      ddl: `CREATE TABLE IF NOT EXISTS contextual_graph_jobs (
+        cgj_id TEXT PRIMARY KEY,
+        cgj_server_id INTEGER NOT NULL,
+        cgj_bank_id TEXT NOT NULL,
+        cgj_status TEXT NOT NULL DEFAULT 'pending' CHECK (cgj_status IN ('pending','running','completed','failed','cancelled')),
+        cgj_stages JSON NOT NULL DEFAULT '[]',
+        cgj_logs JSON NOT NULL DEFAULT '[]',
+        cgj_options JSON,
+        cgj_stats JSON,
+        cgj_error_message TEXT,
+        cgj_error_code TEXT,
+        cgj_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        cgj_started_at TIMESTAMP,
+        cgj_finished_at TIMESTAMP,
+        cgj_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (cgj_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'contextual_graph_job_logs',
+      ddl: `CREATE TABLE IF NOT EXISTS contextual_graph_job_logs (
+        cgjl_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cgj_id TEXT NOT NULL,
+        cgjl_stage TEXT,
+        cgjl_level TEXT NOT NULL CHECK (cgjl_level IN ('info','warn','error')),
+        cgjl_message TEXT NOT NULL,
+        cgjl_details JSON,
+        cgjl_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (cgj_id) REFERENCES contextual_graph_jobs(cgj_id) ON DELETE CASCADE
+      )`
     }
   ];
 
