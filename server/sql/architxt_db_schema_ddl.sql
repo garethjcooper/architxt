@@ -160,6 +160,43 @@ CREATE INDEX idx_cge_source ON contextual_graph_edges(cge_source_id);
 CREATE INDEX idx_cge_target ON contextual_graph_edges(cge_target_id);
 
 -- ============================================================================
+-- CONTEXTUAL GRAPH SYNC JOBS — tracked, cancellable background graph sync
+-- ============================================================================
+
+CREATE TABLE contextual_graph_jobs (
+  cgj_id TEXT PRIMARY KEY,
+  cgj_server_id INTEGER NOT NULL,
+  cgj_bank_id TEXT NOT NULL,
+  cgj_status TEXT NOT NULL DEFAULT 'pending' CHECK (cgj_status IN ('pending','running','completed','failed','cancelled')),
+  cgj_stages JSON NOT NULL DEFAULT '[]',
+  cgj_options JSON,
+  cgj_stats JSON,
+  cgj_error_message TEXT,
+  cgj_error_code TEXT,
+  cgj_cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK (cgj_cancel_requested IN (0, 1)),
+  cgj_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  cgj_started_at TIMESTAMP,
+  cgj_finished_at TIMESTAMP,
+  FOREIGN KEY (cgj_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_contextual_graph_jobs_server_bank ON contextual_graph_jobs(cgj_server_id, cgj_bank_id);
+CREATE INDEX idx_contextual_graph_jobs_status ON contextual_graph_jobs(cgj_status);
+
+CREATE TABLE contextual_graph_job_logs (
+  cgjl_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cgj_id TEXT NOT NULL,
+  cgjl_stage TEXT,
+  cgjl_level TEXT NOT NULL CHECK (cgjl_level IN ('info','warn','error')),
+  cgjl_message TEXT NOT NULL,
+  cgjl_details JSON,
+  cgjl_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (cgj_id) REFERENCES contextual_graph_jobs(cgj_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_contextual_graph_job_logs_job ON contextual_graph_job_logs(cgj_id);
+
+-- ============================================================================
 -- ENTITY TYPES — classification groups (e.g. Application Component, Service)
 -- ============================================================================
 
