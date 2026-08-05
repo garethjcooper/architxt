@@ -1267,7 +1267,14 @@ export const contextualGraphApi = {
     import_skeleton?: boolean;
     neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number; run_discovery?: boolean };
   }) =>
-    fetchApi<{ success: boolean; queued?: { entity: number; edge: number; discover: number }; deployed?: string[]; failed?: { ext_id: string; error: string; code?: string }[]; error?: string; code?: string }>('/contextual-graph/add-context', {
+    fetchApi<{
+      success: boolean;
+      queued?: { entitySummary: number; entityCapabilities: number; edge: number; discover: number };
+      deployed?: string[];
+      failed?: { ext_id: string; error: string; code?: string }[];
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/add-context', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
     }),

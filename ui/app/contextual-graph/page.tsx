@@ -499,18 +499,32 @@ export default function ContextualGraphPage() {
     if (!window.confirm(`Deploy contextual models for ${selectedEntityIds.size} selected entity${selectedEntityIds.size !== 1 ? 'ies' : 'y'}?`)) return;
     try {
       setActionLoading('deploy');
+      const nodeIds = Array.from(selectedEntityIds);
+      const runDiscovery = patchRoles['sys_discovery_context'];
       const result = await contextualGraphApi.addContext(serverId, bankId, {
-        node_ids: Array.from(selectedEntityIds),
+        node_ids: nodeIds,
+        seed_node_ids: runDiscovery ? nodeIds : undefined,
         import_skeleton: false,
-        run_discovery: false,
+        run_discovery: runDiscovery,
       });
       if (result.success) {
         const deployed = result.deployed?.length ?? 0;
         const failed = result.failed?.length ?? 0;
+        const queued = result.queued;
+        const totalQueued =
+          (queued?.entitySummary ?? 0) +
+          (queued?.entityCapabilities ?? 0) +
+          (queued?.edge ?? 0) +
+          (queued?.discover ?? 0);
+
         if (failed > 0) {
           toast.warning(`Deployed ${deployed} models; ${failed} failed`);
-        } else {
+        } else if (deployed > 0) {
           toast.success(`Deployed ${deployed} models`);
+        } else if (totalQueued === 0) {
+          toast.info('No new models to deploy — selected entities already have contextual models.');
+        } else {
+          toast.info(`Queued ${totalQueued} model${totalQueued === 1 ? '' : 's'} but none were reported deployed.`);
         }
       } else {
         toast.error(`Deploy failed: ${result.error || result.code || 'unknown'}`);
@@ -524,7 +538,7 @@ export default function ContextualGraphPage() {
     } finally {
       setActionLoading(null);
     }
-  }, [serverId, bankId, selectedEntityIds, loadGraph]);
+  }, [serverId, bankId, selectedEntityIds, loadGraph, patchRoles]);
 
   const handleSelectEdge = useCallback((edge: GraphEdge) => {
     setDataBoxEdgeId(edge.id);
