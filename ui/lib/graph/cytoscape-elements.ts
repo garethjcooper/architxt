@@ -26,6 +26,9 @@ export interface CytoscapeEdgeData {
 
 function buildNodeData(n: GraphNode): CytoscapeNodeData {
   const inferredType = n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other');
+  const backgroundColor = n.health
+    ? { green: '#10b981', orange: '#f97316', red: '#ef4444' }[n.health]
+    : n.color || colorForType(inferredType);
   return {
     id: n.id,
     label: truncateLabel(n.name || n.label || n.id),
@@ -33,7 +36,7 @@ function buildNodeData(n: GraphNode): CytoscapeNodeData {
     qualifiedId: n.type ? `${n.type}:${n.id}` : n.id,
     type: inferredType,
     category: mapTypeName(inferredType),
-    backgroundColor: n.color || colorForType(inferredType),
+    backgroundColor,
     source: n.source || 'hindsight',
     mental_model_applied: n.mental_model_applied ?? false,
   };
