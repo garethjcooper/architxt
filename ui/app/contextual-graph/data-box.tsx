@@ -5,7 +5,7 @@ import { Grip, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
 
-export type DataBoxTab = 'data' | 'patch-config';
+export type DataBoxTab = 'data' | 'patch-config' | 'discovery';
 
 interface ModelRef {
   role?: string;
@@ -22,6 +22,10 @@ interface ContextualGraphDataBoxProps {
   edge: GraphEdge | null;
   activeTab: DataBoxTab;
   onTabChange: (tab: DataBoxTab) => void;
+  /** Whether the discovery role is enabled in patch config. */
+  discoveryEnabled?: boolean;
+  /** Full graph canvas for correlating discovery model refs with discovered nodes/edges. */
+  graph?: { nodes: GraphNode[]; edges: GraphEdge[] };
 }
 
 const STORAGE_KEY = 'contextual-graph-data-box-state';
@@ -181,6 +185,8 @@ export function ContextualGraphDataBox({
   edge,
   activeTab,
   onTabChange,
+  discoveryEnabled = false,
+  graph,
 }: ContextualGraphDataBoxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [boxState, setBoxState] = useState<{
@@ -324,6 +330,14 @@ export function ContextualGraphDataBox({
   }, [resizeState, position?.x, position?.y]);
 
   const modelRefs: ModelRef[] = item?.modelRefs || (item as any)?.properties?.provenance?.model_refs || [];
+  const discoveryRefs = modelRefs.filter((r) => r.role === 'sys_discovery_context');
+  const discoveredByRef = (ref: ModelRef) => {
+    if (!graph || !ref.ext_id) return { nodes: [], edges: [] };
+    const match = (m: ModelRef) => m.ext_id === ref.ext_id && m.role === 'sys_discovery_context';
+    const nodes = graph.nodes.filter((n) => n.id !== node?.id && n.modelRefs?.some(match));
+    const edges = graph.edges.filter((e) => e.id !== edge?.id && e.modelRefs?.some(match));
+    return { nodes, edges };
+  };
 
   const nodeTimestamps = node
     ? {
@@ -404,6 +418,18 @@ export function ContextualGraphDataBox({
               )}
             >
               Patch Config
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange('discovery')}
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap',
+                activeTab === 'discovery'
+                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                  : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
+              )}
+            >
+              Discovery
             </button>
           </div>
           <button
@@ -522,6 +548,53 @@ export function ContextualGraphDataBox({
                   )}
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'discovery' && (
+          <div className="space-y-3">
+            {!discoveryEnabled ? (
+              <div className="text-[11px] text-white/50 italic">Discovery is disabled in patch config.</div>
+            ) : !item ? (
+              <div className="text-[11px] text-white/50 italic">Select a node or edge to view discovery context.</div>
+            ) : discoveryRefs.length === 0 ? (
+              <div className="text-[11px] text-white/50 italic">No discovery context attached.</div>
+            ) : (
+              <div className="space-y-3">
+                {discoveryRefs.map((ref: ModelRef, i: number) => {
+                  const { nodes, edges } = discoveredByRef(ref);
+                  return (
+                    <div key={`${ref.ext_id ?? 'discover'}-${i}`} className="rounded border border-white/5 bg-black/10 px-2 py-1.5 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/20 text-white/60">{ref.role}</span>
+                        {ref.ext_id && <span className="font-mono text-white/70 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
+                      </div>
+                      {ref.attached_at && <div className="text-[10px] text-white/40">attached {formatDate(ref.attached_at)}</div>}
+                      {nodes.length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Discovered nodes ({nodes.length})</div>
+                          <div className="mt-1 space-y-1">
+                            {nodes.map((n: GraphNode) => (
+                              <div key={n.id} className="text-[11px] text-white/80 truncate" title={n.id}>{n.label || n.name || n.id}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {edges.length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Discovered edges ({edges.length})</div>
+                          <div className="mt-1 space-y-1">
+                            {edges.map((e: GraphEdge) => (
+                              <div key={e.id} className="text-[11px] text-white/80 truncate" title={e.id}>{e.detail || e.label || e.type || e.id}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

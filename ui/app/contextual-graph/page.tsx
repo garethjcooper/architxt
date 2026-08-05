@@ -766,6 +766,12 @@ export default function ContextualGraphPage() {
                     const typeLine = type && !entity.id.startsWith(`${type}:`) ? `${type}:${entity.id}` : entity.id;
                     const summary = entitySummaryText(entity);
                     const { health, missing, present, expected } = computePatchHealth(entity, patchRoles);
+                    const hasDiscovery = entity.modelRefs?.some((r) => r.role === 'sys_discovery_context');
+                    const discoveryBadgeColor = patchRoles['sys_discovery_context']
+                      ? hasDiscovery
+                        ? 'bg-emerald-500'
+                        : 'bg-red-500'
+                      : 'bg-white/20';
                     const selected = selectedEntityIds.has(entity.id);
                     return (
                       <button
@@ -821,6 +827,14 @@ export default function ContextualGraphPage() {
                               missing.length > 0 ? `Missing: ${missing.map((r) => ROLE_LABELS[r] || r).join(', ')}` : '',
                             ].filter(Boolean).join(' | ')}
                             className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))}
+                          />
+                          <span
+                            title={patchRoles['sys_discovery_context']
+                              ? hasDiscovery
+                                ? 'Discovery context attached'
+                                : 'Discovery context missing'
+                              : 'Discovery context disabled'}
+                            className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', discoveryBadgeColor)}
                           />
                         </div>
                         <span
@@ -990,6 +1004,8 @@ export default function ContextualGraphPage() {
                       edge={dataBoxEdgeId ? graph.edges.find((e) => e.id === dataBoxEdgeId) ?? null : null}
                       activeTab={dataBoxTab}
                       onTabChange={setDataBoxTab}
+                      discoveryEnabled={patchRoles['sys_discovery_context']}
+                      graph={displayGraph}
                     />
                   )}
                 </div>
