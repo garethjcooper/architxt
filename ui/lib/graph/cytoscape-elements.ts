@@ -22,13 +22,14 @@ export interface CytoscapeEdgeData {
   type: string | undefined;
   detail: string | undefined;
   cpDistance?: number;
+  healthColor?: string;
 }
+
+const HEALTH_COLORS = { green: '#10b981', orange: '#f97316', red: '#ef4444' };
 
 function buildNodeData(n: GraphNode): CytoscapeNodeData {
   const inferredType = n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other');
-  const backgroundColor = n.health
-    ? { green: '#10b981', orange: '#f97316', red: '#ef4444' }[n.health]
-    : n.color || colorForType(inferredType);
+  const backgroundColor = n.health ? HEALTH_COLORS[n.health] : n.color || colorForType(inferredType);
   return {
     id: n.id,
     label: truncateLabel(n.name || n.label || n.id),
@@ -51,6 +52,7 @@ function buildEdgeData(e: GraphEdge): CytoscapeEdgeData {
     label: typeof e.label === 'string' ? e.label : '',
     type: e.type,
     detail: e.detail,
+    healthColor: e.health ? HEALTH_COLORS[e.health] : undefined,
   };
 }
 

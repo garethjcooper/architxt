@@ -351,6 +351,15 @@ export function InteractiveGraph({
           },
         },
         {
+          selector: 'edge[healthColor]',
+          style: {
+            width: 0.75,
+            'line-color': 'data(healthColor)',
+            'target-arrow-color': 'data(healthColor)',
+            'source-arrow-color': 'data(healthColor)',
+          },
+        },
+        {
           selector: 'edge[source = "synthesize"]',
           style: {
             width: 0.75,
