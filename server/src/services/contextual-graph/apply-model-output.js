@@ -373,10 +373,13 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     const existingProperties = existingNode?.properties || {};
     const existingLabels = existingNode?.labels || [];
 
+    const isDiscoveredNode = String(node.id).startsWith('found:');
+
     const discoveredProperties = {
       ...existingProperties,
-      display_name: node.name,
-      type: node.type,
+      // Only set name/type from the discovery output for new candidate nodes.
+      // Canonical and grounded nodes keep their existing display_name/type.
+      ...(isDiscoveredNode ? { display_name: node.name, type: node.type } : {}),
       provenance: {
         ...(existingProperties.provenance || {}),
         source: 'contextual-graph',
