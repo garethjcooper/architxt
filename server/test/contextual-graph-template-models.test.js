@@ -64,8 +64,9 @@ describe('contextual graph template models', () => {
     assert.ok(spec.source_query.includes('Billing Service'));
     assert.equal(spec.refresh_mode, 'full');
     assert.equal(spec.refresh_after_consolidation, false);
-    assert.equal(spec.exclude_all_mental_models, false);
-    assert.equal(spec.tags_match_mode, 'all_strict');
+    assert.equal(spec.exclude_all_mental_models, true);
+    assert.equal(spec.max_tokens, 8192);
+    assert.equal(spec.tags_match_mode, 'any');
   });
 
   it('derives an entity-capabilities model from a node', async () => {
@@ -78,7 +79,9 @@ describe('contextual graph template models', () => {
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
     assert.equal(spec.refresh_mode, 'full');
-    assert.equal(spec.tags_match_mode, 'all_strict');
+    assert.equal(spec.exclude_all_mental_models, true);
+    assert.equal(spec.max_tokens, 8192);
+    assert.equal(spec.tags_match_mode, 'any');
   });
 
   it('derives an edge context model from source and target nodes', async () => {
@@ -95,7 +98,9 @@ describe('contextual graph template models', () => {
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Payment API'));
     assert.equal(spec.refresh_mode, 'full');
-    assert.equal(spec.tags_match_mode, 'all_strict');
+    assert.equal(spec.exclude_all_mental_models, true);
+    assert.equal(spec.max_tokens, 8192);
+    assert.equal(spec.tags_match_mode, 'any');
   });
 
   it('derives a discover model from a seed node', async () => {
@@ -107,7 +112,9 @@ describe('contextual graph template models', () => {
     assert.equal(spec.role, 'sys_discovery_context');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.equal(spec.refresh_mode, 'full');
-    assert.equal(spec.tags_match_mode, 'all_strict');
+    assert.equal(spec.exclude_all_mental_models, true);
+    assert.equal(spec.max_tokens, 8192);
+    assert.equal(spec.tags_match_mode, 'any');
   });
 
   it('system templates have no tags', () => {
