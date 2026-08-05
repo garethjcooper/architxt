@@ -54,7 +54,7 @@ describe('contextual graph template models', () => {
   });
 
   it('derives an entity-summary model from a node', async () => {
-    const spec = await deriveEntitySummaryModel(db, { id: 'svc-001', displayName: 'Billing Service' }, 'bank-1');
+    const spec = await deriveEntitySummaryModel(db, { id: 'svc-001', displayName: 'Billing Service' });
 
     assert.equal(spec.ext_id, 'entity-summary-svc-001');
     assert.equal(spec.name, 'Entity summary: Billing Service');
@@ -62,7 +62,6 @@ describe('contextual graph template models', () => {
     assert.equal(spec.role, 'sys_entity_summary');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
-    assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_entity_summary', 'node-svc-001']);
     assert.equal(spec.refresh_mode, 'full');
     assert.equal(spec.refresh_after_consolidation, false);
     assert.equal(spec.exclude_all_mental_models, false);
@@ -70,7 +69,7 @@ describe('contextual graph template models', () => {
   });
 
   it('derives an entity-capabilities model from a node', async () => {
-    const spec = await deriveEntityCapabilitiesModel(db, { id: 'svc-001', displayName: 'Billing Service' }, 'bank-1');
+    const spec = await deriveEntityCapabilitiesModel(db, { id: 'svc-001', displayName: 'Billing Service' });
 
     assert.equal(spec.ext_id, 'entity-capabilities-svc-001');
     assert.equal(spec.name, 'Entity capabilities: Billing Service');
@@ -78,7 +77,6 @@ describe('contextual graph template models', () => {
     assert.equal(spec.role, 'sys_entity_capabilities');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
-    assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_entity_capabilities', 'node-svc-001']);
     assert.equal(spec.refresh_mode, 'full');
     assert.equal(spec.tags_match_mode, 'all_strict');
   });
@@ -87,8 +85,7 @@ describe('contextual graph template models', () => {
     const spec = await deriveEdgeContextModel(
       db,
       { id: 'svc-001', displayName: 'Billing Service' },
-      { id: 'svc-002', displayName: 'Payment API' },
-      'bank-1'
+      { id: 'svc-002', displayName: 'Payment API' }
     );
 
     assert.equal(spec.ext_id, 'edge-ctx-svc-001|svc-002');
@@ -97,20 +94,18 @@ describe('contextual graph template models', () => {
     assert.equal(spec.role, 'sys_edge_context');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Payment API'));
-    assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_edge_context', 'pair-svc-001|svc-002']);
     assert.equal(spec.refresh_mode, 'full');
     assert.equal(spec.tags_match_mode, 'all_strict');
   });
 
   it('derives a discover model from a seed node', async () => {
-    const spec = await deriveDiscoverContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, [], 'bank-1');
+    const spec = await deriveDiscoverContextModel(db, { id: 'svc-001', displayName: 'Billing Service' }, []);
 
     assert.equal(spec.ext_id, 'discover-svc-001');
     assert.equal(spec.name, 'Discover around Billing Service');
     assert.equal(spec.returns, 'sys_patch');
     assert.equal(spec.role, 'sys_discovery_context');
     assert.ok(spec.source_query.includes('svc-001'));
-    assert.deepEqual(spec.tags, ['ctx-bank-1', 'sys_discovery_context', 'seed-svc-001']);
     assert.equal(spec.refresh_mode, 'full');
     assert.equal(spec.tags_match_mode, 'all_strict');
   });

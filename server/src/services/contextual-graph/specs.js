@@ -81,7 +81,7 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     return deriveEntitySummaryModel(db, {
       id: nodeId,
       displayName: node.cgn_properties?.display_name || nodeId,
-    }, bankId);
+    });
   }
 
   if (role === 'sys_entity_capabilities') {
@@ -95,7 +95,7 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     return deriveEntityCapabilitiesModel(db, {
       id: nodeId,
       displayName: node.cgn_properties?.display_name || nodeId,
-    }, bankId);
+    });
   }
 
   if (role === 'sys_edge_context') {
@@ -117,7 +117,7 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     }, {
       id: pair.targetId,
       displayName: targetNode.cgn_properties?.display_name || pair.targetId,
-    }, bankId);
+    });
   }
 
   if (role === 'sys_discovery_context') {
@@ -131,7 +131,7 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     return deriveDiscoverContextModel(db, {
       id: seedId,
       displayName: seedNode.cgn_properties?.display_name || seedId,
-    }, [], bankId);
+    }, []);
   }
 
   return null;
