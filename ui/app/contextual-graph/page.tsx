@@ -95,41 +95,15 @@ function healthColorClass(health: PatchHealth): string {
   }
 }
 
-function extractNameFromSummary(summary: unknown, id: string): string | undefined {
-  if (typeof summary !== 'string' || !summary.trim()) return undefined;
-  // Look for a leading "Name (id)" or "Name (type:id)" pattern.
-  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = summary.match(new RegExp(`^([^(\\n]+?)\\s*\\(\\s*${escapedId}\\s*\\)`));
-  if (!match) return undefined;
-  const name = match[1].trim();
-  // Avoid treating a full sentence as a name.
-  if (name.length === 0 || name.length > 80 || name.includes('.')) return undefined;
-  return name;
-}
-
-function stripNamePrefixFromSummary(summary: string, name: string, id: string): string {
-  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return summary.replace(new RegExp(`^\\s*${escapedName}\\s*\\(\\s*${escapedId}\\s*\\)\\s*`), '').trim();
-}
-
 function backendNodeToGraphNode(node: BackendNode): GraphNode {
   const inferredType = node.labels[0] ?? (typeof node.id === 'string' && node.id.includes(':') ? node.id.split(':')[0] : 'entity');
-  const explicitName = node.properties.name ?? node.properties.label;
-  const summary = node.properties.summary;
-  const extractedName = explicitName ? undefined : extractNameFromSummary(summary, node.id);
-  const name = explicitName || extractedName || node.id;
-  const displaySummary =
-    typeof summary === 'string' && extractedName
-      ? stripNamePrefixFromSummary(summary, extractedName, node.id)
-      : summary;
+  const name = node.properties.display_name || node.properties.name || node.properties.label || node.id;
 
   return {
     id: node.id,
     type: inferredType,
     label: name,
     name,
-    summaryText: typeof displaySummary === 'string' ? stripMarkdown(displaySummary) : undefined,
     provenance: node.properties.provenance ?? 'known',
     source: node.properties.generated_by === 'contextual_graph' ? 'mental_model' : 'hindsight',
     mental_model_applied: !!node.properties.provenance?.model_refs && Array.isArray(node.properties.provenance.model_refs) && node.properties.provenance.model_refs.length > 0,
