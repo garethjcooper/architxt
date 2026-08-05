@@ -45,14 +45,14 @@ function formatDate(value?: string): string | null {
 }
 
 function renderValue(value: unknown): React.ReactNode {
-  if (value === undefined || value === null) return <span className="text-white/40 italic">null</span>;
+  if (value === undefined || value === null) return <span className="text-[11px] text-white/40 italic">null</span>;
   if (typeof value === 'string') {
     return value.trim().length === 0
-      ? <span className="text-white/40 italic">empty</span>
-      : <p className="whitespace-pre-wrap text-white/80">{value}</p>;
+      ? <span className="text-[11px] text-white/40 italic">empty</span>
+      : <p className="text-[11px] whitespace-pre-wrap text-white/80">{value}</p>;
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
-    return <span className="font-mono text-white/80">{String(value)}</span>;
+    return <span className="text-[11px] font-mono text-white/80">{String(value)}</span>;
   }
   return (
     <pre className="text-[11px] text-white/70 bg-black/20 rounded p-1.5 overflow-x-auto">
@@ -418,7 +418,7 @@ export function ContextualGraphDataBox({
       </div>
 
       <div className="px-2.5 py-1.5 border-b border-white/5 bg-black/20 shrink-0">
-        <div className="text-xs text-white/90 truncate" title={title}>{title}</div>
+        <div className="text-[11px] text-white/90 truncate" title={title}>{title}</div>
         <div className="text-[10px] text-white/40 truncate" title={subtitle}>{subtitle}</div>
       </div>
 
