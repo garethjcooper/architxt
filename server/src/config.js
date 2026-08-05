@@ -234,6 +234,11 @@ export const config = {
       enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_BACKGROUND_ENABLED', 'false') === 'true',
       poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_POLL_INTERVAL_MS', 300000),
     },
+    // Sync job auto-start daemon. Disabled by default.
+    sync_daemon: {
+      enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_ENABLED', 'false') === 'true',
+      poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_POLL_INTERVAL_MS', 60000),
+    },
   },
 
 };

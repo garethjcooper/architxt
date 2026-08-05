@@ -1050,6 +1050,15 @@ function ensureDocumentsFts(db) {
 function ensureMissingColumns(db) {
   const migrations = [
     {
+      table: 'servers',
+      columns: [
+        {
+          name: 'svr_contextual_graph_banks',
+          ddl: 'ALTER TABLE servers ADD COLUMN svr_contextual_graph_banks JSON'
+        }
+      ]
+    },
+    {
       table: 'pending_operations',
       columns: [
         {
