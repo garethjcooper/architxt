@@ -44,9 +44,13 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {string[]} [options.seed_node_ids] - manual seed nodes to discover around
  * @param {Object} [options.neighborhood] - discovery scope
  * @param {number} [options.neighborhood.top_k_neighbors]
+ * @param {string[]} [options.allowed_model_types] - which model roles to deploy
+ * @param {number} [options.max_models_per_run] - cap total models deployed in one run
+ * @param {string[]} [options.exclude_node_ids] - never deploy models for these nodes
+ * @param {string[]} [options.include_node_ids] - if provided, only deploy models for these nodes
  * @param {Function} [options.fetchGraph] - override for testing
  * @param {Function} [options.deployBatch] - override for testing; receives (db, serverId, bankId, specs)
- * @returns {Promise<{success: boolean, queued?: {entity: number, edge: number, discover: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, queued?: {entity: number, edge: number, discover: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], skipped_by_restriction?: number, error?: string, code?: string}>}
  */
 export async function addContext(
   db,
@@ -61,6 +65,20 @@ export async function addContext(
   const importSkeleton = options.import_skeleton !== false;
   let runDiscovery = options.run_discovery !== false;
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
+  const allowedModelTypes = new Set(Array.isArray(options.allowed_model_types) ? options.allowed_model_types : [
+    'entity-summary',
+    'entity-capabilities',
+    'edge-ctx',
+    'discover',
+  ]);
+  const maxModelsPerRun = typeof options.max_models_per_run === 'number' && options.max_models_per_run > 0
+    ? options.max_models_per_run
+    : Infinity;
+  const excludeNodeIds = new Set(Array.isArray(options.exclude_node_ids) ? options.exclude_node_ids : []);
+  const includeNodeIds = Array.isArray(options.include_node_ids) && options.include_node_ids.length > 0
+    ? new Set(options.include_node_ids)
+    : null;
+  const restrictNode = (id) => !excludeNodeIds.has(id) && (!includeNodeIds || includeNodeIds.has(id));
 
   // Step 1: optionally import current Hindsight skeleton.
   let importResult = { success: true, imported: { nodes: 0, edges: 0 } };
@@ -69,7 +87,13 @@ export async function addContext(
       db,
       serverId,
       bankId,
-      { min_count: options.min_count, min_weight: options.min_weight },
+      {
+        min_count: options.min_count,
+        min_weight: options.min_weight,
+        top_k_nodes: options.top_k_nodes,
+        include_patterns: options.include_patterns,
+        exclude_patterns: options.exclude_patterns,
+      },
       options.fetchGraph,
     );
     if (!importResult.success) {
@@ -93,10 +117,13 @@ export async function addContext(
   const subsetNodeIds = Array.isArray(options.node_ids)
     ? new Set(options.node_ids.filter((id) => existingNodeIds.has(id)))
     : null;
-  const inSubset = (id) => (subsetNodeIds ? subsetNodeIds.has(id) : true);
+  const inSubset = (id) => {
+    if (!restrictNode(id)) return false;
+    return subsetNodeIds ? subsetNodeIds.has(id) : true;
+  };
   const filteredNodes = subsetNodeIds
-    ? existingNodes.filter((n) => subsetNodeIds.has(n.cgn_id))
-    : existingNodes;
+    ? existingNodes.filter((n) => subsetNodeIds.has(n.cgn_id) && restrictNode(n.cgn_id))
+    : existingNodes.filter((n) => restrictNode(n.cgn_id));
   const filteredEdges = subsetNodeIds
     ? existingEdges.filter((e) => subsetNodeIds.has(e.cge_source_id) && subsetNodeIds.has(e.cge_target_id))
     : existingEdges;
@@ -107,8 +134,9 @@ export async function addContext(
   const entityCapabilitiesSpecs = [];
   for (const node of filteredNodes) {
     if (!node.cgn_labels?.includes('active')) continue;
+    if (!inSubset(node.cgn_id)) continue;
 
-    if (!hasModelRef(node.cgn_properties, 'sys_entity_summary')) {
+    if (allowedModelTypes.has('entity-summary') && !hasModelRef(node.cgn_properties, 'sys_entity_summary')) {
       const summarySpec = await deriveEntitySummaryModel(db, {
         id: node.cgn_id,
         displayName: node.cgn_properties?.display_name || node.cgn_id,
@@ -116,7 +144,7 @@ export async function addContext(
       entitySummarySpecs.push(summarySpec);
     }
 
-    if (!hasModelRef(node.cgn_properties, 'sys_entity_capabilities')) {
+    if (allowedModelTypes.has('entity-capabilities') && !hasModelRef(node.cgn_properties, 'sys_entity_capabilities')) {
       const capabilitiesSpec = await deriveEntityCapabilitiesModel(db, {
         id: node.cgn_id,
         displayName: node.cgn_properties?.display_name || node.cgn_id,
@@ -129,34 +157,38 @@ export async function addContext(
   const edgeSpecs = [];
   const seenEdgePairs = new Set();
   for (const edge of filteredEdges) {
-    if (hasModelRef(edge.cge_properties, 'sys_edge_context')) continue;
+    if (allowedModelTypes.has('edge-ctx')) {
+      if (hasModelRef(edge.cge_properties, 'sys_edge_context')) continue;
 
-    // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
-    // candidate hypotheses). Directed edges are produced by edge-ctx itself.
-    if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
+      // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
+      // candidate hypotheses). Directed edges are produced by edge-ctx itself.
+      if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
 
-    const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active') && inSubset(n.cgn_id));
-    const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active') && inSubset(n.cgn_id));
-    if (!sourceActive || !targetActive) continue;
+      if (!inSubset(edge.cge_source_id) || !inSubset(edge.cge_target_id)) continue;
 
-    const pk = `${edge.cge_source_id}|${edge.cge_target_id}`;
-    if (seenEdgePairs.has(pk)) continue;
-    seenEdgePairs.add(pk);
+      const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active'));
+      const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active'));
+      if (!sourceActive || !targetActive) continue;
 
-    const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
-    const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
+      const pk = `${edge.cge_source_id}|${edge.cge_target_id}`;
+      if (seenEdgePairs.has(pk)) continue;
+      seenEdgePairs.add(pk);
 
-    const spec = await deriveEdgeContextModel(db, {
-      id: edge.cge_source_id,
-      displayName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
-    }, {
-      id: edge.cge_target_id,
-      displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
-    });
-    edgeSpecs.push(spec);
+      const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
+      const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
+
+      const spec = await deriveEdgeContextModel(db, {
+        id: edge.cge_source_id,
+        displayName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
+      }, {
+        id: edge.cge_target_id,
+        displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
+      });
+      edgeSpecs.push(spec);
+    }
   }
 
-  // Step 4: queue discovery models around seeds (no LLM call here; candidates
+  // Step 5: queue discovery models around seeds (no LLM call here; candidates
   // are fetched later from the discover-ctx mental model content).
   const discoverQueue = new Set();
   const discoverSpecs = [];
@@ -168,7 +200,7 @@ export async function addContext(
   }
 
   // Auto-rank high-degree nodes as additional discovery seeds when discovery is enabled.
-  if (runDiscovery) {
+  if (runDiscovery && allowedModelTypes.has('discover')) {
     const nodeDegrees = new Map();
     for (const edge of filteredEdges) {
       nodeDegrees.set(edge.cge_source_id, (nodeDegrees.get(edge.cge_source_id) || 0) + 1);
@@ -210,7 +242,21 @@ export async function addContext(
   const dedupedSummarySpecs = dedupeSpecsByExtId(entitySummarySpecs);
   const dedupedCapabilitiesSpecs = dedupeSpecsByExtId(entityCapabilitiesSpecs);
   const dedupedEdgeSpecs = dedupeSpecsByExtId(edgeSpecs);
-  const allSpecs = [...dedupedSummarySpecs, ...dedupedCapabilitiesSpecs, ...dedupedEdgeSpecs, ...discoverSpecs];
+  const dedupedDiscoverSpecs = dedupeSpecsByExtId(discoverSpecs);
+
+  const allUnrestrictedSpecs = [
+    ...dedupedSummarySpecs,
+    ...dedupedCapabilitiesSpecs,
+    ...dedupedEdgeSpecs,
+    ...dedupedDiscoverSpecs,
+  ];
+
+  // Apply the max-models-per-run cap, preserving the order above (entities
+  // first, edges second, discovery last) so the most useful models are
+  // deployed first.
+  const skippedByRestriction = Math.max(0, allUnrestrictedSpecs.length - maxModelsPerRun);
+  const allSpecs = allUnrestrictedSpecs.slice(0, maxModelsPerRun);
+
   const deployFn = options.deployBatch || deployMentalModelBatch;
   const deployResult = await deployFn(db, serverId, bankId, allSpecs);
 
@@ -233,10 +279,12 @@ export async function addContext(
       entitySummary: dedupedSummarySpecs.length,
       entityCapabilities: dedupedCapabilitiesSpecs.length,
       edge: dedupedEdgeSpecs.length,
-      discover: discoverSpecs.length,
+      discover: dedupedDiscoverSpecs.length,
+      total: allUnrestrictedSpecs.length,
     },
     deployed: deployResult.deployed,
     failed: deployResult.failed,
+    skipped_by_restriction: skippedByRestriction,
   };
 }
 

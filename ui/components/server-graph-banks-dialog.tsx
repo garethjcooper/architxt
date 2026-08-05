@@ -6,16 +6,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Network } from 'lucide-react';
-import { serversApi } from '@/lib/api/client';
+import { Loader2, Network, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { serversApi, contextualGraphApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import type { Server, ContextualGraphBankConfig } from '@/lib/types';
+
+const MODEL_TYPE_LABELS: Record<string, string> = {
+  'entity-summary': 'Entity summary',
+  'entity-capabilities': 'Entity capabilities',
+  'edge-ctx': 'Edge context',
+  'discover': 'Discovery',
+};
+const ALL_MODEL_TYPES = Object.keys(MODEL_TYPE_LABELS);
 
 interface ServerGraphBanksDialogProps {
   server: Server | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onServerUpdated?: () => void;
+}
+
+function ensureRestriction(cfg: ContextualGraphBankConfig): NonNullable<ContextualGraphBankConfig['restriction']> {
+  return cfg.restriction || { import: {}, deploy: {} };
 }
 
 export function ServerGraphBanksDialog({
@@ -28,13 +40,15 @@ export function ServerGraphBanksDialog({
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [configs, setConfigs] = useState<Record<string, ContextualGraphBankConfig>>({});
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [cleaning, setCleaning] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!server || !open) return;
 
     const initial: Record<string, ContextualGraphBankConfig> = {};
     for (const cfg of server.contextual_graph_banks || []) {
-      initial[cfg.bank_id] = { ...cfg };
+      initial[cfg.bank_id] = JSON.parse(JSON.stringify(cfg));
     }
     setConfigs(initial);
 
@@ -93,6 +107,65 @@ export function ServerGraphBanksDialog({
     }));
   };
 
+  const setImportRestriction = (bankId: string, key: string, value: unknown) => {
+    setConfigs((prev) => {
+      const cfg = prev[bankId];
+      const restriction = ensureRestriction(cfg);
+      return {
+        ...prev,
+        [bankId]: {
+          ...cfg,
+          bank_id: bankId,
+          restriction: {
+            ...restriction,
+            import: { ...restriction.import, [key]: value },
+          },
+        },
+      };
+    });
+  };
+
+  const setDeployRestriction = (bankId: string, key: string, value: unknown) => {
+    setConfigs((prev) => {
+      const cfg = prev[bankId];
+      const restriction = ensureRestriction(cfg);
+      return {
+        ...prev,
+        [bankId]: {
+          ...cfg,
+          bank_id: bankId,
+          restriction: {
+            ...restriction,
+            deploy: { ...restriction.deploy, [key]: value },
+          },
+        },
+      };
+    });
+  };
+
+  const toggleModelType = (bankId: string, type: string) => {
+    setConfigs((prev) => {
+      const cfg = prev[bankId];
+      const restriction = ensureRestriction(cfg);
+      const current = restriction.deploy?.allowed_model_types || [];
+      const next = current.includes(type) ? current.filter((t: string) => t !== type) : [...current, type];
+      return {
+        ...prev,
+        [bankId]: {
+          ...cfg,
+          bank_id: bankId,
+          restriction: {
+            ...restriction,
+            deploy: { ...restriction.deploy, allowed_model_types: next },
+          },
+        },
+      };
+    });
+  };
+
+  const parsePatternCsv = (value: string): string[] =>
+    value.split(',').map((s) => s.trim()).filter(Boolean);
+
   const hasChanges = (() => {
     const initial = new Map((server.contextual_graph_banks || []).map((c) => [c.bank_id, c]));
     const next = new Map(Object.values(configs).map((c) => [c.bank_id, c]));
@@ -100,8 +173,7 @@ export function ServerGraphBanksDialog({
     for (const [bankId, cfg] of next) {
       const existing = initial.get(bankId);
       if (!existing) return true;
-      if (existing.mode !== cfg.mode) return true;
-      if (cfg.mode === 'auto' && existing.refresh_interval !== cfg.refresh_interval) return true;
+      if (JSON.stringify(existing) !== JSON.stringify(cfg)) return true;
     }
     return false;
   })();
@@ -130,9 +202,45 @@ export function ServerGraphBanksDialog({
     }
   };
 
+  const handleCleanBank = async (bankId: string, dryRun: boolean) => {
+    setCleaning((prev) => ({ ...prev, [bankId]: true }));
+    try {
+      const result = await contextualGraphApi.undeployBank(server.id, bankId, { dry_run: dryRun });
+      if (!result.success) {
+        toast.error(result.error || 'Clean failed');
+        return;
+      }
+      if (dryRun) {
+        toast.info(
+          `Dry run: ${result.target_count ?? 0} generated mental models would be deleted from ${bankId}.`,
+        );
+        return;
+      }
+      toast.success(
+        `Cleaned ${bankId}: deleted ${result.deleted_count ?? 0} models, cleared ${result.cleared?.nodes ?? 0} nodes / ${result.cleared?.edges ?? 0} edges, marked ${result.marked_stale?.nodes ?? 0} stale.`,
+      );
+      onServerUpdated?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Clean failed');
+    } finally {
+      setCleaning((prev) => ({ ...prev, [bankId]: false }));
+    }
+  };
+
+  const isAutoWithNoRestriction = (cfg: ContextualGraphBankConfig) => {
+    if (cfg.mode !== 'auto') return false;
+    const r = cfg.restriction;
+    if (!r) return true;
+    const deploy = r.deploy || {};
+    const importR = r.import || {};
+    const hasDeployCap = typeof deploy.max_models_per_run === 'number';
+    const hasImportCap = typeof importR.top_k_nodes === 'number';
+    return !hasDeployCap && !hasImportCap;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
             <Network className="h-5 w-5 text-emerald-400" />
@@ -155,54 +263,225 @@ export function ServerGraphBanksDialog({
               No banks found on this server.
             </div>
           ) : (
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+            <div className="space-y-2">
               {banks.map((bank) => {
                 const cfg = configs[bank.bank_id];
                 const enabled = !!cfg;
+                const isExpanded = !!expanded[bank.bank_id];
+                const restriction = ensureRestriction(cfg || {});
+                const importR = restriction.import || {};
+                const deploy = restriction.deploy || {};
+                const needsWarning = enabled && isAutoWithNoRestriction(cfg);
+
                 return (
                   <div
                     key={bank.bank_id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/[0.03]"
+                    className="rounded-lg border border-white/10 bg-white/[0.03] overflow-hidden"
                   >
-                    <Checkbox
-                      checked={enabled}
-                      onCheckedChange={() => toggleBank(bank.bank_id)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">
-                        {bank.name || bank.bank_id}
-                      </p>
-                      <p className="text-xs text-white/40 font-mono truncate">
-                        {bank.bank_id}
-                      </p>
+                    <div className="flex items-center gap-3 p-3">
+                      <Checkbox
+                        checked={enabled}
+                        onCheckedChange={() => toggleBank(bank.bank_id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">
+                          {bank.name || bank.bank_id}
+                        </p>
+                        <p className="text-xs text-white/40 font-mono truncate">
+                          {bank.bank_id}
+                        </p>
+                      </div>
+
+                      {enabled && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-white/50 whitespace-nowrap">Mode</Label>
+                            <select
+                              value={cfg.mode}
+                              onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
+                              className="h-8 rounded-md border border-white/20 bg-transparent text-white text-xs px-2 focus:border-emerald-400 focus:outline-none"
+                            >
+                              <option value="manual">Manual</option>
+                              <option value="auto">Auto</option>
+                            </select>
+                          </div>
+
+                          {cfg.mode === 'auto' && (
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-white/50 whitespace-nowrap">Interval</Label>
+                              <Input
+                                value={cfg.refresh_interval || ''}
+                                onChange={(e) => setInterval(bank.bank_id, e.target.value)}
+                                placeholder="10m"
+                                className="h-8 w-20 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                              />
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() =>
+                              setExpanded((prev) => ({
+                                ...prev,
+                                [bank.bank_id]: !prev[bank.bank_id],
+                              }))
+                            }
+                            className="inline-flex items-center justify-center h-7 w-7 rounded text-white/50 hover:text-white hover:bg-white/5"
+                            title="Restrictions"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                        </>
+                      )}
                     </div>
 
-                    {enabled && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-white/50 whitespace-nowrap">Mode</Label>
-                          <select
-                            value={cfg.mode}
-                            onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
-                            className="h-8 rounded-md border border-white/20 bg-transparent text-white text-xs px-2 focus:border-emerald-400 focus:outline-none"
-                          >
-                            <option value="manual">Manual</option>
-                            <option value="auto">Auto</option>
-                          </select>
-                        </div>
-
-                        {cfg.mode === 'auto' && (
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-white/50 whitespace-nowrap">Interval</Label>
-                            <Input
-                              value={cfg.refresh_interval || ''}
-                              onChange={(e) => setInterval(bank.bank_id, e.target.value)}
-                              placeholder="10m"
-                              className="h-8 w-20 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
-                            />
+                    {enabled && isExpanded && (
+                      <div className="px-4 pb-4 space-y-4 border-t border-white/10">
+                        {needsWarning && (
+                          <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 p-2.5 text-amber-200 text-xs">
+                            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <span>
+                              Auto-sync with no restrictions can provision many mental models. Set import limits and deploy caps below.
+                            </span>
                           </div>
                         )}
-                      </>
+
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-white/80 uppercase tracking-wide">Import limits</p>
+                            <div>
+                              <Label className="text-xs text-white/50">Top K nodes</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={importR.top_k_nodes ?? ''}
+                                onChange={(e) =>
+                                  setImportRestriction(
+                                    bank.bank_id,
+                                    'top_k_nodes',
+                                    e.target.value === '' ? undefined : parseInt(e.target.value, 10),
+                                  )
+                                }
+                                placeholder="100"
+                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/50">Min edge weight</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.1}
+                                value={importR.min_weight ?? ''}
+                                onChange={(e) =>
+                                  setImportRestriction(
+                                    bank.bank_id,
+                                    'min_weight',
+                                    e.target.value === '' ? undefined : parseFloat(e.target.value),
+                                  )
+                                }
+                                placeholder="0"
+                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/50">Include patterns (comma-separated regex)</Label>
+                              <Input
+                                value={(importR.include_patterns || []).join(', ')}
+                                onChange={(e) =>
+                                  setImportRestriction(bank.bank_id, 'include_patterns', parsePatternCsv(e.target.value))
+                                }
+                                placeholder="e.g. ^API:, Service"
+                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/50">Exclude patterns (comma-separated regex)</Label>
+                              <Input
+                                value={(importR.exclude_patterns || []).join(', ')}
+                                onChange={(e) =>
+                                  setImportRestriction(bank.bank_id, 'exclude_patterns', parsePatternCsv(e.target.value))
+                                }
+                                placeholder="e.g. temp-, noise"
+                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-white/80 uppercase tracking-wide">Deploy limits</p>
+                            <div>
+                              <Label className="text-xs text-white/50">Max models per run</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={deploy.max_models_per_run ?? ''}
+                                onChange={(e) =>
+                                  setDeployRestriction(
+                                    bank.bank_id,
+                                    'max_models_per_run',
+                                    e.target.value === '' ? undefined : parseInt(e.target.value, 10),
+                                  )
+                                }
+                                placeholder="50"
+                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/50">Model types</Label>
+                              <div className="flex flex-wrap gap-2 mt-1.5">
+                                {ALL_MODEL_TYPES.map((type) => (
+                                  <label
+                                    key={type}
+                                    className="inline-flex items-center gap-1.5 text-xs text-white/70 cursor-pointer"
+                                  >
+                                    <Checkbox
+                                      checked={(deploy.allowed_model_types || []).includes(type)}
+                                      onCheckedChange={() => toggleModelType(bank.bank_id, type)}
+                                    />
+                                    {MODEL_TYPE_LABELS[type]}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                          <div className="text-xs text-white/40">
+                            Defaults for auto: top 100 nodes, 50 entity-summary models per run.
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cleaning[bank.bank_id]}
+                              onClick={() => handleCleanBank(bank.bank_id, true)}
+                              className="h-7 text-[11px] text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                            >
+                              {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                              Dry-run clean
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cleaning[bank.bank_id]}
+                              onClick={() => {
+                                if (confirm(`Delete all contextual-graph mental models from ${bank.bank_id} and mark local graph nodes stale? Auto-sync will be disabled for this bank.`)) {
+                                  handleCleanBank(bank.bank_id, false);
+                                }
+                              }}
+                              className="h-7 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            >
+                              {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                              Clean bank
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 );

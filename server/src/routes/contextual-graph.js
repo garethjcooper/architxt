@@ -16,6 +16,7 @@ import {
 import { importHindsightSkeleton as defaultImportSkeleton } from '../services/contextual-graph/import-hindsight-skeleton.js';
 import { addContext as defaultAddContext } from '../services/contextual-graph/add-context.js';
 import { deleteGeneratedModels } from '../services/contextual-graph/delete-generated-models.js';
+import { undeployContextualGraphBank as defaultUndeployBank } from '../services/contextual-graph/undeploy-bank.js';
 import {
   fetchCandidatesFromModel as defaultFetchCandidates,
   ingestCandidates as defaultIngestCandidates,
@@ -60,6 +61,7 @@ export function createContextualGraphRouter({
   getSyncJob = defaultGetSyncJob,
   listSyncJobs = defaultListSyncJobs,
   cancelSyncJob = defaultCancelSyncJob,
+  undeployBank = defaultUndeployBank,
 } = {}) {
   const router = Router();
 
@@ -620,6 +622,83 @@ export function createContextualGraphRouter({
       ids: dryRun ? (result.ext_ids ?? []) : (result.deleted ?? []),
       failed: result.failed ?? [],
       cleared: result.cleared ?? { nodes: 0, edges: 0 },
+    };
+
+    if (!result.success) {
+      sendResponse({
+        res,
+        status: 500,
+        data: { ...responseData, error: result.error, code: result.code },
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: responseData,
+      logger,
+      method: req.method,
+      path: req.path,
+      duration,
+    });
+  });
+
+  /**
+   * @openapi
+   * /contextual-graph/undeploy-bank:
+   *   post:
+   *     summary: Undeploy every contextual-graph generated mental model from a bank and stop auto-sync
+   *     tags: [Contextual Graph]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [server_id, bank_id]
+   *             properties:
+   *               server_id: { type: integer }
+   *               bank_id: { type: string }
+   *               dry_run: { type: boolean }
+   *     responses:
+   *       200: { description: Bank undeployed or previewed }
+   *       400: { description: Missing or invalid scope }
+   */
+  router.post('/undeploy-bank', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'body');
+    if (!scope.valid) return;
+
+    const { serverId, bankId } = scope;
+    const dryRun = req.body.dry_run === true;
+
+    const result = await undeployBank(db, serverId, bankId, { dry_run: dryRun });
+
+    const duration = Date.now() - start;
+    logger.info('Undeploy contextual graph bank', {
+      serverId,
+      bankId,
+      dryRun,
+      targetCount: result.target_count ?? result.deleted?.length ?? 0,
+      deleted: result.deleted?.length ?? 0,
+      failed: result.failed?.length ?? 0,
+    });
+
+    const responseData = {
+      success: result.success,
+      dry_run: dryRun,
+      stopped_auto_sync: result.stopped_auto_sync ?? false,
+      target_count: result.target_count ?? result.deleted?.length ?? 0,
+      deleted_count: result.deleted?.length ?? 0,
+      deleted: result.deleted ?? [],
+      failed: result.failed ?? [],
+      cleared: result.cleared ?? { nodes: 0, edges: 0 },
+      marked_stale: result.marked_stale ?? { nodes: 0, edges: 0 },
     };
 
     if (!result.success) {

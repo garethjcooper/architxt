@@ -121,9 +121,13 @@ function buildRunner(deps) {
 
     try {
       await runStage(db, jobId, 'importing_skeleton', async () => {
+        const restriction = options.restriction?.import || {};
         const result = await importSkeleton(db, serverId, bankId, {
           min_count: options.min_count,
           min_weight: options.min_weight,
+          top_k_nodes: restriction.top_k_nodes,
+          include_patterns: restriction.include_patterns,
+          exclude_patterns: restriction.exclude_patterns,
         });
         if (!result.success) {
           throw new StageError(result.error, result.code || 'IMPORT_FAILED');
@@ -133,12 +137,17 @@ function buildRunner(deps) {
       });
 
       await runStage(db, jobId, 'deploying_models', async () => {
+        const restriction = options.restriction?.deploy || {};
         const deployOptions = {
           import_skeleton: false,
           run_discovery: options.run_discovery !== false,
           node_ids: options.node_ids,
           seed_node_ids: options.seed_node_ids,
           neighborhood: options.neighborhood,
+          allowed_model_types: restriction.allowed_model_types,
+          max_models_per_run: restriction.max_models_per_run,
+          include_node_ids: restriction.include_node_ids,
+          exclude_node_ids: restriction.exclude_node_ids,
         };
         const result = await addContext(db, serverId, bankId, deployOptions);
         if (!result.success) {

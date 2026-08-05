@@ -1390,4 +1390,22 @@ export const contextualGraphApi = {
         dry_run: options?.dry_run ?? false,
       }),
     }),
+
+  undeployBank: (serverId: number, bankId: string, options?: { dry_run?: boolean }) =>
+    fetchApi<{
+      success: boolean;
+      dry_run?: boolean;
+      stopped_auto_sync?: boolean;
+      target_count?: number;
+      deleted_count?: number;
+      deleted?: string[];
+      failed?: { ext_id: string; error: string }[];
+      cleared?: { nodes: number; edges: number };
+      marked_stale?: { nodes: number; edges: number };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/undeploy-bank', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
+    }),
 };
