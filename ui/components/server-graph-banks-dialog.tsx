@@ -202,22 +202,31 @@ export function ServerGraphBanksDialog({
     }
   };
 
-  const handleCleanBank = async (bankId: string, dryRun: boolean) => {
+  const handleCleanBank = async (bankId: string, dryRun: boolean, deleteLocalGraph: boolean) => {
     setCleaning((prev) => ({ ...prev, [bankId]: true }));
     try {
-      const result = await contextualGraphApi.undeployBank(server.id, bankId, { dry_run: dryRun });
+      const result = await contextualGraphApi.undeployBank(server.id, bankId, {
+        dry_run: dryRun,
+        delete_local_graph: deleteLocalGraph,
+      });
       if (!result.success) {
         toast.error(result.error || 'Clean failed');
         return;
       }
       if (dryRun) {
         toast.info(
-          `Dry run: ${result.target_count ?? 0} generated mental models would be deleted from ${bankId}.`,
+          `Dry run for ${bankId}: ${result.target_count ?? 0} generated mental models would be deleted. ` +
+            (deleteLocalGraph
+              ? `${result.deleted_local_graph?.nodes ?? 0} nodes / ${result.deleted_local_graph?.edges ?? 0} edges would be removed locally.`
+              : 'Local graph would be preserved.'),
         );
         return;
       }
       toast.success(
-        `Cleaned ${bankId}: deleted ${result.deleted_count ?? 0} models, cleared ${result.cleared?.nodes ?? 0} nodes / ${result.cleared?.edges ?? 0} edges, marked ${result.marked_stale?.nodes ?? 0} stale.`,
+        `Cleaned ${bankId}: deleted ${result.deleted_count ?? 0} models` +
+          (deleteLocalGraph
+            ? ` and removed ${result.deleted_local_graph?.nodes ?? 0} nodes / ${result.deleted_local_graph?.edges ?? 0} edges locally.`
+            : `, cleared ${result.cleared?.nodes ?? 0} nodes / ${result.cleared?.edges ?? 0} edges, marked ${result.marked_stale?.nodes ?? 0} stale.`),
       );
       onServerUpdated?.();
     } catch (err) {
@@ -459,7 +468,7 @@ export function ServerGraphBanksDialog({
                               variant="ghost"
                               size="sm"
                               disabled={cleaning[bank.bank_id]}
-                              onClick={() => handleCleanBank(bank.bank_id, true)}
+                              onClick={() => handleCleanBank(bank.bank_id, true, false)}
                               className="h-7 text-[11px] text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
                             >
                               {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
@@ -470,14 +479,28 @@ export function ServerGraphBanksDialog({
                               size="sm"
                               disabled={cleaning[bank.bank_id]}
                               onClick={() => {
-                                if (confirm(`Delete all contextual-graph mental models from ${bank.bank_id} and mark local graph nodes stale? Auto-sync will be disabled for this bank.`)) {
-                                  handleCleanBank(bank.bank_id, false);
+                                if (confirm(`Delete all contextual-graph mental models from ${bank.bank_id}? Local graph nodes will be marked stale but kept. Auto-sync will be disabled for this bank.`)) {
+                                  handleCleanBank(bank.bank_id, false, false);
                                 }
                               }}
                               className="h-7 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
                             >
                               {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
-                              Clean bank
+                              Clean models
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cleaning[bank.bank_id]}
+                              onClick={() => {
+                                if (confirm(`Delete all contextual-graph mental models AND remove the entire local context graph from ${bank.bank_id}? Auto-sync will be disabled for this bank.`)) {
+                                  handleCleanBank(bank.bank_id, false, true);
+                                }
+                              }}
+                              className="h-7 text-[11px] text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                            >
+                              {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                              Clean everything
                             </Button>
                           </div>
                         </div>
