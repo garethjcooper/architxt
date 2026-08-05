@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Grip, X } from 'lucide-react';
+import { Grip, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { GraphNode, GraphEdge } from '@/components/research-canvas';
+import type { GraphNode, GraphEdge } from '@/lib/api/client';
 
 export type DataBoxTab = 'data' | 'patch-config';
 
@@ -11,6 +11,8 @@ interface ModelRef {
   role?: string;
   ext_id?: string;
   attached_at?: string;
+  fetched_at?: string;
+  content_hash?: string;
 }
 
 interface ContextualGraphDataBoxProps {
@@ -23,6 +25,117 @@ interface ContextualGraphDataBoxProps {
 }
 
 const STORAGE_KEY = 'contextual-graph-data-box-position';
+
+const ROLE_LABELS: Record<string, string> = {
+  sys_entity_summary: 'Summary',
+  sys_entity_capabilities: 'Capabilities',
+  sys_edge_context: 'Edge context',
+  sys_discovery_context: 'Discovery context',
+};
+
+function formatDate(value?: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? value : d.toLocaleString();
+}
+
+function isObject(value: unknown): value is Record<string, any> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function renderValue(value: unknown): React.ReactNode {
+  if (value === undefined || value === null) return <span className="text-white/40 italic">null</span>;
+  if (typeof value === 'string') {
+    return value.trim().length === 0
+      ? <span className="text-white/40 italic">empty</span>
+      : <p className="whitespace-pre-wrap text-white/80">{value}</p>;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return <span className="font-mono text-white/80">{String(value)}</span>;
+  }
+  return (
+    <pre className="text-[11px] text-white/70 bg-black/20 rounded p-1.5 overflow-x-auto">
+      {JSON.stringify(value, null, 2)}
+    </pre>
+  );
+}
+
+function ModelRefSection({ ref, index, item }: { ref: ModelRef; index: number; item: GraphNode | GraphEdge }) {
+  const [expanded, setExpanded] = useState(true);
+  const role = ref.role || 'model';
+  const label = ROLE_LABELS[role] || role;
+  const properties = item.properties || {};
+
+  let body: React.ReactNode = null;
+  if (role === 'sys_entity_summary') {
+    body = renderValue(properties.summary);
+  } else if (role === 'sys_entity_capabilities') {
+    const capabilities = Array.isArray(properties.capabilities) ? properties.capabilities : [];
+    body =
+      capabilities.length === 0 ? (
+        <span className="text-white/40 italic">No capabilities stored.</span>
+      ) : (
+        <ul className="list-disc pl-4 space-y-1">
+          {capabilities.map((cap, i) => (
+            <li key={i} className="text-[11px] text-white/80">{renderValue(cap)}</li>
+          ))}
+        </ul>
+      );
+  } else if (role === 'sys_edge_context') {
+    const hasContent = properties.detail || properties.evidence || properties.label;
+    body = hasContent ? (
+      <div className="space-y-2">
+        {properties.label && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-white/40">label</div>
+            {renderValue(properties.label)}
+          </div>
+        )}
+        {properties.detail && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-white/40">detail</div>
+            {renderValue(properties.detail)}
+          </div>
+        )}
+        {properties.evidence && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-white/40">evidence</div>
+            {renderValue(properties.evidence)}
+          </div>
+        )}
+      </div>
+    ) : (
+      <span className="text-white/40 italic">No edge context stored.</span>
+    );
+  } else if (role === 'sys_discovery_context') {
+    body = (
+      <span className="text-white/50 italic">
+        Discovery context is attached to this seed. Discovered nodes and edges carry this model ref in their own provenance.
+      </span>
+    );
+  }
+
+  return (
+    <div className="rounded border border-white/5 bg-black/10 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left hover:bg-white/5 transition-colors"
+      >
+        {expanded ? <ChevronDown className="w-3 h-3 text-white/50" /> : <ChevronRight className="w-3 h-3 text-white/50" />}
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/20 text-white/60">
+          {label}
+        </span>
+        {ref.ext_id && (
+          <span className="text-[11px] font-mono text-white/50 truncate" title={ref.ext_id}>
+            {ref.ext_id}
+          </span>
+        )}
+      </button>
+      {expanded && <div className="px-2.5 pb-2.5 pt-1">{body}</div>}
+    </div>
+  );
+}
 
 export function ContextualGraphDataBox({
   open,
@@ -111,20 +224,18 @@ export function ContextualGraphDataBox({
     return () => window.removeEventListener('mousemove', handleMove);
   }, [dragState]);
 
-  const modelRefs: ModelRef[] = (item?.modelRefs && Array.isArray(item.modelRefs))
-    ? item.modelRefs
-    : (item as any)?.properties?.provenance?.model_refs ?? [];
+  const modelRefs: ModelRef[] = item?.modelRefs || (item as any)?.properties?.provenance?.model_refs || [];
 
   const nodeTimestamps = node
     ? {
-        created_at: (node as any).created_at,
-        updated_at: (node as any).updated_at,
+        created_at: node.properties?.created_at,
+        updated_at: node.properties?.updated_at,
       }
     : null;
   const edgeTimestamps = edge
     ? {
-        created_at: (edge as any).created_at,
-        updated_at: (edge as any).updated_at,
+        created_at: edge.properties?.created_at,
+        updated_at: edge.properties?.updated_at,
       }
     : null;
   const timestamps = nodeTimestamps || edgeTimestamps;
@@ -139,6 +250,14 @@ export function ContextualGraphDataBox({
     : edge
       ? `${edge.from} → ${edge.to}`
       : 'Select a node or edge on the canvas';
+
+  const rawProperties = item?.properties || {};
+  const hasStoredData =
+    rawProperties.summary ||
+    (Array.isArray(rawProperties.capabilities) && rawProperties.capabilities.length > 0) ||
+    rawProperties.detail ||
+    rawProperties.evidence ||
+    rawProperties.label;
 
   if (!open) return null;
 
@@ -205,26 +324,58 @@ export function ContextualGraphDataBox({
         )}
 
         {activeTab === 'data' && item && (
-          <div className="space-y-3">
-            <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Mental model output</div>
-            <div className="text-[11px] text-white/50 italic">
-              Retrieved mental-model content will appear here.
-            </div>
-            {modelRefs.length > 0 && (
-              <div className="space-y-1">
-                <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Attached models</div>
-                <div className="space-y-1">
-                  {modelRefs.map((ref, i) => (
-                    <div
-                      key={`${ref.ext_id ?? i}-${i}`}
-                      className="rounded border border-white/5 bg-black/10 px-2 py-1 text-[11px] text-white/70"
-                    >
-                      <span className="text-white/50">{ref.role || 'model'}</span>
-                      {ref.ext_id && <span className="ml-1.5 font-mono text-white/60">{ref.ext_id}</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="space-y-2">
+            {!hasStoredData && modelRefs.length === 0 ? (
+              <div className="text-[11px] text-white/50 italic">No mental-model data stored on this graph element.</div>
+            ) : (
+              <>
+                {modelRefs.map((ref, i) => (
+                  <ModelRefSection key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} ref={ref} index={i} item={item} />
+                ))}
+                {!modelRefs.length && hasStoredData && (
+                  <div className="space-y-2">
+                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Stored data</div>
+                    {rawProperties.summary && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-white/40">summary</div>
+                        {renderValue(rawProperties.summary)}
+                      </div>
+                    )}
+                    {Array.isArray(rawProperties.capabilities) && rawProperties.capabilities.length > 0 && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-white/40">capabilities</div>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {rawProperties.capabilities.map((cap, i) => (
+                            <li key={i} className="text-[11px] text-white/80">{renderValue(cap)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {(rawProperties.detail || rawProperties.evidence || rawProperties.label) && (
+                      <div className="space-y-2">
+                        {rawProperties.label && (
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-white/40">label</div>
+                            {renderValue(rawProperties.label)}
+                          </div>
+                        )}
+                        {rawProperties.detail && (
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-white/40">detail</div>
+                            {renderValue(rawProperties.detail)}
+                          </div>
+                        )}
+                        {rawProperties.evidence && (
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-white/40">evidence</div>
+                            {renderValue(rawProperties.evidence)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -238,7 +389,7 @@ export function ContextualGraphDataBox({
               <div className="space-y-1">
                 {modelRefs.map((ref, i) => (
                   <div
-                    key={`${ref.ext_id ?? i}-${i}`}
+                    key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`}
                     className="rounded border border-white/5 bg-black/10 px-2 py-1.5 text-[11px]"
                   >
                     <div className="flex items-center gap-1.5">
@@ -249,11 +400,11 @@ export function ContextualGraphDataBox({
                         <span className="font-mono text-white/70 truncate" title={ref.ext_id}>{ref.ext_id}</span>
                       )}
                     </div>
-                    {ref.attached_at && (
-                      <div className="text-[10px] text-white/40 mt-1">
-                        attached {new Date(ref.attached_at).toLocaleString()}
-                      </div>
-                    )}
+                    <div className="mt-1.5 space-y-0.5 text-[10px] text-white/40">
+                      {ref.attached_at && <div>attached {formatDate(ref.attached_at)}</div>}
+                      {ref.fetched_at && <div>fetched {formatDate(ref.fetched_at)}</div>}
+                      {ref.content_hash && <div className="font-mono truncate" title={ref.content_hash}>hash {ref.content_hash}</div>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -264,10 +415,10 @@ export function ContextualGraphDataBox({
                 <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Graph row</div>
                 <div className="rounded border border-white/5 bg-black/10 px-2 py-1.5 text-[11px] text-white/60 space-y-1">
                   {timestamps.created_at && (
-                    <div>created <span className="text-white/80">{new Date(timestamps.created_at).toLocaleString()}</span></div>
+                    <div>created <span className="text-white/80">{formatDate(timestamps.created_at)}</span></div>
                   )}
                   {timestamps.updated_at && (
-                    <div>updated <span className="text-white/80">{new Date(timestamps.updated_at).toLocaleString()}</span></div>
+                    <div>updated <span className="text-white/80">{formatDate(timestamps.updated_at)}</span></div>
                   )}
                 </div>
               </>

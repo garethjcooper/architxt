@@ -106,6 +106,7 @@ function backendNodeToGraphNode(node: BackendNode): GraphNode {
     source: node.properties.generated_by === 'contextual_graph' ? 'mental_model' : 'hindsight',
     mental_model_applied: !!node.properties.provenance?.model_refs && Array.isArray(node.properties.provenance.model_refs) && node.properties.provenance.model_refs.length > 0,
     modelRefs: node.properties.provenance?.model_refs,
+    properties: node.properties,
   };
 }
 
@@ -121,6 +122,7 @@ function backendEdgeToGraphEdge(edge: BackendEdge): GraphEdge {
     provenance: edge.properties.provenance ?? 'known',
     source: edge.properties.generated_by === 'contextual_graph' ? 'mental_model' : 'hindsight',
     modelRefs: edge.properties.provenance?.model_refs,
+    properties: edge.properties,
   };
 }
 
