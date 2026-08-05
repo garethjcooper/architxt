@@ -6,10 +6,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { InteractiveGraph, type GraphLayout, colorForType } from '@/components/research-canvas';
 import { GraphControls } from '@/app/explore/graph-controls';
 import { CardControls } from '@/app/explore/card-controls';
+import { ContextualGraphDataBox, type DataBoxTab } from './data-box';
 import { serversApi, contextualGraphApi, configApi, type GraphNode, type GraphEdge, type GraphCanvas } from '@/lib/api/client';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { createLogger } from '@/lib/logger';
@@ -408,6 +410,10 @@ export default function ContextualGraphPage() {
   const [edgeFilters, setEdgeFilters] = useState<Set<string>>(new Set());
   const [entitySelectMode, setEntitySelectMode] = useState(false);
   const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
+  const [dataBoxOpen, setDataBoxOpen] = useState(false);
+  const [dataBoxTab, setDataBoxTab] = useState<DataBoxTab>('node');
+  const [dataBoxNodeId, setDataBoxNodeId] = useState<string | null>(null);
+  const [dataBoxEdgeId, setDataBoxEdgeId] = useState<string | null>(null);
 
   const toggleNodeFilter = useCallback((type: string) => {
     setNodeFilters((prev) => {
@@ -432,6 +438,9 @@ export default function ContextualGraphPage() {
     setEdgeFilters(new Set());
     setSelectedEntityIds(new Set());
     setEntitySelectMode(false);
+    setDataBoxOpen(false);
+    setDataBoxNodeId(null);
+    setDataBoxEdgeId(null);
   }, [selectedBankId]);
 
   const selectOnCanvas = useCallback((id: string) => {
@@ -455,6 +464,10 @@ export default function ContextualGraphPage() {
       });
       return;
     }
+    setDataBoxNodeId(nodeId);
+    setDataBoxEdgeId(null);
+    setDataBoxTab('node');
+    setDataBoxOpen(true);
     selectOnCanvas(nodeId);
   }, [entitySelectMode, selectOnCanvas]);
 
@@ -491,6 +504,10 @@ export default function ContextualGraphPage() {
   }, [serverId, bankId, selectedEntityIds, loadGraph]);
 
   const handleSelectEdge = useCallback((edge: GraphEdge) => {
+    setDataBoxEdgeId(edge.id);
+    setDataBoxNodeId(null);
+    setDataBoxTab('edge');
+    setDataBoxOpen(true);
     selectOnCanvas(edge.id);
   }, [selectOnCanvas]);
 
@@ -889,6 +906,10 @@ export default function ContextualGraphPage() {
           <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
             <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
               <span className="font-medium text-sm">Graph</span>
+              <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+                <Switch checked={dataBoxOpen} onCheckedChange={(checked) => setDataBoxOpen(Boolean(checked))} size="sm" />
+                Data
+              </label>
             </div>
             <CardContent className="flex-1 min-h-0 p-0 relative">
               {serverId && bankId ? (
@@ -927,6 +948,16 @@ export default function ContextualGraphPage() {
                     highlightedEdgeId={hoveredEdgeId}
                     onCyReady={(cy) => { cyRef.current = cy; }}
                   />
+                  {dataBoxOpen && (
+                    <ContextualGraphDataBox
+                      open={dataBoxOpen}
+                      onOpenChange={setDataBoxOpen}
+                      node={dataBoxNodeId ? nodeById.get(dataBoxNodeId) ?? null : null}
+                      edge={dataBoxEdgeId ? graph.edges.find((e) => e.id === dataBoxEdgeId) ?? null : null}
+                      activeTab={dataBoxTab}
+                      onTabChange={setDataBoxTab}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-white/50 text-sm">
