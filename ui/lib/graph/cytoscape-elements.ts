@@ -11,6 +11,7 @@ export interface CytoscapeNodeData {
   backgroundColor: string;
   source: string;
   mental_model_applied?: boolean;
+  health?: 'green' | 'orange' | 'red';
 }
 
 export interface CytoscapeEdgeData {
@@ -23,6 +24,7 @@ export interface CytoscapeEdgeData {
   detail: string | undefined;
   cpDistance?: number;
   healthColor?: string;
+  health?: 'green' | 'orange' | 'red';
 }
 
 const HEALTH_COLORS = { green: '#10b981', orange: '#f97316', red: '#ef4444' };
@@ -40,6 +42,7 @@ function buildNodeData(n: GraphNode): CytoscapeNodeData {
     backgroundColor,
     source: n.source || 'hindsight',
     mental_model_applied: n.mental_model_applied ?? false,
+    health: n.health,
   };
 }
 
@@ -53,6 +56,7 @@ function buildEdgeData(e: GraphEdge): CytoscapeEdgeData {
     type: e.type,
     detail: e.detail,
     healthColor: e.health ? HEALTH_COLORS[e.health] : undefined,
+    health: e.health,
   };
 }
 
