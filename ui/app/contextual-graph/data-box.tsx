@@ -178,6 +178,18 @@ function ModelRefSection({ ref, index, item }: { ref: ModelRef; index: number; i
   );
 }
 
+function seedNameForRef(ref: ModelRef, nodes: GraphNode[]): string {
+  if (!ref.ext_id?.startsWith('discover-')) return ref.ext_id || 'unknown';
+  const seedId = ref.ext_id.slice('discover-'.length);
+  const seed = nodes.find((n) => n.id === seedId);
+  return seed?.label || seed?.name || seedId;
+}
+
+function isOwnDiscoverySeedRef(ref: ModelRef, item: GraphNode | GraphEdge | null): boolean {
+  if (!item || !ref.ext_id) return false;
+  return ref.ext_id === `discover-${item.id}`;
+}
+
 export function ContextualGraphDataBox({
   open,
   onOpenChange,
@@ -564,14 +576,21 @@ export function ContextualGraphDataBox({
               <div className="space-y-3">
                 {discoveryRefs.map((ref: ModelRef, i: number) => {
                   const { nodes, edges } = discoveredByRef(ref);
+                  const isOwnSeed = isOwnDiscoverySeedRef(ref, item);
+                  const seedName = seedNameForRef(ref, graph?.nodes || []);
                   return (
                     <div key={`${ref.ext_id ?? 'discover'}-${i}`} className="rounded border border-white/5 bg-black/10 px-2 py-1.5 space-y-2">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/20 text-white/60">{ref.role}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/20 text-white/60">
+                          {isOwnSeed ? 'Discovery seed' : 'Discovered by'}
+                        </span>
                         {ref.ext_id && <span className="font-mono text-white/70 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
                       </div>
+                      {!isOwnSeed && seedName && (
+                        <div className="text-[11px] text-white/80">{seedName}</div>
+                      )}
                       {ref.attached_at && <div className="text-[10px] text-white/40">attached {formatDate(ref.attached_at)}</div>}
-                      {nodes.length > 0 && (
+                      {isOwnSeed && nodes.length > 0 && (
                         <div>
                           <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Discovered nodes ({nodes.length})</div>
                           <div className="mt-1 space-y-1">
@@ -581,7 +600,7 @@ export function ContextualGraphDataBox({
                           </div>
                         </div>
                       )}
-                      {edges.length > 0 && (
+                      {isOwnSeed && edges.length > 0 && (
                         <div>
                           <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Discovered edges ({edges.length})</div>
                           <div className="mt-1 space-y-1">

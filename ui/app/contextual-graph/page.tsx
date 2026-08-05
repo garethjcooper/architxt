@@ -64,6 +64,23 @@ function getModelRefRoles(item: GraphNode | GraphEdge): string[] {
   return item.modelRefs.map((r) => r.role).filter((r): r is string => Boolean(r));
 }
 
+function getDiscoverySeedExtId(item: GraphNode | GraphEdge): string | undefined {
+  if (!item.modelRefs || !Array.isArray(item.modelRefs)) return undefined;
+  const seedRef = item.modelRefs.find((r) => r.role === 'sys_discovery_context' && r.ext_id === `discover-${item.id}`);
+  return seedRef?.ext_id;
+}
+
+function isDiscoverySeed(item: GraphNode | GraphEdge): boolean {
+  return !!getDiscoverySeedExtId(item);
+}
+
+function getDiscoveredByExtIds(item: GraphNode | GraphEdge): string[] {
+  if (!item.modelRefs || !Array.isArray(item.modelRefs)) return [];
+  return item.modelRefs
+    .filter((r) => r.role === 'sys_discovery_context' && r.ext_id && r.ext_id !== `discover-${item.id}`)
+    .map((r) => r.ext_id as string);
+}
+
 function computePatchHealth(
   item: GraphNode | GraphEdge,
   enabledRoles: Record<string, boolean>
@@ -780,12 +797,23 @@ export default function ContextualGraphPage() {
                     const typeLine = type && !entity.id.startsWith(`${type}:`) ? `${type}:${entity.id}` : entity.id;
                     const summary = entitySummaryText(entity);
                     const { health, missing, present, expected } = computePatchHealth(entity, patchRoles);
-                    const hasDiscovery = entity.modelRefs?.some((r) => r.role === 'sys_discovery_context');
-                    const discoveryBadgeColor = patchRoles['sys_discovery_context']
-                      ? hasDiscovery
-                        ? 'bg-emerald-500'
-                        : 'bg-red-500'
-                      : 'bg-white/20';
+                    const discoverySeed = isDiscoverySeed(entity);
+                    const discoveredBy = getDiscoveredByExtIds(entity);
+                    let discoveryBadgeColor: string;
+                    let discoveryBadgeTitle: string;
+                    if (!patchRoles['sys_discovery_context']) {
+                      discoveryBadgeColor = 'bg-white/20';
+                      discoveryBadgeTitle = 'Discovery context disabled';
+                    } else if (discoverySeed) {
+                      discoveryBadgeColor = 'bg-emerald-500';
+                      discoveryBadgeTitle = 'Discovery context attached (seed)';
+                    } else if (discoveredBy.length > 0) {
+                      discoveryBadgeColor = 'bg-amber-500';
+                      discoveryBadgeTitle = `Discovered by ${discoveredBy.join(', ')}`;
+                    } else {
+                      discoveryBadgeColor = 'bg-red-500';
+                      discoveryBadgeTitle = 'Discovery context missing';
+                    }
                     const selected = selectedEntityIds.has(entity.id);
                     return (
                       <button
@@ -843,11 +871,7 @@ export default function ContextualGraphPage() {
                             className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', healthColorClass(health))}
                           />
                           <span
-                            title={patchRoles['sys_discovery_context']
-                              ? hasDiscovery
-                                ? 'Discovery context attached'
-                                : 'Discovery context missing'
-                              : 'Discovery context disabled'}
+                            title={discoveryBadgeTitle}
                             className={cn('mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-help', discoveryBadgeColor)}
                           />
                         </div>
