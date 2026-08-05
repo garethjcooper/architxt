@@ -80,6 +80,20 @@ export interface ContextualGraphBankConfig {
   bank_id: string;
   mode: 'manual' | 'auto';
   refresh_interval?: string;
+  restriction?: {
+    import?: {
+      top_k_nodes?: number;
+      min_weight?: number;
+      include_patterns?: string[];
+      exclude_patterns?: string[];
+    };
+    deploy?: {
+      max_models_per_run?: number;
+      allowed_model_types?: string[];
+      include_node_ids?: string[];
+      exclude_node_ids?: string[];
+    };
+  };
 }
 
 export interface Server {

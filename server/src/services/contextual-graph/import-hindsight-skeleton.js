@@ -21,8 +21,11 @@ const logger = createLogger('contextual-graph-import');
  * @param {Object} [options]
  * @param {number} [options.min_count] - passed to Hindsight /entities/graph
  * @param {number} [options.min_weight] - minimum edge weight to import
+ * @param {number} [options.top_k_nodes] - only import the top K nodes by raw graph degree
+ * @param {string[]} [options.include_patterns] - regex/label patterns; if provided, only import matching labels
+ * @param {string[]} [options.exclude_patterns] - regex/label patterns; drop matching labels
  * @param {Function} [options.fetchGraph] - override for testing
- * @returns {Promise<{success: boolean, imported?: {nodes: number, edges: number}, error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, imported?: {nodes: number, edges: number}, skipped?: {nodes: number}, error?: string, code?: string}>}
  */
 export async function importHindsightSkeleton(
   db,
@@ -38,6 +41,8 @@ export async function importHindsightSkeleton(
   const minWeight = typeof options.min_weight === 'number' ? options.min_weight : 0;
   const now = new Date().toISOString();
 
+  const { includePatterns, excludePatterns } = buildPatternMatchers(options);
+
   const graphResult = await fetchGraph(serverId, bankId, { min_count: options.min_count });
   if (!graphResult.success || !graphResult.data) {
     logger.warn('Hindsight entity graph unavailable', { serverId, bankId, error: graphResult.error });
@@ -51,15 +56,57 @@ export async function importHindsightSkeleton(
   const rawNodes = Array.isArray(graphResult.data.nodes) ? graphResult.data.nodes : [];
   const rawEdges = Array.isArray(graphResult.data.edges) ? graphResult.data.edges : [];
 
+  // Pre-compute raw degrees for top-k filtering.
+  const rawDegrees = new Map();
+  for (const e of rawEdges) {
+    const source = e?.data?.source;
+    const target = e?.data?.target;
+    if (source) rawDegrees.set(source, (rawDegrees.get(source) || 0) + 1);
+    if (target) rawDegrees.set(target, (rawDegrees.get(target) || 0) + 1);
+  }
+
+  let candidateNodes = rawNodes.filter((n) => {
+    const label = n?.data?.label;
+    return typeof label === 'string' && label.trim() !== '';
+  });
+
+  // Apply label filters before ranking.
+  let skippedByFilter = 0;
+  candidateNodes = candidateNodes.filter((n) => {
+    const label = n.data.label;
+    if (excludePatterns.some((p) => p.test(label))) {
+      skippedByFilter += 1;
+      return false;
+    }
+    if (includePatterns.length > 0 && !includePatterns.some((p) => p.test(label))) {
+      skippedByFilter += 1;
+      return false;
+    }
+    return true;
+  });
+
+  // Apply top-k by degree if configured.
+  if (typeof options.top_k_nodes === 'number' && options.top_k_nodes > 0) {
+    candidateNodes = candidateNodes
+      .map((n) => ({ n, degree: rawDegrees.get(n.data.id) || 0 }))
+      .sort((a, b) => b.degree - a.degree || a.n.data.label.localeCompare(b.n.data.label))
+      .slice(0, options.top_k_nodes)
+      .map(({ n }) => n);
+  }
+
+  const allowedRawIds = new Set(candidateNodes.map((n) => n.data.id));
+
   const lookups = await buildArchitxtLookups(db);
 
   const hindsightIdToResolved = new Map();
   const seenNodeIds = new Set();
   let importedNodes = 0;
 
-  for (const n of rawNodes) {
+  for (const n of candidateNodes) {
     const data = n?.data;
     if (!data || !data.id || !data.label) continue;
+
+    if (!allowedRawIds.has(data.id)) continue;
 
     const resolved = await resolveHindsightNode(db, serverId, bankId, lookups, { label: data.label });
     if (!resolved) continue;
@@ -110,6 +157,9 @@ export async function importHindsightSkeleton(
   for (const e of rawEdges) {
     const data = e?.data;
     if (!data || !data.source || !data.target) continue;
+
+    // Skip edges whose endpoints were filtered out by top-k / include / exclude.
+    if (!allowedRawIds.has(data.source) || !allowedRawIds.has(data.target)) continue;
 
     const sourceId = hindsightIdToResolved.get(data.source);
     const targetId = hindsightIdToResolved.get(data.target);
@@ -246,14 +296,38 @@ export async function importHindsightSkeleton(
     restoredEdges,
     rawNodes: rawNodes.length,
     rawEdges: rawEdges.length,
+    skippedByFilter,
   });
 
   return {
     success: true,
     imported: { nodes: importedNodes, edges: importedEdges },
+    skipped: { nodes: skippedByFilter },
     stale: { nodes: staleNodes, edges: staleEdges },
     restored: { nodes: restoredNodes, edges: restoredEdges },
   };
+}
+
+function buildPatternMatchers(options) {
+  const includePatterns = (options.include_patterns || [])
+    .map((p) => compilePattern(p, 'include_patterns'))
+    .filter(Boolean);
+  const excludePatterns = (options.exclude_patterns || [])
+    .map((p) => compilePattern(p, 'exclude_patterns'))
+    .filter(Boolean);
+  return { includePatterns, excludePatterns };
+}
+
+function compilePattern(raw, fieldName) {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    return new RegExp(trimmed, 'i');
+  } catch (err) {
+    logger.warn('Invalid restriction pattern, ignoring', { fieldName, pattern: raw, error: err.message });
+    return null;
+  }
 }
 
 function buildAliases(resolved, rawLabel) {

@@ -3,7 +3,11 @@ import { config } from '../config.js';
 import { db } from '../db/connection.js';
 import { stmt } from '../cache.js';
 import { startContextualGraphSyncJob } from '../services/contextual-graph/sync-job.js';
-import { getAutoSyncBanks, parseRefreshInterval } from '../services/contextual-graph/server-bank-config.js';
+import {
+  getAutoSyncBanks,
+  parseRefreshInterval,
+  resolveRestrictions,
+} from '../services/contextual-graph/server-bank-config.js';
 
 const logger = createLogger('contextual-graph-sync-daemon');
 
@@ -68,8 +72,7 @@ function listAutoSyncBanks() {
       for (const bank of banks) {
         configs.push({
           server_id: server.svr_id,
-          bank_id: bank.bank_id,
-          refresh_interval: bank.refresh_interval,
+          ...bank,
         });
       }
     }
@@ -91,7 +94,8 @@ async function enqueueIfDue(configEntry) {
     return { skipped: true };
   }
 
-  const result = await startContextualGraphSyncJob(db, server_id, bank_id);
+  const restriction = resolveRestrictions(configEntry);
+  const result = await startContextualGraphSyncJob(db, server_id, bank_id, { restriction });
   if (!result.success && result.code === 'ALREADY_RUNNING') {
     logger.debug('Sync job already running for bank', { serverId: server_id, bankId: bank_id });
     return { skipped: true, reason: 'already_running' };
