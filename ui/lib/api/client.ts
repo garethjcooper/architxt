@@ -836,7 +836,7 @@ export interface GraphNode {
   provenance?: 'known' | 'discovered' | 'inferred' | string;
   mental_model_applied?: boolean;
   /** Attached contextual mental-model refs, if any. */
-  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
+  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string; fetched_at?: string; content_hash?: string }>;
   /** Raw contextual-graph properties stored on this node. */
   properties?: Record<string, any>;
   /** Patch health status (green = all roles present, orange = some, red = none). */
@@ -868,7 +868,7 @@ export interface GraphEdge {
   mental_model_applied?: boolean;
   source_fact_ids?: string[];
   /** Attached contextual mental-model refs, if any. */
-  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string }>;
+  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string; fetched_at?: string; content_hash?: string }>;
   /** Raw contextual-graph properties stored on this edge. */
   properties?: Record<string, any>;
   /** Patch health status (green = all roles present, orange = some, red = none). */

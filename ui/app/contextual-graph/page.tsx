@@ -81,6 +81,32 @@ function getDiscoveredByExtIds(item: GraphNode | GraphEdge): string[] {
     .map((r) => r.ext_id as string);
 }
 
+function formatRelative(value?: string | null): string {
+  if (!value) return 'never';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const now = Date.now();
+  const diff = now - d.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (diff < 0) return 'future';
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString();
+}
+
+function getLastRefreshedAt(item: GraphNode | GraphEdge): string | null {
+  const refs = item.modelRefs || [];
+  const timestamps = refs
+    .filter((r) => r.fetched_at)
+    .map((r) => new Date(r.fetched_at!).getTime())
+    .filter((t) => !isNaN(t));
+  return timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+}
+
 function computePatchHealth(
   item: GraphNode | GraphEdge,
   enabledRoles: Record<string, boolean>
@@ -796,6 +822,7 @@ export default function ContextualGraphPage() {
                     const type = entity.type || (typeof entity.id === 'string' && entity.id.includes(':') ? entity.id.split(':')[0] : 'entity');
                     const typeLine = type && !entity.id.startsWith(`${type}:`) ? `${type}:${entity.id}` : entity.id;
                     const summary = entitySummaryText(entity);
+                    const lastRefreshed = getLastRefreshedAt(entity);
                     const { health, missing, present, expected } = computePatchHealth(entity, patchRoles);
                     const discoverySeed = isDiscoverySeed(entity);
                     const discoveredBy = getDiscoveredByExtIds(entity);
@@ -860,6 +887,7 @@ export default function ContextualGraphPage() {
                             <div className="flex flex-col gap-0.5 min-w-0">
                               <div className="text-xs text-white/90 truncate">{entity.label || entity.name || entity.id}</div>
                               <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                              <div className="text-[10px] text-white/30 truncate" title={lastRefreshed ?? undefined}>refreshed {formatRelative(lastRefreshed)}</div>
                             </div>
                           </div>
                           <span
@@ -932,6 +960,7 @@ export default function ContextualGraphPage() {
                 {edgeViews.map(({ edge, sourceNode, targetNode }) => {
                   const active = hoveredEdgeId === edge.id;
                   const edgeColor = colorForType(edge.type || undefined);
+                  const lastRefreshed = getLastRefreshedAt(edge);
                   const { health, missing, present, expected } = computePatchHealth(edge, patchRoles);
                   return (
                     <button
@@ -961,6 +990,7 @@ export default function ContextualGraphPage() {
                       <div className="text-[10px] text-white/40 truncate">
                         {sourceNode?.name || sourceNode?.label || edge.from} → {targetNode?.name || targetNode?.label || edge.to}
                       </div>
+                      <div className="text-[10px] text-white/30 truncate" title={lastRefreshed ?? undefined}>refreshed {formatRelative(lastRefreshed)}</div>
                     </button>
                   );
                 })}
