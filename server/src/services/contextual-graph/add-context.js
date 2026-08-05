@@ -112,7 +112,7 @@ export async function addContext(
       const summarySpec = await deriveEntitySummaryModel(db, {
         id: node.cgn_id,
         displayName: node.cgn_properties?.display_name || node.cgn_id,
-      }, bankId);
+      });
       entitySummarySpecs.push(summarySpec);
     }
 
@@ -120,7 +120,7 @@ export async function addContext(
       const capabilitiesSpec = await deriveEntityCapabilitiesModel(db, {
         id: node.cgn_id,
         displayName: node.cgn_properties?.display_name || node.cgn_id,
-      }, bankId);
+      });
       entityCapabilitiesSpecs.push(capabilitiesSpec);
     }
   }
@@ -152,7 +152,7 @@ export async function addContext(
     }, {
       id: edge.cge_target_id,
       displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
-    }, bankId);
+    });
     edgeSpecs.push(spec);
   }
 
@@ -200,7 +200,7 @@ export async function addContext(
       discoverSpecs.push(await deriveDiscoverContextModel(db, {
         id: seedId,
         displayName: seedNode?.cgn_properties?.display_name || seedId,
-      }, neighbors, bankId));
+      }, neighbors));
     } else {
       logger.info('Skipping duplicate discover model for seed', { serverId, bankId, seedId });
     }

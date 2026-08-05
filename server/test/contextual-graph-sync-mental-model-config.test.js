@@ -73,7 +73,7 @@ describe('syncContextualMentalModelConfig', () => {
   it('skips when local config matches Hindsight', async () => {
     seedNodeWithRef(db);
 
-    const spec = await deriveEntitySummaryModel(db, { id: NODE_ID, displayName: 'Billing Service' }, bankId);
+    const spec = await deriveEntitySummaryModel(db, { id: NODE_ID, displayName: 'Billing Service' });
     const composed = await composeMentalModelPrompt(db, 'sys_entity_summary', spec.source_query);
 
     const result = await syncContextualMentalModelConfig(db, serverId, bankId, {

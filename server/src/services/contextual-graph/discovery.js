@@ -135,11 +135,11 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
     entitySpecs.push(await deriveEntitySummaryModel(db, {
       id: candidate.id,
       displayName: candidate.displayName,
-    }, bankId));
+    }));
     entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
       id: candidate.id,
       displayName: candidate.displayName,
-    }, bankId));
+    }));
 
     if (Array.isArray(candidate.hypothesizedEdges)) {
       for (const he of candidate.hypothesizedEdges) {
@@ -152,7 +152,7 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
         }, {
           id: he.target,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
-        }, bankId));
+        }));
 
         const edgeId = buildUndirectedEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
@@ -175,11 +175,11 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
       entitySpecs.push(await deriveEntitySummaryModel(db, {
         id: existing.cgn_id,
         displayName: existing.cgn_properties?.display_name || existing.cgn_id,
-      }, bankId));
+      }));
       entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
         id: existing.cgn_id,
         displayName: existing.cgn_properties?.display_name || existing.cgn_id,
-      }, bankId));
+      }));
     }
 
     if (Array.isArray(candidate.hypothesized_edges)) {
@@ -193,7 +193,7 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
         }, {
           id: he.target,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
-        }, bankId));
+        }));
 
         const edgeId = buildUndirectedEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
