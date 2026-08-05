@@ -5,7 +5,13 @@ import { Grip, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { GraphNode, GraphEdge } from '@/components/research-canvas';
 
-export type DataBoxTab = 'node' | 'edge';
+export type DataBoxTab = 'data' | 'patch-config';
+
+interface ModelRef {
+  role?: string;
+  ext_id?: string;
+  attached_at?: string;
+}
 
 interface ContextualGraphDataBoxProps {
   open: boolean;
@@ -46,6 +52,8 @@ export function ContextualGraphDataBox({
     startMouse: { x: number; y: number };
     startPos: { x: number; y: number };
   } | null>(null);
+
+  const item = (node || edge) as (GraphNode | GraphEdge) | null;
 
   useEffect(() => {
     latestPositionRef.current = position;
@@ -103,16 +111,42 @@ export function ContextualGraphDataBox({
     return () => window.removeEventListener('mousemove', handleMove);
   }, [dragState]);
 
-  if (!open) return null;
+  const modelRefs: ModelRef[] = (item?.modelRefs && Array.isArray(item.modelRefs))
+    ? item.modelRefs
+    : (item as any)?.properties?.provenance?.model_refs ?? [];
 
-  const title = node ? (node.label || node.name || node.id) : edge ? (edge.label || edge.type || edge.id) : 'No selection';
-  const subtitle = node ? node.id : edge ? `${edge.from} → ${edge.to}` : 'Select a node or edge on the canvas';
+  const nodeTimestamps = node
+    ? {
+        created_at: (node as any).created_at,
+        updated_at: (node as any).updated_at,
+      }
+    : null;
+  const edgeTimestamps = edge
+    ? {
+        created_at: (edge as any).created_at,
+        updated_at: (edge as any).updated_at,
+      }
+    : null;
+  const timestamps = nodeTimestamps || edgeTimestamps;
+
+  const title = node
+    ? (node.label || node.name || node.id)
+    : edge
+      ? (edge.detail || edge.label || edge.type || edge.id)
+      : 'No selection';
+  const subtitle = node
+    ? node.id
+    : edge
+      ? `${edge.from} → ${edge.to}`
+      : 'Select a node or edge on the canvas';
+
+  if (!open) return null;
 
   return (
     <div
       ref={panelRef}
       className={cn(
-        'absolute z-20 w-[24rem] rounded-xl border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm shadow-2xl overflow-hidden',
+        'absolute z-20 w-[26rem] rounded-xl border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm shadow-2xl overflow-hidden',
         dragState?.dragging ? 'cursor-grabbing select-none' : 'cursor-default'
       )}
       style={position ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' } : { left: 16, top: 16 }}
@@ -126,27 +160,27 @@ export function ContextualGraphDataBox({
           <div className="flex items-center gap-1 mr-1">
             <button
               type="button"
-              onClick={() => onTabChange('node')}
+              onClick={() => onTabChange('data')}
               className={cn(
                 'text-[10px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap',
-                activeTab === 'node'
+                activeTab === 'data'
                   ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                   : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
               )}
             >
-              Node
+              Data
             </button>
             <button
               type="button"
-              onClick={() => onTabChange('edge')}
+              onClick={() => onTabChange('patch-config')}
               className={cn(
                 'text-[10px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap',
-                activeTab === 'edge'
+                activeTab === 'patch-config'
                   ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                   : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
               )}
             >
-              Edge
+              Patch Config
             </button>
           </div>
           <button
@@ -165,11 +199,81 @@ export function ContextualGraphDataBox({
         <div className="text-[10px] text-white/40 truncate" title={subtitle}>{subtitle}</div>
       </div>
 
-      <div className="max-h-[min(360px,55vh)] overflow-y-auto p-3">
-        <div className="text-[11px] text-white/50 italic">
-          {activeTab === 'node' && (node ? 'Node details will appear here.' : 'Select a node to view details.')}
-          {activeTab === 'edge' && (edge ? 'Edge details will appear here.' : 'Select an edge to view details.')}
-        </div>
+      <div className="max-h-[min(360px,55vh)] overflow-y-auto p-3 space-y-3">
+        {!item && (
+          <div className="text-[11px] text-white/50 italic">Select a node or edge to view details.</div>
+        )}
+
+        {activeTab === 'data' && item && (
+          <div className="space-y-3">
+            <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Mental model output</div>
+            <div className="text-[11px] text-white/50 italic">
+              Retrieved mental-model content will appear here.
+            </div>
+            {modelRefs.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Attached models</div>
+                <div className="space-y-1">
+                  {modelRefs.map((ref, i) => (
+                    <div
+                      key={`${ref.ext_id ?? i}-${i}`}
+                      className="rounded border border-white/5 bg-black/10 px-2 py-1 text-[11px] text-white/70"
+                    >
+                      <span className="text-white/50">{ref.role || 'model'}</span>
+                      {ref.ext_id && <span className="ml-1.5 font-mono text-white/60">{ref.ext_id}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'patch-config' && item && (
+          <div className="space-y-3">
+            <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Model refs</div>
+            {modelRefs.length === 0 ? (
+              <div className="text-[11px] text-white/50 italic">No mental-model refs attached.</div>
+            ) : (
+              <div className="space-y-1">
+                {modelRefs.map((ref, i) => (
+                  <div
+                    key={`${ref.ext_id ?? i}-${i}`}
+                    className="rounded border border-white/5 bg-black/10 px-2 py-1.5 text-[11px]"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/20 text-white/60">
+                        {ref.role || 'model'}
+                      </span>
+                      {ref.ext_id && (
+                        <span className="font-mono text-white/70 truncate" title={ref.ext_id}>{ref.ext_id}</span>
+                      )}
+                    </div>
+                    {ref.attached_at && (
+                      <div className="text-[10px] text-white/40 mt-1">
+                        attached {new Date(ref.attached_at).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {timestamps && (
+              <>
+                <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">Graph row</div>
+                <div className="rounded border border-white/5 bg-black/10 px-2 py-1.5 text-[11px] text-white/60 space-y-1">
+                  {timestamps.created_at && (
+                    <div>created <span className="text-white/80">{new Date(timestamps.created_at).toLocaleString()}</span></div>
+                  )}
+                  {timestamps.updated_at && (
+                    <div>updated <span className="text-white/80">{new Date(timestamps.updated_at).toLocaleString()}</span></div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

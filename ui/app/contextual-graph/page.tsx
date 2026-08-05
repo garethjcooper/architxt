@@ -411,7 +411,7 @@ export default function ContextualGraphPage() {
   const [entitySelectMode, setEntitySelectMode] = useState(false);
   const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
   const [dataBoxOpen, setDataBoxOpen] = useState(false);
-  const [dataBoxTab, setDataBoxTab] = useState<DataBoxTab>('node');
+  const [dataBoxTab, setDataBoxTab] = useState<DataBoxTab>('data');
   const [dataBoxNodeId, setDataBoxNodeId] = useState<string | null>(null);
   const [dataBoxEdgeId, setDataBoxEdgeId] = useState<string | null>(null);
 
@@ -466,7 +466,7 @@ export default function ContextualGraphPage() {
     }
     setDataBoxNodeId(nodeId);
     setDataBoxEdgeId(null);
-    setDataBoxTab('node');
+    setDataBoxTab('data');
     setDataBoxOpen(true);
     selectOnCanvas(nodeId);
   }, [entitySelectMode, selectOnCanvas]);
@@ -506,7 +506,7 @@ export default function ContextualGraphPage() {
   const handleSelectEdge = useCallback((edge: GraphEdge) => {
     setDataBoxEdgeId(edge.id);
     setDataBoxNodeId(null);
-    setDataBoxTab('edge');
+    setDataBoxTab('data');
     setDataBoxOpen(true);
     selectOnCanvas(edge.id);
   }, [selectOnCanvas]);
