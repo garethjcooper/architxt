@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns } from '../types';
+import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -329,12 +329,12 @@ export const tagsApi = {
 export const serversApi = {
   list: () => fetchApi<Server[]>('/servers'),
   get: (id: number) => fetchApi<Server>(`/servers/${id}`),
-  create: (data: { base_url: string; name?: string; api_key?: string; api_version?: string }) => 
+  create: (data: { base_url: string; name?: string; api_key?: string; api_version?: string; contextual_graph_banks?: ContextualGraphBankConfig[] }) => 
     fetchApi<{ id: number }>('/servers', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id: number, data: { base_url?: string; name?: string; api_key?: string; api_version?: string }) => 
+  update: (id: number, data: { base_url?: string; name?: string; api_key?: string; api_version?: string; contextual_graph_banks?: ContextualGraphBankConfig[] }) => 
     fetchApi<void>(`/servers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

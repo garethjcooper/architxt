@@ -16,6 +16,7 @@ interface Server {
   name: string;
   api_key: string | null;
   api_version: string | null;
+  contextual_graph_banks: { bank_id: string; mode: 'manual' | 'auto'; refresh_interval?: string }[];
   created_at: string;
   updated_at: string;
 }
@@ -151,6 +152,31 @@ export function ViewServerDialog({
 
           {/* Read-only Metadata */}
           <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
+            <div className="col-span-2 space-y-2">
+              <p className="text-xs uppercase text-white/50 font-medium">Contextual Graph Banks</p>
+              {(server.contextual_graph_banks || []).length === 0 ? (
+                <p className="text-sm text-white/40">None configured.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {(server.contextual_graph_banks || []).map((cfg) => (
+                    <span
+                      key={cfg.bank_id}
+                      className={[
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border",
+                        cfg.mode === 'auto'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : 'bg-neutral-500/10 text-neutral-300 border-neutral-500/30',
+                      ].join(' ')}
+                      title={cfg.mode === 'auto' ? `Auto sync${cfg.refresh_interval ? ` (${cfg.refresh_interval})` : ''}` : 'Manual only'}
+                    >
+                      {cfg.bank_id}
+                      <span className="text-white/40">·{cfg.mode === 'auto' ? 'auto' : 'manual'}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
               <p className="text-xs uppercase text-white/50 font-medium">Server ID</p>
               <p className="text-sm text-white font-mono">{server.id}</p>

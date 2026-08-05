@@ -76,12 +76,19 @@ export interface Tag {
   updated_at: string;
 }
 
+export interface ContextualGraphBankConfig {
+  bank_id: string;
+  mode: 'manual' | 'auto';
+  refresh_interval?: string;
+}
+
 export interface Server {
   id: number;
   base_url: string;
   name: string;
   api_key: string | null;
   api_version: string | null;
+  contextual_graph_banks: ContextualGraphBankConfig[];
   created_at: string;
   updated_at: string;
 }
