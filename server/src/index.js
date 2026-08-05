@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { fork, execSync } from 'child_process';
+import { fork } from 'child_process';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { createLogger } from './utils/logger.js';
@@ -40,9 +40,11 @@ try {
 let daemon = null;
 let hindsightPollDaemon = null;
 let contextualGraphRefreshDaemon = null;
+let contextualGraphSyncDaemon = null;
 let daemonRestartTimer = null;
 let hindsightPollRestartTimer = null;
 let contextualGraphRefreshRestartTimer = null;
+let contextualGraphSyncRestartTimer = null;
 const DAEMON_RESTART_DELAY_MS = 5000;
 
 
@@ -169,6 +171,46 @@ function spawnContextualGraphRefreshDaemon() {
 }
 
 /**
+ * Spawn the contextual-graph sync daemon as a child process
+ * Controlled by config.contextualGraph.sync_daemon.enabled (default: false)
+ */
+function spawnContextualGraphSyncDaemon() {
+  if (!config.contextualGraph?.sync_daemon?.enabled) {
+    logger.info('Contextual-graph sync daemon disabled via config');
+    return null;
+  }
+
+  const daemonPath = path.join(__dirname, 'daemons', 'contextual-graph-sync-daemon.js');
+  const child = fork(daemonPath, [], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  logger.info('Contextual-graph sync daemon spawned', { pid: child.pid, path: daemonPath });
+
+  child.on('exit', (code, signal) => {
+    logger.warn('Contextual-graph sync daemon exited', { code, signal, pid: child.pid });
+
+    if (contextualGraphSyncDaemon === child) {
+      contextualGraphSyncDaemon = null;
+    }
+
+    if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
+      logger.info(`Contextual-graph sync daemon restart scheduled in ${DAEMON_RESTART_DELAY_MS}ms`);
+      contextualGraphSyncRestartTimer = setTimeout(() => {
+        contextualGraphSyncDaemon = spawnContextualGraphSyncDaemon();
+      }, DAEMON_RESTART_DELAY_MS);
+    }
+  });
+
+  child.on('error', (err) => {
+    logger.error('Contextual-graph sync daemon error', { error: err.message, pid: child.pid });
+  });
+
+  return child;
+}
+
+/**
  * Stop a specific daemon by child process ref
  */
 function stopChildDaemon(child, name, signal = 'SIGTERM') {
@@ -206,10 +248,15 @@ function stopDaemon(signal = 'SIGTERM') {
     clearTimeout(contextualGraphRefreshRestartTimer);
     contextualGraphRefreshRestartTimer = null;
   }
+  if (contextualGraphSyncRestartTimer) {
+    clearTimeout(contextualGraphSyncRestartTimer);
+    contextualGraphSyncRestartTimer = null;
+  }
   const promises = [
     stopChildDaemon(daemon, 'Extract daemon', signal),
     stopChildDaemon(hindsightPollDaemon, 'Hindsight poll daemon', signal),
     stopChildDaemon(contextualGraphRefreshDaemon, 'Contextual-graph refresh daemon', signal),
+    stopChildDaemon(contextualGraphSyncDaemon, 'Contextual-graph sync daemon', signal),
   ];
   return Promise.all(promises);
 }
@@ -291,6 +338,7 @@ server.headersTimeout = 120000;
 daemon = spawnDaemon();
 hindsightPollDaemon = spawnHindsightPollDaemon();
 contextualGraphRefreshDaemon = spawnContextualGraphRefreshDaemon();
+contextualGraphSyncDaemon = spawnContextualGraphSyncDaemon();
 
 // Graceful shutdown
 let isShuttingDown = false;

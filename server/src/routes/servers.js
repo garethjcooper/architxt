@@ -28,6 +28,7 @@ const toApiServer = (dbRow) => ({
   name: dbRow.svr_name,
   api_key: dbRow.svr_api_key,
   api_version: dbRow.svr_api_version,
+  contextual_graph_banks: dbRow.svr_contextual_graph_banks || [],
   created_at: dbRow.svr_created_at,
   updated_at: dbRow.svr_updated_at
 });
@@ -162,7 +163,8 @@ router.post('/', async (req, res) => {
     svr_base_url: urlCheck.value,
     svr_name: req.body.name || null,
     svr_api_key: req.body.api_key || null,
-    svr_api_version: req.body.api_version || null
+    svr_api_version: req.body.api_version || null,
+    svr_contextual_graph_banks: req.body.contextual_graph_banks
   });
   
   handleCrudResult({
@@ -246,7 +248,8 @@ router.put('/:id', async (req, res) => {
     svr_base_url: req.body.base_url,
     svr_name: req.body.name,
     svr_api_key: req.body.api_key,
-    svr_api_version: req.body.api_version
+    svr_api_version: req.body.api_version,
+    svr_contextual_graph_banks: req.body.contextual_graph_banks
   });
   
   handleCrudResult({

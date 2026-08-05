@@ -89,6 +89,7 @@ CREATE TABLE servers (
   svr_name TEXT,
   svr_api_key TEXT,
   svr_api_version TEXT,
+  svr_contextual_graph_banks JSON,
   svr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   svr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

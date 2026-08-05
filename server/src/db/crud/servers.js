@@ -1,10 +1,11 @@
 import { createBaseCrud } from '../base.js';
 import { stmt } from '../../cache.js';
 import { requireString, requireInt, dbExec } from '../../utils/db-helpers.js';
+import { validateContextualGraphBanks } from '../../services/contextual-graph/server-bank-config.js';
 
 const TABLE = 'servers';
 const PK = 'svr_id';
-const JSON_FIELDS = [];  // No JSON fields in this table
+const JSON_FIELDS = ['svr_contextual_graph_banks'];  // Stored as JSON array
 
 // Use base for generic operations with integer primary key
 const base = createBaseCrud(TABLE, PK, JSON_FIELDS, { pkType: 'integer' });
@@ -26,12 +27,13 @@ export const createServer = (db, data) => dbExec(() => {
   // This should already be validated by route layer
   if (!baseUrl) throw new Error('Internal: svr_base_url is required');
   
-  const sql = `INSERT INTO ${TABLE} (svr_base_url, svr_name, svr_api_key, svr_api_version) VALUES (?, ?, ?, ?)`;
+  const sql = `INSERT INTO ${TABLE} (svr_base_url, svr_name, svr_api_key, svr_api_version, svr_contextual_graph_banks) VALUES (?, ?, ?, ?, ?)`;
   const result = stmt(db, sql).run(
     baseUrl,
     data.svr_name || null,
     data.svr_api_key || null,
-    data.svr_api_version || null
+    data.svr_api_version || null,
+    data.svr_contextual_graph_banks !== undefined ? JSON.stringify(data.svr_contextual_graph_banks) : null
   );
   
   return result.lastInsertRowid;
@@ -68,6 +70,15 @@ export const updateServer = (db, id, data) => dbExec(() => {
   if (data.svr_api_version !== undefined) {
     updates.push('svr_api_version = ?');
     values.push(data.svr_api_version || null);
+  }
+  
+  if (data.svr_contextual_graph_banks !== undefined) {
+    const validated = validateContextualGraphBanks(data.svr_contextual_graph_banks);
+    if (!validated.success) {
+      throw new Error(validated.error);
+    }
+    updates.push('svr_contextual_graph_banks = ?');
+    values.push(JSON.stringify(validated.data));
   }
   
   if (updates.length === 0) {
