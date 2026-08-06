@@ -76,7 +76,7 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: {} });
 
     assert.equal(result.success, true);
@@ -114,7 +114,7 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: {} });
 
     assert.equal(result.success, true);
@@ -149,7 +149,7 @@ describe('addContext', () => {
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: {} });
 
     assert.equal(result.success, true);
@@ -176,7 +176,7 @@ describe('addContext', () => {
       fetchGraph,
       deployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: { top_k_neighbors: 5 } });
 
     assert.equal(result.success, true);
@@ -201,7 +201,7 @@ describe('addContext', () => {
     await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
       deployBatch,
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: {} });
 
     const { getNode } = await import('../src/db/crud/contextual-graph.js');
@@ -231,7 +231,7 @@ describe('addContext', () => {
       fetchGraph,
       deployBatch: firstDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: { top_k_neighbors: 5 } });
 
     const discoverExtId = firstDeployed.find((id) => id === 'discover-svc:SVC-005');
@@ -247,7 +247,7 @@ describe('addContext', () => {
       fetchGraph,
       deployBatch: secondDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: { top_k_neighbors: 5 },
       import_skeleton: false });
 

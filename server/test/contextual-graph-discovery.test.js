@@ -73,7 +73,7 @@ describe('addContext discovery integration', () => {
       fetchGraph,
       deployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: { top_k_neighbors: 5 },
       import_skeleton: false });
 
@@ -108,7 +108,7 @@ describe('addContext discovery integration', () => {
       fetchGraph,
       deployBatch: firstDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: { top_k_neighbors: 5 },
       import_skeleton: false });
 
@@ -125,7 +125,7 @@ describe('addContext discovery integration', () => {
       fetchGraph,
       deployBatch: secondDeployBatch,
       seed_node_ids: ['svc:SVC-005'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
  neighborhood: { top_k_neighbors: 5 },
       import_skeleton: false });
 

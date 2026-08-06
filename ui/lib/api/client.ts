@@ -1270,9 +1270,8 @@ export const contextualGraphApi = {
     min_weight?: number;
     seed_node_ids?: string[];
     node_ids?: string[];
-    run_discovery?: boolean;
     import_skeleton?: boolean;
-    neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number; run_discovery?: boolean };
+    neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number };
   }) =>
     fetchApi<{
       success: boolean;
@@ -1458,7 +1457,6 @@ export const contextualGraphApi = {
   },
 
   startSyncJob: (serverId: number, bankId: string, options?: {
-    run_discovery?: boolean;
     node_ids?: string[];
     seed_node_ids?: string[];
     min_count?: number;
