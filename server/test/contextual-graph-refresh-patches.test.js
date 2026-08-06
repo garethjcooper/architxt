@@ -204,4 +204,35 @@ describe('refreshContextualGraphPatches', () => {
     const node = getNode(db, serverId, bankId, 'svc-001').data;
     assert.equal(node.properties.summary, 'Same summary.');
   });
+
+  it('skips newly deployed models and marks them pending_build', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    // Return empty content: if the model were fetched normally this would throw.
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content: '' }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, {
+      listAllMentalModels: injectedList,
+      newlyDeployedExtIds: ['entity-summary-svc-001'],
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedBuilding, 1);
+    assert.equal(result.stats.applied, 0);
+    assert.equal(result.stats.failed, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    const ref = node.properties.provenance.model_refs[0];
+    assert.equal(ref.last_refresh_status, 'pending_build');
+    assert.equal(ref.content_hash, undefined);
+  });
 });
