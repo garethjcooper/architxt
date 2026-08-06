@@ -185,12 +185,21 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
  * prompt/config changed: pushing a config update does not automatically produce new
  * content, so the caller must request a refresh for changed models.
  *
+ * If `newlyDeployedExtIds` is provided, those models are skipped without error and
+ * marked as `pending_build` on the local scope. They were just submitted to Hindsight
+ * and are not expected to have usable content yet, so attempting to fetch would only
+ * produce "can not read envelope" errors. The next refresh (or poll daemon) will
+ * pick them up once they are ready.
+ *
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
  * @param {object} [options]
  * @param {boolean} [options.dryRun=false] - when true, compare but do not apply.
  * @param {string[]} [options.rerunExtIds=[]] - ext_ids to refresh in Hindsight before fetch.
+ * @param {string[]} [options.newlyDeployedExtIds=[]] - ext_ids that were just deployed and
+ *   whose Hindsight content is not yet ready. They are skipped without error and marked
+ *   as 'pending_build' on the local scope so a later refresh can fetch them.
  * @param {Function} [options.listAllMentalModels]
  * @param {Function} [options.refreshMentalModel]
  * @returns {Promise<{success: boolean, stats: object, error?: string}>}
@@ -198,6 +207,9 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
 export async function refreshContextualGraphPatches(db, serverId, bankId, options = {}) {
   const dryRun = options.dryRun === true;
   const rerunExtIds = Array.isArray(options.rerunExtIds) ? options.rerunExtIds : [];
+  const newlyDeployedExtIds = new Set(
+    Array.isArray(options.newlyDeployedExtIds) ? options.newlyDeployedExtIds : [],
+  );
   const timestamp = new Date().toISOString();
   const patchRoles = config.contextualGraph?.patchRoles || {};
   const listModels = options.listAllMentalModels || listAllMentalModels;
@@ -208,6 +220,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     matched: 0,
     skippedDisabled: 0,
     skippedUnchanged: 0,
+    skippedBuilding: 0,
     applied: 0,
     failed: 0,
     rerunRequested: 0,
@@ -221,6 +234,19 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     const localRefs = extractModelRefsFromDb(db, serverId, bankId);
     if (localRefs.size === 0) {
       return { success: true, stats };
+    }
+
+    // Mark any models that were deployed in this sync as still building. We do
+    // this before the Hindsight list so we don't accidentally treat a missing
+    // entry as a failure, and so the next refresh knows these need content.
+    for (const extId of newlyDeployedExtIds) {
+      const scope = localRefs.get(extId);
+      if (!scope) continue;
+      stats.skippedBuilding += 1;
+      updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, {
+        status: 'pending_build',
+        error: 'Model is still building after initial deploy',
+      });
     }
 
     // Explicitly request fresh Hindsight output for models whose config just changed.
@@ -266,6 +292,12 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const scope = localRefs.get(model.id);
       if (!scope) continue;
       stats.matched += 1;
+
+      // Skip models that were just deployed in this sync; their Hindsight content
+      // is not expected to be ready yet. They are already marked pending_build above.
+      if (newlyDeployedExtIds.has(model.id)) {
+        continue;
+      }
 
       const role = inferRole(model.id);
       const enabled = patchRoles[role] === true;

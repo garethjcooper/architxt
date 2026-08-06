@@ -184,6 +184,7 @@ function buildRunner(deps) {
         const result = await refreshPatches(db, serverId, bankId, {
           dryRun: false,
           rerunExtIds: syncResult?.updatedExtIds || [],
+          newlyDeployedExtIds: stats.deploy?.deployed || [],
         });
         if (!result.success) {
           throw new StageError(result.error, result.code || 'REFRESH_FAILED');
