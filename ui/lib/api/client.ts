@@ -1457,6 +1457,32 @@ export const contextualGraphApi = {
     }>>(`/contextual-graph/sync-jobs?${params.toString()}`);
   },
 
+  startSyncJob: (serverId: number, bankId: string, options?: {
+    run_discovery?: boolean;
+    node_ids?: string[];
+    seed_node_ids?: string[];
+    min_count?: number;
+    min_weight?: number;
+    neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number };
+  }) =>
+    fetchApi<{
+      success: boolean;
+      job?: {
+        id: string;
+        server_id: number;
+        bank_id: string;
+        status: string;
+        stages: any[];
+        options: any;
+        created_at: string;
+      };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/sync-jobs', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
+    }),
+
   getSyncJob: (id: string, options?: { limit?: number; offset?: number }) => {
     const params = new URLSearchParams();
     if (options?.limit !== undefined) params.set('limit', String(options.limit));
