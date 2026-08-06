@@ -144,9 +144,9 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
     scope.node = node;
     const provenance = { ...(node.properties?.provenance || {}) };
     const refs = provenance.model_refs || [];
-    const existing = refs.find((r) => r.ext_id === ref.ext_id);
-    if (existing) {
-      Object.assign(existing, updatedRef);
+    const idx = refs.findIndex((r) => r.ext_id === ref.ext_id);
+    if (idx >= 0) {
+      refs[idx] = updatedRef;
     } else {
       refs.push(updatedRef);
     }
@@ -162,9 +162,9 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
   scope.edge = edge;
   const provenance = { ...(edge.cge_properties?.provenance || {}) };
   const refs = provenance.model_refs || [];
-  const existing = refs.find((r) => r.ext_id === ref.ext_id);
-  if (existing) {
-    Object.assign(existing, updatedRef);
+  const idx = refs.findIndex((r) => r.ext_id === ref.ext_id);
+  if (idx >= 0) {
+    refs[idx] = updatedRef;
   } else {
     refs.push(updatedRef);
   }

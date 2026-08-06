@@ -64,15 +64,29 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
   const containerWidthRef = useRef(0);
 
   const refs = useMemo(() => {
-    const seen = new Set<string>();
-    const out: ModelRef[] = [];
+    const byId = new Map<string, ModelRef>();
     for (const ref of modelRefs) {
       const id = ref.ext_id || ref.role || '';
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      out.push(ref);
+      if (!id) continue;
+      const existing = byId.get(id);
+      if (!existing) {
+        byId.set(id, ref);
+        continue;
+      }
+      // Prefer the ref with a refresh status; if both have one, prefer the latest.
+      const existingHasStatus = !!existing.last_refresh_status;
+      const refHasStatus = !!ref.last_refresh_status;
+      if (refHasStatus && !existingHasStatus) {
+        byId.set(id, ref);
+      } else if (existingHasStatus && refHasStatus) {
+        const existingTime = existing.last_refresh_at ? new Date(existing.last_refresh_at).getTime() : 0;
+        const refTime = ref.last_refresh_at ? new Date(ref.last_refresh_at).getTime() : 0;
+        if (refTime > existingTime) {
+          byId.set(id, ref);
+        }
+      }
     }
-    return out;
+    return Array.from(byId.values());
   }, [modelRefs]);
 
   const filteredRefs = useMemo(() => {
