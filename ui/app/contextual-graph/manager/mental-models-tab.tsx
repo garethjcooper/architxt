@@ -44,9 +44,10 @@ export interface MentalModelsTabProps {
   serverId: number | null;
   bankId: string | null;
   modelRefs: ModelRef[];
+  isActive?: boolean;
 }
 
-export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTabProps) {
+export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: MentalModelsTabProps) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [contents, setContents] = useState<Record<string, ContentResult>>({});
@@ -179,10 +180,19 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
   const handleSelectRow = useCallback(async (ref: ModelRef) => {
     const extId = ref.ext_id || null;
     setSelectedExtId(extId);
-    if (extId && !contents[extId] && !contentErrors[extId]) {
+    if (extId) {
       await runHealthCheck([extId], { silent: true });
     }
-  }, [contents, contentErrors, runHealthCheck]);
+  }, [runHealthCheck]);
+
+  // Refresh data when the tab becomes active or the bank scope changes.
+  useEffect(() => {
+    if (!isActive || !serverId || !bankId) return;
+    fetchPendingOps();
+    if (selectedExtId) {
+      runHealthCheck([selectedExtId], { silent: true });
+    }
+  }, [isActive, serverId, bankId, selectedExtId, fetchPendingOps, runHealthCheck]);
 
   const handleRefresh = useCallback(async (ref: ModelRef, e?: React.MouseEvent) => {
     e?.stopPropagation();

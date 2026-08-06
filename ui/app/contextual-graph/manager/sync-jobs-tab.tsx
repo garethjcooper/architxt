@@ -160,6 +160,7 @@ export function SyncJobsTab({
   setSelectedServerId,
   selectedBankId,
   setSelectedBankId,
+  isActive,
 }: {
   servers: Array<{ id: number; name?: string; base_url?: string }>;
   banks: SelectorBank[];
@@ -169,6 +170,7 @@ export function SyncJobsTab({
   setSelectedServerId: (id: string) => void;
   selectedBankId: string;
   setSelectedBankId: (id: string) => void;
+  isActive?: boolean;
 }) {
   const [jobs, setJobs] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(false);
@@ -209,14 +211,15 @@ export function SyncJobsTab({
   }, [filters]);
 
   useEffect(() => {
+    if (!isActive) return;
     loadJobs();
-  }, [loadJobs]);
+  }, [isActive, loadJobs]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || !isActive) return;
     const id = setInterval(loadJobs, 5000);
     return () => clearInterval(id);
-  }, [autoRefresh, loadJobs]);
+  }, [autoRefresh, isActive, loadJobs]);
 
   const loadJobDetail = useCallback(async (jobId: string) => {
     try {

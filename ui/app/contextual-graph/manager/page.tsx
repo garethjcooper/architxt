@@ -416,6 +416,8 @@ export default function ContextManagerPage() {
     );
   };
 
+  const [activeTab, setActiveTab] = useState('graph');
+
   return (
     <PageShell
       title="Context Manager"
@@ -424,7 +426,7 @@ export default function ContextManagerPage() {
       countLabel="node"
       loading={graphLoading}
     >
-      <Tabs defaultValue="graph" className="flex flex-col flex-1 min-h-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 shrink-0">
           <TabsList variant="line">
             <TabsTrigger value="graph">Graph</TabsTrigger>
@@ -581,6 +583,7 @@ export default function ContextManagerPage() {
             setSelectedServerId={setSelectedServerId}
             selectedBankId={selectedBankId || ''}
             setSelectedBankId={setSelectedBankId}
+            isActive={activeTab === 'jobs'}
           />
         </TabsContent>
 
@@ -589,6 +592,7 @@ export default function ContextManagerPage() {
             serverId={selectedServerId ? Number(selectedServerId) : null}
             bankId={selectedBankId}
             modelRefs={allModelRefs}
+            isActive={activeTab === 'models'}
           />
         </TabsContent>
       </Tabs>
