@@ -22,7 +22,7 @@ export const DEFAULT_AUTO_RESTRICTIONS = Object.freeze({
   }),
   deploy: Object.freeze({
     max_models_per_run: 50,
-    allowed_model_types: Object.freeze(['entity-summary']),
+    allowed_model_types: Object.freeze([]),
     include_node_ids: [],
     exclude_node_ids: [],
   }),
@@ -226,21 +226,13 @@ export function resolveRestrictions(bank) {
   const user = bank?.restriction || {};
   const defaults = bank?.mode === 'auto' ? DEFAULT_AUTO_RESTRICTIONS : { import: {}, deploy: {} };
 
-  // allowed_model_types must be explicitly omitted to inherit the default.
-  // An explicit empty array means "deploy no contextual model types".
-  const userAllowedModelTypes = user.deploy?.allowed_model_types;
-  const deployDefaults = { ...defaults.deploy };
-  if (userAllowedModelTypes !== undefined) {
-    delete deployDefaults.allowed_model_types;
-  }
-
   return {
     import: {
       ...defaults.import,
       ...user.import,
     },
     deploy: {
-      ...deployDefaults,
+      ...defaults.deploy,
       ...user.deploy,
     },
   };
