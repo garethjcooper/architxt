@@ -1086,15 +1086,17 @@ router.get('/mental-models/content', async (req, res) => {
       return res.status(status).json({ error: result.error, code: result.code || 'FETCH_FAILED' });
     }
 
+    const model = result.mentalModel || {};
+
     sendResponse({
       res,
       status: 200,
       data: {
         ext_id: extId,
         found: true,
-        content: result.content ?? null,
-        content_hash: result.content_hash ?? null,
-        updated_at: result.updated_at ?? null,
+        content: model.content ?? null,
+        content_hash: model.content_hash ?? null,
+        updated_at: model.updated_at ?? null,
       },
       logger,
       method: 'GET',
