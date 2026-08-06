@@ -1,6 +1,14 @@
 import { createLogger } from '../../utils/logger.js';
-import { extractModelRefsFromDb } from './graph-model-refs.js';
-import { deleteGeneratedModels } from './delete-generated-models.js';
+import { extractModelRefsFromDb, stripModelRefsFromProperties } from './graph-model-refs.js';
+import { deleteMentalModel } from '../hindsight/mental-models.js';
+import {
+  listNodes,
+  listEdges,
+  upsertNode,
+  upsertEdge,
+  deleteNode,
+  deleteEdge,
+} from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-cleanup');
 
@@ -11,13 +19,22 @@ const ROLE_TO_PREFIX = Object.freeze({
   sys_discovery_context: 'discover-',
 });
 
+const ROLES = Object.freeze({
+  entitySummary: 'sys_entity_summary',
+  entityCapabilities: 'sys_entity_capabilities',
+  edgeContext: 'sys_edge_context',
+  discoveryContext: 'sys_discovery_context',
+});
+
 /**
  * Delete generated contextual-graph mental models whose role is not in the
- * bank's allowed_model_types list, and strip their refs from the local graph.
+ * bank's allowed_model_types list, remove any applied mental-model data they
+ * produced (summaries, capabilities, generated edges, discovered subgraphs),
+ * and strip their refs from the local graph.
  *
  * This is the reconcile half of a sync run: anything not allowed is removed
- * from both Hindsight and local provenance so it is no longer refreshed or
- * surfaced in the UI.
+ * from both Hindsight and the local working graph so it is no longer refreshed
+ * or surfaced in the UI.
  *
  * @param {Object} db
  * @param {number} serverId
@@ -50,8 +67,15 @@ export async function cleanupDisallowedModels(
       : [],
   );
 
+  const KNOWN_ROLES = new Set([
+    'sys_entity_summary',
+    'sys_entity_capabilities',
+    'sys_edge_context',
+    'sys_discovery_context',
+  ]);
+
   const refs = await extractModelRefsFromDb(db, serverId, bankId, {
-    filterFn: ({ role }) => !allowedRoles.has(role),
+    filterFn: ({ role }) => KNOWN_ROLES.has(role) && !allowedRoles.has(role),
   });
 
   if (refs.extIds.length === 0) {
@@ -67,13 +91,192 @@ export async function cleanupDisallowedModels(
     serverId,
     bankId,
     count: refs.extIds.length,
-    roles: [...allowedRoles],
+    disallowedRoles: [...new Set(refs.extIds.map(inferRoleFromExtId))],
   });
 
-  return deleteGeneratedModels(db, serverId, bankId, {
-    ext_ids: refs.extIds,
-    deleteFromHindsight: options.deleteFromHindsight,
-  });
+  const removeSet = new Set(refs.extIds);
+  const deleteFn = options.deleteFromHindsight || deleteMentalModel;
+
+  const deleted = [];
+  const failed = [];
+  for (const extId of refs.extIds) {
+    const result = await deleteFn(serverId, bankId, extId);
+    if (result.success) {
+      deleted.push(extId);
+    } else {
+      failed.push({ ext_id: extId, error: result.error });
+    }
+  }
+
+  // Always clear local applied data and provenance for ids we attempted to
+  // delete, even if the remote call failed. The remote model is either gone or
+  // the user can retry; leaving stale generated data in the graph is the
+  // symptom we are fixing.
+  const cleared = await clearLocalModelData(db, serverId, bankId, removeSet, refs);
+
+  return {
+    success: true,
+    deleted,
+    failed,
+    cleared,
+  };
+}
+
+async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
+  const byRole = new Map();
+  for (const extId of removeSet) {
+    const role = inferRoleFromExtId(extId);
+    if (!byRole.has(role)) byRole.set(role, new Set());
+    byRole.get(role).add(extId);
+  }
+
+  const [nodesResult, edgesResult] = await Promise.all([
+    listNodes(db, serverId, bankId, { limit: 10000 }),
+    listEdges(db, serverId, bankId, { limit: 10000 }),
+  ]);
+
+  const nodes = nodesResult.data || [];
+  const edges = edgesResult.data || [];
+
+  let nodesCleared = 0;
+  let edgesCleared = 0;
+
+  const deletedNodeIds = new Set();
+  const deletedEdgeIds = new Set();
+
+  // 1. Discovery cleanup first, using the original snapshot so ref-stripping
+  //    later does not hide the nodes/edges we need to remove.
+  const discoveryIds = byRole.get(ROLES.discoveryContext);
+  if (discoveryIds && discoveryIds.size > 0) {
+    for (const edge of edges) {
+      const disallowedRefsOnEdge = refs.byEdgeId.get(edge.cge_id) || [];
+      if (disallowedRefsOnEdge.some((extId) => discoveryIds.has(extId))) {
+        deleteEdge(db, serverId, bankId, edge.cge_id);
+        edgesCleared += 1;
+        deletedEdgeIds.add(edge.cge_id);
+      }
+    }
+
+    for (const node of nodes) {
+      const disallowedRefsOnNode = refs.byNodeId.get(node.cgn_id) || [];
+      if (!disallowedRefsOnNode.some((extId) => discoveryIds.has(extId))) continue;
+
+      // Preserve nodes that are seeds for their own discovery model.
+      const isOwnSeed = disallowedRefsOnNode.some((extId) => extId === `discover-${node.cgn_id}`);
+      if (isOwnSeed) continue;
+
+      deleteNode(db, serverId, bankId, node.cgn_id);
+      nodesCleared += 1;
+      deletedNodeIds.add(node.cgn_id);
+    }
+  }
+
+  // 2. Strip refs and clear applied role data for remaining nodes/edges.
+  for (const node of nodes) {
+    if (deletedNodeIds.has(node.cgn_id)) continue;
+
+    const properties = node.cgn_properties || node.properties || {};
+    const nextProperties = stripModelRefsFromProperties(properties, removeSet);
+    const effectiveProperties = nextProperties || { ...properties };
+
+    let changed = nextProperties !== null;
+    changed = clearNodeRoleData(effectiveProperties, byRole, node.cgn_id) || changed;
+
+    if (changed) {
+      cleanupEmptyProvenance(effectiveProperties);
+      upsertNode(db, serverId, bankId, node.cgn_id, node.cgn_labels, effectiveProperties);
+      nodesCleared += 1;
+    }
+  }
+
+  for (const edge of edges) {
+    if (deletedEdgeIds.has(edge.cge_id)) continue;
+
+    const properties = edge.cge_properties || edge.properties || {};
+    const disallowedRefsOnEdge = refs.byEdgeId.get(edge.cge_id) || [];
+    const edgeCtxRefsOnEdge = disallowedRefsOnEdge.filter((extId) => extId.startsWith('edge-ctx-'));
+
+    const nextProperties = stripModelRefsFromProperties(properties, removeSet);
+    const effectiveProperties = nextProperties || { ...properties };
+    const remainingModelRefs = (effectiveProperties.provenance?.model_refs || []).filter(
+      (ref) => ref && ref.ext_id && !removeSet.has(ref.ext_id),
+    );
+
+    let changed = nextProperties !== null;
+
+    // Delete directed edge-ctx edges that were generated by a removed model and
+    // have no remaining contextual model refs. We only delete if this specific
+    // edge carried a removed edge-ctx ref.
+    if (
+      edgeCtxRefsOnEdge.length > 0 &&
+      properties.directed === true &&
+      (properties.label !== undefined || properties.detail !== undefined || properties.evidence !== undefined) &&
+      remainingModelRefs.length === 0
+    ) {
+      deleteEdge(db, serverId, bankId, edge.cge_id);
+      edgesCleared += 1;
+      continue;
+    }
+
+    if (changed) {
+      cleanupEmptyProvenance(effectiveProperties);
+      upsertEdge(
+        db,
+        serverId,
+        bankId,
+        edge.cge_id,
+        edge.cge_source_id,
+        edge.cge_target_id,
+        edge.cge_type,
+        effectiveProperties,
+      );
+      edgesCleared += 1;
+    }
+  }
+
+  return { nodes: nodesCleared, edges: edgesCleared };
+}
+
+function clearNodeRoleData(properties, byRole, nodeId) {
+  let changed = false;
+
+  const entitySummaryExtIds = byRole.get(ROLES.entitySummary);
+  if (entitySummaryExtIds && entitySummaryExtIds.has(`entity-summary-${nodeId}`)) {
+    if (properties.summary !== undefined) {
+      delete properties.summary;
+      changed = true;
+    }
+  }
+
+  const entityCapabilitiesExtIds = byRole.get(ROLES.entityCapabilities);
+  if (entityCapabilitiesExtIds && entityCapabilitiesExtIds.has(`entity-capabilities-${nodeId}`)) {
+    if (properties.capabilities !== undefined) {
+      delete properties.capabilities;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+function cleanupEmptyProvenance(properties) {
+  const provenance = properties.provenance;
+  if (!provenance || typeof provenance !== 'object') return;
+  if (Array.isArray(provenance.model_refs) && provenance.model_refs.length === 0) {
+    delete provenance.model_refs;
+  }
+  if (Object.keys(provenance).length === 0) {
+    delete properties.provenance;
+  }
+}
+
+function inferRoleFromExtId(extId) {
+  if (typeof extId !== 'string') return 'model';
+  if (extId.startsWith('entity-summary-')) return ROLES.entitySummary;
+  if (extId.startsWith('entity-capabilities-')) return ROLES.entityCapabilities;
+  if (extId.startsWith('edge-ctx-')) return ROLES.edgeContext;
+  if (extId.startsWith('discover-')) return ROLES.discoveryContext;
+  return 'model';
 }
 
 /**
