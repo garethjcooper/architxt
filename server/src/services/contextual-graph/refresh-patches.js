@@ -123,7 +123,24 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
   return byExtId;
 }
 
-function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) {
+function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshState = {}) {
+  const { status, error } = refreshState;
+  const updatedRef = {
+    ...ref,
+    fetched_at: timestamp,
+    attached_at: ref.attached_at || timestamp,
+    last_refresh_at: timestamp,
+  };
+  if (status) {
+    updatedRef.last_refresh_status = status;
+    if (status === 'ok') {
+      delete updatedRef.last_refresh_error;
+    } else if (error) {
+      updatedRef.last_refresh_error = error;
+    }
+  }
+  if (ref.content_hash) updatedRef.content_hash = ref.content_hash;
+
   if (scope.type === 'node') {
     const nodeResult = getNode(db, serverId, bankId, scope.id);
     const node = nodeResult?.success ? nodeResult.data : null;
@@ -133,10 +150,9 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
     const refs = provenance.model_refs || [];
     const existing = refs.find((r) => r.ext_id === ref.ext_id);
     if (existing) {
-      existing.fetched_at = timestamp;
-      if (ref.content_hash) existing.content_hash = ref.content_hash;
+      Object.assign(existing, updatedRef);
     } else {
-      refs.push({ ...ref, fetched_at: timestamp });
+      refs.push(updatedRef);
     }
     provenance.model_refs = refs;
     const properties = { ...node.properties, provenance, updated_at: timestamp };
@@ -152,10 +168,9 @@ function updateRefTimestampOnScope(db, serverId, bankId, scope, ref, timestamp) 
   const refs = provenance.model_refs || [];
   const existing = refs.find((r) => r.ext_id === ref.ext_id);
   if (existing) {
-    existing.fetched_at = timestamp;
-    if (ref.content_hash) existing.content_hash = ref.content_hash;
+    Object.assign(existing, updatedRef);
   } else {
-    refs.push({ ...ref, fetched_at: timestamp });
+    refs.push(updatedRef);
   }
   provenance.model_refs = refs;
   const properties = { ...edge.cge_properties, provenance, updated_at: timestamp };
@@ -261,7 +276,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
       if (!enabled) {
         stats.skippedDisabled += 1;
-        updateRefTimestampOnScope(db, serverId, bankId, scope, scope.ref, timestamp);
+        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'skipped', error: 'role disabled' });
         continue;
       }
 
@@ -270,14 +285,16 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
       // Dry-run still fetches and normalizes, but never applies.
       if (dryRun) {
-        updateRefTimestampOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp);
+        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp, { status: 'ok' });
         continue;
       }
 
       const output = normalizeModelOutput(content);
       if (output.errors.length > 0) {
         stats.failed += 1;
+        const error = output.errors.map((e) => typeof e === 'string' ? e : e.message).join('; ');
         stats.errors.push({ extId: model.id, errors: output.errors });
+        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
         logger.warn('Normalized output has errors; treating as failed', { extId: model.id, errors: output.errors });
         continue;
       }
@@ -288,7 +305,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
       if (!hashChanged && !diverged) {
         stats.skippedUnchanged += 1;
-        updateRefTimestampOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp);
+        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp, { status: 'ok' });
         continue;
       }
 
@@ -296,14 +313,16 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const applyResult = await applyModelOutput(db, serverId, bankId, localModel, output, { now: timestamp });
       if (!applyResult.success) {
         stats.failed += 1;
+        const error = applyResult.error || applyResult.code || 'apply failed';
         stats.errors.push({ extId: model.id, error: applyResult.error, code: applyResult.code });
+        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
         logger.error('Failed to apply contextual model output', { extId: model.id, error: applyResult.error });
         continue;
       }
 
       // Record the new content hash + fetched_at on the scope.
       const updatedRef = { ...scope.ref, content_hash: newHash, fetched_at: timestamp, attached_at: scope.ref.attached_at || timestamp };
-      updateRefTimestampOnScope(db, serverId, bankId, scope, updatedRef, timestamp);
+      updateRefOnScope(db, serverId, bankId, scope, updatedRef, timestamp, { status: 'ok' });
       stats.applied += 1;
     }
 
