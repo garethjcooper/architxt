@@ -1,6 +1,6 @@
 import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
 import { refreshMentalModel } from '../../services/hindsight/mental-models.js';
-import { listNodes, listEdges, upsertNode, upsertEdge, getNode, getEdge } from '../../db/crud/contextual-graph.js';
+import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge, findEdgeByEndpoints } from '../../db/crud/contextual-graph.js';
 import { normalizeModelOutput, contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { config } from '../../config.js';
@@ -69,15 +69,11 @@ function hasDivergence(db, serverId, bankId, scope, output) {
 
   if (role === 'sys_edge_context') {
     if (output.graph.edges.length === 0) return true;
-    const allEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
-    const allEdges = allEdgesResult?.success ? allEdgesResult.data : [];
 
     for (const modelEdge of output.graph.edges) {
-      if (!modelEdge.from || !modelEdge.to) continue;
-      const existing = allEdges.find((e) =>
-        (e.cge_source_id === modelEdge.from && e.cge_target_id === modelEdge.to) ||
-        (e.cge_source_id === modelEdge.to && e.cge_target_id === modelEdge.from)
-      );
+      if (!modelEdge.from || !modelEdge.to || !modelEdge.type) continue;
+      const findResult = findEdgeByEndpoints(db, serverId, bankId, modelEdge.from, modelEdge.to, modelEdge.type);
+      const existing = findResult?.success ? findResult.data : null;
       if (!existing) return true;
       if (!edgeContentEqual(existing.cge_properties || {}, modelEdge)) return true;
     }
