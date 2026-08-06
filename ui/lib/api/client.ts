@@ -1415,4 +1415,64 @@ export const contextualGraphApi = {
         delete_local_graph: options?.delete_local_graph ?? false,
       }),
     }),
+
+  listSyncJobs: (options: {
+    serverId?: number;
+    bankId?: string;
+    status?: string;
+    since?: string;
+    until?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (options.serverId !== undefined) params.set('server_id', String(options.serverId));
+    if (options.bankId) params.set('bank_id', options.bankId);
+    if (options.status) params.set('status', options.status);
+    if (options.since) params.set('since', options.since);
+    if (options.until) params.set('until', options.until);
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    if (options.offset !== undefined) params.set('offset', String(options.offset));
+    return fetchApi<Array<{
+      id: string;
+      server_id: number;
+      bank_id: string;
+      status: string;
+      stages: Array<{ name: string; label: string; status: string; started_at?: string; finished_at?: string; error_message?: string; error_code?: string; stats?: any }>;
+      options: any;
+      stats: any;
+      error_message?: string;
+      error_code?: string;
+      created_at: string;
+      started_at?: string;
+      finished_at?: string;
+      updated_at?: string;
+    }>>(`/contextual-graph/sync-jobs?${params.toString()}`);
+  },
+
+  getSyncJob: (id: string, options?: { limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    const query = params.toString();
+    return fetchApi<{
+      id: string;
+      server_id: number;
+      bank_id: string;
+      status: string;
+      stages: Array<{ name: string; label: string; status: string; started_at?: string; finished_at?: string; error_message?: string; error_code?: string; stats?: any }>;
+      options: any;
+      stats: any;
+      error_message?: string;
+      error_code?: string;
+      created_at: string;
+      started_at?: string;
+      finished_at?: string;
+      updated_at?: string;
+      logs: Array<{ id: number; stage: string | null; level: string; message: string; details?: any; created_at: string }>;
+    }>(`/contextual-graph/sync-jobs/${encodeURIComponent(id)}${query ? `?${query}` : ''}`);
+  },
+
+  cancelSyncJob: (id: string) =>
+    fetchApi<{ success: boolean; error?: string; code?: string }>(`/contextual-graph/sync-jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 };

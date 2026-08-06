@@ -100,9 +100,11 @@ export const getJob = (db, id) => dbExec(() => {
 }, `${JOBS_TABLE}.get`);
 
 /**
- * List jobs, optionally filtered by server/bank/status.
+ * List jobs, optionally filtered by server/bank/status/date range.
+ *
+ * Date filters are inclusive ISO strings compared against cgj_created_at.
  */
-export const listJobs = (db, { serverId, bankId, status, limit = 50, offset = 0 } = {}) => dbExec(() => {
+export const listJobs = (db, { serverId, bankId, status, since, until, limit = 50, offset = 0 } = {}) => dbExec(() => {
   const conditions = [];
   const values = [];
   if (serverId !== undefined) {
@@ -116,6 +118,14 @@ export const listJobs = (db, { serverId, bankId, status, limit = 50, offset = 0 
   if (status !== undefined) {
     conditions.push('cgj_status = ?');
     values.push(status);
+  }
+  if (since !== undefined && since !== null && since !== '') {
+    conditions.push('cgj_created_at >= ?');
+    values.push(since);
+  }
+  if (until !== undefined && until !== null && until !== '') {
+    conditions.push('cgj_created_at <= ?');
+    values.push(until);
   }
 
   let sql = `SELECT ${PUBLIC_FIELDS} FROM ${JOBS_TABLE}`;

@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { SyncJobsTab } from './sync-jobs-tab';
 
 const logger = createLogger('ContextManagerPage');
 
@@ -404,23 +406,18 @@ export default function ContextManagerPage() {
   return (
     <PageShell
       title="Context Manager"
-      subtitle="Manage contextual graph data: inspect entities and edges, their mental-model refs, and stored patches."
+      subtitle="Manage contextual graph data and sync jobs."
       count={nodes.length}
       countLabel="node"
       loading={graphLoading}
     >
-      <div className="flex flex-col flex-1 min-h-0">
+      <Tabs defaultValue="graph" className="flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 shrink-0">
-          <ServerBankSelectors
-            servers={servers}
-            selectedServerId={selectedServerId}
-            setSelectedServerId={setSelectedServerId}
-            banks={banks}
-            selectedBankId={selectedBankId}
-            setSelectedBankId={setSelectedBankId}
-            loadingBanks={loadingBanks}
-            disabled={loadingServers}
-          />
+          <TabsList variant="line">
+            <TabsTrigger value="graph">Graph</TabsTrigger>
+            <TabsTrigger value="jobs">Sync Jobs</TabsTrigger>
+          </TabsList>
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -441,112 +438,140 @@ export default function ContextManagerPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex mt-2 gap-2">
-          <div className="min-w-0 flex flex-col gap-1" style={{ flex: 1 }}>
-            <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: 1.5 }}>
-              <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
-                <span className="font-medium text-sm">Entities</span>
-                <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
-                  {sortedNodes.length}
-                </span>
+        <TabsContent value="graph" className="flex flex-col flex-1 min-h-0 mt-0">
+          <div className="flex items-center gap-3 border-b border-white/10 pb-2 shrink-0 mt-2">
+            <ServerBankSelectors
+              servers={servers}
+              selectedServerId={selectedServerId}
+              setSelectedServerId={setSelectedServerId}
+              banks={banks}
+              selectedBankId={selectedBankId}
+              setSelectedBankId={setSelectedBankId}
+              loadingBanks={loadingBanks}
+              disabled={loadingServers}
+            />
+          </div>
+
+          <div className="flex-1 min-h-0 flex mt-2 gap-2">
+            <div className="min-w-0 flex flex-col gap-1" style={{ flex: 1 }}>
+              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: 1.5 }}>
+                <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+                  <span className="font-medium text-sm">Entities</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
+                    {sortedNodes.length}
+                  </span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
+                  {graphLoading ? (
+                    <div className="p-3 space-y-2">
+                      <Skeleton className="h-10 w-full bg-white/10" />
+                      <Skeleton className="h-10 w-full bg-white/10" />
+                      <Skeleton className="h-10 w-full bg-white/10" />
+                    </div>
+                  ) : sortedNodes.length === 0 ? (
+                    <div className="text-[11px] text-white/40 px-2 py-3">No entities loaded.</div>
+                  ) : (
+                    sortedNodes.map((node) => {
+                      const active = selectedNodeId === node.id;
+                      const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
+                      const lastRefreshed = getLastRefreshedAt(node.modelRefs);
+                      return (
+                        <button
+                          key={node.id}
+                          type="button"
+                          onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
+                          className={cn(
+                            'w-full flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors',
+                            active ? 'border-emerald-500/50 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="text-xs text-white/90 truncate">{node.label}</div>
+                              <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                            </div>
+                            <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {node.modelRefs.map((ref, i) => (
+                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+                                {ROLE_LABELS[ref.role || ''] || ref.role}
+                              </Badge>
+                            ))}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-                {graphLoading ? (
-                  <div className="p-3 space-y-2">
-                    <Skeleton className="h-10 w-full bg-white/10" />
-                    <Skeleton className="h-10 w-full bg-white/10" />
-                    <Skeleton className="h-10 w-full bg-white/10" />
-                  </div>
-                ) : sortedNodes.length === 0 ? (
-                  <div className="text-[11px] text-white/40 px-2 py-3">No entities loaded.</div>
-                ) : (
-                  sortedNodes.map((node) => {
-                    const active = selectedNodeId === node.id;
-                    const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
-                    const lastRefreshed = getLastRefreshedAt(node.modelRefs);
+
+              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col mt-1" style={{ flex: 1 }}>
+                <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+                  <span className="font-medium text-sm">Edges</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
+                    {sortedEdges.length}
+                  </span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
+                  {sortedEdges.length === 0 && (
+                    <div className="text-[11px] text-white/40 px-2 py-3">No edges loaded.</div>
+                  )}
+                  {sortedEdges.map((edge) => {
+                    const active = selectedEdgeId === edge.id;
+                    const source = nodeById.get(edge.source_id);
+                    const target = nodeById.get(edge.target_id);
+                    const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
                     return (
                       <button
-                        key={node.id}
+                        key={edge.id}
                         type="button"
-                        onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
+                        onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
                         className={cn(
-                          'w-full flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors',
-                          active ? 'border-emerald-500/50 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
+                          'w-full text-left rounded border px-2 py-1.5 transition-colors',
+                          active ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
                         )}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <div className="text-xs text-white/90 truncate">{node.label}</div>
-                            <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                        <div className="text-xs text-white/90 truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
+                        <div className="text-[10px] text-white/40 truncate">
+                          {source?.label || edge.source_id} → {target?.label || edge.target_id}
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {edge.modelRefs.map((ref, i) => (
+                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+                                {ROLE_LABELS[ref.role || ''] || ref.role}
+                              </Badge>
+                            ))}
                           </div>
                           <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
                         </div>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {node.modelRefs.map((ref, i) => (
-                            <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                              {ROLE_LABELS[ref.role || ''] || ref.role}
-                            </Badge>
-                          ))}
-                        </div>
                       </button>
                     );
-                  })
-                )}
+                  })}
+                </div>
               </div>
             </div>
 
-            <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col mt-1" style={{ flex: 1 }}>
-              <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
-                <span className="font-medium text-sm">Edges</span>
-                <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
-                  {sortedEdges.length}
-                </span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-                {sortedEdges.length === 0 && (
-                  <div className="text-[11px] text-white/40 px-2 py-3">No edges loaded.</div>
-                )}
-                {sortedEdges.map((edge) => {
-                  const active = selectedEdgeId === edge.id;
-                  const source = nodeById.get(edge.source_id);
-                  const target = nodeById.get(edge.target_id);
-                  const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
-                  return (
-                    <button
-                      key={edge.id}
-                      type="button"
-                      onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
-                      className={cn(
-                        'w-full text-left rounded border px-2 py-1.5 transition-colors',
-                        active ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
-                      )}
-                    >
-                      <div className="text-xs text-white/90 truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
-                      <div className="text-[10px] text-white/40 truncate">
-                        {source?.label || edge.source_id} → {target?.label || edge.target_id}
-                      </div>
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {edge.modelRefs.map((ref, i) => (
-                            <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                              {ROLE_LABELS[ref.role || ''] || ref.role}
-                            </Badge>
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: 1.4 }}>
+              {renderDetailPanel()}
+            </Card>
           </div>
+        </TabsContent>
 
-          <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: 1.4 }}>
-            {renderDetailPanel()}
-          </Card>
-        </div>
-      </div>
+        <TabsContent value="jobs" className="flex flex-col flex-1 min-h-0 mt-0">
+          <SyncJobsTab
+            servers={servers}
+            banks={banks}
+            loadingServers={loadingServers}
+            loadingBanks={loadingBanks}
+            selectedServerId={selectedServerId || ''}
+            setSelectedServerId={setSelectedServerId}
+            selectedBankId={selectedBankId || ''}
+            setSelectedBankId={setSelectedBankId}
+          />
+        </TabsContent>
+      </Tabs>
     </PageShell>
   );
 }

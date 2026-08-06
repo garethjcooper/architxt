@@ -305,6 +305,6 @@ export function getContextualGraphSyncJob(db, jobId, { limit = 200, offset = 0 }
 /**
  * List jobs for a scope.
  */
-export function listContextualGraphSyncJobs(db, { serverId, bankId, status, limit = 50, offset = 0 } = {}) {
-  return listJobs(db, { serverId, bankId, status, limit, offset });
+export function listContextualGraphSyncJobs(db, { serverId, bankId, status, since, until, limit = 50, offset = 0 } = {}) {
+  return listJobs(db, { serverId, bankId, status, since, until, limit, offset });
 }
