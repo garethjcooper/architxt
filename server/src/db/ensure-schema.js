@@ -652,7 +652,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_edge_context',
     returns: 'sys_patch',
     dimension: 'sys_edge_context',
-    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-name} (node id: {source-id}) and {target-name} (node id: {target-id})? Return every distinct flow as a directed edge in the standard envelope. The endpoints are supplied above with their exact node ids; reuse those exact ids in the from/to fields. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.',
+    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-id} ({source-name}) and {target-id} ({target-name})? Return every distinct flow as a directed edge in the standard envelope. The endpoints are supplied above with their exact node ids; reuse those exact ids in the from/to fields. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
