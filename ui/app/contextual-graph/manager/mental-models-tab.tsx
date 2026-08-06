@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, RefreshCw, Search, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -54,8 +53,14 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
   const [health, setHealth] = useState<Record<string, HealthResult>>({});
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
-  const [viewing, setViewing] = useState<{ extId: string; title: string } | null>(null);
+  const [selectedExtId, setSelectedExtId] = useState<string | null>(null);
+  const [panelWidth, setPanelWidth] = useState(45);
   const activeRefreshIdsRef = useRef<Set<string>>(new Set());
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isResizingRef = useRef(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(45);
+  const containerWidthRef = useRef(0);
 
   const refs = useMemo(() => {
     const seen = new Set<string>();
@@ -78,6 +83,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
       return id.includes(q) || role.includes(q);
     });
   }, [refs, search]);
+
+  const selectedRef = useMemo(() => filteredRefs.find((r) => (r.ext_id || null) === selectedExtId) || null, [filteredRefs, selectedExtId]);
+  const selectedHealth = selectedExtId ? health[selectedExtId] || null : null;
 
   const fetchPendingOps = useCallback(async () => {
     if (!serverId || !bankId) {
@@ -105,7 +113,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
   const runHealthCheck = useCallback(async (extIds: string[], opts: { silent?: boolean } = {}) => {
     if (!serverId || !bankId || extIds.length === 0) return;
     try {
-      setLoading(!opts.silent);
+      if (!opts.silent) setLoading(true);
       const response = await mentalModelsApi.healthCheck({
         server_id: serverId,
         bank_id: bankId,
@@ -124,11 +132,10 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
         toast.error(`Health check failed: ${message}`);
       }
     } finally {
-      setLoading(false);
+      if (!opts.silent) setLoading(false);
     }
   }, [serverId, bankId]);
 
-  // When pending refresh operations complete, re-check those models.
   useEffect(() => {
     if (!serverId || !bankId) return;
 
@@ -156,19 +163,16 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
     runHealthCheck(targets, { silent: true });
   }, [pendingOps, serverId, bankId, runHealthCheck]);
 
-  const handleView = useCallback(async (ref: ModelRef) => {
-    const extId = ref.ext_id || '';
-    if (!extId || !serverId || !bankId) return;
-    setLoading(true);
-    try {
+  const handleSelectRow = useCallback(async (ref: ModelRef) => {
+    const extId = ref.ext_id || null;
+    setSelectedExtId(extId);
+    if (extId && !health[extId]) {
       await runHealthCheck([extId], { silent: true });
-      setViewing({ extId, title: ROLE_LABELS[ref.role || ''] || ref.role || extId });
-    } finally {
-      setLoading(false);
     }
-  }, [serverId, bankId, runHealthCheck]);
+  }, [health, runHealthCheck]);
 
-  const handleRefresh = useCallback(async (ref: ModelRef) => {
+  const handleRefresh = useCallback(async (ref: ModelRef, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const extId = ref.ext_id || '';
     if (!extId || !serverId || !bankId) {
       toast.error('Select a server and bank first');
@@ -258,10 +262,68 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
     return 'No content available';
   };
 
-  const viewedResult = viewing ? health[viewing.extId] || null : null;
+  const copyContent = useCallback(() => {
+    const text = formatPreview(selectedHealth);
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => toast.success('Content copied to clipboard'));
+  }, [selectedHealth]);
+
+  const downloadContent = useCallback(() => {
+    const text = formatPreview(selectedHealth);
+    if (!text) return;
+    const extId = selectedExtId || 'model';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${extId.replace(/[^a-zA-Z0-9\-_]/g, '_')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [selectedHealth, selectedExtId]);
+
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    resizeStartXRef.current = e.clientX;
+    resizeStartWidthRef.current = panelWidth;
+    containerWidthRef.current = containerRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizingRef.current) return;
+    const dx = e.clientX - resizeStartXRef.current;
+    const containerWidth = containerWidthRef.current;
+    if (!containerWidth) return;
+    const deltaPercent = (dx / containerWidth) * 100;
+    const next = Math.min(70, Math.max(20, resizeStartWidthRef.current + deltaPercent));
+    setPanelWidth(next);
+  }, []);
+
+  const handleResizeEnd = useCallback(() => {
+    if (!isResizingRef.current) return;
+    isResizingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => handleResizeMove(e);
+    const onUp = () => handleResizeEnd();
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [handleResizeMove, handleResizeEnd]);
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div ref={containerRef} className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2 shrink-0">
         <div className="flex items-center gap-2">
           <div className="relative w-64">
@@ -276,154 +338,189 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
           </div>
           <span className="text-xs text-white/50">{refs.length} model ref{refs.length === 1 ? '' : 's'}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0}
-            onClick={handleRefreshAll}
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshingIds.size > 0 && 'animate-spin')} />
-            Refresh all
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!serverId || !bankId || loading}
-            onClick={() => runHealthCheck(filteredRefs.map((r) => r.ext_id).filter(Boolean) as string[])}
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <ActivityIcon className="h-3.5 w-3.5 mr-1.5" />}
-            Check health
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0}
+          onClick={handleRefreshAll}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshingIds.size > 0 && 'animate-spin')} />
+          Refresh all
+        </Button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto mt-2">
-        <Table className="w-full caption-bottom text-sm">
-          <TableHeader>
-            <TableRow className="border-b border-white/10 hover:bg-transparent">
-              <TableHead className="w-[18%] text-xs uppercase text-white/60 font-medium py-2 px-3">Role</TableHead>
-              <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
-              <TableHead className="w-32 text-xs uppercase text-white/60 font-medium py-2 px-3">Fetched</TableHead>
-              <TableHead className="w-32 text-xs uppercase text-white/60 font-medium py-2 px-3">Refresh state</TableHead>
-              <TableHead className="w-36 text-xs uppercase text-white/60 font-medium py-2 px-3">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && filteredRefs.length === 0 ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i} className="border-b border-white/5">
-                  <TableCell className="py-2 px-3"><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell className="py-2 px-3"><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
+      <div className="flex-1 min-h-0 flex mt-2 overflow-hidden">
+        {/* Table */}
+        <div
+          className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
+          style={{ width: `${100 - panelWidth}%` }}
+        >
+          <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+            <span className="font-medium text-sm">Mental Models</span>
+            <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
+              {filteredRefs.length}
+            </span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto p-0">
+            <Table className="w-full caption-bottom text-sm">
+              <TableHeader>
+                <TableRow className="border-b border-white/10 hover:bg-transparent">
+                  <TableHead className="w-[18%] text-xs uppercase text-white/60 font-medium py-2 px-3">Role</TableHead>
+                  <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
+                  <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Fetched</TableHead>
+                  <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Refresh state</TableHead>
+                  <TableHead className="w-10 text-xs uppercase text-white/60 font-medium py-2 px-3"></TableHead>
                 </TableRow>
-              ))
-            ) : filteredRefs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-xs text-white/50">
-                  {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredRefs.map((ref) => {
-                const extId = ref.ext_id || '';
-                const roleLabel = ROLE_LABELS[ref.role || ''] || ref.role || 'model';
-                const op = getOperationForRow(extId);
-                const result = extId ? health[extId] : null;
-                const isRefreshing = Boolean(op) || refreshingIds.has(extId);
-                return (
-                  <TableRow key={extId || `${ref.role}-${Math.random()}`} className="border-b border-white/5 hover:bg-white/5">
-                    <TableCell className="py-2 px-3">
-                      <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
-                        {roleLabel}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-2 px-3 font-mono text-xs text-white/80 truncate" title={extId || '-'}>
-                      {extId || '-'}
-                    </TableCell>
-                    <TableCell className="py-2 px-3 text-xs text-white/60">
-                      {ref.fetched_at ? formatDistanceToNow(new Date(ref.fetched_at), { addSuffix: true }) : 'never'}
-                    </TableCell>
-                    <TableCell className="py-2 px-3 text-xs">
-                      {isRefreshing ? (
-                        <span className="inline-flex items-center gap-1 text-amber-300">
-                          <Loader2 className="h-3 w-3 animate-spin" /> refreshing
-                        </span>
-                      ) : ref.last_refresh_status === 'error' ? (
-                        <span className="inline-flex items-center gap-1 text-red-400" title={ref.last_refresh_error || ''}>
-                          <AlertCircle className="h-3 w-3" /> error
-                        </span>
-                      ) : ref.last_refresh_status === 'ok' ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400">
-                          <CheckCircle2 className="h-3 w-3" /> ok
-                          {ref.last_refresh_at ? ` ${formatDistanceToNow(new Date(ref.last_refresh_at), { addSuffix: true })}` : ''}
-                        </span>
-                      ) : ref.last_refresh_status === 'skipped' ? (
-                        <span className="inline-flex items-center gap-1 text-amber-400">⊘ skipped</span>
-                      ) : (
-                        <span className="text-white/40">−</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-2 px-3">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          disabled={!extId || loading}
-                          onClick={() => handleView(ref)}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1" /> View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          disabled={!extId || isRefreshing}
-                          onClick={() => handleRefresh(ref)}
-                        >
-                          <RefreshCw className={cn('h-3.5 w-3.5 mr-1', isRefreshing && 'animate-spin')} /> Refresh
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {loading && filteredRefs.length === 0 ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i} className="border-b border-white/5">
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-8" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredRefs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-xs text-white/50">
+                      {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
                     </TableCell>
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                ) : (
+                  filteredRefs.map((ref) => {
+                    const extId = ref.ext_id || '';
+                    const roleLabel = ROLE_LABELS[ref.role || ''] || ref.role || 'model';
+                    const op = getOperationForRow(extId);
+                    const isRefreshing = Boolean(op) || refreshingIds.has(extId);
+                    const isSelected = selectedExtId === extId;
+                    return (
+                      <TableRow
+                        key={extId || `${ref.role}-${Math.random()}`}
+                        onClick={() => handleSelectRow(ref)}
+                        className={cn(
+                          'border-b border-white/5 cursor-pointer transition-colors',
+                          isSelected ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+                        )}
+                      >
+                        <TableCell className="py-2 px-3">
+                          <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
+                            {roleLabel}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2 px-3 font-mono text-xs text-white/80 truncate" title={extId || '-'}>
+                          {extId || '-'}
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-xs text-white/60">
+                          {ref.fetched_at ? formatDistanceToNow(new Date(ref.fetched_at), { addSuffix: true }) : 'never'}
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-xs">
+                          {isRefreshing ? (
+                            <span className="inline-flex items-center gap-1 text-amber-300">
+                              <Loader2 className="h-3 w-3 animate-spin" /> refreshing
+                            </span>
+                          ) : ref.last_refresh_status === 'error' ? (
+                            <span className="inline-flex items-center gap-1 text-red-400" title={ref.last_refresh_error || ''}>
+                              <AlertCircle className="h-3 w-3" /> error
+                            </span>
+                          ) : ref.last_refresh_status === 'ok' ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-400">
+                              <CheckCircle2 className="h-3 w-3" /> ok
+                              {ref.last_refresh_at ? ` ${formatDistanceToNow(new Date(ref.last_refresh_at), { addSuffix: true })}` : ''}
+                            </span>
+                          ) : ref.last_refresh_status === 'skipped' ? (
+                            <span className="inline-flex items-center gap-1 text-amber-400">⊘ skipped</span>
+                          ) : (
+                            <span className="text-white/40">−</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            disabled={!extId || isRefreshing}
+                            onClick={(e) => handleRefresh(ref, e)}
+                            title="Refresh model"
+                          >
+                            <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
 
-      <Dialog open={!!viewing} onOpenChange={(open) => !open && setViewing(null)}>
-        <DialogContent className="!max-w-3xl max-h-[80vh] overflow-hidden p-0 flex flex-col">
-          <DialogHeader className="px-4 py-3 border-b border-white/10 shrink-0">
-            <DialogTitle className="text-sm font-semibold text-white/90">
-              {viewing?.title} — {viewing?.extId}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-auto p-4">
-            {viewedResult?.error ? (
+        {/* Resizer */}
+        <div
+          className="w-3 shrink-0 cursor-col-resize flex items-center justify-center group"
+          onMouseDown={handleResizeStart}
+          title="Drag to resize panels"
+        >
+          <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+        </div>
+
+        {/* Content panel */}
+        <div
+          className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
+          style={{ width: `${panelWidth}%` }}
+        >
+          <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+            <span className="font-medium text-sm truncate" title={selectedExtId || undefined}>
+              {selectedRef ? (ROLE_LABELS[selectedRef.role || ''] || selectedRef.role || 'Model') : 'Content'}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                disabled={!selectedHealth}
+                onClick={copyContent}
+                title="Copy content"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                disabled={!selectedHealth}
+                onClick={downloadContent}
+                title="Download content"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-auto p-3">
+            {!selectedExtId ? (
+              <div className="h-full flex items-center justify-center text-xs text-white/50">Select a mental model to view its fetched content.</div>
+            ) : loading && !selectedHealth ? (
+              <div className="space-y-2 p-2">
+                <Skeleton className="h-4 w-3/4 bg-white/10" />
+                <Skeleton className="h-4 w-1/2 bg-white/10" />
+                <Skeleton className="h-4 w-5/6 bg-white/10" />
+                <Skeleton className="h-4 w-2/3 bg-white/10" />
+              </div>
+            ) : selectedHealth?.error ? (
               <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">
-                {viewedResult.error}
+                {selectedHealth.error}
               </div>
             ) : (
               <pre className="text-xs text-white/80 whitespace-pre-wrap font-mono bg-black/20 rounded border border-white/10 p-3">
-                {formatPreview(viewedResult)}
+                {formatPreview(selectedHealth)}
               </pre>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
     </div>
-  );
-}
-
-function ActivityIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-    </svg>
   );
 }
