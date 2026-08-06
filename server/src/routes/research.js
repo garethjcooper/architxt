@@ -24,7 +24,6 @@ import {
 import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
-import { createPendingOperation } from '../db/crud/pending-operations.js';
 import { parseGraphResponse } from '../prompts/parse-graph-response.js';
 
 const logger = createLogger('research-route');
@@ -1007,25 +1006,17 @@ router.post('/mental-models/refresh', async (req, res) => {
       return res.status(502).json({ error: refreshResult.error, code: 'REFRESH_FAILED' });
     }
 
-    const createResult = createPendingOperation(db, {
-      pop_operation_id: refreshResult.operationId,
-      pop_server_id: serverId,
-      pop_bank_id: bankId,
-      pop_ext_id: extId,
-      pop_action: 'refresh',
-      pop_status: refreshResult.status || 'pending',
-    });
-
-    if (!createResult.success) {
-      logger.error('Failed to create pending operation for mental-model refresh', { serverId, bankId, extId, error: createResult.error });
-      return res.status(500).json({ error: createResult.error, code: 'TRACKING_ERROR' });
+    // refreshHindsightMentalModel already creates the pending_operations row;
+    // reuse its pop_id instead of creating a duplicate.
+    if (!refreshResult.popId) {
+      logger.warn('Mental-model refresh succeeded but pending operation was not tracked', { serverId, bankId, extId, operationId: refreshResult.operationId });
     }
 
-    logger.info('Mental-model refresh queued', { serverId, bankId, extId, operationId: refreshResult.operationId, popId: createResult.data });
+    logger.info('Mental-model refresh queued', { serverId, bankId, extId, operationId: refreshResult.operationId, popId: refreshResult.popId });
     sendResponse({
       res,
       status: 200,
-      data: { operation_id: refreshResult.operationId, pop_id: createResult.data, status: refreshResult.status },
+      data: { operation_id: refreshResult.operationId, pop_id: refreshResult.popId || null, status: refreshResult.status },
       logger,
       method: 'POST',
       path: '/research/mental-models/refresh',
