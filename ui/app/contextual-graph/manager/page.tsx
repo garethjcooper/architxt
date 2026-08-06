@@ -42,13 +42,24 @@ type BackendEdge = {
   properties: Record<string, any>;
 };
 
+type ModelRef = {
+  role?: string;
+  ext_id?: string;
+  attached_at?: string;
+  fetched_at?: string;
+  content_hash?: string;
+  last_refresh_status?: 'ok' | 'error' | 'skipped' | string;
+  last_refresh_at?: string;
+  last_refresh_error?: string;
+};
+
 type DisplayNode = {
   id: string;
   type: string;
   label: string;
   labels: string[];
   properties: Record<string, any>;
-  modelRefs: Array<{ role?: string; ext_id?: string; attached_at?: string; fetched_at?: string; content_hash?: string }>;
+  modelRefs: ModelRef[];
 };
 
 type DisplayEdge = {
@@ -59,7 +70,7 @@ type DisplayEdge = {
   label?: string;
   detail?: string;
   properties: Record<string, any>;
-  modelRefs: Array<{ role?: string; ext_id?: string; attached_at?: string; fetched_at?: string; content_hash?: string }>;
+  modelRefs: ModelRef[];
 };
 
 function backendNodeToDisplayNode(node: BackendNode): DisplayNode {
@@ -94,6 +105,20 @@ function getLastRefreshedAt(modelRefs: DisplayNode['modelRefs']): string | null 
     .map((r) => new Date(r.fetched_at!).getTime())
     .filter((t) => !isNaN(t));
   return timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+}
+
+function getRefreshState(modelRefs: ModelRef[]): { status: 'ok' | 'error' | 'none'; at: string | null; error: string | null } {
+  const errorRef = modelRefs.find((r) => r.last_refresh_status === 'error');
+  if (errorRef) {
+    return { status: 'error', at: errorRef.last_refresh_at || null, error: errorRef.last_refresh_error || null };
+  }
+  const okTimestamps = modelRefs
+    .filter((r) => r.last_refresh_status === 'ok' && r.last_refresh_at)
+    .map((r) => new Date(r.last_refresh_at!).getTime())
+    .filter((t) => !isNaN(t));
+  return okTimestamps.length > 0
+    ? { status: 'ok', at: new Date(Math.max(...okTimestamps)).toISOString(), error: null }
+    : { status: 'none', at: null, error: null };
 }
 
 function formatRelative(value?: string | null): string {
@@ -348,23 +373,57 @@ export default function ContextManagerPage() {
             <span className="text-white/50 italic">No mental-model refs attached.</span>
           ) : (
             <div className="space-y-2">
-              {modelRefs.map((ref, i) => (
-                <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
-                      {ROLE_LABELS[ref.role || ''] || ref.role || 'model'}
-                    </Badge>
-                    {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
+              {modelRefs.map((ref, i) => {
+                const status = ref.last_refresh_status || (ref.fetched_at ? 'ok' : 'none');
+                const statusColor =
+                  status === 'error' ? 'text-red-400' :
+                  status === 'skipped' ? 'text-amber-400' :
+                  status === 'ok' ? 'text-emerald-400' : 'text-white/50';
+                const statusIcon =
+                  status === 'error' ? '✗' :
+                  status === 'skipped' ? '⊘' :
+                  status === 'ok' ? '✓' : '−';
+                return (
+                  <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
+                        {ROLE_LABELS[ref.role || ''] || ref.role || 'model'}
+                      </Badge>
+                      {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-white/50">
+                      {ref.attached_at && <span>attached {formatRelative(ref.attached_at)}</span>}
+                      {ref.fetched_at && <span>fetched {formatRelative(ref.fetched_at)}</span>}
+                      {ref.content_hash && <span className="font-mono col-span-2">hash {ref.content_hash}</span>}
+                    </div>
+                    <div className="flex flex-col gap-0.5 text-[10px]">
+                      <span className={cn('font-medium', statusColor)}>
+                        {statusIcon} refresh {status}{ref.last_refresh_at ? ` ${formatRelative(ref.last_refresh_at)}` : ''}
+                      </span>
+                      {ref.last_refresh_error && (
+                        <span className="text-red-300/80 line-clamp-2" title={ref.last_refresh_error}>{ref.last_refresh_error}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] text-white/50">
-                    {ref.attached_at && <span>attached {formatRelative(ref.attached_at)}</span>}
-                    {ref.fetched_at && <span>fetched {formatRelative(ref.fetched_at)}</span>}
-                    {ref.content_hash && <span className="font-mono col-span-2">hash {ref.content_hash}</span>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+        </Section>
+
+        <Section title="Refresh status">
+          {(() => {
+            const { status, at, error } = getRefreshState(modelRefs);
+            return (
+              <div className="text-[11px] space-y-1">
+                <div className={cn('font-medium', status === 'error' ? 'text-red-400' : status === 'ok' ? 'text-emerald-400' : 'text-white/50')}>
+                  {status === 'error' ? '⚠ last refresh failed' : status === 'ok' ? '✓ last refresh ok' : '− no refresh recorded'}
+                </div>
+                {at && <div className="text-white/50">{formatRelative(at)}</div>}
+                {error && <div className="text-red-300/80 line-clamp-3" title={error}>{error}</div>}
+              </div>
+            );
+          })()}
         </Section>
 
         <Section title="Provenance">
