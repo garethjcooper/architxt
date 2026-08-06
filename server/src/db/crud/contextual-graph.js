@@ -259,6 +259,24 @@ export const listEdges = (db, serverId, bankId, options = {}) => dbExec(() => {
 }, `${EDGE_TABLE}.listEdges`);
 
 /**
+ * Find an edge by its endpoints and type, regardless of direction.
+ * Useful when a model may assert an edge in either orientation.
+ */
+export const findEdgeByEndpoints = (db, serverId, bankId, sourceId, targetId, type) => dbExec(() => {
+  const sql = `
+    SELECT * FROM ${EDGE_TABLE}
+    WHERE cge_server_id = ? AND cge_bank_id = ?
+      AND ((cge_source_id = ? AND cge_target_id = ?) OR (cge_source_id = ? AND cge_target_id = ?))
+      AND cge_type = ?
+    ORDER BY cge_id
+    LIMIT 1
+  `;
+  const row = stmt(db, sql).get(serverId, bankId, sourceId, targetId, targetId, sourceId, type);
+  const data = parseJson(row);
+  return data ? { ...data, labels: data.cgn_labels, properties: data.cge_properties } : null;
+}, `${EDGE_TABLE}.findEdgeByEndpoints`);
+
+/**
  * Delete a single edge by scoped id.
  */
 export const deleteEdge = (db, serverId, bankId, id) => dbExec(() => {

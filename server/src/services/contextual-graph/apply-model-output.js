@@ -7,6 +7,7 @@ import {
   getEdge,
   deleteEdge,
   deleteNode,
+  findEdgeByEndpoints,
 } from '../../db/crud/contextual-graph.js';
 import { buildDirectedEdgeId } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
@@ -238,6 +239,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   }
 
   const appliedEdges = [];
+  const touchedEdgeIds = new Set();
 
   for (const modelEdge of output.graph.edges) {
     if (!modelEdge.from || !modelEdge.to || !modelEdge.type) {
@@ -245,13 +247,15 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       continue;
     }
 
-    // Prefer an existing edge only when source, target, and type match the model.
-    // If the model asserts a different type between the same endpoints, it is a
-    // distinct edge and should not overwrite the existing one.
-    const existing = allEdges.find((e) =>
-      (e.cge_source_id === modelEdge.from && e.cge_target_id === modelEdge.to && e.cge_type === modelEdge.type) ||
-      (e.cge_source_id === modelEdge.to && e.cge_target_id === modelEdge.from && e.cge_type === modelEdge.type)
-    );
+    // Look for an existing edge between the same endpoints and type. We query
+    // the DB directly so large banks don't miss edges due to an in-memory page
+    // limit. Edges touched earlier in this same call are ignored so parallel
+    // edges of the same type but different labels remain distinct.
+    const findResult = findEdgeByEndpoints(db, serverId, bankId, modelEdge.from, modelEdge.to, modelEdge.type);
+    let existing = findResult?.success ? findResult.data : null;
+    if (existing && touchedEdgeIds.has(existing.cge_id)) {
+      existing = null;
+    }
 
     let edgeId;
     let source;
@@ -296,6 +300,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     if (modelEdge.evidence !== undefined) properties.evidence = modelEdge.evidence;
 
     upsertEdge(db, serverId, bankId, edgeId, source, target, modelEdge.type, properties);
+    touchedEdgeIds.add(edgeId);
     appliedEdges.push(edgeId);
   }
 
