@@ -98,10 +98,11 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
 /**
  * Deploy a batch of mental model specs to Hindsight.
  *
- * @returns {Promise<{success: true, deployed: string[], failed: {ext_id: string, error: string, code?: string}[]}>}
+ * @returns {Promise<{success: true, deployed: string[], pushed: string[], skipped: string[], failed: {ext_id: string, error: string, code?: string}[]}>}
  */
 export async function deployMentalModelBatch(db, serverId, bankId, specs) {
   const deployed = [];
+  const pushed = [];
   const failed = [];
   const skipped = [];
 
@@ -109,11 +110,15 @@ export async function deployMentalModelBatch(db, serverId, bankId, specs) {
     const result = await deployMentalModel(db, serverId, bankId, spec);
     if (result.success) {
       deployed.push(result.model_id);
-      if (result.skipped) skipped.push(result.model_id);
+      if (result.skipped) {
+        skipped.push(result.model_id);
+      } else {
+        pushed.push(result.model_id);
+      }
     } else {
       failed.push({ ext_id: spec.ext_id, error: result.error, code: result.code });
     }
   }
 
-  return { success: true, deployed, skipped, failed };
+  return { success: true, deployed, pushed, skipped, failed };
 }

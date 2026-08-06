@@ -1277,6 +1277,8 @@ export const contextualGraphApi = {
       success: boolean;
       queued?: { entitySummary: number; entityCapabilities: number; edge: number; discover: number };
       deployed?: string[];
+      pushed?: string[];
+      skipped?: string[];
       failed?: { ext_id: string; error: string; code?: string }[];
       error?: string;
       code?: string;
