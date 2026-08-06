@@ -6,6 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectValue,
+  SelectTrigger,
+  SelectPopup,
+  SelectItem,
+} from '@/components/ui/select';
 import { Loader2, Network, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { serversApi, contextualGraphApi } from '@/lib/api/client';
 import { toast } from 'sonner';
@@ -305,14 +312,18 @@ export function ServerGraphBanksDialog({
                         <>
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-white/50 whitespace-nowrap">Mode</Label>
-                            <select
+                            <Select
                               value={cfg.mode}
-                              onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
-                              className="h-8 rounded-md border border-white/20 bg-transparent text-white text-xs px-2 focus:border-emerald-400 focus:outline-none"
+                              onValueChange={(value) => setMode(bank.bank_id, value as 'manual' | 'auto')}
                             >
-                              <option value="manual">Manual</option>
-                              <option value="auto">Auto</option>
-                            </select>
+                              <SelectTrigger className="h-8 w-[110px] text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectPopup>
+                                <SelectItem value="manual" className="text-xs">Manual</SelectItem>
+                                <SelectItem value="auto" className="text-xs">Auto</SelectItem>
+                              </SelectPopup>
+                            </Select>
                           </div>
 
                           {cfg.mode === 'auto' && (
@@ -461,7 +472,7 @@ export function ServerGraphBanksDialog({
 
                         <div className="flex items-center justify-between pt-2 border-t border-white/10">
                           <div className="text-xs text-white/40">
-                            Defaults for auto: top 100 nodes, 50 entity-summary models per run.
+                            Auto defaults: top 100 nodes, no model types deployed.
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
