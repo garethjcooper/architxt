@@ -3,12 +3,12 @@
 The `graph` envelope section must contain a `nodes` array and an `edges` array.
 
 Node field rules:
-- `id`: canonical entity id. Known entities use `TYPE:ENTITY-ID`. Discovered candidates use `found:{slug}`.
+- `id`: stable working-graph id. Reuse the exact id from the topic or catalog. For genuinely new candidates not in the topic/catalog, use a lowercase hyphenated slug with no prefix.
 - `name`: human-readable name only; must not include the id.
 - `type`: the entity type.
 
 Edge field rules:
-- `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`.
+- `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied.
 - `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`.
 - `label`: short phrase, max 4 words.
 - `detail`: full description, max 2 sentences; empty string if not justified.

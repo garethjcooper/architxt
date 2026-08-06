@@ -1,5 +1,5 @@
 ### Entity id format
 
-- Known entities use the canonical id `TYPE:ENTITY-ID` (for example, `example-type:EXAMPLE-001`). The exact prefix and id are supplied in the entity catalog.
-- Discovered entities use `found:{slug}` where the slug is a lowercase hyphenated identifier derived from the entity name.
+- Every node already has a stable working-graph id. When a node is supplied in the topic or catalog, reuse that exact id in the `id`, `from`, and `to` fields. Do not change its case, prefix, or format.
+- If you discover a genuinely new candidate that is not in the supplied topic/catalog, use a lowercase hyphenated slug. Do not add `found:` or any other prefix; the system attaches labels.
 - The `name` field of a node is the human-readable display name and must not include the id.
