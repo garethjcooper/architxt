@@ -226,13 +226,21 @@ export function resolveRestrictions(bank) {
   const user = bank?.restriction || {};
   const defaults = bank?.mode === 'auto' ? DEFAULT_AUTO_RESTRICTIONS : { import: {}, deploy: {} };
 
+  // allowed_model_types must be explicitly omitted to inherit the default.
+  // An explicit empty array means "deploy no contextual model types".
+  const userAllowedModelTypes = user.deploy?.allowed_model_types;
+  const deployDefaults = { ...defaults.deploy };
+  if (userAllowedModelTypes !== undefined) {
+    delete deployDefaults.allowed_model_types;
+  }
+
   return {
     import: {
       ...defaults.import,
       ...user.import,
     },
     deploy: {
-      ...defaults.deploy,
+      ...deployDefaults,
       ...user.deploy,
     },
   };
