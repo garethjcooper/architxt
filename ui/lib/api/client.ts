@@ -537,15 +537,22 @@ export const mentalModelsApi = {
         content?: string | object | null;
         content_length?: number;
         parsed?: { narrative?: string; graph?: { nodes: unknown[]; edges: unknown[] } };
-        node_count?: number;
-        edge_count?: number;
         error?: string;
       }[];
     }>('/research/mental-models/health', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }, { timeoutMs: 60000 }),
+    }),
 
+  // Fetch raw Hindsight mental-model content without graph validation
+  fetchContent: (serverId: number, bankId: string, extId: string) =>
+    fetchApi<{
+      ext_id: string;
+      found: boolean;
+      content: string | object | null;
+      content_hash: string | null;
+      updated_at: string | null;
+    }>(`/research/mental-models/content?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&ext_id=${encodeURIComponent(extId)}`),
   // Tags
   getTags: (id: number) => fetchApi<Tag[]>(`/mentalmodels/${id}/tags`),
   addTag: (mmId: number, tagId: number) =>

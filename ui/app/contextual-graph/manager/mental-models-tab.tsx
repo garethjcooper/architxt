@@ -32,13 +32,12 @@ type PendingOp = {
   pop_updated_at: string;
 };
 
-type HealthResult = {
+type ContentResult = {
   ext_id: string;
-  healthy: boolean;
-  found?: boolean;
-  content?: string | object | null;
-  content_length?: number;
-  error?: string;
+  found: boolean;
+  content: string | object | null;
+  content_hash: string | null;
+  updated_at: string | null;
 };
 
 export interface MentalModelsTabProps {
@@ -50,7 +49,8 @@ export interface MentalModelsTabProps {
 export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTabProps) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
-  const [health, setHealth] = useState<Record<string, HealthResult>>({});
+  const [contents, setContents] = useState<Record<string, ContentResult>>({});
+  const [contentErrors, setContentErrors] = useState<Record<string, string>>({});
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
   const [selectedExtId, setSelectedExtId] = useState<string | null>(null);
@@ -85,7 +85,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
   }, [refs, search]);
 
   const selectedRef = useMemo(() => filteredRefs.find((r) => (r.ext_id || null) === selectedExtId) || null, [filteredRefs, selectedExtId]);
-  const selectedHealth = selectedExtId ? health[selectedExtId] || null : null;
+  const selectedContent = selectedExtId ? contents[selectedExtId] || null : null;
+  const selectedContentError = selectedExtId ? contentErrors[selectedExtId] || null : null;
 
   const fetchPendingOps = useCallback(async () => {
     if (!serverId || !bankId) {
@@ -114,22 +115,27 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
     if (!serverId || !bankId || extIds.length === 0) return;
     try {
       if (!opts.silent) setLoading(true);
-      const response = await mentalModelsApi.healthCheck({
-        server_id: serverId,
-        bank_id: bankId,
-        models: extIds.map((ext_id) => ({ ext_id })),
-      });
-      const results = response.results || [];
-      setHealth((prev) => {
+      const results = await Promise.all(
+        extIds.map(async (extId) => {
+          try {
+            return await mentalModelsApi.fetchContent(serverId, bankId, extId);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            setContentErrors((prev) => ({ ...prev, [extId]: message }));
+            return null;
+          }
+        })
+      );
+      setContents((prev) => {
         const next = { ...prev };
-        for (const r of results) next[r.ext_id] = r;
+        for (const r of results) if (r) next[r.ext_id] = r;
         return next;
       });
-      return results;
+      return results.filter(Boolean);
     } catch (err) {
       if (!opts.silent) {
         const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Health check failed: ${message}`);
+        toast.error(`Content fetch failed: ${message}`);
       }
     } finally {
       if (!opts.silent) setLoading(false);
@@ -166,10 +172,10 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
   const handleSelectRow = useCallback(async (ref: ModelRef) => {
     const extId = ref.ext_id || null;
     setSelectedExtId(extId);
-    if (extId && !health[extId]) {
+    if (extId && !contents[extId] && !contentErrors[extId]) {
       await runHealthCheck([extId], { silent: true });
     }
-  }, [health, runHealthCheck]);
+  }, [contents, contentErrors, runHealthCheck]);
 
   const handleRefresh = useCallback(async (ref: ModelRef, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -246,16 +252,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
       .sort((a, b) => new Date(b.pop_updated_at).getTime() - new Date(a.pop_updated_at).getTime())[0];
   };
 
-  const formatPreview = (result: HealthResult | null): string => {
+  const formatPreview = (result: ContentResult | null, error: string | null): string => {
+    if (error) return `Error:\n${error}`;
     if (!result) return '';
-    if (result.error) {
-      let out = `Error:\n${result.error}`;
-      if (result.content != null) {
-        const contentText = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-        out += `\n\nReturned content:\n${contentText}`;
-      }
-      return out;
-    }
     if (result.content != null) {
       return typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
     }
@@ -263,13 +262,13 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
   };
 
   const copyContent = useCallback(() => {
-    const text = formatPreview(selectedHealth);
+    const text = formatPreview(selectedContent, selectedContentError);
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => toast.success('Content copied to clipboard'));
-  }, [selectedHealth]);
+  }, [selectedContent, selectedContentError]);
 
   const downloadContent = useCallback(() => {
-    const text = formatPreview(selectedHealth);
+    const text = formatPreview(selectedContent, selectedContentError);
     if (!text) return;
     const extId = selectedExtId || 'model';
     const blob = new Blob([text], { type: 'text/plain' });
@@ -281,7 +280,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [selectedHealth, selectedExtId]);
+  }, [selectedContent, selectedContentError, selectedExtId]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -480,7 +479,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0"
-                disabled={!selectedHealth}
+                disabled={!selectedContent}
                 onClick={copyContent}
                 title="Copy content"
               >
@@ -490,7 +489,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0"
-                disabled={!selectedHealth}
+                disabled={!selectedContent}
                 onClick={downloadContent}
                 title="Download content"
               >
@@ -502,20 +501,20 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
           <div className="flex-1 min-h-0 overflow-auto p-3">
             {!selectedExtId ? (
               <div className="h-full flex items-center justify-center text-xs text-white/50">Select a mental model to view its fetched content.</div>
-            ) : loading && !selectedHealth ? (
+            ) : loading && !selectedContent ? (
               <div className="space-y-2 p-2">
                 <Skeleton className="h-4 w-3/4 bg-white/10" />
                 <Skeleton className="h-4 w-1/2 bg-white/10" />
                 <Skeleton className="h-4 w-5/6 bg-white/10" />
                 <Skeleton className="h-4 w-2/3 bg-white/10" />
               </div>
-            ) : selectedHealth?.error ? (
+            ) : selectedContentError ? (
               <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">
-                {selectedHealth.error}
+                {selectedContentError}
               </div>
             ) : (
               <pre className="text-xs text-white/80 whitespace-pre-wrap font-mono bg-black/20 rounded border border-white/10 p-3">
-                {formatPreview(selectedHealth)}
+                {formatPreview(selectedContent, selectedContentError)}
               </pre>
             )}
           </div>

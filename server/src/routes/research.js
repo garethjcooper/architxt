@@ -1039,6 +1039,76 @@ router.post('/mental-models/refresh', async (req, res) => {
 
 /**
  * @openapi
+ * /research/mental-models/content:
+ *   get:
+ *     summary: Fetch raw Hindsight mental-model content
+ *     description: |
+ *       Returns the latest content for a Hindsight mental model ext_id without
+ *       any graph parsing or validation. Useful for inspecting model output.
+ *     tags: [Research]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: ext_id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Content retrieved
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Model not found in Hindsight
+ *       502:
+ *         description: Hindsight server error
+ */
+router.get('/mental-models/content', async (req, res) => {
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.query.bank_id;
+  const extId = req.query.ext_id;
+  const start = Date.now();
+
+  if (!serverId || !bankId || !extId) {
+    return res.status(400).json({ error: 'server_id, bank_id, and ext_id are required', code: 'VALIDATION_ERROR' });
+  }
+
+  try {
+    const result = await getHindsightMentalModel(serverId, bankId, extId, { detail: 'content' });
+    if (!result.success) {
+      const status = result.code === 'NOT_FOUND' ? 404 : 502;
+      return res.status(status).json({ error: result.error, code: result.code || 'FETCH_FAILED' });
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        ext_id: extId,
+        found: true,
+        content: result.content ?? null,
+        content_hash: result.content_hash ?? null,
+        updated_at: result.updated_at ?? null,
+      },
+      logger,
+      method: 'GET',
+      path: '/research/mental-models/content',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research mental-models content fetch failed', { serverId, bankId, extId, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * @openapi
  * /research/sessions/{id}:
  *   get:
  *     summary: Get a research session
