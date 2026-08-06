@@ -246,17 +246,6 @@ export default function ContextManagerPage() {
     }
   }, [serverId, bankId]);
 
-  useEffect(() => {
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
-    if (serverId && bankId) {
-      loadGraph();
-    } else {
-      setNodes([]);
-      setEdges([]);
-    }
-  }, [serverId, bankId, loadGraph]);
-
   const handleRunSyncJob = useCallback(async () => {
     if (!serverId || !bankId) return;
     if (!window.confirm(`Run a full contextual sync job for ${bankId}? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.`)) return;
@@ -304,6 +293,22 @@ export default function ContextManagerPage() {
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) ?? null : null;
   const selectedEdge = selectedEdgeId ? edges.find((e) => e.id === selectedEdgeId) ?? null : null;
   const selectedItem: (DisplayNode | DisplayEdge) | null = selectedNode || selectedEdge;
+
+  const [activeTab, setActiveTab] = useState('graph');
+
+  useEffect(() => {
+    if (!serverId || !bankId) {
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+    // Refresh graph data whenever the user switches back to a data-driven tab.
+    if (activeTab === 'graph' || activeTab === 'models') {
+      loadGraph();
+    }
+  }, [serverId, bankId, activeTab, loadGraph]);
 
   const renderDetailPanel = () => {
     if (!selectedItem) {
@@ -415,8 +420,6 @@ export default function ContextManagerPage() {
       </div>
     );
   };
-
-  const [activeTab, setActiveTab] = useState('graph');
 
   return (
     <PageShell
