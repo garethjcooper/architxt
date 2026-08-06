@@ -22,4 +22,4 @@ Special handling:
 - Collapse an entire processing chain into a single node unless a stage is itself a known/deployed system.
 - Emit edges directly between systems for data carriers; do not create a node for the file, message, table, or stream.
 - Auto-collapse function-named components (for example, "Invoice Server", "PDF Generator") into the parent system unless the catalog explicitly marks them as a system.
-- Keep external/boundary sources as `found:` nodes only if explicitly named and persistent; generic references become edge detail.
+- Keep external/boundary sources as discovered nodes only if explicitly named and persistent; generic references become edge detail.

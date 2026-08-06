@@ -9,7 +9,7 @@ import {
   deleteNode,
   findEdgeByEndpoints,
 } from '../../db/crud/contextual-graph.js';
-import { buildDirectedEdgeId, normalizeModelNodeId, modelNodeLookupKeys } from './identity.js';
+import { buildDirectedEdgeId, normalizeModelNodeId, modelNodeLookupKeys, stripDiscoveryPrefix } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
 import { contentHash } from './normalize-model-output.js';
 
@@ -476,8 +476,9 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
   let createdEdges = 0;
 
   for (const node of output.graph.nodes) {
-    const resolvedId = resolveModelNodeId(node.id, allNodesMap, nodeIdByModelId);
-    idRemap.set(node.id, resolvedId);
+    const strippedId = stripDiscoveryPrefix(node.id);
+    const resolvedId = resolveModelNodeId(strippedId, allNodesMap, nodeIdByModelId);
+    idRemap.set(strippedId, resolvedId);
     nodeIds.add(resolvedId);
     nodeIdByModelId.set(normalizeModelNodeId(resolvedId), resolvedId);
     const existingNodeResult = getNode(db, serverId, bankId, resolvedId);
@@ -485,13 +486,13 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     const existingProperties = existingNode?.properties || {};
     const existingLabels = existingNode?.labels || [];
 
-    const isDiscoveredNode = String(resolvedId).startsWith('found:') || String(resolvedId).startsWith('candidate:');
+    const isExistingNode = allNodesMap.has(resolvedId);
 
     const discoveredProperties = {
       ...existingProperties,
       // Only set name/type from the discovery output for new candidate nodes.
       // Canonical and grounded nodes keep their existing display_name/type.
-      ...(isDiscoveredNode ? { display_name: node.name, type: node.type } : {}),
+      ...(!isExistingNode ? { display_name: node.name, type: node.type } : {}),
       provenance: {
         ...(existingProperties.provenance || {}),
         source: 'contextual-graph',
@@ -506,8 +507,8 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
   }
 
   for (const edge of output.graph.edges) {
-    const fromId = idRemap.get(edge.from) || resolveModelNodeId(edge.from, allNodesMap, nodeIdByModelId);
-    const toId = idRemap.get(edge.to) || resolveModelNodeId(edge.to, allNodesMap, nodeIdByModelId);
+    const fromId = idRemap.get(stripDiscoveryPrefix(edge.from)) || resolveModelNodeId(stripDiscoveryPrefix(edge.from), allNodesMap, nodeIdByModelId);
+    const toId = idRemap.get(stripDiscoveryPrefix(edge.to)) || resolveModelNodeId(stripDiscoveryPrefix(edge.to), allNodesMap, nodeIdByModelId);
 
     if (!nodeIds.has(fromId) || !nodeIds.has(toId)) {
       warnings.push(`Discovery edge ${edge.from} -> ${edge.to} references a node not emitted by the model; skipping`);

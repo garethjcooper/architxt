@@ -125,7 +125,7 @@ describe('reflect handler', () => {
 
     assert.ok(capturedQuery);
     assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
-    assert.ok(capturedQuery.includes('found:'));
+    assert.ok(capturedQuery.includes('bare-slug'));
   });
 
   it('composes the graph-known template when output_mode is graph-only', async () => {

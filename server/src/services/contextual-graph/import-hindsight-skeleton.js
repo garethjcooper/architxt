@@ -1,7 +1,7 @@
 import { createLogger } from '../../utils/logger.js';
 import { getEntityGraph } from '../hindsight/research.js';
 import { buildArchitxtLookups, resolveHindsightNode, buildUndirectedEdgeId } from './identity.js';
-import { upsertNode, upsertEdge, listNodes, listEdges } from '../../db/crud/contextual-graph.js';
+import { upsertNode, upsertEdge, listNodes, listEdges, getNode } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-import');
 
@@ -114,7 +114,7 @@ export async function importHindsightSkeleton(
     const isCanonical = resolved.taxonomy === 'canonical';
     const labels = isCanonical
       ? ['canonical', 'active', resolved.typeLabel].filter(Boolean)
-      : ['uncanonical', 'grounded', 'active', resolved.typeLabel].filter(Boolean);
+      : ['grounded', 'active', resolved.typeLabel].filter(Boolean);
 
     const properties = {
       display_name: resolved.displayName,
@@ -126,11 +126,8 @@ export async function importHindsightSkeleton(
       updated_at: now,
     };
 
-    const existing = await listNodes(db, serverId, bankId, {
-      idPrefix: resolved.id,
-      limit: 1,
-    });
-    const existingNode = existing.success && existing.data?.[0];
+    const existing = await getNode(db, serverId, bankId, resolved.id);
+    const existingNode = existing.success ? existing.data : null;
     const mergedProperties = existingNode
       ? mergeProperties(existingNode.cgn_properties, properties)
       : properties;

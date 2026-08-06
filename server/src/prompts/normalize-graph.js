@@ -12,7 +12,6 @@ import { createLogger } from '../utils/logger.js';
 const logger = createLogger('normalize-graph');
 
 const KNOWN_ID_RE = /^[a-z][a-z0-9-]*:[A-Za-z0-9._-]+$/;
-const FOUND_ID_PREFIX = 'found:';
 const MAX_SLUG_LENGTH = 64;
 
 const VALID_EDGE_TYPES = new Set(['calls', 'sends', 'reads', 'writes', 'depends-on']);
@@ -49,7 +48,6 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
   const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
 
   const nodeById = new Map();
-  const foundNameCollisions = new Map();
 
   for (const n of rawNodes) {
     if (!n || typeof n !== 'object') continue;
@@ -67,11 +65,6 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       name = id;
     }
 
-    if (id.startsWith(FOUND_ID_PREFIX)) {
-      const baseSlug = id.slice(FOUND_ID_PREFIX.length);
-      id = `${FOUND_ID_PREFIX}${normalizeSlug(baseSlug, name)}`;
-    }
-
     if (nodeById.has(id)) {
       const existing = nodeById.get(id);
       // Known catalog wins for name conflicts.
@@ -84,12 +77,17 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       continue;
     }
 
-    if (id.startsWith(FOUND_ID_PREFIX) && !DISCOVERY_MODES.has(mode)) {
-      logger.warn('Discovered node present in known-only mode', { id });
+    if (KNOWN_ID_RE.test(id) && !knownCatalog.has(id)) {
+      // Only warn when the catalog explicitly does not contain the id; do not
+      // treat valid data-driven type prefixes (e.g. "System:Singleview") as
+      // suspicious just because the regex is lowercase-only.
+      logger.warn('Node id uses known format but is not in catalog', { id });
     }
 
-    if (KNOWN_ID_RE.test(id) && !id.startsWith(FOUND_ID_PREFIX) && !knownCatalog.has(id)) {
-      logger.warn('Node id uses known format but is not in catalog', { id });
+    // Slug-normalize only plain discovered slugs, preserving explicit type ids
+    // and legacy `found:` ids for backward compatibility.
+    if (!id.includes(':')) {
+      id = normalizeSlug(id);
     }
 
     nodeById.set(id, {
@@ -102,17 +100,21 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
     });
   }
 
-  // Resolve found: id collisions with same name.
+  // Collapse discovered nodes that share the same name but have different slugs.
+  // This prevents the model from emitting both "found:payment-gateway" and
+  // "payment-gateway" as separate nodes.
+  const discoveredNameCollisions = new Map();
   for (const [id, node] of nodeById) {
-    if (!id.startsWith(FOUND_ID_PREFIX)) continue;
-    if (foundNameCollisions.has(node.name)) {
-      const firstId = foundNameCollisions.get(node.name);
+    if (node.provenance !== 'discovered' && !id.startsWith('found:')) continue;
+    const key = node.name.toLowerCase().replace(/\W+/g, '-');
+    if (discoveredNameCollisions.has(key)) {
+      const firstId = discoveredNameCollisions.get(key);
       if (firstId !== id) {
-        logger.warn('Found nodes with same name but different slugs; collapsing', { id, firstId, name: node.name });
+        logger.warn('Discovered nodes with same name but different ids; collapsing', { id, firstId, name: node.name });
         nodeById.delete(id);
       }
     } else {
-      foundNameCollisions.set(node.name, id);
+      discoveredNameCollisions.set(key, id);
     }
   }
 
@@ -122,18 +124,21 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
   for (const e of rawEdges) {
     if (!e || typeof e !== 'object') continue;
 
-    let from = normalizeEdgeEndpoint(e.from, nodeById, 'from');
-    let to = normalizeEdgeEndpoint(e.to, nodeById, 'to');
+    let from = normalizeEdgeEndpoint(e.from);
+    let to = normalizeEdgeEndpoint(e.to);
     if (!from || !to) {
       logger.warn('Skipping edge with missing endpoint', { edge: e });
       continue;
     }
 
-    // For discovered-only, any edge that only touches known/corpus nodes is invalid:
-    // known/corpus entities may only appear as endpoints of a discovered edge.
+    // For discovered-only modes, require at least one endpoint to be a
+    // discovered node. Nodes are considered discovered if their provenance is
+    // explicitly marked as such or if they carry the legacy `found:` prefix.
     if (DISCOVERED_ONLY_MODES.has(mode)) {
-      const fromDiscovered = from.startsWith(FOUND_ID_PREFIX);
-      const toDiscovered = to.startsWith(FOUND_ID_PREFIX);
+      const fromNode = nodeById.get(from);
+      const toNode = nodeById.get(to);
+      const fromDiscovered = from.startsWith('found:') || fromNode?.provenance === 'discovered';
+      const toDiscovered = to.startsWith('found:') || toNode?.provenance === 'discovered';
       if (!fromDiscovered && !toDiscovered) {
         logger.warn('Discovered-only edge missing discovered endpoint', { from, to, edge: e });
         continue;
@@ -175,7 +180,7 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
     const detail = typeof e.detail === 'string' ? e.detail.trim() : '';
 
     const key = `${from}|${to}|${type}`;
-    const provenance = deriveProvenance(from, to, activity);
+    const provenance = deriveProvenance(from, to, activity, nodeById);
 
     if (edgeByKey.has(key)) {
       const existing = edgeByKey.get(key);
@@ -193,27 +198,18 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
   };
 }
 
-function normalizeEdgeEndpoint(value, nodeById, role) {
+function normalizeEdgeEndpoint(value) {
   if (typeof value !== 'string') return null;
   const id = value.trim();
   if (!id) return null;
-
-  if (id.startsWith(FOUND_ID_PREFIX)) {
-    // If the endpoint was supplied as found:slug but we collapsed it, resolve to existing node.
-    for (const [existingId, node] of nodeById) {
-      if (existingId.startsWith(FOUND_ID_PREFIX) && node.name.toLowerCase().replace(/\W+/g, '-') === id.slice(FOUND_ID_PREFIX.length).toLowerCase()) {
-        return existingId;
-      }
-    }
-  }
-
   return id;
 }
 
-function deriveProvenance(from, to, activity) {
-  if (from.startsWith(FOUND_ID_PREFIX) || to.startsWith(FOUND_ID_PREFIX)) {
-    return 'discovered';
-  }
+function deriveProvenance(from, to, activity, nodeById) {
+  const fromNode = nodeById.get(from);
+  const toNode = nodeById.get(to);
+  if (from.startsWith('found:') || to.startsWith('found:')) return 'discovered';
+  if (fromNode?.provenance === 'discovered' || toNode?.provenance === 'discovered') return 'discovered';
   if (activity === 'synthesize') return 'inferred';
   return 'known';
 }

@@ -109,8 +109,8 @@ describe('applyModelOutput', () => {
     const firstOutput = normalizeModelOutput(JSON.stringify({
       narrative: '',
       graph: {
-        nodes: [{ id: 'found:a', name: 'A', type: 'service' }],
-        edges: [{ from: 'svc-001', to: 'found:a', type: 'calls', label: 'calls', detail: 'detail', evidence: ['mem-3'] }],
+        nodes: [{ id: 'candidate:a', name: 'A', type: 'service' }],
+        edges: [{ from: 'svc-001', to: 'candidate:a', type: 'calls', label: 'calls', detail: 'detail', evidence: ['mem-3'] }],
       },
       tables: [],
     }));
@@ -119,7 +119,7 @@ describe('applyModelOutput', () => {
     assert.equal(result.success, true);
     assert.equal(result.applied.nodeCount, 1);
 
-    const discovered = getNode(db, serverId, bankId, 'found:a').data;
+    const discovered = getNode(db, serverId, bankId, 'a').data;
     assert.ok(discovered.labels.includes('candidate'));
     assert.equal(discovered.properties.provenance.discovery, 'discovered');
 
@@ -127,8 +127,8 @@ describe('applyModelOutput', () => {
     const secondOutput = normalizeModelOutput(JSON.stringify({
       narrative: '',
       graph: {
-        nodes: [{ id: 'found:b', name: 'B', type: 'service' }],
-        edges: [{ from: 'svc-001', to: 'found:b', type: 'sends', label: 'sends', detail: 'detail', evidence: ['mem-4'] }],
+        nodes: [{ id: 'candidate:b', name: 'B', type: 'service' }],
+        edges: [{ from: 'svc-001', to: 'candidate:b', type: 'sends', label: 'sends', detail: 'detail', evidence: ['mem-4'] }],
       },
       tables: [],
     }));
@@ -136,14 +136,14 @@ describe('applyModelOutput', () => {
     result = await applyModelOutput(db, serverId, bankId, model('discover-svc-001', 'sys_discovery_context'), secondOutput);
     assert.equal(result.success, true);
 
-    const oldNode = getNode(db, serverId, bankId, 'found:a').data;
+    const oldNode = getNode(db, serverId, bankId, 'a').data;
     assert.equal(oldNode, null);
-    const newNode = getNode(db, serverId, bankId, 'found:b').data;
+    const newNode = getNode(db, serverId, bankId, 'b').data;
     assert.ok(newNode);
 
     // Count edges after second apply. The old edge should be gone and one new edge should exist.
     const edges = listEdges(db, serverId, bankId, { limit: 100 }).data;
-    const discoveredEdges = edges.filter((e) => e.cge_source_id === 'svc-001' && e.cge_target_id === 'found:b');
+    const discoveredEdges = edges.filter((e) => e.cge_source_id === 'svc-001' && e.cge_target_id === 'b');
     assert.equal(discoveredEdges.length, 1);
     assert.equal(discoveredEdges[0].cge_type, 'sends');
   });
@@ -243,12 +243,12 @@ describe('applyModelOutput', () => {
     assert.equal(edge.cge_type, 'sends');
   });
 
-  it('resolves model-emitted found: ids to existing uncanonical nodes', async () => {
+  it('resolves model-emitted found: ids to existing grounded nodes', async () => {
     // Reproduces the fresh-bank scenario where the edge-context model emits
-    // discovery-style ids for nodes that already exist as uncanonical ground
-    // nodes from the Hindsight skeleton.
-    upsertNode(db, serverId, bankId, 'uncanonical:mozart-api', ['uncanonical', 'grounded', 'active'], { display_name: 'Mozart API', aliases: ['Mozart API'] });
-    upsertNode(db, serverId, bankId, 'uncanonical:subscriber', ['uncanonical', 'grounded', 'active'], { display_name: 'Subscriber', aliases: ['Subscriber'] });
+    // discovery-style ids for nodes that already exist as grounded nodes from
+    // the Hindsight skeleton.
+    upsertNode(db, serverId, bankId, 'mozart-api', ['grounded', 'active'], { display_name: 'Mozart API', aliases: ['Mozart API'] });
+    upsertNode(db, serverId, bankId, 'subscriber', ['grounded', 'active'], { display_name: 'Subscriber', aliases: ['Subscriber'] });
 
     const output = normalizeModelOutput(JSON.stringify({
       narrative: '',
@@ -262,19 +262,19 @@ describe('applyModelOutput', () => {
       tables: [],
     }));
 
-    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-uncanonical:subscriber|uncanonical:mozart-api', 'sys_edge_context'), output);
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-subscriber|mozart-api', 'sys_edge_context'), output);
     assert.equal(result.success, true);
     assert.equal(result.applied.createdNodes, 0);
     assert.equal(result.applied.edgeIds.length, 1);
 
-    const mozart = getNode(db, serverId, bankId, 'uncanonical:mozart-api').data;
-    const subscriber = getNode(db, serverId, bankId, 'uncanonical:subscriber').data;
+    const mozart = getNode(db, serverId, bankId, 'mozart-api').data;
+    const subscriber = getNode(db, serverId, bankId, 'subscriber').data;
     assert.equal(mozart.properties.provenance.inferred, 'edge-context');
     assert.equal(subscriber.properties.provenance.inferred, 'edge-context');
 
     const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
-    assert.equal(edge.cge_source_id, 'uncanonical:mozart-api');
-    assert.equal(edge.cge_target_id, 'uncanonical:subscriber');
+    assert.equal(edge.cge_source_id, 'mozart-api');
+    assert.equal(edge.cge_target_id, 'subscriber');
     assert.equal(edge.cge_type, 'sends');
 
     const foundMozart = getNode(db, serverId, bankId, 'found:mozart-api').data;

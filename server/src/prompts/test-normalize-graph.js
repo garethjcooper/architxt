@@ -13,10 +13,10 @@ describe('normalizeGraph', () => {
     assert.strictEqual(result.edges[0].provenance, 'known');
   });
 
-  it('derives discovered provenance from found: endpoint', () => {
+  it('derives discovered provenance from discovered endpoint', () => {
     const result = normalizeGraph({
-      nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'found:payment-gateway', name: 'Payment Gateway' }],
-      edges: [{ from: 'a-com:COM-001', to: 'found:payment-gateway', type: 'sends', label: 'charges' }],
+      nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'payment-gateway', name: 'Payment Gateway', provenance: 'discovered' }],
+      edges: [{ from: 'a-com:COM-001', to: 'payment-gateway', type: 'sends', label: 'charges' }],
     }, { activity: 'reflect' });
     assert.strictEqual(result.edges[0].provenance, 'discovered');
   });
@@ -42,12 +42,12 @@ describe('normalizeGraph', () => {
     assert.strictEqual(result.edges[0].detail, 'A; B');
   });
 
-  it('normalizes found: slugs', () => {
+  it('normalizes bare slugs', () => {
     const result = normalizeGraph({
-      nodes: [{ id: 'found:Payment Gateway!', name: 'Payment Gateway' }],
+      nodes: [{ id: 'Payment Gateway!', name: 'Payment Gateway' }],
       edges: [],
     });
-    assert.strictEqual(result.nodes[0].id, 'found:payment-gateway');
+    assert.strictEqual(result.nodes[0].id, 'payment-gateway');
   });
 
   it('skips nodes without id', () => {
@@ -72,10 +72,10 @@ describe('normalizeGraph', () => {
     ]);
     const result = normalizeGraph({
       nodes: [
-        { id: 'found:billdb-fuse-rendered-invoice', name: 'Rendered Invoice Flow' },
+        { id: 'billdb-fuse-rendered-invoice', name: 'Rendered Invoice Flow', provenance: 'discovered' },
       ],
       edges: [
-        { from: 'a-com:COM-011', to: 'found:billdb-fuse-rendered-invoice', type: 'sends' },
+        { from: 'a-com:COM-011', to: 'billdb-fuse-rendered-invoice', type: 'sends' },
       ],
     }, { activity: 'reflect', knownCatalog, mode: 'graph-discovery' });
     assert.strictEqual(result.nodes.length, 2);
@@ -89,7 +89,7 @@ describe('normalizeGraph', () => {
 
   it('preserves node label, type, provenance and source', () => {
     const result = normalizeGraph({
-      nodes: [{ id: 'found:alpha', name: 'Alpha', label: 'A', type: 'service', provenance: 'discovered', source: 'llm' }],
+      nodes: [{ id: 'alpha', name: 'Alpha', label: 'A', type: 'service', provenance: 'discovered', source: 'llm' }],
       edges: [],
     }, { mode: 'graph-discovery' });
     assert.strictEqual(result.nodes.length, 1);
@@ -101,16 +101,16 @@ describe('normalizeGraph', () => {
 
   it('allows discovered nodes in discovery mode', () => {
     const result = normalizeGraph({
-      nodes: [{ id: 'found:beta', name: 'Beta' }],
+      nodes: [{ id: 'beta', name: 'Beta', provenance: 'discovered' }],
       edges: [],
     }, { mode: 'graph-discovery' });
     assert.strictEqual(result.nodes.length, 1);
-    assert.strictEqual(result.nodes[0].id, 'found:beta');
+    assert.strictEqual(result.nodes[0].id, 'beta');
   });
 
   it('allows discovered nodes in discovered-only mode', () => {
     const result = normalizeGraph({
-      nodes: [{ id: 'found:gamma', name: 'Gamma' }],
+      nodes: [{ id: 'gamma', name: 'Gamma', provenance: 'discovered' }],
       edges: [],
     }, { mode: 'graph-discovered-only' });
     assert.strictEqual(result.nodes.length, 1);
@@ -120,15 +120,15 @@ describe('normalizeGraph', () => {
     const result = normalizeGraph({
       nodes: [
         { id: 'a-com:COM-001', name: 'Known' },
-        { id: 'found:delta', name: 'Delta' },
+        { id: 'delta', name: 'Delta', provenance: 'discovered' },
       ],
       edges: [
         { from: 'a-com:COM-001', to: 'a-com:COM-001', type: 'depends-on' },
-        { from: 'a-com:COM-001', to: 'found:delta', type: 'sends' },
+        { from: 'a-com:COM-001', to: 'delta', type: 'sends' },
       ],
     }, { mode: 'graph-discovered-only' });
     assert.strictEqual(result.edges.length, 1);
-    assert.strictEqual(result.edges[0].to, 'found:delta');
+    assert.strictEqual(result.edges[0].to, 'delta');
   });
 });
 
