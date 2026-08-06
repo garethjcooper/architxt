@@ -147,13 +147,13 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
 
     const nextActive = new Set(
       pendingOps
-        .filter((op) => op.pop_action === 'refresh' && !isTerminalStatus(op.pop_status))
+        .filter((op) => ['refresh', 'mental_model_refresh'].includes(op.pop_action) && !isTerminalStatus(op.pop_status))
         .map((op) => op.pop_operation_id),
     );
 
     const justCompleted = pendingOps.filter(
       (op) =>
-        op.pop_action === 'refresh' &&
+        ['refresh', 'mental_model_refresh'].includes(op.pop_action) &&
         op.pop_status === 'completed' &&
         activeRefreshIdsRef.current.has(op.pop_operation_id),
     );
@@ -168,6 +168,13 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
 
     runHealthCheck(targets, { silent: true });
   }, [pendingOps, serverId, bankId, runHealthCheck]);
+
+  const getOperationForRow = (extId?: string) => {
+    if (!extId) return null;
+    return pendingOps
+      .filter((op) => op.pop_ext_id === extId && ['refresh', 'mental_model_refresh'].includes(op.pop_action) && !isTerminalStatus(op.pop_status))
+      .sort((a, b) => new Date(b.pop_updated_at).getTime() - new Date(a.pop_updated_at).getTime())[0];
+  };
 
   const handleSelectRow = useCallback(async (ref: ModelRef) => {
     const extId = ref.ext_id || null;
@@ -244,13 +251,6 @@ export function MentalModelsTab({ serverId, bankId, modelRefs }: MentalModelsTab
     }
     await fetchPendingOps();
   }, [serverId, bankId, filteredRefs, fetchPendingOps]);
-
-  const getOperationForRow = (extId?: string) => {
-    if (!extId) return null;
-    return pendingOps
-      .filter((op) => op.pop_ext_id === extId && op.pop_action === 'refresh' && !isTerminalStatus(op.pop_status))
-      .sort((a, b) => new Date(b.pop_updated_at).getTime() - new Date(a.pop_updated_at).getTime())[0];
-  };
 
   const formatPreview = (result: ContentResult | null, error: string | null): string => {
     if (error) return `Error:\n${error}`;
