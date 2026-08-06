@@ -6,7 +6,7 @@ import {
   deriveEntityCapabilitiesModel,
   deriveEdgeContextModel,
 } from './template-models.js';
-import { dedupeCandidates, buildUndirectedEdgeId } from './identity.js';
+import { dedupeCandidates, buildUndirectedEdgeId, modelNodeLookupKeys } from './identity.js';
 import { upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-discovery');
@@ -169,16 +169,20 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
     }
   }
 
-  for (const { candidate } of mergedIntoExisting) {
-    const existing = existingNodes.find((n) => n.cgn_id === candidate.id);
-    if (existing && !hasEntitySummaryRef(existing.cgn_properties)) {
+  for (const { candidate, target } of mergedIntoExisting) {
+    const existingId = target?.id;
+    if (!existingId) continue;
+    const existing = existingNodes.find((n) => n.cgn_id === existingId);
+    if (!existing) continue;
+
+    if (!hasEntitySummaryRef(existing.cgn_properties)) {
       entitySpecs.push(await deriveEntitySummaryModel(db, {
-        id: existing.cgn_id,
-        displayName: existing.cgn_properties?.display_name || existing.cgn_id,
+        id: existingId,
+        displayName: existing.cgn_properties?.display_name || existingId,
       }));
       entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
-        id: existing.cgn_id,
-        displayName: existing.cgn_properties?.display_name || existing.cgn_id,
+        id: existingId,
+        displayName: existing.cgn_properties?.display_name || existingId,
       }));
     }
 
@@ -188,14 +192,14 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
         const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
 
         edgeSpecs.push(await deriveEdgeContextModel(db, {
-          id: candidate.id,
-          displayName: candidate.displayName || candidate.id,
+          id: existingId,
+          displayName: existing.cgn_properties?.display_name || existingId,
         }, {
           id: he.target,
           displayName: targetNode?.cgn_properties?.display_name || he.target,
         }));
 
-        const edgeId = buildUndirectedEdgeId(candidate.id, he.target, null, 'discover');
+        const edgeId = buildUndirectedEdgeId(existingId, he.target, null, 'discover');
         const edgeProperties = {
           directed: false,
           type: he.type || 'co-occurs',
@@ -204,7 +208,7 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
           last_seen_at: now,
           updated_at: now,
         };
-        upsertEdge(db, serverId, bankId, edgeId, candidate.id, he.target, null, edgeProperties);
+        upsertEdge(db, serverId, bankId, edgeId, existingId, he.target, null, edgeProperties);
         upsertedEdges.push(edgeId);
       }
     }
@@ -219,22 +223,40 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
 }
 
 function buildLookupsFromGraph(nodes) {
-  const byName = new Map();
-  const byId = new Map();
+  const byKey = new Map();
   for (const n of nodes) {
-    const display = n.cgn_properties?.display_name;
-    if (display) byName.set(display.toLowerCase(), n.cgn_id);
-    for (const alias of n.cgn_properties?.aliases || []) {
-      if (alias) byName.set(alias.toLowerCase(), n.cgn_id);
+    const id = n.cgn_id;
+    // Register the node under every lookup key derived from its id, display
+    // name, and aliases. This lets model-emitted ids like `found:mozart-api`
+    // resolve to an existing `uncanonical:mozart-api` or `svc:mozart-api` node.
+    for (const key of modelNodeLookupKeys(id).concat([id])) {
+      if (!byKey.has(key)) {
+        byKey.set(key, id);
+      }
     }
-    byId.set(n.cgn_id, n.cgn_id);
+
+    const display = n.cgn_properties?.display_name;
+    if (display) {
+      for (const key of modelNodeLookupKeys(display)) {
+        if (!byKey.has(key)) {
+          byKey.set(key, id);
+        }
+      }
+    }
+
+    for (const alias of n.cgn_properties?.aliases || []) {
+      for (const key of modelNodeLookupKeys(alias)) {
+        if (!byKey.has(key)) {
+          byKey.set(key, id);
+        }
+      }
+    }
   }
   return {
     find: (nameOrId) => {
       if (!nameOrId) return undefined;
-      const id = byId.get(nameOrId) || byName.get(String(nameOrId).toLowerCase());
-      if (!id) return undefined;
-      return { id };
+      const key = String(nameOrId).toLowerCase();
+      return byKey.get(key) ? { id: byKey.get(key) } : undefined;
     },
   };
 }

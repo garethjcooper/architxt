@@ -215,6 +215,40 @@ describe('ingestCandidates', () => {
     serverId = seedServer(db);
   });
 
+  it('merges discovered found: candidates into existing uncanonical nodes', async () => {
+    const { upsertNode, listNodes, getNode } = await import('../src/db/crud/contextual-graph.js');
+    upsertNode(db, serverId, 'Mozart-API', 'uncanonical:mozart-api', ['uncanonical', 'grounded', 'active'], {
+      display_name: 'Mozart API',
+      aliases: ['Mozart API'],
+    });
+    upsertNode(db, serverId, 'Mozart-API', 'uncanonical:subscriber', ['uncanonical', 'grounded', 'active'], {
+      display_name: 'Subscriber',
+      aliases: ['Subscriber'],
+    });
+
+    const candidates = [
+      {
+        id: 'found:mozart-api',
+        summary: 'Mozart API',
+        hypothesized_edges: [
+          { target: 'uncanonical:subscriber', type: 'sends', evidence: 'mem-001' },
+        ] },
+    ];
+
+    const existingNodes = listNodes(db, serverId, 'Mozart-API', { limit: 10000 }).data;
+    const result = await ingestCandidates(db, serverId, 'Mozart-API', 'uncanonical:subscriber', candidates, { existingNodes });
+
+    assert.equal(result.success, true);
+    assert.equal(result.upserted.nodes.length, 0);
+    assert.equal(result.upserted.edges.length, 1);
+    assert.equal(result.entity[0].ext_id, 'entity-summary-uncanonical:mozart-api');
+    assert.equal(result.entity[1].ext_id, 'entity-capabilities-uncanonical:mozart-api');
+    assert.equal(result.edge[0].ext_id, 'edge-ctx-uncanonical:mozart-api|uncanonical:subscriber');
+
+    const foundNode = getNode(db, serverId, 'Mozart-API', 'found:mozart-api').data;
+    assert.equal(foundNode, null);
+  });
+
   it('upserts candidate nodes/edges and derives entity/edge-ctx specs', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
