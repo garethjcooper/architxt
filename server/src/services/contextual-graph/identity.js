@@ -63,9 +63,15 @@ export function normalizeNodeId(label) {
 /**
  * Build a working-graph node id from a Hindsight node.
  *
+ * - If the node resolves to a canonical Architxt entity, use the catalog id
+ *   (type:id). The type prefix is data-driven from the entity type registry.
+ * - Otherwise use a stable bare normalized slug. Status metadata such as
+ *   "uncanonical", "found", or "candidate" lives in node labels, not in the id.
+ *
  * @param {Object} options
  * @param {string} options.label - raw Hindsight label/value
  * @param {string} [options.canonicalId] - resolved canonical entity id
+ * @param {string} [options.typeLabel] - explicit type prefix from the label
  * @returns {string}
  */
 export function buildNodeId({ label, canonicalId, typeLabel }) {
@@ -77,7 +83,7 @@ export function buildNodeId({ label, canonicalId, typeLabel }) {
   const localLabel = inferredType ? stripTypePrefix(label, inferredType) : label;
   const normalized = normalizeNodeId(localLabel);
   if (inferredType) return `${inferredType}:${normalized}`;
-  return `uncanonical:${normalized}`;
+  return normalized;
 }
 
 function stripTypePrefix(value, typeLabel) {
@@ -128,9 +134,11 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
   const existingNode = await getNode(db, serverId, bankId, normalizedId);
   if (existingNode?.data) {
     const node = existingNode.data;
+    const isGrounded = node.labels?.includes('grounded');
+    const isCanonical = node.labels?.includes('canonical');
     return {
       id: normalizedId,
-      taxonomy: node.labels?.includes('grounded') ? 'uncanonical-grounded' : 'uncanonical-discovered',
+      taxonomy: isCanonical ? 'canonical' : (isGrounded ? 'uncanonical-grounded' : 'uncanonical-discovered'),
       existingNode: node,
       displayName,
       typeLabel: rawTypeLabel,
@@ -154,9 +162,11 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
  * @returns {string|null}
  */
 /**
- * Strip discovery/artifact prefixes so a model-emitted `found:{slug}` or
- * `candidate:{slug}` id can be resolved against an existing typed or
- * uncanonical node.
+ * Strip transient discovery prefixes (`found:`, `candidate:`) from a model-
+ * emitted id. These prefixes are not part of the stable node identity; they
+ * were historically used as a hint that a node was newly discovered, but that
+ * state now lives in node labels. The function is retained so legacy model
+ * outputs still resolve correctly during the transition.
  *
  * @param {string} label
  * @returns {string}
@@ -174,13 +184,12 @@ export function stripDiscoveryPrefix(label) {
  * explicit type prefix when present. This is intentionally looser than the full
  * `buildNodeId` resolution used during Hindsight skeleton import because models
  * may emit bare names (e.g. "mozart-api") that should resolve to an existing
- * "svc:mozart-api" or "uncanonical:mozart-api" node, while an emitted
- * "svc:mozart-api" should be left as-is.
+ * "svc:mozart-api" or bare "mozart-api" node.
  *
  * `found:` and `candidate:` prefixes are stripped for matching; they are
- * discovery aliases, not distinct identity namespaces. A `found:mozart-api`
- * emitted by a model should resolve to an existing `uncanonical:mozart-api`
- * node rather than creating a duplicate.
+ * transient discovery markers, not distinct identity namespaces. A
+ * `found:mozart-api` emitted by a legacy model should resolve to an existing
+ * bare "mozart-api" node rather than creating a duplicate.
  *
  * @param {string} label
  * @returns {string}
@@ -197,34 +206,26 @@ export function normalizeModelNodeId(label) {
 }
 
 /**
- * Return all lookup keys that a model-emitted id should be matched against.
- * This includes the normalized bare slug and, when a discovery prefix is
- * present, the `found:` / `candidate:` forms so existing nodes can be found
- * either way.
+ * Return lookup keys that a model-emitted id should be matched against. The
+ * keys include the normalized bare/typed form of the id, plus display names
+ * and aliases when they are passed in. Discovery prefixes (`found:`,
+ * `candidate:`) are stripped; they are labels, not identity namespaces.
  *
  * @param {string} label
  * @returns {string[]}
  */
 export function modelNodeLookupKeys(label) {
   if (!label || typeof label !== 'string') return [];
-  const keys = new Set();
   const bare = stripDiscoveryPrefix(label);
   const normalizedBare = normalizeModelNodeId(bare);
-  keys.add(normalizedBare);
+  const keys = new Set([normalizedBare]);
 
   const typeLabel = extractTypeLabel(bare);
   if (!typeLabel) {
-    // Bare name: also look for it as a discovery-prefixed id.
-    keys.add(`found:${normalizedBare}`);
-    keys.add(`candidate:${normalizedBare}`);
-    keys.add(`uncanonical:${normalizedBare}`);
-  }
-
-  const lowered = label.toLowerCase();
-  if (lowered.startsWith('found:') || lowered.startsWith('candidate:')) {
-    // Discovery id: also look for the bare normalized form (already added) and
-    // the uncanonical form, which is how ground nodes from Hindsight are stored.
-    keys.add(`uncanonical:${normalizedBare}`);
+    // For backward compatibility with legacy model outputs, also register the
+    // bare slug so a `found:mozart-api` input can match an existing bare
+    // "mozart-api" node.
+    keys.add(normalizeNodeId(bare));
   }
 
   return Array.from(keys);
@@ -265,7 +266,7 @@ export async function dedupeCandidates(db, serverId, bankId, lookups, candidates
     const candidateName = candidate.summary || candidate.name || candidate.id;
     const names = [candidateName, ...(candidate.aliases || [])];
     const normalizedName = normalizeNodeId(candidateName);
-    const candidateId = `candidate:${normalizedName}`;
+    const candidateId = normalizedName;
 
     let canonicalMatch = null;
     let existingMatch = null;

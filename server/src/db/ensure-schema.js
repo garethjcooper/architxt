@@ -307,7 +307,7 @@ const BUILTIN_TEMPLATES = [
     name: 'graph-discovery',
     mode: 'graph-discovery',
     description: 'Graph-only output allowing discovered nodes.',
-    body: 'Return only the graph section for the topic below. Prefer known entities from the catalog; you may add found: nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    body: 'Return only the graph section for the topic below. Prefer known entities from the catalog; you may add bare-slug discovered nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
     fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-allowed.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
     examplesHeuristic: 'top-n',
@@ -334,7 +334,7 @@ const BUILTIN_TEMPLATES = [
     name: 'narrative-graph-discovery',
     mode: 'narrative-graph-discovery',
     description: 'Narrative + graph allowing discovered nodes.',
-    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section. Prefer known entities from the catalog; you may add found: nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section. Prefer known entities from the catalog; you may add bare-slug discovered nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
     fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-allowed.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
     examplesHeuristic: 'top-n',
@@ -455,11 +455,11 @@ Rules:
 Return candidate nodes and edges in \`graph.nodes\` and \`graph.edges\`. This output is an internal working-graph input only; do not surface it as user-facing prose.
 
 Rules:
-- Candidate node IDs must use the \`found:{slug}\` form.
-- Existing known nodes must use their canonical \`TYPE:ID\` id.
+- Candidate node ids must be bare lowercase hyphenated slugs. Do not use the \`found:{slug}\` form; the system attaches labels.
+- Existing known nodes must use their exact working-graph id.
 - Every candidate and edge must be backed by evidence.
-- Do not return candidates that are already known canonical nodes.
-- Discovery output is for new candidate nodes only: every edge in \`graph.edges\` must have at least one endpoint that is a \`found:{slug}\` candidate. Do not emit edges between two already-known canonical nodes; those belong in the skeleton or edge-context models, not here.
+- Do not return candidates that are already known nodes.
+- Discovery output is for new candidate nodes only: every edge in \`graph.edges\` must have at least one endpoint that is a newly discovered candidate. Do not emit edges between two already-known nodes; those belong in the skeleton or edge-context models, not here.
 
 ## Source material
 
@@ -665,7 +665,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_discovery_context',
     returns: 'sys_patch',
     dimension: 'sys_discovery_context',
-    sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest candidate nodes and edges in the standard envelope.',
+    sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest candidate nodes and edges in the standard envelope. Candidates should use the same node id as the seed for any known neighbor; only use a bare lowercase slug for genuinely new candidates.',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',

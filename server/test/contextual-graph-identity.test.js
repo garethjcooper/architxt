@@ -69,7 +69,7 @@ describe('contextual graph identity', () => {
   it('builds canonical node id when canonical entity is resolved', () => {
     assert.equal(buildNodeId({ label: 'a-com:COM-001', canonicalId: 'COM-001', typeLabel: 'a-com' }), 'a-com:COM-001');
     assert.equal(buildNodeId({ label: 'app-com:COM-001', canonicalId: 'COM-001', typeLabel: 'app-com' }), 'app-com:COM-001');
-    assert.equal(buildNodeId({ label: 'Payment Gateway' }), 'uncanonical:payment-gateway');
+    assert.equal(buildNodeId({ label: 'Payment Gateway' }), 'payment-gateway');
   });
 
   it('resolves canonical entity by id or alias', async () => {
@@ -89,7 +89,7 @@ describe('contextual graph identity', () => {
 
   it('resolves existing uncanonical-grounded node', async () => {
     seedEntities(db, []);
-    upsertNode(db, serverId, 'Mozart-API', 'payment:payment-gateway', ['uncanonical', 'grounded', 'active'], {});
+    upsertNode(db, serverId, 'Mozart-API', 'payment:payment-gateway', ['grounded', 'active'], {});
     const lookups = await buildArchitxtLookups(db);
 
     const result = await resolveHindsightNode(db, serverId, 'Mozart-API', lookups, { label: 'payment:Payment Gateway' });
@@ -102,7 +102,7 @@ describe('contextual graph identity', () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-001', name: 'Billing Service', aliases: [] },
     ]);
-    upsertNode(db, serverId, 'Mozart-API', 'uncanonical:rate-limiter', ['uncanonical', 'discovered', 'active'], {});
+    upsertNode(db, serverId, 'Mozart-API', 'rate-limiter', ['discovered', 'active'], {});
     const lookups = await buildArchitxtLookups(db);
 
     const candidates = [
@@ -115,7 +115,7 @@ describe('contextual graph identity', () => {
     const { unique, mergedIntoExisting } = await dedupeCandidates(db, serverId, 'Mozart-API', lookups, candidates);
 
     assert.equal(unique.length, 1);
-    assert.equal(unique[0].id, 'candidate:invoice-gateway');
+    assert.equal(unique[0].id, 'invoice-gateway');
     assert.equal(mergedIntoExisting.length, 3);
   });
 

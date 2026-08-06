@@ -121,7 +121,7 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
   const { unique, mergedIntoExisting } = await dedupeCandidates(db, serverId, bankId, lookups, candidates);
 
   for (const candidate of unique) {
-    const labels = ['uncanonical', 'candidate', 'active'];
+    const labels = ['candidate', 'active'];
     const properties = {
       display_name: candidate.displayName,
       provenance: { source: 'discover', seed_id: seedId, discovered_at: now, model_refs: [] },
@@ -227,8 +227,9 @@ function buildLookupsFromGraph(nodes) {
   for (const n of nodes) {
     const id = n.cgn_id;
     // Register the node under every lookup key derived from its id, display
-    // name, and aliases. This lets model-emitted ids like `found:mozart-api`
-    // resolve to an existing `uncanonical:mozart-api` or `svc:mozart-api` node.
+    // name, and aliases. This lets legacy model-emitted ids like
+    // `found:mozart-api` resolve to the existing bare `mozart-api` or typed
+    // `svc:mozart-api` node.
     for (const key of modelNodeLookupKeys(id).concat([id])) {
       if (!byKey.has(key)) {
         byKey.set(key, id);

@@ -31,18 +31,18 @@ Example for a graph of known entities only:
 }
 ```
 
-When the discovery policy allows `found:` nodes, the graph may also contain discovered nodes:
+When the discovery policy allows discovered nodes, the graph may also contain discovered nodes:
 
 ```json
 {
   "nodes": [
-    { "id": "found:payment-gateway", "name": "Payment Gateway", "provenance": "discovered" },
+    { "id": "payment-gateway", "name": "Payment Gateway", "provenance": "discovered" },
     { "id": "example-type:EXAMPLE-001", "name": "Example System A", "provenance": "known", "source": "known" }
   ],
   "edges": [
     {
       "from": "example-type:EXAMPLE-001",
-      "to": "found:payment-gateway",
+      "to": "payment-gateway",
       "type": "sends",
       "label": "payment events",
       "detail": "Example System A sends payment events to the discovered payment gateway."
@@ -56,13 +56,13 @@ Discovered-only policy example: when only newly discovered entities are requeste
 ```json
 {
   "nodes": [
-    { "id": "found:invoice-delivery-interface", "name": "Invoice Delivery Interface", "provenance": "discovered" },
+    { "id": "invoice-delivery-interface", "name": "Invoice Delivery Interface", "provenance": "discovered" },
     { "id": "example-type:EXAMPLE-001", "name": "Example System A", "provenance": "known", "source": "known" }
   ],
   "edges": [
     {
       "from": "example-type:EXAMPLE-001",
-      "to": "found:invoice-delivery-interface",
+      "to": "invoice-delivery-interface",
       "type": "sends",
       "label": "invoices",
       "detail": "Example System A sends invoices to the discovered delivery interface."
@@ -72,13 +72,13 @@ Discovered-only policy example: when only newly discovered entities are requeste
 ```
 
 Field rules:
-- `id`: canonical entity id. Known: `TYPE:ENTITY-ID`. Discovered: `found:{slug}`.
+- `id`: stable node id. Known entities use their canonical entity id from the catalog. Genuinely discovered entities use a bare lowercase hyphenated slug. Do not add `found:` or any other prefix.
 - `name`: human-readable name only; must not include the id.
 - `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`.
 - `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`.
 - `label`: short phrase, max 4 words.
 - `detail`: full description, max 2 sentences; empty string if not justified.
-- Do not include a `provenance` field on edges. The system derives edge provenance from the endpoint ids.
+- Do not include a `provenance` field on edges. The system derives edge provenance from the endpoint node provenance.
 - Only include `provenance` on a node when the active discovery policy explicitly requires it.
 
 **CRITICAL: connected-node rule.** Every node in the `nodes` array must be an endpoint of at least one emitted edge (as `from` or `to`). Do not return a graph that has nodes but zero edges — an isolated node is not useful. Before returning the graph, remove any isolated node. If this leaves no edges, return an empty graph instead:

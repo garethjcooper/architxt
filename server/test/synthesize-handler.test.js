@@ -86,10 +86,7 @@ describe('synthesize handler', () => {
   });
 
   it('parses universal format, normalizes, and keeps corpus/catalog nodes in known-only mode', async () => {
-    const response = `Synthesized summary.
-
-## ARCHITXT-GRAPH-DATA
-{"nodes": [{"id": "a-com:COM-001", "name": "Singleview"}, {"id": "a-svc:SVC-005", "name": "Rating"}, {"id": "found:payment-gateway", "name": "Payment Gateway"}], "edges": [{"from": "a-com:COM-001", "to": "a-svc:SVC-005", "type": "sends", "label": "usage data", "detail": "Billable events"}, {"from": "a-com:COM-001", "to": "found:payment-gateway", "type": "calls", "label": "charges"}]}`;
+    const response = `Synthesized summary.\n\n## ARCHITXT-GRAPH-DATA\n${JSON.stringify({ nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'a-svc:SVC-005', name: 'Rating' }, { id: 'payment-gateway', name: 'Payment Gateway' }], edges: [{ from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'usage data', detail: 'Billable events' }, { from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' }] })}`;
 
     const sourceSteps = [
       {
@@ -135,10 +132,7 @@ describe('synthesize handler', () => {
   });
 
   it('keeps discovered nodes in discovery mode', async () => {
-    const response = `Synthesized summary.
-
-## ARCHITXT-GRAPH-DATA
-{"nodes": [{"id": "a-com:COM-001", "name": "Singleview"}, {"id": "found:payment-gateway", "name": "Payment Gateway"}], "edges": [{"from": "a-com:COM-001", "to": "found:payment-gateway", "type": "calls", "label": "charges"}]}`;
+    const response = `Synthesized summary.\n\n## ARCHITXT-GRAPH-DATA\n${JSON.stringify({ nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'payment-gateway', name: 'Payment Gateway' }], edges: [{ from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' }] })}`;
 
     const sourceSteps = [
       {
@@ -164,6 +158,6 @@ describe('synthesize handler', () => {
     assert.equal(result.success, true);
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
-    assert.ok(result.graph.nodes.some((n) => n.id === 'found:payment-gateway'));
+    assert.ok(result.graph.nodes.some((n) => n.id === 'payment-gateway'));
   });
 });

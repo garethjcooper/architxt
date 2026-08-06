@@ -16,16 +16,11 @@ describe('parseGraphResponse', () => {
   });
 
   it('parses heading with non-ASCII dashes (U+2011 non-breaking hyphen)', () => {
-    const raw = `Summary.
-
-## ARCHITXT\u2011GRAPH\u2011DATA
-\`\`\`json
-{"nodes":[{"id":"found:payment-gateway","name":"Payment Gateway"}],"edges":[{"from":"a-com:COM-002","to":"found:payment-gateway","type":"sends"}]}
-\`\`\``;
+    const raw = `Summary.\n\n## ARCHITXT\u2011GRAPH\u2011DATA\n\`\`\`json\n{"nodes":[{"id":"payment-gateway","name":"Payment Gateway"}],"edges":[{"from":"a-com:COM-002","to":"payment-gateway","type":"sends"}]}\n\`\`\``;
     const result = parseGraphResponse(raw);
     assert.strictEqual(result.narrative, 'Summary.');
     assert.strictEqual(result.graph.nodes.length, 1);
-    assert.strictEqual(result.graph.nodes[0].id, 'found:payment-gateway');
+    assert.strictEqual(result.graph.nodes[0].id, 'payment-gateway');
     assert.strictEqual(result.graph.edges.length, 1);
   });
 
@@ -71,15 +66,10 @@ second
   });
 
   it('extracts graph even with trailing narrative after the JSON block', () => {
-    const raw = `Summary.
-
-## ARCHITXT-GRAPH-DATA
-{"nodes":[{"id":"found:invoice-delivery-interface","name":"Invoice Delivery Interface"}],"edges":[{"from":"a-com:COM-011","to":"found:invoice-delivery-interface","type":"sends"}]}
-
-More text after the graph.`;
+    const raw = `Summary.\n\n## ARCHITXT-GRAPH-DATA\n{"nodes":[{"id":"invoice-delivery-interface","name":"Invoice Delivery Interface"}],"edges":[{"from":"a-com:COM-011","to":"invoice-delivery-interface","type":"sends"}]}\n\nMore text after the graph.`;
     const result = parseGraphResponse(raw);
     assert.strictEqual(result.graph.nodes.length, 1);
-    assert.strictEqual(result.graph.nodes[0].id, 'found:invoice-delivery-interface');
+    assert.strictEqual(result.graph.nodes[0].id, 'invoice-delivery-interface');
     assert.strictEqual(result.graph.edges.length, 1);
   });
 

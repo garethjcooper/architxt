@@ -91,10 +91,10 @@ describe('importHindsightSkeleton', () => {
     assert.deepEqual(canonical.cgn_labels, ['canonical', 'active', 'svc']);
     assert.equal(canonical.cgn_properties.provenance.source, 'hindsight');
 
-    const uncanonical = getNode(db, serverId, 'Mozart-API', 'uncanonical:payment-gateway').data;
-    assert.equal(uncanonical.cgn_id, 'uncanonical:payment-gateway');
-    assert.deepEqual(uncanonical.cgn_labels, ['uncanonical', 'grounded', 'active']);
-    assert.equal(uncanonical.cgn_properties.display_name, 'Payment Gateway');
+    const grounded = getNode(db, serverId, 'Mozart-API', 'payment-gateway').data;
+    assert.equal(grounded.cgn_id, 'payment-gateway');
+    assert.deepEqual(grounded.cgn_labels, ['grounded', 'active']);
+    assert.equal(grounded.cgn_properties.display_name, 'Payment Gateway');
   });
 
   it('imports undirected co-occurrence edges between resolved nodes', async () => {
@@ -189,7 +189,7 @@ describe('importHindsightSkeleton', () => {
     ]);
 
     const { upsertNode } = await import('../src/db/crud/contextual-graph.js');
-    upsertNode(db, serverId, 'Mozart-API', 'uncanonical:existing-node', ['uncanonical', 'discovered', 'active'], {
+    upsertNode(db, serverId, 'Mozart-API', 'existing-node', ['discovered', 'active'], {
       display_name: 'Existing Node' });
 
     const fetchGraph = makeFetchGraph({
@@ -199,7 +199,7 @@ describe('importHindsightSkeleton', () => {
     const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', {}, fetchGraph);
     assert.equal(result.imported.nodes, 1);
 
-    const existing = getNode(db, serverId, 'Mozart-API', 'uncanonical:existing-node').data;
+    const existing = getNode(db, serverId, 'Mozart-API', 'existing-node').data;
     assert.notEqual(existing, null);
   });
 });
