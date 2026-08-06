@@ -225,17 +225,31 @@ class StageError extends Error {
 
 /**
  * Count partial-failure issues across stage stats.
- * Looks at failed/rerunFailed counts and explicit errors arrays.
+ * Prefer the explicit errors array; fall back to failed/rerunFailed counts
+ * when no per-item error list is provided. Do not add them together, because
+ * `failed` is usually just the cardinality of `errors`.
  */
 function countIssues(stats) {
   let count = 0;
   for (const key of Object.keys(stats || {})) {
     if (key === 'issue_count') continue;
     const stageStats = stats[key]?.stats || stats[key] || {};
-    if (typeof stageStats.failed === 'number' && stageStats.failed > 0) count += stageStats.failed;
-    if (typeof stageStats.rerunFailed === 'number' && stageStats.rerunFailed > 0) count += stageStats.rerunFailed;
-    if (Array.isArray(stageStats.errors)) count += stageStats.errors.length;
+    if (Array.isArray(stageStats.errors)) {
+      count += stageStats.errors.length;
+    } else {
+      if (typeof stageStats.failed === 'number' && stageStats.failed > 0) count += stageStats.failed;
+      if (typeof stageStats.rerunFailed === 'number' && stageStats.rerunFailed > 0) count += stageStats.rerunFailed;
+    }
   }
+  return count;
+}
+
+function countStageIssues(result) {
+  const stats = result?.stats || result || {};
+  if (Array.isArray(stats.errors)) return stats.errors.length;
+  let count = 0;
+  if (typeof stats.failed === 'number' && stats.failed > 0) count += stats.failed;
+  if (typeof stats.rerunFailed === 'number' && stats.rerunFailed > 0) count += stats.rerunFailed;
   return count;
 }
 
@@ -275,15 +289,6 @@ async function runStage(db, jobId, stageName, fn) {
     });
     throw new StageError(err.message, err.code || 'UNKNOWN', stageName);
   }
-}
-
-function countStageIssues(result) {
-  const stats = result?.stats || result || {};
-  let count = 0;
-  if (typeof stats.failed === 'number' && stats.failed > 0) count += stats.failed;
-  if (typeof stats.rerunFailed === 'number' && stats.rerunFailed > 0) count += stats.rerunFailed;
-  if (Array.isArray(stats.errors)) count += stats.errors.length;
-  return count;
 }
 
 function updateStageState(db, jobId, stageName, updates) {
