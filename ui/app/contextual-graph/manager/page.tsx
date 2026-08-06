@@ -159,7 +159,7 @@ function PropertyRow({ label, value }: { label: string; value: unknown }) {
 }
 
 export default function ContextManagerPage() {
-  const [servers, setServers] = useState<Array<{ id: number; name?: string; base_url?: string }>>([]);
+  const [servers, setServers] = useState<Array<{ id: number; name?: string; base_url?: string; contextual_graph_banks?: any }>>([]);
   const [banks, setBanks] = useState<SelectorBank[]>([]);
   const [loadingServers, setLoadingServers] = useState(false);
   const [loadingBanks, setLoadingBanks] = useState(false);
@@ -180,12 +180,22 @@ export default function ContextManagerPage() {
   const serverId = selectedServerId ? Number(selectedServerId) : 0;
   const bankId = selectedBankId;
 
+  const selectedServer = servers.find((s) => s.id === serverId);
+  const bankConfig = useMemo(() => {
+    if (!selectedServer?.contextual_graph_banks) return null;
+    const banks = Array.isArray(selectedServer.contextual_graph_banks)
+      ? selectedServer.contextual_graph_banks
+      : [];
+    return banks.find((b: any) => b.bank_id === bankId) || null;
+  }, [selectedServer, bankId]);
+  const bankMode = bankConfig?.mode ?? null; // 'manual' | 'auto' | null
+
   useEffect(() => {
     async function loadServers() {
       try {
         setLoadingServers(true);
         const data = await serversApi.list();
-        setServers(data.map((s) => ({ id: s.id, name: s.name || s.base_url })));
+        setServers(data.map((s) => ({ id: s.id, name: s.name || s.base_url, contextual_graph_banks: s.contextual_graph_banks })));
       } catch (err) {
         logger.error('Failed to load servers', { error: err });
         toast.error('Failed to load servers');
@@ -247,53 +257,24 @@ export default function ContextManagerPage() {
     }
   }, [serverId, bankId, loadGraph]);
 
-  const handleImportGraph = useCallback(async () => {
+  const handleRunSyncJob = useCallback(async () => {
     if (!serverId || !bankId) return;
-    if (!window.confirm(`Import Hindsight skeleton into ${bankId}? This will add nodes and edges to the working graph.`)) return;
+    if (!window.confirm(`Run a full contextual sync job for ${bankId}? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.`)) return;
     try {
-      setActionLoading('import');
-      const result = await contextualGraphApi.import(serverId, bankId);
+      setActionLoading('sync-job');
+      const result = await contextualGraphApi.startSyncJob(serverId, bankId);
       if (result.success) {
-        toast.success(`Imported ${result.imported?.nodes ?? 0} nodes, ${result.imported?.edges ?? 0} edges`);
+        toast.success(`Sync job started — ${result.job?.id ?? 'queued'}`);
       } else {
-        toast.error(`Import failed: ${result.error || result.code || 'unknown'}`);
+        toast.error(`Sync job failed: ${result.error || result.code || 'unknown'}`);
       }
-      await loadGraph();
     } catch (err: any) {
-      logger.error('Failed to import contextual graph', { error: err, serverId, bankId });
-      toast.error(`Import failed: ${err.message || err}`);
+      logger.error('Failed to start sync job', { error: err, serverId, bankId });
+      toast.error(`Sync job failed: ${err.message || err}`);
     } finally {
       setActionLoading(null);
     }
-  }, [serverId, bankId, loadGraph]);
-
-  const handleRefreshPatches = useCallback(async () => {
-    if (!serverId || !bankId) return;
-    const message = `Refresh contextual patches for ${bankId}? This will sync mental-model config, request fresh Hindsight output for any changed models, and apply any changed outputs.`;
-    if (!window.confirm(message)) return;
-    try {
-      setActionLoading('refresh');
-      const result = await contextualGraphApi.refresh(serverId, bankId);
-      if (result.success) {
-        const stats = result.stats;
-        const syncUpdated = stats?.sync?.updated ?? 0;
-        const rerunRequested = stats?.rerunRequested ?? 0;
-        const base = `Refresh complete — fetched ${stats?.fetched ?? 0}, applied ${stats?.applied ?? 0}, unchanged ${stats?.skippedUnchanged ?? 0}, failed ${stats?.failed ?? 0}`;
-        const syncPart = syncUpdated > 0 ? `synced ${syncUpdated}` : '';
-        const rerunPart = rerunRequested > 0 ? `re-runs requested ${rerunRequested}` : '';
-        const parts = [syncPart, rerunPart].filter(Boolean);
-        toast.success(parts.length > 0 ? `${base} (${parts.join(', ')})` : base);
-      } else {
-        toast.error(`Refresh failed: ${result.error || result.code || 'unknown'}`);
-      }
-      await loadGraph();
-    } catch (err: any) {
-      logger.error('Refresh failed', { error: err, serverId, bankId });
-      toast.error(`Refresh failed: ${err.message || err}`);
-    } finally {
-      setActionLoading(null);
-    }
-  }, [serverId, bankId, loadGraph]);
+  }, [serverId, bankId]);
 
   const sortedNodes = useMemo(() => {
     return [...nodes].sort((a, b) => a.label.localeCompare(b.label));
@@ -452,22 +433,20 @@ export default function ContextManagerPage() {
           </TabsList>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!serverId || !bankId || actionLoading === 'import'}
-              onClick={handleImportGraph}
-            >
-              {actionLoading === 'import' ? 'Importing…' : 'Import skeleton'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!serverId || !bankId || actionLoading === 'refresh'}
-              onClick={handleRefreshPatches}
-            >
-              {actionLoading === 'refresh' ? 'Refreshing…' : 'Refresh'}
-            </Button>
+            {bankMode === 'auto' ? (
+              <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                Auto-sync
+              </Badge>
+            ) : bankMode === 'manual' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!serverId || !bankId || actionLoading === 'sync-job'}
+                onClick={handleRunSyncJob}
+              >
+                {actionLoading === 'sync-job' ? 'Running…' : 'Run sync job'}
+              </Button>
+            ) : null}
           </div>
         </div>
 

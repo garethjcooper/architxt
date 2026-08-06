@@ -29,6 +29,11 @@ import {
   listContextualGraphSyncJobs as defaultListSyncJobs,
   cancelContextualGraphSyncJob as defaultCancelSyncJob,
 } from '../services/contextual-graph/sync-job.js';
+import { getServer as defaultGetServer } from '../db/crud/servers.js';
+import {
+  getManagedBanks,
+  resolveRestrictions,
+} from '../services/contextual-graph/server-bank-config.js';
 
 const BASE_PATH = '/contextual-graph';
 
@@ -62,6 +67,7 @@ export function createContextualGraphRouter({
   listSyncJobs = defaultListSyncJobs,
   cancelSyncJob = defaultCancelSyncJob,
   undeployBank = defaultUndeployBank,
+  getServer = defaultGetServer,
 } = {}) {
   const router = Router();
 
@@ -1381,6 +1387,17 @@ export function createContextualGraphRouter({
       min_weight: typeof req.body.min_weight === 'number' ? req.body.min_weight : undefined,
       neighborhood: req.body.neighborhood,
     };
+
+    // When the caller does not provide explicit restrictions, look up the bank
+    // config and apply the same restrictions the auto-sync daemon would use.
+    if (!options.restriction) {
+      const serverResult = getServer(db, serverId);
+      const managedBanks = serverResult?.success ? getManagedBanks(serverResult.data) : [];
+      const bankConfig = managedBanks.find((b) => b.bank_id === bankId);
+      if (bankConfig) {
+        options.restriction = resolveRestrictions(bankConfig);
+      }
+    }
 
     const result = await startSyncJob(db, serverId, bankId, options);
     const duration = Date.now() - start;
