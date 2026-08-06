@@ -179,6 +179,8 @@ function buildRunner(deps) {
       });
 
       const finishedAt = new Date().toISOString();
+      const issueCount = countIssues(stats);
+      stats.issue_count = issueCount;
       updateJob(db, jobId, {
         status: 'completed',
         finished_at: finishedAt,
@@ -186,13 +188,15 @@ function buildRunner(deps) {
       });
       appendLog(db, jobId, {
         stage: null,
-        level: 'info',
-        message: 'Sync job completed',
+        level: issueCount > 0 ? 'warn' : 'info',
+        message: issueCount > 0 ? `Sync job completed with ${issueCount} issue(s)` : 'Sync job completed',
         details: { stats },
       });
     } catch (err) {
       const finishedAt = new Date().toISOString();
       const status = err.code === 'CANCELLED' ? 'cancelled' : 'failed';
+      const issueCount = countIssues(stats);
+      stats.issue_count = issueCount;
       updateJob(db, jobId, {
         status,
         finished_at: finishedAt,
@@ -219,6 +223,22 @@ class StageError extends Error {
   }
 }
 
+/**
+ * Count partial-failure issues across stage stats.
+ * Looks at failed/rerunFailed counts and explicit errors arrays.
+ */
+function countIssues(stats) {
+  let count = 0;
+  for (const key of Object.keys(stats || {})) {
+    if (key === 'issue_count') continue;
+    const stageStats = stats[key]?.stats || stats[key] || {};
+    if (typeof stageStats.failed === 'number' && stageStats.failed > 0) count += stageStats.failed;
+    if (typeof stageStats.rerunFailed === 'number' && stageStats.rerunFailed > 0) count += stageStats.rerunFailed;
+    if (Array.isArray(stageStats.errors)) count += stageStats.errors.length;
+  }
+  return count;
+}
+
 async function runStage(db, jobId, stageName, fn) {
   const stageStart = new Date().toISOString();
   updateStageState(db, jobId, stageName, { status: 'running', started_at: stageStart });
@@ -231,15 +251,17 @@ async function runStage(db, jobId, stageName, fn) {
   try {
     const result = await fn();
     const stageFinished = new Date().toISOString();
+    const stageIssueCount = countStageIssues(result);
     updateStageState(db, jobId, stageName, {
-      status: 'completed',
+      status: stageIssueCount > 0 ? 'completed_with_issues' : 'completed',
       finished_at: stageFinished,
       stats: result,
+      issue_count: stageIssueCount,
     });
     appendLog(db, jobId, {
       stage: stageName,
-      level: 'info',
-      message: `Stage ${stageName} completed`,
+      level: stageIssueCount > 0 ? 'warn' : 'info',
+      message: stageIssueCount > 0 ? `Stage ${stageName} completed with ${stageIssueCount} issue(s)` : `Stage ${stageName} completed`,
       details: result,
     });
     return result;
@@ -253,6 +275,15 @@ async function runStage(db, jobId, stageName, fn) {
     });
     throw new StageError(err.message, err.code || 'UNKNOWN', stageName);
   }
+}
+
+function countStageIssues(result) {
+  const stats = result?.stats || result || {};
+  let count = 0;
+  if (typeof stats.failed === 'number' && stats.failed > 0) count += stats.failed;
+  if (typeof stats.rerunFailed === 'number' && stats.rerunFailed > 0) count += stats.rerunFailed;
+  if (Array.isArray(stats.errors)) count += stats.errors.length;
+  return count;
 }
 
 function updateStageState(db, jobId, stageName, updates) {
