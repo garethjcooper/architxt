@@ -153,6 +153,27 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
  * @param {string} label
  * @returns {string|null}
  */
+/**
+ * Normalize a model-emitted node id to a working-graph node id, preserving an
+ * explicit type prefix when present. This is intentionally looser than the full
+ * `buildNodeId` resolution used during Hindsight skeleton import because models
+ * may emit bare names (e.g. "mozart-api") that should resolve to an existing
+ * "svc:mozart-api" or "uncanonical:mozart-api" node, while an emitted
+ * "svc:mozart-api" should be left as-is.
+ *
+ * @param {string} label
+ * @returns {string}
+ */
+export function normalizeModelNodeId(label) {
+  if (!label || typeof label !== 'string') return 'unknown';
+  const typeLabel = extractTypeLabel(label);
+  if (typeLabel) {
+    const localId = label.slice(typeLabel.length + 1);
+    return `${typeLabel}:${normalizeNodeId(localId)}`;
+  }
+  return normalizeNodeId(label);
+}
+
 function extractTypeLabel(label) {
   if (!label || typeof label !== 'string') return null;
   const parts = label.split(':');

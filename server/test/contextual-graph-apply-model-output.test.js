@@ -216,6 +216,65 @@ describe('applyModelOutput', () => {
     assert.equal(edge.cge_type, 'reads');
   });
 
+  it('resolves model-emitted bare ids to existing typed nodes', async () => {
+    upsertNode(db, serverId, bankId, 'svc:mozart-api', ['active'], { display_name: 'Mozart API', aliases: ['mozart-api'] });
+    upsertNode(db, serverId, bankId, 'svc:subscriber', ['active'], { display_name: 'Subscriber', aliases: ['subscriber'] });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [
+          { id: 'mozart-api', name: 'Mozart API', type: 'service' },
+          { id: 'subscriber', name: 'Subscriber', type: 'service' },
+        ],
+        edges: [{ from: 'mozart-api', to: 'subscriber', type: 'sends', label: 'usage data', detail: 'Mozart API sends usage data to Subscriber', evidence: ['mem-1'] }],
+      },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-mozart-api|subscriber', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'svc:mozart-api');
+    assert.equal(edge.cge_target_id, 'svc:subscriber');
+    assert.equal(edge.cge_type, 'sends');
+  });
+
+  it('resolves model-emitted bare ids to existing uncanonical nodes', async () => {
+    upsertNode(db, serverId, bankId, 'uncanonical:mozart-api', ['uncanonical', 'grounded', 'active'], { display_name: 'Mozart API', aliases: ['mozart-api'] });
+    upsertNode(db, serverId, bankId, 'uncanonical:subscriber', ['uncanonical', 'grounded', 'active'], { display_name: 'Subscriber', aliases: ['subscriber'] });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [
+          { id: 'mozart-api', name: 'Mozart API', type: 'service' },
+          { id: 'subscriber', name: 'Subscriber', type: 'service' },
+        ],
+        edges: [{ from: 'mozart-api', to: 'subscriber', type: 'sends', label: 'usage data', detail: 'Mozart API sends usage data to Subscriber', evidence: ['mem-1'] }],
+      },
+      tables: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-mozart-api|subscriber', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const mozart = getNode(db, serverId, bankId, 'uncanonical:mozart-api').data;
+    const subscriber = getNode(db, serverId, bankId, 'uncanonical:subscriber').data;
+    assert.equal(mozart.properties.provenance.inferred, 'edge-context');
+    assert.equal(subscriber.properties.provenance.inferred, 'edge-context');
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'uncanonical:mozart-api');
+    assert.equal(edge.cge_target_id, 'uncanonical:subscriber');
+    assert.equal(edge.cge_type, 'sends');
+  });
+
   it('fails when edge-context model returns no edges', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {});
     upsertNode(db, serverId, bankId, 'svc-002', ['active'], {});
