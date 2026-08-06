@@ -76,7 +76,7 @@ describe('addContext subset options', () => {
       fetchGraph,
       deployBatch,
       node_ids: ['svc:SVC-005', 'svc:SVC-006'],
-      run_discovery: false,
+            allowed_model_types: ['entity-summary', 'entity-capabilities', 'edge-ctx'],
       import_skeleton: true });
 
     assert.equal(result.success, true);
@@ -112,7 +112,8 @@ describe('addContext subset options', () => {
       fetchGraph,
       deployBatch,
       import_skeleton: false,
-      run_discovery: false });
+      allowed_model_types: ['entity-summary', 'entity-capabilities'],
+    });
 
     assert.equal(result.success, true);
     assert.equal(result.queued.entitySummary, 2);

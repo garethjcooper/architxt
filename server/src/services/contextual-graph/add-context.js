@@ -39,18 +39,15 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {number} [options.min_count] - passed to Hindsight /entities/graph
  * @param {number} [options.min_weight] - minimum edge weight to import
  * @param {string[]} [options.node_ids] - explicit subset of working-graph nodes to contextualize
- * @param {boolean} [options.run_discovery] - whether to auto-rank high-degree nodes as discovery seeds
  * @param {boolean} [options.import_skeleton] - whether to re-import the Hindsight skeleton first
  * @param {string[]} [options.seed_node_ids] - manual seed nodes to discover around
  * @param {Object} [options.neighborhood] - discovery scope
  * @param {number} [options.neighborhood.top_k_neighbors]
- * @param {string[]} [options.allowed_model_types] - which model roles to deploy
+ * @param {string[]} [options.allowed_model_types] - which model roles to deploy; defaults to all
  * @param {number} [options.max_models_per_run] - cap total models deployed in one run
  * @param {string[]} [options.exclude_node_ids] - never deploy models for these nodes
  * @param {string[]} [options.include_node_ids] - if provided, only deploy models for these nodes
- * @param {Function} [options.fetchGraph] - override for testing
- * @param {Function} [options.deployBatch] - override for testing; receives (db, serverId, bankId, specs)
- * @returns {Promise<{success: boolean, queued?: {entity: number, edge: number, discover: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], skipped_by_restriction?: number, error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, queued?: {entitySummary: number, entityCapabilities: number, edge: number, discover: number, total: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], skipped_by_restriction?: number, error?: string, code?: string}>}
  */
 export async function addContext(
   db,
@@ -63,7 +60,6 @@ export async function addContext(
   }
 
   const importSkeleton = options.import_skeleton !== false;
-  let runDiscovery = options.run_discovery !== false;
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
   const allowedModelTypes = new Set(Array.isArray(options.allowed_model_types) ? options.allowed_model_types : [
     'entity-summary',
@@ -199,8 +195,9 @@ export async function addContext(
     }
   }
 
-  // Auto-rank high-degree nodes as additional discovery seeds when discovery is enabled.
-  if (runDiscovery && allowedModelTypes.has('discover')) {
+  // Auto-rank high-degree nodes as additional discovery seeds when discovery is
+  // an allowed model type.
+  if (allowedModelTypes.has('discover')) {
     const nodeDegrees = new Map();
     for (const edge of filteredEdges) {
       nodeDegrees.set(edge.cge_source_id, (nodeDegrees.get(edge.cge_source_id) || 0) + 1);

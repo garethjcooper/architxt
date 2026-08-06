@@ -137,7 +137,7 @@ describe('contextual-graph route', () => {
           server_id: serverId,
           bank_id: bankId,
           seed_node_ids: ['node-A', 'node-B'],
-          neighborhood: { top_k_neighbors: 3, run_discovery: false } });
+          neighborhood: { top_k_neighbors: 3 } });
 
       assert.deepEqual(captured.seed_node_ids, ['node-A', 'node-B']);
       assert.equal(captured.neighborhood.top_k_neighbors, 3);

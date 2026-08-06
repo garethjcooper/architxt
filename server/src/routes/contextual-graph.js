@@ -295,7 +295,6 @@ export function createContextualGraphRouter({
    *               min_count: { type: integer }
    *               min_weight: { type: number }
    *               import_skeleton: { type: boolean, default: true }
-   *               run_discovery: { type: boolean, default: true }
    *               node_ids: { type: array, items: { type: string } }
    *               seed_node_ids: { type: array, items: { type: string } }
    *               neighborhood:
@@ -304,6 +303,11 @@ export function createContextualGraphRouter({
    *                   top_k_neighbors: { type: integer }
    *                   min_weight: { type: number }
    *                   min_count: { type: integer }
+   *               allowed_model_types:
+   *                 type: array
+   *                 items:
+   *                   type: string
+   *                   enum: [entity-summary, entity-capabilities, edge-ctx, discover]
    *     responses:
    *       200: { description: Context added }
    *       400: { description: Missing or invalid scope }
@@ -320,7 +324,9 @@ export function createContextualGraphRouter({
       min_weight: typeof req.body.min_weight === 'number' ? req.body.min_weight : undefined,
       neighborhood: req.body.neighborhood,
       import_skeleton: parseBoolParam(req.body.import_skeleton),
-      run_discovery: parseBoolParam(req.body.run_discovery),
+      allowed_model_types: Array.isArray(req.body.allowed_model_types)
+        ? req.body.allowed_model_types.filter((t) => typeof t === 'string')
+        : undefined,
     };
 
     if (Array.isArray(req.body.node_ids)) {
@@ -1363,7 +1369,6 @@ export function createContextualGraphRouter({
    *             properties:
    *               server_id: { type: integer }
    *               bank_id: { type: string }
-   *               run_discovery: { type: boolean, default: true }
    *               node_ids: { type: array, items: { type: string } }
    *               seed_node_ids: { type: array, items: { type: string } }
    *               min_count: { type: integer }
@@ -1380,7 +1385,6 @@ export function createContextualGraphRouter({
 
     const { serverId, bankId } = scope;
     const options = {
-      run_discovery: parseBoolParam(req.body.run_discovery) !== false,
       node_ids: Array.isArray(req.body.node_ids) ? req.body.node_ids.filter((id) => typeof id === 'string') : undefined,
       seed_node_ids: Array.isArray(req.body.seed_node_ids) ? req.body.seed_node_ids.filter((id) => typeof id === 'string') : undefined,
       min_count: parseIntParam(req.body.min_count),

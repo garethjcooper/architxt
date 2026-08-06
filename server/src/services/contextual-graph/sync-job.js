@@ -14,11 +14,13 @@ import { importHindsightSkeleton as defaultImportSkeleton } from './import-hinds
 import { addContext as defaultAddContext } from './add-context.js';
 import { refreshContextualGraphPatches as defaultRefreshPatches } from './refresh-patches.js';
 import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from './sync-mental-model-config.js';
+import { cleanupDisallowedModels as defaultCleanupDisallowedModels } from './cleanup-disallowed-models.js';
 
 const logger = createLogger('contextual-graph-sync-job');
 
 const STAGES = [
   { name: 'importing_skeleton', label: 'Import Hindsight skeleton' },
+  { name: 'cleaning_up_models', label: 'Remove disallowed models' },
   { name: 'deploying_models', label: 'Deploy contextual models' },
   { name: 'syncing_config', label: 'Sync mental-model config' },
   { name: 'refreshing_patches', label: 'Refresh patches' },
@@ -98,6 +100,7 @@ export async function startContextualGraphSyncJob(
  */
 function buildRunner(deps) {
   const importSkeleton = deps.importHindsightSkeleton || defaultImportSkeleton;
+  const cleanupDisallowedModels = deps.cleanupDisallowedModels || defaultCleanupDisallowedModels;
   const addContext = deps.addContext || defaultAddContext;
   const syncMentalModelConfig = deps.syncMentalModelConfig || defaultSyncMentalModelConfig;
   const refreshPatches = deps.refreshPatches || defaultRefreshPatches;
@@ -114,6 +117,7 @@ function buildRunner(deps) {
 
     const stats = {
       import: {},
+      cleanup: {},
       deploy: {},
       sync: {},
       refresh: {},
@@ -136,11 +140,21 @@ function buildRunner(deps) {
         return result;
       });
 
+      const allowedModelTypes = options.restriction?.deploy?.allowed_model_types;
+
+      await runStage(db, jobId, 'cleaning_up_models', async () => {
+        const result = await cleanupDisallowedModels(db, serverId, bankId, allowedModelTypes);
+        if (!result.success) {
+          throw new StageError(result.error, result.code || 'CLEANUP_FAILED');
+        }
+        stats.cleanup = result;
+        return result;
+      });
+
       await runStage(db, jobId, 'deploying_models', async () => {
         const restriction = options.restriction?.deploy || {};
         const deployOptions = {
           import_skeleton: false,
-          run_discovery: options.run_discovery !== false,
           node_ids: options.node_ids,
           seed_node_ids: options.seed_node_ids,
           neighborhood: options.neighborhood,
