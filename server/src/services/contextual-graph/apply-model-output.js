@@ -9,7 +9,7 @@ import {
   deleteNode,
   findEdgeByEndpoints,
 } from '../../db/crud/contextual-graph.js';
-import { buildDirectedEdgeId } from './identity.js';
+import { buildDirectedEdgeId, normalizeModelNodeId } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
 import { contentHash } from './normalize-model-output.js';
 
@@ -214,14 +214,21 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   const allNodesResult = listNodes(db, serverId, bankId, { limit: 10000 });
   const allNodes = allNodesResult?.success ? allNodesResult.data : [];
   const existingNodeIds = new Set(allNodes.map((n) => n.cgn_id));
+  const nodeIdByModelId = buildNodeIdByModelIdMap(allNodes);
 
   const modelRef = buildModelRef(model, output.raw, timestamp);
 
   // Ensure endpoint nodes emitted by the model exist in the working graph.
   // If a node is missing, create it from the model output so asserted edges have endpoints.
+  // We always normalize model-emitted ids through buildNodeId so a bare
+  // "mozart-api" resolves to an existing "svc:mozart-api" or "uncanonical:mozart-api"
+  // node instead of creating a new duplicate.
   let createdNodes = 0;
+  const idRemap = new Map();
   for (const node of output.graph.nodes) {
-    if (existingNodeIds.has(node.id)) continue;
+    const resolvedId = resolveModelNodeId(node.id, existingNodeIds, nodeIdByModelId);
+    idRemap.set(node.id, resolvedId);
+    if (existingNodeIds.has(resolvedId)) continue;
     const properties = {
       display_name: node.name,
       type: node.type,
@@ -233,9 +240,30 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       },
       updated_at: timestamp,
     };
-    upsertNode(db, serverId, bankId, node.id, ['active'], properties);
-    existingNodeIds.add(node.id);
+    upsertNode(db, serverId, bankId, resolvedId, ['active'], properties);
+    existingNodeIds.add(resolvedId);
+    nodeIdByModelId.set(resolvedId, resolvedId);
+    nodeIdByModelId.set(normalizeModelNodeId(resolvedId), resolvedId);
     createdNodes += 1;
+  }
+
+  // Merge the edge-context model_ref into existing nodes that the model
+  // resolved to, so the provenance chain is complete even when the model only
+  // emitted a bare name such as "mozart-api" that matched an existing node.
+  for (const [modelId, resolvedId] of idRemap.entries()) {
+    if (modelId === resolvedId) continue;
+    const existingResult = getNode(db, serverId, bankId, resolvedId);
+    const existingNode = existingResult?.success ? existingResult.data : null;
+    if (!existingNode) continue;
+    const properties = { ...existingNode.properties };
+    const provenance = { ...(properties.provenance || {}) };
+    provenance.source = 'contextual-graph';
+    provenance.inferred = 'edge-context';
+    provenance.model_refs = mergeModelRefs(provenance.model_refs, modelRef);
+    provenance.updated_at = timestamp;
+    properties.provenance = provenance;
+    properties.updated_at = timestamp;
+    upsertNode(db, serverId, bankId, resolvedId, existingNode.labels, properties);
   }
 
   const appliedEdges = [];
@@ -247,11 +275,14 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       continue;
     }
 
+    const fromId = idRemap.get(modelEdge.from) || resolveModelNodeId(modelEdge.from, existingNodeIds, nodeIdByModelId);
+    const toId = idRemap.get(modelEdge.to) || resolveModelNodeId(modelEdge.to, existingNodeIds, nodeIdByModelId);
+
     // Look for an existing edge between the same endpoints and type. We query
     // the DB directly so large banks don't miss edges due to an in-memory page
     // limit. Edges touched earlier in this same call are ignored so parallel
     // edges of the same type but different labels remain distinct.
-    const findResult = findEdgeByEndpoints(db, serverId, bankId, modelEdge.from, modelEdge.to, modelEdge.type);
+    const findResult = findEdgeByEndpoints(db, serverId, bankId, fromId, toId, modelEdge.type);
     let existing = findResult?.success ? findResult.data : null;
     if (existing && touchedEdgeIds.has(existing.cge_id)) {
       existing = null;
@@ -277,9 +308,9 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
         updated_at: timestamp,
       };
     } else {
-      edgeId = buildDirectedEdgeId(modelEdge.from, modelEdge.to, modelEdge.type, modelEdge.label, 'edge-ctx');
-      source = modelEdge.from;
-      target = modelEdge.to;
+      edgeId = buildDirectedEdgeId(fromId, toId, modelEdge.type, modelEdge.label, 'edge-ctx');
+      source = fromId;
+      target = toId;
       properties = {
         directed: true,
         label: modelEdge.label,
@@ -305,6 +336,66 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   }
 
   return { success: true, applied: { edgeIds: appliedEdges, createdNodes }, warnings };
+}
+
+/**
+ * Build a map from normalized model-emitted node ids to the actual existing
+ * working-graph node id that best represents the same entity. This lets a bare
+ * "mozart-api" emitted by a model resolve to an existing "svc:mozart-api" or
+ * "uncanonical:mozart-api" node.
+ *
+ * @param {Array} allNodes
+ * @returns {Map<string, string>}
+ */
+function buildNodeIdByModelIdMap(allNodes) {
+  const map = new Map();
+  for (const node of allNodes) {
+    const id = node.cgn_id;
+    const normalized = normalizeModelNodeId(id);
+    if (!map.has(normalized)) {
+      map.set(normalized, id);
+    }
+
+    const display = node.cgn_properties?.display_name;
+    if (display) {
+      const displayNormalized = normalizeModelNodeId(display);
+      if (!map.has(displayNormalized)) {
+        map.set(displayNormalized, id);
+      }
+    }
+
+    for (const alias of node.cgn_properties?.aliases || []) {
+      const aliasNormalized = normalizeModelNodeId(alias);
+      if (!map.has(aliasNormalized)) {
+        map.set(aliasNormalized, id);
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Resolve a node id emitted by a model to the canonical working-graph node id.
+ * First try exact match, then normalized id, then display name/alias match.
+ *
+ * @param {string} modelId
+ * @param {Set<string>|Map<string, *>} existingNodeIdsOrMap
+ * @param {Map<string, string>} nodeIdByModelId
+ * @returns {string}
+ */
+function resolveModelNodeId(modelId, existingNodeIdsOrMap, nodeIdByModelId) {
+  if (existingNodeIdsOrMap instanceof Map) {
+    if (existingNodeIdsOrMap.has(modelId)) return modelId;
+  } else if (existingNodeIdsOrMap.has(modelId)) {
+    return modelId;
+  }
+  const normalized = normalizeModelNodeId(modelId);
+  if (existingNodeIdsOrMap instanceof Map) {
+    if (existingNodeIdsOrMap.has(normalized)) return normalized;
+  } else if (existingNodeIdsOrMap.has(normalized)) {
+    return normalized;
+  }
+  return nodeIdByModelId.get(normalized) || normalized;
 }
 
 function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
@@ -367,18 +458,24 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
   }
 
   // Upsert new discovered nodes and edges.
+  const allNodesMap = new Map(allNodes.map((n) => [n.cgn_id, n]));
+  const nodeIdByModelId = buildNodeIdByModelIdMap(allNodes);
   const nodeIds = new Set([seedId]);
+  const idRemap = new Map();
   let createdNodes = 0;
   let createdEdges = 0;
 
   for (const node of output.graph.nodes) {
-    nodeIds.add(node.id);
-    const existingNodeResult = getNode(db, serverId, bankId, node.id);
+    const resolvedId = resolveModelNodeId(node.id, allNodesMap, nodeIdByModelId);
+    idRemap.set(node.id, resolvedId);
+    nodeIds.add(resolvedId);
+    nodeIdByModelId.set(normalizeModelNodeId(resolvedId), resolvedId);
+    const existingNodeResult = getNode(db, serverId, bankId, resolvedId);
     const existingNode = existingNodeResult?.success ? existingNodeResult.data : null;
     const existingProperties = existingNode?.properties || {};
     const existingLabels = existingNode?.labels || [];
 
-    const isDiscoveredNode = String(node.id).startsWith('found:');
+    const isDiscoveredNode = String(resolvedId).startsWith('found:');
 
     const discoveredProperties = {
       ...existingProperties,
@@ -394,17 +491,20 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
       },
       updated_at: timestamp,
     };
-    upsertNode(db, serverId, bankId, node.id, [...new Set([...existingLabels, 'candidate', 'active'])], discoveredProperties);
+    upsertNode(db, serverId, bankId, resolvedId, [...new Set([...existingLabels, 'candidate', 'active'])], discoveredProperties);
     createdNodes += 1;
   }
 
   for (const edge of output.graph.edges) {
-    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+    const fromId = idRemap.get(edge.from) || resolveModelNodeId(edge.from, allNodesMap, nodeIdByModelId);
+    const toId = idRemap.get(edge.to) || resolveModelNodeId(edge.to, allNodesMap, nodeIdByModelId);
+
+    if (!nodeIds.has(fromId) || !nodeIds.has(toId)) {
       warnings.push(`Discovery edge ${edge.from} -> ${edge.to} references a node not emitted by the model; skipping`);
       continue;
     }
 
-    const edgeId = `discovered-${seedId}-${edge.from}-${edge.to}-${edge.type}`;
+    const edgeId = `discovered-${seedId}-${fromId}-${toId}-${edge.type}`;
     const existingEdgeResult = getEdge(db, serverId, bankId, edgeId);
     const existingEdge = existingEdgeResult?.success ? existingEdgeResult.data : null;
     const existingProperties = existingEdge?.cge_properties || {};
@@ -422,7 +522,7 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
       },
       updated_at: timestamp,
     };
-    upsertEdge(db, serverId, bankId, edgeId, edge.from, edge.to, edge.type, edgeProperties);
+    upsertEdge(db, serverId, bankId, edgeId, fromId, toId, edge.type, edgeProperties);
     createdEdges += 1;
   }
 
