@@ -1,7 +1,7 @@
 import { createLogger } from '../../utils/logger.js';
 import { getEntityGraph } from '../hindsight/research.js';
 import { buildArchitxtLookups, resolveHindsightNode, buildUndirectedEdgeId } from './identity.js';
-import { upsertNode, upsertEdge, listNodes, listEdges, getNode } from '../../db/crud/contextual-graph.js';
+import { upsertNode, upsertEdge, listNodes, listEdges, getNode, getEdge } from '../../db/crud/contextual-graph.js';
 
 const logger = createLogger('contextual-graph-import');
 
@@ -169,7 +169,7 @@ export async function importHindsightSkeleton(
     if (seenEdgeIds.has(edgeId)) continue;
     seenEdgeIds.add(edgeId);
 
-    const properties = {
+    const incomingEdgeProperties = {
       directed: false,
       weight,
       provenance: {
@@ -178,6 +178,12 @@ export async function importHindsightSkeleton(
       last_seen_at: now,
       updated_at: now,
     };
+
+    const existingEdge = await getEdge(db, serverId, bankId, edgeId);
+    const existingEdgeProperties = existingEdge?.data?.cge_properties;
+    const properties = existingEdgeProperties
+      ? mergeProperties(existingEdgeProperties, incomingEdgeProperties)
+      : incomingEdgeProperties;
 
     const upsertResult = upsertEdge(db, serverId, bankId, edgeId, sourceId, targetId, null, properties);
     if (!upsertResult.success) {
