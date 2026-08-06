@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SyncJobsTab } from './sync-jobs-tab';
+import { MentalModelsTab } from './mental-models-tab';
 
 const logger = createLogger('ContextManagerPage');
 
@@ -42,7 +43,7 @@ type BackendEdge = {
   properties: Record<string, any>;
 };
 
-type ModelRef = {
+export type ModelRef = {
   role?: string;
   ext_id?: string;
   attached_at?: string;
@@ -306,6 +307,13 @@ export default function ContextManagerPage() {
     });
   }, [edges]);
 
+  const allModelRefs = useMemo(() => {
+    const refs: ModelRef[] = [];
+    for (const node of nodes) refs.push(...node.modelRefs);
+    for (const edge of edges) refs.push(...edge.modelRefs);
+    return refs;
+  }, [nodes, edges]);
+
   const nodeById = useMemo(() => {
     const map = new Map<string, DisplayNode>();
     for (const n of nodes) map.set(n.id, n);
@@ -439,6 +447,7 @@ export default function ContextManagerPage() {
         <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 shrink-0">
           <TabsList variant="line">
             <TabsTrigger value="graph">Graph</TabsTrigger>
+            <TabsTrigger value="models">Mental Models</TabsTrigger>
             <TabsTrigger value="jobs">Sync Jobs</TabsTrigger>
           </TabsList>
 
@@ -593,6 +602,14 @@ export default function ContextManagerPage() {
             setSelectedServerId={setSelectedServerId}
             selectedBankId={selectedBankId || ''}
             setSelectedBankId={setSelectedBankId}
+          />
+        </TabsContent>
+
+        <TabsContent value="models" className="flex flex-col flex-1 min-h-0 mt-0">
+          <MentalModelsTab
+            serverId={selectedServerId ? Number(selectedServerId) : null}
+            bankId={selectedBankId}
+            modelRefs={allModelRefs}
           />
         </TabsContent>
       </Tabs>
