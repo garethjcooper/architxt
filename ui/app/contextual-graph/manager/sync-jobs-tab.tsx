@@ -12,7 +12,7 @@ import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ChevronDown, ChevronRight, RefreshCw, XCircle } from 'lucide-react';
+import { RefreshCw, XCircle, AlertTriangle } from 'lucide-react';
 
 const logger = createLogger('SyncJobsTab');
 
@@ -43,6 +43,60 @@ const STATUS_COLORS: Record<string, string> = {
   failed: 'bg-red-500/20 text-red-300 border-red-500/30',
   cancelled: 'bg-white/10 text-white/50 border-white/10',
 };
+
+const STAGE_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-white/20',
+  running: 'bg-blue-500 animate-pulse',
+  completed: 'bg-emerald-500',
+  completed_with_issues: 'bg-amber-500',
+  failed: 'bg-red-500',
+};
+
+const STAGE_LABEL_COLORS: Record<string, string> = {
+  failed: 'text-red-400',
+  completed_with_issues: 'text-amber-400',
+  running: 'text-blue-400',
+  completed: 'text-white/40',
+  pending: 'text-white/40',
+};
+
+function getIssueCount(job: any): number {
+  const stats = job?.stats || {};
+  if (typeof stats.issue_count === 'number') return stats.issue_count;
+  let count = 0;
+  for (const key of Object.keys(stats)) {
+    if (key === 'issue_count') continue;
+    const stageStats = stats[key]?.stats || stats[key] || {};
+    if (typeof stageStats.failed === 'number' && stageStats.failed > 0) count += stageStats.failed;
+    if (Array.isArray(stageStats.errors)) count += stageStats.errors.length;
+  }
+  return count;
+}
+
+function collectStageIssues(job: any): Array<{ stage: string; label?: string; extId?: string; messages: string[] }> {
+  const issues: Array<{ stage: string; label?: string; extId?: string; messages: string[] }> = [];
+  for (const stage of job?.stages || []) {
+    const stats = stage?.stats?.stats || stage?.stats || {};
+    if (Array.isArray(stats.errors)) {
+      for (const item of stats.errors) {
+        if (typeof item === 'string') {
+          issues.push({ stage: stage.name, label: stage.label, messages: [item] });
+        } else if (item && typeof item === 'object') {
+          const extId = item.extId || item.id || item.nodeId || item.edgeId;
+          const messages = Array.isArray(item.errors)
+            ? item.errors
+            : Array.isArray(item.messages)
+            ? item.messages
+            : item.error
+            ? [item.error]
+            : [JSON.stringify(item)];
+          issues.push({ stage: stage.name, label: stage.label, extId, messages });
+        }
+      }
+    }
+  }
+  return issues;
+}
 
 function toIsoStart(date: Date): string {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
@@ -122,7 +176,6 @@ export function SyncJobsTab({
   const [status, setStatus] = useState<string | null>('');
   const [customSince, setCustomSince] = useState('');
   const [customUntil, setCustomUntil] = useState('');
-  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -298,6 +351,9 @@ export function SyncJobsTab({
             ) : (
               jobs.map((job) => {
                 const active = selectedJob?.id === job.id;
+                const issueCount = getIssueCount(job);
+                const hasIssues = issueCount > 0;
+
                 return (
                   <button
                     key={job.id}
@@ -316,6 +372,11 @@ export function SyncJobsTab({
                         <Badge variant="outline" className={cn('text-[9px] px-1 py-0', STATUS_COLORS[job.status] || 'bg-white/10 text-white/50')}>
                           {job.status}
                         </Badge>
+                        {hasIssues && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-amber-500/20 text-amber-300 border-amber-500/30">
+                            {issueCount} issue{issueCount === 1 ? '' : 's'}
+                          </Badge>
+                        )}
                         <span className="text-[10px] font-mono text-white/50 truncate">{job.id.slice(0, 8)}</span>
                       </div>
                       <span className="text-[10px] text-white/40 shrink-0">{formatDistanceToNow(new Date(job.created_at), { addSuffix: true })}</span>
@@ -375,17 +436,26 @@ export function SyncJobsTab({
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-white/40 mb-2">Stages</div>
                   <div className="space-y-1">
-                    {selectedJob.stages?.map((stage: any) => (
-                      <div key={stage.name} className="flex items-center justify-between rounded border border-white/5 bg-black/10 px-2 py-1">
-                        <div className="flex items-center gap-2">
-                          <span className={cn('w-2 h-2 rounded-full', stage.status === 'completed' ? 'bg-emerald-500' : stage.status === 'running' ? 'bg-blue-500 animate-pulse' : stage.status === 'failed' ? 'bg-red-500' : 'bg-white/20')} />
-                          <span className="text-[11px] text-white/80">{stage.label || stage.name}</span>
+                    {selectedJob.stages?.map((stage: any) => {
+                      const stageIssues = stage.issue_count > 0 || stage.status === 'completed_with_issues';
+                      return (
+                        <div key={stage.name} className="flex items-center justify-between rounded border border-white/5 bg-black/10 px-2 py-1">
+                          <div className="flex items-center gap-2">
+                            <span className={cn('w-2 h-2 rounded-full', STAGE_STATUS_COLORS[stage.status] || 'bg-white/20')} />
+                            <span className="text-[11px] text-white/80">{stage.label || stage.name}</span>
+                            {stageIssues && <AlertTriangle className="w-3 h-3 text-amber-400" />}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {stage.issue_count > 0 && (
+                              <span className="text-[10px] text-amber-400">{stage.issue_count} issue{stage.issue_count === 1 ? '' : 's'}</span>
+                            )}
+                            <span className={cn('text-[10px]', STAGE_LABEL_COLORS[stage.status] || 'text-white/40')}>
+                              {stage.status === 'completed_with_issues' ? 'completed with issues' : stage.status}
+                            </span>
+                          </div>
                         </div>
-                        <span className={cn('text-[10px]', stage.status === 'failed' ? 'text-red-400' : 'text-white/40')}>
-                          {stage.status}
-                        </span>
-                      </div>
-                    )) || <span className="text-white/40 italic">No stage data.</span>}
+                      );
+                    }) || <span className="text-white/40 italic">No stage data.</span>}
                   </div>
                 </div>
 
@@ -396,6 +466,37 @@ export function SyncJobsTab({
                     {selectedJob.error_code && <div className="text-[10px] text-red-300 mt-1 font-mono">{selectedJob.error_code}</div>}
                   </div>
                 )}
+
+                {(() => {
+                  const issues = collectStageIssues(selectedJob);
+                  if (issues.length === 0) return null;
+                  return (
+                    <div className="rounded border border-amber-500/20 bg-amber-900/20 p-2">
+                      <div className="text-[10px] uppercase tracking-wider text-amber-300 mb-2 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Issues ({issues.length})
+                      </div>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {issues.slice(0, 20).map((issue, idx) => (
+                          <div key={idx} className="rounded bg-black/20 p-1.5">
+                            <div className="text-[10px] text-amber-300/80">
+                              {issue.label || issue.stage}
+                              {issue.extId && <span className="text-white/50 ml-1 font-mono">{issue.extId}</span>}
+                            </div>
+                            <ul className="mt-1 space-y-0.5">
+                              {issue.messages.slice(0, 3).map((msg, mIdx) => (
+                                <li key={mIdx} className="text-[11px] text-white/70">{msg}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                        {issues.length > 20 && (
+                          <div className="text-[10px] text-amber-300/70 italic">…and {issues.length - 20} more</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-white/40 mb-2">Logs</div>
@@ -431,7 +532,7 @@ export function SyncJobsTab({
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-white/50 text-sm px-6 text-center">
-              <p>Select a sync job from the left to view its stages, logs, and stats.</p>
+              <p>Select a sync job from the left to view its stages, logs, and issues.</p>
             </div>
           )}
         </Card>
