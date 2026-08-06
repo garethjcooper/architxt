@@ -1428,6 +1428,14 @@ export function createContextualGraphRouter({
    *         name: status
    *         schema: { type: string }
    *       - in: query
+   *         name: since
+   *         description: Inclusive ISO 8601 lower bound on cgj_created_at
+   *         schema: { type: string, format: date-time }
+   *       - in: query
+   *         name: until
+   *         description: Inclusive ISO 8601 upper bound on cgj_created_at
+   *         schema: { type: string, format: date-time }
+   *       - in: query
    *         name: limit
    *         schema: { type: integer }
    *       - in: query
@@ -1442,6 +1450,8 @@ export function createContextualGraphRouter({
       serverId: parseIntParam(req.query.server_id),
       bankId: typeof req.query.bank_id === 'string' ? req.query.bank_id : undefined,
       status: typeof req.query.status === 'string' ? req.query.status : undefined,
+      since: typeof req.query.since === 'string' && req.query.since.trim() ? req.query.since.trim() : undefined,
+      until: typeof req.query.until === 'string' && req.query.until.trim() ? req.query.until.trim() : undefined,
       limit: parseIntParam(req.query.limit) ?? 50,
       offset: parseIntParam(req.query.offset) ?? 0,
     };
