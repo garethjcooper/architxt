@@ -34,6 +34,7 @@ function cleanupTestDb(db, file) {
 }
 
 const deleteFromHindsight = async () => ({ success: true });
+const listMentalModels = async (_serverId, _bankId) => ({ success: true, mentalModels: [] });
 
 test('removes summary and capabilities from nodes when roles are disallowed', async () => {
   const { db, file, serverId } = createTestDb();
@@ -57,6 +58,7 @@ test('removes summary and capabilities from nodes when roles are disallowed', as
 
   const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-capabilities'], {
     deleteFromHindsight,
+    listMentalModels,
   });
 
   assert.equal(result.success, true);
@@ -82,6 +84,13 @@ test('removes summary and capabilities from nodes when roles are disallowed', as
   cleanupTestDb(db, file);
 });
 
+function makeCleanup(db, serverId, bankId, allowedModelTypes) {
+  return cleanupDisallowedModels(db, serverId, bankId, allowedModelTypes, {
+    deleteFromHindsight,
+    listMentalModels,
+  });
+}
+
 test('deletes directed edge-ctx edges when role is disallowed', async () => {
   const { db, file, serverId } = createTestDb();
   const bankId = 'bank-b';
@@ -105,9 +114,7 @@ test('deletes directed edge-ctx edges when role is disallowed', async () => {
     },
   });
 
-  const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-summary'], {
-    deleteFromHindsight,
-  });
+  const result = await makeCleanup(db, serverId, bankId, ['entity-summary']);
 
   assert.equal(result.success, true);
   assert.equal(result.cleared.edges, 1);
@@ -138,9 +145,7 @@ test('removes model ref from mixed provenance without deleting the edge', async 
     },
   });
 
-  const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-summary'], {
-    deleteFromHindsight,
-  });
+  const result = await makeCleanup(db, serverId, bankId, ['entity-summary']);
 
   assert.equal(result.success, true);
   assert.equal(result.cleared.edges, 1);
@@ -190,9 +195,7 @@ test('removes discovery-generated subgraph when discover is disallowed', async (
     },
   });
 
-  const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-summary'], {
-    deleteFromHindsight,
-  });
+  const result = await makeCleanup(db, serverId, bankId, ['entity-summary']);
 
   assert.equal(result.success, true);
   assert.equal(result.cleared.nodes, 2, 'seed updated + discovered node deleted');
@@ -237,9 +240,7 @@ test('preserves seed node that is its own discovery seed', async () => {
     },
   });
 
-  const result = await cleanupDisallowedModels(db, serverId, bankId, [], {
-    deleteFromHindsight,
-  });
+  const result = await makeCleanup(db, serverId, bankId, []);
 
   assert.equal(result.success, true);
 
@@ -271,9 +272,7 @@ test('does nothing when all referenced roles are allowed', async () => {
     },
   });
 
-  const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-summary'], {
-    deleteFromHindsight,
-  });
+  const result = await makeCleanup(db, serverId, bankId, ['entity-summary']);
 
   assert.equal(result.success, true);
   assert.deepEqual(result.deleted, []);
@@ -281,6 +280,41 @@ test('does nothing when all referenced roles are allowed', async () => {
 
   const nodeResult = getNode(db, serverId, bankId, nodeId);
   assert.equal(nodeResult.data.properties.summary, 'Keep me');
+
+  cleanupTestDb(db, file);
+});
+
+test('deletes orphaned Hindsight models that no longer have local refs', async () => {
+  const { db, file, serverId } = createTestDb();
+  const bankId = 'bank-g';
+  const sourceId = 'src';
+  const targetId = 'dst';
+  const orphanedExtId = 'edge-ctx-src|dst';
+
+  upsertNode(db, serverId, bankId, sourceId, ['active'], { display_name: 'Source' });
+  upsertNode(db, serverId, bankId, targetId, ['active'], { display_name: 'Target' });
+
+  const deleted = [];
+  const listWithOrphan = async (_serverId, _bankId) => ({
+    success: true,
+    mentalModels: [{ id: orphanedExtId }, { id: 'entity-summary-src' }],
+  });
+  const trackDelete = async (_serverId, _bankId, extId) => {
+    deleted.push(extId);
+    return { success: true };
+  };
+
+  // Only entity-summary is allowed, so edge-ctx should be deleted even though
+  // it has no local ref in the working graph.
+  const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-summary'], {
+    deleteFromHindsight: trackDelete,
+    listMentalModels: listWithOrphan,
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(deleted, [orphanedExtId], 'should delete disallowed Hindsight models even when they have no local refs');
+  assert.equal(result.cleared.nodes, 0);
+  assert.equal(result.cleared.edges, 0);
 
   cleanupTestDb(db, file);
 });

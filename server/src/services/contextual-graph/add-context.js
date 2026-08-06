@@ -280,6 +280,8 @@ export async function addContext(
       total: allUnrestrictedSpecs.length,
     },
     deployed: deployResult.deployed,
+    pushed: deployResult.pushed || [],
+    skipped: deployResult.skipped || [],
     failed: deployResult.failed,
     skipped_by_restriction: skippedByRestriction,
   };

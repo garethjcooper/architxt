@@ -1,6 +1,6 @@
 import { createLogger } from '../../utils/logger.js';
 import { extractModelRefsFromDb, stripModelRefsFromProperties } from './graph-model-refs.js';
-import { deleteMentalModel } from '../hindsight/mental-models.js';
+import { deleteMentalModel, listAllMentalModels } from '../hindsight/mental-models.js';
 import {
   listNodes,
   listEdges,
@@ -17,6 +17,13 @@ const ROLE_TO_PREFIX = Object.freeze({
   sys_entity_capabilities: 'entity-capabilities-',
   sys_edge_context: 'edge-ctx-',
   sys_discovery_context: 'discover-',
+});
+
+const MODEL_TYPE_TO_ROLE = Object.freeze({
+  'entity-summary': 'sys_entity_summary',
+  'entity-capabilities': 'sys_entity_capabilities',
+  'edge-ctx': 'sys_edge_context',
+  discover: 'sys_discovery_context',
 });
 
 const ROLES = Object.freeze({
@@ -36,12 +43,16 @@ const ROLES = Object.freeze({
  * from both Hindsight and the local working graph so it is no longer refreshed
  * or surfaced in the UI.
  *
+ * Hindsight is the source of truth for which remote models exist; we delete by
+ * role prefix so orphaned models that no longer have local refs are also purged.
+ *
  * @param {Object} db
  * @param {number} serverId
  * @param {string} bankId
  * @param {string[]} allowedModelTypes - e.g. ['entity-summary', 'discover']
  * @param {Object} [options]
  * @param {Function} [options.deleteFromHindsight] - override for testing
+ * @param {Function} [options.listMentalModels] - override for testing
  * @returns {Promise<{success: boolean, deleted?: string[], failed?: {ext_id: string, error: string}[], cleared?: {nodes: number, edges: number}, error?: string, code?: string}>}
  */
 export async function cleanupDisallowedModels(
@@ -57,13 +68,7 @@ export async function cleanupDisallowedModels(
 
   const allowedRoles = new Set(
     Array.isArray(allowedModelTypes)
-      ? allowedModelTypes.map((t) => {
-        if (t === 'entity-summary') return 'sys_entity_summary';
-        if (t === 'entity-capabilities') return 'sys_entity_capabilities';
-        if (t === 'edge-ctx') return 'sys_edge_context';
-        if (t === 'discover') return 'sys_discovery_context';
-        return t;
-      })
+      ? allowedModelTypes.map((t) => MODEL_TYPE_TO_ROLE[t] || t)
       : [],
   );
 
@@ -74,32 +79,45 @@ export async function cleanupDisallowedModels(
     'sys_discovery_context',
   ]);
 
+  const disallowedRoles = [...KNOWN_ROLES].filter((role) => !allowedRoles.has(role));
+
+  // Use Hindsight as the source of truth for remote models so orphaned models
+  // (whose local refs were already stripped) are also deleted.
+  const listModels = options.listMentalModels || listAllMentalModels;
+  const listResult = await listModels(serverId, bankId, { detail: 'metadata' });
+  if (!listResult.success) {
+    return { success: false, error: listResult.error, code: 'LIST_MODELS_FAILED' };
+  }
+
+  const remoteModels = listResult.mentalModels || [];
+  const disallowedRemoteModels = remoteModels.filter((model) => {
+    const role = inferRoleFromExtId(model.id);
+    return KNOWN_ROLES.has(role) && !allowedRoles.has(role);
+  });
+
   const refs = await extractModelRefsFromDb(db, serverId, bankId, {
     filterFn: ({ role }) => KNOWN_ROLES.has(role) && !allowedRoles.has(role),
   });
 
-  if (refs.extIds.length === 0) {
-    return {
-      success: true,
-      deleted: [],
-      failed: [],
-      cleared: { nodes: 0, edges: 0 },
-    };
-  }
+  const removeSet = new Set([
+    ...disallowedRemoteModels.map((model) => model.id),
+    ...refs.extIds,
+  ]);
 
   logger.info('Cleaning up disallowed contextual models', {
     serverId,
     bankId,
-    count: refs.extIds.length,
-    disallowedRoles: [...new Set(refs.extIds.map(inferRoleFromExtId))],
+    disallowedRoles,
+    remoteCount: disallowedRemoteModels.length,
+    localRefCount: refs.extIds.length,
+    total: removeSet.size,
   });
 
-  const removeSet = new Set(refs.extIds);
   const deleteFn = options.deleteFromHindsight || deleteMentalModel;
 
   const deleted = [];
   const failed = [];
-  for (const extId of refs.extIds) {
+  for (const extId of removeSet) {
     const result = await deleteFn(serverId, bankId, extId);
     if (result.success) {
       deleted.push(extId);
