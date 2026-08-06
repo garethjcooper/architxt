@@ -154,6 +154,22 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
  * @returns {string|null}
  */
 /**
+ * Strip discovery/artifact prefixes so a model-emitted `found:{slug}` or
+ * `candidate:{slug}` id can be resolved against an existing typed or
+ * uncanonical node.
+ *
+ * @param {string} label
+ * @returns {string}
+ */
+export function stripDiscoveryPrefix(label) {
+  if (!label || typeof label !== 'string') return '';
+  const lowered = label.toLowerCase();
+  if (lowered.startsWith('found:')) return label.slice(6);
+  if (lowered.startsWith('candidate:')) return label.slice(10);
+  return label;
+}
+
+/**
  * Normalize a model-emitted node id to a working-graph node id, preserving an
  * explicit type prefix when present. This is intentionally looser than the full
  * `buildNodeId` resolution used during Hindsight skeleton import because models
@@ -161,17 +177,57 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
  * "svc:mozart-api" or "uncanonical:mozart-api" node, while an emitted
  * "svc:mozart-api" should be left as-is.
  *
+ * `found:` and `candidate:` prefixes are stripped for matching; they are
+ * discovery aliases, not distinct identity namespaces. A `found:mozart-api`
+ * emitted by a model should resolve to an existing `uncanonical:mozart-api`
+ * node rather than creating a duplicate.
+ *
  * @param {string} label
  * @returns {string}
  */
 export function normalizeModelNodeId(label) {
   if (!label || typeof label !== 'string') return 'unknown';
-  const typeLabel = extractTypeLabel(label);
+  const bare = stripDiscoveryPrefix(label);
+  const typeLabel = extractTypeLabel(bare);
   if (typeLabel) {
-    const localId = label.slice(typeLabel.length + 1);
+    const localId = bare.slice(typeLabel.length + 1);
     return `${typeLabel}:${normalizeNodeId(localId)}`;
   }
-  return normalizeNodeId(label);
+  return normalizeNodeId(bare);
+}
+
+/**
+ * Return all lookup keys that a model-emitted id should be matched against.
+ * This includes the normalized bare slug and, when a discovery prefix is
+ * present, the `found:` / `candidate:` forms so existing nodes can be found
+ * either way.
+ *
+ * @param {string} label
+ * @returns {string[]}
+ */
+export function modelNodeLookupKeys(label) {
+  if (!label || typeof label !== 'string') return [];
+  const keys = new Set();
+  const bare = stripDiscoveryPrefix(label);
+  const normalizedBare = normalizeModelNodeId(bare);
+  keys.add(normalizedBare);
+
+  const typeLabel = extractTypeLabel(bare);
+  if (!typeLabel) {
+    // Bare name: also look for it as a discovery-prefixed id.
+    keys.add(`found:${normalizedBare}`);
+    keys.add(`candidate:${normalizedBare}`);
+    keys.add(`uncanonical:${normalizedBare}`);
+  }
+
+  const lowered = label.toLowerCase();
+  if (lowered.startsWith('found:') || lowered.startsWith('candidate:')) {
+    // Discovery id: also look for the bare normalized form (already added) and
+    // the uncanonical form, which is how ground nodes from Hindsight are stored.
+    keys.add(`uncanonical:${normalizedBare}`);
+  }
+
+  return Array.from(keys);
 }
 
 function extractTypeLabel(label) {

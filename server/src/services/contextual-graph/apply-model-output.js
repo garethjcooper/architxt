@@ -9,7 +9,7 @@ import {
   deleteNode,
   findEdgeByEndpoints,
 } from '../../db/crud/contextual-graph.js';
-import { buildDirectedEdgeId, normalizeModelNodeId } from './identity.js';
+import { buildDirectedEdgeId, normalizeModelNodeId, modelNodeLookupKeys } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
 import { contentHash } from './normalize-model-output.js';
 
@@ -342,7 +342,8 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
  * Build a map from normalized model-emitted node ids to the actual existing
  * working-graph node id that best represents the same entity. This lets a bare
  * "mozart-api" emitted by a model resolve to an existing "svc:mozart-api" or
- * "uncanonical:mozart-api" node.
+ * "uncanonical:mozart-api" node, and lets a discovery alias like
+ * "found:mozart-api" resolve to the same existing node.
  *
  * @param {Array} allNodes
  * @returns {Map<string, string>}
@@ -351,23 +352,29 @@ function buildNodeIdByModelIdMap(allNodes) {
   const map = new Map();
   for (const node of allNodes) {
     const id = node.cgn_id;
-    const normalized = normalizeModelNodeId(id);
-    if (!map.has(normalized)) {
-      map.set(normalized, id);
+
+    // Register every lookup key for this existing node: normalized id,
+    // discovery-prefixed aliases, display name, and aliases.
+    for (const key of modelNodeLookupKeys(id).concat([id])) {
+      if (!map.has(key)) {
+        map.set(key, id);
+      }
     }
 
     const display = node.cgn_properties?.display_name;
     if (display) {
-      const displayNormalized = normalizeModelNodeId(display);
-      if (!map.has(displayNormalized)) {
-        map.set(displayNormalized, id);
+      for (const key of modelNodeLookupKeys(display)) {
+        if (!map.has(key)) {
+          map.set(key, id);
+        }
       }
     }
 
     for (const alias of node.cgn_properties?.aliases || []) {
-      const aliasNormalized = normalizeModelNodeId(alias);
-      if (!map.has(aliasNormalized)) {
-        map.set(aliasNormalized, id);
+      for (const key of modelNodeLookupKeys(alias)) {
+        if (!map.has(key)) {
+          map.set(key, id);
+        }
       }
     }
   }
@@ -376,7 +383,8 @@ function buildNodeIdByModelIdMap(allNodes) {
 
 /**
  * Resolve a node id emitted by a model to the canonical working-graph node id.
- * First try exact match, then normalized id, then display name/alias match.
+ * First try exact match, then all normalized lookup keys, then display
+ * name/alias match.
  *
  * @param {string} modelId
  * @param {Set<string>|Map<string, *>} existingNodeIdsOrMap
@@ -384,18 +392,20 @@ function buildNodeIdByModelIdMap(allNodes) {
  * @returns {string}
  */
 function resolveModelNodeId(modelId, existingNodeIdsOrMap, nodeIdByModelId) {
-  if (existingNodeIdsOrMap instanceof Map) {
-    if (existingNodeIdsOrMap.has(modelId)) return modelId;
-  } else if (existingNodeIdsOrMap.has(modelId)) {
-    return modelId;
+  const keys = [modelId, ...modelNodeLookupKeys(modelId)];
+  for (const key of keys) {
+    if (existingNodeIdsOrMap instanceof Map) {
+      if (existingNodeIdsOrMap.has(key)) return key;
+    } else if (existingNodeIdsOrMap.has(key)) {
+      return key;
+    }
   }
-  const normalized = normalizeModelNodeId(modelId);
-  if (existingNodeIdsOrMap instanceof Map) {
-    if (existingNodeIdsOrMap.has(normalized)) return normalized;
-  } else if (existingNodeIdsOrMap.has(normalized)) {
-    return normalized;
+  for (const key of keys) {
+    if (nodeIdByModelId.has(key)) {
+      return nodeIdByModelId.get(key);
+    }
   }
-  return nodeIdByModelId.get(normalized) || normalized;
+  return modelId;
 }
 
 function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
@@ -475,7 +485,7 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     const existingProperties = existingNode?.properties || {};
     const existingLabels = existingNode?.labels || [];
 
-    const isDiscoveredNode = String(resolvedId).startsWith('found:');
+    const isDiscoveredNode = String(resolvedId).startsWith('found:') || String(resolvedId).startsWith('candidate:');
 
     const discoveredProperties = {
       ...existingProperties,
