@@ -107,20 +107,6 @@ function getLastRefreshedAt(modelRefs: DisplayNode['modelRefs']): string | null 
   return timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
 }
 
-function getRefreshState(modelRefs: ModelRef[]): { status: 'ok' | 'error' | 'none'; at: string | null; error: string | null } {
-  const errorRef = modelRefs.find((r) => r.last_refresh_status === 'error');
-  if (errorRef) {
-    return { status: 'error', at: errorRef.last_refresh_at || null, error: errorRef.last_refresh_error || null };
-  }
-  const okTimestamps = modelRefs
-    .filter((r) => r.last_refresh_status === 'ok' && r.last_refresh_at)
-    .map((r) => new Date(r.last_refresh_at!).getTime())
-    .filter((t) => !isNaN(t));
-  return okTimestamps.length > 0
-    ? { status: 'ok', at: new Date(Math.max(...okTimestamps)).toISOString(), error: null }
-    : { status: 'none', at: null, error: null };
-}
-
 function formatRelative(value?: string | null): string {
   if (!value) return 'never';
   const d = new Date(value);
@@ -374,15 +360,6 @@ export default function ContextManagerPage() {
           ) : (
             <div className="space-y-2">
               {modelRefs.map((ref, i) => {
-                const status = ref.last_refresh_status || (ref.fetched_at ? 'ok' : 'none');
-                const statusColor =
-                  status === 'error' ? 'text-red-400' :
-                  status === 'skipped' ? 'text-amber-400' :
-                  status === 'ok' ? 'text-emerald-400' : 'text-white/50';
-                const statusIcon =
-                  status === 'error' ? '✗' :
-                  status === 'skipped' ? '⊘' :
-                  status === 'ok' ? '✓' : '−';
                 return (
                   <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
                     <div className="flex items-center gap-2">
@@ -397,33 +374,21 @@ export default function ContextManagerPage() {
                       {ref.content_hash && <span className="font-mono col-span-2">hash {ref.content_hash}</span>}
                     </div>
                     <div className="flex flex-col gap-0.5 text-[10px]">
-                      <span className={cn('font-medium', statusColor)}>
-                        {statusIcon} refresh {status}{ref.last_refresh_at ? ` ${formatRelative(ref.last_refresh_at)}` : ''}
-                      </span>
-                      {ref.last_refresh_error && (
+                      {ref.last_refresh_status ? (
+                        <span className={cn('font-medium', ref.last_refresh_status === 'error' ? 'text-red-400' : ref.last_refresh_status === 'skipped' ? 'text-amber-400' : 'text-emerald-400')}>
+                          {ref.last_refresh_status === 'error' ? '✗' : ref.last_refresh_status === 'skipped' ? '⊘' : '✓'} refresh {ref.last_refresh_status}
+                          {ref.last_refresh_at ? ` ${formatRelative(ref.last_refresh_at)}` : ''}
+                        </span>
+                      ) : null}
+                      {ref.last_refresh_error ? (
                         <span className="text-red-300/80 line-clamp-2" title={ref.last_refresh_error}>{ref.last_refresh_error}</span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </Section>
-
-        <Section title="Refresh status">
-          {(() => {
-            const { status, at, error } = getRefreshState(modelRefs);
-            return (
-              <div className="text-[11px] space-y-1">
-                <div className={cn('font-medium', status === 'error' ? 'text-red-400' : status === 'ok' ? 'text-emerald-400' : 'text-white/50')}>
-                  {status === 'error' ? '⚠ last refresh failed' : status === 'ok' ? '✓ last refresh ok' : '− no refresh recorded'}
-                </div>
-                {at && <div className="text-white/50">{formatRelative(at)}</div>}
-                {error && <div className="text-red-300/80 line-clamp-3" title={error}>{error}</div>}
-              </div>
-            );
-          })()}
         </Section>
 
         <Section title="Provenance">
