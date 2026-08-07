@@ -521,13 +521,21 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
       continue;
     }
 
+    // A discovered relationship between two grounded/canonical nodes is itself
+    // grounded; only edges that touch at least one candidate remain candidates.
+    const fromNode = allNodesMap.get(fromId);
+    const toNode = allNodesMap.get(toId);
+    const fromGroundedOrCanonical = fromNode?.cgn_labels?.includes('grounded') || fromNode?.cgn_labels?.includes('canonical');
+    const toGroundedOrCanonical = toNode?.cgn_labels?.includes('grounded') || toNode?.cgn_labels?.includes('canonical');
+    const edgeLabels = fromGroundedOrCanonical && toGroundedOrCanonical ? ['grounded'] : ['candidate'];
+
     const edgeId = `discovered-${seedId}-${fromId}-${toId}-${edge.type}`;
     const existingEdgeResult = getEdge(db, serverId, bankId, edgeId);
     const existingEdge = existingEdgeResult?.success ? existingEdgeResult.data : null;
     const existingProperties = existingEdge?.cge_properties || {};
     const edgeProperties = {
       ...existingProperties,
-      labels: ['candidate'],
+      labels: edgeLabels,
       label: edge.label,
       detail: edge.detail,
       evidence: edge.evidence,
