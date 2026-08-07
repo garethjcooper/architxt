@@ -521,6 +521,35 @@ export default function ContextManagerPage() {
       countLabel="node"
       loading={graphLoading}
     >
+      <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <ServerBankSelectors
+            servers={servers}
+            selectedServerId={selectedServerId}
+            setSelectedServerId={setSelectedServerId}
+            banks={banks}
+            selectedBankId={selectedBankId}
+            setSelectedBankId={setSelectedBankId}
+            loadingBanks={loadingBanks}
+            disabled={loadingServers}
+          />
+        </div>
+        {bankMode === 'auto' ? (
+          <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+            Auto-sync
+          </Badge>
+        ) : bankMode === 'manual' ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!serverId || !bankId || actionLoading === 'sync-job'}
+            onClick={handleRunSyncJob}
+          >
+            {actionLoading === 'sync-job' ? 'Running…' : 'Run sync job'}
+          </Button>
+        ) : null}
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 shrink-0">
           <TabsList variant="line">
@@ -528,39 +557,9 @@ export default function ContextManagerPage() {
             <TabsTrigger value="models">Mental Models</TabsTrigger>
             <TabsTrigger value="jobs">Sync Jobs</TabsTrigger>
           </TabsList>
-
-          <div className="flex items-center gap-2">
-            {bankMode === 'auto' ? (
-              <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
-                Auto-sync
-              </Badge>
-            ) : bankMode === 'manual' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!serverId || !bankId || actionLoading === 'sync-job'}
-                onClick={handleRunSyncJob}
-              >
-                {actionLoading === 'sync-job' ? 'Running…' : 'Run sync job'}
-              </Button>
-            ) : null}
-          </div>
         </div>
 
         <TabsContent value="graph" className="flex flex-col flex-1 min-h-0 mt-0">
-          <div className="flex items-center gap-3 border-b border-white/10 pb-2 shrink-0 mt-2">
-            <ServerBankSelectors
-              servers={servers}
-              selectedServerId={selectedServerId}
-              setSelectedServerId={setSelectedServerId}
-              banks={banks}
-              selectedBankId={selectedBankId}
-              setSelectedBankId={setSelectedBankId}
-              loadingBanks={loadingBanks}
-              disabled={loadingServers}
-            />
-          </div>
-
           <div className="flex-1 min-h-0 flex mt-2">
             <div
               ref={leftPaneRef}
