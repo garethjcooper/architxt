@@ -3,6 +3,7 @@ import { createLogger } from '../../utils/logger.js';
 import {
   createJob,
   hasActiveJob,
+  hasAnyActiveJob,
   getJob,
   updateJob,
   appendLog,
@@ -53,6 +54,15 @@ export async function startContextualGraphSyncJob(
     return {
       success: false,
       error: 'A sync job is already running for this server/bank',
+      code: 'ALREADY_RUNNING',
+    };
+  }
+
+  const globalActive = hasAnyActiveJob(db);
+  if (globalActive.success && globalActive.data) {
+    return {
+      success: false,
+      error: 'A sync job is already running',
       code: 'ALREADY_RUNNING',
     };
   }

@@ -91,6 +91,18 @@ export const hasActiveJob = (db, serverId, bankId) => dbExec(() => {
 }, `${JOBS_TABLE}.hasActive`);
 
 /**
+ * Check whether any sync job is active globally, regardless of server/bank.
+ */
+export const hasAnyActiveJob = (db) => dbExec(() => {
+  const sql = `
+    SELECT 1 FROM ${JOBS_TABLE}
+    WHERE cgj_status IN ('pending','running')
+    LIMIT 1
+  `;
+  return !!stmt(db, sql).get();
+}, `${JOBS_TABLE}.hasAnyActive`);
+
+/**
  * Get a single job by id.
  */
 export const getJob = (db, id) => dbExec(() => {
