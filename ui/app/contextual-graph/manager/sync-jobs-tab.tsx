@@ -267,10 +267,9 @@ export function SyncJobsTab({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-white/50">Status</span>
           <Select value={status ?? ''} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue />
+            <SelectTrigger className="h-8 w-[180px] text-xs">
+              <SelectValue placeholder="Any status" />
             </SelectTrigger>
             <SelectPopup>
               {STATUS_OPTIONS.map((opt) => (
