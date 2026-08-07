@@ -5,8 +5,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectValue, SelectTrigger, SelectPopup, SelectItem } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { contextualGraphApi } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
@@ -252,35 +250,27 @@ export function SyncJobsTab({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-2 shrink-0">
         <div className="flex items-center gap-2">
-          <Label className="text-xs text-white/50 whitespace-nowrap">Range</Label>
-          <Select value={range} onValueChange={(v) => setRange((v as DateRange) || 'today')}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {RANGE_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
+          <select
+            value={range}
+            onChange={(e) => setRange((e.target.value as DateRange) || 'today')}
+            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+          >
+            {RANGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-2">
-          <Label className="text-xs text-white/50 whitespace-nowrap">Status</Label>
-          <Select value={status ?? ''} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Any status" />
-            </SelectTrigger>
-            <SelectPopup>
-              {STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value || 'any'} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
+          <select
+            value={status ?? ''}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value || 'any'} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         {range === 'custom' && (
