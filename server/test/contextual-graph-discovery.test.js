@@ -215,7 +215,7 @@ describe('ingestCandidates', () => {
     serverId = seedServer(db);
   });
 
-  it('merges discovered found: candidates into existing grounded nodes', async () => {
+  it('merges discovered found: candidates into existing grounded nodes without deriving new specs', async () => {
     const { upsertNode, listNodes, getNode } = await import('../src/db/crud/contextual-graph.js');
     upsertNode(db, serverId, 'Mozart-API', 'mozart-api', ['grounded', 'active'], {
       display_name: 'Mozart API',
@@ -241,15 +241,14 @@ describe('ingestCandidates', () => {
     assert.equal(result.success, true);
     assert.equal(result.upserted.nodes.length, 0);
     assert.equal(result.upserted.edges.length, 1);
-    assert.equal(result.entity[0].ext_id, 'entity-summary-mozart-api');
-    assert.equal(result.entity[1].ext_id, 'entity-capabilities-mozart-api');
-    assert.equal(result.edge[0].ext_id, 'edge-ctx-mozart-api|subscriber');
+    assert.equal(result.entity.length, 0);
+    assert.equal(result.edge.length, 0);
 
     const foundNode = getNode(db, serverId, 'Mozart-API', 'found:mozart-api').data;
     assert.equal(foundNode, null);
   });
 
-  it('upserts candidate nodes/edges and derives entity/edge-ctx specs', async () => {
+  it('upserts candidate nodes/edges without deriving entity/edge-ctx specs', async () => {
     seedEntities(db, [
       { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
     ]);
@@ -271,11 +270,8 @@ describe('ingestCandidates', () => {
     const result = await ingestCandidates(db, serverId, 'Mozart-API', 'svc:SVC-005', candidates, { existingNodes });
 
     assert.equal(result.success, true);
-    assert.equal(result.entity.length, 2); // summary + capabilities
-    assert.equal(result.edge.length, 1);
-    assert.equal(result.entity[0].ext_id, 'entity-summary-payment-bridge');
-    assert.equal(result.entity[1].ext_id, 'entity-capabilities-payment-bridge');
-    assert.equal(result.edge[0].ext_id, 'edge-ctx-payment-bridge|svc:SVC-005');
+    assert.equal(result.entity.length, 0);
+    assert.equal(result.edge.length, 0);
     assert.ok(result.upserted.nodes.includes('payment-bridge'));
     assert.equal(result.upserted.edges.length, 1);
   });
