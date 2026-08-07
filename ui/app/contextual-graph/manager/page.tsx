@@ -562,7 +562,7 @@ export default function ContextManagerPage() {
             />
           </div>
 
-          <div className="flex-1 min-h-0 flex mt-2 gap-2">
+          <div className="flex-1 min-h-0 flex mt-2">
             <div
               ref={leftPaneRef}
               className="min-w-0 flex flex-col gap-1"
