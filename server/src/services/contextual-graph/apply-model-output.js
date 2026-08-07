@@ -487,6 +487,7 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     const existingLabels = existingNode?.labels || [];
 
     const isExistingNode = allNodesMap.has(resolvedId);
+    const isGroundedOrCanonical = existingLabels.includes('grounded') || existingLabels.includes('canonical');
 
     const discoveredProperties = {
       ...existingProperties,
@@ -502,7 +503,9 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
       },
       updated_at: timestamp,
     };
-    const discoveredLabels = isExistingNode
+    // Discovery owns a node unless it is already grounded/canonical. This covers
+    // brand-new nodes and nodes that were previously created by edge-ctx/etc.
+    const discoveredLabels = isGroundedOrCanonical
       ? [...new Set([...existingLabels, 'active'])]
       : [...new Set([...existingLabels, 'candidate', 'active'])];
     upsertNode(db, serverId, bankId, resolvedId, discoveredLabels, discoveredProperties);
