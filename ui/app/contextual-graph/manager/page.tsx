@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -296,6 +296,99 @@ export default function ContextManagerPage() {
 
   const [activeTab, setActiveTab] = useState('graph');
 
+  // Resizer state: same pattern as explore page.
+  const [topFlex, setTopFlex] = useState(2);
+  const bottomFlex = 5 - topFlex;
+  const [leftFlex, setLeftFlex] = useState(1.0);
+  const rightFlex = 5 - leftFlex;
+  const leftPaneRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startTopFlexRef = useRef(2);
+  const containerHeightRef = useRef(0);
+
+  // Vertical resize between Entities and Edges panels.
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    isDraggingRef.current = true;
+    startYRef.current = e.clientY;
+    startTopFlexRef.current = topFlex;
+    const container = leftPaneRef.current;
+    if (container) {
+      containerHeightRef.current = container.getBoundingClientRect().height;
+    }
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [topFlex]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    const deltaY = e.clientY - startYRef.current;
+    const containerHeight = containerHeightRef.current;
+    if (containerHeight > 0) {
+      const deltaFlex = (deltaY / containerHeight) * 5;
+      const nextTopFlex = Math.min(Math.max(startTopFlexRef.current + deltaFlex, 0.8), 4.2);
+      setTopFlex(nextTopFlex);
+    }
+  }, []);
+
+  const handleResizeEnd = useCallback(() => {
+    isDraggingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  // Horizontal resize between left lists and detail panel.
+  const isHorizontalDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startLeftFlexRef = useRef(1.0);
+  const containerWidthRef = useRef(0);
+
+  const handleHorizontalResizeStart = useCallback((e: React.MouseEvent) => {
+    isHorizontalDraggingRef.current = true;
+    startXRef.current = e.clientX;
+    startLeftFlexRef.current = leftFlex;
+    const container = leftPaneRef.current?.parentElement;
+    if (container) {
+      containerWidthRef.current = container.getBoundingClientRect().width;
+    }
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [leftFlex]);
+
+  const handleHorizontalResizeMove = useCallback((e: MouseEvent) => {
+    if (!isHorizontalDraggingRef.current) return;
+    const deltaX = e.clientX - startXRef.current;
+    const containerWidth = containerWidthRef.current;
+    if (containerWidth > 0) {
+      const deltaFlex = (deltaX / containerWidth) * 5;
+      const nextLeftFlex = Math.min(Math.max(startLeftFlexRef.current + deltaFlex, 0.5), 4.5);
+      setLeftFlex(nextLeftFlex);
+    }
+  }, []);
+
+  const handleHorizontalResizeEnd = useCallback(() => {
+    isHorizontalDraggingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      handleResizeMove(e);
+      handleHorizontalResizeMove(e);
+    };
+    const up = () => {
+      handleResizeEnd();
+      handleHorizontalResizeEnd();
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+  }, [handleResizeMove, handleResizeEnd, handleHorizontalResizeMove, handleHorizontalResizeEnd]);
+
   useEffect(() => {
     if (!serverId || !bankId) {
       setSelectedNodeId(null);
@@ -470,8 +563,12 @@ export default function ContextManagerPage() {
           </div>
 
           <div className="flex-1 min-h-0 flex mt-2 gap-2">
-            <div className="min-w-0 flex flex-col gap-1" style={{ flex: 1 }}>
-              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: 1.5 }}>
+            <div
+              ref={leftPaneRef}
+              className="min-w-0 flex flex-col gap-1"
+              style={{ flex: leftFlex }}
+            >
+              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: topFlex }}>
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Entities</span>
                   <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
@@ -523,7 +620,16 @@ export default function ContextManagerPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col mt-1" style={{ flex: 1 }}>
+              <div
+                onMouseDown={handleResizeStart}
+                onDoubleClick={() => setTopFlex(2)}
+                className="h-2 shrink-0 cursor-row-resize flex items-center justify-center group"
+                title="Drag to resize top and bottom panels; double-click to reset"
+              >
+                <div className="w-16 h-1 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+              </div>
+
+              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Edges</span>
                   <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
@@ -570,7 +676,16 @@ export default function ContextManagerPage() {
               </div>
             </div>
 
-            <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: 1.4 }}>
+            <div
+              onMouseDown={handleHorizontalResizeStart}
+              onDoubleClick={() => setLeftFlex(1.0)}
+              className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
+              title="Drag to resize left and right panels; double-click to reset"
+            >
+              <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+            </div>
+
+            <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
               {renderDetailPanel()}
             </Card>
           </div>
