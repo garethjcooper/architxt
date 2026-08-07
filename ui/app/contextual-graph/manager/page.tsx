@@ -121,6 +121,35 @@ function isGroundedEdge(edge: DisplayEdge): boolean {
   return !isCandidateEdge(edge);
 }
 
+function isUndirectedEdge(edge: DisplayEdge): boolean {
+  return edge.properties.directed === false;
+}
+
+function getEdgeContextPairKey(edge: DisplayEdge): string | null {
+  const ref = edge.modelRefs.find(
+    (r) => r.role === 'sys_edge_context' && r.ext_id?.startsWith('edge-ctx-')
+  );
+  if (!ref?.ext_id) return null;
+  const pairPart = ref.ext_id.slice('edge-ctx-'.length);
+  if (!pairPart.includes('|')) return null;
+  const [a, b] = pairPart.split('|');
+  return [a, b].sort().join('|');
+}
+
+function hasEdgeContextRef(edge: DisplayEdge): boolean {
+  return edge.modelRefs.some((r) => r.role === 'sys_edge_context');
+}
+
+function getEdgeSortGroup(edge: DisplayEdge): string {
+  return getEdgeContextPairKey(edge) || [edge.source_id, edge.target_id].sort().join('|');
+}
+
+function getEdgeSortRank(edge: DisplayEdge): number {
+  if (isUndirectedEdge(edge)) return 0;
+  if (hasEdgeContextRef(edge)) return 1;
+  return 2;
+}
+
 function getLastRefreshedAt(modelRefs: DisplayNode['modelRefs']): string | null {
   const timestamps = modelRefs
     .filter((r) => r.fetched_at)
@@ -305,6 +334,12 @@ export default function ContextManagerPage() {
     return [...edges]
       .filter((e) => isGroundedEdge(e) && !isCandidateEdge(e))
       .sort((a, b) => {
+        const aGroup = getEdgeSortGroup(a);
+        const bGroup = getEdgeSortGroup(b);
+        if (aGroup !== bGroup) return aGroup.localeCompare(bGroup);
+        const aRank = getEdgeSortRank(a);
+        const bRank = getEdgeSortRank(b);
+        if (aRank !== bRank) return aRank - bRank;
         const aKey = `${a.source_id}|${a.target_id}`;
         const bKey = `${b.source_id}|${b.target_id}`;
         return aKey.localeCompare(bKey);
