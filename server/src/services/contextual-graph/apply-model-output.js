@@ -502,7 +502,10 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
       },
       updated_at: timestamp,
     };
-    upsertNode(db, serverId, bankId, resolvedId, [...new Set([...existingLabels, 'candidate', 'active'])], discoveredProperties);
+    const discoveredLabels = isExistingNode
+      ? [...new Set([...existingLabels, 'active'])]
+      : [...new Set([...existingLabels, 'candidate', 'active'])];
+    upsertNode(db, serverId, bankId, resolvedId, discoveredLabels, discoveredProperties);
     createdNodes += 1;
   }
 
@@ -521,6 +524,7 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     const existingProperties = existingEdge?.cge_properties || {};
     const edgeProperties = {
       ...existingProperties,
+      labels: ['candidate'],
       label: edge.label,
       detail: edge.detail,
       evidence: edge.evidence,

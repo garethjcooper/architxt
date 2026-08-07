@@ -297,13 +297,13 @@ export default function ContextManagerPage() {
 
   const sortedNodes = useMemo(() => {
     return [...nodes]
-      .filter((n) => isGroundedNode(n))
+      .filter((n) => isGroundedNode(n) && !isCandidateNode(n))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [nodes]);
 
   const sortedEdges = useMemo(() => {
     return [...edges]
-      .filter((e) => isGroundedEdge(e))
+      .filter((e) => isGroundedEdge(e) && !isCandidateEdge(e))
       .sort((a, b) => {
         const aKey = `${a.source_id}|${a.target_id}`;
         const bKey = `${b.source_id}|${b.target_id}`;
