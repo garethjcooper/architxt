@@ -517,7 +517,6 @@ export default function ContextManagerPage() {
   return (
     <PageShell
       title="Context Manager"
-      subtitle="Manage contextual graph data and sync jobs."
       count={nodes.length}
       countLabel="node"
       loading={graphLoading}
