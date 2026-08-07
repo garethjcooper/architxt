@@ -562,6 +562,8 @@ export default function ContextManagerPage() {
                 )}
               </div>
 
+              <div className="w-px h-4 bg-white/10" />
+
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] uppercase tracking-wider text-white/40">Model Types</span>
                 {allowedModelTypes.length > 0 ? (
@@ -574,6 +576,8 @@ export default function ContextManagerPage() {
                   <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">All types</Badge>
                 )}
               </div>
+
+              <div className="w-px h-4 bg-white/10" />
 
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] uppercase tracking-wider text-white/40">Graph</span>
