@@ -595,24 +595,26 @@ export default function ContextManagerPage() {
                           type="button"
                           onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
                           className={cn(
-                            'w-full flex flex-col gap-1 rounded border bg-black/10 px-1.5 py-1 text-left transition-colors',
+                            'w-full rounded border bg-black/10 px-1.5 py-1 text-left transition-colors',
                             active ? 'border-emerald-500/50 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="flex flex-col gap-0 min-w-0">
                               <div className="text-xs text-white/90 truncate">{node.label}</div>
                               <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
                             </div>
                             <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
                           </div>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {node.modelRefs.map((ref, i) => (
-                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                                {ROLE_LABELS[ref.role || ''] || ref.role}
-                              </Badge>
-                            ))}
-                          </div>
+                          {node.modelRefs.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                              {node.modelRefs.map((ref, i) => (
+                                <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+                                  {ROLE_LABELS[ref.role || ''] || ref.role}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </button>
                       );
                     })
@@ -655,20 +657,24 @@ export default function ContextManagerPage() {
                           active ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
                         )}
                       >
-                        <div className="text-xs text-white/90 truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
-                        <div className="text-[10px] text-white/40 truncate">
-                          {source?.label || edge.source_id} → {target?.label || edge.target_id}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs text-white/90 truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
+                            <div className="text-[10px] text-white/40 truncate">
+                              {source?.label || edge.source_id} → {target?.label || edge.target_id}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-2 mt-1">
-                          <div className="flex items-center gap-1 flex-wrap">
+                        {edge.modelRefs.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {edge.modelRefs.map((ref, i) => (
                               <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
                                 {ROLE_LABELS[ref.role || ''] || ref.role}
                               </Badge>
                             ))}
                           </div>
-                          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
-                        </div>
+                        )}
                       </button>
                     );
                   })}
