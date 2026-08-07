@@ -297,14 +297,14 @@ export default function ContextManagerPage() {
   const [activeTab, setActiveTab] = useState('graph');
 
   // Resizer state: same pattern as explore page.
-  const [topFlex, setTopFlex] = useState(2);
+  const [topFlex, setTopFlex] = useState(2.5);
   const bottomFlex = 5 - topFlex;
   const [leftFlex, setLeftFlex] = useState(1.0);
   const rightFlex = 5 - leftFlex;
   const leftPaneRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
-  const startTopFlexRef = useRef(2);
+  const startTopFlexRef = useRef(2.5);
   const containerHeightRef = useRef(0);
 
   // Vertical resize between Entities and Edges panels.
@@ -624,7 +624,7 @@ export default function ContextManagerPage() {
 
               <div
                 onMouseDown={handleResizeStart}
-                onDoubleClick={() => setTopFlex(2)}
+                onDoubleClick={() => setTopFlex(2.5)}
                 className="h-2 shrink-0 cursor-row-resize flex items-center justify-center group"
                 title="Drag to resize top and bottom panels; double-click to reset"
               >
