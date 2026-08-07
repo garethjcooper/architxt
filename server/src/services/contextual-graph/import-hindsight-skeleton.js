@@ -132,10 +132,15 @@ export async function importHindsightSkeleton(
       ? mergeProperties(existingNode.cgn_properties, properties)
       : properties;
 
-    // Preserve discovery status on existing nodes. The skeleton import must not
-    // relabel discovered candidates as grounded; promotion happens elsewhere.
+    // Preserve discovery status on existing nodes. The skeleton importer must
+    // never promote or demote nodes; it only adds labels for brand-new nodes or
+    // re-activates existing non-candidate nodes.
     const mergedLabels = existingNode
-      ? [...new Set([...labels, ...existingNode.labels].filter((l) => l !== 'stale'))]
+      ? [...new Set(
+          existingNode.labels?.includes('candidate')
+            ? [...existingNode.labels, 'active'].filter((l) => l !== 'stale')
+            : [...labels, ...existingNode.labels].filter((l) => l !== 'stale'),
+        )]
       : labels;
 
     const upsertResult = upsertNode(db, serverId, bankId, resolved.id, mergedLabels, mergedProperties);

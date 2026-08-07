@@ -24,7 +24,7 @@ const NODE_ID = 'svc-001';
 const EXT_ID = 'entity-summary-svc-001';
 
 function seedNodeWithRef(db, nodeId = NODE_ID, extId = EXT_ID, role = 'sys_entity_summary') {
-  upsertNode(db, serverId, bankId, nodeId, ['active'], {
+  upsertNode(db, serverId, bankId, nodeId, ['grounded', 'active'], {
     display_name: 'Billing Service',
     provenance: {
       source: 'contextual-graph',

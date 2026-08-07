@@ -82,6 +82,11 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
       logger.warn('Dropping entity-summary ref for candidate node; promotion required', { serverId, bankId, extId });
       return null;
     }
+    // Defensive: only derive for grounded or canonical nodes.
+    if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) {
+      logger.warn('Dropping entity-summary ref for non-grounded/non-canonical node', { serverId, bankId, extId, labels: node.cgn_labels });
+      return null;
+    }
     return deriveEntitySummaryModel(db, {
       id: nodeId,
       displayName: node.cgn_properties?.display_name || nodeId,
@@ -98,6 +103,11 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     }
     if (node.cgn_labels?.includes('candidate')) {
       logger.warn('Dropping entity-capabilities ref for candidate node; promotion required', { serverId, bankId, extId });
+      return null;
+    }
+    // Defensive: only derive for grounded or canonical nodes.
+    if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) {
+      logger.warn('Dropping entity-capabilities ref for non-grounded/non-canonical node', { serverId, bankId, extId, labels: node.cgn_labels });
       return null;
     }
     return deriveEntityCapabilitiesModel(db, {
@@ -123,6 +133,19 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
       logger.warn('Dropping edge-ctx ref because an endpoint is a candidate; promotion required', { serverId, bankId, extId });
       return null;
     }
+
+    const edges = listEdges(db, serverId, bankId, { limit: 10000 })?.data || [];
+    const pairEdges = edges.filter(
+      (e) =>
+        e.cge_source_id === pair.sourceId &&
+        e.cge_target_id === pair.targetId &&
+        (e.cge_properties?.labels?.includes('candidate') || e.cge_properties?.labels?.includes('grounded')),
+    );
+    if (pairEdges.some((e) => e.cge_properties?.labels?.includes('candidate'))) {
+      logger.warn('Dropping edge-ctx ref because the edge is a candidate; promotion required', { serverId, bankId, extId });
+      return null;
+    }
+
     return deriveEdgeContextModel(db, {
       id: pair.sourceId,
       displayName: sourceNode.cgn_properties?.display_name || pair.sourceId,
@@ -142,6 +165,11 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     }
     if (seedNode.cgn_labels?.includes('candidate')) {
       logger.warn('Dropping discover ref for candidate seed; promotion required', { serverId, bankId, extId });
+      return null;
+    }
+    // Defensive: only derive for grounded or canonical seeds.
+    if (!seedNode.cgn_labels?.includes('grounded') && !seedNode.cgn_labels?.includes('canonical')) {
+      logger.warn('Dropping discover ref for non-grounded/non-canonical seed', { serverId, bankId, extId, labels: seedNode.cgn_labels });
       return null;
     }
     return deriveDiscoverContextModel(db, {

@@ -132,11 +132,8 @@ export async function addContext(
     if (!node.cgn_labels?.includes('active')) continue;
     if (!inSubset(node.cgn_id)) continue;
     // Only derive mental models for explicitly grounded or canonical nodes.
-    // Plain active nodes (e.g. inferred edge-ctx endpoints or drifted labels)
-    // must not get models until they are promoted.
+    // Candidate nodes and plain active edge-ctx endpoints must be promoted first.
     if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) continue;
-    // Do not derive mental models for discovered candidates until they are promoted.
-    if (node.cgn_labels?.includes('candidate')) continue;
 
     if (allowedModelTypes.has('entity-summary') && !hasModelRef(node.cgn_properties, 'sys_entity_summary')) {
       const summarySpec = await deriveEntitySummaryModel(db, {
@@ -165,6 +162,10 @@ export async function addContext(
       // Only run edge-ctx on grounded/canonical working-graph edges. Directed
       // edges are produced by edge-ctx itself; candidate edges are not eligible.
       if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
+
+      // Candidate edges (or edges touching only candidate endpoints) are not
+      // eligible for edge-ctx.
+      if (edge.cge_properties?.labels?.includes('candidate')) continue;
 
       // Only run on edges whose endpoints are grounded or canonical.
       const sourceGroundedOrCanonical = existingNodes.some(
