@@ -1,11 +1,6 @@
 import { createLogger } from '../../utils/logger.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { parseJsonString } from '../../prompts/graph-parser.js';
-import {
-  deriveEntitySummaryModel,
-  deriveEntityCapabilitiesModel,
-  deriveEdgeContextModel,
-} from './template-models.js';
 import { dedupeCandidates, buildUndirectedEdgeId, modelNodeLookupKeys } from './identity.js';
 import { upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
 
@@ -93,8 +88,9 @@ function normalizeCandidates(rawCandidates) {
  *
  * - Creates or updates candidate nodes.
  * - Creates hypothesized edges to existing targets.
- * - Derives entity-summary, entity-capabilities and edge-ctx mental-model specs for the new nodes and edges.
- * - Does NOT deploy the derived specs; the caller decides whether to queue them.
+ * - Does NOT derive entity-summary, entity-capabilities or edge-ctx mental-model specs;
+ *   candidates are parked in the graph and promoted later by a separate approval flow.
+ * - Does NOT deploy any derived specs; the caller decides whether to queue them.
  *
  * @param {Object} db
  * @param {number} serverId
@@ -132,27 +128,14 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
     upsertNode(db, serverId, bankId, candidate.id, labels, properties);
     upsertedNodes.push(candidate.id);
 
-    entitySpecs.push(await deriveEntitySummaryModel(db, {
-      id: candidate.id,
-      displayName: candidate.displayName,
-    }));
-    entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
-      id: candidate.id,
-      displayName: candidate.displayName,
-    }));
+    // Candidate nodes are parked; do not derive entity-summary / capabilities specs until promoted.
 
     if (Array.isArray(candidate.hypothesizedEdges)) {
       for (const he of candidate.hypothesizedEdges) {
         if (!existingNodes.some((n) => n.cgn_id === he.target)) continue;
         const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
 
-        edgeSpecs.push(await deriveEdgeContextModel(db, {
-          id: candidate.id,
-          displayName: candidate.displayName,
-        }, {
-          id: he.target,
-          displayName: targetNode?.cgn_properties?.display_name || he.target,
-        }));
+        // Candidate edges are parked; do not derive edge-ctx specs until promoted.
 
         const edgeId = buildUndirectedEdgeId(candidate.id, he.target, null, 'discover');
         const edgeProperties = {
@@ -175,29 +158,14 @@ export async function ingestCandidates(db, serverId, bankId, seedId, candidates,
     const existing = existingNodes.find((n) => n.cgn_id === existingId);
     if (!existing) continue;
 
-    if (!hasEntitySummaryRef(existing.cgn_properties)) {
-      entitySpecs.push(await deriveEntitySummaryModel(db, {
-        id: existingId,
-        displayName: existing.cgn_properties?.display_name || existingId,
-      }));
-      entitySpecs.push(await deriveEntityCapabilitiesModel(db, {
-        id: existingId,
-        displayName: existing.cgn_properties?.display_name || existingId,
-      }));
-    }
+    // Merged candidates do not trigger new mental-model derivation; the existing node is unchanged.
 
     if (Array.isArray(candidate.hypothesized_edges)) {
       for (const he of candidate.hypothesized_edges) {
         if (!existingNodes.some((n) => n.cgn_id === he.target)) continue;
         const targetNode = existingNodes.find((n) => n.cgn_id === he.target);
 
-        edgeSpecs.push(await deriveEdgeContextModel(db, {
-          id: existingId,
-          displayName: existing.cgn_properties?.display_name || existingId,
-        }, {
-          id: he.target,
-          displayName: targetNode?.cgn_properties?.display_name || he.target,
-        }));
+        // Candidate edges are parked; do not derive edge-ctx specs until promoted.
 
         const edgeId = buildUndirectedEdgeId(existingId, he.target, null, 'discover');
         const edgeProperties = {
@@ -260,12 +228,4 @@ function buildLookupsFromGraph(nodes) {
       return byKey.get(key) ? { id: byKey.get(key) } : undefined;
     },
   };
-}
-
-function hasEntitySummaryRef(properties) {
-  const refs = properties?.provenance?.model_refs;
-  if (Array.isArray(refs)) {
-    return refs.some((ref) => ref?.role?.startsWith('sys_entity_summary'));
-  }
-  return false;
 }
