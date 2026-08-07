@@ -154,22 +154,16 @@ function formatDuration(start?: string, end?: string): string {
 export function SyncJobsTab({
   servers,
   banks,
-  loadingServers,
   loadingBanks,
   selectedServerId,
-  setSelectedServerId,
   selectedBankId,
-  setSelectedBankId,
   isActive,
 }: {
   servers: Array<{ id: number; name?: string; base_url?: string }>;
   banks: SelectorBank[];
-  loadingServers: boolean;
   loadingBanks: boolean;
   selectedServerId: string;
-  setSelectedServerId: (id: string) => void;
   selectedBankId: string;
-  setSelectedBankId: (id: string) => void;
   isActive?: boolean;
 }) {
   const [jobs, setJobs] = useState<Array<any>>([]);
@@ -256,17 +250,6 @@ export function SyncJobsTab({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-2 shrink-0">
-        <ServerBankSelectors
-          servers={servers}
-          selectedServerId={selectedServerId}
-          setSelectedServerId={setSelectedServerId}
-          banks={banks}
-          selectedBankId={selectedBankId}
-          setSelectedBankId={setSelectedBankId}
-          loadingBanks={loadingBanks}
-          disabled={loadingServers}
-        />
-
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-white/50">Range</span>
           <Select value={range} onValueChange={(v) => setRange((v as DateRange) || 'today')}>
