@@ -299,7 +299,7 @@ export default function ContextManagerPage() {
   // Resizer state: same pattern as explore page.
   const [topFlex, setTopFlex] = useState(2.5);
   const bottomFlex = 5 - topFlex;
-  const [leftFlex, setLeftFlex] = useState(1.0);
+  const [leftFlex, setLeftFlex] = useState(1.5);
   const rightFlex = 5 - leftFlex;
   const leftPaneRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -340,7 +340,7 @@ export default function ContextManagerPage() {
   // Horizontal resize between left lists and detail panel.
   const isHorizontalDraggingRef = useRef(false);
   const startXRef = useRef(0);
-  const startLeftFlexRef = useRef(1.0);
+  const startLeftFlexRef = useRef(1.5);
   const containerWidthRef = useRef(0);
 
   const handleHorizontalResizeStart = useCallback((e: React.MouseEvent) => {
@@ -684,7 +684,7 @@ export default function ContextManagerPage() {
 
             <div
               onMouseDown={handleHorizontalResizeStart}
-              onDoubleClick={() => setLeftFlex(1.0)}
+              onDoubleClick={() => setLeftFlex(1.5)}
               className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
               title="Drag to resize left and right panels; double-click to reset"
             >
