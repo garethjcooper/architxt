@@ -64,7 +64,7 @@ export function CandidatesTab({
   const discoveredEdges = useMemo(
     () =>
       edges
-        .filter((e) => e.properties.provenance?.source === 'discover' || e.type === 'discover')
+        .filter((e) => e.id.startsWith('discover-') || e.properties.provenance?.source === 'discover')
         .sort((a, b) => {
           const aKey = `${a.source_id}|${a.target_id}`;
           const bKey = `${b.source_id}|${b.target_id}`;
