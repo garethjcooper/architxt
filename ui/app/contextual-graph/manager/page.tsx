@@ -189,6 +189,12 @@ export default function ContextManagerPage() {
     return banks.find((b: any) => b.bank_id === bankId) || null;
   }, [selectedServer, bankId]);
   const bankMode = bankConfig?.mode ?? null; // 'manual' | 'auto' | null
+  const restriction = bankConfig?.restriction || {};
+  const importRestriction = restriction.import || {};
+  const deployRestriction = restriction.deploy || {};
+  const allowedModelTypes = deployRestriction.allowed_model_types || [];
+  const topKNodes = importRestriction.top_k_nodes;
+  const maxModelsPerRun = deployRestriction.max_models_per_run;
 
   useEffect(() => {
     async function loadServers() {
@@ -517,12 +523,9 @@ export default function ContextManagerPage() {
   return (
     <PageShell
       title="Context Manager"
-      count={nodes.length}
-      countLabel="node"
-      loading={graphLoading}
     >
       <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-white/10">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <ServerBankSelectors
             servers={servers}
             selectedServerId={selectedServerId}
@@ -533,6 +536,46 @@ export default function ContextManagerPage() {
             loadingBanks={loadingBanks}
             disabled={loadingServers}
           />
+
+          {bankId && (
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] border-white/10',
+                  bankMode === 'auto' ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-white/50'
+                )}
+              >
+                {bankMode === 'auto' ? 'Auto' : bankMode === 'manual' ? 'Manual' : 'Unmanaged'}
+              </Badge>
+
+              {allowedModelTypes.length > 0 ? (
+                allowedModelTypes.map((type: string) => (
+                  <Badge key={type} variant="outline" className="text-[10px] border-white/10 text-white/50">
+                    {type}
+                  </Badge>
+                ))
+              ) : (
+                <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">All model types</Badge>
+              )}
+
+              {typeof topKNodes === 'number' && (
+                <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                  Top {topKNodes} nodes
+                </Badge>
+              )}
+
+              {typeof maxModelsPerRun === 'number' && (
+                <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                  Deploy {maxModelsPerRun}
+                </Badge>
+              )}
+
+              <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                {nodes.length} nodes / {edges.length} edges
+              </Badge>
+            </div>
+          )}
         </div>
         {bankMode === 'auto' ? (
           <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
