@@ -224,12 +224,8 @@ export const config = {
   // Contextual graph feature flags (legacy; retained for API compatibility but no longer used).
   // patchRoles: removed; use allowed_model_types on the Hindsight bank instead.
   contextualGraph: {
-    // Background refresh poll. Disabled by default until the manual refresh path is stable.
-    background_refresh: {
-      enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_BACKGROUND_ENABLED', 'false') === 'true',
-      poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_POLL_INTERVAL_MS', 300000),
-    },
-    // Sync job auto-start daemon. Disabled by default.
+    // Sync daemon auto-starts contextual-graph sync jobs for managed banks.
+    // Background refresh poll removed: the sync daemon is now the only scheduled contextual-graph refresh path.
     sync_daemon: {
       enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_ENABLED', 'false') === 'true',
       poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_POLL_INTERVAL_MS', 60000),
