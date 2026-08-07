@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectValue, SelectTrigger, SelectPopup, SelectItem } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { contextualGraphApi } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
@@ -251,7 +252,7 @@ export function SyncJobsTab({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-2 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-white/50">Range</span>
+          <Label className="text-xs text-white/50 whitespace-nowrap">Range</Label>
           <Select value={range} onValueChange={(v) => setRange((v as DateRange) || 'today')}>
             <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue />
@@ -267,8 +268,9 @@ export function SyncJobsTab({
         </div>
 
         <div className="flex items-center gap-2">
+          <Label className="text-xs text-white/50 whitespace-nowrap">Status</Label>
           <Select value={status ?? ''} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-[180px] text-xs">
+            <SelectTrigger className="h-8 w-[140px] text-xs">
               <SelectValue placeholder="Any status" />
             </SelectTrigger>
             <SelectPopup>
