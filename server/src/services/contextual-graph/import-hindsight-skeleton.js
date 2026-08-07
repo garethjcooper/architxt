@@ -172,6 +172,7 @@ export async function importHindsightSkeleton(
     const incomingEdgeProperties = {
       directed: false,
       weight,
+      labels: ['grounded'],
       provenance: {
         source: 'hindsight',
       },

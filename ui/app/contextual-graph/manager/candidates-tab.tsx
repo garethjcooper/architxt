@@ -31,6 +31,14 @@ function getLastRefreshedAt(modelRefs: ModelRef[]): string | null {
   return timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
 }
 
+function isCandidateNode(node: DisplayNode): boolean {
+  return node.labels.includes('candidate');
+}
+
+function isCandidateEdge(edge: DisplayEdge): boolean {
+  return edge.properties.labels?.includes('candidate') ?? false;
+}
+
 export interface CandidatesTabProps {
   nodes: DisplayNode[];
   edges: DisplayEdge[];
@@ -58,13 +66,13 @@ export function CandidatesTab({
   const [filter, setFilter] = useState<CandidateFilter>('all');
 
   const discoveredNodes = useMemo(
-    () => nodes.filter((n) => n.labels.includes('candidate')).sort((a, b) => a.label.localeCompare(b.label)),
+    () => nodes.filter((n) => isCandidateNode(n)).sort((a, b) => a.label.localeCompare(b.label)),
     [nodes]
   );
   const discoveredEdges = useMemo(
     () =>
       edges
-        .filter((e) => e.properties.labels?.includes('candidate'))
+        .filter((e) => isCandidateEdge(e))
         .sort((a, b) => {
           const aKey = `${a.source_id}|${a.target_id}`;
           const bKey = `${b.source_id}|${b.target_id}`;

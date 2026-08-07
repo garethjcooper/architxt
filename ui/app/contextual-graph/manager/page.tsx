@@ -105,6 +105,22 @@ function backendEdgeToDisplayEdge(edge: BackendEdge): DisplayEdge {
   };
 }
 
+function isGroundedNode(node: DisplayNode): boolean {
+  return node.labels.includes('canonical') || node.labels.includes('grounded');
+}
+
+function isCandidateNode(node: DisplayNode): boolean {
+  return node.labels.includes('candidate');
+}
+
+function isCandidateEdge(edge: DisplayEdge): boolean {
+  return edge.properties.labels?.includes('candidate') ?? false;
+}
+
+function isGroundedEdge(edge: DisplayEdge): boolean {
+  return !isCandidateEdge(edge);
+}
+
 function getLastRefreshedAt(modelRefs: DisplayNode['modelRefs']): string | null {
   const timestamps = modelRefs
     .filter((r) => r.fetched_at)
@@ -281,13 +297,13 @@ export default function ContextManagerPage() {
 
   const sortedNodes = useMemo(() => {
     return [...nodes]
-      .filter((n) => !n.labels.includes('candidate'))
+      .filter((n) => isGroundedNode(n))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [nodes]);
 
   const sortedEdges = useMemo(() => {
     return [...edges]
-      .filter((e) => !e.properties.labels?.includes('candidate'))
+      .filter((e) => isGroundedEdge(e))
       .sort((a, b) => {
         const aKey = `${a.source_id}|${a.target_id}`;
         const bKey = `${b.source_id}|${b.target_id}`;
@@ -681,7 +697,7 @@ export default function ContextManagerPage() {
                       <Skeleton className="h-10 w-full bg-white/10" />
                     </div>
                   ) : filteredSortedNodes.length === 0 ? (
-                    <div className="text-[11px] text-white/40 px-2 py-3">No canonical entities loaded.</div>
+                    <div className="text-[11px] text-white/40 px-2 py-3">No grounded entities loaded.</div>
                   ) : (
                     filteredSortedNodes.map((node) => {
                       const active = selectedNodeId === node.id;
@@ -738,7 +754,7 @@ export default function ContextManagerPage() {
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
                   {filteredSortedEdges.length === 0 && (
-                    <div className="text-[11px] text-white/40 px-2 py-3">No canonical edges loaded.</div>
+                    <div className="text-[11px] text-white/40 px-2 py-3">No grounded edges loaded.</div>
                   )}
                   {filteredSortedEdges.map((edge) => {
                     const active = selectedEdgeId === edge.id;
