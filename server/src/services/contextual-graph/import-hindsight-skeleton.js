@@ -132,7 +132,13 @@ export async function importHindsightSkeleton(
       ? mergeProperties(existingNode.cgn_properties, properties)
       : properties;
 
-    const upsertResult = upsertNode(db, serverId, bankId, resolved.id, labels, mergedProperties);
+    // Preserve discovery status on existing nodes. The skeleton import must not
+    // relabel discovered candidates as grounded; promotion happens elsewhere.
+    const mergedLabels = existingNode
+      ? [...new Set([...labels, ...existingNode.labels].filter((l) => l !== 'stale'))]
+      : labels;
+
+    const upsertResult = upsertNode(db, serverId, bankId, resolved.id, mergedLabels, mergedProperties);
     if (!upsertResult.success) {
       logger.error('Failed to upsert skeleton node', {
         serverId,
