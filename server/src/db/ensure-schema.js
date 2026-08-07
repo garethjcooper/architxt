@@ -408,7 +408,7 @@ Rules:
     name: 'sys_edge_context',
     mode: 'sys_edge_context',
     description: 'System template: characterize directed relationships between two contextual-graph nodes.',
-    body: `You are identifying concrete flows between two known architectural entities.
+    body: `You are describing the directed interaction between two known entities in an architecture graph.
 
 ## Relationship
 
@@ -416,22 +416,21 @@ Rules:
 
 ## Instructions
 
-Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct flow between these two endpoints as its own directed edge in \`graph.edges\`.
+Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`.
 
-Look for:
-- APIs or service calls
-- Data reads or writes
-- File or message exchanges
-- Events or notifications
-- Dependencies that are not covered by a more specific type
+For each flow, write a concise but informative \`detail\` that covers as many of the following as the source material supports:
+- What is transferred (data, events, files, commands, money, etc.).
+- How it is transferred (protocol, format, API style, file layout).
+- How often (real-time, on-demand, hourly, nightly, weekly, ad-hoc).
+- Any known intermediaries (gateways, queues, ESBs, object stores, proxies).
+- Any known reliability behavior (retries, acknowledgements, error handling, idempotency, ordering guarantees).
 
 Rules:
-- Emit one edge per distinct flow. If the source material describes multiple kinds of exchange between these two entities (for example, one system reads master data from the other and also sends usage events), return each as its own edge with a distinct \`type\` and \`label\`.
-- Direction matters: \`from\` is the initiator or sender, \`to\` is the receiver or target.
-- For bidirectional flows, emit two separate directed edges with \`from\`/\`to\` swapped rather than a single combined edge.
+- Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
+- If the interaction is bidirectional, emit two edges with \`from\`/\`to\` swapped.
 - Do not include edges to nodes that are not one of the two endpoints.
-- Drop any edge that lacks evidence.
-- Use the most specific vocabulary type that fits.
+- Emit one edge per distinct flow; do not collapse multiple kinds of exchange into a single edge.
+- If a flow is described but no evidence IDs are available, still emit the edge with an empty evidence array.
 
 ## Source material
 
@@ -652,7 +651,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_edge_context',
     returns: 'sys_patch',
     dimension: 'sys_edge_context',
-    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-id} ({source-name}) and {target-id} ({target-name})? Return every distinct flow as a directed edge in the standard envelope. The endpoints are supplied above with their exact node ids; reuse those exact ids in the from/to fields. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.',
+    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-id} ({source-name}) and {target-id} ({target-name})? Return every distinct flow as a directed edge in the standard envelope. For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids in the from/to fields. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
