@@ -699,12 +699,9 @@ export default function ContextManagerPage() {
           <SyncJobsTab
             servers={servers}
             banks={banks}
-            loadingServers={loadingServers}
             loadingBanks={loadingBanks}
             selectedServerId={selectedServerId || ''}
-            setSelectedServerId={setSelectedServerId}
             selectedBankId={selectedBankId || ''}
-            setSelectedBankId={setSelectedBankId}
             isActive={activeTab === 'jobs'}
           />
         </TabsContent>
