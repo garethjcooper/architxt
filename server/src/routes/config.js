@@ -93,33 +93,24 @@ router.get('/entity-format', (req, res) => {
  * @openapi
  * /config/contextual-graph:
  *   get:
- *     summary: Get contextual graph configuration
+ *     summary: Contextual graph feature flags
  *     description: |
- *       Returns the currently enabled contextual-graph patch roles. The UI uses
- *       these to compute health indicators for nodes and edges.
+ *       Deprecated endpoint retained for compatibility. The contextual graph
+ *       is now controlled per-bank via allowed_model_types on the Hindsight
+ *       bank; this route returns an empty object.
  *     tags: [Config]
  *     responses:
  *       200:
- *         description: Enabled patch roles
+ *         description: Empty feature flags object
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 patchRoles:
- *                   type: object
- *                   additionalProperties: { type: boolean }
+ *               additionalProperties: { type: boolean }
  */
 router.get('/contextual-graph', (req, res) => {
   try {
-    res.json({
-      patchRoles: config.contextualGraph?.patchRoles ?? {
-        sys_entity_summary: true,
-        sys_entity_capabilities: true,
-        sys_edge_context: true,
-        sys_discovery_context: false,
-      },
-    });
+    res.json({});
   } catch (err) {
     logger.error('contextual-graph config route error', { error: err.message });
     res.status(500).json({ error: err.message, code: 'CONFIG_ERROR' });

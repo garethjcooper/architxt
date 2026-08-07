@@ -221,14 +221,9 @@ export const config = {
     remove_non_ascii: getEnv('ARCHITXT_DENOISE_REMOVE_NON_ASCII', 'true') === 'true',
     max_consecutive_newlines: getInt('ARCHITXT_DENOISE_MAX_NEWLINES', 3)
   },
+  // Contextual graph feature flags (legacy; retained for API compatibility but no longer used).
+  // patchRoles: removed; use allowed_model_types on the Hindsight bank instead.
   contextualGraph: {
-    patchRoles: {
-      sys_entity_summary: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_ENTITY_SUMMARY', 'true') === 'true',
-      sys_entity_capabilities: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_ENTITY_CAPABILITIES', 'true') === 'true',
-      sys_edge_context: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_EDGE_CONTEXT', 'true') === 'true',
-      // Discovery is disabled by default until the candidate-approval UI exists.
-      sys_discovery_context: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_PATCH_DISCOVERY_CONTEXT', 'false') === 'true',
-    },
     // Background refresh poll. Disabled by default until the manual refresh path is stable.
     background_refresh: {
       enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_REFRESH_BACKGROUND_ENABLED', 'false') === 'true',
