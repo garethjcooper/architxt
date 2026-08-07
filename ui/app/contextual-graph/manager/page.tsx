@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { serversApi, contextualGraphApi, type GraphNode as ApiGraphNode, type GraphEdge as ApiGraphEdge } from '@/lib/api/client';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
@@ -13,10 +14,11 @@ import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SyncJobsTab } from './sync-jobs-tab';
 import { MentalModelsTab } from './mental-models-tab';
+import { CandidatesTab } from './candidates-tab';
 
 const logger = createLogger('ContextManagerPage');
 
@@ -54,7 +56,7 @@ export type ModelRef = {
   last_refresh_error?: string;
 };
 
-type DisplayNode = {
+export type DisplayNode = {
   id: string;
   type: string;
   label: string;
@@ -63,7 +65,7 @@ type DisplayNode = {
   modelRefs: ModelRef[];
 };
 
-type DisplayEdge = {
+export type DisplayEdge = {
   id: string;
   source_id: string;
   target_id: string;
@@ -170,6 +172,9 @@ export default function ContextManagerPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Graph tab search/filter state.
+  const [graphSearch, setGraphSearch] = useState('');
+
   const {
     selectedServerId,
     setSelectedServerId,
@@ -272,16 +277,48 @@ export default function ContextManagerPage() {
   }, [serverId, bankId]);
 
   const sortedNodes = useMemo(() => {
-    return [...nodes].sort((a, b) => a.label.localeCompare(b.label));
+    return [...nodes]
+      .filter((n) => !n.labels.includes('candidate'))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [nodes]);
 
   const sortedEdges = useMemo(() => {
-    return [...edges].sort((a, b) => {
-      const aKey = `${a.source_id}|${a.target_id}`;
-      const bKey = `${b.source_id}|${b.target_id}`;
-      return aKey.localeCompare(bKey);
-    });
+    return [...edges]
+      .filter((e) => e.properties.provenance?.source !== 'discover' && e.type !== 'discover')
+      .sort((a, b) => {
+        const aKey = `${a.source_id}|${a.target_id}`;
+        const bKey = `${b.source_id}|${b.target_id}`;
+        return aKey.localeCompare(bKey);
+      });
   }, [edges]);
+
+  const nodeById = useMemo(() => {
+    const map = new Map<string, DisplayNode>();
+    for (const n of nodes) map.set(n.id, n);
+    return map;
+  }, [nodes]);
+
+  const filteredSortedNodes = useMemo(() => {
+    const q = graphSearch.trim().toLowerCase();
+    if (!q) return sortedNodes;
+    return sortedNodes.filter(
+      (n) =>
+        n.label.toLowerCase().includes(q) ||
+        n.id.toLowerCase().includes(q) ||
+        n.type.toLowerCase().includes(q)
+    );
+  }, [sortedNodes, graphSearch]);
+
+  const filteredSortedEdges = useMemo(() => {
+    const q = graphSearch.trim().toLowerCase();
+    if (!q) return sortedEdges;
+    return sortedEdges.filter((e) => {
+      const source = nodeById.get(e.source_id)?.label || e.source_id;
+      const target = nodeById.get(e.target_id)?.label || e.target_id;
+      const text = `${e.detail || ''} ${e.label || ''} ${e.type || ''} ${source} ${target}`.toLowerCase();
+      return text.includes(q);
+    });
+  }, [sortedEdges, graphSearch, nodeById]);
 
   const allModelRefs = useMemo(() => {
     const refs: ModelRef[] = [];
@@ -289,12 +326,6 @@ export default function ContextManagerPage() {
     for (const edge of edges) refs.push(...edge.modelRefs);
     return refs;
   }, [nodes, edges]);
-
-  const nodeById = useMemo(() => {
-    const map = new Map<string, DisplayNode>();
-    for (const n of nodes) map.set(n.id, n);
-    return map;
-  }, [nodes]);
 
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) ?? null : null;
   const selectedEdge = selectedEdgeId ? edges.find((e) => e.id === selectedEdgeId) ?? null : null;
@@ -404,7 +435,7 @@ export default function ContextManagerPage() {
       return;
     }
     // Refresh graph data whenever the user switches back to a data-driven tab.
-    if (activeTab === 'graph' || activeTab === 'models') {
+    if (activeTab === 'graph' || activeTab === 'candidates' || activeTab === 'models') {
       loadGraph();
     }
   }, [serverId, bankId, activeTab, loadGraph]);
@@ -604,12 +635,28 @@ export default function ContextManagerPage() {
         <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 shrink-0">
           <TabsList variant="line">
             <TabsTrigger value="graph">Graph</TabsTrigger>
+            <TabsTrigger value="candidates">Candidates</TabsTrigger>
             <TabsTrigger value="models">Mental Models</TabsTrigger>
             <TabsTrigger value="jobs">Sync Jobs</TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="graph" className="flex flex-col flex-1 min-h-0 mt-0">
+          <div className="flex items-center gap-3 pb-2 border-b border-white/10 shrink-0">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+              <Input
+                value={graphSearch}
+                onChange={(e) => setGraphSearch(e.target.value)}
+                placeholder="Search entities and edges..."
+                className="h-8 pl-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/40"
+              />
+            </div>
+            <span className="text-[11px] text-white/50 ml-auto">
+              {filteredSortedNodes.length} node{filteredSortedNodes.length !== 1 ? 's' : ''} / {filteredSortedEdges.length} edge
+              {filteredSortedEdges.length !== 1 ? 's' : ''}
+            </span>
+          </div>
           <div className="flex-1 min-h-0 flex mt-2">
             <div
               ref={leftPaneRef}
@@ -620,7 +667,7 @@ export default function ContextManagerPage() {
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Entities</span>
                   <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
-                    {sortedNodes.length}
+                    {filteredSortedNodes.length}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
@@ -630,10 +677,10 @@ export default function ContextManagerPage() {
                       <Skeleton className="h-10 w-full bg-white/10" />
                       <Skeleton className="h-10 w-full bg-white/10" />
                     </div>
-                  ) : sortedNodes.length === 0 ? (
-                    <div className="text-[11px] text-white/40 px-2 py-3">No entities loaded.</div>
+                  ) : filteredSortedNodes.length === 0 ? (
+                    <div className="text-[11px] text-white/40 px-2 py-3">No canonical entities loaded.</div>
                   ) : (
-                    sortedNodes.map((node) => {
+                    filteredSortedNodes.map((node) => {
                       const active = selectedNodeId === node.id;
                       const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
                       const lastRefreshed = getLastRefreshedAt(node.modelRefs);
@@ -683,14 +730,14 @@ export default function ContextManagerPage() {
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Edges</span>
                   <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
-                    {sortedEdges.length}
+                    {filteredSortedEdges.length}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-                  {sortedEdges.length === 0 && (
-                    <div className="text-[11px] text-white/40 px-2 py-3">No edges loaded.</div>
+                  {filteredSortedEdges.length === 0 && (
+                    <div className="text-[11px] text-white/40 px-2 py-3">No canonical edges loaded.</div>
                   )}
-                  {sortedEdges.map((edge) => {
+                  {filteredSortedEdges.map((edge) => {
                     const active = selectedEdgeId === edge.id;
                     const source = nodeById.get(edge.source_id);
                     const target = nodeById.get(edge.target_id);
@@ -753,6 +800,19 @@ export default function ContextManagerPage() {
             selectedServerId={selectedServerId || ''}
             selectedBankId={selectedBankId || ''}
             isActive={activeTab === 'jobs'}
+          />
+        </TabsContent>
+
+        <TabsContent value="candidates" className="flex flex-col flex-1 min-h-0 mt-0">
+          <CandidatesTab
+            nodes={nodes}
+            edges={edges}
+            nodeById={nodeById}
+            selectedNodeId={selectedNodeId}
+            selectedEdgeId={selectedEdgeId}
+            onSelectNode={(id) => { setSelectedNodeId(id); setSelectedEdgeId(null); }}
+            onSelectEdge={(id) => { setSelectedEdgeId(id); setSelectedNodeId(null); }}
+            loading={graphLoading}
           />
         </TabsContent>
 
