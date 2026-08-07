@@ -78,6 +78,10 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
       logger.warn('Dropping stale entity-summary ref; node not found', { serverId, bankId, extId });
       return null;
     }
+    if (node.cgn_labels?.includes('candidate')) {
+      logger.warn('Dropping entity-summary ref for candidate node; promotion required', { serverId, bankId, extId });
+      return null;
+    }
     return deriveEntitySummaryModel(db, {
       id: nodeId,
       displayName: node.cgn_properties?.display_name || nodeId,
@@ -90,6 +94,10 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) {
       logger.warn('Dropping stale entity-capabilities ref; node not found', { serverId, bankId, extId });
+      return null;
+    }
+    if (node.cgn_labels?.includes('candidate')) {
+      logger.warn('Dropping entity-capabilities ref for candidate node; promotion required', { serverId, bankId, extId });
       return null;
     }
     return deriveEntityCapabilitiesModel(db, {
@@ -111,6 +119,10 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
       logger.warn('Dropping stale edge-ctx ref; endpoint missing', { serverId, bankId, extId, sourceId: pair.sourceId, targetId: pair.targetId });
       return null;
     }
+    if (sourceNode.cgn_labels?.includes('candidate') || targetNode.cgn_labels?.includes('candidate')) {
+      logger.warn('Dropping edge-ctx ref because an endpoint is a candidate; promotion required', { serverId, bankId, extId });
+      return null;
+    }
     return deriveEdgeContextModel(db, {
       id: pair.sourceId,
       displayName: sourceNode.cgn_properties?.display_name || pair.sourceId,
@@ -126,6 +138,10 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     const seedNode = getNode(db, serverId, bankId, seedId)?.data;
     if (!seedNode) {
       logger.warn('Dropping stale discover ref; seed node not found', { serverId, bankId, extId });
+      return null;
+    }
+    if (seedNode.cgn_labels?.includes('candidate')) {
+      logger.warn('Dropping discover ref for candidate seed; promotion required', { serverId, bankId, extId });
       return null;
     }
     return deriveDiscoverContextModel(db, {

@@ -131,6 +131,8 @@ export async function addContext(
   for (const node of filteredNodes) {
     if (!node.cgn_labels?.includes('active')) continue;
     if (!inSubset(node.cgn_id)) continue;
+    // Do not derive mental models for discovered candidates until they are promoted.
+    if (node.cgn_labels?.includes('candidate')) continue;
 
     if (allowedModelTypes.has('entity-summary') && !hasModelRef(node.cgn_properties, 'sys_entity_summary')) {
       const summarySpec = await deriveEntitySummaryModel(db, {
@@ -159,6 +161,9 @@ export async function addContext(
       // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
       // candidate hypotheses). Directed edges are produced by edge-ctx itself.
       if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
+
+      // Do not derive edge-ctx for discovered candidate edges until they are promoted.
+      if (edge.cge_properties?.labels?.includes('candidate')) continue;
 
       if (!inSubset(edge.cge_source_id) || !inSubset(edge.cge_target_id)) continue;
 
@@ -205,7 +210,7 @@ export async function addContext(
     }
 
     const ranked = filteredNodes
-      .filter((n) => n.cgn_labels?.includes('uncanonical') || n.cgn_labels?.includes('active'))
+      .filter((n) => !n.cgn_labels?.includes('candidate') && (n.cgn_labels?.includes('uncanonical') || n.cgn_labels?.includes('active')))
       .map((n) => ({ id: n.cgn_id, degree: nodeDegrees.get(n.cgn_id) || 0 }))
       .sort((a, b) => b.degree - a.degree)
       .slice(0, neighborhood.top_k_neighbors);
