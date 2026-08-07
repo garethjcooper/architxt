@@ -595,7 +595,7 @@ export default function ContextManagerPage() {
                           type="button"
                           onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
                           className={cn(
-                            'w-full flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors',
+                            'w-full flex flex-col gap-1 rounded border bg-black/10 px-1.5 py-1 text-left transition-colors',
                             active ? 'border-emerald-500/50 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
                           )}
                         >
@@ -651,7 +651,7 @@ export default function ContextManagerPage() {
                         type="button"
                         onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
                         className={cn(
-                          'w-full text-left rounded border px-2 py-1.5 transition-colors',
+                          'w-full text-left rounded border px-1.5 py-1 transition-colors',
                           active ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
                         )}
                       >
