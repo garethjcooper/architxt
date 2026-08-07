@@ -131,6 +131,10 @@ export async function addContext(
   for (const node of filteredNodes) {
     if (!node.cgn_labels?.includes('active')) continue;
     if (!inSubset(node.cgn_id)) continue;
+    // Only derive mental models for explicitly grounded or canonical nodes.
+    // Plain active nodes (e.g. inferred edge-ctx endpoints or drifted labels)
+    // must not get models until they are promoted.
+    if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) continue;
     // Do not derive mental models for discovered candidates until they are promoted.
     if (node.cgn_labels?.includes('candidate')) continue;
 
@@ -158,12 +162,18 @@ export async function addContext(
     if (allowedModelTypes.has('edge-ctx')) {
       if (hasModelRef(edge.cge_properties, 'sys_edge_context')) continue;
 
-      // Only run edge-ctx on undirected working-graph edges (Hindsight skeleton or
-      // candidate hypotheses). Directed edges are produced by edge-ctx itself.
+      // Only run edge-ctx on grounded/canonical working-graph edges. Directed
+      // edges are produced by edge-ctx itself; candidate edges are not eligible.
       if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
 
-      // Do not derive edge-ctx for discovered candidate edges until they are promoted.
-      if (edge.cge_properties?.labels?.includes('candidate')) continue;
+      // Only run on edges whose endpoints are grounded or canonical.
+      const sourceGroundedOrCanonical = existingNodes.some(
+        (n) => n.cgn_id === edge.cge_source_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
+      );
+      const targetGroundedOrCanonical = existingNodes.some(
+        (n) => n.cgn_id === edge.cge_target_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
+      );
+      if (!sourceGroundedOrCanonical || !targetGroundedOrCanonical) continue;
 
       if (!inSubset(edge.cge_source_id) || !inSubset(edge.cge_target_id)) continue;
 
@@ -210,9 +220,9 @@ export async function addContext(
     }
 
     const ranked = filteredNodes
-      .filter((n) => !n.cgn_labels?.includes('candidate') && (n.cgn_labels?.includes('uncanonical') || n.cgn_labels?.includes('active')))
+      .filter((n) => !n.cgn_labels?.includes('candidate') && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')))
       .map((n) => ({ id: n.cgn_id, degree: nodeDegrees.get(n.cgn_id) || 0 }))
-      .sort((a, b) => b.degree - a.degree)
+      .sort((a, b) => b.degree - a.degree || a.id.localeCompare(b.id))
       .slice(0, neighborhood.top_k_neighbors);
 
     for (const { id } of ranked) {
