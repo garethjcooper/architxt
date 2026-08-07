@@ -42,6 +42,7 @@ type BackendEdge = {
   source_id: string;
   target_id: string;
   type: string | null;
+  labels?: string[];
   properties: Record<string, any>;
 };
 
@@ -70,6 +71,7 @@ export type DisplayEdge = {
   source_id: string;
   target_id: string;
   type: string | null;
+  labels: string[];
   label?: string;
   detail?: string;
   properties: Record<string, any>;
@@ -95,6 +97,7 @@ function backendEdgeToDisplayEdge(edge: BackendEdge): DisplayEdge {
     source_id: edge.source_id,
     target_id: edge.target_id,
     type: edge.type,
+    labels: edge.labels || [],
     label: edge.properties.label,
     detail: edge.properties.detail,
     properties: edge.properties,
@@ -284,7 +287,7 @@ export default function ContextManagerPage() {
 
   const sortedEdges = useMemo(() => {
     return [...edges]
-      .filter((e) => !e.id.startsWith('discover-') && e.properties.provenance?.source !== 'discover')
+      .filter((e) => !e.properties.labels?.includes('candidate'))
       .sort((a, b) => {
         const aKey = `${a.source_id}|${a.target_id}`;
         const bKey = `${b.source_id}|${b.target_id}`;
