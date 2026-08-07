@@ -3,7 +3,6 @@ import { refreshMentalModel } from '../../services/hindsight/mental-models.js';
 import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge, findEdgeByEndpoints } from '../../db/crud/contextual-graph.js';
 import { normalizeModelOutput, contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
-import { config } from '../../config.js';
 import { createLogger } from '../../utils/logger.js';
 import { inferRole } from './specs.js';
 
@@ -211,14 +210,12 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     Array.isArray(options.newlyDeployedExtIds) ? options.newlyDeployedExtIds : [],
   );
   const timestamp = new Date().toISOString();
-  const patchRoles = config.contextualGraph?.patchRoles || {};
   const listModels = options.listAllMentalModels || listAllMentalModels;
   const refreshFn = options.refreshMentalModel || refreshMentalModel;
 
   const stats = {
     fetched: 0,
     matched: 0,
-    skippedDisabled: 0,
     skippedUnchanged: 0,
     skippedBuilding: 0,
     applied: 0,
@@ -300,13 +297,6 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       }
 
       const role = inferRole(model.id);
-      const enabled = patchRoles[role] === true;
-
-      if (!enabled) {
-        stats.skippedDisabled += 1;
-        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'skipped', error: 'role disabled' });
-        continue;
-      }
 
       const content = getModelContent(model);
       const newHash = contentHash(content);

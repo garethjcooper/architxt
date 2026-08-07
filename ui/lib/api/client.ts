@@ -1254,7 +1254,8 @@ export interface SettingsSnapshot {
 }
 
 export interface ContextualGraphConfig {
-  patchRoles: Record<string, boolean>;
+  // Legacy field; the server now returns {} for compatibility.
+  patchRoles?: Record<string, boolean>;
 }
 
 // Contextual Graph API
