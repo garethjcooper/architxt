@@ -538,50 +538,53 @@ export default function ContextManagerPage() {
           />
 
           {bankId && (
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className={cn(
-                  'text-[10px] border-white/10',
-                  bankMode === 'auto' ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-white/50'
-                )}
-              >
-                {bankMode === 'auto' ? 'Auto' : bankMode === 'manual' ? 'Manual' : 'Unmanaged'}
-              </Badge>
-
-              {allowedModelTypes.length > 0 ? (
-                allowedModelTypes.map((type: string) => (
-                  <Badge key={type} variant="outline" className="text-[10px] border-white/10 text-white/50">
-                    {type}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-white/40">Config</span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[10px] border-white/10',
+                    bankMode === 'auto' ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-white/50'
+                  )}
+                >
+                  {bankMode === 'auto' ? 'Auto refresh' : bankMode === 'manual' ? 'Manual refresh' : 'Unmanaged'}
+                </Badge>
+                {typeof topKNodes === 'number' && (
+                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                    Import top {topKNodes} nodes
                   </Badge>
-                ))
-              ) : (
-                <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">All model types</Badge>
-              )}
+                )}
+                {typeof maxModelsPerRun === 'number' && (
+                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                    Deploy max {maxModelsPerRun}
+                  </Badge>
+                )}
+              </div>
 
-              {typeof topKNodes === 'number' && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-white/40">Model Types</span>
+                {allowedModelTypes.length > 0 ? (
+                  allowedModelTypes.map((type: string) => (
+                    <Badge key={type} variant="outline" className="text-[10px] border-white/10 text-white/50">
+                      {type}
+                    </Badge>
+                  ))
+                ) : (
+                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">All types</Badge>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-white/40">Graph</span>
                 <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
-                  Top {topKNodes} nodes
+                  {nodes.length} node{nodes.length !== 1 ? 's' : ''} / {edges.length} edge{edges.length !== 1 ? 's' : ''}
                 </Badge>
-              )}
-
-              {typeof maxModelsPerRun === 'number' && (
-                <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
-                  Deploy {maxModelsPerRun}
-                </Badge>
-              )}
-
-              <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
-                {nodes.length} nodes / {edges.length} edges
-              </Badge>
+              </div>
             </div>
           )}
         </div>
-        {bankMode === 'auto' ? (
-          <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
-            Auto-sync
-          </Badge>
-        ) : bankMode === 'manual' ? (
+        {bankMode === 'manual' && (
           <Button
             variant="outline"
             size="sm"
@@ -590,7 +593,7 @@ export default function ContextManagerPage() {
           >
             {actionLoading === 'sync-job' ? 'Running…' : 'Run sync job'}
           </Button>
-        ) : null}
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
