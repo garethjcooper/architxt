@@ -285,9 +285,6 @@ export function deriveMentalModels(template) {
     exclude_mental_model_list: template.exclude_mental_model_list,
     max_tokens: normaliseMaxTokens(template.max_tokens),
     tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
-    dimension: template.dimension,
-    returns: template.returns,
-    concatenation: template.concatenation,
     is_template: template.is_template,
     tags: template.tags || [],
     entities: entities,
@@ -308,9 +305,6 @@ export function deriveMentalModels(template) {
       exclude_all_mental_models: overrides.exclude_all_mental_models ?? template.exclude_all_mental_models,
       max_tokens: overrides.max_tokens ?? normaliseMaxTokens(template.max_tokens),
       tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
-      dimension: template.dimension,
-      returns: template.returns,
-      concatenation: template.concatenation,
       derived_entity: entity,
       is_derived: true,
     };
@@ -329,12 +323,11 @@ export async function composeDerivedMentalModels(db, derivedRows) {
   return Promise.all(
     derivedRows.map(async (row) => {
       try {
-        const composedQuery = await composeMentalModelPrompt(db, row.returns, row.source_query);
+        const composedQuery = await composeMentalModelPrompt(db, 'narrative-graph-known', row.source_query);
         return { ...row, composed_query: composedQuery };
       } catch (err) {
         logger.warn('Failed to compose derived mental model prompt', {
           derivedId: row.id,
-          returns: row.returns,
           error: err.message,
         });
         return { ...row, composed_query: null, compose_error: err.message };
@@ -522,7 +515,7 @@ export const createMentalModel = (db, data) => dbExec(() => {
     throw err;
   }
 
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_template_role'];
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_template_role'];
   const presentCols = cols.filter(c => data[c] !== undefined && data[c] !== null);
   const placeholders = presentCols.map(() => '?').join(',');
   const values = presentCols.map(c => data[c]);
@@ -536,7 +529,7 @@ export const createMentalModel = (db, data) => dbExec(() => {
  * Update mental model. Only present fields are updated.
  */
 export const updateMentalModel = (db, id, data) => dbExec(() => {
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_template_role'];
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_template_role'];
   const updates = [];
   const values = [];
 

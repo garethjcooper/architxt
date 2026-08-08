@@ -37,8 +37,6 @@ import {
   normaliseRefreshMode,
   normaliseTagsMatchMode,
   normaliseMaxTokens,
-  normaliseReturns,
-  normaliseConcatenation,
   toDbBool,
   DEFAULT_MAX_TOKENS,
   DEFAULT_REFRESH_MODE,
@@ -90,9 +88,6 @@ const toApiMentalModel = (dbRow) => ({
   is_template: dbRow.mm_is_template === 'true',
   template_role: dbRow.mm_template_role ?? null,
   is_system_template: isSystemTemplateRole(dbRow.mm_template_role),
-  dimension: dbRow.mm_dimension ?? null,
-  returns: dbRow.mm_returns ?? 'narrative',
-  concatenation: dbRow.mm_concatenation ?? 'compile',
   tags: dbRow.mm_tags || [],
   entities: (dbRow.mm_entities || []).map((e) => ({
     ...e,
@@ -147,8 +142,6 @@ router.get('/', async (req, res) => {
   const result = await listMentalModels(db, {
     limit: Number(req.query.limit) || 1000,
     offset: Number(req.query.offset) || 0,
-    dimension: req.query.dimension,
-    returns: req.query.returns,
   });
   handleCrudResult({
     res,
@@ -306,22 +299,6 @@ router.post('/', async (req, res) => {
     return sendResponse({ res, status: 400, error: eligibility.error, code: eligibility.code, logger, method: 'POST', path, duration });
   }
 
-  const returns = normaliseReturns(body.returns) ?? 'narrative';
-  const templateExists = db.prepare("SELECT 1 FROM prompt_templates WHERE pt_name = ?").get(returns);
-  if (!templateExists) {
-    const duration = Date.now() - start;
-    return sendResponse({
-      res,
-      status: 400,
-      error: `No prompt template found for returns='${returns}'. Restart the server to apply built-in template migrations.`,
-      code: 'TEMPLATE_NOT_FOUND',
-      logger,
-      method: 'POST',
-      path,
-      duration,
-    });
-  }
-
   const result = await createMentalModel(db, {
     mm_ext_id: extIdCheck.value,
     mm_name: body.name ?? null,
@@ -333,9 +310,6 @@ router.post('/', async (req, res) => {
     mm_tags_match_mode: normaliseTagsMatchMode(body.tags_match_mode) ?? DEFAULT_TAGS_MATCH_MODE,
     mm_is_template: isTemplate,
     mm_max_tokens: normaliseMaxTokens(body.max_tokens) ?? DEFAULT_MAX_TOKENS,
-    mm_dimension: body.dimension ?? null,
-    mm_returns: returns,
-    mm_concatenation: normaliseConcatenation(body.concatenation) ?? 'compile',
   });
 
   handleCrudResult({
@@ -439,30 +413,6 @@ router.put('/:id', async (req, res) => {
   }
   if (body.tags_match_mode !== undefined) {
     data.mm_tags_match_mode = normaliseTagsMatchMode(body.tags_match_mode);
-  }
-  if (body.dimension !== undefined) {
-    data.mm_dimension = body.dimension === '' ? null : body.dimension;
-  }
-  if (body.returns !== undefined) {
-    const returns = normaliseReturns(body.returns);
-    const templateExists = db.prepare("SELECT 1 FROM prompt_templates WHERE pt_name = ?").get(returns);
-    if (!templateExists) {
-      const duration = Date.now() - start;
-      return sendResponse({
-        res,
-        status: 400,
-        error: `No prompt template found for returns='${returns}'. Restart the server to apply built-in template migrations.`,
-        code: 'TEMPLATE_NOT_FOUND',
-        logger,
-        method: 'PUT',
-        path,
-        duration,
-      });
-    }
-    data.mm_returns = returns;
-  }
-  if (body.concatenation !== undefined) {
-    data.mm_concatenation = normaliseConcatenation(body.concatenation);
   }
 
   const result = await updateMentalModel(db, idCheck.id, data);
