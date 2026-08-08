@@ -16,6 +16,7 @@ import {
 import { colorForType } from '@/components/research-canvas';
 import { type ResearchQueryOptions } from './use-research-session';
 import { type ResearchStepSummary } from '@/lib/api/client';
+import { researchApi } from '@/lib/api/client';
 
 export type Server = {
   id: number;
@@ -39,13 +40,15 @@ export interface QueryFormProps {
   availableEntities: EntityLike[];
   availableEdges: EdgeLike[];
   onSubmit: (e: React.FormEvent) => void;
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models';
+  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
   dimensions: string[];
   setDimensions: (d: string[]) => void;
   availableDimensions: Array<{ value: string; label: string }>;
   queryOptions: ResearchQueryOptions;
   setQueryOptions: (opts: ResearchQueryOptions | ((prev: ResearchQueryOptions) => ResearchQueryOptions)) => void;
   availableMentalModels?: Array<{ id: number; ext_id: string; name?: string; returns?: string; concatenation?: string }>;
+  serverId?: string;
+  bankId?: string;
   /** Trail for synthesize-mode source step preview. */
   trail?: ResearchStepSummary[];
   /** Current step selection state for synthesize-mode preview. */
@@ -62,6 +65,7 @@ const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
   reflect: 'Returns a generated narrative for the given query. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   models: 'Select one or more mental models and enter a query to explore their content. Type [[ to show list of existing known entities.',
+  templates: 'Select one or more entities on the left to reveal eligible templates.',
 };
 
 function tokenLabel(token: QueryToken, entities: EntityLike[], edges: EdgeLike[]): string {
@@ -298,6 +302,8 @@ export function QueryForm(props: QueryFormProps) {
     queryOptions,
     setQueryOptions,
     availableMentalModels = [],
+    serverId,
+    bankId,
     trail = [],
     selectedStepIds = new Set(),
     activeStepId,
@@ -311,6 +317,19 @@ export function QueryForm(props: QueryFormProps) {
   const [autocompleteKind, setAutocompleteKind] = useState<'entity'>('entity');
   const [autocompletePos, setAutocompletePos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [eligibleTemplates, setEligibleTemplates] = useState<Array<{
+    id: number;
+    ext_id: string;
+    name: string;
+    matched_entities: Array<{
+      entity_id: string;
+      name: string;
+      type_name?: string;
+      derived_ext_id: string;
+    }>;
+  }>>([]);
+  const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [eligibleError, setEligibleError] = useState<string | null>(null);
   const lastHandledKeyRef = useRef<string | null>(null);
   const lastHtmlRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
@@ -330,6 +349,45 @@ export function QueryForm(props: QueryFormProps) {
       .sort((a, b) => trail.indexOf(a) - trail.indexOf(b));
   }, [queryMode, trail, selectedStepIds, activeStepId]);
   const tokens = useMemo(() => parseQueryTokens(query), [query]);
+
+  // Fetch eligible templates whenever selected entities change in templates mode.
+  useEffect(() => {
+    if (queryMode !== 'templates' || !serverId || !bankId) {
+      setEligibleTemplates([]);
+      setEligibleError(null);
+      return;
+    }
+    const entityIds = queryOptions.templates?.selectedEntities || [];
+    if (entityIds.length === 0) {
+      setEligibleTemplates([]);
+      setEligibleError(null);
+      return;
+    }
+    let cancelled = false;
+    setEligibleLoading(true);
+    setEligibleError(null);
+    researchApi.eligibleTemplateModels({
+      server_id: parseInt(serverId, 10),
+      bank_id: bankId,
+      entities: entityIds,
+    })
+      .then((res) => {
+        if (!cancelled) {
+          setEligibleTemplates(res.templates || []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setEligibleError(err instanceof Error ? err.message : String(err));
+          setEligibleTemplates([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setEligibleLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [queryMode, serverId, bankId, queryOptions.templates?.selectedEntities]);
+
   const entityMap = useMemo(() => {
     const map = new Map<string, EntityLike>();
     for (const e of availableEntities) {
@@ -675,7 +733,7 @@ export function QueryForm(props: QueryFormProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col h-full p-2 gap-2 overflow-hidden">
       <div className="flex flex-1 min-h-0 gap-2">
-        {queryMode !== 'models' && (
+        {queryMode !== 'models' && queryMode !== 'templates' && (
           <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0 relative">
             <div
               ref={editorRef}
@@ -834,6 +892,107 @@ export function QueryForm(props: QueryFormProps) {
             </div>
           </div>
         )}
+
+        {queryMode === 'templates' && (
+          <div className="flex flex-1 min-h-0 gap-2 w-full">
+            <div className={`w-1/3 min-h-0 flex flex-col border-r border-white/10 pr-2 ${isRunning ? 'opacity-50' : ''}`}>
+              <div className="text-[10px] text-white/70 font-medium mb-1">Entities</div>
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+                {availableEntities.length === 0 && (
+                  <div className="text-[10px] text-white/40 italic">No entities available.</div>
+                )}
+                {availableEntities.map((entity) => {
+                  const selected = (queryOptions.templates?.selectedEntities || []).includes(entity.id);
+                  return (
+                    <label
+                      key={entity.id}
+                      className={`flex items-center gap-2 text-[10px] text-white/80 ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer'}`}
+                    >
+                      <Checkbox
+                        disabled={isRunning}
+                        checked={selected}
+                        onCheckedChange={(checked) => {
+                          const prev = queryOptions.templates?.selectedEntities || [];
+                          const next = checked
+                            ? [...prev, entity.id]
+                            : prev.filter((id) => id !== entity.id);
+                          setQueryOptions((o) => ({
+                            ...o,
+                            templates: {
+                              ...o.templates,
+                              selectedEntities: next,
+                              selections: [], // reset derived selections when entities change
+                            },
+                          }));
+                        }}
+                      />
+                      <span className="truncate">{entity.label || entity.id}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
+              <div className="text-[10px] text-white/70 font-medium mb-1">Eligible Templates</div>
+              {eligibleLoading && (
+                <div className="text-[10px] text-white/40 italic">Loading eligible templates…</div>
+              )}
+              {eligibleError && (
+                <div className="text-[10px] text-red-400 italic">{eligibleError}</div>
+              )}
+              {!eligibleLoading && !eligibleError && eligibleTemplates.length === 0 && (
+                <div className="text-[10px] text-white/40 italic">
+                  {queryOptions.templates?.selectedEntities?.length
+                    ? 'No templates match the selected entities.'
+                    : 'Select at least one entity to see eligible templates.'}
+                </div>
+              )}
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+                {eligibleTemplates.map((template) => (
+                  <div key={template.id} className="rounded border border-white/10 bg-black/20 p-2 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-white/90 truncate">{template.name || template.ext_id}</span>
+                      <span className="text-[10px] text-white/40 font-mono truncate">{template.ext_id}</span>
+                    </div>
+                    <div className="space-y-1 pl-1">
+                      {template.matched_entities.map((me) => {
+                        const derivedId = `${template.ext_id}:${me.entity_id}`;
+                        const selections = queryOptions.templates?.selections || [];
+                        const selected = selections.some((s) => s.ext_id === derivedId || s.ext_id === me.derived_ext_id);
+                        return (
+                          <label
+                            key={me.entity_id}
+                            className={`flex items-center gap-2 text-[10px] ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer text-white/80'}`}
+                          >
+                            <Checkbox
+                              disabled={isRunning}
+                              checked={selected}
+                              onCheckedChange={(checked) => {
+                                const prev = queryOptions.templates?.selections || [];
+                                const next = checked
+                                  ? [...prev, { kind: 'derived_model' as const, ext_id: me.derived_ext_id, name: `${template.name || template.ext_id} — ${me.name}` }]
+                                  : prev.filter((s) => s.ext_id !== me.derived_ext_id);
+                                setQueryOptions((o) => ({
+                                  ...o,
+                                  templates: {
+                                    ...o.templates,
+                                    selections: next,
+                                  },
+                                }));
+                              }}
+                            />
+                            <span className="truncate">{me.name}</span>
+                            <span className="text-[10px] text-white/40 font-mono truncate">{me.derived_ext_id}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
         {queryMode === 'synthesize' && (
@@ -865,14 +1024,14 @@ export function QueryForm(props: QueryFormProps) {
       <div className="flex gap-2 shrink-0">
         <Button
           type="submit"
-          disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : !query.trim())}
+          disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : queryMode === 'templates' ? !queryOptions.templates?.selections?.length : !query.trim())}
           className="flex-1"
           size="sm"
         >
           {isRunning ? 'Running…' : (
             <>
               <Play className="w-4 h-4 mr-2" />
-              {queryMode === 'synthesize' ? 'Synthesize' : queryMode === 'models' ? 'Run Models' : 'Run Query'}
+              {queryMode === 'synthesize' ? 'Synthesize' : queryMode === 'models' ? 'Run Models' : queryMode === 'templates' ? 'Run Templates' : 'Run Query'}
             </>
           )}
         </Button>

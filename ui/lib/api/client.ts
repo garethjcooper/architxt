@@ -1068,7 +1068,7 @@ export const researchApi = {
     bank_id: string;
     viewpoint_ids: number[];
     intent_text: string;
-    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models';
+    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
     dimension?: string;
     selections?: any[];
     budget?: 'low' | 'mid' | 'high';
@@ -1109,6 +1109,28 @@ export const researchApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { timeoutMs: 60000 }),
+
+  eligibleTemplateModels: (payload: {
+    server_id: number;
+    bank_id: string;
+    entities: string[];
+  }) =>
+    fetchApi<{
+      templates: Array<{
+        id: number;
+        ext_id: string;
+        name: string;
+        matched_entities: Array<{
+          entity_id: string;
+          name: string;
+          type_name?: string;
+          derived_ext_id: string;
+        }>;
+      }>;
+    }>('/research/eligible-template-models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }),
 
   synthesize: (payload: {
     server_id: number;
