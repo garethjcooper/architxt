@@ -13,9 +13,11 @@ const logger = createLogger('template-eligibility');
  * @param {Object} db
  * @param {Object} options
  * @param {string[]} options.entities - entity ids (ent_entity_id) selected by the user
+ * @param {string} [options.bankId]
+ * @param {number|string} [options.serverId]
  * @returns {{success: true, templates: Array<object>} | {success: false, error: string, code: string}}
  */
-export function findEligibleTemplateModels(db, { entities = [] } = {}) {
+export function findEligibleTemplateModels(db, { entities = [], bankId, serverId } = {}) {
   return dbExec(() => {
     if (!Array.isArray(entities) || entities.length === 0) {
       return { success: false, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR' };
@@ -31,6 +33,8 @@ export function findEligibleTemplateModels(db, { entities = [] } = {}) {
         e.ent_id AS id,
         e.ent_entity_id AS entity_id,
         e.ent_name AS name,
+        e.ent_description AS description,
+        e.ent_aliases AS aliases,
         et.et_type_name AS type_name
       FROM mental_models m
       JOIN mental_model_entities mme ON mme.mm_id = m.mm_id
@@ -41,6 +45,7 @@ export function findEligibleTemplateModels(db, { entities = [] } = {}) {
       ORDER BY m.mm_id, e.ent_entity_id
     `;
 
+    const context = { bankId, serverId };
     const rows = db.prepare(sql).all(...entities);
     const byTemplate = new Map();
 
@@ -57,16 +62,28 @@ export function findEligibleTemplateModels(db, { entities = [] } = {}) {
         byTemplate.set(key, entry);
       }
 
+      const aliases = (() => {
+        if (!row.aliases) return [];
+        try {
+          const parsed = JSON.parse(row.aliases);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+
       const entity = {
         id: row.id,
         entity_id: row.entity_id,
         name: row.name,
+        description: row.description,
+        aliases,
         type_name: row.type_name,
       };
 
       entry.matched_entities.push({
         ...entity,
-        derived_ext_id: substitutePlaceholders(row.template_ext_id, entity),
+        derived_ext_id: substitutePlaceholders(row.template_ext_id, entity, context),
       });
     }
 

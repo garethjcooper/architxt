@@ -524,7 +524,7 @@ router.post('/eligible-template-models', async (req, res) => {
       return;
     }
 
-    const result = findEligibleTemplateModels(db, { entities });
+    const result = findEligibleTemplateModels(db, { entities, bankId: bank_id, serverId: server_id });
     if (!result.success) {
       sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
       return;

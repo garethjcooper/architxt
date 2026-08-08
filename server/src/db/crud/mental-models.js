@@ -71,6 +71,12 @@ export const deleteMentalModel = (db, id) => dbExec(() => {
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
 const ENTITY_TYPE_PLACEHOLDER = '{entity-type}';
+const ENTITY_DESCRIPTION_PLACEHOLDER = '{entity-description}';
+const ENTITY_ALIASES_PLACEHOLDER = '{entity-aliases}';
+const BANK_ID_PLACEHOLDER = '{bank-id}';
+const SERVER_ID_PLACEHOLDER = '{server-id}';
+const NOW_PLACEHOLDER = '{now}';
+const DATE_PLACEHOLDER = '{date}';
 
 /** Contextual-graph placeholders that can also satisfy template eligibility. */
 const CONTEXTUAL_PLACEHOLDERS = [
@@ -86,7 +92,18 @@ const CONTEXTUAL_PLACEHOLDERS = [
 ];
 
 const PLACEHOLDER_PATTERN = new RegExp(
-  [ENTITY_NAME_PLACEHOLDER, ENTITY_ID_PLACEHOLDER, ENTITY_TYPE_PLACEHOLDER, ...CONTEXTUAL_PLACEHOLDERS]
+  [
+    ENTITY_NAME_PLACEHOLDER,
+    ENTITY_ID_PLACEHOLDER,
+    ENTITY_TYPE_PLACEHOLDER,
+    ENTITY_DESCRIPTION_PLACEHOLDER,
+    ENTITY_ALIASES_PLACEHOLDER,
+    BANK_ID_PLACEHOLDER,
+    SERVER_ID_PLACEHOLDER,
+    NOW_PLACEHOLDER,
+    DATE_PLACEHOLDER,
+    ...CONTEXTUAL_PLACEHOLDERS,
+  ]
     .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$\u0026'))
     .join('|'),
   'g'
@@ -201,14 +218,34 @@ export function isStandardDimension(value) {
 }
 
 /**
- * Substitute entity placeholders into a template string.
+ * Substitute entity and runtime placeholders into a template string.
+ *
+ * @param {string} template
+ * @param {Object} entity
+ * @param {Object} [context]
+ * @param {string} [context.bankId]
+ * @param {number|string} [context.serverId]
+ * @param {string|Date} [context.now] - defaults to current time
  */
-export function substitutePlaceholders(template, entity) {
+export function substitutePlaceholders(template, entity, context = {}) {
   if (!template) return template;
+  const now = context.now ? new Date(context.now) : new Date();
+  const date = now.toISOString().slice(0, 10);
+  const aliases = Array.isArray(entity.aliases)
+    ? entity.aliases.join(', ')
+    : typeof entity.aliases === 'string'
+      ? entity.aliases
+      : '';
   return template
     .replaceAll(ENTITY_NAME_PLACEHOLDER, entity.name ?? '')
     .replaceAll(ENTITY_ID_PLACEHOLDER, entity.entity_id ?? '')
-    .replaceAll(ENTITY_TYPE_PLACEHOLDER, entity.type_name ?? '');
+    .replaceAll(ENTITY_TYPE_PLACEHOLDER, entity.type_name ?? '')
+    .replaceAll(ENTITY_DESCRIPTION_PLACEHOLDER, entity.description ?? '')
+    .replaceAll(ENTITY_ALIASES_PLACEHOLDER, aliases)
+    .replaceAll(BANK_ID_PLACEHOLDER, context.bankId ?? '')
+    .replaceAll(SERVER_ID_PLACEHOLDER, context.serverId != null ? String(context.serverId) : '')
+    .replaceAll(NOW_PLACEHOLDER, now.toISOString())
+    .replaceAll(DATE_PLACEHOLDER, date);
 }
 
 /**
@@ -250,7 +287,7 @@ export function validateEntityTemplateEligibility({
   if (!hasEntityPlaceholders(mm_name, mm_ext_id, '')) {
     return {
       valid: false,
-      error: `Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.`,
+      error: `Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {entity-description}, {entity-aliases}, {bank-id}, {server-id}, {now}, {date}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.`,
       code: 'VALIDATION_ERROR',
     };
   }
@@ -261,8 +298,14 @@ export function validateEntityTemplateEligibility({
 /**
  * Derive virtual mental models from a template model.
  * The template must be pre-loaded with tags and entities.
+ *
+ * @param {Object} template
+ * @param {Object} [context]
+ * @param {string} [context.bankId]
+ * @param {number|string} [context.serverId]
+ * @param {string|Date} [context.now]
  */
-export function deriveMentalModels(template) {
+export function deriveMentalModels(template, context = {}) {
   const entities = template?.entities;
   if (template?.is_template !== true || !Array.isArray(entities) || entities.length === 0) {
     return [];
@@ -297,9 +340,9 @@ export function deriveMentalModels(template) {
     return {
       ...baseModel,
       id: `${template.id}:${entity.id}`,
-      ext_id: substitutePlaceholders(template.ext_id, entity),
-      name: substitutePlaceholders(template.name, entity),
-      source_query: substitutePlaceholders(template.source_query, entity),
+      ext_id: substitutePlaceholders(template.ext_id, entity, context),
+      name: substitutePlaceholders(template.name, entity, context),
+      source_query: substitutePlaceholders(template.source_query, entity, context),
       refresh_mode: overrides.refresh_mode ?? normaliseRefreshMode(template.refresh_mode),
       refresh_after_consolidation: overrides.refresh_after_consolidation ?? template.refresh_after_consolidation,
       exclude_all_mental_models: overrides.exclude_all_mental_models ?? template.exclude_all_mental_models,
