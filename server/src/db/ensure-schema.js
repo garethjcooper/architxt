@@ -52,8 +52,8 @@ function ensureMissingTables(db) {
         mm_viewp_description TEXT,
         mm_viewp_meta JSON,
         mm_dimension TEXT,
-        mm_returns TEXT DEFAULT 'narrative',
-        mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
+        mm_returns TEXT,
+        mm_concatenation TEXT,
         mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
@@ -623,8 +623,6 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'entity-summary-{id}',
     name: 'Entity summary: {entity-name}',
     role: 'sys_entity_summary',
-    returns: 'sys_patch',
-    dimension: 'sys_entity_summary',
     sourceQuery: 'Entity: {id} ({entity-name}). Return a concise JSON summary in the narrative field of the standard envelope.',
     maxTokens: 8192,
     refreshMode: 'full',
@@ -636,9 +634,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'entity-capabilities-{id}',
     name: 'Entity capabilities: {entity-name}',
     role: 'sys_entity_capabilities',
-    returns: 'sys_patch',
-    dimension: 'sys_entity_capabilities',
-    sourceQuery: 'Entity: {id} ({entity-name}). Return a capabilities table in the standard envelope.',
+    sourceQuery: 'Entity: {id} ({entity-name}). Return capabilities table in the standard envelope.',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
@@ -649,8 +645,6 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'edge-ctx-{source-id}|{target-id}',
     name: 'Edge context: {source-name} ↔ {target-name}',
     role: 'sys_edge_context',
-    returns: 'sys_patch',
-    dimension: 'sys_edge_context',
     sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-id} ({source-name}) and {target-id} ({target-name})? Return every distinct flow as a directed edge in the standard envelope. For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids in the from/to fields. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.',
     maxTokens: 8192,
     refreshMode: 'full',
@@ -662,8 +656,6 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'discover-{seed-id}',
     name: 'Discover around {seed-name}',
     role: 'sys_discovery_context',
-    returns: 'sys_patch',
-    dimension: 'sys_discovery_context',
     sourceQuery: 'Seed entity: {seed-id} ({seed-name}). Suggest candidate nodes and edges in the standard envelope. Candidates should use the same node id as the seed for any known neighbor; only use a bare lowercase slug for genuinely new candidates.',
     maxTokens: 8192,
     refreshMode: 'full',
@@ -715,14 +707,12 @@ function ensureContextualGraphTemplates(db) {
 
   let seeded = 0;
   const upsert = db.prepare(`
-    INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens, mm_refresh_mode, mm_refresh_after_consolidation, mm_exclude_all_mental_models, mm_tags_match_mode)
-    VALUES (?, ?, ?, 'true', ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_max_tokens, mm_refresh_mode, mm_refresh_after_consolidation, mm_exclude_all_mental_models, mm_tags_match_mode)
+    VALUES (?, ?, ?, 'true', ?, ?, ?, ?, ?, ?)
     ON CONFLICT(mm_ext_id) DO UPDATE SET
       mm_name = excluded.mm_name,
       mm_source_query = excluded.mm_source_query,
       mm_template_role = excluded.mm_template_role,
-      mm_returns = excluded.mm_returns,
-      mm_dimension = excluded.mm_dimension,
       mm_max_tokens = excluded.mm_max_tokens,
       mm_refresh_mode = excluded.mm_refresh_mode,
       mm_refresh_after_consolidation = excluded.mm_refresh_after_consolidation,
@@ -737,8 +727,6 @@ function ensureContextualGraphTemplates(db) {
         t.name,
         t.sourceQuery,
         t.role,
-        t.returns,
-        t.dimension,
         t.maxTokens,
         t.refreshMode,
         t.refreshAfterConsolidation,
@@ -864,8 +852,8 @@ function removeMentalModelCheckConstraints(db) {
       mm_viewp_description TEXT,
       mm_viewp_meta JSON,
       mm_dimension TEXT,
-      mm_returns TEXT DEFAULT 'narrative',
-      mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
+      mm_returns TEXT,
+      mm_concatenation TEXT,
       mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
     )`,

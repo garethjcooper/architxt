@@ -28,7 +28,7 @@ describe('contextual graph template models', () => {
 
   it('seeds the four system templates on schema creation', () => {
     const rows = db.prepare(`
-      SELECT mm_template_role, mm_ext_id, mm_name, mm_returns, mm_dimension
+      SELECT mm_template_role, mm_ext_id, mm_name
       FROM mental_models
       WHERE mm_is_template = 'true'
       ORDER BY mm_template_role
@@ -44,13 +44,9 @@ describe('contextual graph template models', () => {
     const summary = rows.find((r) => r.mm_template_role === 'sys_entity_summary');
     assert.ok(summary.mm_ext_id.includes('{id}'));
     assert.ok(summary.mm_name.includes('{entity-name}'));
-    assert.equal(summary.mm_returns, 'sys_patch');
-    assert.equal(summary.mm_dimension, 'sys_entity_summary');
 
     const capabilities = rows.find((r) => r.mm_template_role === 'sys_entity_capabilities');
     assert.ok(capabilities.mm_ext_id.includes('{id}'));
-    assert.equal(capabilities.mm_returns, 'sys_patch');
-    assert.equal(capabilities.mm_dimension, 'sys_entity_capabilities');
   });
 
   it('derives an entity-summary model from a node', async () => {
@@ -58,7 +54,6 @@ describe('contextual graph template models', () => {
 
     assert.equal(spec.ext_id, 'entity-summary-svc-001');
     assert.equal(spec.name, 'Entity summary: Billing Service');
-    assert.equal(spec.returns, 'sys_patch');
     assert.equal(spec.role, 'sys_entity_summary');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
@@ -74,7 +69,6 @@ describe('contextual graph template models', () => {
 
     assert.equal(spec.ext_id, 'entity-capabilities-svc-001');
     assert.equal(spec.name, 'Entity capabilities: Billing Service');
-    assert.equal(spec.returns, 'sys_patch');
     assert.equal(spec.role, 'sys_entity_capabilities');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Billing Service'));
@@ -93,7 +87,6 @@ describe('contextual graph template models', () => {
 
     assert.equal(spec.ext_id, 'edge-ctx-svc-001|svc-002');
     assert.equal(spec.name, 'Edge context: Billing Service ↔ Payment API');
-    assert.equal(spec.returns, 'sys_patch');
     assert.equal(spec.role, 'sys_edge_context');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.ok(spec.source_query.includes('Payment API'));
@@ -108,7 +101,6 @@ describe('contextual graph template models', () => {
 
     assert.equal(spec.ext_id, 'discover-svc-001');
     assert.equal(spec.name, 'Discover around Billing Service');
-    assert.equal(spec.returns, 'sys_patch');
     assert.equal(spec.role, 'sys_discovery_context');
     assert.ok(spec.source_query.includes('svc-001'));
     assert.equal(spec.refresh_mode, 'full');
