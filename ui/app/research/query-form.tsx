@@ -2,6 +2,8 @@ import { useRef, useState, useEffect, useLayoutEffect, useCallback, useMemo } fr
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Play } from 'lucide-react';
 import {
   formatEntityToken,
@@ -330,6 +332,7 @@ export function QueryForm(props: QueryFormProps) {
   }>>([]);
   const [eligibleLoading, setEligibleLoading] = useState(false);
   const [eligibleError, setEligibleError] = useState<string | null>(null);
+  const [templateSearch, setTemplateSearch] = useState('');
   const lastHandledKeyRef = useRef<string | null>(null);
   const lastHtmlRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
@@ -933,7 +936,16 @@ export function QueryForm(props: QueryFormProps) {
               </div>
             </div>
             <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-              <div className="text-[10px] text-white/70 font-medium mb-1">Eligible Templates</div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-[10px] text-white/70 font-medium">Eligible Templates</div>
+                <Input
+                  placeholder="Filter templates…"
+                  value={templateSearch}
+                  onChange={(e) => setTemplateSearch(e.target.value)}
+                  disabled={isRunning || eligibleLoading}
+                  className="h-5 w-28 rounded border border-white/10 bg-black/20 px-1.5 py-0 text-[10px] text-white placeholder:text-white/30 focus:border-emerald-500"
+                />
+              </div>
               {eligibleLoading && (
                 <div className="text-[10px] text-white/40 italic">Loading eligible templates…</div>
               )}
@@ -947,48 +959,86 @@ export function QueryForm(props: QueryFormProps) {
                     : 'Select at least one entity to see eligible templates.'}
                 </div>
               )}
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
-                {eligibleTemplates.map((template) => (
-                  <div key={template.id} className="rounded border border-white/10 bg-black/20 p-2 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-white/90 truncate">{template.name || template.ext_id}</span>
-                      <span className="text-[10px] text-white/40 font-mono truncate">{template.ext_id}</span>
-                    </div>
-                    <div className="space-y-1 pl-1">
-                      {template.matched_entities.map((me) => {
-                        const derivedId = `${template.ext_id}:${me.entity_id}`;
-                        const selections = queryOptions.templates?.selections || [];
-                        const selected = selections.some((s) => s.ext_id === derivedId || s.ext_id === me.derived_ext_id);
-                        return (
-                          <label
-                            key={me.entity_id}
-                            className={`flex items-center gap-2 text-[10px] ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer text-white/80'}`}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="flex flex-wrap gap-2 content-start">
+                  {eligibleTemplates
+                    .filter((template) => {
+                      if (!templateSearch.trim()) return true;
+                      const term = templateSearch.toLowerCase();
+                      return (
+                        (template.name || '').toLowerCase().includes(term) ||
+                        template.ext_id.toLowerCase().includes(term)
+                      );
+                    })
+                    .map((template) => {
+                      const selections = queryOptions.templates?.selections || [];
+                      const selectedCount = template.matched_entities.filter((me) =>
+                        selections.some((s) => s.ext_id === me.derived_ext_id),
+                      ).length;
+                      const hasAny = selectedCount > 0;
+                      return (
+                        <Popover key={template.id}>
+                          <PopoverTrigger
+                            disabled={isRunning}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs transition-colors ${
+                              hasAny
+                                ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
+                                : 'bg-black/20 border-white/10 text-white/80 hover:bg-white/10'
+                            } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                            title={`${template.name || template.ext_id} — ${template.matched_entities.length} matched entities`}
                           >
-                            <Checkbox
-                              disabled={isRunning}
-                              checked={selected}
-                              onCheckedChange={(checked) => {
-                                const prev = queryOptions.templates?.selections || [];
-                                const next = checked
-                                  ? [...prev, { kind: 'derived_model' as const, ext_id: me.derived_ext_id, name: `${template.name || template.ext_id} — ${me.name}` }]
-                                  : prev.filter((s) => s.ext_id !== me.derived_ext_id);
-                                setQueryOptions((o) => ({
-                                  ...o,
-                                  templates: {
-                                    ...o.templates,
-                                    selections: next,
-                                  },
-                                }));
-                              }}
-                            />
-                            <span className="truncate">{me.name}</span>
-                            <span className="text-[10px] text-white/40 font-mono truncate">{me.derived_ext_id}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                            <span className="truncate max-w-[8rem]">{template.name || template.ext_id}</span>
+                            <span
+                              className={`flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-medium ${
+                                hasAny ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/10 text-white/60'
+                              }`}
+                            >
+                              {selectedCount}/{template.matched_entities.length}
+                            </span>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 bg-[oklch(0.23_0_0)] border-white/10 text-white" side="bottom" align="start">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium truncate">{template.name || template.ext_id}</span>
+                                <span className="text-[10px] text-white/40 font-mono truncate">{template.ext_id}</span>
+                              </div>
+                              <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1">
+                                {template.matched_entities.map((me) => {
+                                  const selected = selections.some((s) => s.ext_id === me.derived_ext_id);
+                                  return (
+                                    <label
+                                      key={me.entity_id}
+                                      className={`flex items-center gap-2 rounded px-1 py-1 text-[10px] ${isRunning ? 'cursor-not-allowed' : 'hover:bg-white/5 cursor-pointer text-white/80'}`}
+                                    >
+                                      <Checkbox
+                                        disabled={isRunning}
+                                        checked={selected}
+                                        onCheckedChange={(checked) => {
+                                          const prev = queryOptions.templates?.selections || [];
+                                          const next = checked
+                                            ? [...prev, { kind: 'derived_model' as const, ext_id: me.derived_ext_id, name: `${template.name || template.ext_id} — ${me.name}` }]
+                                            : prev.filter((s) => s.ext_id !== me.derived_ext_id);
+                                          setQueryOptions((o) => ({
+                                            ...o,
+                                            templates: {
+                                              ...o.templates,
+                                              selections: next,
+                                            },
+                                          }));
+                                        }}
+                                      />
+                                      <span className="truncate flex-1">{me.name}</span>
+                                      <span className="text-[10px] text-white/40 font-mono truncate">{me.derived_ext_id}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })}
+                </div>
               </div>
             </div>
           </div>
