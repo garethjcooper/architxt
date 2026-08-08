@@ -366,13 +366,11 @@ export default function ResearchPage() {
     fetchServers();
     mentalModelsApi.list({ limit: 1000 })
       .then((data) => {
-        const models = (Array.isArray(data) ? data : []).filter((m) => !m.is_template);
+        const models = (Array.isArray(data) ? data : []).filter((m) => !m.is_template && !m.template_role);
         setAvailableMentalModels(models.map((m) => ({
           id: m.id,
           ext_id: m.ext_id,
           name: m.name || undefined,
-          returns: m.returns,
-          concatenation: m.concatenation,
         })));
       })
       .catch((err) => {
@@ -629,8 +627,8 @@ export default function ResearchPage() {
                     { key: 'recall', label: 'Recall' },
                     { key: 'reflect', label: 'Reflect' },
                     { key: 'synthesize', label: 'Synthesize' },
-                    { key: 'models', label: 'Models' },
-                    { key: 'templates', label: 'Templates' },
+                    { key: 'models', label: 'Plain Models' },
+                    { key: 'templates', label: 'Template Models' },
                   ].map((m) => (
                     <button
                       key={m.key}

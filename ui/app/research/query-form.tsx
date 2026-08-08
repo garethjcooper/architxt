@@ -48,7 +48,7 @@ export interface QueryFormProps {
   availableDimensions: Array<{ value: string; label: string }>;
   queryOptions: ResearchQueryOptions;
   setQueryOptions: (opts: ResearchQueryOptions | ((prev: ResearchQueryOptions) => ResearchQueryOptions)) => void;
-  availableMentalModels?: Array<{ id: number; ext_id: string; name?: string; returns?: string; concatenation?: string }>;
+  availableMentalModels?: Array<{ id: number; ext_id: string; name?: string }>;
   serverId?: string;
   bankId?: string;
   /** Trail for synthesize-mode source step preview. */
@@ -864,7 +864,7 @@ export function QueryForm(props: QueryFormProps) {
                     disabled={isRunning}
                     onClick={() => {
                       const next = !selected
-                        ? [...selections, { kind: 'model', id: String(model.id), ext_id: model.ext_id, name: model.name, returns: model.returns, concatenation: model.concatenation }]
+                        ? [...selections, { kind: 'model' as const, id: String(model.id), ext_id: model.ext_id, name: model.name }]
                         : selections.filter((s) => s.id !== String(model.id) && s.ext_id !== model.ext_id);
                       setQueryOptions((prev) => ({ ...prev, models: { ...prev.models, selections: next } }));
                     }}
