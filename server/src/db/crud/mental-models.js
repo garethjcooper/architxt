@@ -203,7 +203,7 @@ export function isStandardDimension(value) {
 /**
  * Substitute entity placeholders into a template string.
  */
-function substitutePlaceholders(template, entity) {
+export function substitutePlaceholders(template, entity) {
   if (!template) return template;
   return template
     .replaceAll(ENTITY_NAME_PLACEHOLDER, entity.name ?? '')

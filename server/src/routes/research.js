@@ -23,6 +23,7 @@ import {
 
 import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
+import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
 import { parseGraphResponse } from '../prompts/parse-graph-response.js';
 
@@ -220,7 +221,7 @@ const toApiStep = (dbRow) => ({
  *                 type: string
  *               query_depth:
  *                 type: string
- *                 enum: [prebuilt, recall, reflect, synthesize, models]
+ *                 enum: [prebuilt, recall, reflect, synthesize, models, templates]
  *                 default: prebuilt
  *               selections:
  *                 type: array
@@ -433,7 +434,7 @@ router.post('/discover', async (req, res) => {
  * @openapi
  * /research/eligible-mental-models:
  *   post:
- *     summary: List eligible derived mental models without querying Hindsight
+ *     summary: List eligible derived mental models across dimensions (legacy dimension-based discovery)
  *     tags: [Research]
  *     requestBody:
  *       required: true
@@ -477,6 +478,62 @@ router.post('/eligible-mental-models', async (req, res) => {
   } catch (err) {
     logger.error('Research eligible-mental-models route error', { error: err.message, stack: err.stack });
     sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/eligible-template-models:
+ *   post:
+ *     summary: List eligible template-derived mental models for selected entities
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [entities]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               entities: { type: array, items: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Per-template matched entity list with derived ext_ids
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Database error
+ */
+router.post('/eligible-template-models', async (req, res) => {
+  const start = Date.now();
+  try {
+    const { server_id, bank_id, entities } = req.body;
+
+    if (!server_id || typeof server_id !== 'number') {
+      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+      return;
+    }
+    if (!bank_id || typeof bank_id !== 'string') {
+      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+      return;
+    }
+    if (!Array.isArray(entities) || entities.length === 0) {
+      sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+      return;
+    }
+
+    const result = findEligibleTemplateModels(db, { entities });
+    if (!result.success) {
+      sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+      return;
+    }
+
+    sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Research eligible-template-models route error', { error: err.message, stack: err.stack });
+    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
   }
 });
 
