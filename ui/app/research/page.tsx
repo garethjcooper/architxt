@@ -630,6 +630,7 @@ export default function ResearchPage() {
                     { key: 'reflect', label: 'Reflect' },
                     { key: 'synthesize', label: 'Synthesize' },
                     { key: 'models', label: 'Models' },
+                    { key: 'templates', label: 'Templates' },
                   ].map((m) => (
                     <button
                       key={m.key}
@@ -673,6 +674,8 @@ export default function ResearchPage() {
                 queryOptions={queryOptions}
                 setQueryOptions={setQueryOptions}
                 availableMentalModels={availableMentalModels}
+                serverId={selectedServerId}
+                bankId={selectedBankId}
                 trail={trail}
                 selectedStepIds={selectedStepIds}
                 activeStepId={activeStepId}

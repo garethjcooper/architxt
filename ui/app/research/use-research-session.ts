@@ -69,12 +69,16 @@ export interface ResearchQueryOptions {
   models?: {
     selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string; returns?: string; concatenation?: string }>;
   };
+  templates?: {
+    selectedEntities?: string[];
+    selections?: Array<{ kind: 'template' | 'derived_model'; ext_id: string; name?: string }>;
+  };
 }
 
-const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models'>(['prebuilt', 'recall', 'reflect', 'synthesize', 'models']);
+const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>(['prebuilt', 'recall', 'reflect', 'synthesize', 'models', 'templates']);
 
 function buildDiscoverOptions(
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models',
+  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates',
   queryOptions?: ResearchQueryOptions,
 ): Partial<Parameters<typeof researchApi.discover>[0]> {
   if (queryMode === 'recall') {
@@ -113,8 +117,9 @@ function buildDiscoverOptions(
     };
   }
 
-  if (queryMode === 'models') {
-    const opts = queryOptions?.models;
+  if (queryMode === 'models' || queryMode === 'templates') {
+    const key = queryMode;
+    const opts = queryOptions?.[key];
     if (!opts?.selections?.length) return {};
     return {
       selections: opts.selections,
@@ -168,6 +173,10 @@ function buildQueryOptionsFromParameters(
     opts.models = {
       ...(Array.isArray(parameters.selections) && { selections: parameters.selections }),
     };
+  } else if (actionType === 'templates') {
+    opts.templates = {
+      ...(Array.isArray(parameters.selections) && { selections: parameters.selections }),
+    };
   }
 
   return opts;
@@ -193,6 +202,10 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
     maxTokens: 4096,
     template: 'narrative-graph-known',
   },
+  templates: {
+    selectedEntities: [],
+    selections: [],
+  },
 };
 
 export function useResearchSession({
@@ -203,7 +216,7 @@ export function useResearchSession({
   availableDimensions = [],
 }: UseResearchSessionOptions) {
   const [query, setQuery] = useState('');
-  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models'>('prebuilt');
+  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>('prebuilt');
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
   const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
     recall: { ...DEFAULT_QUERY_OPTIONS.recall },
@@ -572,7 +585,7 @@ export function useResearchSession({
       setQuery(step.intent_text || '');
 
       if (VALID_QUERY_MODES.has(step.action_type as any)) {
-        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models');
+        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates');
       } else {
         logger.warn('Unsupported action_type for use details', { action_type: step.action_type });
       }
@@ -592,6 +605,14 @@ export function useResearchSession({
           ...prev,
           models: {
             selections: modelSelections,
+          },
+        }));
+      } else if (step.action_type === 'templates' && step.parameters && Array.isArray(step.parameters.selections)) {
+        const templateSelections = step.parameters.selections;
+        setQueryOptions((prev) => ({
+          ...prev,
+          templates: {
+            selections: templateSelections,
           },
         }));
       } else if (step.action_type !== 'prebuilt') {
@@ -656,10 +677,12 @@ export function useResearchSession({
       toast.error('Select a server and bank first');
       return;
     }
-    if (queryMode === 'models') {
-      const modelSelections = queryOptions.models?.selections || [];
-      if (modelSelections.length === 0) {
-        toast.error('Select at least one mental model');
+    if (queryMode === 'models' || queryMode === 'templates') {
+      const selections = queryMode === 'models'
+        ? queryOptions.models?.selections || []
+        : queryOptions.templates?.selections || [];
+      if (selections.length === 0) {
+        toast.error(queryMode === 'models' ? 'Select at least one mental model' : 'Select at least one template');
         return;
       }
     } else if (!query.trim()) {
@@ -677,13 +700,12 @@ export function useResearchSession({
       return;
     }
 
-    if (queryMode === 'models') {
-      const modelSelections = queryOptions.models?.selections || [];
-      if (modelSelections.length === 0) {
-        toast.error('Select at least one mental model');
+    if (queryMode === 'templates') {
+      const templateSelections = queryOptions.templates?.selections || [];
+      if (templateSelections.length === 0) {
+        toast.error('Select at least one template');
         return;
       }
-      // Models mode uses the discover endpoint like recall/reflect.
     }
 
     const tokens = parseQueryTokens(query);
@@ -740,6 +762,9 @@ export function useResearchSession({
       if (queryMode === 'models') {
         const names = queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`) || [];
         title = names.slice(0, 3).join(', ').slice(0, 80) || 'Models query';
+      } else if (queryMode === 'templates') {
+        const names = queryOptions.templates?.selections?.map((s) => s.name || s.ext_id) || [];
+        title = names.slice(0, 3).join(', ').slice(0, 80) || 'Templates query';
       } else {
         title = query.trim().slice(0, 80) || 'Untitled session';
       }
@@ -771,7 +796,9 @@ export function useResearchSession({
         viewpoint_ids: [],
         intent_text: queryMode === 'models'
           ? 'Mental models: ' + (queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`).join(', ') || '')
-          : query.trim(),
+          : queryMode === 'templates'
+            ? 'Templates: ' + (queryOptions.templates?.selections?.map((s) => s.name || s.ext_id).join(', ') || '')
+            : query.trim(),
         query_depth: queryMode,
         ...buildDiscoverOptions(queryMode, queryOptions),
       });
