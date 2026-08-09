@@ -659,6 +659,7 @@ export default function ResearchPage() {
                   const type = resolveNodeType({ id: e.entity_id, name: e.name, type: e.type_name });
                   return {
                     id: canonicalNodeId({ id: e.entity_id, name: e.name, type: e.type_name }),
+                    entity_id: e.entity_id,
                     label: e.name,
                     type,
                   };

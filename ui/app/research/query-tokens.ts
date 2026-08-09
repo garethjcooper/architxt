@@ -28,6 +28,7 @@ export interface QueryToken {
 
 export interface EntityLike {
   id: string;
+  entity_id?: string | null;
   name?: string | null;
   label?: string | null;
   type?: string | null;
