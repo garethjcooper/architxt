@@ -365,20 +365,13 @@ export function useResearchSession({
             setSelectedStepIds((prev) => new Set([...prev, stepId]));
           }
           if (step.canvas && step.synthesis) {
-            const queryDepth =
-              step.action_type === 'prebuilt' ||
-              step.action_type === 'recall' ||
-              step.action_type === 'reflect' ||
-              step.action_type === 'synthesize'
-                ? step.action_type
-                : undefined;
             setResult({
               step_id: step.id,
               session_id: step.session_id,
               status: 'completed',
               bank_id: bankId,
               viewpoint_ids: step.viewpoint_ids || [],
-              query_depth: queryDepth,
+              query_depth: step.action_type,
               action_type: step.action_type,
               parameters: step.parameters,
               synthesis: step.synthesis,
@@ -495,13 +488,7 @@ export function useResearchSession({
         status: step.status || 'completed',
         bank_id: bankId,
         viewpoint_ids: step.viewpoint_ids || [],
-        query_depth:
-          step.action_type === 'prebuilt' ||
-          step.action_type === 'recall' ||
-          step.action_type === 'reflect' ||
-          step.action_type === 'synthesize'
-            ? step.action_type
-            : undefined,
+        query_depth: step.action_type,
         action_type: step.action_type,
         parameters: step.parameters,
         synthesis: step.synthesis,
