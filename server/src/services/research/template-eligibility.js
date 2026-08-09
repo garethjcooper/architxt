@@ -39,7 +39,7 @@ export function findEligibleTemplateModels(db, { entities = [], bankId, serverId
       FROM mental_models m
       JOIN mental_model_entities mme ON mme.mm_id = m.mm_id
       JOIN entities e ON e.ent_id = mme.ent_id
-      JOIN entity_types et ON et.et_type_id = e.ent_type_id
+      JOIN entity_types et ON et.et_id = e.ent_type_id
       WHERE m.mm_is_template = 'true'
         AND e.ent_entity_id IN (${placeholders})
       ORDER BY m.mm_id, e.ent_entity_id
