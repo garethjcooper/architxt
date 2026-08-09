@@ -1116,21 +1116,24 @@ export const researchApi = {
     entities: string[];
   }) =>
     fetchApi<{
-      templates: Array<{
-        id: number;
-        ext_id: string;
-        name: string;
-        matched_entities: Array<{
-          entity_id: string;
+      success: boolean;
+      data: {
+        templates: Array<{
+          id: number;
+          ext_id: string;
           name: string;
-          type_name?: string;
-          derived_ext_id: string;
+          matched_entities: Array<{
+            entity_id: string;
+            name: string;
+            type_name?: string;
+            derived_ext_id: string;
+          }>;
         }>;
-      }>;
+      };
     }>('/research/eligible-template-models', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }, { timeoutMs: 30000 }),
+    }, { timeoutMs: 30000 }).then((res) => res.data),
 
   synthesize: (payload: {
     server_id: number;
