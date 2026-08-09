@@ -360,7 +360,9 @@ export function QueryForm(props: QueryFormProps) {
       setEligibleError(null);
       return;
     }
-    const entityIds = queryOptions.templates?.selectedEntities || [];
+    const entityIds = queryOptions.templates?.selectedEntities
+      ?.map((id) => entityMap.get(id)?.entity_id)
+      .filter((id): id is string => Boolean(id)) || [];
     if (entityIds.length === 0) {
       setEligibleTemplates([]);
       setEligibleError(null);
