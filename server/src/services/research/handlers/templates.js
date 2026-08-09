@@ -102,8 +102,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         };
       }
 
-      const { graph, error: graphError } = parseGraphResponse(content, {
-        mode: 'graph-known',
+      const { graph, narrative: modelNarrative, error: graphError } = parseGraphResponse(content, {
         expectGraph: true,
         defaultSource: 'template_model',
       });
@@ -113,6 +112,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         name,
         found: true,
         content,
+        narrative: modelNarrative,
         graph,
         graph_error: graphError,
       };
@@ -128,7 +128,9 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
       errors.push({ model: item.name || item.ext_id, error: item.error || 'Not found' });
       continue;
     }
-    if (item.content) {
+    if (item.narrative) {
+      narratives.push(`## ${item.name || item.ext_id}\n\n${item.narrative}`);
+    } else if (item.content) {
       narratives.push(`## ${item.name || item.ext_id}\n\n${item.content}`);
     }
     if (item.graph) {
