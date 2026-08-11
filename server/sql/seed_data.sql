@@ -20,18 +20,6 @@ INSERT OR IGNORE INTO metadata (meta_key, meta_value, meta_generated_by) VALUES
   ('architxt-author',                 '{document-author}',       'system');
 
 -- ----------------------------------------------------------------------------
--- Mental model templates
--- Seeded from dev01: 4 base templates used by the Research prebuilt flow.
--- They are templates (mm_is_template='true') and expand per entity via
--- {entity-id}, {entity-name}, {entity-type} placeholders at runtime.
--- ----------------------------------------------------------------------------
-INSERT OR IGNORE INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role) VALUES
-  ('architxt-capabilities-txt-{entity-id}', 'architxt-capabilities-txt-{entity-id}-{entity-name}', 'What are the major architectural capabilities for {entity-name} ({entity-type}:{entity-id})? Return the result in the standard envelope: a focused Markdown narrative followed by an optional graph section. List responsibilities, purpose and business capability mapping in the narrative, and include any supported relationships in the graph section.', 'true', 'user_entity_derived'),
-  ('architxt-interface-found-{entity-id}', 'architxt-interface-found-{entity-id}-{entity-name}', 'What are the flows (apis, data, files and interface calls) into and out of {entity-name} ({entity-type}:{entity-id})? Return the result in the standard envelope: a focused Markdown narrative followed by a graph section containing one edge per distinct flow. For each flow, describe it contextually in the edge detail.', 'true', 'user_entity_derived'),
-  ('architxt-interface-json-{entity-id}', 'architxt-interface-json-{entity-id}-{entity-name}', 'What are the flows (apis, data, files and interface calls) into and out of {entity-name} ({entity-type}:{entity-id})? Return the result in the standard envelope: a focused Markdown narrative followed by a graph section containing one edge per distinct known flow. Describe each flow contextually in the edge detail.', 'true', 'user_entity_derived'),
-  ('architxt-summary-txt-{entity-id}', 'architxt-summary-txt-{entity-id}-{entity-name}', 'Describe the core role that {entity-name} ({entity-type}:{entity-id}) plays in the architecture. Return the result in the standard envelope: a short Markdown narrative followed by an optional graph section. Include a table in the narrative listing aspect and description.', 'true', 'user_entity_derived');
-
--- ----------------------------------------------------------------------------
 -- Built-in prompt templates (v0.3.5 prompt/graph standardization)
 -- ----------------------------------------------------------------------------
 INSERT OR IGNORE INTO prompt_templates (pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_examples_heuristic, pt_is_builtin) VALUES
