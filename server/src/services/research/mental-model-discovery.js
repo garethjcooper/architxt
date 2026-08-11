@@ -166,31 +166,28 @@ async function mergeDimensionResult(candidates, entityIds) {
     if (!candidate.found || !candidate.content) continue;
     if (!modelMatchesEntities({ content: candidate.content }, entityIds)) continue;
 
-    const returns = (candidate.returns || 'json').toLowerCase();
-    if (returns === 'json') {
-      const { graph, error: graphError } = parseGraphResponse(candidate.content, {
-        mode: 'graph-known',
-        expectGraph: true,
-        defaultSource: 'mental_model',
-      });
-      if (graph.nodes.length > 0 || graph.edges.length > 0) {
-        for (const n of graph.nodes) {
-          if (!nodeById.has(n.id)) nodeById.set(n.id, n);
-        }
-        for (const e of graph.edges) {
-          const key = `${e.from}|${e.to}|${e.label}`;
-          if (edgeKeys.has(key)) continue;
-          edgeKeys.add(key);
-          edges.push(e);
-        }
-      } else if (graphError) {
-        errors.push({ model: candidate.name || candidate.ext_id, error: graphError });
+    const { narrative, graph, error: graphError } = parseGraphResponse(candidate.content, {
+      mode: 'narrative-graph-known',
+      expectGraph: true,
+      defaultSource: 'mental_model',
+    });
+
+    if (narrative) {
+      narratives.push(narrative);
+    }
+
+    if (graph.nodes.length > 0 || graph.edges.length > 0) {
+      for (const n of graph.nodes) {
+        if (!nodeById.has(n.id)) nodeById.set(n.id, n);
       }
-    } else if (returns === 'narrative') {
-      const { narrative } = parseGraphResponse(candidate.content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
-      if (narrative) {
-        narratives.push(narrative);
+      for (const e of graph.edges) {
+        const key = `${e.from}|${e.to}|${e.label}`;
+        if (edgeKeys.has(key)) continue;
+        edgeKeys.add(key);
+        edges.push(e);
       }
+    } else if (graphError) {
+      errors.push({ model: candidate.name || candidate.ext_id, error: graphError });
     }
   }
 

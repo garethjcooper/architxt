@@ -6,24 +6,22 @@ import path from 'node:path';
 import { ensureSchema } from '../src/db/ensure-schema.js';
 import { handleReflect } from '../src/services/research/handlers/reflect.js';
 
-const REFLECT_TEXT_WITH_GRAPH = `Here is the analysis.
-
-## ARCHITXT-GRAPH-DATA
-
-\`\`\`json
-{
-  "nodes": [
-    {"id": "a", "name": "Alpha"},
-    {"id": "b", "name": "Beta"}
-  ],
-  "edges": [
-    {"from": "a", "to": "b", "type": "calls", "label": "links to"}
-  ]
+function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
+  return JSON.stringify({ narrative, graph: { nodes, edges } });
 }
-\`\`\`
-`;
 
-const REFLECT_TEXT_NO_GRAPH = `Just a plain text response with no graph data.`;
+const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
+  narrative: 'Here is the analysis.',
+  nodes: [
+    { id: 'a', name: 'Alpha' },
+    { id: 'b', name: 'Beta' },
+  ],
+  edges: [
+    { from: 'a', to: 'b', type: 'calls', label: 'links to' },
+  ],
+});
+
+const REFLECT_TEXT_NO_GRAPH = JSON.stringify({ narrative: 'Just a plain text response with no graph data.', graph: { nodes: [], edges: [] } });
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-reflect-handler-${Date.now()}.db`);
@@ -59,7 +57,7 @@ describe('reflect handler', () => {
     });
   }
 
-  it('extracts graph from ARCHITXT-GRAPH-DATA section when present', async () => {
+  it('extracts graph from contextual envelope when present', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
       reflectFn: makeReflectFn(REFLECT_TEXT_WITH_GRAPH),
       output_mode: 'narrative+graph',
@@ -74,7 +72,7 @@ describe('reflect handler', () => {
     assert.equal(result.graph.nodes[0].source, 'mental_model');
   });
 
-  it('returns empty graph when no ARCHITXT-GRAPH-DATA section is present', async () => {
+  it('returns empty graph when envelope graph is empty', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
       reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
       output_mode: 'narrative+graph',
@@ -99,6 +97,7 @@ describe('reflect handler', () => {
     assert.ok(capturedQuery.includes('test query'));
     assert.ok(!capturedQuery.includes('{{ARCHITXT_TOPIC}}'));
     assert.ok(!capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('contextual JSON envelope'));
   });
 
   it('composes the narrative-graph-known template when output_mode is narrative+graph', async () => {
@@ -111,7 +110,8 @@ describe('reflect handler', () => {
     await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative+graph' }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('contextual JSON envelope'));
+    assert.ok(!capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
   });
 
   it('composes the narrative-graph-discovery template when output_mode is narrative+graph and allow_discovery is true', async () => {
@@ -124,7 +124,7 @@ describe('reflect handler', () => {
     await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative+graph', allow_discovery: true }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('contextual JSON envelope'));
     assert.ok(capturedQuery.includes('bare-slug'));
   });
 
@@ -138,7 +138,7 @@ describe('reflect handler', () => {
     const result = await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'graph-only' }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('contextual JSON envelope'));
     assert.equal(result.success, true);
     assert.equal(result.narrative, '');
     assert.equal(result.graph.nodes.length, 2);

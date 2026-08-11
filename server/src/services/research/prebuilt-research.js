@@ -60,7 +60,6 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   const mentalModel = hindsightResult.mentalModel;
   const content = mentalModel.content ?? null;
   const contentLength = typeof content === 'string' ? content.length : content ? JSON.stringify(content).length : 0;
-  const returns = (candidate.returns || 'json').toLowerCase();
 
   if (!content) {
     logger.info('Prebuilt candidate content missing', {
@@ -68,48 +67,30 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
       bankId,
       extId,
       candidateId: candidate.id,
-      returns,
       contentKeys: Object.keys(mentalModel),
     });
     return {
       ...candidate,
       found: true,
       content: null,
+      narrative: '',
       graph: { nodes: [], edges: [] },
       graph_error: 'Mental-model content is empty or missing.',
     };
   }
 
-  if (returns === 'narrative') {
-    const { narrative, error: parseError } = parseGraphResponse(content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
-    logger.info('Prebuilt candidate narrative extracted', {
-      serverId,
-      bankId,
-      extId,
-      candidateId: candidate.id,
-      contentLength,
-      narrativeLength: narrative.length,
-      parseError: parseError || null,
-    });
-    return {
-      ...candidate,
-      found: true,
-      content,
-      narrative,
-    };
-  }
-
-  const { graph, error: graphError } = parseGraphResponse(content, {
-    mode: returns.startsWith('narrative-graph') ? returns : 'graph-known',
+  const { narrative, graph, error: graphError } = parseGraphResponse(content, {
+    mode: 'narrative-graph-known',
     expectGraph: true,
     defaultSource: 'mental_model',
   });
-  logger.info('Prebuilt candidate graph extracted', {
+  logger.info('Prebuilt candidate envelope extracted', {
     serverId,
     bankId,
     extId,
     candidateId: candidate.id,
     contentLength,
+    narrativeLength: narrative.length,
     nodeCount: graph?.nodes.length ?? 0,
     edgeCount: graph?.edges.length ?? 0,
     graphError: graphError || null,
@@ -118,6 +99,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     ...candidate,
     found: true,
     content,
+    narrative,
     graph: graph || { nodes: [], edges: [] },
     graph_error: graphError,
   };
