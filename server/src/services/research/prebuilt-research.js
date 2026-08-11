@@ -21,7 +21,7 @@
 
 import { listEligibleMentalModels } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { parseGraphResponse } from '../../prompts/parse-graph-response.js';
+import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt');
@@ -79,11 +79,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     };
   }
 
-  const { narrative, graph, error: graphError } = parseGraphResponse(content, {
-    mode: 'narrative-graph-known',
-    expectGraph: true,
-    defaultSource: 'mental_model',
-  });
+  const { narrative, graph, tables, errors: modelErrors } = normalizeModelOutput(content);
   logger.info('Prebuilt candidate envelope extracted', {
     serverId,
     bankId,
@@ -93,15 +89,17 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     narrativeLength: narrative.length,
     nodeCount: graph?.nodes.length ?? 0,
     edgeCount: graph?.edges.length ?? 0,
-    graphError: graphError || null,
+    tableCount: tables?.length ?? 0,
+    modelError: modelErrors?.length ? modelErrors.join('; ') : null,
   });
   return {
     ...candidate,
     found: true,
-    content,
+    content: null,
     narrative,
-    graph: graph || { nodes: [], edges: [] },
-    graph_error: graphError,
+    graph,
+    tables: tables || [],
+    graph_error: modelErrors?.length ? modelErrors.join('; ') : null,
   };
 }
 

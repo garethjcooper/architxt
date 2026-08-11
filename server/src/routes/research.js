@@ -25,7 +25,7 @@ import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../s
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
-import { parseGraphResponse } from '../prompts/parse-graph-response.js';
+import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
 
 const logger = createLogger('research-route');
 const router = Router();
@@ -968,12 +968,8 @@ router.post('/mental-models/health', async (req, res) => {
         };
       }
 
-      const { narrative, graph, error: graphError } = parseGraphResponse(content, {
-        mode: returns === 'narrative' ? 'narrative' : 'narrative-graph-known',
-        expectGraph: returns !== 'narrative',
-        defaultSource: 'mental_model',
-      });
-      const healthy = graphError == null;
+      const { graph, errors: modelErrors } = normalizeModelOutput(content);
+      const healthy = !modelErrors?.length;
       return {
         ext_id: extId,
         healthy,
@@ -981,11 +977,10 @@ router.post('/mental-models/health', async (req, res) => {
         content,
         content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
         parsed: healthy ? { graph } : undefined,
-        narrative_length: narrative.length,
         graph_present: healthy,
         node_count: graph?.nodes.length ?? 0,
         edge_count: graph?.edges.length ?? 0,
-        error: graphError,
+        error: modelErrors?.length ? modelErrors.join('; ') : null,
       };
     }));
 
