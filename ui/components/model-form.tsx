@@ -9,8 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
-import type { MentalModel, StandardDimension, MentalModelReturns } from '@/lib/types/index';
-import { MENTAL_MODEL_RETURNS_OPTIONS, toMentalModelReturns } from '@/lib/types/index';
+import type { MentalModel, StandardDimension } from '@/lib/types/index';
 import { mentalModelsApi } from '@/lib/api/client';
 
 const inputFocusStyle = {
@@ -33,8 +32,6 @@ interface ModelFormProps {
     max_tokens: number;
     tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     dimension: string | null;
-    returns: MentalModelReturns;
-    concatenation: 'merge' | 'compile';
     is_template: boolean;
   }) => Promise<void>;
   onCancel: () => void;
@@ -67,8 +64,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
   const [dimension, setDimension] = useState(initial?.dimension || 'none');
-  const [returns, setReturns] = useState<MentalModelReturns>(initial?.returns ?? 'narrative');
-  const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(initial?.concatenation ?? 'compile');
   const [submitting, setSubmitting] = useState(false);
   const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
 
@@ -125,8 +120,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
         max_tokens: maxTokensValidation.value,
         tags_match_mode: tagsMatchMode,
         dimension: dimension.trim() || null,
-        returns,
-        concatenation,
         is_template: isTemplate,
       });
     } catch (err) {
@@ -175,33 +168,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
                 {standardDimensions.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
                 ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mm-returns" className="text-xs uppercase text-white/50 font-medium">Returns</Label>
-              <select
-                id="mm-returns"
-                value={returns}
-                onChange={(e) => setReturns(toMentalModelReturns(e.target.value))}
-                disabled={isSystemTemplate}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mm-concatenation" className="text-xs uppercase text-white/50 font-medium">Concatenation</Label>
-              <select
-                id="mm-concatenation"
-                value={concatenation}
-                onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
-                disabled={isSystemTemplate}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="merge">Merge</option>
-                <option value="compile">Compile</option>
               </select>
             </div>
           </div>
@@ -337,7 +303,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
       </div>
 
       {!isTemplate && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
             <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
             <select
@@ -350,33 +316,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
               {standardDimensions.map((d) => (
                 <option key={d.value} value={d.value}>{d.label}</option>
               ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="mm-returns" className="text-xs uppercase text-white/50 font-medium">Returns</Label>
-            <select
-              id="mm-returns"
-              value={returns}
-              onChange={(e) => setReturns(toMentalModelReturns(e.target.value))}
-              disabled={isSystemTemplate}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="mm-concatenation" className="text-xs uppercase text-white/50 font-medium">Concatenation</Label>
-            <select
-              id="mm-concatenation"
-              value={concatenation}
-              onChange={(e) => setConcatenation(e.target.value as 'merge' | 'compile')}
-              disabled={isSystemTemplate}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="merge">Merge</option>
-              <option value="compile">Compile</option>
             </select>
           </div>
         </div>

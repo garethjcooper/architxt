@@ -111,9 +111,8 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
       return {
         ext_id: extId,
         name,
-        found: true,
         content,
-        concatenation: selection.concatenation,
+        found: true,
         graph,
         graph_error: graphError,
       };
