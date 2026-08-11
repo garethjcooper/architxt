@@ -6,41 +6,13 @@
  */
 
 import { reflect } from '../../hindsight/index.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
+import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';
-import { composeMentalModelPrompt } from '../../../prompts/template-service.js';
+import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
 
 const logger = createLogger('research-handler-reflect');
-
-const VALID_TEMPLATES = new Set([
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
-]);
-
-function resolveTemplate(requestedTemplate, outputMode, allowDiscovery) {
-  if (VALID_TEMPLATES.has(requestedTemplate)) return requestedTemplate;
-
-  // Legacy UI output_mode values map to v0.3.5 template names.
-  if (outputMode === 'narrative') return 'narrative';
-  if (outputMode === 'graph-only') return 'graph-known';
-  if (outputMode === 'narrative+graph') {
-    return allowDiscovery ? 'narrative-graph-discovery' : 'narrative-graph-known';
-  }
-  return 'narrative-graph-known';
-}
-
-async function composeReflectPrompt(db, query, requestedTemplate, outputMode, allowDiscovery) {
-  if (!db) throw new Error('db is required to compose Reflect prompt');
-  const templateName = resolveTemplate(requestedTemplate, outputMode, allowDiscovery);
-  return composeMentalModelPrompt(db, templateName, query);
-}
 
 function basedOnToMarkdown(data, query) {
   const memories = data?.based_on?.memories;
@@ -84,13 +56,16 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
 
   logger.info('Reflect research query', { serverId, bankId, queryLength: query.length });
 
-  const templateName = resolveTemplate(options.template, options.output_mode, options.allow_discovery);
-
+  const focus = options.section_focus || {};
   let composedQuery;
   try {
-    composedQuery = await composeReflectPrompt(db, query, options.template, options.output_mode, options.allow_discovery);
+    composedQuery = await composeMentalModelPrompt(db, 'generic', query, {
+      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
+      ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
+    });
   } catch (err) {
-    logger.error('Failed to compose Reflect prompt', { error: err.message, template: templateName });
+    logger.error('Failed to compose Reflect prompt', { error: err.message });
     return { success: false, error: err.message, code: 'COMPOSE_PROMPT_FAILED' };
   }
 
@@ -136,16 +111,12 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   }
 
   const text = result.data?.text;
-  const extracted = parseGraphResponse(text || '', {
-    mode: templateName,
-    expectGraph: templateName.startsWith('graph-'),
-    defaultSource: 'mental_model',
-  });
+  const extracted = normalizeModelOutput(text || '');
   const knownCatalog = await knownCatalogPromise;
   const normalizedGraph = normalizeGraph(extracted.graph, {
     activity: 'reflect',
     knownCatalog,
-    mode: templateName,
+    mode: 'generic',
   });
 
   const graph = {
@@ -153,24 +124,8 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     edges: normalizedGraph.edges,
   };
   const hasGraph = graph.nodes.length > 0 || graph.edges.length > 0;
-  const graphOnly = templateName.startsWith('graph-');
 
-  if (graphOnly) {
-    if (!hasGraph) {
-      logger.warn('Reflect graph-only response missing graph data', { keys: Object.keys(result.data || {}), preview: text?.slice(0, 200) });
-      return {
-        success: false,
-        error: 'Reflect graph-only response missing graph data',
-        code: 'INVALID_REFLECT_RESPONSE',
-        calls: [{
-          ...baseCall,
-          status: 'failure',
-          error: 'Reflect graph-only response missing graph data',
-          code: 'INVALID_REFLECT_RESPONSE',
-        }],
-      };
-    }
-  } else if (!extracted.narrative || extracted.narrative.length === 0) {
+  if (!extracted.narrative || extracted.narrative.length === 0) {
     logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
     return {
       success: false,
@@ -187,8 +142,9 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
 
   return {
     success: true,
-    narrative: graphOnly ? '' : `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query),
+    narrative: `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query),
     graph,
+    tables: extracted.tables || [],
     calls_used: ['reflect'],
     calls: [baseCall],
   };

@@ -28,7 +28,7 @@ function makeCompletion(content) {
 }
 
 function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
-  return JSON.stringify({ narrative, graph: { nodes, edges } });
+  return JSON.stringify({ narrative, graph: { nodes, edges }, tables: [] });
 }
 
 describe('synthesize handler', () => {

@@ -12,31 +12,12 @@
 import * as llmClient from '../../llm/client.js';
 import { config } from '../../../config.js';
 import { createLogger } from '../../../utils/logger.js';
-import { loadAndComposeWithCatalog } from '../../../prompts/template-service.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
+import { loadAndComposeWithCatalog, formatFocusVariable } from '../../../prompts/template-service.js';
+import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 
 const logger = createLogger('research-synthesize');
-
-const DISCOVERY_MODES = new Set([
-  'graph-discovery',
-  'narrative-graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-discovered-only',
-]);
-
-function resolveTemplate(requestedTemplate, outputMode, allowDiscovery) {
-  if (typeof requestedTemplate === 'string' && DISCOVERY_MODES.has(requestedTemplate)) return requestedTemplate;
-
-  // Legacy UI output_mode values map to v0.3.5 template names.
-  if (outputMode === 'narrative') return 'narrative';
-  if (outputMode === 'graph-only') return allowDiscovery ? 'graph-discovery' : 'graph-known';
-  if (outputMode === 'narrative+graph') {
-    return allowDiscovery ? 'narrative-graph-discovery' : 'narrative-graph-known';
-  }
-  return 'narrative-graph-known';
-}
 
 function formatEntity(entity) {
   const name = entity.name || entity.id;
@@ -151,7 +132,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   const intentText = query;
   const sourceSteps = options?.source_steps || [];
   const cfg = config.research.synthesize;
-  const templateName = resolveTemplate(options?.template, options?.output_mode, options?.allow_discovery);
+  const allowDiscovery = options?.allow_discovery === true;
 
   if (!db) {
     return {
@@ -169,6 +150,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
       success: true,
       narrative: 'No source material available for synthesis.',
       graph: { nodes: [], edges: [] },
+      tables: [],
       calls: [],
     };
   }
@@ -178,6 +160,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
       success: true,
       narrative: 'Synthesis is not configured: missing model.',
       graph: { nodes: [], edges: [] },
+      tables: [],
       calls: [],
     };
   }
@@ -189,7 +172,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     sourceStepCount: sourceSteps.length,
     provider: cfg.provider,
     model: options?.model || cfg.model,
-    template: templateName,
+    template: 'generic',
     maxTokens: options?.max_tokens ?? cfg.max_tokens,
     corpusChars: corpus.length,
   });
@@ -203,9 +186,13 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     narrativeCount: sourceSteps.filter((s) => s.synthesis?.narrative).length,
   });
 
-  const { prompt: systemPrompt, mode } = await loadAndComposeWithCatalog(db, templateName, {
+  const focus = options?.section_focus || {};
+  const { prompt: systemPrompt } = await loadAndComposeWithCatalog(db, 'generic', {
     ARCHITXT_TOPIC: intentText,
     ARCHITXT_CORPUS: corpus,
+    ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
+    ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+    ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
   });
 
   const messages = [
@@ -245,47 +232,18 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
 
   const corpusNodeIds = new Set(corpusNodes.map((n) => n.id));
 
-  const expectGraph = templateName !== 'narrative';
-  const parsed = parseGraphResponse(llmResult.data.content, { mode, expectGraph });
+  const parsed = normalizeModelOutput(llmResult.data.content);
   const normalized = normalizeGraph(parsed.graph, {
     activity: 'synthesize',
     knownCatalog,
-    mode: templateName,
+    mode: 'generic',
   });
 
-  const discoveredOnly = templateName.includes('discovered-only');
-  const discoveryMode = DISCOVERY_MODES.has(templateName);
-
-  // Known templates: keep corpus/catalog nodes only.
-  // Discovery templates: keep all normalized nodes.
-  // Discovered-only templates: keep only discovered nodes as standalone nodes, but known/corpus
-  // entities may still appear as endpoints of discovered edges.
+  // Filter nodes based on discovery permission.
   let filteredNodes;
   let filteredEdges;
 
-  if (discoveredOnly) {
-    // For discovered-only, start from nodes that are NOT already in the corpus/catalog.
-    const discoveredNodes = normalized.nodes.filter(
-      (n) => !corpusNodeIds.has(n.id) && !knownCatalog.has(n.id)
-    );
-    const discoveredNodeIds = new Set(discoveredNodes.map((n) => n.id));
-
-    // Keep edges that touch at least one discovered node.
-    const discoveredEdges = normalized.edges.filter(
-      (e) => discoveredNodeIds.has(e.from) || discoveredNodeIds.has(e.to)
-    );
-
-    // Known/corpus nodes may appear as endpoints of discovered edges.
-    const edgeEndpointIds = new Set();
-    for (const e of discoveredEdges) {
-      edgeEndpointIds.add(e.from);
-      edgeEndpointIds.add(e.to);
-    }
-
-    filteredNodes = normalized.nodes.filter((n) => edgeEndpointIds.has(n.id));
-    const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = discoveredEdges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
-  } else if (discoveryMode) {
+  if (allowDiscovery) {
     filteredNodes = normalized.nodes;
     const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
     filteredEdges = normalized.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
@@ -306,26 +264,24 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     corpusNodes: corpusNodes.length,
     corpusEdges: corpusEdges.length,
     knownCatalogSize: knownCatalog.size,
-    templateName,
-    discoveredOnly,
+    allowDiscovery,
   });
 
   const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
 
-  const graphOnly = templateName.startsWith('graph-');
-
   logger.info('Synthesize handler completed', {
     intentText,
-    templateName,
-    narrativeLength: graphOnly ? 0 : parsed.narrative.length,
+    templateName: 'generic',
+    narrativeLength: parsed.narrative.length,
     graphNodeCount: graph.nodes.length,
     graphEdgeCount: graph.edges.length,
   });
 
   return {
     success: true,
-    narrative: graphOnly ? '' : parsed.narrative,
+    narrative: parsed.narrative,
     graph,
+    tables: parsed.tables || [],
     calls: [
       {
         mode: 'synthesize',

@@ -354,7 +354,7 @@ const BUILTIN_TEMPLATES = [
     description: 'Universal template. Returns narrative + graph + tables based on user directives.',
     body: 'Answer the topic below using the output sections requested in the directives.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS","ARCHITXT_NARRATIVE_FOCUS"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
     examplesHeuristic: 'top-n',
   },
   {

@@ -7,7 +7,7 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { handleReflect } from '../src/services/research/handlers/reflect.js';
 
 function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
-  return JSON.stringify({ narrative, graph: { nodes, edges } });
+  return JSON.stringify({ narrative, graph: { nodes, edges }, tables: [] });
 }
 
 const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
@@ -21,7 +21,7 @@ const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
   ],
 });
 
-const REFLECT_TEXT_NO_GRAPH = JSON.stringify({ narrative: 'Just a plain text response with no graph data.', graph: { nodes: [], edges: [] } });
+const REFLECT_TEXT_NO_GRAPH = JSON.stringify({ narrative: 'Just a plain text response with no graph data.', graph: { nodes: [], edges: [] }, tables: [] });
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-reflect-handler-${Date.now()}.db`);
@@ -60,7 +60,6 @@ describe('reflect handler', () => {
   it('extracts graph from contextual envelope when present', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
       reflectFn: makeReflectFn(REFLECT_TEXT_WITH_GRAPH),
-      output_mode: 'narrative+graph',
     }, db);
 
     assert.equal(result.success, true);
@@ -69,13 +68,12 @@ describe('reflect handler', () => {
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
     assert.equal(result.graph.nodes[0].id, 'a');
-    assert.equal(result.graph.nodes[0].source, 'mental_model');
+    assert.equal(result.graph.nodes[0].name, 'Alpha');
   });
 
   it('returns empty graph when envelope graph is empty', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
       reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
-      output_mode: 'narrative+graph',
     }, db);
 
     assert.equal(result.success, true);
@@ -84,70 +82,56 @@ describe('reflect handler', () => {
     assert.equal(result.graph.edges.length, 0);
   });
 
-  it('composes the narrative template by default', async () => {
+  it('composes the generic template by default', async () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
       return { success: true, data: { text: 'ok' } };
     };
 
-    await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative' }, db);
+    await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
 
     assert.ok(capturedQuery);
     assert.ok(capturedQuery.includes('test query'));
     assert.ok(!capturedQuery.includes('{{ARCHITXT_TOPIC}}'));
-    assert.ok(!capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
-    assert.ok(capturedQuery.includes('contextual JSON envelope'));
+    assert.ok(capturedQuery.includes('## Topic'));
   });
 
-  it('composes the narrative-graph-known template when output_mode is narrative+graph', async () => {
+  it('injects section focus variables when provided', async () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
       return { success: true, data: { text: 'ok' } };
     };
 
-    await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative+graph' }, db);
+    await handleReflect(1, 'bank', 'test query', {
+      reflectFn,
+      section_focus: { graph: 'CRM, ERP' },
+    }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('contextual JSON envelope'));
-    assert.ok(!capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('- CRM, ERP'));
   });
 
-  it('composes the narrative-graph-discovery template when output_mode is narrative+graph and allow_discovery is true', async () => {
-    let capturedQuery = null;
-    const reflectFn = async (body) => {
-      capturedQuery = body.query;
-      return { success: true, data: { text: 'ok' } };
-    };
-
-    await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative+graph', allow_discovery: true }, db);
-
-    assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('contextual JSON envelope'));
-    assert.ok(capturedQuery.includes('bare-slug'));
-  });
-
-  it('composes the graph-known template when output_mode is graph-only', async () => {
+  it('returns narrative and graph for generic template', async () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
       return { success: true, data: { text: REFLECT_TEXT_WITH_GRAPH } };
     };
 
-    const result = await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'graph-only' }, db);
+    const result = await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('contextual JSON envelope'));
+    assert.ok(capturedQuery.includes('## Topic'));
     assert.equal(result.success, true);
-    assert.equal(result.narrative, '');
+    assert.ok(result.narrative.length > 0);
     assert.equal(result.graph.nodes.length, 2);
   });
 
   it('fails fast without db', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
       reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
-      output_mode: 'narrative+graph',
     });
 
     assert.equal(result.success, false);
