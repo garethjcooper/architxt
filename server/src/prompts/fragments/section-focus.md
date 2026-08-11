@@ -1,0 +1,7 @@
+## Output directives
+
+{{ARCHITXT_NARRATIVE_FOCUS}}
+
+{{ARCHITXT_GRAPH_FOCUS}}
+
+{{ARCHITXT_TABLE_FOCUS}}

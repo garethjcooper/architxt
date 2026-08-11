@@ -172,15 +172,29 @@ function formatNodeExamples({ include, exclude }) {
 }
 
 /**
+ * Format a raw focus string into a bullet directive for prompt injection.
+ * Returns empty string if the input is missing or blank (stripped by composePrompt).
+ *
+ * @param {string} [raw]
+ * @returns {string}
+ */
+export function formatFocusVariable(raw) {
+  if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
+  return `- ${raw.trim()}`;
+}
+
+/**
  * Compose a full prompt for a derived mental model.
  *
  * @param {object} db
  * @param {string} templateName - value from mental_models.mm_template_role for
  *   contextual-graph system templates, or mental_models.mm_returns for all others.
  * @param {string} topic - rendered mm_source_query after single-brace substitution
+ * @param {Record<string, string>} [focusVariables] - Optional per-section focus variables
+ *   (ARCHITXT_GRAPH_FOCUS, ARCHITXT_TABLE_FOCUS, ARCHITXT_NARRATIVE_FOCUS).
  * @returns {Promise<string>}
  */
-export async function composeMentalModelPrompt(db, templateName, topic) {
+export async function composeMentalModelPrompt(db, templateName, topic, focusVariables = {}) {
   // Contextual-graph system templates are keyed by mm_template_role, not by
   // mm_returns (which is now the generic 'sys_patch' placeholder).
   if (CONTEXTUAL_MODES.has(templateName)) {
@@ -190,12 +204,14 @@ export async function composeMentalModelPrompt(db, templateName, topic) {
     }
     const { prompt } = composePrompt(template, {
       ARCHITXT_TOPIC: topic || '',
+      ...focusVariables,
     });
     return prompt;
   }
 
   const { prompt } = await loadAndComposeWithCatalog(db, templateName, {
     ARCHITXT_TOPIC: topic || '',
+    ...focusVariables,
   });
   return prompt;
 }
