@@ -67,7 +67,7 @@ export interface ResearchQueryOptions {
     template?: string;
   };
   models?: {
-    selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string; returns?: string; concatenation?: string }>;
+    selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string }>;
   };
   templates?: {
     selectedEntities?: string[];

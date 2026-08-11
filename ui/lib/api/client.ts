@@ -481,8 +481,6 @@ export const mentalModelsApi = {
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     dimension?: string | null;
-    returns?: MentalModelReturns;
-    concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
     method: 'POST',
@@ -499,8 +497,6 @@ export const mentalModelsApi = {
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     dimension?: string | null;
-    returns?: MentalModelReturns;
-    concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
     method: 'PUT',

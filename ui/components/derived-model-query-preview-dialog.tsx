@@ -5,8 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { DerivedMentalModel, MentalModelReturns } from '@/lib/types/index';
-import { MENTAL_MODEL_RETURNS_OPTIONS } from '@/lib/types/index';
+import type { DerivedMentalModel } from '@/lib/types/index';
 import { mentalModelsApi } from '@/lib/api/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -27,10 +26,6 @@ type PreviewStatus =
   | { state: 'loading' }
   | { state: 'error'; message: string }
   | { state: 'done'; rows: PreviewRow[] };
-
-function returnsLabel(value: MentalModelReturns): string {
-  return MENTAL_MODEL_RETURNS_OPTIONS.find((o) => o.value === value)?.label || value;
-}
 
 export function DerivedModelQueryPreviewDialog({
   isOpen,
@@ -176,7 +171,7 @@ export function DerivedModelQueryPreviewDialog({
                               }`}
                               title={hasError ? (row.compose_error ?? undefined) : hasContent ? 'Composed query available' : 'No composed query'}
                             >
-                              {returnsLabel(row.returns)}
+                              {hasContent ? 'Composed' : hasError ? 'Failed' : 'Pending'}
                             </span>
                           </TableCell>
                         </TableRow>

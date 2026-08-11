@@ -213,7 +213,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     setSelectedResultId(null);
     try {
       const results = await runHealthCheck(
-        derived.map((d) => ({ ext_id: d.ext_id || '', returns: d.returns })),
+        derived.map((d) => ({ ext_id: d.ext_id || '', returns: 'narrative-graph-known' })),
       );
       setStatus({ state: 'done', results: results || [] });
       if ((results || []).length > 0) {
@@ -330,7 +330,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
         if (idx === -1 || !op.pop_ext_id) return null;
         return {
           idx,
-          model: { ext_id: op.pop_ext_id, returns: derived[idx].returns },
+          model: { ext_id: op.pop_ext_id, returns: 'narrative-graph-known' },
         };
       })
       .filter(Boolean) as { idx: number; model: { ext_id: string; returns?: MentalModelReturns } }[];

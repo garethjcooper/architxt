@@ -4,10 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi } from '@/lib/api/client';
 import {
-  MENTAL_MODEL_RETURNS_OPTIONS,
-  MentalModelReturns,
   StandardDimension,
-  toMentalModelReturns,
   type DerivedMentalModel,
   type Entity,
   type MentalModel,
@@ -48,8 +45,6 @@ export interface BaseConfig {
   exclude_all_mental_models: boolean;
   max_tokens: number;
   dimension: string | null;
-  returns: MentalModelReturns;
-  concatenation: 'merge' | 'compile';
 }
 
 interface ModelDetailsDialogProps {
@@ -88,8 +83,6 @@ function buildBaseConfig(
       local.exclude_all_mental_models ?? model.exclude_all_mental_models ?? false,
     max_tokens: local.max_tokens ?? model.max_tokens ?? 2048,
     dimension: local.dimension ?? model.dimension ?? null,
-    returns: local.returns ?? model.returns ?? 'narrative',
-    concatenation: local.concatenation ?? model.concatenation ?? 'compile',
   };
 }
 
@@ -115,8 +108,6 @@ function buildDerivedRow(
     max_tokens: overrides.max_tokens ?? baseConfig.max_tokens,
     tags_match_mode: model.tags_match_mode,
     dimension: baseConfig.dimension,
-    returns: baseConfig.returns,
-    concatenation: baseConfig.concatenation,
     is_template: false,
     is_system_template: false,
     is_derived: true,
@@ -149,8 +140,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
   const [dimension, setDimension] = useState(model.dimension || 'none');
-  const [returns, setReturns] = useState<MentalModelReturns>(model.returns ?? 'narrative');
-  const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(model.concatenation ?? 'compile');
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
     buildDerivedRows(model, buildBaseConfig(model))
   );
@@ -181,10 +170,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       exclude_all_mental_models: excludeAll,
       max_tokens: parseMaxTokens(maxTokens, model.max_tokens ?? 2048),
       dimension: dimension.trim() || null,
-      returns,
-      concatenation,
     }),
-    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens, dimension, returns, concatenation]
+    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens, dimension]
   );
 
   const derivedRef = useRef(derived);
@@ -207,8 +194,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
     setDimension(model.dimension || 'none');
-    setReturns(model.returns ?? 'narrative');
-    setConcatenation(model.concatenation ?? 'compile');
     setDerived(buildDerivedRows(model, buildBaseConfig(model)));
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
@@ -270,8 +255,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
     isTemplate !== (model.is_template ?? false) ||
     dimension !== (model.dimension || 'none') ||
-    returns !== (model.returns ?? 'narrative') ||
-    concatenation !== (model.concatenation ?? 'compile') ||
     derivedChanged;
 
   const isSystemTemplate = model.is_system_template;
@@ -354,18 +337,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setDerived((prev) => prev.map((d) => ({ ...d, dimension: value.trim() || null })));
   };
 
-  const handleReturnsChange = (value: MentalModelReturns) => {
-    if (isSystemTemplate) return;
-    setReturns(value);
-    setDerived((prev) => prev.map((d) => ({ ...d, returns: value })));
-  };
-
-  const handleConcatenationChange = (value: 'merge' | 'compile') => {
-    if (isSystemTemplate) return;
-    setConcatenation(value);
-    setDerived((prev) => prev.map((d) => ({ ...d, concatenation: value })));
-  };
-
   const handleSave = async () => {
     if (!name.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
@@ -415,8 +386,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       if (isTemplate !== (model.is_template ?? false)) updates.is_template = isTemplate;
       const nextDimension = dimension.trim() || null;
       if (nextDimension !== (model.dimension ?? null)) updates.dimension = nextDimension;
-      if (returns !== (model.returns ?? 'narrative')) updates.returns = returns;
-      if (concatenation !== (model.concatenation ?? 'compile')) updates.concatenation = concatenation;
 
       if (Object.keys(updates).length > 0) {
         await mentalModelsApi.update(model.id, updates);
@@ -477,7 +446,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
         </div>
 
         {!isTemplate && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
                 Dimension
@@ -492,37 +461,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                 {standardDimensions.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
                 ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
-                Returns
-              </Label>
-              <select
-                id="mm-detail-returns"
-                value={returns}
-                onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
-                disabled={isSystemTemplate}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
-                Concatenation
-              </Label>
-              <select
-                id="mm-detail-concatenation"
-                value={concatenation}
-                onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
-                disabled={isSystemTemplate}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="merge">Merge</option>
-                <option value="compile">Compile</option>
               </select>
             </div>
           </div>
@@ -762,7 +700,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
                 <div className="w-1/2 min-w-[480px] p-4 flex flex-col gap-4 overflow-hidden">
                   <div className="shrink-0 border border-white/10 rounded-lg p-3 bg-white/[0.02]">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
                           Dimension
@@ -776,35 +714,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                           {standardDimensions.map((d) => (
                             <option key={d.value} value={d.value}>{d.label}</option>
                           ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
-                          Returns
-                        </Label>
-                        <select
-                          id="mm-detail-returns"
-                          value={returns}
-                          onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
-                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-                        >
-                          {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
-                          Concatenation
-                        </Label>
-                        <select
-                          id="mm-detail-concatenation"
-                          value={concatenation}
-                          onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
-                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-                        >
-                          <option value="merge">Merge</option>
-                          <option value="compile">Compile</option>
                         </select>
                       </div>
                     </div>

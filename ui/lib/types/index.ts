@@ -198,8 +198,6 @@ export interface MentalModel {
   max_tokens: number;
   tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
   dimension: string | null;
-  returns: MentalModelReturns;
-  concatenation: 'merge' | 'compile';
   is_template: boolean;
   template_role?: string | null;
   is_system_template: boolean;
