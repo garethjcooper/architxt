@@ -12,7 +12,7 @@
  */
 
 import { getMentalModel as getHindsightMentalModel } from '../../hindsight/mental-models.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
+import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('research-handler-models');
@@ -102,11 +102,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         };
       }
 
-      const { graph, narrative: modelNarrative, error: graphError } = parseGraphResponse(content, {
-        mode: 'graph-known',
-        expectGraph: true,
-        defaultSource: 'mental_model',
-      });
+      const { graph, narrative: modelNarrative, tables: modelTables, errors: modelErrors } = normalizeModelOutput(content);
 
       return {
         ext_id: extId,
@@ -115,13 +111,15 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         found: true,
         narrative: modelNarrative,
         graph,
-        graph_error: graphError,
+        tables: modelTables || [],
+        errors: modelErrors?.length ? modelErrors : undefined,
       };
     }),
   );
 
   const narratives = [];
   const graphs = [];
+  const tables = [];
   const errors = [];
 
   for (const item of fetched) {
@@ -134,11 +132,15 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
     } else if (item.content) {
       narratives.push(`## ${item.name || item.ext_id}\n\n${item.content}`);
     }
-    if (item.graph) {
-      if (item.graph.nodes.length > 0 || item.graph.edges.length > 0) {
-        graphs.push(item.graph);
-      } else if (item.graph_error) {
-        errors.push({ model: item.name || item.ext_id, error: item.graph_error });
+    if (item.graph && (item.graph.nodes.length > 0 || item.graph.edges.length > 0)) {
+      graphs.push(item.graph);
+    }
+    if (item.tables && item.tables.length > 0) {
+      tables.push(...item.tables);
+    }
+    if (item.errors) {
+      for (const err of item.errors) {
+        errors.push({ model: item.name || item.ext_id, error: err });
       }
     }
   }
@@ -146,7 +148,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
   let narrative = narratives.join('\n\n');
   if (narrative) {
     narrative = `# Models Query\n\n${narrative}`;
-  } else if (graphs.length > 0) {
+  } else if (graphs.length > 0 || tables.length > 0) {
     narrative = `Found model data for ${graphs.length} selected model(s).`;
   }
 
@@ -160,6 +162,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
     success: true,
     narrative,
     graph,
+    tables,
     calls_used: ['list_mental_models'],
     errors: errors.length > 0 ? errors : undefined,
   };
