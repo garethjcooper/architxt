@@ -101,7 +101,7 @@ export function normalizeEdge(e) {
  * Recursively walk a parsed object/string and return the first graph-shaped
  * payload found. This is a defensive, low-level helper for callers that may
  * receive wrapped objects (e.g. `{ answer: "..." }`) rather than the standard
- * `## ARCHITXT-GRAPH-DATA` text. Heading-aware extraction should use
+ * contextual JSON envelope. Envelope-aware extraction should use
  * `parse-graph-response.js` instead.
  *
  * @param {string|object|null} content

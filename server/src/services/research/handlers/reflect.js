@@ -170,16 +170,16 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
         }],
       };
     }
-  } else if (typeof text !== 'string' || text.length === 0) {
-    logger.warn('Reflect response missing plain text narrative', { keys: Object.keys(result.data || {}) });
+  } else if (!extracted.narrative || extracted.narrative.length === 0) {
+    logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
     return {
       success: false,
-      error: 'Reflect response missing plain text narrative',
+      error: 'Reflect response missing narrative',
       code: 'INVALID_REFLECT_RESPONSE',
       calls: [{
         ...baseCall,
         status: 'failure',
-        error: 'Reflect response missing plain text narrative',
+        error: 'Reflect response missing narrative',
         code: 'INVALID_REFLECT_RESPONSE',
       }],
     };
@@ -187,7 +187,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
 
   return {
     success: true,
-    narrative: graphOnly ? '' : `# Results - ${query}\n\n${text}` + basedOnToMarkdown(result.data, query),
+    narrative: graphOnly ? '' : `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query),
     graph,
     calls_used: ['reflect'],
     calls: [baseCall],

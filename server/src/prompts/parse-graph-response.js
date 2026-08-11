@@ -3,18 +3,20 @@ import { parseJsonString } from './graph-parser.js';
 
 const logger = createLogger('parse-graph-response');
 
-// Match the canonical heading while tolerating common Unicode dashes that
-// LLMs substitute for the ASCII hyphen (U+002D), e.g. non-breaking hyphen
-// U+2011, en dash U+2013, em dash U+2014, minus sign U+2212.
-const DASH_CLASS = '[-\u2011\u2013\u2014\u2212]';
-const GRAPH_DATA_HEADING_RE = new RegExp(`^(#{1,6}\\s*)?ARCHITXT${DASH_CLASS}GRAPH${DASH_CLASS}DATA\\s*$`, 'im');
+const OUTER_FENCE_RE = /^```(?:markdown|json)?\s*\n?([\s\S]*?)\n?```\s*$/;
 
 /**
- * Parse a response that uses the universal Architxt graph output format.
+ * Parse a response that uses the contextual Architxt JSON envelope.
+ *
+ * Expected shape:
+ *   { "narrative": "...", "graph": { "nodes": [], "edges": [] } }
+ *
+ * Graph-only responses may omit "narrative" (it defaults to "").
+ * Narrative-only responses may omit "graph" (it defaults to empty).
  *
  * @param {string|object|null} raw
  * @param {object} [options]
- * @param {string} [options.mode='narrative-graph-known'] - Template mode; used only for logging warnings when graph section is missing.
+ * @param {string} [options.mode='narrative-graph-known'] - Template mode; used only for logging warnings when the graph section is missing.
  * @param {boolean} [options.expectGraph=true] - If true, log a warning when the graph section is missing.
  * @param {string} [options.defaultSource='llm'] - Source value to set on nodes that do not already specify one.
  * @returns {{ narrative: string, graph: { nodes: object[], edges: object[] }, error?: string }}
@@ -24,77 +26,87 @@ export function parseGraphResponse(raw, { mode = 'narrative-graph-known', expect
     return { narrative: '', graph: { nodes: [], edges: [] } };
   }
 
-  let text = '';
-  if (typeof raw === 'string') {
-    text = raw;
-  } else {
+  if (typeof raw !== 'string') {
     logger.warn('Graph response must be a string', { type: typeof raw });
     return { narrative: '', graph: { nodes: [], edges: [] } };
   }
 
-  const trimmed = text.trim();
+  const trimmed = raw.trim();
   if (trimmed === '') {
     return { narrative: '', graph: { nodes: [], edges: [] } };
   }
 
-  const match = trimmed.match(GRAPH_DATA_HEADING_RE);
-  let narrative = trimmed;
-  let graphJson = null;
-
-  if (match && match.index !== undefined) {
-    // Find the last occurrence of the heading.
-    let lastIndex = match.index;
-    let rest = trimmed.slice(lastIndex + match[0].length);
-    let nextMatch;
-    while ((nextMatch = rest.match(GRAPH_DATA_HEADING_RE)) !== null) {
-      lastIndex = lastIndex + match[0].length + nextMatch.index;
-      rest = rest.slice(nextMatch.index + nextMatch[0].length);
-    }
-
-    narrative = trimmed.slice(0, lastIndex).trim();
-    const afterHeading = trimmed.slice(lastIndex + match[0].length).trim();
-    graphJson = afterHeading;
-  } else if (expectGraph) {
-    // No heading found: the entire response may be bare graph JSON (common for
-    // stored mental-model content). Try to parse the whole text as graph JSON.
-    graphJson = trimmed;
-  } else {
-    narrative = trimmed;
-  }
-
-  const graph = parseGraphJson(graphJson, defaultSource);
-  if (!graph) {
+  const parsed = parseEnvelope(trimmed, defaultSource);
+  if (!parsed) {
     return {
-      narrative,
+      narrative: '',
       graph: { nodes: [], edges: [] },
-      error: expectGraph ? 'Graph section found but contained no usable nodes or edges.' : null,
+      error: expectGraph
+        ? 'Response is not a valid contextual JSON envelope.'
+        : null,
     };
   }
 
-  return {
-    narrative,
-    graph,
-    error: null,
-  };
+  const { narrative, graph } = parsed;
+
+  if (parsed.graph && parsed.graph._malformed) {
+    const { _malformed, ...graph } = parsed.graph;
+    return { narrative, graph, error: 'Graph section found but contained no usable nodes or edges.' };
+  }
+
+  if (!parsed.graph) {
+    if (expectGraph) {
+      return { narrative, graph: { nodes: [], edges: [] }, error: 'Response envelope is missing the graph section.' };
+    }
+    return { narrative, graph: { nodes: [], edges: [] }, error: null };
+  }
+
+  const graphPresent = parsed.graph && typeof parsed.graph === 'object' && !Array.isArray(parsed.graph)
+    && (Array.isArray(parsed.graph.nodes) || Array.isArray(parsed.graph.edges));
+
+  if (expectGraph && !graphPresent) {
+    return { narrative, graph, error: 'Graph section found but contained no usable nodes or edges.' };
+  }
+
+  return { narrative, graph, error: null };
 }
 
-function parseGraphJson(text, defaultSource) {
-  if (!text || typeof text !== 'string') return null;
-  const jsonText = extractFirstJson(stripOuterCodeFences(text));
-  if (!jsonText) return null;
-  const parsed = parseJsonString(jsonText);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-  const nodes = (Array.isArray(parsed.nodes) ? parsed.nodes : [])
-    .map((n) => normalizeGraphNode(n, defaultSource))
-    .filter(Boolean);
-  const edges = Array.isArray(parsed.edges) ? parsed.edges : [];
-  // A valid graph response may legitimately have zero nodes and zero edges.
-  // Treat any object with the canonical graph shape as a graph, even when empty.
-  if (!Array.isArray(parsed.nodes) && !Array.isArray(parsed.edges)) return null;
-  return { nodes, edges };
-}
+function parseEnvelope(text, defaultSource) {
+  const stripped = stripOuterCodeFences(text);
+  const parsed = parseJsonString(stripped);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
 
-const OUTER_FENCE_RE = /^```(?:markdown|json)?\s*\n?([\s\S]*?)\n?```\s*$/;
+  const hasNarrativeKey = Object.prototype.hasOwnProperty.call(parsed, 'narrative');
+  const hasGraphKey = Object.prototype.hasOwnProperty.call(parsed, 'graph');
+
+  if (!hasNarrativeKey && !hasGraphKey) {
+    return null;
+  }
+
+  const narrative = hasNarrativeKey && typeof parsed.narrative === 'string' ? parsed.narrative.trim() : '';
+
+  let graph = null;
+  if (hasGraphKey) {
+    const graphInput = parsed.graph;
+    if (graphInput && typeof graphInput === 'object' && !Array.isArray(graphInput)
+      && (Array.isArray(graphInput.nodes) || Array.isArray(graphInput.edges))) {
+      const nodes = (Array.isArray(graphInput.nodes) ? graphInput.nodes : [])
+        .map((n) => normalizeGraphNode(n, defaultSource))
+        .filter(Boolean);
+      const edges = Array.isArray(graphInput.edges) ? graphInput.edges : [];
+      graph = { nodes, edges };
+    } else if (graphInput && typeof graphInput === 'object' && !Array.isArray(graphInput)) {
+      // graph key exists but has no usable nodes/edges arrays
+      graph = { nodes: [], edges: [], _malformed: true };
+    } else {
+      graph = { nodes: [], edges: [] };
+    }
+  }
+
+  return { narrative, graph };
+}
 
 function stripOuterCodeFences(text) {
   const trimmed = text.trim();
@@ -116,43 +128,6 @@ function normalizeGraphNode(n, defaultSource) {
     provenance: typeof n.provenance === 'string' ? n.provenance : undefined,
     source: typeof n.source === 'string' ? n.source : defaultSource,
   };
-}
-
-function extractFirstJson(text) {
-  // Try to find the first top-level { or [ and balance braces/brackets.
-  const startMatch = text.match(/[\{\[]/);
-  if (!startMatch) return null;
-  const start = startMatch.index;
-  const stack = [];
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < text.length; i += 1) {
-    const ch = text[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === '{' || ch === '[') {
-      stack.push(ch);
-    } else if (ch === '}' || ch === ']') {
-      const open = stack.pop();
-      if (!open) return null;
-      if ((open === '{' && ch !== '}') || (open === '[' && ch !== ']')) return null;
-      if (stack.length === 0) {
-        return text.slice(start, i + 1);
-      }
-    }
-  }
-  return null;
 }
 
 /**

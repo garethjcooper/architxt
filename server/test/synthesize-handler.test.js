@@ -27,6 +27,10 @@ function makeCompletion(content) {
   });
 }
 
+function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
+  return JSON.stringify({ narrative, graph: { nodes, edges } });
+}
+
 describe('synthesize handler', () => {
   let db;
 
@@ -85,8 +89,19 @@ describe('synthesize handler', () => {
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
-  it('parses universal format, normalizes, and keeps corpus/catalog nodes in known-only mode', async () => {
-    const response = `Synthesized summary.\n\n## ARCHITXT-GRAPH-DATA\n${JSON.stringify({ nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'a-svc:SVC-005', name: 'Rating' }, { id: 'payment-gateway', name: 'Payment Gateway' }], edges: [{ from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'usage data', detail: 'Billable events' }, { from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' }] })}`;
+  it('parses contextual envelope, normalizes, and keeps corpus/catalog nodes in known-only mode', async () => {
+    const response = buildEnvelope({
+      narrative: 'Synthesized summary.',
+      nodes: [
+        { id: 'a-com:COM-001', name: 'Singleview' },
+        { id: 'a-svc:SVC-005', name: 'Rating' },
+        { id: 'payment-gateway', name: 'Payment Gateway' },
+      ],
+      edges: [
+        { from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'usage data', detail: 'Billable events' },
+        { from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' },
+      ],
+    });
 
     const sourceSteps = [
       {
@@ -132,7 +147,16 @@ describe('synthesize handler', () => {
   });
 
   it('keeps discovered nodes in discovery mode', async () => {
-    const response = `Synthesized summary.\n\n## ARCHITXT-GRAPH-DATA\n${JSON.stringify({ nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'payment-gateway', name: 'Payment Gateway' }], edges: [{ from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' }] })}`;
+    const response = buildEnvelope({
+      narrative: 'Synthesized summary.',
+      nodes: [
+        { id: 'a-com:COM-001', name: 'Singleview' },
+        { id: 'payment-gateway', name: 'Payment Gateway' },
+      ],
+      edges: [
+        { from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' },
+      ],
+    });
 
     const sourceSteps = [
       {

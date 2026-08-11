@@ -968,24 +968,9 @@ router.post('/mental-models/health', async (req, res) => {
         };
       }
 
-      if (returns === 'narrative') {
-        const { narrative } = parseGraphResponse(content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
-        return {
-          ext_id: extId,
-          healthy: narrative.length > 0,
-          found: true,
-          content,
-          content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
-          parsed: { narrative },
-          narrative_length: narrative.length,
-          graph_present: false,
-          error: narrative.length > 0 ? undefined : 'Narrative content is empty',
-        };
-      }
-
       const { narrative, graph, error: graphError } = parseGraphResponse(content, {
-        mode: returns.startsWith('narrative-graph') ? returns : 'graph-known',
-        expectGraph: true,
+        mode: returns === 'narrative' ? 'narrative' : 'narrative-graph-known',
+        expectGraph: returns !== 'narrative',
         defaultSource: 'mental_model',
       });
       const healthy = graphError == null;
