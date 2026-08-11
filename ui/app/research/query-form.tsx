@@ -982,6 +982,7 @@ export function QueryForm(props: QueryFormProps) {
                     );
                     const scopeEntities = template.matched_entities.filter((me) => inScopeIds.has(me.entity_id));
                     const allSelected = scopeEntities.length > 0 && scopeEntities.every((me) => selectedEntityIds.has(me.derived_ext_id));
+                    const partiallySelected = scopeEntities.some((me) => selectedEntityIds.has(me.derived_ext_id)) && !allSelected;
                     const selected = selections.some((s) => s.ext_id === template.ext_id) || allSelected;
                     return (
                       <button
@@ -989,33 +990,37 @@ export function QueryForm(props: QueryFormProps) {
                         type="button"
                         disabled={isRunning}
                         onClick={() => {
-                          if (selected) {
-                            setQueryOptions((o) => ({
-                              ...o,
-                              templates: {
-                                ...o.templates,
-                                selections: [],
-                              },
-                            }));
-                          } else {
-                            const derivedSelections = scopeEntities.map((me) => ({
-                              kind: 'derived_model' as const,
-                              ext_id: me.derived_ext_id,
-                              name: `${template.name || template.ext_id} — ${me.name}`,
-                            }));
-                            setQueryOptions((o) => ({
-                              ...o,
-                              templates: {
-                                ...o.templates,
-                                selections: derivedSelections,
-                              },
-                            }));
-                          }
+                          const prev = queryOptions.templates?.selections || [];
+                          const existing = scopeEntities
+                            .map((me) => me.derived_ext_id)
+                            .filter((extId) => prev.some((s) => s.ext_id === extId));
+                          const isSelected = existing.length > 0 && existing.length === scopeEntities.length;
+                          const next = isSelected
+                            ? prev.filter((s) => !scopeEntities.some((me) => me.derived_ext_id === s.ext_id))
+                            : [
+                                ...prev,
+                                ...scopeEntities
+                                  .filter((me) => !prev.some((s) => s.ext_id === me.derived_ext_id))
+                                  .map((me) => ({
+                                    kind: 'derived_model' as const,
+                                    ext_id: me.derived_ext_id,
+                                    name: `${template.name || template.ext_id} — ${me.name}`,
+                                  })),
+                              ];
+                          setQueryOptions((o) => ({
+                            ...o,
+                            templates: {
+                              ...o.templates,
+                              selections: next,
+                            },
+                          }));
                         }}
                         className={`w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
-                          selected
+                          allSelected
                             ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
-                            : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
+                            : partiallySelected
+                              ? 'bg-emerald-900/10 border-emerald-500/20 text-emerald-200/80'
+                              : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
                         } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                         title={template.ext_id}
                       >
