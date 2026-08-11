@@ -8,7 +8,7 @@ import { composeMentalModelPrompt } from '../src/prompts/template-service.js';
 import { validateEntityTemplateEligibility } from '../src/db/crud/mental-models.js';
 
 const NON_CONTEXTUAL_MODES = [
-  'narrative',
+  'generic',
 ];
 
 describe('composeMentalModelPrompt', () => {

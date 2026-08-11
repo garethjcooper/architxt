@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseGraphResponse } from '../src/prompts/parse-graph-response.js';
+import { normalizeModelOutput } from '../src/services/contextual-graph/normalize-model-output.js';
 import { extractGraph } from '../src/prompts/graph-parser.js';
 
 describe('graph-parser.extractGraph (defensive helper)', () => {
@@ -29,50 +29,49 @@ describe('graph-parser.extractGraph (defensive helper)', () => {
   });
 });
 
-describe('parseGraphResponse (contextual envelope only)', () => {
-  it('returns graph and no error for valid mental-model content', () => {
+describe('normalizeModelOutput (contextual envelope)', () => {
+  it('returns graph and no errors for valid mental-model content', () => {
     const content = JSON.stringify({
       narrative: 'ICMS is the invoice system.',
       graph: {
         nodes: [{ id: 'a-com:COM-002', name: 'ICMS' }],
         edges: [{ from: 'a-com:COM-002', to: 'a-com:COM-269', type: 'sends' }],
       },
+      tables: [],
     });
-    const { graph, error, narrative } = parseGraphResponse(content, { defaultSource: 'mental_model' });
-    assert.equal(error, null);
+    const { graph, errors, narrative } = normalizeModelOutput(content);
+    assert.equal(errors.length, 0);
     assert.equal(graph.nodes.length, 1);
     assert.equal(graph.nodes[0].id, 'a-com:COM-002');
-    assert.equal(graph.nodes[0].source, 'mental_model');
     assert.equal(narrative, 'ICMS is the invoice system.');
   });
 
-  it('reports error for invalid envelope', () => {
+  it('reports errors for invalid envelope', () => {
     const content = 'Not a JSON envelope.';
-    const { graph, error } = parseGraphResponse(content, { defaultSource: 'mental_model' });
+    const { graph, errors } = normalizeModelOutput(content);
     assert.equal(graph.nodes.length, 0);
     assert.equal(graph.edges.length, 0);
-    assert.ok(error.includes('not a valid contextual JSON envelope'), `expected envelope error, got: ${error}`);
+    assert.ok(errors.length > 0, `expected errors, got: ${errors.join('; ')}`);
   });
 
-  it('reports no nodes/edges when graph shape is empty', () => {
-    const content = JSON.stringify({ narrative: 'Nothing to graph.', graph: { unrelated: 'data' } });
-    const { graph, error } = parseGraphResponse(content, { defaultSource: 'mental_model' });
+  it('returns empty graph when graph shape is empty', () => {
+    const content = JSON.stringify({ narrative: 'Nothing to graph.', graph: { unrelated: 'data' }, tables: [] });
+    const { graph, errors } = normalizeModelOutput(content);
     assert.equal(graph.nodes.length, 0);
     assert.equal(graph.edges.length, 0);
-    assert.ok(error.includes('no usable nodes or edges'), `expected empty graph error, got: ${error}`);
   });
 
-  it('returns empty graph and no error when JSON parses to empty nodes/edges', () => {
-    const content = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] } });
-    const { graph, error } = parseGraphResponse(content, { defaultSource: 'mental_model' });
+  it('returns empty graph when JSON parses to empty nodes/edges', () => {
+    const content = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] }, tables: [] });
+    const { graph, errors } = normalizeModelOutput(content);
     assert.ok(graph, 'expected graph to be returned');
     assert.deepEqual(graph, { nodes: [], edges: [] });
-    assert.equal(error, null);
+    assert.equal(errors.length, 0);
   });
 
-  it('returns empty graph and no error for missing content', () => {
-    const { graph, error } = parseGraphResponse(null, { defaultSource: 'mental_model' });
-    assert.equal(error, undefined);
+  it('returns empty graph for missing content', () => {
+    const { graph, errors } = normalizeModelOutput(null);
+    assert.equal(errors.length, 0);
     assert.equal(graph.nodes.length, 0);
     assert.equal(graph.edges.length, 0);
   });
@@ -82,13 +81,14 @@ describe('parseGraphResponse (contextual envelope only)', () => {
       narrative: '',
       graph: {
         nodes: [{ id: 'a-svc:SVC-019', name: 'Create Notification v1' }],
-        edges: [],
+        edges: [{ from: 'a-svc:SVC-019', to: 'a-svc:SVC-020', type: 'sends' }],
       },
+      tables: [],
     })}\n\`\`\``;
-    const { graph, error } = parseGraphResponse(content, { defaultSource: 'mental_model' });
-    assert.equal(error, null);
+    const { graph, errors } = normalizeModelOutput(content);
+    assert.equal(errors.length, 0);
     assert.equal(graph.nodes.length, 1);
     assert.equal(graph.nodes[0].id, 'a-svc:SVC-019');
-    assert.equal(graph.edges.length, 0);
+    assert.equal(graph.edges.length, 1);
   });
 });

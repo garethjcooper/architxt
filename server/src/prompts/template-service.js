@@ -7,13 +7,6 @@ import { applyHeuristic } from './examples-heuristics/index.js';
 const logger = createLogger('prompt-templates');
 
 const VALID_MODES = new Set([
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
   'generic',
   'sys_entity_summary',
   'sys_entity_capabilities',
