@@ -10,6 +10,7 @@ import {
   ApiError,
 } from '@/lib/api/client';
 import { parseQueryTokens, buildSelectionPayload } from './query-tokens';
+import { parseSectionDirectives } from './section-directives';
 import { transformPrebuiltToDiscoverResponse } from './prebuilt';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -776,18 +777,23 @@ export function useResearchSession({
     setLoading(true);
     setError(null);
     try {
+      const parsed = parseSectionDirectives(
+        queryMode === 'models'
+          ? 'Mental models: ' + (queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`).join(', ') || '')
+          : queryMode === 'templates'
+            ? 'Templates: ' + (queryOptions.templates?.selections?.map((s) => s.name || s.ext_id).join(', ') || '')
+            : query.trim(),
+      );
+
       const response = await researchApi.discover({
         server_id: parseInt(serverId, 10),
         session_id: sessionId,
         bank_id: bankId,
         viewpoint_ids: [],
-        intent_text: queryMode === 'models'
-          ? 'Mental models: ' + (queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`).join(', ') || '')
-          : queryMode === 'templates'
-            ? 'Templates: ' + (queryOptions.templates?.selections?.map((s) => s.name || s.ext_id).join(', ') || '')
-            : query.trim(),
+        intent_text: parsed.intentText,
         query_depth: queryMode,
         ...buildDiscoverOptions(queryMode, queryOptions),
+        ...(parsed.sectionFocus ? { section_focus: parsed.sectionFocus } : {}),
       });
       // The route returns 202 immediately. Do not treat it as the final result;
       // polling will set result once the step completes.
