@@ -14,6 +14,7 @@ const VALID_MODES = new Set([
   'narrative-graph-known',
   'narrative-graph-discovery',
   'narrative-graph-discovered-only',
+  'generic',
   'sys_entity_summary',
   'sys_entity_capabilities',
   'sys_edge_context',
