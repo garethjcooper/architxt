@@ -331,7 +331,6 @@ export function QueryForm(props: QueryFormProps) {
   }>>([]);
   const [eligibleLoading, setEligibleLoading] = useState(false);
   const [eligibleError, setEligibleError] = useState<string | null>(null);
-  const [templateSearch, setTemplateSearch] = useState('');
   const lastHandledKeyRef = useRef<string | null>(null);
   const lastHtmlRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
@@ -955,16 +954,7 @@ export function QueryForm(props: QueryFormProps) {
               </div>
             </div>
             <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-[10px] text-white/70 font-medium">Eligible Templates</div>
-                <Input
-                  placeholder="Filter templates…"
-                  value={templateSearch}
-                  onChange={(e) => setTemplateSearch(e.target.value)}
-                  disabled={isRunning || eligibleLoading}
-                  className="h-5 w-28 rounded border border-white/10 bg-black/20 px-1.5 py-0 text-[10px] text-white placeholder:text-white/30 focus:border-emerald-500"
-                />
-              </div>
+              <div className="text-[10px] text-white/70 font-medium mb-1">Eligible Templates</div>
               {eligibleLoading && (
                 <div className="text-[10px] text-white/40 italic">Loading eligible templates…</div>
               )}
@@ -980,109 +970,67 @@ export function QueryForm(props: QueryFormProps) {
               )}
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="flex flex-col gap-1">
-                  {eligibleTemplates
-                    .filter((template) => {
-                      if (!templateSearch.trim()) return true;
-                      const term = templateSearch.toLowerCase();
-                      return (
-                        (template.name || '').toLowerCase().includes(term) ||
-                        template.ext_id.toLowerCase().includes(term)
-                      );
-                    })
-                    .map((template) => {
-                      const selections = queryOptions.templates?.selections || [];
-                      const selectedEntityIds = new Set(
-                        selections.filter((s) => s.kind === 'derived_model').map((s) => s.ext_id),
-                      );
-                      const inScopeIds = new Set(
-                        queryOptions.templates?.selectedEntities
-                          ?.map((id) => entityMap.get(id)?.entity_id)
-                          .filter((id): id is string => Boolean(id)) || [],
-                      );
-                      const scopeEntities = template.matched_entities.filter((me) => inScopeIds.has(me.entity_id));
-                      const allSelected = scopeEntities.length > 0 && scopeEntities.every((me) => selectedEntityIds.has(me.derived_ext_id));
-                      const selected = selections.some((s) => s.ext_id === template.ext_id) || allSelected;
-                      return (
-                        <button
-                          key={template.id}
-                          type="button"
-                          disabled={isRunning}
-                          onClick={() => {
-                            if (selected) {
-                              setQueryOptions((o) => ({
-                                ...o,
-                                templates: {
-                                  ...o.templates,
-                                  selections: [],
-                                },
-                              }));
-                            } else {
-                              const derivedSelections = scopeEntities.map((me) => ({
-                                kind: 'derived_model' as const,
-                                ext_id: me.derived_ext_id,
-                                name: `${template.name || template.ext_id} — ${me.name}`,
-                              }));
-                              setQueryOptions((o) => ({
-                                ...o,
-                                templates: {
-                                  ...o.templates,
-                                  selections: derivedSelections,
-                                },
-                              }));
-                            }
-                          }}
-                          className={`w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
-                            selected
-                              ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
-                              : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
-                          } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                          title={template.ext_id}
-                        >
-                          <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
-                            <div className="text-xs text-white/90 truncate">{template.name || template.ext_id}</div>
-                            <div className="text-[10px] text-white/50 font-mono truncate">{template.ext_id}</div>
-                          </div>
-                          <span className="shrink-0 text-[10px] text-white/60">
-                            {scopeEntities.length} in scope
-                          </span>
-                        </button>
-                      );
-                    })}
+                  {eligibleTemplates.map((template) => {
+                    const selections = queryOptions.templates?.selections || [];
+                    const selectedEntityIds = new Set(
+                      selections.filter((s) => s.kind === 'derived_model').map((s) => s.ext_id),
+                    );
+                    const inScopeIds = new Set(
+                      queryOptions.templates?.selectedEntities
+                        ?.map((id) => entityMap.get(id)?.entity_id)
+                        .filter((id): id is string => Boolean(id)) || [],
+                    );
+                    const scopeEntities = template.matched_entities.filter((me) => inScopeIds.has(me.entity_id));
+                    const allSelected = scopeEntities.length > 0 && scopeEntities.every((me) => selectedEntityIds.has(me.derived_ext_id));
+                    const selected = selections.some((s) => s.ext_id === template.ext_id) || allSelected;
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        disabled={isRunning}
+                        onClick={() => {
+                          if (selected) {
+                            setQueryOptions((o) => ({
+                              ...o,
+                              templates: {
+                                ...o.templates,
+                                selections: [],
+                              },
+                            }));
+                          } else {
+                            const derivedSelections = scopeEntities.map((me) => ({
+                              kind: 'derived_model' as const,
+                              ext_id: me.derived_ext_id,
+                              name: `${template.name || template.ext_id} — ${me.name}`,
+                            }));
+                            setQueryOptions((o) => ({
+                              ...o,
+                              templates: {
+                                ...o.templates,
+                                selections: derivedSelections,
+                              },
+                            }));
+                          }
+                        }}
+                        className={`w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
+                          selected
+                            ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
+                            : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
+                        } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                        title={template.ext_id}
+                      >
+                        <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
+                          <div className="text-xs text-white/90 truncate">{template.name || template.ext_id}</div>
+                          <div className="text-[10px] text-white/50 font-mono truncate">{template.ext_id}</div>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-white/60">
+                          {scopeEntities.length} in scope
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              {(() => {
-                const selections = queryOptions.templates?.selections || [];
-                if (selections.length === 0) return null;
-                const selectedTemplate = eligibleTemplates.find((t) =>
-                  t.matched_entities.some((me) => selections.some((s) => s.ext_id === me.derived_ext_id)),
-                );
-                if (!selectedTemplate) return null;
-                const inScopeIds = new Set(
-                  queryOptions.templates?.selectedEntities
-                    ?.map((id) => entityMap.get(id)?.entity_id)
-                    .filter((id): id is string => Boolean(id)) || [],
-                );
-                const scopeEntities = selectedTemplate.matched_entities.filter((me) => inScopeIds.has(me.entity_id));
-                return (
-                  <div className="mt-2 shrink-0 flex flex-col gap-1 border-t border-white/10 pt-2">
-                    <div className="text-[10px] text-white/70 font-medium">
-                      Entities in scope for {selectedTemplate.name || selectedTemplate.ext_id}
-                    </div>
-                    <div className="max-h-24 overflow-y-auto space-y-1">
-                      {scopeEntities.map((me) => (
-                        <div
-                          key={me.entity_id}
-                          className="flex items-center gap-2 rounded border border-white/5 bg-black/20 px-2 py-1"
-                          style={{ borderLeftColor: colorForType(me.type_name || undefined), borderLeftWidth: 3 }}
-                        >
-                          <span className="text-xs text-white/90 truncate">{me.name}</span>
-                          <span className="text-[10px] text-white/40 font-mono truncate">{me.derived_ext_id}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           </div>
         )}
