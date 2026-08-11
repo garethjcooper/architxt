@@ -349,6 +349,15 @@ const BUILTIN_TEMPLATES = [
     examplesHeuristic: 'top-n',
   },
   {
+    name: 'generic',
+    mode: 'generic',
+    description: 'Universal template. Returns narrative + graph + tables based on user directives.',
+    body: 'Answer the topic below using the output sections requested in the directives.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS","ARCHITXT_NARRATIVE_FOCUS"]',
+    examplesHeuristic: 'top-n',
+  },
+  {
     name: 'sys_entity_summary',
     mode: 'sys_entity_summary',
     description: 'System template: concise evidence-backed summary for one contextual-graph node.',
@@ -372,7 +381,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -401,7 +410,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-table-contextual.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -436,7 +445,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -464,7 +473,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
 ];
