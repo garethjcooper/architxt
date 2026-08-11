@@ -322,6 +322,35 @@ export default function ResearchPage() {
   }, [handleLoadStep, setSelectedStepIds]);
 
   const handleInsertToken = useCallback((token: string) => {
+    if (queryMode === 'templates') {
+      // In templates mode the main Entities panel feeds the template entity list,
+      // not the query box. Extract the entity id from the token and add it if valid.
+      const match = token.match(/^\[\[(.+?)\s*\(([^)]+)\)\]\]$/);
+      if (!match) return;
+      const [, , rawId] = match;
+      const colonIdx = rawId.indexOf(':');
+      const id = colonIdx > 0 ? rawId.slice(colonIdx + 1) : rawId;
+      const entity = allEntities.find((e) => e.entity_id === id);
+      if (!entity) {
+        toast.info('Entity not available for template lookup');
+        return;
+      }
+      const canonicalId = canonicalNodeId({ id: entity.entity_id, name: entity.name, type: entity.type_name });
+      setQueryOptions((prev) => {
+        const prevIds = prev.templates?.selectedEntities || [];
+        if (prevIds.includes(canonicalId)) return prev;
+        return {
+          ...prev,
+          templates: {
+            ...(prev.templates || {}),
+            selectedEntities: [...prevIds, canonicalId],
+            selections: [],
+          },
+        };
+      });
+      return;
+    }
+
     if (queryMode === 'prebuilt' && /\[\[[^\[\]—]+?\s*—\s*[^\[\]—→]+?\s*→\s*[^\[\]]+?\]\]/.test(token)) {
       toast.info('Edges cannot be added to prebuilt queries');
       return;
@@ -333,7 +362,7 @@ export default function ResearchPage() {
     const pos = next.length - after.length;
     setQuery(next);
     setQueryCursor(pos);
-  }, [queryMode]);
+  }, [queryMode, allEntities]);
 
   const handleGraphAddToQuery = useCallback(
     (selection: { kind: string; ids: string[]; source?: string }) => {

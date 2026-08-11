@@ -67,7 +67,7 @@ const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
   reflect: 'Returns a generated narrative for the given query. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   models: 'Select one or more mental models and enter a query to explore their content. Type [[ to show list of existing known entities.',
-  templates: 'Select one or more entities on the left to reveal eligible templates.',
+  templates: 'Double-click an entity in the Entities panel to add it to the template lookup list.',
 };
 
 function tokenLabel(token: QueryToken, entities: EntityLike[], edges: EdgeLike[]): string {
@@ -903,38 +903,56 @@ export function QueryForm(props: QueryFormProps) {
             <div className={`w-1/3 min-h-0 flex flex-col border-r border-white/10 pr-2 ${isRunning ? 'opacity-50' : ''}`}>
               <div className="text-[10px] text-white/70 font-medium mb-1">Entities</div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-                {availableEntities.length === 0 && (
-                  <div className="text-[10px] text-white/40 italic">No entities available.</div>
-                )}
-                {availableEntities.map((entity) => {
-                  const selected = (queryOptions.templates?.selectedEntities || []).includes(entity.id);
-                  return (
-                    <label
-                      key={entity.id}
-                      className={`flex items-center gap-2 text-[10px] text-white/80 ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer'}`}
-                    >
-                      <Checkbox
-                        disabled={isRunning}
-                        checked={selected}
-                        onCheckedChange={(checked) => {
-                          const prev = queryOptions.templates?.selectedEntities || [];
-                          const next = checked
-                            ? [...prev, entity.id]
-                            : prev.filter((id) => id !== entity.id);
-                          setQueryOptions((o) => ({
-                            ...o,
-                            templates: {
-                              ...o.templates,
-                              selectedEntities: next,
-                              selections: [], // reset derived selections when entities change
-                            },
-                          }));
-                        }}
-                      />
-                      <span className="truncate">{entity.label || entity.id}</span>
-                    </label>
-                  );
-                })}
+                {(() => {
+                  const selectedIds = queryOptions.templates?.selectedEntities || [];
+                  if (selectedIds.length === 0) {
+                    return (
+                      <div className="text-[10px] text-white/40 italic">
+                        Double-click an entity in the Entities panel to add it here.
+                      </div>
+                    );
+                  }
+                  return selectedIds
+                    .map((id) => entityMap.get(id))
+                    .filter((e): e is EntityLike => Boolean(e))
+                    .map((entity) => {
+                      const display = entity.label || entity.id;
+                      const qualified = entity.type && !entity.id.startsWith(`${entity.type}:`)
+                        ? `${entity.type}:${entity.id}`
+                        : entity.id;
+                      return (
+                        <div
+                          key={entity.id}
+                          className="flex items-center gap-2 rounded border border-white/5 bg-black/20 px-2 py-1.5 min-h-[2.8125rem]"
+                          style={{ borderLeftColor: colorForType(entity.type || undefined), borderLeftWidth: 3 }}
+                        >
+                          <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
+                            <div className="text-xs text-white/90 truncate">{display}</div>
+                            <div className="text-[10px] text-white/50 font-mono truncate">{qualified}</div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isRunning}
+                            onClick={() => {
+                              setQueryOptions((o) => ({
+                                ...o,
+                                templates: {
+                                  ...o.templates,
+                                  selectedEntities: selectedIds.filter((id) => id !== entity.id),
+                                  selections: [],
+                                },
+                              }));
+                            }}
+                            className={`shrink-0 text-white/50 hover:text-red-400 text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            aria-label={`Remove ${display} from template lookup`}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    });
+                })()}
               </div>
             </div>
             <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
