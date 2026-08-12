@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
-import { ResultTables } from './result-tables';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import cytoscape from 'cytoscape';
 
@@ -201,9 +200,35 @@ export function ResearchResultPanel({
   }, [result?.action_type, result?.parameters?.source_steps]);
 
   const narrative = useMemo(() => {
-    if (viewMode === 'session' && mergedNarrative) return mergedNarrative;
-    return result?.synthesis?.narrative || 'No narrative available.';
-  }, [viewMode, mergedNarrative, result?.synthesis?.narrative]);
+    let text = '';
+    if (viewMode === 'session' && mergedNarrative) {
+      text = mergedNarrative;
+    } else {
+      text = result?.synthesis?.narrative || 'No narrative available.';
+    }
+
+    const tables = result?.canvas?.tables ?? [];
+    if (tables.length > 0) {
+      const mdTables = tables.map((t) => {
+        if (!t.rows || t.rows.length === 0) return '';
+        const cols = t.columns?.length ? t.columns : Object.keys(t.rows[0]);
+        const header = `| ${cols.join(' | ')} |`;
+        const sep = `| ${cols.map(() => '---').join(' | ')} |`;
+        const body = t.rows.map((row) => {
+          const cells = cols.map((c) => {
+            const val = row[c];
+            if (val === undefined || val === null) return '';
+            const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+            return str.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+          });
+          return `| ${cells.join(' | ')} |`;
+        }).join('\n');
+        return `\n\n## Table: ${t.name}\n\n${header}\n${sep}\n${body}`;
+      }).join('\n');
+      text = `${text}${mdTables}`;
+    }
+    return text;
+  }, [viewMode, mergedNarrative, result?.synthesis?.narrative, result?.canvas?.tables]);
 
   return (
     <div className="min-h-0 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
@@ -321,12 +346,7 @@ export function ResearchResultPanel({
                 </div>
               )}
               {resultView === 'narrative' && (
-                <>
-                  <div className="flex-1 min-h-0 overflow-hidden">
-                    <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
-                  </div>
-                  <ResultTables tables={result?.canvas?.tables || []} />
-                </>
+                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
               )}
             </div>
           )}
