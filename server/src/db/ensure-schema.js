@@ -328,7 +328,7 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md"]',
+    fragments: '["contextual-patch.md","section-focus.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -396,7 +396,7 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -424,7 +424,7 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
