@@ -318,7 +318,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -347,7 +347,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-table-contextual.md","section-focus.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -386,7 +386,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -414,7 +414,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
-    variables: '["ARCHITXT_TOPIC"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
 ];
