@@ -1075,10 +1075,9 @@ export const researchApi = {
     fact_types?: string[];
     exclude_mental_models?: boolean;
     include_source_facts?: boolean;
-    template?: string;
     tags?: string[];
     tags_match?: string;
-    section_focus?: Record<string, string | string[]>;
+    section_focus?: Record<string, string | string[] | { name?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/discover', {
       method: 'POST',
@@ -1139,7 +1138,7 @@ export const researchApi = {
     source_step_ids: number[];
     intent_text: string;
     max_tokens?: number;
-    template?: string;
+    section_focus?: Record<string, string | string[] | { name?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/synthesize', {
       method: 'POST',
