@@ -309,24 +309,14 @@ If no directives are specified, provide a general narrative analysis and return 
     name: 'sys_entity_summary',
     mode: 'sys_entity_summary',
     description: 'System template: concise evidence-backed summary for one contextual-graph node.',
-    body: `You are summarising a single known architectural entity for an architecture graph.
+    body: `Answer the topic below.
 
-## Entity
+If specific output sections are requested in the directives, follow them.
+If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
+
+## Topic
 
 {{ARCHITXT_TOPIC}}
-
-## Instructions
-
-If specific output sections are requested in the directives below, follow them.
-If no directives are specified, provide a general narrative analysis and return empty graph and tables.
-
-When a narrative directive is present, describe the core role that the entity plays in the architecture. Return the summary in the \`narrative\` field of the JSON envelope.
-
-Rules:
-- Use only facts supported by the source material.
-- Do not invent aliases, artifacts, or related entities.
-- Evidence is implicit in the source query scope; do not enumerate memory IDs inside the narrative.
-- Keep the narrative short enough to fit within the model token budget.
 
 ## Source material
 
@@ -339,26 +329,14 @@ Rules:
     name: 'sys_entity_capabilities',
     mode: 'sys_entity_capabilities',
     description: 'System template: capabilities table for one contextual-graph node.',
-    body: `You are listing the major architectural capabilities of a single known entity.
+    body: `Answer the topic below.
 
-## Entity
+If specific output sections are requested in the directives, follow them.
+If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
+
+## Topic
 
 {{ARCHITXT_TOPIC}}
-
-## Instructions
-
-If specific output sections are requested in the directives below, follow them.
-If no directives are specified, provide a general narrative analysis and return empty graph and tables.
-
-When a table directive is present, return the capabilities in a single table named \`capabilities\` with columns \`name\`, \`responsibility\`, \`purpose\`, \`business_capability_mapping\`, and \`evidence\`.
-
-Rules:
-- Each capability must be a stable, high-level responsibility, not a one-off mention.
-- \`responsibility\` describes what the entity does for this capability.
-- \`purpose\` explains why the capability matters.
-- \`business_capability_mapping\` places the capability in a business domain.
-- \`evidence\` must be an array of memory IDs that support the capability.
-- Do not include capabilities that are not backed by evidence.
 
 ## Source material
 
@@ -371,36 +349,14 @@ Rules:
     name: 'sys_edge_context',
     mode: 'sys_edge_context',
     description: 'System template: directed interactions between two specific contextual-graph nodes.',
-    body: `You are describing all directed interactions between two specific architectural entities.
+    body: `Answer the topic below.
 
-## Edge endpoints
+If specific output sections are requested in the directives, follow them.
+If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
+
+## Topic
 
 {{ARCHITXT_TOPIC}}
-
-## Instructions
-
-If specific output sections are requested in the directives below, follow them.
-If no directives are specified, provide a general narrative analysis of the interaction between the endpoints and return empty graph and tables.
-
-When a graph directive is present, return every distinct directed flow between the two endpoints as an edge in \`graph.edges\`. Do not include nodes in \`graph.nodes\`; only edges.
-
-Fields:
-- \`from\` and \`to\` must use the exact working-graph ids of the endpoints.
-- \`type\` describes the interaction (data flow, control flow, event, call, etc.).
-- \`direction\` is \`directed\` for unidirectional or \`bidirectional\` for mutual.
-- \`evidence\` must be an array of memory IDs that support the interaction.
-- \`details\` (optional) can include any of the following:
-  - How payloads are shaped (schemas, formats, cardinality).
-  - How often (real-time, on-demand, hourly, nightly, weekly, ad-hoc).
-  - Any known intermediaries (gateways, queues, ESBs, object stores, proxies).
-  - Any known reliability behavior (retries, acknowledgements, error handling, idempotency, ordering guarantees).
-
-Rules:
-- Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
-- If the interaction is bidirectional, emit two edges with \`from\`/\`to\` swapped.
-- Do not include edges to nodes that are not one of the two endpoints.
-- Emit one edge per distinct flow; do not collapse multiple kinds of exchange into a single edge.
-- If a flow is described but no evidence IDs are available, still emit the edge with an empty evidence array.
 
 ## Source material
 
@@ -413,25 +369,14 @@ Rules:
     name: 'sys_discovery_context',
     mode: 'sys_discovery_context',
     description: 'System template: suggest new contextual-graph nodes and edges around a seed node.',
-    body: `You are discovering candidate entities and relationships around a seed entity in the corpus.
+    body: `Answer the topic below.
 
-## Seed
+If specific output sections are requested in the directives, follow them.
+If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
+
+## Topic
 
 {{ARCHITXT_TOPIC}}
-
-## Instructions
-
-If specific output sections are requested in the directives below, follow them.
-If no directives are specified, provide a general narrative analysis of the discovered entities and return empty graph and tables.
-
-When a graph directive is present, return candidate nodes and edges in \`graph.nodes\` and \`graph.edges\`. This output is an internal working-graph input only; do not surface it as user-facing prose.
-
-Rules:
-- Candidate node ids must be bare lowercase hyphenated slugs. Do not use the \`found:{slug}\` form; the system attaches labels.
-- Existing known nodes must use their exact working-graph id.
-- Every candidate and edge must be backed by evidence.
-- Do not return candidates that are already known nodes.
-- Discovery output is for new candidate nodes only: every edge in \`graph.edges\` must have at least one endpoint that is a newly discovered candidate. Do not emit edges between two already-known nodes; those belong in the skeleton or edge-context models, not here.
 
 ## Source material
 
@@ -607,7 +552,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'entity-capabilities-{id}',
     name: 'Entity capabilities: {entity-name}',
     role: 'sys_entity_capabilities',
-    sourceQuery: 'Entity: {id} ({entity-name}).\n#table\n#name Capabilities\nList its major capabilities, each with its purpose, responsibility, business capability mapping, and evidence.\n#end',
+    sourceQuery: 'Entity: {id} ({entity-name}).\n#table\n#name Capabilities\nReturn the major architectural capabilities of the entity in a table named "capabilities" with columns: name, responsibility, purpose, business_capability_mapping, evidence.\n- name: the capability name.\n- responsibility: what the entity does for this capability.\n- purpose: why the capability matters.\n- business_capability_mapping: the business domain this capability belongs to.\n- evidence: array of Hindsight memory IDs supporting this capability.\nList its major capabilities, each with its purpose, responsibility, business capability mapping, and evidence.\n#end',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
