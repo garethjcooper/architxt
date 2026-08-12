@@ -317,7 +317,10 @@ If no directives are specified, provide a general narrative analysis and return 
 
 ## Instructions
 
-Describe the core role that the entity plays in the architecture. Return the summary in the \`narrative\` field of the JSON envelope.
+If specific output sections are requested in the directives below, follow them.
+If no directives are specified, provide a general narrative analysis and return empty graph and tables.
+
+When a narrative directive is present, describe the core role that the entity plays in the architecture. Return the summary in the \`narrative\` field of the JSON envelope.
 
 Rules:
 - Use only facts supported by the source material.
@@ -328,8 +331,8 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","section-focus.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -344,7 +347,10 @@ Rules:
 
 ## Instructions
 
-Return the capabilities in a single table named \`capabilities\` with columns \`name\`, \`responsibility\`, \`purpose\`, \`business_capability_mapping\`, and \`evidence\`.
+If specific output sections are requested in the directives below, follow them.
+If no directives are specified, provide a general narrative analysis and return empty graph and tables.
+
+When a table directive is present, return the capabilities in a single table named \`capabilities\` with columns \`name\`, \`responsibility\`, \`purpose\`, \`business_capability_mapping\`, and \`evidence\`.
 
 Rules:
 - Each capability must be a stable, high-level responsibility, not a one-off mention.
@@ -357,8 +363,8 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-table-contextual.md","section-focus.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_TABLE_FOCUS"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -373,7 +379,10 @@ Rules:
 
 ## Instructions
 
-Return every distinct directed flow between the two endpoints as an edge in \`graph.edges\`. Do not include nodes in \`graph.nodes\`; only edges.
+If specific output sections are requested in the directives below, follow them.
+If no directives are specified, provide a general narrative analysis of the interaction between the endpoints and return empty graph and tables.
+
+When a graph directive is present, return every distinct directed flow between the two endpoints as an edge in \`graph.edges\`. Do not include nodes in \`graph.nodes\`; only edges.
 
 Fields:
 - \`from\` and \`to\` must use the exact working-graph ids of the endpoints.
@@ -396,8 +405,8 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
   {
@@ -412,7 +421,10 @@ Rules:
 
 ## Instructions
 
-Return candidate nodes and edges in \`graph.nodes\` and \`graph.edges\`. This output is an internal working-graph input only; do not surface it as user-facing prose.
+If specific output sections are requested in the directives below, follow them.
+If no directives are specified, provide a general narrative analysis of the discovered entities and return empty graph and tables.
+
+When a graph directive is present, return candidate nodes and edges in \`graph.nodes\` and \`graph.edges\`. This output is an internal working-graph input only; do not surface it as user-facing prose.
 
 Rules:
 - Candidate node ids must be bare lowercase hyphenated slugs. Do not use the \`found:{slug}\` form; the system attaches labels.
@@ -424,8 +436,8 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
 ];
