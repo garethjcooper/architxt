@@ -3,7 +3,6 @@ import { createLogger } from '../utils/logger.js';
 import { composeFragments } from './fragment-loader.js';
 import { buildEntityCatalogVariable, loadEntityCatalog } from './entity-catalog.js';
 import { applyHeuristic } from './examples-heuristics/index.js';
-import { parseSectionDirectives } from './section-directives.js';
 
 const logger = createLogger('prompt-templates');
 
@@ -166,22 +165,25 @@ function formatNodeExamples({ include, exclude }) {
 }
 
 /**
- * Build focus variables by parsing section directives from the raw topic text.
- *
- * @param {string} topic - raw mm_source_query text (may contain #graph/#table/#narrative blocks)
- * @returns {{topic: string, focusVariables: Record<string, string>}}
+ * Default focus directives for contextual-graph system templates.
+ * These are auto-injected when callers do not supply focus variables,
+ * preserving historical single-purpose behavior while keeping the template
+ * bodies fully directive-driven.
  */
-function buildFocusFromDirectives(topic) {
-  const { intentText, sectionFocus } = parseSectionDirectives(topic || '');
-  return {
-    topic: intentText,
-    focusVariables: {
-      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(sectionFocus?.graph || ''),
-      ARCHITXT_TABLE_FOCUS: formatFocusVariable(sectionFocus?.table || ''),
-      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(sectionFocus?.narrative || ''),
-    },
-  };
-}
+const DEFAULT_FOCUS_BY_TEMPLATE = {
+  sys_entity_summary: {
+    ARCHITXT_NARRATIVE_FOCUS: '- Summarise the core role of the entity in the architecture',
+  },
+  sys_entity_capabilities: {
+    ARCHITXT_TABLE_FOCUS: '- List the major architectural capabilities of the entity',
+  },
+  sys_edge_context: {
+    ARCHITXT_GRAPH_FOCUS: '- Describe every distinct directed flow between the two endpoints',
+  },
+  sys_discovery_context: {
+    ARCHITXT_GRAPH_FOCUS: '- Discover candidate entities and relationships around the seed entity',
+  },
+};
 /**
  * Format a raw focus string (or array of strings / table directives) into bullet
  * or blank.
@@ -241,13 +243,13 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     if (!template) {
       throw new Error(`Prompt template not found: ${templateName}`);
     }
-    const { topic: parsedTopic, focusVariables: parsedFocus } = buildFocusFromDirectives(topic);
+    const defaults = DEFAULT_FOCUS_BY_TEMPLATE[templateName] || {};
     const merged = {
-      ARCHITXT_TOPIC: parsedTopic || '',
+      ARCHITXT_TOPIC: topic || '',
       ARCHITXT_GRAPH_FOCUS: '',
       ARCHITXT_TABLE_FOCUS: '',
       ARCHITXT_NARRATIVE_FOCUS: '',
-      ...parsedFocus,
+      ...defaults,
       ...focusVariables,
     };
     const { prompt } = composePrompt(template, merged);
@@ -304,13 +306,15 @@ export async function composeMentalModelPromptBatch(db, items) {
     }
 
     try {
-      const { topic: parsedTopic, focusVariables: parsedFocus } = buildFocusFromDirectives(item.source_query);
+      const defaults = CONTEXTUAL_MODES.has(lookupKey)
+        ? (DEFAULT_FOCUS_BY_TEMPLATE[lookupKey] || {})
+        : {};
       const variables = {
-        ARCHITXT_TOPIC: parsedTopic || '',
+        ARCHITXT_TOPIC: item.source_query || '',
         ARCHITXT_GRAPH_FOCUS: '',
         ARCHITXT_TABLE_FOCUS: '',
         ARCHITXT_NARRATIVE_FOCUS: '',
-        ...parsedFocus,
+        ...defaults,
       };
 
       if (!CONTEXTUAL_MODES.has(lookupKey)) {
