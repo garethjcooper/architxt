@@ -1,22 +1,22 @@
 /**
  * Parse section-focus directives from a user query.
  *
- * Supported syntax:
- *   Block style:
- *     #graph
- *     CRM, ERP
- *     #end
+ * Supported syntax (block style ONLY):
+ *   #graph
+ *   CRM, ERP
+ *   #end
  *
- *   Inline style:
- *     #graph: CRM, ERP
+ *   #table
+ *   capabilities
+ *   #end
  *
- * Recognised directives: #graph, #table, #narrative
- * Everything outside directives is preserved as clean query text.
+ *   #narrative
+ *   business impact
+ *   #end
  *
- * Cardinality rules (defined in SECTION_DIRECTIVE_CONFIG):
- *   - #graph    → single  (multiple blocks are concatenated)
- *   - #narrative → single (multiple blocks are concatenated)
- *   - #table    → multiple (each block becomes its own array entry)
+ * Directives must be explicitly closed with #end. No inline colon syntax.
+ * Multiple blocks of the same type are collected according to cardinality
+ * rules in SECTION_DIRECTIVE_CONFIG.
  */
 
 export const SECTION_DIRECTIVE_CONFIG: Record<string, {
@@ -38,7 +38,7 @@ export function parseSectionDirectives(rawQuery: string): {
 
   const focus: Record<string, string | string[]> = {};
 
-  // Block style: #directive\n...content...\n#end
+  // Block style ONLY: #directive\n...content...\n#end
   const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch: RegExpExecArray | null;
   let blockStripped = rawQuery;
@@ -62,30 +62,7 @@ export function parseSectionDirectives(rawQuery: string): {
     blockStripped = blockStripped.replace(blockMatch[0], '');
   }
 
-  // Inline style: #directive: content (stops before another directive, newline, or EOS)
-  const inlineRe = /#(graph|table|narrative):\s*([^\r\n#]*?)(?=\s*#(?:graph|table|narrative):|\r?\n|$)/gi;
-  let inlineMatch: RegExpExecArray | null;
-  let inlineStripped = blockStripped;
-  while ((inlineMatch = inlineRe.exec(blockStripped)) !== null) {
-    const key = inlineMatch[1].toLowerCase();
-    const content = inlineMatch[2].trim();
-    if (content) {
-      const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
-      if (config.cardinality === 'multiple') {
-        if (!focus[key]) focus[key] = [];
-        (focus[key] as string[]).push(content);
-      } else {
-        if (config.merge === 'concat' && focus[key]) {
-          focus[key] = (focus[key] as string) + '\n' + content;
-        } else {
-          focus[key] = content;
-        }
-      }
-    }
-    inlineStripped = inlineStripped.replace(inlineMatch[0], '');
-  }
-
-  const intentText = inlineStripped.replace(/\s+/g, ' ').trim();
+  const intentText = blockStripped.replace(/\s+/g, ' ').trim();
 
   return Object.keys(focus).length > 0
     ? { intentText, sectionFocus: focus }
