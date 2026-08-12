@@ -2,8 +2,14 @@
  * Parse section-focus directives from a user query.
  *
  * Supported syntax (block style ONLY):
+ *
  *   #graph
  *   CRM, ERP
+ *   #end
+ *
+ *   #table
+ *   #name Billing Dependencies
+ *   List all upstream and downstream dependencies
  *   #end
  *
  *   #table
@@ -17,6 +23,9 @@
  * Directives must be explicitly closed with #end. No inline colon syntax.
  * Multiple blocks of the same type are collected according to cardinality
  * rules in SECTION_DIRECTIVE_CONFIG.
+ *
+ * Table blocks may optionally contain a #name sub-directive on its own line.
+ * If omitted, the LLM should generate a short name (4–6 words) from the content.
  */
 
 export const SECTION_DIRECTIVE_CONFIG: Record<string, {
@@ -28,15 +37,39 @@ export const SECTION_DIRECTIVE_CONFIG: Record<string, {
   narrative: { cardinality: 'single', merge: 'concat' },
 };
 
-export function parseSectionDirectives(rawQuery: string): {
+export interface TableDirective {
+  /** Explicit name from #name sub-directive, or omitted so LLM generates one */
+  name?: string;
+  /** Remaining content after #name (or entire content if no #name) */
+  content: string;
+}
+
+export interface ParsedSectionFocus {
   intentText: string;
-  sectionFocus?: Record<string, string | string[]>;
-} {
+  sectionFocus?: Record<string, string | string[] | TableDirective[]>;
+}
+
+/**
+ * Extract #name value from the first line of a table block content.
+ * Returns { name, content } where content is everything after #name.
+ */
+function extractTableName(content: string): TableDirective {
+  const nameRe = /^#name\s+(.+?)(?:\r?\n|$)/i;
+  const match = content.match(nameRe);
+  if (match) {
+    const name = match[1].trim();
+    const remaining = content.slice(match[0].length).trim();
+    return { name, content: remaining };
+  }
+  return { content };
+}
+
+export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
   if (!rawQuery || typeof rawQuery !== 'string') {
     return { intentText: '' };
   }
 
-  const focus: Record<string, string | string[]> = {};
+  const focus: Record<string, string | string[] | TableDirective[]> = {};
 
   // Block style ONLY: #directive\n...content...\n#end
   const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
@@ -48,8 +81,9 @@ export function parseSectionDirectives(rawQuery: string): {
     if (content) {
       const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
       if (config.cardinality === 'multiple') {
+        // table: collect as TableDirective objects
         if (!focus[key]) focus[key] = [];
-        (focus[key] as string[]).push(content);
+        (focus[key] as TableDirective[]).push(extractTableName(content));
       } else {
         // single
         if (config.merge === 'concat' && focus[key]) {

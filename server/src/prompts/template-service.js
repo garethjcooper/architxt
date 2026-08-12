@@ -165,22 +165,42 @@ function formatNodeExamples({ include, exclude }) {
 }
 
 /**
- * Format a raw focus string (or array of strings) into bullet directive(s) for
- * prompt injection. Returns empty string if the input is missing or blank.
+ * Format a raw focus string (or array of strings / table directives) into bullet
+ * directive(s) for prompt injection. Returns empty string if the input is missing
+ * or blank.
  *
- * When an array is provided, each item becomes its own bullet line.
+ * When an array of strings is provided, each item becomes its own bullet line.
+ * When an array of table directives is provided, each renders as:
+ *   - **Name** — description  (if name is present)
+ *   - description               (if name is omitted; LLM should generate one)
+ *
  * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
  *   - #graph, #narrative → single string (one bullet)
- *   - #table             → string[] (multiple bullets, one per table)
+ *   - #table             → TableDirective[] (one per table, with optional name)
  *
- * @param {string|string[]} [raw]
+ * @param {string|string[]|{name?:string,content:string}[]} [raw]
  * @returns {string}
  */
 export function formatFocusVariable(raw) {
+  // Table directives
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'content' in raw[0]) {
+    const directives = /** @type {{name?:string,content:string}[]} */ (raw);
+    const lines = directives
+      .filter((d) => d.content?.trim() !== '')
+      .map((d) => {
+        const content = d.content.trim();
+        if (d.name?.trim()) return `- **${d.name.trim()}** — ${content}`;
+        return `- ${content}`;
+      });
+    return lines.join('\n');
+  }
+
+  // String array (graph/narrative multiple scopes, or legacy table array)
   if (Array.isArray(raw)) {
     const lines = raw.filter((s) => typeof s === 'string' && s.trim() !== '').map((s) => `- ${s.trim()}`);
     return lines.join('\n');
   }
+
   if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
   return `- ${raw.trim()}`;
 }
