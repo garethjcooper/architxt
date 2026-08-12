@@ -1148,46 +1148,7 @@ const BUDGET_OPTIONS = [
   { value: 'high', label: 'High' },
 ] as const;
 
-const TEMPLATE_OPTIONS = [
-  { value: 'narrative', label: 'Narrative' },
-  { value: 'graph-known', label: 'Graph (known nodes)' },
-  { value: 'graph-discovery', label: 'Graph (discovery allowed)' },
-  { value: 'graph-discovered-only', label: 'Graph (discovered only)' },
-  { value: 'narrative-graph-known', label: 'Narrative + graph (known nodes)' },
-  { value: 'narrative-graph-discovery', label: 'Narrative + graph (discovery allowed)' },
-  { value: 'narrative-graph-discovered-only', label: 'Narrative + graph (discovered only)' },
-] as const;
-
 type Budget = 'low' | 'mid' | 'high';
-type ResearchTemplate = typeof TEMPLATE_OPTIONS[number]['value'];
-
-function TemplateSelect({
-  value,
-  onChange,
-  disabled,
-}: {
-  value?: ResearchTemplate;
-  onChange: (value: ResearchTemplate) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] text-white/60">Output</span>
-      <select
-        disabled={disabled}
-        value={value || 'narrative-graph-known'}
-        onChange={(e) => onChange(e.target.value as ResearchTemplate)}
-        className="h-7 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2 text-[10px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
-      >
-        {TEMPLATE_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 function BudgetSelect({
   value,
@@ -1315,14 +1276,8 @@ function ReflectOptions({
 }) {
   const opts = options || {};
   const factTypes = opts.factTypes || [];
-  const template = (opts.template || 'narrative-graph-known') as ResearchTemplate;
   return (
     <div className="space-y-2">
-      <TemplateSelect
-        value={template}
-        onChange={(template) => onChange({ ...opts, template })}
-        disabled={disabled}
-      />
       <div className="flex flex-col gap-1">
         <span className="text-[10px] text-white/60">Fact types</span>
         <div className="space-y-1">
@@ -1361,14 +1316,8 @@ function SynthesizeOptions({
   disabled?: boolean;
 }) {
   const opts = options || {};
-  const template = (opts.template || 'narrative-graph-known') as ResearchTemplate;
   return (
     <div className="space-y-2">
-      <TemplateSelect
-        value={template}
-        onChange={(template) => onChange({ ...opts, template })}
-        disabled={disabled}
-      />
       <MaxTokensInput value={opts.maxTokens} onChange={(maxTokens) => onChange({ ...opts, maxTokens })} disabled={disabled} />
     </div>
   );

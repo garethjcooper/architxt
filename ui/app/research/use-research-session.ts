@@ -61,11 +61,9 @@ export interface ResearchQueryOptions {
     maxTokens?: number;
     factTypes?: string[];
     excludeMentalModels?: boolean;
-    template?: string;
   };
   synthesize?: {
     maxTokens?: number;
-    template?: string;
   };
   models?: {
     selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string }>;
@@ -105,7 +103,6 @@ function buildDiscoverOptions(
       ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
       ...(opts.factTypes?.length && { fact_types: opts.factTypes }),
       ...(typeof opts.excludeMentalModels === 'boolean' && { exclude_mental_models: opts.excludeMentalModels }),
-      ...(opts.template && { template: opts.template }),
     };
   }
 
@@ -114,7 +111,6 @@ function buildDiscoverOptions(
     if (!opts) return {};
     return {
       ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
-      ...(opts.template && { template: opts.template }),
     };
   }
 
@@ -163,12 +159,10 @@ function buildQueryOptionsFromParameters(
       ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
       ...(Array.isArray(parameters.fact_types) && { factTypes: parameters.fact_types }),
       ...(typeof parameters.exclude_mental_models === 'boolean' && { excludeMentalModels: parameters.exclude_mental_models }),
-      ...(typeof parameters.template === 'string' && { template: parameters.template }),
     };
   } else if (actionType === 'synthesize') {
     opts.synthesize = {
       ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
-      ...(typeof parameters.template === 'string' && { template: parameters.template }),
     };
   } else if (actionType === 'models') {
     opts.models = {
@@ -197,11 +191,9 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
     maxTokens: 4096,
     factTypes: ['world', 'observation'],
     excludeMentalModels: false,
-    template: 'narrative-graph-known',
   },
   synthesize: {
     maxTokens: 4096,
-    template: 'narrative-graph-known',
   },
   templates: {
     selectedEntities: [],
@@ -635,9 +627,6 @@ export function useResearchSession({
         intent_text: intentText.trim(),
         ...(queryOptions.synthesize?.maxTokens != null
           ? { max_tokens: queryOptions.synthesize.maxTokens }
-          : {}),
-        ...(queryOptions.synthesize?.template != null
-          ? { template: queryOptions.synthesize.template }
           : {}),
       });
       setActiveSessionId(response.session_id);
