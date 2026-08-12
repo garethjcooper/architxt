@@ -10,7 +10,8 @@
  */
 
 import { getMentalModel as getHindsightMentalModel } from '../../hindsight/mental-models.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
+import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
+import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('research-handler-templates');
@@ -102,19 +103,17 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         };
       }
 
-      const { graph, narrative: modelNarrative, error: graphError } = parseGraphResponse(content, {
-        expectGraph: true,
-        defaultSource: 'template_model',
-      });
+      const { narrative, graph, tables, errors: modelErrors } = normalizeModelOutput(content);
+      const graphNormalized = normalizeGraph(graph || { nodes: [], edges: [] }, { source: 'template_model' });
 
       return {
         ext_id: extId,
         name,
         found: true,
         content,
-        narrative: modelNarrative,
-        graph,
-        graph_error: graphError,
+        narrative,
+        graph: graphNormalized,
+        graph_error: modelErrors?.length ? modelErrors.join('; ') : undefined,
       };
     }),
   );
