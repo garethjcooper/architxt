@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
+import { ResultTables } from './result-tables';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import cytoscape from 'cytoscape';
 
@@ -320,7 +321,12 @@ export function ResearchResultPanel({
                 </div>
               )}
               {resultView === 'narrative' && (
-                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
+                <>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
+                  </div>
+                  <ResultTables tables={result?.canvas?.tables || []} />
+                </>
               )}
             </div>
           )}

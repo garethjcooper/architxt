@@ -972,6 +972,11 @@ export interface DiscoverStepResponse {
       nodes: GraphNode[];
       edges: GraphEdge[];
     };
+    tables?: Array<{
+      name: string;
+      columns: string[];
+      rows: Record<string, any>[];
+    }>;
     meta?: GraphMeta;
   };
   calls?: Array<{
