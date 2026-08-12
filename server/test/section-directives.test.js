@@ -15,6 +15,7 @@ function parseSectionDirectives(rawQuery) {
 
   const focus = {};
 
+  // Block style ONLY: #directive\n...content...\n#end
   const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch;
   let blockStripped = rawQuery;
@@ -37,29 +38,7 @@ function parseSectionDirectives(rawQuery) {
     blockStripped = blockStripped.replace(blockMatch[0], '');
   }
 
-  const inlineRe = /#(graph|table|narrative):\s*([^\r\n#]*?)(?=\s*#(?:graph|table|narrative):|\r?\n|$)/gi;
-  let inlineMatch;
-  let inlineStripped = blockStripped;
-  while ((inlineMatch = inlineRe.exec(blockStripped)) !== null) {
-    const key = inlineMatch[1].toLowerCase();
-    const content = inlineMatch[2].trim();
-    if (content) {
-      const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
-      if (config.cardinality === 'multiple') {
-        if (!focus[key]) focus[key] = [];
-        focus[key].push(content);
-      } else {
-        if (config.merge === 'concat' && focus[key]) {
-          focus[key] = focus[key] + '\n' + content;
-        } else {
-          focus[key] = content;
-        }
-      }
-    }
-    inlineStripped = inlineStripped.replace(inlineMatch[0], '');
-  }
-
-  const intentText = inlineStripped.replace(/\s+/g, ' ').trim();
+  const intentText = blockStripped.replace(/\s+/g, ' ').trim();
 
   return Object.keys(focus).length > 0
     ? { intentText, sectionFocus: focus }
@@ -73,22 +52,11 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus, undefined);
   });
 
-  it('parses inline #graph directive', () => {
+  it('ignores inline #graph syntax (no #end required)', () => {
+    // Inline syntax is NOT supported — everything stays in intent text
     const result = parseSectionDirectives('Analyze billing #graph: CRM, ERP, ICMS');
-    assert.equal(result.intentText, 'Analyze billing');
-    assert.deepEqual(result.sectionFocus, { graph: 'CRM, ERP, ICMS' });
-  });
-
-  it('parses inline #table directive as array', () => {
-    const result = parseSectionDirectives('Show me #table: capabilities, dependencies');
-    assert.equal(result.intentText, 'Show me');
-    assert.deepEqual(result.sectionFocus, { table: ['capabilities, dependencies'] });
-  });
-
-  it('parses inline #narrative directive', () => {
-    const result = parseSectionDirectives('#narrative: summary\nFull system overview');
-    assert.equal(result.intentText, 'Full system overview');
-    assert.deepEqual(result.sectionFocus, { narrative: 'summary' });
+    assert.equal(result.intentText, 'Analyze billing #graph: CRM, ERP, ICMS');
+    assert.equal(result.sectionFocus, undefined);
   });
 
   it('parses block-style #graph directive', () => {
@@ -97,9 +65,25 @@ describe('parseSectionDirectives', () => {
     assert.deepEqual(result.sectionFocus, { graph: 'CRM\nERP\nICMS' });
   });
 
-  it('parses multiple directives (mixed inline and block)', () => {
+  it('parses block-style #table directive as array', () => {
     const result = parseSectionDirectives(
-      'System overview\n#graph\nCRM, ERP\n#end\n#table: capabilities\n#narrative: summary',
+      'Show me\n#table\ncapabilities, dependencies\n#end',
+    );
+    assert.equal(result.intentText, 'Show me');
+    assert.deepEqual(result.sectionFocus, { table: ['capabilities, dependencies'] });
+  });
+
+  it('parses block-style #narrative directive', () => {
+    const result = parseSectionDirectives(
+      '#narrative\nsummary\n#end\nFull system overview',
+    );
+    assert.equal(result.intentText, 'Full system overview');
+    assert.deepEqual(result.sectionFocus, { narrative: 'summary' });
+  });
+
+  it('parses multiple directives (all block style)', () => {
+    const result = parseSectionDirectives(
+      'System overview\n#graph\nCRM, ERP\n#end\n#table\ncapabilities\n#end\n#narrative\nsummary\n#end',
     );
     assert.equal(result.intentText, 'System overview');
     assert.equal(result.sectionFocus.graph, 'CRM, ERP');
@@ -108,15 +92,16 @@ describe('parseSectionDirectives', () => {
   });
 
   it('ignores unknown directives', () => {
-    const result = parseSectionDirectives('#unknown: value\nWhat is this?');
-    assert.equal(result.intentText, '#unknown: value What is this?');
+    // Unknown directives are not parsed — the raw text stays in intent
+    const result = parseSectionDirectives('#unknown\nvalue\n#end\nWhat is this?');
+    assert.equal(result.intentText, '#unknown value #end What is this?');
     assert.equal(result.sectionFocus, undefined);
   });
 
   it('strips whitespace from intent text', () => {
-    const result = parseSectionDirectives('  Analyze   billing   #graph: CRM  ');
+    const result = parseSectionDirectives('  Analyze   billing  ');
     assert.equal(result.intentText, 'Analyze billing');
-    assert.deepEqual(result.sectionFocus, { graph: 'CRM' });
+    assert.equal(result.sectionFocus, undefined);
   });
 
   it('multiple #table blocks → array of topics', () => {
@@ -125,14 +110,6 @@ describe('parseSectionDirectives', () => {
     );
     assert.equal(result.intentText, 'System overview');
     assert.deepEqual(result.sectionFocus.table, ['capabilities', 'dependencies', 'integrations']);
-  });
-
-  it('multiple inline #table → array of topics', () => {
-    const result = parseSectionDirectives(
-      'Overview #table: capabilities, dependencies #table: integrations',
-    );
-    assert.equal(result.intentText, 'Overview');
-    assert.deepEqual(result.sectionFocus.table, ['capabilities, dependencies', 'integrations']);
   });
 
   it('multiple #graph blocks → concatenated scope', () => {
@@ -151,9 +128,9 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus.narrative, 'business impact\nrisk assessment');
   });
 
-  it('block #table followed by inline #table → merged array', () => {
+  it('block #table followed by another block #table → merged array', () => {
     const result = parseSectionDirectives(
-      'Overview\n#table\ncapabilities\n#end\n#table: dependencies',
+      'Overview\n#table\ncapabilities\n#end\n#table\ndependencies\n#end',
     );
     assert.equal(result.intentText, 'Overview');
     assert.deepEqual(result.sectionFocus.table, ['capabilities', 'dependencies']);
