@@ -21,7 +21,7 @@
 
 import { listEligibleMentalModels } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
+import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt');
