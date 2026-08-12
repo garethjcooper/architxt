@@ -280,6 +280,7 @@ router.post('/discover', async (req, res) => {
       tags,
       tags_match,
       template,
+      section_focus,
     } = req.body;
 
     if (!bank_id || typeof bank_id !== 'string') {
@@ -314,6 +315,7 @@ router.post('/discover', async (req, res) => {
       ...(tags_match !== undefined && { tags_match }),
       ...(selections !== undefined && { selections }),
       ...(template !== undefined && { template }),
+      ...(section_focus !== undefined && { section_focus }),
     };
 
     // Normalize Reflect provenance so every recorded step has a complete,
@@ -1193,6 +1195,7 @@ router.post('/synthesize', async (req, res) => {
       intent_text,
       max_tokens,
       template,
+      section_focus,
     } = req.body;
 
     if (!bank_id || typeof bank_id !== 'string') {
@@ -1257,6 +1260,7 @@ router.post('/synthesize', async (req, res) => {
     const handlerOptions = {
       ...(max_tokens !== undefined && { max_tokens }),
       ...(template !== undefined && { template }),
+      ...(section_focus !== undefined && { section_focus }),
       source_steps: sourceSteps.map((s) => ({
         intent_text: s.rstep_intent_text,
         action_type: s.rstep_action_type,
