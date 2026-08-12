@@ -50,7 +50,7 @@ export function composePrompt(template, variables = {}) {
   const required = JSON.parse(template.pt_variables || '[]');
   const missing = required.filter((key) => {
     const value = variables[key];
-    return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+    return value === undefined || value === null;
   });
   if (missing.length > 0) {
     throw new Error(`Missing required variables for template ${template.pt_name}: ${missing.join(', ')}`);
@@ -197,6 +197,9 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     }
     const { prompt } = composePrompt(template, {
       ARCHITXT_TOPIC: topic || '',
+      ARCHITXT_GRAPH_FOCUS: focusVariables.ARCHITXT_GRAPH_FOCUS || '',
+      ARCHITXT_TABLE_FOCUS: focusVariables.ARCHITXT_TABLE_FOCUS || '',
+      ARCHITXT_NARRATIVE_FOCUS: focusVariables.ARCHITXT_NARRATIVE_FOCUS || '',
       ...focusVariables,
     });
     return prompt;
@@ -254,6 +257,9 @@ export async function composeMentalModelPromptBatch(db, items) {
     try {
       const variables = {
         ARCHITXT_TOPIC: item.source_query || '',
+        ARCHITXT_GRAPH_FOCUS: '',
+        ARCHITXT_TABLE_FOCUS: '',
+        ARCHITXT_NARRATIVE_FOCUS: '',
       };
 
       if (!CONTEXTUAL_MODES.has(lookupKey)) {
