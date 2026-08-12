@@ -107,14 +107,6 @@ function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
   }
   const node = nodeResult.data;
 
-  const warnings = [];
-  if (output.graph.nodes.length > 0 || output.graph.edges.length > 0) {
-    warnings.push('entity-summary model returned graph data; ignoring');
-  }
-  if (output.tables.length > 0) {
-    warnings.push('entity-summary model returned tables; ignoring');
-  }
-
   const modelRef = buildModelRef(model, output.raw, timestamp);
   const properties = {
     ...node.properties,
@@ -128,9 +120,17 @@ function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
     updated_at: timestamp,
   };
 
+  // Also apply tables if the model produced them (e.g. capabilities alongside summary).
+  if (output.tables.length > 0) {
+    const capabilitiesTable = output.tables.find((t) => t.name === 'capabilities');
+    if (capabilitiesTable) {
+      properties.capabilities = capabilitiesTable.rows || [];
+    }
+  }
+
   upsertNode(db, serverId, bankId, nodeId, node.labels || [], properties);
 
-  return { success: true, applied: { nodeId, summary: properties.summary }, warnings };
+  return { success: true, applied: { nodeId, summary: properties.summary, capabilities: properties.capabilities } };
 }
 
 function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp) {
@@ -145,20 +145,10 @@ function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp)
   }
   const node = nodeResult.data;
 
-  const warnings = [];
-  if (output.narrative.trim()) {
-    warnings.push('entity-capabilities model returned narrative; ignoring');
-  }
-  if (output.graph.nodes.length > 0 || output.graph.edges.length > 0) {
-    warnings.push('entity-capabilities model returned graph data; ignoring');
-  }
-
   const capabilitiesTable = output.tables.find((t) => t.name === 'capabilities');
   const capabilities = capabilitiesTable?.rows || [];
-  if (output.tables.length > 0 && !capabilitiesTable) {
-    warnings.push('entity-capabilities model returned tables other than capabilities; ignoring');
-  }
 
+  // Also apply narrative if the model produced one.
   const modelRef = buildModelRef(model, output.raw, timestamp);
   const properties = {
     ...node.properties,
@@ -172,9 +162,13 @@ function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp)
     updated_at: timestamp,
   };
 
+  if (output.narrative.trim()) {
+    properties.summary = output.narrative;
+  }
+
   upsertNode(db, serverId, bankId, nodeId, node.labels || [], properties);
 
-  return { success: true, applied: { nodeId, capabilities }, warnings };
+  return { success: true, applied: { nodeId, capabilities, summary: properties.summary } };
 }
 
 function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
@@ -198,13 +192,6 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   }
 
   const warnings = [];
-  if (output.narrative.trim()) {
-    warnings.push('edge-ctx model returned narrative; ignoring');
-  }
-  if (output.tables.length > 0) {
-    warnings.push('edge-ctx model returned tables; ignoring');
-  }
-
   if (output.graph.edges.length === 0) {
     return { success: false, error: 'edge-ctx model returned no edges', code: 'NO_EDGES' };
   }
@@ -420,11 +407,6 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
   }
   const seedNode = seedNodeResult.data;
 
-  const warnings = [];
-  if (output.narrative.trim()) {
-    warnings.push('discovery model returned narrative; ignoring');
-  }
-
   const modelRef = buildModelRef(model, output.raw, timestamp);
 
   // Attach/refresh the model ref on the seed node.
@@ -552,5 +534,5 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     createdEdges += 1;
   }
 
-  return { success: true, applied: { seedId, nodeCount: createdNodes, edgeCount: createdEdges }, warnings };
+  return { success: true, applied: { seedId, nodeCount: createdNodes, edgeCount: createdEdges } };
 }

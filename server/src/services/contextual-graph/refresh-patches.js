@@ -43,6 +43,11 @@ function edgeContentEqual(props, modelEdge) {
  * Compare the normalized model output against the current working-graph state.
  * Returns true when the working graph does not match the model (i.e. should apply).
  *
+ * Divergence is checked generically based on which envelope fields the model
+ * produced, not on hardcoded role-specific mappings. Narrative is compared
+ * against node.summary; tables are compared against node.capabilities; graph
+ * edges are looked up in the working graph by endpoints and content.
+ *
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
@@ -51,22 +56,44 @@ function edgeContentEqual(props, modelEdge) {
  * @returns {boolean}
  */
 function hasDivergence(db, serverId, bankId, scope, output) {
-  const role = scope.ref.role;
-
-  if (role === 'sys_entity_summary') {
-    if (scope.type !== 'node') return false;
-    const current = scope.node?.properties?.summary ?? '';
-    return current !== (output.narrative || '');
+  // Empty output = nothing to apply
+  if (!output.narrative && output.graph.edges.length === 0 && output.tables.length === 0) {
+    return false;
   }
 
-  if (role === 'sys_entity_capabilities') {
-    if (scope.type !== 'node') return false;
-    const current = scope.node?.properties?.capabilities || [];
-    const modelCapabilities = output.tables.find((t) => t.name === 'capabilities')?.rows || [];
-    return !arraysEqual(current, modelCapabilities);
+  if (scope.type === 'node') {
+    const current = scope.node?.properties || {};
+
+    // Narrative divergence against summary
+    if (output.narrative !== undefined && current.summary !== output.narrative) {
+      return true;
+    }
+
+    // Table divergence against capabilities
+    if (output.tables.length > 0) {
+      const capabilitiesTable = output.tables.find((t) => t.name === 'capabilities');
+      const modelCapabilities = capabilitiesTable?.rows || [];
+      if (!arraysEqual(current.capabilities || [], modelCapabilities)) {
+        return true;
+      }
+    }
+
+    // Graph-edge divergence (e.g. edge-ctx model whose ref is attached to an endpoint node)
+    if (output.graph.edges.length > 0) {
+      for (const modelEdge of output.graph.edges) {
+        if (!modelEdge.from || !modelEdge.to || !modelEdge.type) continue;
+        const findResult = findEdgeByEndpoints(db, serverId, bankId, modelEdge.from, modelEdge.to, modelEdge.type);
+        const existing = findResult?.success ? findResult.data : null;
+        if (!existing) return true;
+        if (!edgeContentEqual(existing.cge_properties || {}, modelEdge)) return true;
+      }
+      return false;
+    }
+
+    return false;
   }
 
-  if (role === 'sys_edge_context') {
+  if (scope.type === 'edge') {
     if (output.graph.edges.length === 0) return true;
 
     for (const modelEdge of output.graph.edges) {
@@ -79,12 +106,8 @@ function hasDivergence(db, serverId, bankId, scope, output) {
     return false;
   }
 
-  if (role === 'sys_discovery_context') {
-    // Discovery replaces a scoped subgraph; always consider it diverged until apply runs.
-    return true;
-  }
-
-  return false;
+  // Unknown scope type: if there is any output, consider diverged
+  return true;
 }
 
 /**
