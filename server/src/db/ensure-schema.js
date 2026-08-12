@@ -318,7 +318,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS"]',
+    variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
   },
   {
@@ -346,30 +346,34 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-table-contextual.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_TABLE_FOCUS"]',
+    fragments: '["contextual-patch.md","output-format-table-contextual.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
   },
   {
     name: 'sys_edge_context',
     mode: 'sys_edge_context',
-    description: 'System template: characterize directed relationships between two contextual-graph nodes.',
-    body: `You are describing the directed interaction between two known entities in an architecture graph.
+    description: 'System template: directed interactions between two specific contextual-graph nodes.',
+    body: `You are describing all directed interactions between two specific architectural entities.
 
-## Relationship
+## Edge endpoints
 
 {{ARCHITXT_TOPIC}}
 
 ## Instructions
 
-Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`.
+Return every distinct directed flow between the two endpoints as an edge in \`graph.edges\`. Do not include nodes in \`graph.nodes\`; only edges.
 
-For each flow, write a concise but informative \`detail\` that covers as many of the following as the source material supports:
-- What is transferred (data, events, files, commands, money, etc.).
-- How it is transferred (protocol, format, API style, file layout).
-- How often (real-time, on-demand, hourly, nightly, weekly, ad-hoc).
-- Any known intermediaries (gateways, queues, ESBs, object stores, proxies).
-- Any known reliability behavior (retries, acknowledgements, error handling, idempotency, ordering guarantees).
+Fields:
+- \`from\` and \`to\` must use the exact working-graph ids of the endpoints.
+- \`type\` describes the interaction (data flow, control flow, event, call, etc.).
+- \`direction\` is \`directed\` for unidirectional or \`bidirectional\` for mutual.
+- \`evidence\` must be an array of memory IDs that support the interaction.
+- \`details\` (optional) can include any of the following:
+  - How payloads are shaped (schemas, formats, cardinality).
+  - How often (real-time, on-demand, hourly, nightly, weekly, ad-hoc).
+  - Any known intermediaries (gateways, queues, ESBs, object stores, proxies).
+  - Any known reliability behavior (retries, acknowledgements, error handling, idempotency, ordering guarantees).
 
 Rules:
 - Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
@@ -382,7 +386,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
+    variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
   },
   {
@@ -410,7 +414,7 @@ Rules:
 
 {{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","node-discovery-policy-allowed.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_GRAPH_FOCUS"]',
+    variables: '["ARCHITXT_TOPIC"]',
     examplesHeuristic: null,
   },
 ];
