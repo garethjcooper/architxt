@@ -62,11 +62,9 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
     maxTokens: 4096,
     factTypes: ['world', 'observation'],
     excludeMentalModels: false,
-    template: 'narrative-graph-known',
   },
   synthesize: {
     maxTokens: 4096,
-    template: 'narrative-graph-known',
   },
   models: {
     selections: [],

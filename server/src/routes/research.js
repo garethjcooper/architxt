@@ -279,7 +279,6 @@ router.post('/discover', async (req, res) => {
       include_source_facts,
       tags,
       tags_match,
-      template,
       section_focus,
     } = req.body;
 
@@ -314,7 +313,6 @@ router.post('/discover', async (req, res) => {
       ...(tags !== undefined && { tags }),
       ...(tags_match !== undefined && { tags_match }),
       ...(selections !== undefined && { selections }),
-      ...(template !== undefined && { template }),
       ...(section_focus !== undefined && { section_focus }),
     };
 
@@ -325,13 +323,7 @@ router.post('/discover', async (req, res) => {
       handlerOptions.max_tokens = handlerOptions.max_tokens ?? 4096;
       handlerOptions.fact_types = handlerOptions.fact_types ?? ['world', 'observation'];
       handlerOptions.exclude_mental_models = handlerOptions.exclude_mental_models ?? false;
-      handlerOptions.template = handlerOptions.template ?? 'narrative-graph-known';
       handlerOptions.include_source_facts = handlerOptions.include_source_facts ?? false;
-    }
-
-    // Normalize Synthesize provenance to match Reflect.
-    if (effectiveDepth === 'synthesize') {
-      handlerOptions.template = handlerOptions.template ?? 'narrative-graph-known';
     }
 
     // Get or create session.
@@ -1194,7 +1186,6 @@ router.post('/synthesize', async (req, res) => {
       source_step_ids,
       intent_text,
       max_tokens,
-      template,
       section_focus,
     } = req.body;
 
@@ -1259,7 +1250,6 @@ router.post('/synthesize', async (req, res) => {
 
     const handlerOptions = {
       ...(max_tokens !== undefined && { max_tokens }),
-      ...(template !== undefined && { template }),
       ...(section_focus !== undefined && { section_focus }),
       source_steps: sourceSteps.map((s) => ({
         intent_text: s.rstep_intent_text,
