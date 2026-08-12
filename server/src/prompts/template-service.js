@@ -165,8 +165,27 @@ function formatNodeExamples({ include, exclude }) {
 }
 
 /**
+ * Default focus directives for contextual-graph system templates.
+ * These are auto-injected when callers do not supply focus variables,
+ * preserving historical single-purpose behavior while keeping the template
+ * bodies fully directive-driven.
+ */
+const DEFAULT_FOCUS_BY_TEMPLATE = {
+  sys_entity_summary: {
+    ARCHITXT_NARRATIVE_FOCUS: '- Summarise the core role of the entity in the architecture',
+  },
+  sys_entity_capabilities: {
+    ARCHITXT_TABLE_FOCUS: '- List the major architectural capabilities of the entity',
+  },
+  sys_edge_context: {
+    ARCHITXT_GRAPH_FOCUS: '- Describe every distinct directed flow between the two endpoints',
+  },
+  sys_discovery_context: {
+    ARCHITXT_GRAPH_FOCUS: '- Discover candidate entities and relationships around the seed entity',
+  },
+};
+/**
  * Format a raw focus string (or array of strings / table directives) into bullet
- * directive(s) for prompt injection. Returns empty string if the input is missing
  * or blank.
  *
  * When an array of strings is provided, each item becomes its own bullet line.
@@ -224,13 +243,16 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     if (!template) {
       throw new Error(`Prompt template not found: ${templateName}`);
     }
-    const { prompt } = composePrompt(template, {
+    const defaults = DEFAULT_FOCUS_BY_TEMPLATE[templateName] || {};
+    const merged = {
       ARCHITXT_TOPIC: topic || '',
-      ARCHITXT_GRAPH_FOCUS: focusVariables.ARCHITXT_GRAPH_FOCUS || '',
-      ARCHITXT_TABLE_FOCUS: focusVariables.ARCHITXT_TABLE_FOCUS || '',
-      ARCHITXT_NARRATIVE_FOCUS: focusVariables.ARCHITXT_NARRATIVE_FOCUS || '',
+      ARCHITXT_GRAPH_FOCUS: '',
+      ARCHITXT_TABLE_FOCUS: '',
+      ARCHITXT_NARRATIVE_FOCUS: '',
+      ...defaults,
       ...focusVariables,
-    });
+    };
+    const { prompt } = composePrompt(template, merged);
     return prompt;
   }
 
@@ -284,11 +306,15 @@ export async function composeMentalModelPromptBatch(db, items) {
     }
 
     try {
+      const defaults = CONTEXTUAL_MODES.has(lookupKey)
+        ? (DEFAULT_FOCUS_BY_TEMPLATE[lookupKey] || {})
+        : {};
       const variables = {
         ARCHITXT_TOPIC: item.source_query || '',
         ARCHITXT_GRAPH_FOCUS: '',
         ARCHITXT_TABLE_FOCUS: '',
         ARCHITXT_NARRATIVE_FOCUS: '',
+        ...defaults,
       };
 
       if (!CONTEXTUAL_MODES.has(lookupKey)) {
