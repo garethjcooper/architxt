@@ -165,13 +165,22 @@ function formatNodeExamples({ include, exclude }) {
 }
 
 /**
- * Format a raw focus string into a bullet directive for prompt injection.
- * Returns empty string if the input is missing or blank (stripped by composePrompt).
+ * Format a raw focus string (or array of strings) into bullet directive(s) for
+ * prompt injection. Returns empty string if the input is missing or blank.
  *
- * @param {string} [raw]
+ * When an array is provided, each item becomes its own bullet line.
+ * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
+ *   - #graph, #narrative → single string (one bullet)
+ *   - #table             → string[] (multiple bullets, one per table)
+ *
+ * @param {string|string[]} [raw]
  * @returns {string}
  */
 export function formatFocusVariable(raw) {
+  if (Array.isArray(raw)) {
+    const lines = raw.filter((s) => typeof s === 'string' && s.trim() !== '').map((s) => `- ${s.trim()}`);
+    return lines.join('\n');
+  }
   if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
   return `- ${raw.trim()}`;
 }

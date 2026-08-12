@@ -1,7 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Replicate the frontend parser logic for server-side unit test
+// Replicate the frontend parser + config for server-side unit test
+const SECTION_DIRECTIVE_CONFIG = {
+  graph:     { cardinality: 'single', merge: 'concat' },
+  table:     { cardinality: 'multiple' },
+  narrative: { cardinality: 'single', merge: 'concat' },
+};
+
 function parseSectionDirectives(rawQuery) {
   if (!rawQuery || typeof rawQuery !== 'string') {
     return { intentText: '' };
@@ -15,17 +21,41 @@ function parseSectionDirectives(rawQuery) {
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
     const key = blockMatch[1].toLowerCase();
     const content = blockMatch[2].trim();
-    if (content) focus[key] = content;
+    if (content) {
+      const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
+      if (config.cardinality === 'multiple') {
+        if (!focus[key]) focus[key] = [];
+        focus[key].push(content);
+      } else {
+        if (config.merge === 'concat' && focus[key]) {
+          focus[key] = focus[key] + '\n' + content;
+        } else {
+          focus[key] = content;
+        }
+      }
+    }
     blockStripped = blockStripped.replace(blockMatch[0], '');
   }
 
-  const inlineRe = /#(graph|table|narrative):\s*(.+?)(?:\r?\n|$)/gi;
+  const inlineRe = /#(graph|table|narrative):\s*([^\r\n#]*?)(?=\s*#(?:graph|table|narrative):|\r?\n|$)/gi;
   let inlineMatch;
   let inlineStripped = blockStripped;
   while ((inlineMatch = inlineRe.exec(blockStripped)) !== null) {
     const key = inlineMatch[1].toLowerCase();
     const content = inlineMatch[2].trim();
-    if (content) focus[key] = content;
+    if (content) {
+      const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
+      if (config.cardinality === 'multiple') {
+        if (!focus[key]) focus[key] = [];
+        focus[key].push(content);
+      } else {
+        if (config.merge === 'concat' && focus[key]) {
+          focus[key] = focus[key] + '\n' + content;
+        } else {
+          focus[key] = content;
+        }
+      }
+    }
     inlineStripped = inlineStripped.replace(inlineMatch[0], '');
   }
 
@@ -49,10 +79,10 @@ describe('parseSectionDirectives', () => {
     assert.deepEqual(result.sectionFocus, { graph: 'CRM, ERP, ICMS' });
   });
 
-  it('parses inline #table directive', () => {
+  it('parses inline #table directive as array', () => {
     const result = parseSectionDirectives('Show me #table: capabilities, dependencies');
     assert.equal(result.intentText, 'Show me');
-    assert.deepEqual(result.sectionFocus, { table: 'capabilities, dependencies' });
+    assert.deepEqual(result.sectionFocus, { table: ['capabilities, dependencies'] });
   });
 
   it('parses inline #narrative directive', () => {
@@ -73,7 +103,7 @@ describe('parseSectionDirectives', () => {
     );
     assert.equal(result.intentText, 'System overview');
     assert.equal(result.sectionFocus.graph, 'CRM, ERP');
-    assert.equal(result.sectionFocus.table, 'capabilities');
+    assert.deepEqual(result.sectionFocus.table, ['capabilities']);
     assert.equal(result.sectionFocus.narrative, 'summary');
   });
 
@@ -87,5 +117,45 @@ describe('parseSectionDirectives', () => {
     const result = parseSectionDirectives('  Analyze   billing   #graph: CRM  ');
     assert.equal(result.intentText, 'Analyze billing');
     assert.deepEqual(result.sectionFocus, { graph: 'CRM' });
+  });
+
+  it('multiple #table blocks → array of topics', () => {
+    const result = parseSectionDirectives(
+      'System overview\n#table\ncapabilities\n#end\n#table\ndependencies\n#end\n#table\nintegrations\n#end',
+    );
+    assert.equal(result.intentText, 'System overview');
+    assert.deepEqual(result.sectionFocus.table, ['capabilities', 'dependencies', 'integrations']);
+  });
+
+  it('multiple inline #table → array of topics', () => {
+    const result = parseSectionDirectives(
+      'Overview #table: capabilities, dependencies #table: integrations',
+    );
+    assert.equal(result.intentText, 'Overview');
+    assert.deepEqual(result.sectionFocus.table, ['capabilities, dependencies', 'integrations']);
+  });
+
+  it('multiple #graph blocks → concatenated scope', () => {
+    const result = parseSectionDirectives(
+      'Analyze\n#graph\nCRM, ERP\n#end\n#graph\nthird-party integrations\n#end',
+    );
+    assert.equal(result.intentText, 'Analyze');
+    assert.equal(result.sectionFocus.graph, 'CRM, ERP\nthird-party integrations');
+  });
+
+  it('multiple #narrative blocks → concatenated narrative', () => {
+    const result = parseSectionDirectives(
+      'Analyze\n#narrative\nbusiness impact\n#end\n#narrative\nrisk assessment\n#end',
+    );
+    assert.equal(result.intentText, 'Analyze');
+    assert.equal(result.sectionFocus.narrative, 'business impact\nrisk assessment');
+  });
+
+  it('block #table followed by inline #table → merged array', () => {
+    const result = parseSectionDirectives(
+      'Overview\n#table\ncapabilities\n#end\n#table: dependencies',
+    );
+    assert.equal(result.intentText, 'Overview');
+    assert.deepEqual(result.sectionFocus.table, ['capabilities', 'dependencies']);
   });
 });

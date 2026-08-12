@@ -1078,7 +1078,7 @@ export const researchApi = {
     template?: string;
     tags?: string[];
     tags_match?: string;
-    section_focus?: Record<string, string>;
+    section_focus?: Record<string, string | string[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/discover', {
       method: 'POST',
