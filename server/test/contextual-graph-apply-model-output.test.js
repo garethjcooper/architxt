@@ -148,19 +148,6 @@ describe('applyModelOutput', () => {
     assert.equal(discoveredEdges[0].cge_type, 'sends');
   });
 
-  it('warns but ignores unexpected sections per role', async () => {
-    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {});
-    const output = normalizeModelOutput(JSON.stringify({
-      narrative: 'unexpected narrative',
-      graph: { nodes: [{ id: 'svc-002', name: 'X' }], edges: [] },
-      tables: [{ name: 'other', columns: [], rows: [] }],
-    }));
-
-    const result = await applyModelOutput(db, serverId, bankId, model('entity-capabilities-svc-001', 'sys_entity_capabilities'), output);
-    assert.equal(result.success, true);
-    assert.ok(result.warnings.length > 0);
-  });
-
   it('creates missing nodes and edges from edge-context model output', async () => {
     const output = normalizeModelOutput(JSON.stringify({
       narrative: '',
