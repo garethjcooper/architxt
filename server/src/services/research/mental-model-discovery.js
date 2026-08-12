@@ -20,7 +20,7 @@
 
 import { listMentalModels as listLocalMentalModels, deriveMentalModels } from '../../db/crud/mental-models.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
+import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../prompts/normalize-graph.js';
 import { modelMatchesEntities } from '../../prompts/graph-parser.js';
 import { createLogger } from '../../utils/logger.js';

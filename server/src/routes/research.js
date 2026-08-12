@@ -25,7 +25,7 @@ import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../s
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
-import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
+import { normalizeModelOutput } from '../services/contextual-graph/normalize-model-output.js';
 
 const logger = createLogger('research-route');
 const router = Router();
