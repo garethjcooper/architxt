@@ -16,5 +16,5 @@ Row rules:
 Example table:
 
 ```json
-{ "name": "capabilities", "columns": ["name", "responsibility", "purpose", "business_capability_mapping", "evidence"], "rows": [{ "name": "billing", "responsibility": "Calculates and issues invoices", "purpose": "Ensures revenue is captured", "business_capability_mapping": "Finance / Revenue Management", "evidence": ["mem-def456"] }] }
+{ "name": "findings", "columns": ["item", "description", "evidence"], "rows": [{ "item": "example", "description": "A description supported by the source material", "evidence": ["mem-def456"] }] }
 ```
