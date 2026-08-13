@@ -130,4 +130,14 @@ describe('normalizeModelOutput', () => {
     assert.equal(h1, h2);
     assert.notEqual(h1, h3);
   });
+
+  it('fixes literal unescaped newlines inside JSON string values', () => {
+    const raw = '{"narrative":"Test","graph":{"nodes":[],"edges":[]},"tables":[{"name":"Data Flows","columns":["Capability"],"rows":[["OCS","handles calls,\nhandling charging"]]}]}';
+    const out = normalizeModelOutput(raw);
+    assert.equal(out.errors.length, 0);
+    assert.equal(out.narrative, 'Test');
+    assert.equal(out.tables.length, 1);
+    assert.equal(out.tables[0].rows[0][0], 'OCS');
+    assert.equal(out.tables[0].rows[0][1], 'handles calls,\nhandling charging');
+  });
 });

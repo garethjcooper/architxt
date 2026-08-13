@@ -142,6 +142,50 @@ function stripMarkdownHeadings(text) {
   return text.replace(/^(#{1,6}\s+.*\n+)+/, '').trim();
 }
 
+
+/**
+ * Detect and fix literal newlines, carriage returns, and tabs that appear inside
+ * apparent JSON string values (models sometimes emit them unescaped).
+ * This is a best-effort scan; it respects escape sequences so \" and \\ are
+ * handled correctly. Only double-quoted JSON strings are targeted.
+ */
+function fixUnescapedControlChars(text) {
+  let inString = false;
+  let escape = false;
+  const out = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (escape) {
+      out.push('\\', ch);
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      out.push(ch);
+      continue;
+    }
+    if (inString) {
+      if (ch === '\n' || ch === '\r') {
+        out.push('\\n');
+        continue;
+      }
+      if (ch === '\t') {
+        out.push('\\t');
+        continue;
+      }
+    }
+    out.push(ch);
+  }
+  // If we ended mid-escape, flush it so we don't drop the backslash.
+  if (escape) out.push('\\');
+  return out.join('');
+}
+
 /**
  * Detect JSON that has been embedded as a string-escaped literal (`\"` instead of `"`).
  * When the text is not valid JSON but contains `{ \"` or `[ \"` we unescape the quotes
@@ -155,7 +199,7 @@ function unescapeStringifiedJson(text) {
 }
 
 function preprocessModelText(text) {
-  return stripMarkdownHeadings(stripOuterCodeFences(text));
+  return fixUnescapedControlChars(stripMarkdownHeadings(stripOuterCodeFences(text)));
 }
 
 /**
