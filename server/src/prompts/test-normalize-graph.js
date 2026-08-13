@@ -77,7 +77,7 @@ describe('normalizeGraph', () => {
       edges: [
         { from: 'a-com:COM-011', to: 'billdb-fuse-rendered-invoice', type: 'sends' },
       ],
-    }, { activity: 'reflect', knownCatalog, mode: 'graph-discovery' });
+    }, { activity: 'reflect', knownCatalog });
     assert.strictEqual(result.nodes.length, 2);
     const knownNode = result.nodes.find((n) => n.id === 'a-com:COM-011');
     assert.ok(knownNode);
@@ -91,7 +91,7 @@ describe('normalizeGraph', () => {
     const result = normalizeGraph({
       nodes: [{ id: 'alpha', name: 'Alpha', label: 'A', type: 'service', provenance: 'discovered', source: 'llm' }],
       edges: [],
-    }, { mode: 'graph-discovery' });
+    }, { });
     assert.strictEqual(result.nodes.length, 1);
     assert.strictEqual(result.nodes[0].label, 'A');
     assert.strictEqual(result.nodes[0].type, 'service');
@@ -103,20 +103,20 @@ describe('normalizeGraph', () => {
     const result = normalizeGraph({
       nodes: [{ id: 'beta', name: 'Beta', provenance: 'discovered' }],
       edges: [],
-    }, { mode: 'graph-discovery' });
+    }, { });
     assert.strictEqual(result.nodes.length, 1);
     assert.strictEqual(result.nodes[0].id, 'beta');
   });
 
-  it('allows discovered nodes in discovered-only mode', () => {
+  it('preserves discovered nodes', () => {
     const result = normalizeGraph({
       nodes: [{ id: 'gamma', name: 'Gamma', provenance: 'discovered' }],
       edges: [],
-    }, { mode: 'graph-discovered-only' });
+    }, { });
     assert.strictEqual(result.nodes.length, 1);
   });
 
-  it('enforces discovered-only endpoint rule', () => {
+  it('keeps both edges when endpoints exist', () => {
     const result = normalizeGraph({
       nodes: [
         { id: 'a-com:COM-001', name: 'Known' },
@@ -126,9 +126,10 @@ describe('normalizeGraph', () => {
         { from: 'a-com:COM-001', to: 'a-com:COM-001', type: 'depends-on' },
         { from: 'a-com:COM-001', to: 'delta', type: 'sends' },
       ],
-    }, { mode: 'graph-discovered-only' });
-    assert.strictEqual(result.edges.length, 1);
-    assert.strictEqual(result.edges[0].to, 'delta');
+    }, { });
+    assert.strictEqual(result.edges.length, 2);
+    assert.strictEqual(result.edges[0].to, 'a-com:COM-001');
+    assert.strictEqual(result.edges[1].to, 'delta');
   });
 });
 
