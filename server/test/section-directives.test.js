@@ -62,9 +62,10 @@ describe('parseSectionDirectives', () => {
 
   it('ignores unknown directives', () => {
     // Unknown directives are not parsed — the raw text stays in intent
+    // and becomes implicit narrative (loose text outside known directives)
     const result = parseSectionDirectives('#unknown\nvalue\n#end\nWhat is this?');
     assert.equal(result.intentText, '#unknown value #end What is this?');
-    assert.equal(result.sectionFocus, undefined);
+    assert.equal(result.sectionFocus?.narrative, '#unknown value #end What is this?');
   });
 
   it('trims whitespace around the remaining intent text', () => {
@@ -103,10 +104,11 @@ describe('parseSectionDirectives', () => {
   });
 
   it('preserves legacy behavior when #topic is absent', () => {
+    // Loose text before directives becomes implicit narrative
     const result = parseSectionDirectives('Analyze billing\n#graph\nCRM, ERP\n#end');
     assert.equal(result.intentText, 'Analyze billing');
     assert.equal(result.sectionFocus?.graph, 'CRM, ERP');
-    assert.equal(result.sectionFocus?.narrative, undefined);
+    assert.equal(result.sectionFocus?.narrative, 'Analyze billing');
   });
 });
 
