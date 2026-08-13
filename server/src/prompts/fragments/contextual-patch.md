@@ -1,6 +1,6 @@
 ### Output format
 
-Return ONLY a valid, parseable JSON object. No Markdown fences, no Markdown headings, no code blocks, no surrounding prose, and no escaped quotes (`\"`). The output must be raw JSON that `JSON.parse` can consume directly.
+Return ONLY a valid, parseable JSON object. No Markdown fences, no Markdown headings, no code blocks, no surrounding prose. The output must be raw, parseable JSON that `JSON.parse` can consume directly. Ensure all control characters inside string values are properly escaped (e.g., newlines as `\n`, tabs as `\t`).
 
 Required envelope:
 
