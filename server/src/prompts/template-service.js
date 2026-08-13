@@ -290,6 +290,38 @@ export function formatFocusVariable(raw) {
 }
 
 /**
+ * Derive effective section focus from parsed directives and merged variables.
+ *
+ * The caller may pass directives in the topic text (parsed) OR as explicit
+ * focus variables (synthesize handler). We take the union of both so that
+ * callers who supply section_focus as variables still get the right fragments.
+ *
+ * @param {{graph?:string, table?:Array, narrative?:string}} parsedSectionFocus
+ * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} merged
+ * @returns {{graph?:string, table?:Array, narrative?:string}}
+ */
+function computeEffectiveFocus(parsedSectionFocus, merged) {
+  const effectiveFocus = {
+    ...parsedSectionFocus,
+  };
+  if (merged.ARCHITXT_GRAPH_FOCUS?.trim()) {
+    effectiveFocus.graph = merged.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
+  }
+  if (merged.ARCHITXT_TABLE_FOCUS?.trim()) {
+    const lines = merged.ARCHITXT_TABLE_FOCUS.trim().split('\n').filter((l) => l.trim());
+    effectiveFocus.table = lines.map((line) => {
+      const m = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+      if (m) return { name: m[1].trim(), content: m[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
+  }
+  if (merged.ARCHITXT_NARRATIVE_FOCUS?.trim()) {
+    effectiveFocus.narrative = merged.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
+  }
+  return effectiveFocus;
+}
+
+/**
  * Compose a full prompt for a derived mental model.
  *
  * @param {object} db
@@ -319,11 +351,16 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     ...focusVariables,
   };
 
-  // Build conditional output-format fragments based on which sections are active
-  const extra = buildConditionalFragments(parsedSectionFocus);
+  // Build conditional output-format fragments based on which sections are active.
+  // The caller may pass directives in the topic text (parsed) OR as explicit
+  // focus variables (synthesize handler). We take the union of both so that
+  // callers who supply section_focus as variables still get the right fragments.
+  const effectiveFocus = computeEffectiveFocus(parsedSectionFocus, merged);
+
+  const extra = buildConditionalFragments(effectiveFocus);
   const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
   const { prompt } = composePrompt(effectiveTemplate, merged);
-  const sectionState = computeSectionState(parsedSectionFocus);
+  const sectionState = computeSectionState(effectiveFocus);
   const instructions = formatSectionInstructions(sectionState);
   return injectBeforeOutputDirectives(prompt, instructions);
 }
@@ -345,11 +382,8 @@ export async function composeMentalModelPromptBatch(db, items) {
   }
 
   const templatesByName = new Map();
-  const examplesByTemplate = new Map();
 
   // Pre-load every unique template so we don't query per row.
-  // For contextual-graph rows the lookup key is role/template_role; for all
-  // others it is mm_returns.
   const uniqueNames = new Set(items.map((i) => i.role || i.template_role || i.returns).filter(Boolean));
   for (const name of uniqueNames) {
     const template = getTemplateByName(db, name);
@@ -375,10 +409,11 @@ export async function composeMentalModelPromptBatch(db, items) {
         ...parsedFocus,
       };
 
-      const extra = buildConditionalFragments(sectionFocus);
+      const effectiveFocus = computeEffectiveFocus(sectionFocus, variables);
+      const extra = buildConditionalFragments(effectiveFocus);
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
       const { prompt } = composePrompt(effectiveTemplate, variables);
-      const sectionState = computeSectionState(sectionFocus);
+      const sectionState = computeSectionState(effectiveFocus);
       const instructions = formatSectionInstructions(sectionState);
       const finalPrompt = injectBeforeOutputDirectives(prompt, instructions);
       results.push({ composed_query: finalPrompt });
