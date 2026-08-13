@@ -11,6 +11,14 @@ const VALID_MODES = new Set([
   'sys_entity_capabilities',
   'sys_edge_context',
   'sys_discovery_context',
+  'narrative',
+  'graph-known',
+  'graph-discovery',
+  'graph-discovered-only',
+  'narrative-graph-known',
+  'narrative-graph-discovery',
+  'narrative-graph-discovered-only',
+  'sys_patch',
 ]);
 
 /**
