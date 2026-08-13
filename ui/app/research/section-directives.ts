@@ -99,6 +99,12 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
 
   const intentText = blockStripped.replace(/\s+/g, ' ').trim();
 
+  // Implicit narrative: loose text outside directives becomes narrative focus
+  // when no explicit #topic or #narrative is present.
+  if (intentText && !focus.narrative) {
+    focus.narrative = intentText;
+  }
+
   return Object.keys(focus).length > 0
     ? { intentText, sectionFocus: focus }
     : { intentText };

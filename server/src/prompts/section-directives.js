@@ -88,6 +88,14 @@ export function parseSectionDirectives(rawQuery) {
 
   const remainingText = blockStripped.replace(/\s+/g, ' ').trim();
 
+  // Implicit narrative: loose text outside directives becomes narrative focus
+  // when no explicit #topic or #narrative is present. This lets users write
+  //   "what is X #graph show flows #end"
+  // and have "what is X" drive the narrative section.
+  if (remainingText && !focus.narrative && topicBlockContent === null) {
+    focus.narrative = remainingText;
+  }
+
   // When #topic is explicit, its content is the intent text and any loose
   // text outside directives becomes narrative focus.
   if (topicBlockContent !== null) {
