@@ -32,6 +32,7 @@ export const SECTION_DIRECTIVE_CONFIG: Record<string, {
   cardinality: 'single' | 'multiple';
   merge?: 'concat' | 'override';
 }> = {
+  topic:     { cardinality: 'single', merge: 'concat' },
   graph:     { cardinality: 'single', merge: 'concat' },
   table:     { cardinality: 'multiple' },
   narrative: { cardinality: 'single', merge: 'concat' },
