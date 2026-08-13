@@ -8,7 +8,7 @@ Required envelope:
 
 All three top-level keys are required. Empty arrays or an empty string are acceptable, but the keys must not be omitted.
 
-- `narrative` is for human-readable prose. It may be empty for data-only models.
+- `narrative` is for human-readable prose. **Must be empty when structured output sections (graph, tables) are requested.** Only include narrative prose when explicitly requested via a `#narrative` directive.
 - `graph` is for nodes and edges. Graph generation rules live in `output-format-graph-contextual.md`.
 - `tables` is for structured tables. Table generation rules live in `output-format-table-contextual.md`.
 
