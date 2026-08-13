@@ -17,18 +17,6 @@ const MAX_SLUG_LENGTH = 64;
 const VALID_EDGE_TYPES = new Set(['calls', 'sends', 'reads', 'writes', 'depends-on']);
 const VALID_PROVENANCE = new Set(['known', 'discovered', 'inferred']);
 
-const DISCOVERY_MODES = new Set([
-  'graph-discovery',
-  'narrative-graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-discovered-only',
-]);
-
-const DISCOVERED_ONLY_MODES = new Set([
-  'graph-discovered-only',
-  'narrative-graph-discovered-only',
-]);
-
 /**
  * Normalize a graph object.
  *
@@ -36,10 +24,9 @@ const DISCOVERED_ONLY_MODES = new Set([
  * @param {object} [options]
  * @param {string} [options.activity='reflect'] - Producing activity: 'reflect', 'synthesize', or 'mental-model'.
  * @param {Map<string, EntityCatalogEntry>} [options.knownCatalog] - Known entity catalog for conflict resolution, validation warnings, and endpoint completion.
- * @param {string} [options.mode='generic'] - Template mode; determines discovery policy.
  * @returns {{nodes: object[], edges: object[]}}
  */
-export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map(), mode = 'generic' } = {}) {
+export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map() } = {}) {
   if (!graph || typeof graph !== 'object') {
     return { nodes: [], edges: [] };
   }
@@ -118,7 +105,6 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
     }
   }
 
-  const nodeIds = new Set(nodeById.keys());
   const edgeByKey = new Map();
 
   for (const e of rawEdges) {
@@ -131,21 +117,7 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       continue;
     }
 
-    // For discovered-only modes, require at least one endpoint to be a
-    // discovered node. Nodes are considered discovered if their provenance is
-    // explicitly marked as such or if they carry the legacy `found:` prefix.
-    if (DISCOVERED_ONLY_MODES.has(mode)) {
-      const fromNode = nodeById.get(from);
-      const toNode = nodeById.get(to);
-      const fromDiscovered = from.startsWith('found:') || fromNode?.provenance === 'discovered';
-      const toDiscovered = to.startsWith('found:') || toNode?.provenance === 'discovered';
-      if (!fromDiscovered && !toDiscovered) {
-        logger.warn('Discovered-only edge missing discovered endpoint', { from, to, edge: e });
-        continue;
-      }
-    }
-
-    // Complete known endpoint nodes that the model omitted from the nodes array.
+    // Complete missing known endpoint nodes that the model omitted from the nodes array.
     // This is explicit contract enforcement, not a silent fallback: we warn every time.
     for (const [id, role] of [[from, 'from'], [to, 'to']]) {
       if (!nodeById.has(id) && knownCatalog.has(id)) {

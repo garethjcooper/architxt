@@ -330,7 +330,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
         if (idx === -1 || !op.pop_ext_id) return null;
         return {
           idx,
-          model: { ext_id: op.pop_ext_id, returns: 'narrative-graph-known' },
+          model: { ext_id: op.pop_ext_id, returns: 'generic' },
         };
       })
       .filter(Boolean) as { idx: number; model: { ext_id: string; returns?: MentalModelReturns } }[];
