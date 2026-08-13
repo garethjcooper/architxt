@@ -289,18 +289,10 @@ const BUILTIN_TEMPLATES = [
     name: 'generic',
     mode: 'generic',
     description: 'Universal template. Returns narrative + graph + tables based on user directives.',
-    body: `Answer the topic below.
-
-## Topic
-
-{{ARCHITXT_TOPIC}}
-
-## Source material
-
-{{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","section-focus.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
+    body: `Answer the topic below.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    examplesHeuristic: null,
   },
   {
     name: 'sys_entity_summary',

@@ -12,7 +12,7 @@
 import * as llmClient from '../../llm/client.js';
 import { config } from '../../../config.js';
 import { createLogger } from '../../../utils/logger.js';
-import { loadAndComposeWithCatalog, formatFocusVariable } from '../../../prompts/template-service.js';
+import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
 import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
@@ -187,13 +187,14 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   });
 
   const focus = options?.section_focus || {};
-  const { prompt: systemPrompt } = await loadAndComposeWithCatalog(db, 'generic', {
-    ARCHITXT_TOPIC: intentText,
+  const topic = intentText;
+  const focusVars = {
     ARCHITXT_CORPUS: corpus,
     ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
     ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
     ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
-  });
+  };
+  const systemPrompt = await composeMentalModelPrompt(db, 'generic', topic, focusVars);
 
   const messages = [
     { role: 'system', content: systemPrompt },
