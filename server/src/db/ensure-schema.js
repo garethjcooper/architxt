@@ -323,7 +323,7 @@ If no directives are specified, provide a general narrative analysis and return 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md"]',
+    fragments: '["contextual-patch.md","section-focus.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -344,7 +344,7 @@ If no directives are specified, provide a general narrative analysis and return 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md"]',
+    fragments: '["contextual-patch.md","section-focus.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -365,7 +365,7 @@ If no directives are specified, provide a general narrative analysis and return 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -386,7 +386,7 @@ If no directives are specified, provide a general narrative analysis and return 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","edge-vocabulary.md","node-discovery-policy-known.md","entity-id-format.md","provenance-rules.md"]',
+    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","node-discovery-policy-known.md","entity-id-format.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
