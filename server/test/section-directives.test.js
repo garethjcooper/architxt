@@ -60,9 +60,9 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus?.graph, 'A\nB');
   });
 
-  it('ignores unknown directives', () => {
-    // Unknown directives are not parsed — the raw text stays in intent
-    // and becomes implicit narrative (loose text outside known directives)
+  it('unknown directives stay as loose text and trigger implicit narrative', () => {
+    // #unknown is not parsed; all text is loose text with zero parsed directives,
+    // so implicit narrative fires on the whole string.
     const result = parseSectionDirectives('#unknown\nvalue\n#end\nWhat is this?');
     assert.equal(result.intentText, '#unknown value #end What is this?');
     assert.equal(result.sectionFocus?.narrative, '#unknown value #end What is this?');
@@ -73,42 +73,33 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.intentText, 'Hello');
   });
 
-  it('parses explicit #topic block as intent text', () => {
-    const result = parseSectionDirectives('#topic\nAnalyze billing system\n#end');
-    assert.equal(result.intentText, 'Analyze billing system');
-    assert.equal(result.sectionFocus, undefined);
-  });
-
-  it('#topic with other directives leaves no loose text', () => {
-    const result = parseSectionDirectives('#topic\nAnalyze billing system\n#end\n#graph\nCRM, ERP\n#end');
-    assert.equal(result.intentText, 'Analyze billing system');
+  it('preserves legacy behavior when #topic is absent', () => {
+    // Loose text before directives becomes implicit narrative ONLY when zero
+    // explicit directives are present.  With #graph present, implicit narrative
+    // is suppressed.
+    const result = parseSectionDirectives('Analyze billing\n#graph\nCRM, ERP\n#end');
+    assert.equal(result.intentText, 'Analyze billing');
     assert.equal(result.sectionFocus?.graph, 'CRM, ERP');
     assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
-  it('loose text outside #topic becomes narrative focus', () => {
-    const result = parseSectionDirectives('#topic\nAnalyze billing\n#end\nSome extra context');
-    assert.equal(result.intentText, 'Analyze billing');
-    assert.equal(result.sectionFocus?.narrative, 'Some extra context');
+  it('topic fallback when all text is inside a narrative block', () => {
+    const result = parseSectionDirectives('#narrative\nTell me about CRM integrations\n#end');
+    assert.equal(result.intentText, 'Tell me about CRM integrations');
+    assert.equal(result.sectionFocus?.narrative, 'Tell me about CRM integrations');
   });
 
-  it('merges loose text with explicit #narrative when #topic is present', () => {
-    const result = parseSectionDirectives('#topic\nAnalyze billing\n#end\nLoose context\n#narrative\nBusiness impact\n#end');
-    assert.equal(result.intentText, 'Analyze billing');
-    assert.equal(result.sectionFocus?.narrative, 'Loose context\nBusiness impact');
+  it('topic fallback when all text is inside a graph block', () => {
+    const result = parseSectionDirectives('#graph\nshow data flows\n#end');
+    assert.equal(result.intentText, 'show data flows');
+    assert.equal(result.sectionFocus?.graph, 'show data flows');
+    assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
-  it('concatenates multiple #topic blocks', () => {
-    const result = parseSectionDirectives('#topic\nPart A\n#end\n#topic\nPart B\n#end');
-    assert.equal(result.intentText, 'Part A\nPart B');
-  });
-
-  it('preserves legacy behavior when #topic is absent', () => {
-    // Loose text before directives becomes implicit narrative
-    const result = parseSectionDirectives('Analyze billing\n#graph\nCRM, ERP\n#end');
-    assert.equal(result.intentText, 'Analyze billing');
-    assert.equal(result.sectionFocus?.graph, 'CRM, ERP');
-    assert.equal(result.sectionFocus?.narrative, 'Analyze billing');
+  it('narrative-only with loose text does not double-assign', () => {
+    const result = parseSectionDirectives('Tell me about CRM\n#narrative\ndetailed analysis\n#end');
+    assert.equal(result.intentText, 'Tell me about CRM');
+    assert.equal(result.sectionFocus?.narrative, 'detailed analysis');
   });
 });
 
