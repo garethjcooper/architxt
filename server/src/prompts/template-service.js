@@ -333,17 +333,32 @@ export function formatFocusVariable(raw) {
 export async function composeMentalModelPrompt(db, templateName, topic, focusVariables = {}) {
   // Contextual-graph system templates are keyed by mm_template_role, not by
   // mm_returns (which is now the generic 'sys_patch' placeholder).
-  if (CONTEXTUAL_MODES.has(templateName)) {
+  if (CONTEXTUAL_MODES.has(templateName) || templateName === 'generic') {
     const template = getTemplateByName(db, templateName);
     if (!template) {
       throw new Error(`Prompt template not found: ${templateName}`);
     }
     const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus } = buildFocusFromDirectives(topic);
+
+    // Load entity catalog and examples for generic template (same as non-contextual path)
+    let entityCatalog = '';
+    let examples = '';
+    if (templateName === 'generic') {
+      entityCatalog = await buildEntityCatalogVariable(db);
+      if (template.pt_examples_heuristic) {
+        const entities = await loadEntityCatalog(db);
+        const result = applyHeuristic(template.pt_examples_heuristic, entities);
+        examples = formatNodeExamples(result);
+      }
+    }
+
     const merged = {
       ARCHITXT_TOPIC: parsedTopic || '',
       ARCHITXT_GRAPH_FOCUS: '',
       ARCHITXT_TABLE_FOCUS: '',
       ARCHITXT_NARRATIVE_FOCUS: '',
+      ARCHITXT_ENTITIES: entityCatalog,
+      ARCHITXT_NODE_EXAMPLES: examples,
       ...parsedFocus,
       ...focusVariables,
     };
@@ -414,7 +429,7 @@ export async function composeMentalModelPromptBatch(db, items) {
         ...parsedFocus,
       };
 
-      if (!CONTEXTUAL_MODES.has(lookupKey)) {
+      if (!CONTEXTUAL_MODES.has(lookupKey) || lookupKey === 'generic') {
         if (entityCatalog === null) {
           entityCatalog = await buildEntityCatalogVariable(db);
         }

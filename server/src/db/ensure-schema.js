@@ -291,10 +291,6 @@ const BUILTIN_TEMPLATES = [
     description: 'Universal template. Returns narrative + graph + tables based on user directives.',
     body: `Answer the topic below.
 
-Only populate the output sections that are explicitly requested in the directives below.
-If a section is not requested, return it as an empty object/array/string as required by the envelope.
-If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
-
 ## Topic
 
 {{ARCHITXT_TOPIC}}
@@ -302,7 +298,7 @@ If no directives are specified, provide a general narrative analysis and return 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","output-format-graph-contextual.md","output-format-table-contextual.md","section-focus.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
+    fragments: '["contextual-patch.md","section-focus.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
     examplesHeuristic: 'top-n',
   },
