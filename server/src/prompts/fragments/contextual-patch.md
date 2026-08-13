@@ -12,7 +12,7 @@ All three top-level keys are required. Empty arrays or an empty string are accep
 - `graph` is for nodes and edges. Graph generation rules live in `output-format-graph-contextual.md`.
 - `tables` is for structured tables. Table generation rules live in `output-format-table-contextual.md`.
 
-The example below shows the envelope structure with all sections empty. **Only populate the sections explicitly requested in the directives above; leave the rest exactly as shown** (empty string, empty arrays, or empty objects). Your actual response must NOT include the code fence, the triple backticks, or any backslash-escaped quotes:
+The example below shows the envelope structure with all sections empty. **Which sections to populate and which to leave empty is governed by the Section rules injected below.** Your actual response must NOT include the code fence, the triple backticks, or any backslash-escaped quotes:
 
 ```json
 {"narrative":"","graph":{"nodes":[],"edges":[]},"tables":[]}
