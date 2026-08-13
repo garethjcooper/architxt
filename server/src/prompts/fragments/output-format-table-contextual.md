@@ -3,7 +3,7 @@
 The `tables` envelope section must contain a list of table objects.
 
 Each table must have:
-- `name`: the table identifier, used as the property key when applied to a node.
+- `name`: the table identifier, used as the property key when applied to a node. If a name is explicitly provided in the `#table` directive, use it as the table's `name` field. If no name is provided, generate a short descriptive name (4–6 words) based on the table's content.
 - `columns`: an array of column names.
 - `rows`: an array of objects. Each row object's keys must match `columns`.
 

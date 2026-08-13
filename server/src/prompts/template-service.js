@@ -154,6 +154,28 @@ export async function loadAndComposeWithCatalog(db, name, variables = {}) {
   });
 }
 
+/**
+ * Compute active/empty section lists from parsed directives.
+ *
+ * @param {{graph?:string, table?:Array, narrative?:string}} sectionFocus
+ * @returns {{active: string[], empty: string[]}}
+ */
+function computeSectionState(sectionFocus) {
+  const active = [];
+  const empty = [];
+  if (sectionFocus?.graph) active.push('graph');
+  else empty.push('graph');
+  if (sectionFocus?.table?.length) active.push('tables');
+  else empty.push('tables');
+  if (sectionFocus?.narrative) active.push('narrative');
+  else empty.push('narrative');
+  // If no directives at all, narrative is the default fallback.
+  if (active.length === 0) {
+    return { active: ['narrative'], empty: ['graph', 'tables'] };
+  }
+  return { active, empty };
+}
+
 function formatNodeExamples({ include, exclude }) {
   const lines = [];
   if (include?.length) {
@@ -210,11 +232,41 @@ function mergeFragments(template, extraFragments) {
 }
 
 /**
- * Compose a mental-model prompt from a named template.
-
- * @param {string} topic - raw mm_source_query text (may contain #graph/#table/#narrative blocks)
- * @returns {{topic: string, focusVariables: Record<string, string>}}
+ * Format active/empty section instructions for injection into a composed prompt.
+ *
+ * @param {{active: string[], empty: string[]}} sectionState
+ * @returns {string}
  */
+function formatSectionInstructions({ active, empty }) {
+  const lines = [];
+  lines.push('### Section rules');
+  lines.push('');
+  lines.push(`Active output sections: ${active.map((s) => `\`${s}\``).join(', ')}.`);
+  lines.push(`Empty output sections (must remain exactly as shown in the envelope example): ${empty.map((s) => `\`${s}\``).join(', ')}.`);
+  lines.push('');
+  if (!active.includes('narrative')) {
+    lines.push('Do not answer the topic in narrative prose. All findings must be expressed through the structured output sections above.');
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Inject section instructions into a composed prompt, placing them before
+ * the "## Output directives" heading if it exists.
+ *
+ * @param {string} prompt
+ * @param {string} instructions
+ * @returns {string}
+ */
+function injectBeforeOutputDirectives(prompt, instructions) {
+  const match = prompt.match(/\n## Output directives/i);
+  if (match) {
+    const idx = match.index;
+    return prompt.slice(0, idx) + '\n' + instructions + '\n' + prompt.slice(idx);
+  }
+  return prompt + '\n' + instructions;
+}
 function buildFocusFromDirectives(topic) {
   const { intentText, sectionFocus } = parseSectionDirectives(topic || '');
   return {
@@ -298,7 +350,9 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     const extra = buildConditionalFragments(sectionFocus);
     const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
     const { prompt } = composePrompt(effectiveTemplate, merged);
-    return prompt;
+    const sectionState = computeSectionState(sectionFocus);
+    const instructions = formatSectionInstructions(sectionState);
+    return injectBeforeOutputDirectives(prompt, instructions);
   }
 
   const { prompt } = await loadAndComposeWithCatalog(db, templateName, {
@@ -385,7 +439,10 @@ export async function composeMentalModelPromptBatch(db, items) {
       const extra = buildConditionalFragments(sectionFocus);
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
       const { prompt } = composePrompt(effectiveTemplate, variables);
-      results.push({ composed_query: prompt });
+      const sectionState = computeSectionState(sectionFocus);
+      const instructions = formatSectionInstructions(sectionState);
+      const finalPrompt = injectBeforeOutputDirectives(prompt, instructions);
+      results.push({ composed_query: finalPrompt });
     } catch (err) {
       logger.warn('Failed to compose mental model prompt in batch', {
         template: lookupKey,

@@ -312,10 +312,6 @@ If no directives are specified, provide a general narrative analysis and return 
     description: 'System template: concise evidence-backed summary for one contextual-graph node.',
     body: `Answer the topic below.
 
-Only populate the output sections that are explicitly requested in the directives below.
-If a section is not requested, return it as an empty object/array/string as required by the envelope.
-If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
-
 ## Topic
 
 {{ARCHITXT_TOPIC}}
@@ -332,10 +328,6 @@ If no directives are specified, provide a general narrative analysis and return 
     mode: 'sys_entity_capabilities',
     description: 'System template: capabilities table for one contextual-graph node.',
     body: `Answer the topic below.
-
-Only populate the output sections that are explicitly requested in the directives below.
-If a section is not requested, return it as an empty object/array/string as required by the envelope.
-If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
 
 ## Topic
 
@@ -354,10 +346,6 @@ If no directives are specified, provide a general narrative analysis and return 
     description: 'System template: directed interactions between two specific contextual-graph nodes.',
     body: `Answer the topic below.
 
-Only populate the output sections that are explicitly requested in the directives below.
-If a section is not requested, return it as an empty object/array/string as required by the envelope.
-If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
-
 ## Topic
 
 {{ARCHITXT_TOPIC}}
@@ -374,10 +362,6 @@ If no directives are specified, provide a general narrative analysis and return 
     mode: 'sys_discovery_context',
     description: 'System template: suggest new contextual-graph nodes and edges around a seed node.',
     body: `Answer the topic below.
-
-Only populate the output sections that are explicitly requested in the directives below.
-If a section is not requested, return it as an empty object/array/string as required by the envelope.
-If no directives are specified, provide a general narrative analysis and return an empty graph and tables array.
 
 ## Topic
 
