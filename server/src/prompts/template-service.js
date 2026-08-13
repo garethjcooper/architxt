@@ -1,21 +1,12 @@
 import { stmt } from '../cache.js';
 import { createLogger } from '../utils/logger.js';
 import { composeFragments } from './fragment-loader.js';
-import { buildEntityCatalogVariable, loadEntityCatalog } from './entity-catalog.js';
-import { applyHeuristic } from './examples-heuristics/index.js';
 import { parseSectionDirectives } from './section-directives.js';
 
 const logger = createLogger('prompt-templates');
 
 const VALID_MODES = new Set([
   'generic',
-  'sys_entity_summary',
-  'sys_entity_capabilities',
-  'sys_edge_context',
-  'sys_discovery_context',
-]);
-
-const CONTEXTUAL_MODES = new Set([
   'sys_entity_summary',
   'sys_entity_capabilities',
   'sys_edge_context',
@@ -126,36 +117,7 @@ export function loadAndCompose(db, name, variables) {
 }
 
 /**
- * Load template by name and compose it, auto-populating ARCHITXT_ENTITIES from the DB catalog.
- *
- * @param {object} db
- * @param {string} name
- * @param {Record<string, string>} variables
- * @returns {Promise<{prompt: string, mode: string}>}
- */
-export async function loadAndComposeWithCatalog(db, name, variables = {}) {
-  const entityCatalog = await buildEntityCatalogVariable(db);
-  const template = getTemplateByName(db, name);
-  if (!template) {
-    throw new Error(`Prompt template not found: ${name}`);
-  }
-
-  let examples = variables.ARCHITXT_NODE_EXAMPLES;
-  if (examples === undefined && template.pt_examples_heuristic) {
-    const entities = await loadEntityCatalog(db);
-    const result = applyHeuristic(template.pt_examples_heuristic, entities);
-    examples = formatNodeExamples(result);
-  }
-
-  return composePrompt(template, {
-    ARCHITXT_ENTITIES: entityCatalog,
-    ARCHITXT_NODE_EXAMPLES: examples || '',
-    ...variables,
-  });
-}
-
-/**
- * Compute active/empty section lists from parsed directives.
+ * Compose a full prompt for a derived mental model.
  *
  * @param {{graph?:string, table?:Array, narrative?:string}} sectionFocus
  * @returns {{active: string[], empty: string[]}}
@@ -228,36 +190,6 @@ function mergeFragments(template, extraFragments) {
   return {
     ...template,
     pt_fragments: JSON.stringify(base),
-  };
-}
-
-/**
- * Strip heavy semantic fragments from a template to keep prompts lightweight.
- *
- * The `generic` template carries semantic-graph fragments (entity-catalog,
- * edge-vocabulary, node-eligibility, etc.) that add ~60K tokens. Those are
- * appropriate for graph-building via the non-contextual path but overwhelm the
- * model when the caller (reflect handler) just needs a lightweight narrative +
- * structured outputs.
- *
- * Fragments retained: contextual-patch.md, section-focus.md, output-format-*.md.
- *
- * @param {object} template
- * @returns {object} New template-like object with stripped fragments.
- */
-function stripSemanticFragments(template) {
-  const base = JSON.parse(template.pt_fragments || '[]');
-  const lightweight = [
-    'contextual-patch.md',
-    'section-focus.md',
-    'output-format-narrative.md',
-    'output-format-graph-contextual.md',
-    'output-format-table-contextual.md',
-  ];
-  const filtered = base.filter((name) => lightweight.includes(name));
-  return {
-    ...template,
-    pt_fragments: JSON.stringify(filtered),
   };
 }
 
@@ -350,48 +282,6 @@ export function formatFocusVariable(raw) {
 }
 
 /**
- * Derive section-focus state from merged focus variables.
- *
- * When the caller (e.g. the reflect handler) passes pre-parsed focus variables
- * but the topic text is already stripped of directives, we need to reconstruct
- * which sections are active from the variable values, not by re-parsing.
- *
- * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} variables
- * @returns {{graph?:string, table?:Array, narrative?:string}|undefined}
- */
-function deriveSectionFocusFromVariables(variables) {
-  const focus = {};
-  if (variables.ARCHITXT_GRAPH_FOCUS?.trim()) {
-    focus.graph = variables.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
-  }
-  if (variables.ARCHITXT_TABLE_FOCUS?.trim()) {
-    // Table focus is formatted as bullet lines; reconstruct directive objects
-    const lines = variables.ARCHITXT_TABLE_FOCUS.trim().split('\n').filter((l) => l.trim());
-    focus.table = lines.map((line) => {
-      const m = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
-      if (m) return { name: m[1].trim(), content: m[2].trim() };
-      return { content: line.replace(/^- /, '').trim() };
-    });
-  }
-  if (variables.ARCHITXT_NARRATIVE_FOCUS?.trim()) {
-    focus.narrative = variables.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
-  }
-  return Object.keys(focus).length > 0 ? focus : undefined;
-}
-
-/**
- * Derive section-focus state from merged focus variables.
- *
- * When the caller (e.g. the reflect handler) passes pre-parsed focus variables
- * but the topic text is already stripped of directives, we need to reconstruct
- * which sections are active from the variable values, not by re-parsing.
- *
- * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} variables
- * @returns {{graph?:string, table?:Array, narrative?:string}|undefined}
- */
-
-
-/**
  * Compose a full prompt for a derived mental model.
  *
  * @param {object} db
@@ -403,70 +293,31 @@ function deriveSectionFocusFromVariables(variables) {
  * @returns {Promise<string>}
  */
 export async function composeMentalModelPrompt(db, templateName, topic, focusVariables = {}) {
-  // Contextual-graph system templates are keyed by mm_template_role, not by
-  // mm_returns (which is now the generic 'sys_patch' placeholder).
-  if (CONTEXTUAL_MODES.has(templateName) || templateName === 'generic') {
-    const template = getTemplateByName(db, templateName);
-    if (!template) {
-      throw new Error(`Prompt template not found: ${templateName}`);
-    }
-    const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus: parsedSectionFocus } = buildFocusFromDirectives(topic);
-
-    // Load entity catalog and examples for generic template (same as non-contextual path)
-    let entityCatalog = '';
-    let examples = '';
-    if (templateName === 'generic') {
-      entityCatalog = await buildEntityCatalogVariable(db);
-      if (template.pt_examples_heuristic) {
-        const entities = await loadEntityCatalog(db);
-        const result = applyHeuristic(template.pt_examples_heuristic, entities);
-        examples = formatNodeExamples(result);
-      }
-    }
-
-    const merged = {
-      ARCHITXT_TOPIC: parsedTopic || '',
-      ARCHITXT_GRAPH_FOCUS: '',
-      ARCHITXT_TABLE_FOCUS: '',
-      ARCHITXT_NARRATIVE_FOCUS: '',
-      ARCHITXT_ENTITIES: entityCatalog,
-      ARCHITXT_NODE_EXAMPLES: examples,
-      ...parsedFocus,
-      ...focusVariables,
-    };
-
-    // For generic template, the caller (reflect handler) passes parsed focus
-    // variables but the topic is already stripped intentText. Derive section
-    // state from the merged focus variables so conditional fragments and
-    // Section rules reflect what the user actually requested.
-    //
-    // Also strip heavy semantic fragments (entity-catalog, edge-vocabulary,
-    // etc.) that add ~60K tokens and are appropriate for graph-building but
-    // overwhelm the model when synthesizing a reflect answer.
-    let effectiveTemplate = template;
-    if (templateName === 'generic') {
-      effectiveTemplate = stripSemanticFragments(template);
-    }
-
-    const effectiveSectionFocus = templateName === 'generic'
-      ? deriveSectionFocusFromVariables(merged)
-      : parsedSectionFocus;
-
-    const extra = buildConditionalFragments(effectiveSectionFocus);
-    if (extra.length > 0) {
-      effectiveTemplate = mergeFragments(effectiveTemplate, extra);
-    }
-    const { prompt } = composePrompt(effectiveTemplate, merged);
-    const sectionState = computeSectionState(effectiveSectionFocus);
-    const instructions = formatSectionInstructions(sectionState);
-    return injectBeforeOutputDirectives(prompt, instructions);
+  const template = getTemplateByName(db, templateName);
+  if (!template) {
+    throw new Error(`Prompt template not found: ${templateName}`);
   }
 
-  const { prompt } = await loadAndComposeWithCatalog(db, templateName, {
-    ARCHITXT_TOPIC: topic || '',
+  // Parse directives from the topic to determine which sections are active
+  const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus: parsedSectionFocus } = buildFocusFromDirectives(topic);
+
+  // Merge parsed focus with caller-supplied focus (caller wins for overrides)
+  const merged = {
+    ARCHITXT_TOPIC: parsedTopic || '',
+    ARCHITXT_GRAPH_FOCUS: '',
+    ARCHITXT_TABLE_FOCUS: '',
+    ARCHITXT_NARRATIVE_FOCUS: '',
+    ...parsedFocus,
     ...focusVariables,
-  });
-  return prompt;
+  };
+
+  // Build conditional output-format fragments based on which sections are active
+  const extra = buildConditionalFragments(parsedSectionFocus);
+  const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
+  const { prompt } = composePrompt(effectiveTemplate, merged);
+  const sectionState = computeSectionState(parsedSectionFocus);
+  const instructions = formatSectionInstructions(sectionState);
+  return injectBeforeOutputDirectives(prompt, instructions);
 }
 
 /**
@@ -497,11 +348,6 @@ export async function composeMentalModelPromptBatch(db, items) {
     if (template) templatesByName.set(name, template);
   }
 
-  // Shared, expensive lookups done exactly once, and only if a non-contextual
-  // template actually needs them.
-  let entityCatalog = null;
-  let entities = null;
-
   const results = [];
   for (const item of items) {
     const lookupKey = item.role || item.template_role || item.returns;
@@ -520,28 +366,6 @@ export async function composeMentalModelPromptBatch(db, items) {
         ARCHITXT_NARRATIVE_FOCUS: '',
         ...parsedFocus,
       };
-
-      if (!CONTEXTUAL_MODES.has(lookupKey) || lookupKey === 'generic') {
-        if (entityCatalog === null) {
-          entityCatalog = await buildEntityCatalogVariable(db);
-        }
-        variables.ARCHITXT_ENTITIES = entityCatalog;
-
-        let examples = '';
-        if (template.pt_examples_heuristic) {
-          if (!examplesByTemplate.has(template.pt_name)) {
-            if (entities === null) {
-              entities = await loadEntityCatalog(db);
-            }
-            const result = applyHeuristic(template.pt_examples_heuristic, entities);
-            examples = formatNodeExamples(result);
-            examplesByTemplate.set(template.pt_name, examples);
-          } else {
-            examples = examplesByTemplate.get(template.pt_name);
-          }
-        }
-        variables.ARCHITXT_NODE_EXAMPLES = examples;
-      }
 
       const extra = buildConditionalFragments(sectionFocus);
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
