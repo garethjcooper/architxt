@@ -25,7 +25,6 @@
  */
 
 export const SECTION_DIRECTIVE_CONFIG = {
-  topic:     { cardinality: 'single', merge: 'concat' },
   graph:     { cardinality: 'single', merge: 'concat' },
   table:     { cardinality: 'multiple' },
   narrative: { cardinality: 'single', merge: 'concat' },
@@ -48,27 +47,23 @@ export function parseSectionDirectives(rawQuery) {
   }
 
   const focus = {};
-  let topicBlockContent = null;
+  let firstDirectiveContent = null;
+  let anyDirectiveFound = false;
 
   // Block style ONLY: #directive\n...content...\n#end
-  const blockRe = /#(topic|graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
+  const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch;
   let blockStripped = rawQuery;
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
     const key = blockMatch[1].toLowerCase();
     const content = blockMatch[2].trim();
-
-    if (key === 'topic') {
-      if (content) {
-        topicBlockContent = topicBlockContent
-          ? topicBlockContent + '\n' + content
-          : content;
-      }
-      blockStripped = blockStripped.replace(blockMatch[0], '');
-      continue;
-    }
+    anyDirectiveFound = true;
 
     if (content) {
+      if (firstDirectiveContent === null) {
+        firstDirectiveContent = content;
+      }
+
       const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
       if (config.cardinality === 'multiple') {
         // table: collect as TableDirective objects
@@ -89,30 +84,19 @@ export function parseSectionDirectives(rawQuery) {
   const remainingText = blockStripped.replace(/\s+/g, ' ').trim();
 
   // Implicit narrative: loose text outside directives becomes narrative focus
-  // when no explicit #topic or #narrative is present. This lets users write
-  //   "what is X #graph show flows #end"
-  // and have "what is X" drive the narrative section.
-  if (remainingText && !focus.narrative && topicBlockContent === null) {
+  // ONLY when no explicit directives are present. This makes plain queries
+  // produce narrative-only output, while any directive suppresses implicit
+  // narrative so the user controls output shape explicitly.
+  if (remainingText && !focus.narrative && !anyDirectiveFound) {
     focus.narrative = remainingText;
   }
 
-  // When #topic is explicit, its content is the intent text and any loose
-  // text outside directives becomes narrative focus.
-  if (topicBlockContent !== null) {
-    if (remainingText) {
-      if (focus.narrative) {
-        focus.narrative = remainingText + '\n' + focus.narrative;
-      } else {
-        focus.narrative = remainingText;
-      }
-    }
-    return Object.keys(focus).length > 0
-      ? { intentText: topicBlockContent, sectionFocus: focus }
-      : { intentText: topicBlockContent };
-  }
+  // Topic fallback: if no loose text remains after stripping directives,
+  // promote the first directive's content as the topic so ARCHITXT_TOPIC
+  // is never empty.
+  const intentText = remainingText || firstDirectiveContent || '';
 
-  // Legacy behaviour: no #topic block, loose text is the intent.
   return Object.keys(focus).length > 0
-    ? { intentText: remainingText, sectionFocus: focus }
-    : { intentText: remainingText };
+    ? { intentText, sectionFocus: focus }
+    : { intentText };
 }

@@ -32,7 +32,6 @@ export const SECTION_DIRECTIVE_CONFIG: Record<string, {
   cardinality: 'single' | 'multiple';
   merge?: 'concat' | 'override';
 }> = {
-  topic:     { cardinality: 'single', merge: 'concat' },
   graph:     { cardinality: 'single', merge: 'concat' },
   table:     { cardinality: 'multiple' },
   narrative: { cardinality: 'single', merge: 'concat' },
@@ -71,6 +70,8 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
   }
 
   const focus: Record<string, string | string[] | TableDirective[]> = {};
+  let firstDirectiveContent: string | null = null;
+  let anyDirectiveFound = false;
 
   // Block style ONLY: #directive\n...content...\n#end
   const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
@@ -79,7 +80,13 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
     const key = blockMatch[1].toLowerCase();
     const content = blockMatch[2].trim();
+    anyDirectiveFound = true;
+
     if (content) {
+      if (firstDirectiveContent === null) {
+        firstDirectiveContent = content;
+      }
+
       const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
       if (config.cardinality === 'multiple') {
         // table: collect as TableDirective objects
@@ -97,13 +104,20 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
     blockStripped = blockStripped.replace(blockMatch[0], '');
   }
 
-  const intentText = blockStripped.replace(/\s+/g, ' ').trim();
+  const remainingText = blockStripped.replace(/\s+/g, ' ').trim();
 
   // Implicit narrative: loose text outside directives becomes narrative focus
-  // when no explicit #topic or #narrative is present.
-  if (intentText && !focus.narrative) {
-    focus.narrative = intentText;
+  // ONLY when no explicit directives are present. This makes plain queries
+  // produce narrative-only output, while any directive suppresses implicit
+  // narrative so the user controls output shape explicitly.
+  if (remainingText && !focus.narrative && !anyDirectiveFound) {
+    focus.narrative = remainingText;
   }
+
+  // Topic fallback: if no loose text remains after stripping directives,
+  // promote the first directive's content as the topic so ARCHITXT_TOPIC
+  // is never empty.
+  const intentText = remainingText || firstDirectiveContent || '';
 
   return Object.keys(focus).length > 0
     ? { intentText, sectionFocus: focus }
