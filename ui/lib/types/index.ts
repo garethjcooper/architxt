@@ -157,31 +157,15 @@ export interface Entity {
   updated_at: string;
 }
 
-export type MentalModelReturns =
-  | 'narrative'
-  | 'graph-known'
-  | 'graph-discovery'
-  | 'graph-discovered-only'
-  | 'narrative-graph-known'
-  | 'narrative-graph-discovery'
-  | 'narrative-graph-discovered-only';
+export type MentalModelReturns = 'generic';
 
 export const MENTAL_MODEL_RETURNS_OPTIONS: { value: MentalModelReturns; label: string }[] = [
-  { value: 'narrative', label: 'Narrative' },
-  { value: 'graph-known', label: 'Graph (known nodes)' },
-  { value: 'graph-discovery', label: 'Graph (discovery allowed)' },
-  { value: 'graph-discovered-only', label: 'Graph (discovered only)' },
-  { value: 'narrative-graph-known', label: 'Narrative + graph (known nodes)' },
-  { value: 'narrative-graph-discovery', label: 'Narrative + graph (discovery allowed)' },
-  { value: 'narrative-graph-discovered-only', label: 'Narrative + graph (discovered only)' },
+  { value: 'generic', label: 'Generic (directive-driven)' },
 ];
 
 export function toMentalModelReturns(value: string): MentalModelReturns {
-  const option = MENTAL_MODEL_RETURNS_OPTIONS.find((o) => o.value === value);
-  if (!option) {
-    throw new Error(`Invalid mental model returns value: ${value}`);
-  }
-  return option.value;
+  if (value === 'generic') return 'generic';
+  throw new Error(`Invalid mental model returns value: ${value}`);
 }
 
 export interface MentalModel {

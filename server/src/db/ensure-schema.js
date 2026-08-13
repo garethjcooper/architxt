@@ -829,7 +829,7 @@ function removeMentalModelCheckConstraints(db) {
     const colList = columns.join(', ');
     if (name === 'mental_models') {
       const mappedColList = columns.map((c) =>
-        c === 'mm_returns' ? "CASE mm_returns WHEN 'json' THEN 'graph-known' WHEN 'narrative' THEN 'narrative' ELSE mm_returns END AS mm_returns" : c
+        c === 'mm_returns' ? "CASE mm_returns WHEN 'json' THEN 'generic' WHEN 'narrative' THEN 'generic' WHEN 'graph-known' THEN 'generic' WHEN 'graph-discovery' THEN 'generic' WHEN 'graph-discovered-only' THEN 'generic' WHEN 'narrative-graph-known' THEN 'generic' WHEN 'narrative-graph-discovery' THEN 'generic' WHEN 'narrative-graph-discovered-only' THEN 'generic' ELSE mm_returns END AS mm_returns" : c
       ).join(', ');
       db.exec(`INSERT INTO ${name}_new (${colList}) SELECT ${mappedColList} FROM ${name}`);
     } else {
@@ -917,6 +917,26 @@ function removePromptTemplateModeCheck(db) {
   } finally {
     db.pragma('foreign_keys = ON');
   }
+}
+
+/**
+ * Migrate legacy mm_returns values ('json', 'narrative', 'graph-known', etc.)
+ * to 'generic' since the old per-mode templates have been replaced by a single
+ * universal template with directive-driven output.
+ */
+function migrateMentalModelReturnsToGeneric(db) {
+  const mmTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mental_models'").get();
+  if (!mmTableExists) return 0;
+
+  const legacyValues = ['json', 'narrative', 'graph-known', 'graph-discovery', 'graph-discovered-only', 'narrative-graph-known', 'narrative-graph-discovery', 'narrative-graph-discovered-only'];
+  const placeholders = legacyValues.map(() => '?').join(',');
+  const existingLegacy = db.prepare(`SELECT mm_returns, COUNT(*) as c FROM mental_models WHERE mm_returns IN (${placeholders}) GROUP BY mm_returns`).all(...legacyValues);
+  if (!existingLegacy || existingLegacy.length === 0) return 0;
+
+  const update = db.prepare(`UPDATE mental_models SET mm_returns = 'generic' WHERE mm_returns IN (${placeholders})`);
+  const result = update.run(...legacyValues);
+  logger.info(`Migrated ${result.changes} mental model(s) from legacy mm_returns to 'generic'`, { legacyValues, counts: existingLegacy });
+  return result.changes;
 }
 
 /**
@@ -1355,6 +1375,7 @@ export function ensureSchema(db) {
     const userRolesBackfilled = backfillUserTemplateRoles(db);
     const removed = removeMentalModelCheckConstraints(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
+    const mmReturnsMigrated = migrateMentalModelReturnsToGeneric(db);
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
     const researchFkFixed = ensureResearchSessionsServerFk(db);
@@ -1362,12 +1383,12 @@ export function ensureSchema(db) {
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
     const cgTemplates = ensureContextualGraphTemplates(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}`);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

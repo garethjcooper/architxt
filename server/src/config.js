@@ -192,7 +192,7 @@ export const config = {
     synthesize: {
       provider: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_PROVIDER', 'ollama_cloud'),
       model: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MODEL', ''),
-      template: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPLATE', 'narrative-graph-known'),
+      template: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPLATE', 'generic'),
       temperature: parseFloat(getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPERATURE', '0.2')),
       max_tokens: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', '') !== ''
         ? getInt('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', 0)

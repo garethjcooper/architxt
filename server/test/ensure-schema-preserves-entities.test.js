@@ -122,13 +122,7 @@ function seedOldSchema(db) {
     INSERT INTO prompt_templates
       (pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_is_builtin)
     VALUES
-      ('narrative', 'narrative', 'Narrative-only output.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('graph-known', 'graph-known', 'Graph known.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('graph-discovery', 'graph-discovery', 'Graph discovery.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-known', 'narrative-graph-known', 'Narrative + graph known.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-discovery', 'narrative-graph-discovery', 'Narrative + graph discovery.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('graph-discovered-only', 'graph-discovered-only', 'Graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-discovered-only', 'narrative-graph-discovered-only', 'Narrative + graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('generic', 'generic', 'Generic output.', '...', '[]', '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]', 1),
       ('sys_entity_summary', 'sys_entity_summary', 'Entity summary.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
       ('sys_entity_capabilities', 'sys_entity_capabilities', 'Entity capabilities.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
       ('sys_edge_context', 'sys_edge_context', 'Edge context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
@@ -175,7 +169,7 @@ describe('ensureSchema preserves mental_model_entities across CHECK constraint r
 
       // The parent model must still exist with the returns mapped to a valid template name.
       const model = db.prepare('SELECT mm_returns FROM mental_models WHERE mm_id = ?').get(mmId);
-      assert.equal(model.mm_returns, 'narrative');
+      assert.equal(model.mm_returns, 'generic');
     } finally {
       closeAndDelete({ db, file });
     }

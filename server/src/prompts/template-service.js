@@ -5,19 +5,12 @@ import { parseSectionDirectives } from './section-directives.js';
 
 const logger = createLogger('prompt-templates');
 
-const VALID_MODES = new Set([
+export const VALID_MODES = new Set([
   'generic',
   'sys_entity_summary',
   'sys_entity_capabilities',
   'sys_edge_context',
   'sys_discovery_context',
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
   'sys_patch',
 ]);
 

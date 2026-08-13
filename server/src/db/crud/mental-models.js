@@ -111,16 +111,7 @@ const PLACEHOLDER_PATTERN = new RegExp(
 
 const VALID_REFRESH_MODES = new Set(['full', 'delta']);
 const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any', 'exact']);
-export const VALID_RETURNS = new Set([
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
-  'sys_patch',
-]);
+export const VALID_RETURNS = new Set(['generic']);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
 export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability', 'contextual-graph'];
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
@@ -366,7 +357,7 @@ export async function composeDerivedMentalModels(db, derivedRows) {
   return Promise.all(
     derivedRows.map(async (row) => {
       try {
-        const composedQuery = await composeMentalModelPrompt(db, 'narrative-graph-known', row.source_query);
+        const composedQuery = await composeMentalModelPrompt(db, 'generic', row.source_query);
         return { ...row, composed_query: composedQuery };
       } catch (err) {
         logger.warn('Failed to compose derived mental model prompt', {
