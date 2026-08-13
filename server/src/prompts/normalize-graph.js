@@ -36,10 +36,10 @@ const DISCOVERED_ONLY_MODES = new Set([
  * @param {object} [options]
  * @param {string} [options.activity='reflect'] - Producing activity: 'reflect', 'synthesize', or 'mental-model'.
  * @param {Map<string, EntityCatalogEntry>} [options.knownCatalog] - Known entity catalog for conflict resolution, validation warnings, and endpoint completion.
- * @param {string} [options.mode='narrative-graph-known'] - Template mode; determines discovery policy.
+ * @param {string} [options.mode='generic'] - Template mode; determines discovery policy.
  * @returns {{nodes: object[], edges: object[]}}
  */
-export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map(), mode = 'narrative-graph-known' } = {}) {
+export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map(), mode = 'generic' } = {}) {
   if (!graph || typeof graph !== 'object') {
     return { nodes: [], edges: [] };
   }

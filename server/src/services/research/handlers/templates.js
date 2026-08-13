@@ -104,7 +104,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
       }
 
       const { narrative, graph, tables, errors: modelErrors } = normalizeModelOutput(content);
-      const graphNormalized = normalizeGraph(graph || { nodes: [], edges: [] }, { source: 'template_model' });
+      const graphNormalized = normalizeGraph(graph || { nodes: [], edges: [] }, { source: 'template_model', mode: 'generic' });
 
       return {
         ext_id: extId,

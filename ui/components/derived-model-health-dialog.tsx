@@ -213,7 +213,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     setSelectedResultId(null);
     try {
       const results = await runHealthCheck(
-        derived.map((d) => ({ ext_id: d.ext_id || '', returns: 'narrative-graph-known' })),
+        derived.map((d) => ({ ext_id: d.ext_id || '', returns: 'generic' })),
       );
       setStatus({ state: 'done', results: results || [] });
       if ((results || []).length > 0) {
