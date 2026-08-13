@@ -166,52 +166,8 @@ function formatNodeExamples({ include, exclude }) {
 }
 
 /**
- * Build conditional output-format fragments based on parsed section directives.
- *
- * Only includes schema fragments when the corresponding directive is present,
- * keeping prompt size minimal and making new directives (e.g. #diagram)
- * addable with just a parser entry + a new fragment file.
- *
- * @param {{graph?:string, table?:Array, narrative?:string}} sectionFocus
- * @returns {string[]}
- */
-function buildConditionalFragments(sectionFocus) {
-  const extra = [];
-  if (sectionFocus?.graph) {
-    extra.push('output-format-graph-contextual.md');
-  }
-  if (sectionFocus?.table) {
-    extra.push('output-format-table-contextual.md');
-  }
-  return extra;
-}
+ * Compose a mental-model prompt from a named template.
 
-/**
- * Merge conditional fragments into a template's static fragment list.
- *
- * @param {object} template - prompt_templates row (pt_fragments is a JSON string)
- * @param {string[]} extraFragments
- * @returns {object} New template-like object with merged fragments
- */
-function mergeFragments(template, extraFragments) {
-  const base = JSON.parse(template.pt_fragments || '[]');
-  // Insert conditional fragments right after contextual-patch.md (if present)
-  // so they precede section-focus.md and semantic fragments.
-  const patchIndex = base.indexOf('contextual-patch.md');
-  if (patchIndex !== -1 && extraFragments.length > 0) {
-    base.splice(patchIndex + 1, 0, ...extraFragments);
-  } else {
-    base.push(...extraFragments);
-  }
-  return {
-    ...template,
-    pt_fragments: JSON.stringify(base),
-  };
-}
-
-/**
- * Build focus variables by parsing section directives from the raw topic text.
- *
  * @param {string} topic - raw mm_source_query text (may contain #graph/#table/#narrative blocks)
  * @returns {{topic: string, focusVariables: Record<string, string>}}
  */
@@ -295,9 +251,7 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
       ...parsedFocus,
       ...focusVariables,
     };
-    const extra = buildConditionalFragments(sectionFocus);
-    const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
-    const { prompt } = composePrompt(effectiveTemplate, merged);
+    const { prompt } = composePrompt(template, merged);
     return prompt;
   }
 
@@ -382,9 +336,7 @@ export async function composeMentalModelPromptBatch(db, items) {
         variables.ARCHITXT_NODE_EXAMPLES = examples;
       }
 
-      const extra = buildConditionalFragments(sectionFocus);
-      const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
-      const { prompt } = composePrompt(effectiveTemplate, variables);
+      const { prompt } = composePrompt(template, variables);
       results.push({ composed_query: prompt });
     } catch (err) {
       logger.warn('Failed to compose mental model prompt in batch', {
