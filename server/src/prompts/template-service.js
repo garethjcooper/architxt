@@ -232,6 +232,36 @@ function mergeFragments(template, extraFragments) {
 }
 
 /**
+ * Strip heavy semantic fragments from a template to keep prompts lightweight.
+ *
+ * The `generic` template carries semantic-graph fragments (entity-catalog,
+ * edge-vocabulary, node-eligibility, etc.) that add ~60K tokens. Those are
+ * appropriate for graph-building via the non-contextual path but overwhelm the
+ * model when the caller (reflect handler) just needs a lightweight narrative +
+ * structured outputs.
+ *
+ * Fragments retained: contextual-patch.md, section-focus.md, output-format-*.md.
+ *
+ * @param {object} template
+ * @returns {object} New template-like object with stripped fragments.
+ */
+function stripSemanticFragments(template) {
+  const base = JSON.parse(template.pt_fragments || '[]');
+  const lightweight = [
+    'contextual-patch.md',
+    'section-focus.md',
+    'output-format-narrative.md',
+    'output-format-graph-contextual.md',
+    'output-format-table-contextual.md',
+  ];
+  const filtered = base.filter((name) => lightweight.includes(name));
+  return {
+    ...template,
+    pt_fragments: JSON.stringify(filtered),
+  };
+}
+
+/**
  * Format active/empty section instructions for injection into a composed prompt.
  *
  * @param {{active: string[], empty: string[]}} sectionState
@@ -409,12 +439,23 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     // variables but the topic is already stripped intentText. Derive section
     // state from the merged focus variables so conditional fragments and
     // Section rules reflect what the user actually requested.
+    //
+    // Also strip heavy semantic fragments (entity-catalog, edge-vocabulary,
+    // etc.) that add ~60K tokens and are appropriate for graph-building but
+    // overwhelm the model when synthesizing a reflect answer.
+    let effectiveTemplate = template;
+    if (templateName === 'generic') {
+      effectiveTemplate = stripSemanticFragments(template);
+    }
+
     const effectiveSectionFocus = templateName === 'generic'
       ? deriveSectionFocusFromVariables(merged)
       : parsedSectionFocus;
 
     const extra = buildConditionalFragments(effectiveSectionFocus);
-    const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
+    if (extra.length > 0) {
+      effectiveTemplate = mergeFragments(effectiveTemplate, extra);
+    }
     const { prompt } = composePrompt(effectiveTemplate, merged);
     const sectionState = computeSectionState(effectiveSectionFocus);
     const instructions = formatSectionInstructions(sectionState);
