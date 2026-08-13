@@ -25,6 +25,7 @@
  */
 
 export const SECTION_DIRECTIVE_CONFIG = {
+  topic:     { cardinality: 'single', merge: 'concat' },
   graph:     { cardinality: 'single', merge: 'concat' },
   table:     { cardinality: 'multiple' },
   narrative: { cardinality: 'single', merge: 'concat' },
@@ -47,14 +48,26 @@ export function parseSectionDirectives(rawQuery) {
   }
 
   const focus = {};
+  let topicBlockContent = null;
 
   // Block style ONLY: #directive\n...content...\n#end
-  const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
+  const blockRe = /#(topic|graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch;
   let blockStripped = rawQuery;
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
     const key = blockMatch[1].toLowerCase();
     const content = blockMatch[2].trim();
+
+    if (key === 'topic') {
+      if (content) {
+        topicBlockContent = topicBlockContent
+          ? topicBlockContent + '\n' + content
+          : content;
+      }
+      blockStripped = blockStripped.replace(blockMatch[0], '');
+      continue;
+    }
+
     if (content) {
       const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
       if (config.cardinality === 'multiple') {
@@ -73,9 +86,25 @@ export function parseSectionDirectives(rawQuery) {
     blockStripped = blockStripped.replace(blockMatch[0], '');
   }
 
-  const intentText = blockStripped.replace(/\s+/g, ' ').trim();
+  const remainingText = blockStripped.replace(/\s+/g, ' ').trim();
 
+  // When #topic is explicit, its content is the intent text and any loose
+  // text outside directives becomes narrative focus.
+  if (topicBlockContent !== null) {
+    if (remainingText) {
+      if (focus.narrative) {
+        focus.narrative = remainingText + '\n' + focus.narrative;
+      } else {
+        focus.narrative = remainingText;
+      }
+    }
+    return Object.keys(focus).length > 0
+      ? { intentText: topicBlockContent, sectionFocus: focus }
+      : { intentText: topicBlockContent };
+  }
+
+  // Legacy behaviour: no #topic block, loose text is the intent.
   return Object.keys(focus).length > 0
-    ? { intentText, sectionFocus: focus }
-    : { intentText };
+    ? { intentText: remainingText, sectionFocus: focus }
+    : { intentText: remainingText };
 }
