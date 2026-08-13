@@ -320,6 +320,48 @@ export function formatFocusVariable(raw) {
 }
 
 /**
+ * Derive section-focus state from merged focus variables.
+ *
+ * When the caller (e.g. the reflect handler) passes pre-parsed focus variables
+ * but the topic text is already stripped of directives, we need to reconstruct
+ * which sections are active from the variable values, not by re-parsing.
+ *
+ * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} variables
+ * @returns {{graph?:string, table?:Array, narrative?:string}|undefined}
+ */
+function deriveSectionFocusFromVariables(variables) {
+  const focus = {};
+  if (variables.ARCHITXT_GRAPH_FOCUS?.trim()) {
+    focus.graph = variables.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
+  }
+  if (variables.ARCHITXT_TABLE_FOCUS?.trim()) {
+    // Table focus is formatted as bullet lines; reconstruct directive objects
+    const lines = variables.ARCHITXT_TABLE_FOCUS.trim().split('\n').filter((l) => l.trim());
+    focus.table = lines.map((line) => {
+      const m = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+      if (m) return { name: m[1].trim(), content: m[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
+  }
+  if (variables.ARCHITXT_NARRATIVE_FOCUS?.trim()) {
+    focus.narrative = variables.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
+  }
+  return Object.keys(focus).length > 0 ? focus : undefined;
+}
+
+/**
+ * Derive section-focus state from merged focus variables.
+ *
+ * When the caller (e.g. the reflect handler) passes pre-parsed focus variables
+ * but the topic text is already stripped of directives, we need to reconstruct
+ * which sections are active from the variable values, not by re-parsing.
+ *
+ * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} variables
+ * @returns {{graph?:string, table?:Array, narrative?:string}|undefined}
+ */
+
+
+/**
  * Compose a full prompt for a derived mental model.
  *
  * @param {object} db
@@ -338,7 +380,7 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     if (!template) {
       throw new Error(`Prompt template not found: ${templateName}`);
     }
-    const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus } = buildFocusFromDirectives(topic);
+    const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus: parsedSectionFocus } = buildFocusFromDirectives(topic);
 
     // Load entity catalog and examples for generic template (same as non-contextual path)
     let entityCatalog = '';
@@ -362,10 +404,19 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
       ...parsedFocus,
       ...focusVariables,
     };
-    const extra = buildConditionalFragments(sectionFocus);
+
+    // For generic template, the caller (reflect handler) passes parsed focus
+    // variables but the topic is already stripped intentText. Derive section
+    // state from the merged focus variables so conditional fragments and
+    // Section rules reflect what the user actually requested.
+    const effectiveSectionFocus = templateName === 'generic'
+      ? deriveSectionFocusFromVariables(merged)
+      : parsedSectionFocus;
+
+    const extra = buildConditionalFragments(effectiveSectionFocus);
     const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
     const { prompt } = composePrompt(effectiveTemplate, merged);
-    const sectionState = computeSectionState(sectionFocus);
+    const sectionState = computeSectionState(effectiveSectionFocus);
     const instructions = formatSectionInstructions(sectionState);
     return injectBeforeOutputDirectives(prompt, instructions);
   }
