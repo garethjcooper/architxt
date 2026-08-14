@@ -296,15 +296,15 @@ export function validateEntityTemplateEligibility({
  * @param {number|string} [context.serverId]
  * @param {string|Date} [context.now]
  */
-export function deriveMentalModels(template, context = {}) {
+export function deriveMentalModels(template, context = {}, { includeSystemTemplates = false } = {}) {
   const entities = template?.entities;
   if (template?.is_template !== true || !Array.isArray(entities) || entities.length === 0) {
     return [];
   }
 
-  // System templates are never derived from entities; contextual-graph service
-  // derives effective models from graph state instead.
-  if (isSystemTemplateRole(template.template_role)) {
+  // System templates are normally derived by the contextual-graph service from
+  // graph state, but the prebuilt research path needs per-entity derivation too.
+  if (!includeSystemTemplates && isSystemTemplateRole(template.template_role)) {
     return [];
   }
 
