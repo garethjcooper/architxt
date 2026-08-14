@@ -30,12 +30,35 @@ export const SECTION_DIRECTIVE_CONFIG = {
   narrative: { cardinality: 'single', merge: 'concat' },
 };
 
+/**
+ * Extract #name value from table block content.
+ * Returns { name, content } where content is everything after #name.
+ *
+ * Supports both multiline and inline:
+ *   #name Billing\nInvoices          → name="Billing", content="Invoices"
+ *   #name Data Flows list items #end → name="Data Flows", content="list items"
+ */
 export function extractTableName(content) {
   const nameRe = /^#name\s+(.+?)(?:\r?\n|$)/i;
   const match = content.match(nameRe);
   if (match) {
-    const name = match[1].trim();
-    const remaining = content.slice(match[0].length).trim();
+    let name = match[1].trim();
+    let remaining = content.slice(match[0].length).trim();
+
+    // Inline case: no newline after #name and nothing remains.
+    // Take first 1–2 words as the name; the rest becomes content.
+    if (!remaining && !content.includes('\n')) {
+      const words = name.split(/\s+/);
+      if (words.length > 1) {
+        // Heuristic: if second word is lowercase, treat first word as name.
+        // Otherwise use first two words.
+        const secondLower = /^[a-z]/.test(words[1]);
+        const splitAt = secondLower ? 1 : 2;
+        remaining = words.slice(splitAt).join(' ');
+        name = words.slice(0, splitAt).join(' ');
+      }
+    }
+
     return { name, content: remaining };
   }
   return { content };
