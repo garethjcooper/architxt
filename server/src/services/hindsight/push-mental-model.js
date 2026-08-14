@@ -70,14 +70,25 @@ function trackPendingOperation(db, serverId, bankId, extId, operationId, status,
   return { success: true, popId: pendingResult.data };
 }
 
-function buildPayload(model) {
-  if (typeof model.composed_query !== 'string' || model.composed_query.trim() === '') {
-    throw new Error(`mental model ${model.ext_id || model.name || '(unknown)'} is missing composed_query; refusing to push raw source_query`);
+export function buildPayload(model) {
+  const composedQuery = typeof model.composed_query === 'string' ? model.composed_query.trim() : '';
+  const sourceQuery = typeof model.source_query === 'string' ? model.source_query.trim() : '';
+
+  if (composedQuery === '' && sourceQuery === '') {
+    throw new Error(`mental model ${model.ext_id || model.name || '(unknown)'} has no composed_query or source_query; nothing to push`);
+  }
+
+  const effectiveQuery = composedQuery || sourceQuery;
+  if (composedQuery === '') {
+    logger.warn('Mental model has no composed_query; falling back to raw source_query', {
+      extId: model.ext_id,
+      hasComposeError: !!model.compose_error,
+    });
   }
 
   return {
     name: model.name || null,
-    source_query: model.composed_query,
+    source_query: effectiveQuery,
     tags: Array.isArray(model.tags) ? model.tags : [],
     max_tokens: normaliseMaxTokens(model.max_tokens) ?? DEFAULT_MAX_TOKENS,
     trigger: {
