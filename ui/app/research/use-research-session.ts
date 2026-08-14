@@ -665,7 +665,7 @@ export function useResearchSession({
         toast.error(queryMode === 'models' ? 'Select at least one mental model' : 'Select at least one template');
         return;
       }
-    } else if (!query.trim()) {
+    } else if (queryMode !== 'prebuilt' && !query.trim()) {
       toast.error('Enter a query');
       return;
     }
