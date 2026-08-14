@@ -596,11 +596,13 @@ export default function WorkspacePage() {
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize library pane"
-            title="Drag to resize; double-click to reset"
             onMouseDown={handleResizeStart}
             onDoubleClick={handleResizeReset}
-            className="w-1.5 -ml-0.5 -mr-0.5 cursor-col-resize rounded-full hover:bg-white/20 active:bg-white/30 transition-colors shrink-0 z-10"
-          />
+            className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
+            title="Drag to resize library and quick view panels; double-click to reset"
+          >
+            <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+          </div>
 
           {/* Quick view */}
           <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] p-4 overflow-y-auto">
