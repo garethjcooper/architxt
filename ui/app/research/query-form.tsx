@@ -736,7 +736,7 @@ export function QueryForm(props: QueryFormProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col h-full p-2 gap-2 overflow-hidden">
       <div className="flex flex-1 min-h-0 gap-2">
-        {queryMode !== 'models' && queryMode !== 'templates' && (
+        {queryMode !== 'models' && queryMode !== 'templates' && queryMode !== 'prebuilt' && (
           <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0 relative">
             <div
               ref={editorRef}
@@ -805,31 +805,87 @@ export function QueryForm(props: QueryFormProps) {
         )}
 
         {queryMode === 'prebuilt' && availableTemplateRoles.length > 0 && (
-          <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-            <div className="text-[10px] text-white/70 font-medium mb-1">Model types</div>
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-              {availableTemplateRoles.map(({ value, label }) => {
-                const selected = selectedTemplateRoles.includes(value);
-                return (
-                  <label
-                    key={value}
-                    className={`flex items-center gap-2 text-[10px] text-white/80 ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer'}`}
-                  >
-                    <Checkbox
-                      disabled={isRunning}
-                      checked={selected}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedTemplateRoles([...selectedTemplateRoles, value]);
-                        } else {
-                          setSelectedTemplateRoles(selectedTemplateRoles.filter((x) => x !== value));
-                        }
-                      }}
-                    />
-                    <span>{label}</span>
-                  </label>
-                );
-              })}
+          <div className="flex flex-1 min-h-0 gap-2 w-full">
+            <div className={`w-1/3 min-h-0 flex flex-col border-r border-white/10 pr-2 ${isRunning ? 'opacity-50' : ''}`}>
+              <div className="text-[10px] text-white/70 font-medium mb-1">Entities</div>
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+                {(() => {
+                  const selectedIds = queryOptions.prebuilt?.selectedEntities || [];
+                  if (selectedIds.length === 0) {
+                    return (
+                      <div className="text-[10px] text-white/40 italic">
+                        Double-click an entity in the Entities panel to add it here.
+                      </div>
+                    );
+                  }
+                  return selectedIds
+                    .map((id) => entityMap.get(id))
+                    .filter((e): e is EntityLike => Boolean(e))
+                    .map((entity) => {
+                      const display = entity.label || entity.id;
+                      const qualified = entity.type && !entity.id.startsWith(`${entity.type}:`)
+                        ? `${entity.type}:${entity.id}`
+                        : entity.id;
+                      return (
+                        <div
+                          key={entity.id}
+                          className="flex items-center gap-2 rounded border border-white/5 bg-black/20 px-2 py-1.5 min-h-[2.8125rem]"
+                          style={{ borderLeftColor: colorForType(entity.type || undefined), borderLeftWidth: 3 }}
+                        >
+                          <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
+                            <div className="text-xs text-white/90 truncate">{display}</div>
+                            <div className="text-[10px] text-white/50 font-mono truncate">{qualified}</div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isRunning}
+                            onClick={() => {
+                              setQueryOptions((o) => ({
+                                ...o,
+                                prebuilt: {
+                                  ...o.prebuilt,
+                                  selectedEntities: selectedIds.filter((id) => id !== entity.id),
+                                },
+                              }));
+                            }}
+                            className={`shrink-0 text-white/50 hover:text-red-400 text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            aria-label={`Remove ${display} from prebuilt lookup`}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    });
+                })()}
+              </div>
+            </div>
+            <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
+              <div className="text-[10px] text-white/70 font-medium mb-1">Model types</div>
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+                {availableTemplateRoles.map(({ value, label }) => {
+                  const selected = selectedTemplateRoles.includes(value);
+                  return (
+                    <label
+                      key={value}
+                      className={`flex items-center gap-2 text-[10px] text-white/80 ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer'}`}
+                    >
+                      <Checkbox
+                        disabled={isRunning}
+                        checked={selected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTemplateRoles([...selectedTemplateRoles, value]);
+                          } else {
+                            setSelectedTemplateRoles(selectedTemplateRoles.filter((x) => x !== value));
+                          }
+                        }}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -1070,7 +1126,7 @@ export function QueryForm(props: QueryFormProps) {
       <div className="flex gap-2 shrink-0">
         <Button
           type="submit"
-          disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : queryMode === 'templates' ? !queryOptions.templates?.selections?.length : !query.trim())}
+          disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : queryMode === 'templates' ? !queryOptions.templates?.selections?.length : queryMode === 'prebuilt' ? false : !query.trim())}
           className="flex-1"
           size="sm"
         >
