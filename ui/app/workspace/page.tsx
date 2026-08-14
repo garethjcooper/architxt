@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -113,6 +113,47 @@ export default function WorkspacePage() {
   const [edges, setEdges] = useState<DisplayEdge[]>([]);
   const [models, setModels] = useState<WorkspaceModel[]>([]);
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
+
+  const [libraryWidth, setLibraryWidth] = useState(320);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(libraryWidth);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = libraryWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [libraryWidth]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizingRef.current) return;
+    const deltaX = e.clientX - startXRef.current;
+    const nextWidth = Math.min(Math.max(startWidthRef.current + deltaX, 220), 720);
+    setLibraryWidth(nextWidth);
+  }, []);
+
+  const handleResizeEnd = useCallback(() => {
+    isResizingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  const handleResizeReset = useCallback(() => {
+    setLibraryWidth(320);
+  }, []);
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => handleResizeMove(e);
+    const up = () => handleResizeEnd();
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+  }, [handleResizeMove, handleResizeEnd]);
 
   const [rawModelContent, setRawModelContent] = useState<{ content: string | object | null; updatedAt?: string; loading: boolean; error?: string }>({
     content: null,
@@ -517,7 +558,7 @@ export default function WorkspacePage() {
         {/* Main workspace */}
         <div className="flex-1 flex min-h-0 gap-3">
           {/* Library */}
-          <div className="w-80 flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]">
+          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: libraryWidth, minWidth: libraryWidth, maxWidth: libraryWidth }}>
             <div className="p-3 border-b border-white/10">
               <Input
                 placeholder="Search library..."
@@ -549,6 +590,17 @@ export default function WorkspacePage() {
               {renderLibraryList()}
             </div>
           </div>
+
+          {/* Resize grab bar */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize library pane"
+            title="Drag to resize; double-click to reset"
+            onMouseDown={handleResizeStart}
+            onDoubleClick={handleResizeReset}
+            className="w-1.5 -ml-0.5 -mr-0.5 cursor-col-resize rounded-full hover:bg-white/20 active:bg-white/30 transition-colors shrink-0 z-10"
+          />
 
           {/* Quick view */}
           <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] p-4 overflow-y-auto">
