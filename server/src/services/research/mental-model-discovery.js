@@ -18,7 +18,7 @@
  *   }
  */
 
-import { listMentalModels as listLocalMentalModels, deriveMentalModels } from '../../db/crud/mental-models.js';
+import { listMentalModels as listLocalMentalModels, deriveMentalModels, isSystemTemplateRole } from '../../db/crud/mental-models.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../prompts/normalize-graph.js';
@@ -89,24 +89,60 @@ function buildCandidatesForRole(localModels, entityIds) {
       is_derived: false,
     };
 
-    if (isTemplate) {
-      const derived = deriveMentalModels(model, {}, { includeSystemTemplates: true });
-      for (const d of derived) {
-        const derivedEntityId = stripTypePrefix(d.derived_entity?.entity_id);
-        if (hasEntityFilter && !queryEntitySet.has(derivedEntityId)) {
-          continue;
-        }
+    if (!isTemplate) {
+      candidates.push(base);
+      continue;
+    }
+
+    // System templates have no mental_model_entities rows and use placeholders
+    // like {id}, {seed-id}, {source-id} rather than {entity-id}.
+    // Derive one candidate per requested entity by substituting the entity id.
+    if (isSystemTemplateRole(model.template_role)) {
+      for (const entityId of entityIds) {
+        const bareId = stripTypePrefix(entityId);
+        const extId = model.ext_id
+          .replaceAll('{id}', bareId)
+          .replaceAll('{entity-id}', bareId)
+          .replaceAll('{seed-id}', bareId)
+          .replaceAll('{source-id}', bareId)
+          .replaceAll('{target-id}', bareId);
+        const name = model.name
+          .replaceAll('{id}', bareId)
+          .replaceAll('{entity-name}', bareId)
+          .replaceAll('{entity-id}', bareId)
+          .replaceAll('{seed-name}', bareId)
+          .replaceAll('{seed-id}', bareId)
+          .replaceAll('{source-name}', bareId)
+          .replaceAll('{source-id}', bareId)
+          .replaceAll('{target-name}', bareId)
+          .replaceAll('{target-id}', bareId);
         candidates.push({
           ...base,
-          id: d.id,
-          ext_id: d.ext_id,
-          name: d.name,
+          id: `${model.id}:${bareId}`,
+          ext_id: extId,
+          name,
           is_derived: true,
-          derived_entity_id: derivedEntityId,
+          derived_entity_id: bareId,
         });
       }
-    } else {
-      candidates.push(base);
+      continue;
+    }
+
+    // Normal entity templates with mental_model_entities junction rows
+    const derived = deriveMentalModels(model, {}, { includeSystemTemplates: false });
+    for (const d of derived) {
+      const derivedEntityId = stripTypePrefix(d.derived_entity?.entity_id);
+      if (hasEntityFilter && !queryEntitySet.has(derivedEntityId)) {
+        continue;
+      }
+      candidates.push({
+        ...base,
+        id: d.id,
+        ext_id: d.ext_id,
+        name: d.name,
+        is_derived: true,
+        derived_entity_id: derivedEntityId,
+      });
     }
   }
 
