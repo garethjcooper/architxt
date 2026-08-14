@@ -44,10 +44,13 @@ export interface UseResearchSessionOptions {
   bankId: string;
   viewMode: 'step' | 'session';
   onViewModeChange?: (mode: 'step' | 'session') => void;
-  availableDimensions?: Array<{ value: string; label: string }>;
+  availableTemplateRoles?: Array<{ value: string; label: string }>;
 }
 
 export interface ResearchQueryOptions {
+  prebuilt?: {
+    selectedEntities?: string[];
+  };
   recall?: {
     types?: string[];
     preferObservations?: boolean;
@@ -206,11 +209,11 @@ export function useResearchSession({
   bankId,
   viewMode,
   onViewModeChange,
-  availableDimensions = [],
+  availableTemplateRoles = [],
 }: UseResearchSessionOptions) {
   const [query, setQuery] = useState('');
   const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>('prebuilt');
-  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
+  const [selectedTemplateRoles, setSelectedTemplateRoles] = useState<string[]>([]);
   const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
     recall: { ...DEFAULT_QUERY_OPTIONS.recall },
     reflect: { ...DEFAULT_QUERY_OPTIONS.reflect },
@@ -575,10 +578,10 @@ export function useResearchSession({
         ...buildQueryOptionsFromParameters(step.action_type, step.parameters),
       }));
 
-      if (step.action_type === 'prebuilt' && Array.isArray(step.parameters?.dimensions)) {
-        const validValues = new Set(availableDimensions.map((d) => d.value));
-        const restored = step.parameters.dimensions.filter((d: string) => validValues.has(d));
-        setSelectedDimensions(restored);
+      if (step.action_type === 'prebuilt' && Array.isArray(step.parameters?.roles)) {
+        const validValues = new Set(availableTemplateRoles.map((r) => r.value));
+        const restored = step.parameters.roles.filter((r: string) => validValues.has(r));
+        setSelectedTemplateRoles(restored);
       } else if (step.action_type === 'models' && step.parameters && Array.isArray(step.parameters.selections)) {
         const modelSelections = step.parameters.selections;
         setQueryOptions((prev) => ({
@@ -596,7 +599,7 @@ export function useResearchSession({
           },
         }));
       } else if (step.action_type !== 'prebuilt') {
-        setSelectedDimensions([]);
+        setSelectedTemplateRoles([]);
       }
 
       toast.success('Loaded query details into query card');
@@ -605,7 +608,7 @@ export function useResearchSession({
       logger.error('Failed to load step details', err);
       toast.error(`Failed to load query details: ${message}`);
     }
-  }, [availableDimensions]);
+  }, [availableTemplateRoles]);
 
   const handleSynthesize = useCallback(async (sourceStepIds: number[], intentText: string) => {
     if (!serverId || !bankId || !activeSessionId) {
@@ -691,12 +694,17 @@ export function useResearchSession({
       .map((t) => (t.type ? `${t.type}:${t.id}` : t.id));
 
     if (queryMode === 'prebuilt') {
-      if (selectedDimensions.length === 0) {
-        toast.error('Select at least one dimension');
+      if (selectedTemplateRoles.length === 0) {
+        toast.error('Select at least one template role');
         return;
       }
+      const selectedEntities = queryOptions.prebuilt?.selectedEntities;
+      if (selectedEntities && selectedEntities.length > 0) {
+        // Override entityIds with explicitly selected entities
+        entityIds.splice(0, entityIds.length, ...selectedEntities);
+      }
       if (entityIds.length === 0) {
-        toast.error('Include at least one entity token for prebuilt research');
+        toast.error('Include at least one entity for prebuilt research');
         return;
       }
       setLoading(true);
@@ -706,7 +714,7 @@ export function useResearchSession({
           server_id: parseInt(serverId, 10),
           bank_id: bankId,
           entities: entityIds,
-          dimensions: selectedDimensions,
+          roles: selectedTemplateRoles,
           session_id: activeSessionId ?? undefined,
         });
         if (!prebuilt.success) {
@@ -802,7 +810,7 @@ export function useResearchSession({
     } finally {
       setLoading(false);
     }
-  }, [serverId, bankId, query, queryMode, selectedDimensions, activeSessionId, queryOptions, fetchSessions, pollForStepCompletion, viewMode, selectedStepIds, activeStepId, handleSynthesize]);
+  }, [serverId, bankId, query, queryMode, selectedTemplateRoles, activeSessionId, queryOptions, fetchSessions, pollForStepCompletion, viewMode, selectedStepIds, activeStepId, handleSynthesize]);
 
   return {
     sessions,
@@ -818,8 +826,8 @@ export function useResearchSession({
     setQuery,
     queryMode,
     setQueryMode,
-    selectedDimensions,
-    setSelectedDimensions,
+    selectedTemplateRoles,
+    setSelectedTemplateRoles,
     queryOptions,
     setQueryOptions,
     creatingSession,

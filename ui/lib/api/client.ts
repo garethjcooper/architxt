@@ -469,6 +469,7 @@ export const mentalModelsApi = {
   },
   listDimensions: () => fetchApi<string[]>('/mentalmodels/dimensions'),
   listStandardDimensions: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/dimensions/standard'),
+  listTemplateRoles: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/roles/template'),
   get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
   create: (data: {
     ext_id: string;
@@ -912,8 +913,8 @@ export interface PrebuiltEntityResult {
   model_results: PrebuiltModelResult[];
 }
 
-export interface PrebuiltDimensionResult {
-  dimension: string;
+export interface PrebuiltRoleResult {
+  role: string;
   entities: PrebuiltEntityResult[];
   found_count: number;
   missing_count: number;
@@ -936,8 +937,8 @@ export interface PrebuiltResponse {
   success: boolean;
   error?: string;
   entities: string[];
-  entity_summary: Array<{ entity: string; dimension: string; found: boolean }>;
-  dimensions: PrebuiltDimensionResult[];
+  entity_summary: Array<{ entity: string; role: string; found: boolean }>;
+  roles: PrebuiltRoleResult[];
   session_id?: number;
   step_id?: number;
 }
@@ -1092,7 +1093,7 @@ export const researchApi = {
     server_id: number;
     bank_id: string;
     entities: string[];
-    dimensions: string[];
+    roles: string[];
     session_id?: number;
   }) =>
     fetchApi<PrebuiltResponse>('/research/prebuilt', {
@@ -1104,7 +1105,7 @@ export const researchApi = {
     server_id: number;
     bank_id: string;
     entities: string[];
-    dimensions: string[];
+    roles: string[];
   }) =>
     fetchApi<PrebuiltResponse>('/research/prebuilt/oneshot', {
       method: 'POST',

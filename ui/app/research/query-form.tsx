@@ -42,9 +42,9 @@ export interface QueryFormProps {
   availableEdges: EdgeLike[];
   onSubmit: (e: React.FormEvent) => void;
   queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
-  dimensions: string[];
-  setDimensions: (d: string[]) => void;
-  availableDimensions: Array<{ value: string; label: string }>;
+  selectedTemplateRoles: string[];
+  setSelectedTemplateRoles: (r: string[]) => void;
+  availableTemplateRoles: Array<{ value: string; label: string }>;
   queryOptions: ResearchQueryOptions;
   setQueryOptions: (opts: ResearchQueryOptions | ((prev: ResearchQueryOptions) => ResearchQueryOptions)) => void;
   availableMentalModels?: Array<{ id: number; ext_id: string; name?: string }>;
@@ -61,7 +61,7 @@ export interface QueryFormProps {
 }
 
 const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
-  prebuilt: 'Use entity focused dimensions for faster data retrieval. Type [[ to show list of existing known entities. Double click an entity to add to this query.',
+  prebuilt: 'Double-click an entity to add it to the prebuilt lookup list, then select one or more template roles to run.',
   recall: 'Returns facts for the given query in a table format. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   reflect: 'Returns a generated narrative for the given query. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
@@ -297,9 +297,9 @@ export function QueryForm(props: QueryFormProps) {
     availableEdges,
     onSubmit,
     queryMode,
-    dimensions,
-    setDimensions,
-    availableDimensions,
+    selectedTemplateRoles,
+    setSelectedTemplateRoles,
+    availableTemplateRoles,
     queryOptions,
     setQueryOptions,
     availableMentalModels = [],
@@ -804,12 +804,12 @@ export function QueryForm(props: QueryFormProps) {
         </div>
         )}
 
-        {queryMode === 'prebuilt' && availableDimensions.length > 0 && (
+        {queryMode === 'prebuilt' && availableTemplateRoles.length > 0 && (
           <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-            <div className="text-[10px] text-white/70 font-medium mb-1">Dimensions</div>
+            <div className="text-[10px] text-white/70 font-medium mb-1">Model types</div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-              {availableDimensions.map(({ value, label }) => {
-                const selected = dimensions.includes(value);
+              {availableTemplateRoles.map(({ value, label }) => {
+                const selected = selectedTemplateRoles.includes(value);
                 return (
                   <label
                     key={value}
@@ -820,9 +820,9 @@ export function QueryForm(props: QueryFormProps) {
                       checked={selected}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setDimensions([...dimensions, value]);
+                          setSelectedTemplateRoles([...selectedTemplateRoles, value]);
                         } else {
-                          setDimensions(dimensions.filter((x) => x !== value));
+                          setSelectedTemplateRoles(selectedTemplateRoles.filter((x) => x !== value));
                         }
                       }}
                     />
