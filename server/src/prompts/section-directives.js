@@ -50,8 +50,9 @@ export function parseSectionDirectives(rawQuery) {
   let firstDirectiveContent = null;
   let anyDirectiveFound = false;
 
-  // Block style ONLY: #directive\n...content...\n#end
-  const blockRe = /#(graph|table|narrative)\s*(?:\n|\r\n?)([\s\S]*?)(?:\r?\n)?#end\b/gi;
+  // Block style: #directive ...content... #end
+  // Content may start on the same line as the keyword or on the next line.
+  const blockRe = /#(graph|table|narrative)\b\s*([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch;
   let blockStripped = rawQuery;
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
