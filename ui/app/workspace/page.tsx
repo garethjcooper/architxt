@@ -393,6 +393,10 @@ export default function WorkspacePage() {
       const entity = selectedItem.data;
       const summary = getEntitySummary(entity);
       const modelRefs = entity.properties.provenance?.model_refs || [];
+      const relatedEdges = edges.filter(
+        (e) => e.source_id === entity.id || e.target_id === entity.id
+      );
+      const entityQuickViewEdgeItem = (edge: DisplayEdge): LibraryItem => ({ kind: 'edge', data: edge });
       return (
         <div className="space-y-3">
           <div>
@@ -425,6 +429,23 @@ export default function WorkspacePage() {
               </div>
             </Section>
           )}
+          <Section title={`Related edges (${relatedEdges.length})`} defaultOpen={relatedEdges.length > 0}>
+            {relatedEdges.length === 0 ? (
+              <div className="text-white/40 text-sm">No related edges.</div>
+            ) : (
+              <div className="space-y-1">
+                {relatedEdges.map((edge) => (
+                  <EdgeListRow
+                    key={edge.id}
+                    edge={edge}
+                    sourceLabel={nodeById.get(edge.source_id)?.label}
+                    targetLabel={nodeById.get(edge.target_id)?.label}
+                    onClick={() => handleSelectItem(entityQuickViewEdgeItem(edge))}
+                  />
+                ))}
+              </div>
+            )}
+          </Section>
         </div>
       );
     }
