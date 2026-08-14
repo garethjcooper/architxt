@@ -63,25 +63,12 @@ function formatRelative(value?: string | null): string {
   return formatDistanceToNow(d, { addSuffix: true });
 }
 
-function getNodeType(node: WorkspaceEntity): string {
+function getNodeType(node: { id: string; labels: string[] }): string {
   if (node.labels.includes('canonical')) return 'canonical';
   if (node.labels.includes('grounded')) return 'grounded';
   if (node.labels.includes('discovered')) return 'discovered';
   if (node.labels.includes('candidate')) return 'candidate';
   return node.labels[0] || 'entity';
-}
-
-function getNodeDisplayType(node: { id: string; labels?: string[]; properties?: Record<string, any> }): string {
-  const props = node.properties || {};
-  const labels = node.labels || [];
-  const explicit = props.type || props.entity_type;
-  if (typeof explicit === 'string' && explicit.trim()) return explicit;
-  if (node.id.includes(':')) return node.id.split(':')[0];
-  if (labels.includes('canonical')) return 'canonical';
-  if (labels.includes('grounded')) return 'grounded';
-  if (labels.includes('discovered')) return 'discovered';
-  if (labels.includes('candidate')) return 'candidate';
-  return labels[0] || 'entity';
 }
 
 function getEntitySummary(entity: WorkspaceEntity): string | undefined {
@@ -207,10 +194,20 @@ export default function WorkspacePage() {
         mentalModelsApi.list({ limit: 1000 }),
       ]);
 
+      // Align with the Context Manager's grounded view: only canonical or
+      // grounded nodes that are not candidates. This keeps the workspace focused
+      // on the prebuilt/processed corpus graph rather than inferred/candidate
+      // items that still need review.
+      const groundedNodes = nodesData.filter(
+        (n) =>
+          (n.labels.includes('canonical') || n.labels.includes('grounded')) &&
+          !n.labels.includes('candidate')
+      );
+
       setEntities(
-        nodesData.map((n) => {
+        groundedNodes.map((n) => {
           const label = n.properties.display_name || n.properties.name || n.id;
-          const type = getNodeDisplayType(n);
+          const type = getNodeType(n);
           return {
             id: n.id,
             type,
@@ -221,8 +218,12 @@ export default function WorkspacePage() {
         })
       );
 
+      // Keep only non-candidate edges so the workspace matches the grounded
+      // entity view. Candidate edges belong in review/approval flows.
+      const groundedEdges = edgesData.filter((e) => !(e.properties.labels || []).includes('candidate'));
+
       setEdges(
-        edgesData.map((e) => ({
+        groundedEdges.map((e) => ({
           id: e.id,
           sourceId: e.source_id,
           targetId: e.target_id,
