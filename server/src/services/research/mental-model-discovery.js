@@ -90,7 +90,7 @@ function buildCandidatesForRole(localModels, entityIds) {
     };
 
     if (isTemplate) {
-      const derived = deriveMentalModels(model);
+      const derived = deriveMentalModels(model, {}, { includeSystemTemplates: true });
       for (const d of derived) {
         const derivedEntityId = stripTypePrefix(d.derived_entity?.entity_id);
         if (hasEntityFilter && !queryEntitySet.has(derivedEntityId)) {
