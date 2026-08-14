@@ -96,10 +96,14 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
-  it('narrative-only with loose text does not double-assign', () => {
-    const result = parseSectionDirectives('Tell me about CRM\n#narrative\ndetailed analysis\n#end');
-    assert.equal(result.intentText, 'Tell me about CRM');
-    assert.equal(result.sectionFocus?.narrative, 'detailed analysis');
+  it('parses inline directives without newlines', () => {
+    const result = parseSectionDirectives('what is ICMS #graph show data flows #end #table #name Data Flows list interface name, protocol and destination systems for the data flows #end what is Singleview #table #name table-abc list Singleview capabilities #end');
+    assert.equal(result.intentText, 'what is ICMS what is Singleview');
+    assert.equal(result.sectionFocus?.graph, 'show data flows');
+    assert.equal(result.sectionFocus?.table?.length, 2);
+    assert.ok(result.sectionFocus?.table[0].name);
+    assert.ok(result.sectionFocus?.table[1].name);
+    assert.equal(result.sectionFocus?.narrative, undefined);
   });
 });
 
