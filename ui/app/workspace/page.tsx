@@ -42,7 +42,6 @@ type WorkspaceModel = {
   sourceQuery?: string;
   isTemplate: boolean;
   templateRole?: string;
-  dimension?: string | null;
   updatedAt?: string;
 };
 
@@ -231,7 +230,6 @@ export default function WorkspacePage() {
           sourceQuery: m.source_query || undefined,
           isTemplate: Boolean(m.is_template || m.template_role),
           templateRole: m.template_role || undefined,
-          dimension: m.dimension || null,
           updatedAt: m.updated_at || undefined,
         }))
       );
@@ -491,7 +489,6 @@ export default function WorkspacePage() {
         <div className="flex flex-wrap gap-1.5">
           {model.isTemplate && <Badge variant="outline" className="text-[10px] h-5">template</Badge>}
           {model.templateRole && <Badge variant="outline" className="text-[10px] h-5">{model.templateRole}</Badge>}
-          {model.dimension && <Badge variant="outline" className="text-[10px] h-5">{model.dimension}</Badge>}
         </div>
         {model.sourceQuery && <Section title="Source query"><PropertyRow label="" value={model.sourceQuery} /></Section>}
         <Section title="Raw content">
