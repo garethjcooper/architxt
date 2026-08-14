@@ -253,9 +253,10 @@ export function EdgeListRow({
   sourceLabel?: string;
   targetLabel?: string;
 }) {
-  const source = sourceLabel || edge.source_id;
-  const target = targetLabel || edge.target_id;
-  const description = edge.detail || edge.label || edge.type || 'edge';
+  const sourceDisplay = sourceLabel || edge.source_id;
+  const targetDisplay = targetLabel || edge.target_id;
+  const secondary = edge.label || edge.type || edge.id;
+  const description = edge.detail;
   const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
   return (
     <button
@@ -269,10 +270,10 @@ export function EdgeListRow({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm text-white/90 truncate">
-            {source} <span className="text-white/40">→</span> {target}
+            {sourceDisplay} <span className="text-white/40">→</span> {targetDisplay}
           </div>
           <div className="text-[11px] text-white/40 truncate">
-            {description} · {edge.id}
+            {description || secondary}
           </div>
         </div>
         {lastRefreshed && (

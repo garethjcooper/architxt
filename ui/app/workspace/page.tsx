@@ -185,6 +185,12 @@ export default function WorkspacePage() {
     loadData();
   }, [loadData]);
 
+  const nodeById = useMemo(() => {
+    const map = new Map<string, DisplayNode>();
+    entities.forEach((node) => map.set(node.id, node));
+    return map;
+  }, [entities]);
+
   const filteredEntities = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return entities;
@@ -262,6 +268,8 @@ export default function WorkspacePage() {
               key={edge.id}
               edge={edge}
               active={selectedItem?.kind === 'edge' && selectedItem.data.id === edge.id}
+              sourceLabel={nodeById.get(edge.source_id)?.label}
+              targetLabel={nodeById.get(edge.target_id)?.label}
               onClick={() => handleSelectItem({ kind: 'edge', data: edge })}
             />
           ))}
