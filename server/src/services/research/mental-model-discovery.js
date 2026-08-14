@@ -112,7 +112,9 @@ function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
       if (model.template_role === 'sys_edge_context') {
         // Edge-context requires actual graph edges between selected entities.
         if (!db || !serverId || !bankId) continue;
-        const edges = listEdges(db, serverId, bankId, { undirected: true, limit: 10000 });
+        const edgesResult = listEdges(db, serverId, bankId, { undirected: true, limit: 10000 });
+        if (!edgesResult.success) continue;
+        const edges = edgesResult.data || [];
         const selectedSet = new Set(entityIds);
         const seenPairs = new Set();
         for (const edge of edges) {
