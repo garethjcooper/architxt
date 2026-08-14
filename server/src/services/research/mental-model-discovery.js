@@ -19,6 +19,7 @@
  */
 
 import { listMentalModels as listLocalMentalModels, deriveMentalModels, isSystemTemplateRole } from '../../db/crud/mental-models.js';
+import { listEdges } from '../../db/crud/contextual-graph.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../prompts/normalize-graph.js';
@@ -69,7 +70,18 @@ function stripTypePrefix(value) {
   return colonIdx > 0 ? value.slice(colonIdx + 1) : value;
 }
 
-function buildCandidatesForRole(localModels, entityIds) {
+/**
+ * Build candidate mental models from local template / model rows.
+ *
+ * For system templates (sys_* roles):
+ *   - Single-entity roles (entity-summary, entity-capabilities, discovery) substitute
+ *     the full type-prefixed entity id (e.g. "a-com:COM-001") into placeholders.
+ *   - Edge-context derives candidates from actual undirected graph edges between
+ *     selected entities; it cannot be inferred from a single entity id.
+ *
+ * For normal templates: delegates to deriveMentalModels.
+ */
+function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
   const queryEntitySet = new Set(entityIds.map(stripTypePrefix));
   const hasEntityFilter = entityIds.length > 0;
   const candidates = [];
@@ -96,16 +108,49 @@ function buildCandidatesForRole(localModels, entityIds) {
 
     // System templates have no mental_model_entities rows and use placeholders
     // like {id}, {seed-id}, {source-id} rather than {entity-id}.
-    // Derive one candidate per requested entity by substituting the entity id.
     if (isSystemTemplateRole(model.template_role)) {
+      if (model.template_role === 'sys_edge_context') {
+        // Edge-context requires actual graph edges between selected entities.
+        if (!db || !serverId || !bankId) continue;
+        const edges = listEdges(db, serverId, bankId, { undirected: true, limit: 10000 });
+        const selectedSet = new Set(entityIds);
+        const seenPairs = new Set();
+        for (const edge of edges) {
+          const sourceId = edge.cge_source_id;
+          const targetId = edge.cge_target_id;
+          if (!selectedSet.has(sourceId) || !selectedSet.has(targetId)) continue;
+          const pk = `${sourceId}|${targetId}`;
+          if (seenPairs.has(pk)) continue;
+          seenPairs.add(pk);
+
+          const extId = model.ext_id
+            .replaceAll('{source-id}', sourceId)
+            .replaceAll('{target-id}', targetId);
+          const name = model.name
+            .replaceAll('{source-name}', stripTypePrefix(sourceId))
+            .replaceAll('{target-name}', stripTypePrefix(targetId));
+          candidates.push({
+            ...base,
+            id: `${model.id}:${sourceId}|${targetId}`,
+            ext_id: extId,
+            name,
+            is_derived: true,
+            derived_entity_id: `${sourceId}|${targetId}`,
+          });
+        }
+        continue;
+      }
+
+      // Single-entity system templates (entity-summary, entity-capabilities, discovery).
+      // Use the FULL type-prefixed id for ext_id placeholders; bare id for display name fallback.
       for (const entityId of entityIds) {
         const bareId = stripTypePrefix(entityId);
         const extId = model.ext_id
-          .replaceAll('{id}', bareId)
-          .replaceAll('{entity-id}', bareId)
-          .replaceAll('{seed-id}', bareId)
-          .replaceAll('{source-id}', bareId)
-          .replaceAll('{target-id}', bareId);
+          .replaceAll('{id}', entityId)
+          .replaceAll('{entity-id}', entityId)
+          .replaceAll('{seed-id}', entityId)
+          .replaceAll('{source-id}', entityId)
+          .replaceAll('{target-id}', entityId);
         const name = model.name
           .replaceAll('{id}', bareId)
           .replaceAll('{entity-name}', bareId)
@@ -265,7 +310,7 @@ export async function discoverMentalModelsByRoles(db, serverId, bankId, options 
       return { success: false, error: localResult.error, code: localResult.code || 'DATABASE_ERROR' };
     }
 
-    const candidates = buildCandidatesForRole(localResult.data || [], entityIds);
+    const candidates = buildCandidatesForRole(localResult.data || [], entityIds, db, serverId, bankId);
     const populated = await fetchCandidateContents(serverId, bankId, candidates, timeoutMs);
 
     const found = populated.filter((c) => c.found);
