@@ -21,7 +21,7 @@ import {
   deleteSessionWithSteps,
 } from '../db/crud/research.js';
 
-import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../services/research/mental-model-discovery.js';
+import { discoverMentalModelsByRoles } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
@@ -43,17 +43,17 @@ async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, er
 
 async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   const parameters = step.rstep_parameters || {};
-  const dimensions = parameters.dimensions || [];
+  const roles = parameters.roles || [];
   const selections = step.rstep_selections || [];
   const entities = selections
     .filter((s) => s.kind === 'entity')
     .map((s) => (s.id ? String(s.id) : undefined))
     .filter(Boolean);
 
-  if (!entities.length || !dimensions.length) {
+  if (!entities.length || !roles.length) {
     await updateStep(db, step.rstep_id, {
       rstep_status: 'failed',
-      rstep_error_message: 'Prebuilt step is missing entities or dimensions',
+      rstep_error_message: 'Prebuilt step is missing entities or roles',
       rstep_calls: [],
       rstep_tool_calls_used: 0,
     });
@@ -61,9 +61,9 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   }
 
   const prebuiltStart = Date.now();
-  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, dimensions });
+  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, roles });
   const prebuiltDuration = Date.now() - prebuiltStart;
-  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, dimensions };
+  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, roles };
   const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
 
   const buildPrebuiltCall = (status, extra = {}) => ({
@@ -88,23 +88,24 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
 
   const mergedGraph = { nodes: [], edges: [] };
   const narratives = [];
-  for (const dim of result.dimensions || []) {
-    const found = (dim.entities || [])
+  for (const roleResult of result.roles || []) {
+    const found = (roleResult.entities || [])
       .filter((e) => e.found)
       .map((e) => e.entity);
-    const modelNames = (dim.entities || [])
+    const modelNames = (roleResult.entities || [])
       .flatMap((e) => (e.model_results || []).filter((m) => m.found).map((m) => m.name))
       .filter((v, i, a) => a.indexOf(v) === i);
-    const lines = [`## ${dim.dimension}`, ''];
-    if (dim.result?.narrative) {
-      lines.push(dim.result.narrative);
+    const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
+    const lines = [`## ${roleLabel}`, ''];
+    if (roleResult.result?.narrative) {
+      lines.push(roleResult.result.narrative);
     } else {
       lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
       lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
     }
     narratives.push(lines.join('\n'));
 
-    const jsonResult = dim.result?.json_result;
+    const jsonResult = roleResult.result?.json_result;
     if (jsonResult) {
       const graphs = Array.isArray(jsonResult) ? jsonResult : [jsonResult];
       for (const g of graphs) {
@@ -122,8 +123,8 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
     }
   }
 
-  const foundCount = (result.dimensions || []).reduce((sum, d) => sum + (d.found_count || 0), 0);
-  const missingCount = (result.dimensions || []).reduce((sum, d) => sum + (d.missing_count || 0), 0);
+  const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
+  const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
   await updateStep(db, step.rstep_id, {
     rstep_canvas_state: { graph: mergedGraph, tables: [] },
@@ -134,7 +135,7 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
     rstep_calls: [
       buildPrebuiltCall('success', {
         response_summary: {
-          dimensions: (result.dimensions || []).map((d) => d.dimension),
+          roles: (result.roles || []).map((r) => r.role),
           entity_count: entities.length,
           found_count: foundCount,
           missing_count: missingCount,
@@ -449,30 +450,7 @@ router.post('/discover', async (req, res) => {
  *         description: Database error
  */
 router.post('/eligible-mental-models', async (req, res) => {
-  const start = Date.now();
-  try {
-    const { entities, dimensions } = req.body;
-
-    if (!Array.isArray(entities) || entities.length === 0) {
-      sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
-      return;
-    }
-    if (!Array.isArray(dimensions) || dimensions.length === 0) {
-      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
-      return;
-    }
-
-    const result = await listEligibleMentalModels(db, { entities, dimensions });
-    if (!result.success) {
-      sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
-      return;
-    }
-
-    sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
-  } catch (err) {
-    logger.error('Research eligible-mental-models route error', { error: err.message, stack: err.stack });
-    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
-  }
+  sendResponse({ res, status: 410, error: 'Eligible mental models by dimensions is deprecated. Use /research/prebuilt or /research/eligible-template-models.', code: 'DEPRECATED', logger, method: 'POST', path: '/research/eligible-mental-models', duration: 0 });
 });
 
 /**
@@ -543,18 +521,18 @@ router.post('/eligible-template-models', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [server_id, bank_id, entities, dimensions]
+ *             required: [server_id, bank_id, entities, roles]
  *             properties:
  *               server_id: { type: integer }
  *               bank_id: { type: string }
  *               entities: { type: array, items: { type: string } }
- *               dimensions: { type: array, items: { type: string } }
+ *               roles: { type: array, items: { type: string } }
  *               session_id:
  *                 type: integer
  *                 nullable: true
  *     responses:
  *       200:
- *         description: Per-dimension entity results with merged narrative/graph output
+ *         description: Per-role entity results with merged narrative/graph output
  *       400:
  *         description: Invalid input
  *       500:
@@ -563,7 +541,7 @@ router.post('/eligible-template-models', async (req, res) => {
 router.post('/prebuilt', async (req, res) => {
   const start = Date.now();
   try {
-    const { server_id, bank_id, entities, dimensions, session_id } = req.body;
+    const { server_id, bank_id, entities, roles, session_id } = req.body;
 
     if (!server_id || typeof server_id !== 'number') {
       sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
@@ -577,8 +555,8 @@ router.post('/prebuilt', async (req, res) => {
       sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
       return;
     }
-    if (!Array.isArray(dimensions) || dimensions.length === 0) {
-      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
+    if (!Array.isArray(roles) || roles.length === 0) {
+      sendResponse({ res, status: 400, error: 'roles must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
       return;
     }
 
@@ -615,7 +593,7 @@ router.post('/prebuilt', async (req, res) => {
       rstep_intent_text: intentText,
       rstep_selections: entities.map((id) => ({ id, kind: 'entity' })),
       rstep_action_type: 'prebuilt',
-      rstep_parameters: { dimensions },
+      rstep_parameters: { roles },
       rstep_viewpoint_ids: [],
       rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [] },
       rstep_synthesis: {},
@@ -639,9 +617,9 @@ router.post('/prebuilt', async (req, res) => {
     }
 
     const prebuiltStart = Date.now();
-    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, dimensions });
+    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, roles });
     const prebuiltDuration = Date.now() - prebuiltStart;
-    const prebuiltRequestBody = { server_id, bank_id, entities, dimensions, session_id: rsId };
+    const prebuiltRequestBody = { server_id, bank_id, entities, roles, session_id: rsId };
     const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
 
     const buildPrebuiltCall = (status, extra = {}) => ({
@@ -673,31 +651,32 @@ router.post('/prebuilt', async (req, res) => {
     const mergedGraph = { nodes: [], edges: [] };
     const narratives = [];
     const parseErrors = [];
-    for (const dim of result.dimensions || []) {
-      const found = (dim.entities || [])
+    for (const roleResult of result.roles || []) {
+      const found = (roleResult.entities || [])
         .filter((e) => e.found)
         .map((e) => e.entity);
-      const modelNames = (dim.entities || [])
+      const modelNames = (roleResult.entities || [])
         .flatMap((e) => (e.model_results || []).filter((m) => m.found).map((m) => m.name))
         .filter((v, i, a) => a.indexOf(v) === i);
-      const lines = [`## ${dim.dimension}`, ''];
-      if (dim.result?.narrative) {
-        lines.push(dim.result.narrative);
+      const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
+      const lines = [`## ${roleLabel}`, ''];
+      if (roleResult.result?.narrative) {
+        lines.push(roleResult.result.narrative);
       } else {
         lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
         lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
       }
-      if (dim.result?.errors && dim.result.errors.length > 0) {
+      if (roleResult.result?.errors && roleResult.result.errors.length > 0) {
         lines.push('');
         lines.push('Errors:');
-        for (const err of dim.result.errors) {
+        for (const err of roleResult.result.errors) {
           lines.push(`- ${err.model}: ${err.error}`);
         }
-        parseErrors.push(...dim.result.errors);
+        parseErrors.push(...roleResult.result.errors);
       }
       narratives.push(lines.join('\n'));
 
-      const jsonResult = dim.result?.json_result;
+      const jsonResult = roleResult.result?.json_result;
       if (jsonResult) {
         const graphs = Array.isArray(jsonResult) ? jsonResult : [jsonResult];
         for (const g of graphs) {
@@ -715,8 +694,8 @@ router.post('/prebuilt', async (req, res) => {
       }
     }
 
-    const foundCount = (result.dimensions || []).reduce((sum, d) => sum + (d.found_count || 0), 0);
-    const missingCount = (result.dimensions || []).reduce((sum, d) => sum + (d.missing_count || 0), 0);
+    const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
+    const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
     await updateStep(db, stepId, {
       rstep_canvas_state: { graph: mergedGraph, tables: [] },
@@ -727,7 +706,7 @@ router.post('/prebuilt', async (req, res) => {
       rstep_calls: [
         buildPrebuiltCall('success', {
           response_summary: {
-            dimensions: (result.dimensions || []).map((d) => d.dimension),
+            roles: (result.roles || []).map((r) => r.role),
             entity_count: entities.length,
             found_count: foundCount,
             missing_count: missingCount,
@@ -799,7 +778,7 @@ router.post('/prebuilt/oneshot', async (req, res) => {
       return;
     }
 
-    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, dimensions });
+    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, roles });
     if (!result.success) {
       sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
       return;
@@ -824,7 +803,7 @@ router.post('/prebuilt/oneshot', async (req, res) => {
  * @openapi
  * /research/mental-models:
  *   post:
- *     summary: Discover mental models for entities across dimensions
+ *     summary: Discover mental models for entities across template roles
  *     tags: [Research]
  *     requestBody:
  *       required: true
@@ -832,15 +811,15 @@ router.post('/prebuilt/oneshot', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [server_id, bank_id, entities, dimensions]
+ *             required: [server_id, bank_id, entities, roles]
  *             properties:
  *               server_id: { type: integer }
  *               bank_id: { type: string }
  *               entities: { type: array, items: { type: string } }
- *               dimensions: { type: array, items: { type: string } }
+ *               roles: { type: array, items: { type: string } }
  *     responses:
  *       200:
- *         description: Per-dimension candidate list with found/missing status
+ *         description: Per-role candidate list with found/missing status
  *       400:
  *         description: Invalid input
  *       500:
@@ -849,7 +828,7 @@ router.post('/prebuilt/oneshot', async (req, res) => {
 router.post('/mental-models', async (req, res) => {
   const start = Date.now();
   try {
-    const { server_id, bank_id, entities, dimensions } = req.body;
+    const { server_id, bank_id, entities, roles } = req.body;
 
     if (!server_id || typeof server_id !== 'number') {
       sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
@@ -863,12 +842,12 @@ router.post('/mental-models', async (req, res) => {
       sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
       return;
     }
-    if (!Array.isArray(dimensions) || dimensions.length === 0) {
-      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
+    if (!Array.isArray(roles) || roles.length === 0) {
+      sendResponse({ res, status: 400, error: 'roles must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
       return;
     }
 
-    const result = await discoverMentalModelsByDimensions(db, server_id, bank_id, { entities, dimensions });
+    const result = await discoverMentalModelsByRoles(db, server_id, bank_id, { entities, roles });
     if (!result.success) {
       sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
       return;

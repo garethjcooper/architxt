@@ -6,12 +6,12 @@
  * model's declared `returns` and `concatenation` metadata.
  *
  * Contract:
- *   Input:  { db, serverId, bankId, entities: string[], dimensions: string[] }
- *   Output: { success, entities, dimensions[] }
+ *   Input:  { db, serverId, bankId, entities: string[], roles: string[] }
+ *   Output: { success, entities, roles[] }
  *
- *   DimensionResult:
+ *   RoleResult:
  *   {
- *     dimension: string,
+ *     role: string,
  *     entities: EntityResult[],
  *     found_count: number,
  *     missing_count: number,
@@ -19,7 +19,7 @@
  *   }
  */
 
-import { listEligibleMentalModels } from './mental-model-discovery.js';
+import { discoverMentalModelsByRoles } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
 import { createLogger } from '../../utils/logger.js';
@@ -149,7 +149,7 @@ function toApiModelResult(candidate) {
   };
 }
 
-function aggregateDimensionResults(entityResults) {
+function aggregateRoleResults(entityResults) {
   const narratives = [];
   const graphs = [];
   const errors = [];
@@ -203,27 +203,31 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
     return { success: false, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR' };
   }
 
-  const dimensions = Array.isArray(options.dimensions) && options.dimensions.length > 0
-    ? options.dimensions
+  const roles = Array.isArray(options.roles) && options.roles.length > 0
+    ? options.roles
     : [];
-  if (dimensions.length === 0) {
-    return { success: false, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR' };
+  if (roles.length === 0) {
+    return { success: false, error: 'roles must be a non-empty array', code: 'VALIDATION_ERROR' };
   }
 
   const timeoutMs = typeof options.timeoutMs === 'number' && options.timeoutMs > 0
     ? options.timeoutMs
     : DEFAULT_TIMEOUT_MS;
 
-  const eligible = await listEligibleMentalModels(db, { entities: entityIds, dimensions });
-  if (!eligible.success) {
-    return eligible;
+  const discovery = await discoverMentalModelsByRoles(db, serverId, bankId, {
+    entities: entityIds,
+    roles,
+    timeoutMs,
+  });
+  if (!discovery.success) {
+    return { success: false, error: discovery.error, code: discovery.code };
   }
 
-  const dimensionOutputs = [];
+  const roleOutputs = [];
   const entitySummaryMap = new Map();
 
-  for (const dimension of dimensions) {
-    const candidates = eligible.dimensions[dimension] || [];
+  for (const role of roles) {
+    const candidates = discovery.roles[role]?.candidates || [];
     const populated = await Promise.all(
       candidates.map((c) => fetchModelResult(serverId, bankId, c, timeoutMs)),
     );
@@ -243,9 +247,9 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
       const bucket = byEntity[stripTypePrefix(entityId)];
       const modelResults = bucket ? bucket.candidates.map(toApiModelResult) : [];
       const found = modelResults.some((m) => m.found);
-      const key = `${entityId}|${dimension}`;
+      const key = `${entityId}|${role}`;
       if (!entitySummaryMap.has(key)) {
-        entitySummaryMap.set(key, { entity: entityId, dimension, found });
+        entitySummaryMap.set(key, { entity: entityId, role, found });
       }
       return {
         entity: entityId,
@@ -257,22 +261,22 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
     const foundCount = entityResults.filter((e) => e.found).length;
     const missingCount = entityResults.length - foundCount;
 
-    logger.info('Ran prebuilt research for dimension', {
+    logger.info('Ran prebuilt research for role', {
       serverId,
       bankId,
-      dimension,
+      role,
       entityCount: entityIds.length,
       candidateCount: populated.length,
       foundCount,
       missingCount,
     });
 
-    dimensionOutputs.push({
-      dimension,
+    roleOutputs.push({
+      role,
       entities: entityResults,
       found_count: foundCount,
       missing_count: missingCount,
-      result: aggregateDimensionResults(entityResults),
+      result: aggregateRoleResults(entityResults),
     });
   }
 
@@ -280,6 +284,6 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
     success: true,
     entities: entityIds,
     entity_summary: Array.from(entitySummaryMap.values()),
-    dimensions: dimensionOutputs,
+    roles: roleOutputs,
   };
 }
