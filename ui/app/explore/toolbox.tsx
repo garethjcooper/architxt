@@ -21,8 +21,8 @@ export interface TargetSelection {
   active: boolean;
 }
 
-export interface PrebuiltDimensionStatus {
-  dimension: string;
+export interface PrebuiltRoleStatus {
+  role: string;
   label?: string;
   loaded: boolean;
   hasData: boolean;
@@ -57,7 +57,7 @@ export interface ExploreToolboxProps {
   /** Called when the edge search input changes. */
   onEdgesSearchChange?: (value: string) => void;
   /** Status of each prebuilt dimension loaded for the current node. */
-  prebuiltDimensions?: PrebuiltDimensionStatus[];
+  prebuiltRoles?: PrebuiltRoleStatus[];
   onApply: (nodeId: string, selections: TargetSelection[]) => void;
   onClose: () => void;
   /** Called when the user hovers over or leaves a target row.
@@ -65,15 +65,15 @@ export interface ExploreToolboxProps {
   onHoverTarget?: (payload: { targetId: string | null; direction?: 'inbound' | 'outbound' }) => void;
 }
 
-const DIMENSION_LABELS: Record<string, string> = {
+const ROLE_LABELS: Record<string, string> = {
   summary: 'Summary',
   interface: 'Interfaces',
   'interface-found': 'Interfaces Found',
 };
 
-function dimensionLabel(status: PrebuiltDimensionStatus): string {
+function roleLabel(status: PrebuiltRoleStatus): string {
   if (status.label) return status.label;
-  return DIMENSION_LABELS[status.dimension] || status.dimension;
+  return ROLE_LABELS[status.role] || status.role;
 }
 
 function groupTargets(
@@ -127,7 +127,7 @@ function groupTargets(
   };
 }
 
-export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDiscovering, activeTab, onTabChange, entities, onClickEntity, onHoverEntity, canvasNodeIds, searchValue, onSearchChange, edgesSearchValue, onEdgesSearchChange, prebuiltDimensions, onApply, onClose, onHoverTarget }: ExploreToolboxProps) {
+export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDiscovering, activeTab, onTabChange, entities, onClickEntity, onHoverEntity, canvasNodeIds, searchValue, onSearchChange, edgesSearchValue, onEdgesSearchChange, prebuiltRoles, onApply, onClose, onHoverTarget }: ExploreToolboxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -521,14 +521,14 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
         </div>
       </div>
 
-      {prebuiltDimensions && prebuiltDimensions.length > 0 && (
+      {prebuiltRoles && prebuiltRoles.length > 0 && (
         <div className="px-2.5 py-1 border-b border-white/5 bg-black/20 flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            {prebuiltDimensions.map((dim) => {
-              const isInterface = dim.dimension.startsWith('interface');
-              const label = dimensionLabel(dim);
+            {prebuiltRoles.map((dim) => {
+              const isInterface = dim.role.includes('edge');
+              const label = roleLabel(dim);
               return (
-                <Tooltip key={dim.dimension}>
+                <Tooltip key={dim.role}>
                   <TooltipTrigger>
                     <div
                       role="button"
@@ -569,7 +569,7 @@ export function ExploreToolbox({ nodeId, graph, discovery, errorMessage, isDisco
         </div>
       )}
 
-      {errorMessage && !prebuiltDimensions && (
+      {errorMessage && !prebuiltRoles && (
         <div className="px-2.5 py-1.5 border-b border-red-500/20 bg-red-500/10 flex items-start gap-1.5">
           <AlertTriangle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
           <div className="text-[10px] text-red-200/80 leading-tight">{errorMessage}</div>

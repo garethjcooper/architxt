@@ -47,14 +47,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { ExploreToolbox, type TargetSelection, type PrebuiltDimensionStatus } from './toolbox';
+import { ExploreToolbox, type TargetSelection, type PrebuiltRoleStatus } from './toolbox';
 import { GraphControls } from './graph-controls';
 import { CardControls } from './card-controls';
 import { ResearchImportDialog } from './research-import-dialog';
 
 const logger = createLogger('ExplorePage');
 
-const EXPLORE_DIMENSIONS = ['summary', 'interface', 'interface-found'];
+const EXPLORE_ROLES = ['summary', 'interface', 'interface-found'];
 
 function normalizeGlobalEntity(n: GraphNode): GraphNode {
   const type = n.type || (typeof n.id === 'string' && n.id.includes(':') ? n.id.split(':')[0] : 'other');
@@ -104,14 +104,14 @@ function buildEdgeMarkdownTable(edges: GraphEdge[], nodeById: Map<string, GraphN
   return rows.join('\n');
 }
 
-function extractEntitySummary(prebuilt: { dimensions?: Array<{ dimension: string; result?: { narrative?: string; errors?: Array<{ model?: string; error: string }> } }> } | undefined, entityId: string): { text: string; ok: boolean; reason?: string } {
-  const dimensions = prebuilt?.dimensions;
-  if (!dimensions || dimensions.length === 0) {
+function extractEntitySummary(prebuilt: PrebuiltResponse | undefined, entityId: string) {
+  const roles = (prebuilt as any)?.roles;
+  if (!roles || roles.length === 0) {
     return { text: '', ok: false, reason: 'No summary data returned.' };
   }
-  const summaryDim = dimensions.find((d) => d.dimension === 'summary');
+  const summaryDim = roles.find((d: any) => d.role === 'sys_entity_summary');
   if (!summaryDim) {
-    return { text: '', ok: false, reason: 'Summary dimension not found in response.' };
+    return { text: '', ok: false, reason: 'Entity summary role not found in response.' };
   }
   if (summaryDim.result?.errors && summaryDim.result.errors.length > 0) {
     const first = summaryDim.result.errors[0];
@@ -178,11 +178,11 @@ function removeNodeAndOrphanedNeighbors(graph: GraphCanvas, nodeId: string): Gra
   return removeEdgesAndOrphanNodes(graph, edgeIdsToRemove, new Set());
 }
 
-function buildPrebuiltDimensionStatuses(
+function buildPrebuiltRoleStatuses(
   prebuilt: PrebuiltResponse,
-  dimensionLabels: Map<string, string>
-): PrebuiltDimensionStatus[] {
-  return (prebuilt.dimensions || []).map((dim) => {
+  roleLabels: Map<string, string>
+): PrebuiltRoleStatus[] {
+  return (prebuilt.roles || []).map((dim) => {
     const errors: string[] = [];
     if (dim.result?.errors) {
       for (const err of dim.result.errors) {
@@ -209,11 +209,11 @@ function buildPrebuiltDimensionStatuses(
     const loaded = errors.length === 0;
     const hasData = dim.found_count > 0 || (dim.result?.narrative ? dim.result.narrative.trim().length > 0 : false);
     return {
-      dimension: dim.dimension,
-      label: dimensionLabels.get(dim.dimension) || dim.dimension,
+      role: dim.role,
+      label: roleLabels.get(dim.role) || dim.role,
       loaded,
       hasData,
-      nodeCount: dim.dimension.startsWith('interface') ? nodeCount : undefined,
+      nodeCount: dim.role.includes('edge') ? nodeCount : undefined,
       error: errors.length > 0 ? errors.join('; ') : undefined,
     };
   });
@@ -238,8 +238,8 @@ export default function ExplorePage() {
   const [discoveries, setDiscoveries] = useState<Map<string, DiscoverStepResponse>>(new Map());
   const [discovering, setDiscovering] = useState<Set<string>>(new Set());
   const [discoveryErrors, setDiscoveryErrors] = useState<Map<string, string>>(new Map());
-  const [prebuiltDimensionStatuses, setPrebuiltDimensionStatuses] = useState<Map<string, PrebuiltDimensionStatus[]>>(new Map());
-  const [dimensionLabels, setDimensionLabels] = useState<Map<string, string>>(new Map());
+  const [prebuiltRoleStatuses, setPrebuiltRoleStatuses] = useState<Map<string, PrebuiltRoleStatus[]>>(new Map());
+  const [roleLabels, setRoleLabels] = useState<Map<string, string>>(new Map());
   const [showToolbox, setShowToolbox] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -301,13 +301,13 @@ export default function ExplorePage() {
 
   useEffect(() => {
     fetchServers();
-    mentalModelsApi.listStandardDimensions()
+    mentalModelsApi.listTemplateRoles()
       .then((data) => {
         const map = new Map<string, string>();
         for (const d of Array.isArray(data) ? data : []) {
           if (d.value) map.set(d.value, d.label || d.value);
         }
-        setDimensionLabels(map);
+        setRoleLabels(map);
       })
       .catch((err) => {
         logger.warn('Failed to load standard dimension labels', err);
@@ -348,7 +348,7 @@ export default function ExplorePage() {
     setDiscoveries(new Map());
     setDiscovering(new Set());
     setDiscoveryErrors(new Map());
-    setPrebuiltDimensionStatuses(new Map());
+    setPrebuiltRoleStatuses(new Map());
     setToolboxNodeId(null);
     setEntitySearch('');
     setEdgesSearch('');
@@ -463,7 +463,7 @@ export default function ExplorePage() {
         server_id: serverId,
         bank_id: selectedBankId,
         entities: [qualifiedId],
-        dimensions: EXPLORE_DIMENSIONS,
+        roles: EXPLORE_ROLES,
       });
       if (!prebuilt.success) {
         throw new Error(prebuilt.error || 'Prebuilt research failed');
@@ -483,15 +483,15 @@ export default function ExplorePage() {
         next.set(qualifiedId, cached);
         return next;
       });
-      setPrebuiltDimensionStatuses((prev) => {
+      setPrebuiltRoleStatuses((prev) => {
         const next = new Map(prev);
-        next.set(qualifiedId, buildPrebuiltDimensionStatuses(prebuilt, dimensionLabels));
+        next.set(qualifiedId, buildPrebuiltRoleStatuses(prebuilt, roleLabels));
         return next;
       });
 
       // Build a clear missing-model warning even when no graph came back.
       const missingModels: string[] = [];
-      for (const dim of prebuilt.dimensions || []) {
+      for (const dim of prebuilt.roles || []) {
         for (const ent of dim.entities || []) {
           for (const mr of ent.model_results || []) {
             if (!mr.found) {
@@ -506,7 +506,7 @@ export default function ExplorePage() {
       const sourceNodeData = qualifiedGraph.nodes.find((n) => n.id === qualifiedId);
       const summary = extractEntitySummary(prebuilt, qualifiedId);
       const nodeWithSummary = sourceNodeData
-        ? { ...sourceNodeData, summaryText: summary.ok ? summary.text : summary.reason || 'No summary available.' }
+        ? { ...sourceNodeData, summaryText: summary?.ok ? summary.text : summary?.reason || 'No summary available.' }
         : null;
       if (nodeWithSummary) {
         setGraph((prev) => {
@@ -517,7 +517,7 @@ export default function ExplorePage() {
 
       // Surface partial errors while still keeping any valid data.
       const warnings: string[] = [...missingModels];
-      for (const dim of prebuilt.dimensions || []) {
+      for (const dim of prebuilt.roles || []) {
         for (const ent of dim.entities || []) {
           for (const mr of ent.model_results || []) {
             if (mr.error) warnings.push(`${mr.name}: ${mr.error}`);
@@ -556,7 +556,7 @@ export default function ExplorePage() {
         return next;
       });
     }
-  }, [selectedServerId, selectedBankId, dimensionLabels, globalGraph]);
+  }, [selectedServerId, selectedBankId, roleLabels, globalGraph]);
 
   const handleClickEntity = useCallback((entity: GraphNode) => {
     const qualified = qualifiedId(entity.id, entity.type);
@@ -1210,7 +1210,7 @@ export default function ExplorePage() {
                     onSearchChange={setEntitySearch}
                     edgesSearchValue={edgesSearch}
                     onEdgesSearchChange={setEdgesSearch}
-                    prebuiltDimensions={toolboxNodeId ? prebuiltDimensionStatuses.get(toolboxNodeId) : undefined}
+                    prebuiltRoles={toolboxNodeId ? prebuiltRoleStatuses.get(toolboxNodeId) : undefined}
                     onApply={handleApplyEdges}
                     onClose={() => setShowToolbox(false)}
                     onHoverTarget={handleHoverToolboxTarget}

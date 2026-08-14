@@ -27,20 +27,21 @@ export function transformPrebuiltToDiscoverResponse(
   const graphs: { nodes: GraphNode[]; edges: GraphEdge[] }[] = [];
   const errors: string[] = [];
 
-  for (const dimension of response.dimensions || []) {
-    if (dimension.result?.narrative) {
-      narratives.push(`## ${dimension.dimension}\n\n${dimension.result.narrative}`);
+  for (const roleResult of response.roles || []) {
+    const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
+    if (roleResult.result?.narrative) {
+      narratives.push(`## ${roleLabel}\n\n${roleResult.result.narrative}`);
     }
-    const graph = extractGraphFromJsonResult(dimension.result?.json_result);
+    const graph = extractGraphFromJsonResult(roleResult.result?.json_result);
     if (graph) {
       graphs.push(graph);
-      if (!dimension.result?.narrative) {
-        const found = dimension.entities?.filter((e) => e.found).map((e) => e.entity) || [];
-        const modelNames = dimension.entities
+      if (!roleResult.result?.narrative) {
+        const found = roleResult.entities?.filter((e) => e.found).map((e) => e.entity) || [];
+        const modelNames = roleResult.entities
           ?.flatMap((e) => e.model_results.filter((m) => m.found).map((m) => m.name))
           .filter((v, i, a) => a.indexOf(v) === i) || [];
         const lines = [
-          `## ${dimension.dimension}`,
+          `## ${roleLabel}`,
           '',
           `- Entities covered: ${found.join(', ') || 'none'}`,
           `- Models applied: ${modelNames.join(', ') || 'none'}`,
@@ -48,9 +49,9 @@ export function transformPrebuiltToDiscoverResponse(
         narratives.push(lines.join('\n'));
       }
     }
-    if (dimension.result?.errors && dimension.result.errors.length > 0) {
-      for (const err of dimension.result.errors) {
-        errors.push(`${dimension.dimension}: ${err.model || 'model'} — ${err.error}`);
+    if (roleResult.result?.errors && roleResult.result.errors.length > 0) {
+      for (const err of roleResult.result.errors) {
+        errors.push(`${roleResult.role}: ${err.model || 'model'} — ${err.error}`);
       }
     }
   }
@@ -77,7 +78,7 @@ export function transformPrebuiltToDiscoverResponse(
         mental_model_applied_to: response.entities,
         mental_model_missing: response.entity_summary
           ?.filter((s) => !s.found)
-          .map((s) => `${s.entity} (${s.dimension})`) || [],
+          .map((s) => `${s.entity} (${s.role})`) || [],
         mental_model_referenced_entity_ids: response.entities,
       },
     },
@@ -86,7 +87,7 @@ export function transformPrebuiltToDiscoverResponse(
 }
 
 function extractGraphFromJsonResult(
-  jsonResult: PrebuiltResponse['dimensions'][number]['result']['json_result'],
+  jsonResult: PrebuiltResponse['roles'][number]['result']['json_result'],
 ): { nodes: GraphNode[]; edges: GraphEdge[] } | null {
   if (!jsonResult) return null;
 

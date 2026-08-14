@@ -96,8 +96,8 @@ export default function ResearchPage() {
 
   const [entityTab, setEntityTab] = useState<EntityTab>('entities');
   const [viewMode, setViewMode] = useState<'step' | 'session'>('step');
-  const [availableDimensions, setAvailableDimensions] = useState<Array<{ value: string; label: string }>>([
-    { value: 'interface', label: 'Interface' },
+  const [availableTemplateRoles, setAvailableTemplateRoles] = useState<Array<{ value: string; label: string }>>([
+    { value: 'sys_entity_summary', label: 'Entity summary' },
   ]);
   const [availableMentalModels, setAvailableMentalModels] = useState<Array<{ id: number; ext_id: string; name?: string; returns?: string; concatenation?: string }>>([]);
   const resultView: 'narrative' = 'narrative';
@@ -174,8 +174,8 @@ export default function ResearchPage() {
     setQuery,
     queryMode,
     setQueryMode,
-    selectedDimensions,
-    setSelectedDimensions,
+    selectedTemplateRoles,
+    setSelectedTemplateRoles,
     queryOptions,
     setQueryOptions,
     creatingSession,
@@ -206,7 +206,7 @@ export default function ResearchPage() {
     bankId: selectedBankId,
     viewMode,
     onViewModeChange: setViewMode,
-    availableDimensions,
+    availableTemplateRoles,
   });
 
   const queryRef = useRef(query);
@@ -320,9 +320,8 @@ export default function ResearchPage() {
   }, [handleLoadStep, setSelectedStepIds]);
 
   const handleInsertToken = useCallback((token: string) => {
+    // Templates mode: add entity to template entity list
     if (queryMode === 'templates') {
-      // In templates mode the main Entities panel feeds the template entity list,
-      // not the query box. Extract the entity id from the token and add it if valid.
       const match = token.match(/^\[\[(.+?)\s*\(([^)]+)\)\]\]$/);
       if (!match) return;
       const [, , rawId] = match;
@@ -349,7 +348,34 @@ export default function ResearchPage() {
       return;
     }
 
-    if (queryMode === 'prebuilt' && /\[\[[^\[\]—]+?\s*—\s*[^\[\]—→]+?\s*→\s*[^\[\]]+?\]\]/.test(token)) {
+    // Prebuilt mode: add entity to prebuilt selected entities list (like templates)
+    if (queryMode === 'prebuilt') {
+      const match = token.match(/^\[\[(.+?)\s*\(([^)]+)\)\]\]$/);
+      if (!match) return;
+      const [, , rawId] = match;
+      const colonIdx = rawId.indexOf(':');
+      const id = colonIdx > 0 ? rawId.slice(colonIdx + 1) : rawId;
+      const entity = allEntities.find((e) => e.entity_id === id);
+      if (!entity) {
+        toast.info('Entity not available for prebuilt lookup');
+        return;
+      }
+      const canonicalId = canonicalNodeId({ id: entity.entity_id, name: entity.name, type: entity.type_name });
+      setQueryOptions((prev) => {
+        const prevIds = prev.prebuilt?.selectedEntities || [];
+        if (prevIds.includes(canonicalId)) return prev;
+        return {
+          ...prev,
+          prebuilt: {
+            ...(prev.prebuilt || {}),
+            selectedEntities: [...prevIds, canonicalId],
+          },
+        };
+      });
+      return;
+    }
+
+    if (/\[\[[^\[\]—]+?\s*—\s*[^\[\]—→]+?\s*→\s*[^\[\]]+?\]\]/.test(token)) {
       toast.info('Edges cannot be added to prebuilt queries');
       return;
     }
@@ -406,17 +432,25 @@ export default function ResearchPage() {
       });
     // Dimensions come from the local mental-model configuration, not any
     // selected bank/server, so load them once at page startup.
-    mentalModelsApi.listStandardDimensions()
+    mentalModelsApi.listTemplateRoles()
       .then((data) => {
-        const dims = (Array.isArray(data) ? data : []).filter(
-          (d) => d.value?.toLowerCase() !== 'none' && d.label?.toLowerCase() !== 'none',
-        );
-        setAvailableDimensions(dims.length > 0 ? dims : [{ value: 'interface', label: 'Interface' }]);
-        setSelectedDimensions((prev: string[]) => prev.filter((d) => dims.some((dim) => dim.value === d)));
+        const roles = Array.isArray(data) ? data : [];
+        setAvailableTemplateRoles(roles.length > 0 ? roles : [
+          { value: 'sys_entity_summary', label: 'Entity summary' },
+          { value: 'sys_entity_capabilities', label: 'Entity capabilities' },
+          { value: 'sys_edge_context', label: 'Edge context' },
+          { value: 'sys_discovery_context', label: 'Discovery' },
+        ]);
+        setSelectedTemplateRoles((prev: string[]) => prev.filter((r) => roles.some((role) => role.value === r)));
       })
       .catch((err) => {
-        logger.error('Failed to fetch mental model dimensions', err);
-        setAvailableDimensions([{ value: 'interface', label: 'Interface' }]);
+        logger.error('Failed to fetch template roles', err);
+        setAvailableTemplateRoles([
+          { value: 'sys_entity_summary', label: 'Entity summary' },
+          { value: 'sys_entity_capabilities', label: 'Entity capabilities' },
+          { value: 'sys_edge_context', label: 'Edge context' },
+          { value: 'sys_discovery_context', label: 'Discovery' },
+        ]);
       });
   }, []);
 
@@ -694,9 +728,9 @@ export default function ResearchPage() {
                 availableEdges={graphEdges}
                 onSubmit={handleSubmit}
                 queryMode={queryMode}
-                dimensions={selectedDimensions}
-                setDimensions={setSelectedDimensions}
-                availableDimensions={availableDimensions}
+                selectedTemplateRoles={selectedTemplateRoles}
+                setSelectedTemplateRoles={setSelectedTemplateRoles}
+                availableTemplateRoles={availableTemplateRoles}
                 queryOptions={queryOptions}
                 setQueryOptions={setQueryOptions}
                 availableMentalModels={availableMentalModels}
