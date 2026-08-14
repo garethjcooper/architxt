@@ -16,6 +16,8 @@ import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
   DisplayNode,
   DisplayEdge,
+  EntityListRow,
+  EdgeListRow,
   backendNodeToDisplayNode,
   backendEdgeToDisplayEdge,
   isGroundedNode,
@@ -48,14 +50,6 @@ type LibraryItem =
   | { kind: 'entity'; data: DisplayNode }
   | { kind: 'edge'; data: DisplayEdge }
   | { kind: 'model'; data: WorkspaceModel };
-
-function getNodeType(node: { labels: string[] }): string {
-  if (node.labels.includes('canonical')) return 'canonical';
-  if (node.labels.includes('grounded')) return 'grounded';
-  if (node.labels.includes('discovered')) return 'discovered';
-  if (node.labels.includes('candidate')) return 'candidate';
-  return node.labels[0] || 'entity';
-}
 
 function getEntitySummary(entity: DisplayNode): string | undefined {
   return entity.properties.summary || entity.properties.description || entity.properties.blurb;
@@ -246,23 +240,12 @@ export default function WorkspacePage() {
       return (
         <div className="space-y-1">
           {filteredEntities.map((entity) => (
-            <button
+            <EntityListRow
               key={entity.id}
-              type="button"
+              node={entity}
+              active={selectedItem?.kind === 'entity' && selectedItem.data.id === entity.id}
               onClick={() => handleSelectItem({ kind: 'entity', data: entity })}
-              className={cn(
-                'w-full text-left px-3 py-2 rounded-md border border-transparent transition-colors',
-                selectedItem?.kind === 'entity' && selectedItem.data.id === entity.id
-                  ? 'bg-emerald-900/30 border-emerald-700/30'
-                  : 'hover:bg-white/5 hover:border-white/5'
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-white/90 truncate">{entity.label}</span>
-                <Badge variant="outline" className="text-[10px] h-5 shrink-0">{getNodeType(entity)}</Badge>
-              </div>
-              <div className="text-[11px] text-white/50 truncate">{entity.id}</div>
-            </button>
+            />
           ))}
         </div>
       );
@@ -275,24 +258,12 @@ export default function WorkspacePage() {
       return (
         <div className="space-y-1">
           {filteredEdges.map((edge) => (
-            <button
+            <EdgeListRow
               key={edge.id}
-              type="button"
+              edge={edge}
+              active={selectedItem?.kind === 'edge' && selectedItem.data.id === edge.id}
               onClick={() => handleSelectItem({ kind: 'edge', data: edge })}
-              className={cn(
-                'w-full text-left px-3 py-2 rounded-md border border-transparent transition-colors',
-                selectedItem?.kind === 'edge' && selectedItem.data.id === edge.id
-                  ? 'bg-emerald-900/30 border-emerald-700/30'
-                  : 'hover:bg-white/5 hover:border-white/5'
-              )}
-            >
-              <div className="text-sm text-white/90 truncate">
-                {edge.source_id} <span className="text-white/40">→</span> {edge.target_id}
-              </div>
-              <div className="text-[11px] text-white/50 truncate">
-                {edge.label || edge.type || 'edge'} · {edge.id}
-              </div>
-            </button>
+            />
           ))}
         </div>
       );
