@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -33,7 +32,8 @@ import { RefreshCw } from 'lucide-react';
 
 const logger = createLogger('WorkspacePage');
 
-type LibraryTab = 'entities' | 'edges' | 'models';
+type LibraryKind = 'entity' | 'edge' | 'model';
+type LibraryKindFilter = 'all' | LibraryKind;
 
 type WorkspaceModel = {
   id: number;
@@ -67,13 +67,46 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
   return isGroundedEdge(edge) && !isCandidateEdge(edge);
 }
 
+function ModelListRow({
+  model,
+  active,
+  onClick,
+}: {
+  model: WorkspaceModel;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const label = getModelLabel(model);
+  const kindLabel = model.isTemplate ? 'template' : 'standard';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-2 py-1.5 rounded transition-colors',
+        active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm text-white/90 truncate">{label}</div>
+          <div className="text-[11px] text-white/40 truncate">{model.extId}</div>
+        </div>
+        <Badge variant="outline" className="text-[10px] h-5 border-white/20 text-white/60 shrink-0">
+          {kindLabel}
+        </Badge>
+      </div>
+    </button>
+  );
+}
+
 export default function WorkspacePage() {
   const [servers, setServers] = useState<Server[]>([]);
   const [banks, setBanks] = useState<SelectorBank[]>([]);
   const [loadingServers, setLoadingServers] = useState(false);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [activeTab, setActiveTab] = useState<LibraryTab>('entities');
+  const [kindFilter, setKindFilter] = useState<LibraryKindFilter>('all');
   const [search, setSearch] = useState('');
 
   const [entities, setEntities] = useState<DisplayNode[]>([]);
@@ -191,34 +224,55 @@ export default function WorkspacePage() {
     return map;
   }, [entities]);
 
-  const filteredEntities = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return entities;
-    return entities.filter((e) =>
-      e.label.toLowerCase().includes(q) ||
-      e.id.toLowerCase().includes(q) ||
-      e.type.toLowerCase().includes(q)
-    );
-  }, [entities, search]);
-
-  const filteredEdges = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return edges;
-    return edges.filter((e) => {
-      const text = `${e.label || ''} ${e.detail || ''} ${e.source_id} ${e.target_id} ${e.type || ''}`.toLowerCase();
-      return text.includes(q);
+  const allItems = useMemo<LibraryItem[]>(() => {
+    const items: LibraryItem[] = [
+      ...entities.map((e) => ({ kind: 'entity' as const, data: e })),
+      ...edges.map((e) => ({ kind: 'edge' as const, data: e })),
+      ...models.map((m) => ({ kind: 'model' as const, data: m })),
+    ];
+    // Stable sort: entities first, then edges, then models, each internally by label/id.
+    items.sort((a, b) => {
+      const kindRank = { entity: 0, edge: 1, model: 2 };
+      const rankDiff = kindRank[a.kind] - kindRank[b.kind];
+      if (rankDiff !== 0) return rankDiff;
+      const aKey = a.kind === 'entity' ? a.data.label : a.kind === 'edge' ? (a.data.label || a.data.id) : getModelLabel(a.data);
+      const bKey = b.kind === 'entity' ? b.data.label : b.kind === 'edge' ? (b.data.label || b.data.id) : getModelLabel(b.data);
+      return aKey.localeCompare(bKey);
     });
-  }, [edges, search]);
+    return items;
+  }, [entities, edges, models]);
 
-  const filteredModels = useMemo(() => {
+  const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return models;
-    return models.filter((m) =>
-      getModelLabel(m).toLowerCase().includes(q) ||
-      m.extId.toLowerCase().includes(q) ||
-      (m.templateRole || '').toLowerCase().includes(q)
-    );
-  }, [models, search]);
+    let items = allItems;
+    if (kindFilter !== 'all') {
+      items = items.filter((i) => i.kind === kindFilter);
+    }
+    if (!q) return items;
+    return items.filter((item) => {
+      if (item.kind === 'entity') {
+        const e = item.data;
+        return (
+          e.label.toLowerCase().includes(q) ||
+          e.id.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q) ||
+          (e.properties.summary || '').toLowerCase().includes(q)
+        );
+      }
+      if (item.kind === 'edge') {
+        const e = item.data;
+        const text = `${e.label || ''} ${e.detail || ''} ${e.source_id} ${e.target_id} ${e.type || ''}`.toLowerCase();
+        return text.includes(q);
+      }
+      const m = item.data;
+      return (
+        getModelLabel(m).toLowerCase().includes(q) ||
+        m.extId.toLowerCase().includes(q) ||
+        (m.templateRole || '').toLowerCase().includes(q) ||
+        (m.sourceQuery || '').toLowerCase().includes(q)
+      );
+    });
+  }, [allItems, search, kindFilter]);
 
   const handleSelectItem = useCallback(async (item: LibraryItem) => {
     setSelectedItem(item);
@@ -238,71 +292,51 @@ export default function WorkspacePage() {
     }
   }, [serverId, bankId]);
 
+  const isSelected = useCallback((item: LibraryItem) => {
+    if (!selectedItem || selectedItem.kind !== item.kind) return false;
+    if (item.kind === 'entity') return selectedItem.data.id === item.data.id;
+    if (item.kind === 'edge') return selectedItem.data.id === item.data.id;
+    return selectedItem.data.id === item.data.id;
+  }, [selectedItem]);
+
   const renderLibraryList = () => {
-    if (activeTab === 'entities') {
-      if (filteredEntities.length === 0) {
-        return <div className="text-white/50 text-sm px-3 py-4">No entities match your filters.</div>;
-      }
-      return (
-        <div className="space-y-1">
-          {filteredEntities.map((entity) => (
-            <EntityListRow
-              key={entity.id}
-              node={entity}
-              active={selectedItem?.kind === 'entity' && selectedItem.data.id === entity.id}
-              onClick={() => handleSelectItem({ kind: 'entity', data: entity })}
-            />
-          ))}
-        </div>
-      );
-    }
-
-    if (activeTab === 'edges') {
-      if (filteredEdges.length === 0) {
-        return <div className="text-white/50 text-sm px-3 py-4">No edges match your filters.</div>;
-      }
-      return (
-        <div className="space-y-1">
-          {filteredEdges.map((edge) => (
-            <EdgeListRow
-              key={edge.id}
-              edge={edge}
-              active={selectedItem?.kind === 'edge' && selectedItem.data.id === edge.id}
-              sourceLabel={nodeById.get(edge.source_id)?.label}
-              targetLabel={nodeById.get(edge.target_id)?.label}
-              onClick={() => handleSelectItem({ kind: 'edge', data: edge })}
-            />
-          ))}
-        </div>
-      );
-    }
-
-    if (filteredModels.length === 0) {
-      return <div className="text-white/50 text-sm px-3 py-4">No mental models match your filters.</div>;
+    if (filteredItems.length === 0) {
+      return <div className="text-white/50 text-sm px-3 py-4">No library items match your filters.</div>;
     }
     return (
       <div className="space-y-1">
-        {filteredModels.map((model) => (
-          <button
-            key={model.id}
-            type="button"
-            onClick={() => handleSelectItem({ kind: 'model', data: model })}
-            className={cn(
-              'w-full text-left px-3 py-2 rounded-md border border-transparent transition-colors',
-              selectedItem?.kind === 'model' && selectedItem.data.id === model.id
-                ? 'bg-emerald-900/30 border-emerald-700/30'
-                : 'hover:bg-white/5 hover:border-white/5'
-            )}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm text-white/90 truncate">{getModelLabel(model)}</span>
-              <Badge variant="outline" className="text-[10px] h-5 shrink-0">
-                {model.isTemplate ? 'template' : 'standard'}
-              </Badge>
-            </div>
-            <div className="text-[11px] text-white/50 truncate">{model.extId}</div>
-          </button>
-        ))}
+        {filteredItems.map((item) => {
+          if (item.kind === 'entity') {
+            return (
+              <EntityListRow
+                key={`entity-${item.data.id}`}
+                node={item.data}
+                active={isSelected(item)}
+                onClick={() => handleSelectItem(item)}
+              />
+            );
+          }
+          if (item.kind === 'edge') {
+            return (
+              <EdgeListRow
+                key={`edge-${item.data.id}`}
+                edge={item.data}
+                active={isSelected(item)}
+                sourceLabel={nodeById.get(item.data.source_id)?.label}
+                targetLabel={nodeById.get(item.data.target_id)?.label}
+                onClick={() => handleSelectItem(item)}
+              />
+            );
+          }
+          return (
+            <ModelListRow
+              key={`model-${item.data.id}`}
+              model={item.data}
+              active={isSelected(item)}
+              onClick={() => handleSelectItem(item)}
+            />
+          );
+        })}
       </div>
     );
   };
@@ -359,12 +393,14 @@ export default function WorkspacePage() {
     if (selectedItem.kind === 'edge') {
       const edge = selectedItem.data;
       const modelRefs = edge.properties.provenance?.model_refs || [];
+      const sourceLabel = nodeById.get(edge.source_id)?.label;
+      const targetLabel = nodeById.get(edge.target_id)?.label;
       return (
         <div className="space-y-3">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Edge</div>
             <div className="text-lg font-semibold text-white/90">
-              {edge.source_id} <span className="text-white/40">→</span> {edge.target_id}
+              {sourceLabel || edge.source_id} <span className="text-white/40">→</span> {targetLabel || edge.target_id}
             </div>
             <div className="text-xs text-white/50 font-mono">{edge.id}</div>
           </div>
@@ -439,17 +475,24 @@ export default function WorkspacePage() {
     );
   };
 
+  const kindFilters: { value: LibraryKindFilter; label: string; count: number }[] = [
+    { value: 'all', label: 'All', count: allItems.length },
+    { value: 'entity', label: 'Entities', count: entities.length },
+    { value: 'edge', label: 'Edges', count: edges.length },
+    { value: 'model', label: 'Models', count: models.length },
+  ];
+
   return (
     <PageShell
       title="Workspace"
       subtitle="Efficient discovery and collation of prebuilt data."
-      count={activeTab === 'entities' ? filteredEntities.length : activeTab === 'edges' ? filteredEdges.length : filteredModels.length}
-      countLabel={activeTab === 'entities' ? 'entity' : activeTab === 'edges' ? 'edge' : 'model'}
+      count={filteredItems.length}
+      countLabel="item"
       loading={loadingServers || loadingBanks || loadingData}
     >
       <div className="flex flex-col flex-1 min-h-0 gap-3">
         {/* Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <ServerBankSelectors
             servers={servers}
             banks={banks}
@@ -476,21 +519,31 @@ export default function WorkspacePage() {
           {/* Library */}
           <div className="w-80 flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]">
             <div className="p-3 border-b border-white/10">
-              <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as LibraryTab); setSelectedItem(null); }}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="entities" className="text-xs">Entities</TabsTrigger>
-                  <TabsTrigger value="edges" className="text-xs">Edges</TabsTrigger>
-                  <TabsTrigger value="models" className="text-xs">Models</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            <div className="p-2 border-b border-white/10">
               <Input
-                placeholder="Filter..."
+                placeholder="Search library..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm"
               />
+            </div>
+            <div className="px-3 py-2 border-b border-white/10">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {kindFilters.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => { setKindFilter(f.value); setSelectedItem(null); }}
+                    className={cn(
+                      'text-[11px] px-2 py-1 rounded border transition-colors',
+                      kindFilter === f.value
+                        ? 'bg-emerald-900/30 border-emerald-700/30 text-emerald-100'
+                        : 'border-white/10 text-white/60 hover:bg-white/5'
+                    )}
+                  >
+                    {f.label} <span className="text-white/40 ml-0.5">{f.count}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2 min-h-0">
               {renderLibraryList()}
