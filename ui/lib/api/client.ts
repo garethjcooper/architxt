@@ -929,6 +929,11 @@ export interface PrebuiltRoleResult {
           nodes: GraphNode[];
           edges: GraphEdge[];
         }>;
+    tables?: Array<{
+      name: string;
+      columns: string[];
+      rows: Record<string, any>[];
+    }>;
     errors?: Array<{ model?: string; error: string }>;
   };
 }

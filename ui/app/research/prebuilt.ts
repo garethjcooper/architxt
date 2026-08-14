@@ -25,6 +25,7 @@ export function transformPrebuiltToDiscoverResponse(
 ): DiscoverStepResponse {
   const narratives: string[] = [];
   const graphs: { nodes: GraphNode[]; edges: GraphEdge[] }[] = [];
+  const tables: any[] = [];
   const errors: string[] = [];
 
   for (const roleResult of response.roles || []) {
@@ -48,6 +49,9 @@ export function transformPrebuiltToDiscoverResponse(
         ];
         narratives.push(lines.join('\n'));
       }
+    }
+    if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
+      tables.push(...roleResult.result.tables);
     }
     if (roleResult.result?.errors && roleResult.result.errors.length > 0) {
       for (const err of roleResult.result.errors) {
@@ -74,6 +78,7 @@ export function transformPrebuiltToDiscoverResponse(
     },
     canvas: {
       graph: graphs.length > 0 ? mergeGraphs(...graphs) : { nodes: [], edges: [] },
+      tables,
       meta: {
         mental_model_applied_to: response.entities,
         mental_model_missing: response.entity_summary
