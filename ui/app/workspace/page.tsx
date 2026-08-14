@@ -13,38 +13,31 @@ import { toast } from 'sonner';
 import { serversApi, contextualGraphApi, mentalModelsApi, type Server } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
-import { formatDistanceToNow } from 'date-fns';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import {
+  DisplayNode,
+  DisplayEdge,
+  backendNodeToDisplayNode,
+  backendEdgeToDisplayEdge,
+  isGroundedNode,
+  isCandidateNode,
+  isCandidateEdge,
+  isGroundedEdge,
+  formatRelative,
+  renderValue,
+  Section,
+  PropertyRow,
+} from '@/lib/contextual-graph/display';
+import { RefreshCw } from 'lucide-react';
 
 const logger = createLogger('WorkspacePage');
 
 type LibraryTab = 'entities' | 'edges' | 'models';
-
-type WorkspaceEntity = {
-  id: string;
-  type: string;
-  label: string;
-  labels: string[];
-  properties: Record<string, any>;
-};
-
-type WorkspaceEdge = {
-  id: string;
-  sourceId: string;
-  targetId: string;
-  type: string | null;
-  labels: string[];
-  label?: string;
-  detail?: string;
-  properties: Record<string, any>;
-};
 
 type WorkspaceModel = {
   id: number;
   extId: string;
   name?: string;
   sourceQuery?: string;
-  returns?: string;
   isTemplate: boolean;
   templateRole?: string;
   dimension?: string | null;
@@ -52,18 +45,11 @@ type WorkspaceModel = {
 };
 
 type LibraryItem =
-  | { kind: 'entity'; data: WorkspaceEntity }
-  | { kind: 'edge'; data: WorkspaceEdge }
+  | { kind: 'entity'; data: DisplayNode }
+  | { kind: 'edge'; data: DisplayEdge }
   | { kind: 'model'; data: WorkspaceModel };
 
-function formatRelative(value?: string | null): string {
-  if (!value) return '';
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return value;
-  return formatDistanceToNow(d, { addSuffix: true });
-}
-
-function getNodeType(node: { id: string; labels: string[] }): string {
+function getNodeType(node: { labels: string[] }): string {
   if (node.labels.includes('canonical')) return 'canonical';
   if (node.labels.includes('grounded')) return 'grounded';
   if (node.labels.includes('discovered')) return 'discovered';
@@ -71,7 +57,7 @@ function getNodeType(node: { id: string; labels: string[] }): string {
   return node.labels[0] || 'entity';
 }
 
-function getEntitySummary(entity: WorkspaceEntity): string | undefined {
+function getEntitySummary(entity: DisplayNode): string | undefined {
   return entity.properties.summary || entity.properties.description || entity.properties.blurb;
 }
 
@@ -79,47 +65,12 @@ function getModelLabel(model: WorkspaceModel): string {
   return model.name || model.extId;
 }
 
-function renderValue(value: unknown): React.ReactNode {
-  if (value === undefined || value === null) return <span className="text-white/40 italic">null</span>;
-  if (typeof value === 'string') {
-    return value.trim().length === 0
-      ? <span className="text-white/40 italic">empty</span>
-      : <p className="whitespace-pre-wrap text-white/80">{value}</p>;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return <span className="font-mono text-white/80">{String(value)}</span>;
-  }
-  return (
-    <pre className="text-[11px] text-white/70 bg-black/20 rounded p-1.5 overflow-x-auto">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
+function isGroundedNodeForWorkspace(node: DisplayNode): boolean {
+  return isGroundedNode(node) && !isCandidateNode(node);
 }
 
-function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded border border-white/5 bg-black/10 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-white/5 transition-colors"
-      >
-        <ChevronRight className={cn('w-3.5 h-3.5 text-white/50 transition-transform', open && 'rotate-90')} />
-        <span className="text-[11px] font-medium text-white/80">{title}</span>
-      </button>
-      {open && <div className="px-2.5 pb-2.5 pt-1 space-y-2">{children}</div>}
-    </div>
-  );
-}
-
-function PropertyRow({ label, value }: { label: string; value: unknown }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">{label}</div>
-      {renderValue(value)}
-    </div>
-  );
+function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
+  return isGroundedEdge(edge) && !isCandidateEdge(edge);
 }
 
 export default function WorkspacePage() {
@@ -131,8 +82,8 @@ export default function WorkspacePage() {
   const [activeTab, setActiveTab] = useState<LibraryTab>('entities');
   const [search, setSearch] = useState('');
 
-  const [entities, setEntities] = useState<WorkspaceEntity[]>([]);
-  const [edges, setEdges] = useState<WorkspaceEdge[]>([]);
+  const [entities, setEntities] = useState<DisplayNode[]>([]);
+  const [edges, setEdges] = useState<DisplayEdge[]>([]);
   const [models, setModels] = useState<WorkspaceModel[]>([]);
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
 
@@ -198,42 +149,11 @@ export default function WorkspacePage() {
       // grounded nodes that are not candidates. This keeps the workspace focused
       // on the prebuilt/processed corpus graph rather than inferred/candidate
       // items that still need review.
-      const groundedNodes = nodesData.filter(
-        (n) =>
-          (n.labels.includes('canonical') || n.labels.includes('grounded')) &&
-          !n.labels.includes('candidate')
-      );
+      const displayNodes = nodesData.map(backendNodeToDisplayNode).filter(isGroundedNodeForWorkspace);
+      const displayEdges = edgesData.map(backendEdgeToDisplayEdge).filter(isGroundedEdgeForWorkspace);
 
-      setEntities(
-        groundedNodes.map((n) => {
-          const label = n.properties.display_name || n.properties.name || n.id;
-          const type = getNodeType(n);
-          return {
-            id: n.id,
-            type,
-            label,
-            labels: n.labels,
-            properties: n.properties,
-          };
-        })
-      );
-
-      // Keep only non-candidate edges so the workspace matches the grounded
-      // entity view. Candidate edges belong in review/approval flows.
-      const groundedEdges = edgesData.filter((e) => !(e.properties.labels || []).includes('candidate'));
-
-      setEdges(
-        groundedEdges.map((e) => ({
-          id: e.id,
-          sourceId: e.source_id,
-          targetId: e.target_id,
-          type: e.type,
-          labels: e.properties.labels || [],
-          label: e.properties.label,
-          detail: e.properties.detail,
-          properties: e.properties,
-        }))
-      );
+      setEntities(displayNodes);
+      setEdges(displayEdges);
 
       setModels(
         (Array.isArray(modelsData) ? modelsData : []).map((m) => ({
@@ -285,7 +205,7 @@ export default function WorkspacePage() {
     const q = search.trim().toLowerCase();
     if (!q) return edges;
     return edges.filter((e) => {
-      const text = `${e.label || ''} ${e.detail || ''} ${e.sourceId} ${e.targetId} ${e.type || ''}`.toLowerCase();
+      const text = `${e.label || ''} ${e.detail || ''} ${e.source_id} ${e.target_id} ${e.type || ''}`.toLowerCase();
       return text.includes(q);
     });
   }, [edges, search]);
@@ -339,7 +259,7 @@ export default function WorkspacePage() {
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-white/90 truncate">{entity.label}</span>
-                <Badge variant="outline" className="text-[10px] h-5 shrink-0">{entity.type}</Badge>
+                <Badge variant="outline" className="text-[10px] h-5 shrink-0">{getNodeType(entity)}</Badge>
               </div>
               <div className="text-[11px] text-white/50 truncate">{entity.id}</div>
             </button>
@@ -367,7 +287,7 @@ export default function WorkspacePage() {
               )}
             >
               <div className="text-sm text-white/90 truncate">
-                {edge.sourceId} <span className="text-white/40">→</span> {edge.targetId}
+                {edge.source_id} <span className="text-white/40">→</span> {edge.target_id}
               </div>
               <div className="text-[11px] text-white/50 truncate">
                 {edge.label || edge.type || 'edge'} · {edge.id}
@@ -465,7 +385,7 @@ export default function WorkspacePage() {
           <div>
             <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Edge</div>
             <div className="text-lg font-semibold text-white/90">
-              {edge.sourceId} <span className="text-white/40">→</span> {edge.targetId}
+              {edge.source_id} <span className="text-white/40">→</span> {edge.target_id}
             </div>
             <div className="text-xs text-white/50 font-mono">{edge.id}</div>
           </div>
@@ -516,7 +436,6 @@ export default function WorkspacePage() {
           {model.isTemplate && <Badge variant="outline" className="text-[10px] h-5">template</Badge>}
           {model.templateRole && <Badge variant="outline" className="text-[10px] h-5">{model.templateRole}</Badge>}
           {model.dimension && <Badge variant="outline" className="text-[10px] h-5">{model.dimension}</Badge>}
-          {model.returns && <Badge variant="outline" className="text-[10px] h-5">returns {model.returns}</Badge>}
         </div>
         {model.sourceQuery && <Section title="Source query"><PropertyRow label="" value={model.sourceQuery} /></Section>}
         <Section title="Raw content">
