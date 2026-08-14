@@ -139,14 +139,17 @@ function toApiModelResult(candidate) {
   if (!candidate.found) {
     return { ...base, error: candidate.error || 'Not found' };
   }
-  if (candidate.returns === 'narrative') {
-    return { ...base, narrative: candidate.narrative };
+  const result = { ...base };
+  if (candidate.narrative != null) {
+    result.narrative = candidate.narrative;
   }
-  return {
-    ...base,
-    graph: candidate.graph,
-    graph_error: candidate.graph_error || undefined,
-  };
+  if (candidate.graph) {
+    result.graph = candidate.graph;
+  }
+  if (candidate.graph_error) {
+    result.graph_error = candidate.graph_error;
+  }
+  return result;
 }
 
 function aggregateRoleResults(entityResults) {

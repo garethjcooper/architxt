@@ -135,7 +135,7 @@ function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
             ext_id: extId,
             name,
             is_derived: true,
-            derived_entity_id: `${sourceId}|${targetId}`,
+            derived_entity_id: `${stripTypePrefix(sourceId)}|${stripTypePrefix(targetId)}`,
           });
         }
         continue;
