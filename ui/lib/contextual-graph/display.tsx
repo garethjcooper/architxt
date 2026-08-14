@@ -3,6 +3,8 @@
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 export type BackendNode = {
   id: string;
@@ -178,5 +180,114 @@ export function PropertyRow({ label, value }: { label: string; value: unknown })
       <div className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">{label}</div>
       {renderValue(value)}
     </div>
+  );
+}
+
+export const MODEL_ROLE_LABELS: Record<string, string> = {
+  sys_entity_summary: 'summary',
+  sys_entity_capabilities: 'capabilities',
+  sys_edge_context: 'edge context',
+  sys_discovery_context: 'discovery',
+};
+
+function getNodeStatusBadge(node: DisplayNode): string {
+  if (node.labels.includes('canonical')) return 'canonical';
+  if (node.labels.includes('grounded')) return 'grounded';
+  if (node.labels.includes('discovered')) return 'discovered';
+  if (node.labels.includes('candidate')) return 'candidate';
+  return node.type;
+}
+
+export function EntityListRow({
+  node,
+  active,
+  onClick,
+}: {
+  node: DisplayNode;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
+  const lastRefreshed = getLastRefreshedAt(node.modelRefs);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-2 py-1.5 rounded transition-colors',
+        active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm text-white/90 truncate">{node.label}</div>
+          <div className="text-[11px] text-white/40 truncate">{typeLine}</div>
+        </div>
+        <Badge variant="outline" className="text-[10px] h-5 border-white/20 text-white/60 shrink-0">
+          {getNodeStatusBadge(node)}
+        </Badge>
+      </div>
+      {node.modelRefs.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap mt-1">
+          {node.modelRefs.map((ref, i) => (
+            <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+              {MODEL_ROLE_LABELS[ref.role || ''] || ref.role}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </button>
+  );
+}
+
+export function EdgeListRow({
+  edge,
+  active,
+  onClick,
+  sourceLabel,
+  targetLabel,
+}: {
+  edge: DisplayEdge;
+  active?: boolean;
+  onClick?: () => void;
+  sourceLabel?: string;
+  targetLabel?: string;
+}) {
+  const source = sourceLabel || edge.source_id;
+  const target = targetLabel || edge.target_id;
+  const description = edge.detail || edge.label || edge.type || 'edge';
+  const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-2 py-1.5 rounded transition-colors',
+        active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm text-white/90 truncate">
+            {source} <span className="text-white/40">→</span> {target}
+          </div>
+          <div className="text-[11px] text-white/40 truncate">
+            {description} · {edge.id}
+          </div>
+        </div>
+        {lastRefreshed && (
+          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
+        )}
+      </div>
+      {edge.modelRefs.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap mt-1">
+          {edge.modelRefs.map((ref, i) => (
+            <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+              {MODEL_ROLE_LABELS[ref.role || ''] || ref.role}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </button>
   );
 }

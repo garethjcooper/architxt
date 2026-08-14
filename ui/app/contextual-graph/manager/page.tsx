@@ -26,6 +26,8 @@ import {
   ModelRef,
   DisplayNode,
   DisplayEdge,
+  EntityListRow,
+  EdgeListRow,
   backendNodeToDisplayNode,
   backendEdgeToDisplayEdge,
   isGroundedNode,
@@ -53,24 +55,6 @@ const ROLE_LABELS: Record<string, string> = {
   sys_entity_capabilities: 'capabilities',
   sys_edge_context: 'edge context',
   sys_discovery_context: 'discovery',
-};
-
-// Re-export shared helpers for local sub-tabs that import from this module.
-export {
-  isGroundedNode,
-  isCandidateNode,
-  isCandidateEdge,
-  isGroundedEdge,
-  isUndirectedEdge,
-  hasEdgeContextRef,
-  getEdgeContextPairKey,
-  getEdgeSortGroup,
-  getEdgeSortRank,
-  getLastRefreshedAt,
-  formatRelative,
-  renderValue,
-  backendNodeToDisplayNode,
-  backendEdgeToDisplayEdge,
 };
 
 const logger = createLogger('ContextManagerPage');
@@ -601,39 +585,14 @@ export default function ContextManagerPage() {
                   ) : filteredSortedNodes.length === 0 ? (
                     <div className="text-[11px] text-white/40 px-2 py-3">No grounded entities loaded.</div>
                   ) : (
-                    filteredSortedNodes.map((node) => {
-                      const active = selectedNodeId === node.id;
-                      const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
-                      const lastRefreshed = getLastRefreshedAt(node.modelRefs);
-                      return (
-                        <button
-                          key={node.id}
-                          type="button"
-                          onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
-                          className={cn(
-                            'w-full rounded border bg-black/10 px-1.5 py-1 text-left transition-colors',
-                            active ? 'border-emerald-500/50 bg-emerald-900/30' : 'border-white/5 hover:bg-white/5'
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-col gap-0 min-w-0">
-                              <div className="text-xs text-white/90 truncate">{node.label}</div>
-                              <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
-                            </div>
-                            <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
-                          </div>
-                          {node.modelRefs.length > 0 && (
-                            <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                              {node.modelRefs.map((ref, i) => (
-                                <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                                  {ROLE_LABELS[ref.role || ''] || ref.role}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })
+                    filteredSortedNodes.map((node) => (
+                      <EntityListRow
+                        key={node.id}
+                        node={node}
+                        active={selectedNodeId === node.id}
+                        onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
+                      />
+                    ))
                   )}
                 </div>
               </div>
@@ -658,42 +617,16 @@ export default function ContextManagerPage() {
                   {filteredSortedEdges.length === 0 && (
                     <div className="text-[11px] text-white/40 px-2 py-3">No grounded edges loaded.</div>
                   )}
-                  {filteredSortedEdges.map((edge) => {
-                    const active = selectedEdgeId === edge.id;
-                    const source = nodeById.get(edge.source_id);
-                    const target = nodeById.get(edge.target_id);
-                    const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
-                    return (
-                      <button
-                        key={edge.id}
-                        type="button"
-                        onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
-                        className={cn(
-                          'w-full text-left rounded border px-1.5 py-1 transition-colors',
-                          active ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-xs text-white/90 truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
-                            <div className="text-[10px] text-white/40 truncate">
-                              {source?.label || edge.source_id} → {target?.label || edge.target_id}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
-                        </div>
-                        {edge.modelRefs.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                            {edge.modelRefs.map((ref, i) => (
-                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                                {ROLE_LABELS[ref.role || ''] || ref.role}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                  {filteredSortedEdges.map((edge) => (
+                    <EdgeListRow
+                      key={edge.id}
+                      edge={edge}
+                      active={selectedEdgeId === edge.id}
+                      sourceLabel={nodeById.get(edge.source_id)?.label}
+                      targetLabel={nodeById.get(edge.target_id)?.label}
+                      onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
