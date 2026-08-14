@@ -1,15 +1,15 @@
 /**
  * Mental model discovery service.
  *
- * Looks up dimension-classified mental models in the local (bank-agnostic) DB,
+ * Looks up role-classified mental models in the local (bank-agnostic) DB,
  * derives template instances for the requested entities, queries Hindsight for
- * each candidate ext_id, and merges/compiles found content per dimension.
+ * each candidate ext_id, and merges/compiles found content per role.
  *
  * Contract:
- *   Input:  { db, serverId, bankId, entities: string[], dimensions: string[] }
- *   Output: { success, dimensions: { [dimension]: DimensionResult }, error?, code? }
+ *   Input:  { db, serverId, bankId, entities: string[], roles: string[] }
+ *   Output: { success, roles: { [role]: RoleResult }, error?, code? }
  *
- *   DimensionResult:
+ *   RoleResult:
  *   {
  *     candidates: Candidate[],
  *     found_count: number,
@@ -50,7 +50,7 @@ function normalizeLocalModel(dbRow) {
     ext_id: dbRow.mm_ext_id,
     name: dbRow.mm_name,
     source_query: dbRow.mm_source_query,
-    dimension: dbRow.mm_dimension,
+    template_role: dbRow.mm_template_role,
     returns: dbRow.mm_returns,
     concatenation: dbRow.mm_concatenation,
     is_template: normalizeDbBool(dbRow.mm_is_template),
@@ -69,7 +69,7 @@ function stripTypePrefix(value) {
   return colonIdx > 0 ? value.slice(colonIdx + 1) : value;
 }
 
-function buildCandidatesForDimension(localModels, entityIds) {
+function buildCandidatesForRole(localModels, entityIds) {
   const queryEntitySet = new Set(entityIds.map(stripTypePrefix));
   const hasEntityFilter = entityIds.length > 0;
   const candidates = [];
@@ -82,7 +82,7 @@ function buildCandidatesForDimension(localModels, entityIds) {
       id: model.id,
       ext_id: model.ext_id,
       name: model.name,
-      dimension: model.dimension,
+      template_role: model.template_role,
       returns: model.returns || 'json',
       concatenation: model.concatenation || 'merge',
       is_template: isTemplate,
@@ -156,7 +156,7 @@ async function fetchCandidateContents(serverId, bankId, candidates, timeoutMs) {
   );
 }
 
-async function mergeDimensionResult(candidates, entityIds) {
+async function mergeRoleResult(candidates, entityIds) {
   const nodeById = new Map();
   const edgeKeys = new Set();
   const edges = [];
@@ -201,56 +201,7 @@ async function mergeDimensionResult(candidates, entityIds) {
   return result;
 }
 
-export async function listEligibleMentalModels(db, options = {}) {
-  if (!db) {
-    return { success: false, error: 'db is required', code: 'MISSING_DB' };
-  }
-
-  const entityIds = Array.isArray(options.entities) ? options.entities : [];
-  if (entityIds.length === 0) {
-    return { success: false, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR' };
-  }
-
-  const dimensions = Array.isArray(options.dimensions) && options.dimensions.length > 0
-    ? options.dimensions
-    : [];
-  if (dimensions.length === 0) {
-    return { success: false, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR' };
-  }
-
-  const localResult = await listLocalMentalModels(db, { dimensions, limit: 1000 });
-  if (!localResult.success) {
-    logger.error('Failed to list local mental models', { dimensions, error: localResult.error, code: localResult.code });
-    return { success: false, error: localResult.error, code: localResult.code || 'DATABASE_ERROR' };
-  }
-
-  const modelsByDimension = {};
-  for (const model of localResult.data || []) {
-    const dim = model.dimension || model.mm_dimension;
-    if (!dim) continue;
-    if (!modelsByDimension[dim]) modelsByDimension[dim] = [];
-    modelsByDimension[dim].push(model);
-  }
-
-  const dimensionResults = {};
-  for (const dimension of dimensions) {
-    dimensionResults[dimension] = buildCandidatesForDimension(modelsByDimension[dimension] || [], entityIds);
-  }
-
-  logger.info('Listed eligible mental models', {
-    entityCount: entityIds.length,
-    dimensions,
-    candidateCount: Object.values(dimensionResults).flat().length,
-  });
-
-  return {
-    success: true,
-    entities: entityIds,
-    dimensions: dimensionResults,
-  };
-}
-
-export async function discoverMentalModelsByDimensions(db, serverId, bankId, options = {}) {
+export async function discoverMentalModelsByRoles(db, serverId, bankId, options = {}) {
   if (!db) {
     return { success: false, error: 'db is required', code: 'MISSING_DB' };
   }
@@ -262,32 +213,32 @@ export async function discoverMentalModelsByDimensions(db, serverId, bankId, opt
   }
 
   const entityIds = Array.isArray(options.entities) ? options.entities : [];
-  const dimensions = Array.isArray(options.dimensions) && options.dimensions.length > 0
-    ? options.dimensions
-    : ['interface'];
+  const roles = Array.isArray(options.roles) && options.roles.length > 0
+    ? options.roles
+    : ['sys_entity_summary'];
   const timeoutMs = typeof options.timeoutMs === 'number' && options.timeoutMs > 0
     ? options.timeoutMs
     : DEFAULT_TIMEOUT_MS;
 
-  const dimensionResults = {};
+  const roleResults = {};
 
-  for (const dimension of dimensions) {
-    const localResult = await listLocalMentalModels(db, { dimension, limit: 1000 });
+  for (const role of roles) {
+    const localResult = await listLocalMentalModels(db, { templateRole: role, limit: 1000 });
     if (!localResult.success) {
-      logger.error('Failed to list local mental models', { dimension, error: localResult.error, code: localResult.code });
+      logger.error('Failed to list local mental models', { role, error: localResult.error, code: localResult.code });
       return { success: false, error: localResult.error, code: localResult.code || 'DATABASE_ERROR' };
     }
 
-    const candidates = buildCandidatesForDimension(localResult.data || [], entityIds);
+    const candidates = buildCandidatesForRole(localResult.data || [], entityIds);
     const populated = await fetchCandidateContents(serverId, bankId, candidates, timeoutMs);
 
     const found = populated.filter((c) => c.found);
     const missing = populated.filter((c) => !c.found);
 
-    logger.info('Discovered mental models for dimension', {
+    logger.info('Discovered mental models for role', {
       serverId,
       bankId,
-      dimension,
+      role,
       entityCount: entityIds.length,
       candidateCount: populated.length,
       foundCount: found.length,
@@ -295,17 +246,17 @@ export async function discoverMentalModelsByDimensions(db, serverId, bankId, opt
       candidateExtIds: populated.map((c) => ({ ext_id: c.ext_id, found: c.found, error: c.error })),
     });
 
-    dimensionResults[dimension] = {
+    roleResults[role] = {
       candidates: populated,
       found_count: found.length,
       missing_count: missing.length,
-      result: await mergeDimensionResult(populated, entityIds),
+      result: await mergeRoleResult(populated, entityIds),
     };
   }
 
   return {
     success: true,
     entities: entityIds,
-    dimensions: dimensionResults,
+    roles: roleResults,
   };
 }

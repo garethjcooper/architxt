@@ -414,7 +414,7 @@ const ENTITIES_SQL = `
  * List all mental models with their associated tags and entities as JSON arrays.
  */
 export const listMentalModels = (db, options = {}) => dbExec(() => {
-  const { limit = 1000, offset = 0, dimension, dimensions, returns } = options;
+  const { limit = 1000, offset = 0, dimension, dimensions, templateRole, templateRoles, returns } = options;
   const conditions = [];
   const params = [];
   if (dimension !== undefined && dimension !== null) {
@@ -424,6 +424,14 @@ export const listMentalModels = (db, options = {}) => dbExec(() => {
   if (Array.isArray(dimensions) && dimensions.length > 0) {
     conditions.push(`m.mm_dimension IN (${dimensions.map(() => '?').join(',')})`);
     params.push(...dimensions);
+  }
+  if (templateRole !== undefined && templateRole !== null) {
+    conditions.push('m.mm_template_role = ?');
+    params.push(templateRole);
+  }
+  if (Array.isArray(templateRoles) && templateRoles.length > 0) {
+    conditions.push(`m.mm_template_role IN (${templateRoles.map(() => '?').join(',')})`);
+    params.push(...templateRoles);
   }
   if (returns !== undefined && returns !== null) {
     conditions.push('m.mm_returns = ?');
@@ -502,6 +510,31 @@ export const listMentalModelsForDiff = (db, options = {}) => dbExec(() => {
   const rows = stmt(db, sql).all(requireInt('limit', limit), requireInt('offset', offset));
   return rows.map(r => fromJson(r, ['mm_tag_names', 'mm_entities']));
 }, 'mentalModels.listForDiff');
+/**
+ * List distinct system template roles (sys_*) with display labels.
+ */
+const ROLE_LABELS = {
+  sys_entity_summary: 'Entity summary',
+  sys_entity_capabilities: 'Entity capabilities',
+  sys_edge_context: 'Edge context',
+  sys_discovery_context: 'Discovery',
+};
+
+export const listTemplateRoles = (db) => dbExec(() => {
+  const sql = `
+    SELECT DISTINCT mm_template_role AS role
+    FROM ${TABLE}
+    WHERE mm_template_role IS NOT NULL
+      AND mm_template_role LIKE 'sys_%'
+    ORDER BY mm_template_role ASC
+  `;
+  const rows = stmt(db, sql).all();
+  return rows.map((r) => ({
+    value: r.role,
+    label: ROLE_LABELS[r.role] ?? r.role,
+  }));
+}, 'mentalModels.listTemplateRoles');
+
 
 /**
  * Get a single mental model with tags and entities.

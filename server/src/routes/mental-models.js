@@ -18,6 +18,7 @@ import {
   listMentalModels,
   listMentalModelDimensions,
   listStandardDimensions,
+  listTemplateRoles,
   getMentalModelTags,
   addMentalModelTag,
   removeMentalModelTag,
@@ -196,6 +197,32 @@ router.get('/dimensions/standard', async (req, res) => {
   const start = Date.now();
   const result = listStandardDimensions();
   sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: '/mentalmodels/dimensions/standard', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/roles/template:
+ *   get:
+ *     summary: List distinct system template roles
+ *     tags: [MentalModels]
+ *     responses:
+ *       200:
+ *         description: Array of role value/label pairs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   value: { type: string }
+ *                   label: { type: string }
+ */
+router.get('/roles/template', async (req, res) => {
+  const start = Date.now();
+  const result = await listTemplateRoles(db);
+  const roles = Array.isArray(result) ? result : (result.success ? result.data : []);
+  sendResponse({ res, status: 200, data: roles, logger, method: 'GET', path: '/mentalmodels/roles/template', duration: Date.now() - start });
 });
 
 /**
