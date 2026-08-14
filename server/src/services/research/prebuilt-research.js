@@ -146,6 +146,9 @@ function toApiModelResult(candidate) {
   if (candidate.graph) {
     result.graph = candidate.graph;
   }
+  if (candidate.tables && candidate.tables.length > 0) {
+    result.tables = candidate.tables;
+  }
   if (candidate.graph_error) {
     result.graph_error = candidate.graph_error;
   }
@@ -155,6 +158,7 @@ function toApiModelResult(candidate) {
 function aggregateRoleResults(entityResults) {
   const narratives = [];
   const graphs = [];
+  const tables = [];
   const errors = [];
   let effectiveConcatenation = 'merge';
 
@@ -172,6 +176,9 @@ function aggregateRoleResults(entityResults) {
           errors.push({ model: candidate.name || candidate.ext_id, error: candidate.graph_error });
         }
       }
+      if (candidate.tables && candidate.tables.length > 0) {
+        tables.push(...candidate.tables);
+      }
     }
   }
 
@@ -183,6 +190,9 @@ function aggregateRoleResults(entityResults) {
     result.json_result = effectiveConcatenation === 'compile'
       ? graphs
       : mergeGraphs(graphs);
+  }
+  if (tables.length > 0) {
+    result.tables = tables;
   }
   if (errors.length > 0) {
     result.errors = errors;

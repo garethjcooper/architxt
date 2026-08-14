@@ -649,6 +649,7 @@ router.post('/prebuilt', async (req, res) => {
 
     // Derive a merged canvas/synthesis for the step so it works in the trail.
     const mergedGraph = { nodes: [], edges: [] };
+    const mergedTables = [];
     const narratives = [];
     const parseErrors = [];
     for (const roleResult of result.roles || []) {
@@ -692,13 +693,16 @@ router.post('/prebuilt', async (req, res) => {
           }
         }
       }
+      if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
+        mergedTables.push(...roleResult.result.tables);
+      }
     }
 
     const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
     const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
     await updateStep(db, stepId, {
-      rstep_canvas_state: { graph: mergedGraph, tables: [] },
+      rstep_canvas_state: { graph: mergedGraph, tables: mergedTables },
       rstep_synthesis: { narrative: narratives.join('\n\n') },
       rstep_status: 'completed',
       rstep_error_message: parseErrors.length > 0 ? `Some mental models could not be parsed. ${parseErrors.map((e) => `${e.model}: ${e.error}`).join('; ')}` : null,
