@@ -125,25 +125,46 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     edges: normalizedGraph.edges,
   };
   const hasGraph = graph.nodes.length > 0 || graph.edges.length > 0;
+  const hasTables = Array.isArray(extracted.tables) && extracted.tables.length > 0;
+  const hasDiagrams = Array.isArray(extracted.diagrams) && extracted.diagrams.length > 0;
+  const requestedNarrative = focus.narrative && focus.narrative.trim().length > 0;
+  const hasStructuredOutput = hasGraph || hasTables || hasDiagrams;
 
+  // Require a non-empty narrative only when narrative was explicitly requested
+  // or when no structured output sections were produced.
   if (!extracted.narrative || extracted.narrative.length === 0) {
-    logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
-    return {
-      success: false,
-      error: 'Reflect response missing narrative',
-      code: 'INVALID_REFLECT_RESPONSE',
-      calls: [{
-        ...baseCall,
-        status: 'failure',
+    if (requestedNarrative || !hasStructuredOutput) {
+      logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
+      return {
+        success: false,
         error: 'Reflect response missing narrative',
         code: 'INVALID_REFLECT_RESPONSE',
-      }],
-    };
+        calls: [{
+          ...baseCall,
+          status: 'failure',
+          error: 'Reflect response missing narrative',
+          code: 'INVALID_REFLECT_RESPONSE',
+        }],
+      };
+    }
   }
+
+  // Defense in depth: if the caller did not ask for narrative, treat any
+  // returned narrative as a model mistake and discard it before it reaches
+  // downstream consumers.
+  if (!requestedNarrative) {
+    extracted.narrative = '';
+  }
+
+  // If narrative is empty but structured output exists, synthesize a header so
+  // downstream consumers still have a Markdown section to render.
+  const narrative = extracted.narrative && extracted.narrative.length > 0
+    ? `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query)
+    : `# Results - ${query}` + basedOnToMarkdown(result.data, query);
 
   return {
     success: true,
-    narrative: `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query),
+    narrative,
     graph,
     tables: extracted.tables || [],
     diagrams: extracted.diagrams || [],

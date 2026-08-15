@@ -131,6 +131,83 @@ describe('reflect handler', () => {
     assert.equal(result.graph.nodes.length, 2);
   });
 
+  it('succeeds with empty narrative when diagrams are returned', async () => {
+    const reflectFn = async (body) => ({
+      success: true,
+      data: {
+        text: JSON.stringify({
+          narrative: '',
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [{
+            name: 'ICMS and Singleview Dataflow',
+            type: 'erDiagram',
+            content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+          }],
+        }),
+      },
+    });
+
+    const result = await handleReflect(1, 'bank', 'test1 (erDiagram)', {
+      reflectFn,
+      section_focus: { diagram: [{ name: 'test1', type: 'erDiagram', content: 'show the relationship...' }] },
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.ok(result.narrative.includes('# Results - test1 (erDiagram)'));
+    assert.equal(result.diagrams.length, 1);
+    assert.equal(result.diagrams[0].type, 'erDiagram');
+  });
+
+  it('still requires narrative when narrative section was requested', async () => {
+    const reflectFn = async (body) => ({
+      success: true,
+      data: {
+        text: JSON.stringify({
+          narrative: '',
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [],
+        }),
+      },
+    });
+
+    const result = await handleReflect(1, 'bank', 'test query', {
+      reflectFn,
+      section_focus: { narrative: 'explain impact' },
+    }, db);
+
+    assert.equal(result.success, false);
+    assert.equal(result.code, 'INVALID_REFLECT_RESPONSE');
+  });
+
+  it('scrubs returned narrative when narrative was not requested', async () => {
+    const reflectFn = async (body) => ({
+      success: true,
+      data: {
+        text: JSON.stringify({
+          narrative: 'The model should not have written this.',
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [{
+            name: 'ICMS and Singleview Dataflow',
+            type: 'erDiagram',
+            content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+          }],
+        }),
+      },
+    });
+
+    const result = await handleReflect(1, 'bank', 'test1 (erDiagram)', {
+      reflectFn,
+      section_focus: { diagram: [{ name: 'test1', type: 'erDiagram', content: 'show the relationship...' }] },
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.ok(!result.narrative.includes('The model should not have written this.'));
+    assert.equal(result.diagrams.length, 1);
+  });
+
   it('fails fast without db', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
       reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
