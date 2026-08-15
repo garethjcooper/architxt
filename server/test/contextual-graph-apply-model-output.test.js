@@ -18,11 +18,25 @@ function createDb() {
 }
 
 function model(extId, role) {
+  const scope =
+    role === 'sys_entity_summary' ? { node_id: extId.replace(/^entity-summary-/, '') }
+    : role === 'sys_entity_capabilities' ? { node_id: extId.replace(/^entity-capabilities-/, '') }
+    : role === 'sys_edge_context'
+      ? (() => {
+          const pair = extId.replace(/^edge-ctx-/, '');
+          const [sourceId, targetId] = pair.split('|');
+          return { source_id: sourceId, target_id: targetId };
+        })()
+    : role === 'sys_discovery_context'
+      ? { seed_id: extId.replace(/^discover-/, '') }
+      : null;
+
   return {
     mm_ext_id: extId,
     mm_template_role: role,
     mm_dimension: role,
     mm_name: 'Test model',
+    scope,
   };
 }
 

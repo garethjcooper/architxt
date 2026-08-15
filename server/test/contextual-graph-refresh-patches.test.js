@@ -35,7 +35,7 @@ describe('refreshContextualGraphPatches', () => {
   it('extracts model refs from nodes', () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       provenance: {
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash' }],
       },
     });
 
@@ -51,7 +51,7 @@ describe('refreshContextualGraphPatches', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
 
@@ -84,7 +84,7 @@ describe('refreshContextualGraphPatches', () => {
       summary: 'Same summary.',
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
 
@@ -104,7 +104,7 @@ describe('refreshContextualGraphPatches', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
 
@@ -126,7 +126,7 @@ describe('refreshContextualGraphPatches', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
 
@@ -153,7 +153,7 @@ describe('refreshContextualGraphPatches', () => {
       // No summary applied yet, even though a content hash was recorded.
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
 
@@ -176,7 +176,7 @@ describe('refreshContextualGraphPatches', () => {
       display_name: 'Billing Service',
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
 

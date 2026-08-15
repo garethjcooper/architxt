@@ -5,53 +5,28 @@ import {
   deriveEntityCapabilitiesModel,
   deriveEdgeContextModel,
   deriveDiscoverContextModel,
+  CONTEXTUAL_GRAPH_ROLES,
 } from './template-models.js';
 
 const logger = createLogger('contextual-graph-specs');
 
-const ROLE_PREFIXES = [
-  { role: 'sys_entity_summary', prefix: 'entity-summary-' },
-  { role: 'sys_entity_capabilities', prefix: 'entity-capabilities-' },
-  { role: 'sys_edge_context', prefix: 'edge-ctx-' },
-  { role: 'sys_discovery_context', prefix: 'discover-' },
-];
+const KNOWN_ROLES = new Set([
+  CONTEXTUAL_GRAPH_ROLES.entitySummary,
+  CONTEXTUAL_GRAPH_ROLES.entityCapabilities,
+  CONTEXTUAL_GRAPH_ROLES.edge,
+  CONTEXTUAL_GRAPH_ROLES.discover,
+]);
 
-/**
- * Infer the contextual-graph role for an ext_id based on its prefix.
- * @param {string} extId
- * @returns {string|null}
- */
-export function inferRole(extId) {
-  for (const { role, prefix } of ROLE_PREFIXES) {
-    if (extId?.startsWith(prefix)) return role;
-  }
-  return null;
+function isKnownRole(role) {
+  return typeof role === 'string' && KNOWN_ROLES.has(role);
 }
 
-function parseIdAfterPrefix(extId, prefix) {
-  if (!extId?.startsWith(prefix)) return null;
-  return extId.slice(prefix.length);
+function nodeIsGroundedOrCanonical(labels) {
+  return labels?.includes('grounded') || labels?.includes('canonical');
 }
 
-function parseNodeIdFromExtId(extId, role) {
-  const { prefix } = ROLE_PREFIXES.find((r) => r.role === role) || {};
-  return parseIdAfterPrefix(extId, prefix);
-}
-
-/**
- * Parse the pair from an edge-ctx ext_id. The canonical ext_id format is
- * `edge-ctx-{source}|{target}` and uses the raw endpoint IDs (not sorted),
- * matching the system-template definition in ensure-schema.js.
- *
- * @param {string} extId
- * @returns {{sourceId: string, targetId: string}|null}
- */
-function parseEdgePairFromExtId(extId) {
-  const pairPart = parseIdAfterPrefix(extId, 'edge-ctx-');
-  if (!pairPart) return null;
-  const parts = pairPart.split('|');
-  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
-  return { sourceId: parts[0], targetId: parts[1] };
+function nodeIsCandidate(labels) {
+  return labels?.includes('candidate');
 }
 
 /**
@@ -63,28 +38,34 @@ function parseEdgePairFromExtId(extId) {
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
- * @param {string} extId
+ * @param {object} ref - model_ref entry with explicit role and scope
  * @returns {Promise<object|null>} spec or null if the backing node/edge is gone
  */
-export async function deriveSpecForExtId(db, serverId, bankId, extId) {
-  const role = inferRole(extId);
-  if (!role) return null;
+export async function deriveSpecForRef(db, serverId, bankId, ref) {
+  if (!ref?.role || !isKnownRole(ref.role)) {
+    logger.warn('Cannot derive spec for ref with missing/unknown role', { ref });
+    return null;
+  }
 
-  if (role === 'sys_entity_summary') {
-    const nodeId = parseNodeIdFromExtId(extId, role);
-    if (!nodeId) return null;
+  const scope = ref.scope || {};
+
+  if (ref.role === CONTEXTUAL_GRAPH_ROLES.entitySummary) {
+    const nodeId = scope.node_id;
+    if (!nodeId) {
+      logger.warn('Missing node_id in entity-summary ref scope', { ref });
+      return null;
+    }
     const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) {
-      logger.warn('Dropping stale entity-summary ref; node not found', { serverId, bankId, extId });
+      logger.warn('Dropping stale entity-summary ref; node not found', { serverId, bankId, ref });
       return null;
     }
-    if (node.cgn_labels?.includes('candidate')) {
-      logger.warn('Dropping entity-summary ref for candidate node; promotion required', { serverId, bankId, extId });
+    if (nodeIsCandidate(node.cgn_labels)) {
+      logger.warn('Dropping entity-summary ref for candidate node; promotion required', { serverId, bankId, ref });
       return null;
     }
-    // Defensive: only derive for grounded or canonical nodes.
-    if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) {
-      logger.warn('Dropping entity-summary ref for non-grounded/non-canonical node', { serverId, bankId, extId, labels: node.cgn_labels });
+    if (!nodeIsGroundedOrCanonical(node.cgn_labels)) {
+      logger.warn('Dropping entity-summary ref for non-grounded/non-canonical node', { serverId, bankId, ref, labels: node.cgn_labels });
       return null;
     }
     return deriveEntitySummaryModel(db, {
@@ -93,21 +74,23 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     });
   }
 
-  if (role === 'sys_entity_capabilities') {
-    const nodeId = parseNodeIdFromExtId(extId, role);
-    if (!nodeId) return null;
+  if (ref.role === CONTEXTUAL_GRAPH_ROLES.entityCapabilities) {
+    const nodeId = scope.node_id;
+    if (!nodeId) {
+      logger.warn('Missing node_id in entity-capabilities ref scope', { ref });
+      return null;
+    }
     const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) {
-      logger.warn('Dropping stale entity-capabilities ref; node not found', { serverId, bankId, extId });
+      logger.warn('Dropping stale entity-capabilities ref; node not found', { serverId, bankId, ref });
       return null;
     }
-    if (node.cgn_labels?.includes('candidate')) {
-      logger.warn('Dropping entity-capabilities ref for candidate node; promotion required', { serverId, bankId, extId });
+    if (nodeIsCandidate(node.cgn_labels)) {
+      logger.warn('Dropping entity-capabilities ref for candidate node; promotion required', { serverId, bankId, ref });
       return null;
     }
-    // Defensive: only derive for grounded or canonical nodes.
-    if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) {
-      logger.warn('Dropping entity-capabilities ref for non-grounded/non-canonical node', { serverId, bankId, extId, labels: node.cgn_labels });
+    if (!nodeIsGroundedOrCanonical(node.cgn_labels)) {
+      logger.warn('Dropping entity-capabilities ref for non-grounded/non-canonical node', { serverId, bankId, ref, labels: node.cgn_labels });
       return null;
     }
     return deriveEntityCapabilitiesModel(db, {
@@ -116,60 +99,64 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
     });
   }
 
-  if (role === 'sys_edge_context') {
-    const pair = parseEdgePairFromExtId(extId);
-    if (!pair) {
-      logger.warn('Malformed edge-ctx ext_id; cannot derive spec', { serverId, bankId, extId });
+  if (ref.role === CONTEXTUAL_GRAPH_ROLES.edge) {
+    const sourceId = scope.source_id;
+    const targetId = scope.target_id;
+    if (!sourceId || !targetId) {
+      logger.warn('Missing source_id/target_id in edge-ctx ref scope', { ref });
       return null;
     }
+
     const nodes = listNodes(db, serverId, bankId, { limit: 10000 })?.data || [];
-    const sourceNode = nodes.find((n) => n.cgn_id === pair.sourceId);
-    const targetNode = nodes.find((n) => n.cgn_id === pair.targetId);
+    const sourceNode = nodes.find((n) => n.cgn_id === sourceId);
+    const targetNode = nodes.find((n) => n.cgn_id === targetId);
     if (!sourceNode || !targetNode) {
-      logger.warn('Dropping stale edge-ctx ref; endpoint missing', { serverId, bankId, extId, sourceId: pair.sourceId, targetId: pair.targetId });
+      logger.warn('Dropping stale edge-ctx ref; endpoint missing', { serverId, bankId, ref, sourceId, targetId });
       return null;
     }
-    if (sourceNode.cgn_labels?.includes('candidate') || targetNode.cgn_labels?.includes('candidate')) {
-      logger.warn('Dropping edge-ctx ref because an endpoint is a candidate; promotion required', { serverId, bankId, extId });
+    if (nodeIsCandidate(sourceNode.cgn_labels) || nodeIsCandidate(targetNode.cgn_labels)) {
+      logger.warn('Dropping edge-ctx ref because an endpoint is a candidate; promotion required', { serverId, bankId, ref });
       return null;
     }
 
     const edges = listEdges(db, serverId, bankId, { limit: 10000 })?.data || [];
     const pairEdges = edges.filter(
       (e) =>
-        e.cge_source_id === pair.sourceId &&
-        e.cge_target_id === pair.targetId &&
+        e.cge_source_id === sourceId &&
+        e.cge_target_id === targetId &&
         (e.cge_properties?.labels?.includes('candidate') || e.cge_properties?.labels?.includes('grounded')),
     );
     if (pairEdges.some((e) => e.cge_properties?.labels?.includes('candidate'))) {
-      logger.warn('Dropping edge-ctx ref because the edge is a candidate; promotion required', { serverId, bankId, extId });
+      logger.warn('Dropping edge-ctx ref because the edge is a candidate; promotion required', { serverId, bankId, ref });
       return null;
     }
 
     return deriveEdgeContextModel(db, {
-      id: pair.sourceId,
-      displayName: sourceNode.cgn_properties?.display_name || pair.sourceId,
+      id: sourceId,
+      displayName: sourceNode.cgn_properties?.display_name || sourceId,
     }, {
-      id: pair.targetId,
-      displayName: targetNode.cgn_properties?.display_name || pair.targetId,
+      id: targetId,
+      displayName: targetNode.cgn_properties?.display_name || targetId,
     });
   }
 
-  if (role === 'sys_discovery_context') {
-    const seedId = parseNodeIdFromExtId(extId, role);
-    if (!seedId) return null;
+  if (ref.role === CONTEXTUAL_GRAPH_ROLES.discover) {
+    const seedId = scope.seed_id;
+    if (!seedId) {
+      logger.warn('Missing seed_id in discover ref scope', { ref });
+      return null;
+    }
     const seedNode = getNode(db, serverId, bankId, seedId)?.data;
     if (!seedNode) {
-      logger.warn('Dropping stale discover ref; seed node not found', { serverId, bankId, extId });
+      logger.warn('Dropping stale discover ref; seed node not found', { serverId, bankId, ref });
       return null;
     }
-    if (seedNode.cgn_labels?.includes('candidate')) {
-      logger.warn('Dropping discover ref for candidate seed; promotion required', { serverId, bankId, extId });
+    if (nodeIsCandidate(seedNode.cgn_labels)) {
+      logger.warn('Dropping discover ref for candidate seed; promotion required', { serverId, bankId, ref });
       return null;
     }
-    // Defensive: only derive for grounded or canonical seeds.
-    if (!seedNode.cgn_labels?.includes('grounded') && !seedNode.cgn_labels?.includes('canonical')) {
-      logger.warn('Dropping discover ref for non-grounded/non-canonical seed', { serverId, bankId, extId, labels: seedNode.cgn_labels });
+    if (!nodeIsGroundedOrCanonical(seedNode.cgn_labels)) {
+      logger.warn('Dropping discover ref for non-grounded/non-canonical seed', { serverId, bankId, ref, labels: seedNode.cgn_labels });
       return null;
     }
     return deriveDiscoverContextModel(db, {
@@ -188,13 +175,13 @@ export async function deriveSpecForExtId(db, serverId, bankId, extId) {
  * @param {object} db
  * @param {number} serverId
  * @param {string} bankId
- * @param {Map<string, object>} refsByExtId - result of extractModelRefsFromDb
+ * @param {Map<string, {type: 'node'|'edge', id: string, ref: object}>} refsByExtId - result of extractModelRefsFromDb
  * @returns {Promise<Array<{extId: string, spec: object}>>}
  */
 export async function deriveSpecsForRefs(db, serverId, bankId, refsByExtId) {
   const results = [];
-  for (const [extId] of refsByExtId) {
-    const spec = await deriveSpecForExtId(db, serverId, bankId, extId);
+  for (const [extId, { ref }] of refsByExtId) {
+    const spec = await deriveSpecForRef(db, serverId, bankId, ref);
     if (spec) results.push({ extId, spec });
   }
   return results;
