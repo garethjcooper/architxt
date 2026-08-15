@@ -67,6 +67,7 @@ export interface ResearchQueryOptions {
   };
   synthesize?: {
     maxTokens?: number;
+    sectionFocus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   };
   models?: {
     selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string }>;
@@ -114,6 +115,7 @@ function buildDiscoverOptions(
     if (!opts) return {};
     return {
       ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
+      ...(opts.sectionFocus && { section_focus: opts.sectionFocus }),
     };
   }
 
@@ -166,6 +168,7 @@ function buildQueryOptionsFromParameters(
   } else if (actionType === 'synthesize') {
     opts.synthesize = {
       ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
+      ...(parameters.section_focus && { sectionFocus: parameters.section_focus }),
     };
   } else if (actionType === 'models') {
     opts.models = {
@@ -622,15 +625,17 @@ export function useResearchSession({
     setLoading(true);
     setError(null);
     try {
+      const parsed = parseSectionDirectives(intentText.trim());
       const response = await researchApi.synthesize({
         server_id: parseInt(serverId, 10),
         bank_id: bankId,
         session_id: activeSessionId,
         source_step_ids: sourceStepIds,
-        intent_text: intentText.trim(),
+        intent_text: parsed.intentText,
         ...(queryOptions.synthesize?.maxTokens != null
           ? { max_tokens: queryOptions.synthesize.maxTokens }
           : {}),
+        ...(parsed.sectionFocus ? { section_focus: parsed.sectionFocus } : {}),
       });
       setActiveSessionId(response.session_id);
       onViewModeChange?.('step');

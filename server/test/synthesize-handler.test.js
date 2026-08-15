@@ -27,9 +27,8 @@ function makeCompletion(content) {
   });
 }
 
-function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
-  return JSON.stringify({ narrative, graph: { nodes, edges }, tables: [],
-      diagrams: [] });
+function buildEnvelope({ narrative = '', nodes = [], edges = [], tables = [], diagrams = [] } = {}) {
+  return JSON.stringify({ narrative, graph: { nodes, edges }, tables, diagrams });
 }
 
 describe('synthesize handler', () => {
@@ -184,5 +183,72 @@ describe('synthesize handler', () => {
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
     assert.ok(result.graph.nodes.some((n) => n.id === 'payment-gateway'));
+  });
+
+  it('scrubs narrative when only diagrams are requested', async () => {
+    const response = buildEnvelope({
+      narrative: 'The model should not have written this.',
+      nodes: [],
+      edges: [],
+      tables: [],
+      diagrams: [{
+        name: 'ICMS and Singleview Dataflow',
+        type: 'erDiagram',
+        content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+      }],
+    });
+
+    const sourceSteps = [
+      {
+        intent_text: 'step one',
+        synthesis: { narrative: 'Narrative one' },
+        canvas: {
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [{
+            name: 'ICMS and Singleview Dataflow',
+            type: 'erDiagram',
+            content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+          }],
+        },
+      },
+    ];
+
+    const result = await handleSynthesize(1, 'bank', 'test1 (erDiagram)', {
+      source_steps: sourceSteps,
+      model: 'test-model',
+      section_focus: { diagram: [{ name: 'test1', type: 'erDiagram', content: 'show the relationship...' }] },
+      generateCompletion: makeCompletion(response),
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.equal(result.narrative, '');
+    assert.equal(result.diagrams.length, 1);
+  });
+
+  it('keeps narrative when narrative section is explicitly requested', async () => {
+    const response = buildEnvelope({
+      narrative: 'Keep this summary.',
+      nodes: [],
+      edges: [],
+    });
+
+    const sourceSteps = [
+      {
+        intent_text: 'step one',
+        synthesis: { narrative: 'Narrative one' },
+        canvas: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
+      },
+    ];
+
+    const result = await handleSynthesize(1, 'bank', '#narrative\nsummarize this\n#end', {
+      source_steps: sourceSteps,
+      model: 'test-model',
+      section_focus: { narrative: 'summarize this' },
+      generateCompletion: makeCompletion(response),
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.equal(result.narrative, 'Keep this summary.');
   });
 });
