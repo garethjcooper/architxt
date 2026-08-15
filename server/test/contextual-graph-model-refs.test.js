@@ -21,7 +21,7 @@ describe('graph-model-refs', () => {
     ]);
   });
 
-  it('filters by role prefix', () => {
+  it('filters by exact role', () => {
     const properties = {
       provenance: {
         model_refs: [
@@ -29,7 +29,7 @@ describe('graph-model-refs', () => {
           { role: 'sys_edge_context', ext_id: 'edge-ctx-svc:SVC-005|svc:SVC-006' },
         ] } };
 
-    assert.deepEqual(extractRefsFromProperties(properties, { rolePrefix: 'sys_edge_context' }), [
+    assert.deepEqual(extractRefsFromProperties(properties, { role: 'sys_edge_context' }), [
       'edge-ctx-svc:SVC-005|svc:SVC-006',
     ]);
   });

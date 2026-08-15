@@ -11,14 +11,10 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
+import { MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 import type { ModelRef } from './page';
 
-const ROLE_LABELS: Record<string, string> = {
-  sys_entity_summary: 'summary',
-  sys_entity_capabilities: 'capabilities',
-  sys_edge_context: 'edge context',
-  sys_discovery_context: 'discovery',
-};
+const ROLE_LABELS = MODEL_ROLE_LABELS;
 
 const isTerminalStatus = (s: string) => ['completed', 'failed', 'acknowledged', 'cancelled', 'canceled'].includes(s);
 

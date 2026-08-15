@@ -23,7 +23,8 @@ const logger = createLogger('contextual-graph-delete-generated');
  * @param {string} bankId
  * @param {Object} [options]
  * @param {string[]} [options.ext_ids] - explicit list; if omitted, parsed from working graph
- * @param {string} [options.rolePrefix] - only delete refs whose role starts with this prefix
+ * @param {string} [options.role] - only delete refs with this exact role
+ * @param {Function} [options.filterFn] - receives { role, ext_id, scope }
  * @param {boolean} [options.dry_run] - if true, do not delete anything
  * @param {Function} [options.deleteFromHindsight] - override for testing
  * @returns {Promise<{success: boolean, dry_run?: boolean, deleted?: string[], failed?: {ext_id: string, error: string}[], cleared?: {nodes: number, edges: number}, error?: string, code?: string}>}
@@ -43,7 +44,7 @@ export async function deleteGeneratedModels(
     extIds = [...new Set(options.ext_ids.filter((id) => typeof id === 'string' && id))];
   } else {
     const refs = await extractModelRefsFromDb(db, serverId, bankId, {
-      rolePrefix: options.rolePrefix,
+      role: options.role,
       filterFn: options.filterFn,
     });
     extIds = refs.extIds;

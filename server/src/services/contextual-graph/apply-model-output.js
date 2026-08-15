@@ -91,10 +91,6 @@ export async function applyModelOutput(db, serverId, bankId, model, output, opti
   }
 }
 
-function parseNodeIdFromExtId(extId, prefix) {
-  if (!extId?.startsWith(prefix)) return null;
-  return extId.slice(prefix.length);
-}
 
 function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
   const nodeId = model.scope?.node_id;
@@ -429,7 +425,7 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     // Preserve nodes that are seeds for their own discovery model; they are not
     // disposable discovered nodes for this ref.
     const isOwnSeed = refs.some((ref) =>
-      ref?.role === 'sys_discovery_context' && ref?.ext_id === `discover-${node.cgn_id}`
+      ref?.role === 'sys_discovery_context' && ref?.scope?.seed_id === node.cgn_id,
     );
     if (isOwnSeed) continue;
     if (refs.some((ref) => ref?.ext_id === model.mm_ext_id)) {
