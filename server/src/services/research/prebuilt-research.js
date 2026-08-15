@@ -79,7 +79,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     };
   }
 
-  const { narrative, graph, tables, errors: modelErrors } = normalizeModelOutput(content);
+  const { narrative, graph, tables, diagrams, errors: modelErrors } = normalizeModelOutput(content);
   logger.info('Prebuilt candidate envelope extracted', {
     serverId,
     bankId,
@@ -90,6 +90,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     nodeCount: graph?.nodes.length ?? 0,
     edgeCount: graph?.edges.length ?? 0,
     tableCount: tables?.length ?? 0,
+    diagramCount: diagrams?.length ?? 0,
     modelError: modelErrors?.length ? modelErrors.join('; ') : null,
   });
   return {
@@ -99,6 +100,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     narrative,
     graph,
     tables: tables || [],
+    diagrams: diagrams || [],
     graph_error: modelErrors?.length ? modelErrors.join('; ') : null,
   };
 }
@@ -149,6 +151,9 @@ function toApiModelResult(candidate) {
   if (candidate.tables && candidate.tables.length > 0) {
     result.tables = candidate.tables;
   }
+  if (candidate.diagrams && candidate.diagrams.length > 0) {
+    result.diagrams = candidate.diagrams;
+  }
   if (candidate.graph_error) {
     result.graph_error = candidate.graph_error;
   }
@@ -159,6 +164,7 @@ function aggregateRoleResults(entityResults) {
   const narratives = [];
   const graphs = [];
   const tables = [];
+  const diagrams = [];
   const errors = [];
   let effectiveConcatenation = 'merge';
 
@@ -179,6 +185,9 @@ function aggregateRoleResults(entityResults) {
       if (candidate.tables && candidate.tables.length > 0) {
         tables.push(...candidate.tables);
       }
+      if (candidate.diagrams && candidate.diagrams.length > 0) {
+        diagrams.push(...candidate.diagrams);
+      }
     }
   }
 
@@ -193,6 +202,9 @@ function aggregateRoleResults(entityResults) {
   }
   if (tables.length > 0) {
     result.tables = tables;
+  }
+  if (diagrams.length > 0) {
+    result.diagrams = diagrams;
   }
   if (errors.length > 0) {
     result.errors = errors;

@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { createLogger } from '../../utils/logger.js';
+import { VALID_MERMAID_DIAGRAM_TYPES } from '../../prompts/section-directives.js';
 
 const logger = createLogger('contextual-graph-normalize-model-output');
 
@@ -322,6 +323,18 @@ function normalizeTable(t) {
   return { name, columns, rows };
 }
 
+function normalizeDiagram(d) {
+  if (!d || typeof d !== 'object') return null;
+  const name = typeof d.name === 'string' && d.name.length > 0 ? d.name : null;
+  const type = typeof d.type === 'string' && d.type.length > 0 ? d.type : null;
+  const content = typeof d.content === 'string' ? d.content.trim() : '';
+  if (!name) return null;
+  if (!type) return null;
+  if (!VALID_MERMAID_DIAGRAM_TYPES.has(type)) return null;
+  if (!content) return null;
+  return { name, type, content };
+}
+
 function dropIsolatedNodes(nodes, edges) {
   const endpointIds = new Set();
   for (const e of edges) {
@@ -339,6 +352,7 @@ function dropIsolatedNodes(nodes, edges) {
  *   narrative: string,
  *   graph: { nodes: object[], edges: object[] },
  *   tables: object[],
+ *   diagrams: object[],
  *   errors: string[],
  *   raw: string
  * }}
@@ -348,7 +362,7 @@ export function normalizeModelOutput(raw) {
   const errors = [];
 
   if (rawString.trim() === '') {
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], errors, raw: rawString };
+    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
   }
 
   let parsed = null;
@@ -384,6 +398,7 @@ export function normalizeModelOutput(raw) {
         narrative: extractProseBeforeTable(preprocessed),
         graph: { nodes: [], edges: [] },
         tables: [table],
+        diagrams: [],
       };
       jsonText = JSON.stringify(parsed);
     }
@@ -391,12 +406,12 @@ export function normalizeModelOutput(raw) {
 
   if (!parsed) {
     errors.push('Unable to parse JSON envelope from model output');
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], errors, raw: rawString };
+    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     errors.push('Model output is not a JSON object');
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], errors, raw: rawString };
+    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
   }
 
   // 3. Validate required top-level keys and fill defaults.
@@ -417,6 +432,11 @@ export function normalizeModelOutput(raw) {
     errors.push('Missing required top-level key: tables');
   }
 
+  const diagramsInput = Array.isArray(parsed.diagrams) ? parsed.diagrams : [];
+  if (!Object.prototype.hasOwnProperty.call(parsed, 'diagrams')) {
+    errors.push('Missing required top-level key: diagrams');
+  }
+
   // 4. Normalize graph nodes/edges and drop isolated nodes.
   const nodes = (Array.isArray(graphInput.nodes) ? graphInput.nodes : [])
     .map(normalizeNode)
@@ -432,6 +452,12 @@ export function normalizeModelOutput(raw) {
     errors.push('Some table entries are missing a valid name');
   }
 
+  // 6. Validate diagrams.
+  const diagrams = diagramsInput.map(normalizeDiagram).filter(Boolean);
+  if (diagrams.length !== diagramsInput.length) {
+    errors.push('Some diagram entries are missing a valid name, type, or valid Mermaid type');
+  }
+
   // Warn if graph-producing roles returned nodes without edges.
   if (nodes.length > 0 && edges.length === 0) {
     logger.warn('Model output contained graph nodes but zero edges; all nodes dropped', { nodeCount: nodes.length });
@@ -441,6 +467,7 @@ export function normalizeModelOutput(raw) {
     narrative,
     graph: { nodes: connectedNodes, edges },
     tables,
+    diagrams,
     errors,
     raw: rawString,
   };

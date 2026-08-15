@@ -55,6 +55,7 @@ describe('applyModelOutput', () => {
       narrative: 'Handles customer billing.',
       graph: { nodes: [], edges: [] },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('entity-summary-svc-001', 'sys_entity_summary'), output);
@@ -104,6 +105,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'A sends usage data to B', evidence: ['mem-2'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
@@ -127,6 +129,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'svc-001', to: 'candidate:a', type: 'calls', label: 'calls', detail: 'detail', evidence: ['mem-3'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     let result = await applyModelOutput(db, serverId, bankId, model('discover-svc-001', 'sys_discovery_context'), firstOutput);
@@ -145,6 +148,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'svc-001', to: 'candidate:b', type: 'sends', label: 'sends', detail: 'detail', evidence: ['mem-4'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     result = await applyModelOutput(db, serverId, bankId, model('discover-svc-001', 'sys_discovery_context'), secondOutput);
@@ -173,6 +177,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'A sends usage data to B', evidence: ['mem-2'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
@@ -204,6 +209,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'svc-001', to: 'svc-002', type: 'reads', label: 'account data', detail: 'Reads account data', evidence: ['mem-5'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
@@ -231,6 +237,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'mozart-api', to: 'subscriber', type: 'sends', label: 'usage data', detail: 'Mozart API sends usage data to Subscriber', evidence: ['mem-1'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-mozart-api|subscriber', 'sys_edge_context'), output);
@@ -261,6 +268,7 @@ describe('applyModelOutput', () => {
         edges: [{ from: 'found:mozart-api', to: 'found:subscriber', type: 'sends', label: 'usage data', detail: 'Mozart API sends usage data to Subscriber', evidence: ['mem-1'] }],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-subscriber|mozart-api', 'sys_edge_context'), output);
@@ -292,6 +300,7 @@ describe('applyModelOutput', () => {
       narrative: '',
       graph: { nodes: [], edges: [] },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
@@ -301,13 +310,13 @@ describe('applyModelOutput', () => {
 
   it('parses JSON containing non-breaking hyphens and no-break spaces', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
-    const output = normalizeModelOutput('Some prose before the envelope.\n\n{\n  "narrative": "payment‑method and account‑merge routing",\n  "graph": { "nodes": [], "edges": [] },\n  "tables": []\n}\n\nTrailing prose.');
+    const output = normalizeModelOutput('Some prose before the envelope.\n\n{\n  "narrative": "payment‑method and account‑merge routing",\n  "graph": { "nodes": [], "edges": [] },\n  "tables": [],\n  "diagrams": []\n}\n\nTrailing prose.');
     assert.equal(output.errors.length, 0);
     assert.equal(output.narrative, 'payment-method and account-merge routing');
   });
 
   it('parses real Hindsight content envelope for edge-context model', () => {
-    const realContent = '## Overview\n\n{ \\"narrative\\": \\"Singleview (a-com:COM-001) is the emerging canonical source for customer agreement, payment‑method and usage information. ICMS (a-com:COM-002) reads account and payment data from Singleview, depends on Singleview for account‑merge and transaction routing, and receives usage data forwarded by Singleview for rating and billing.\\", \\"graph\\": { \\"nodes\\": [ { \\"id\\": \\"a-com:COM-002\\", \\"name\\": \\"ICMS\\", \\"type\\": \\"component\\" }, { \\"id\\": \\"a-com:COM-001\\", \\"name\\": \\"Singleview\\", \\"type\\": \\"component\\" } ], \\"edges\\": [ { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"reads\\", \\"label\\": \\"account data\\", \\"detail\\": \\"ICMS reads account and payment‑method information from Singleview to populate credit‑account identifiers.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-capabilities-txt-COM-002\\"] }, { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"depends-on\\", \\"label\\": \\"account merge\\", \\"detail\\": \\"ICMS depends on Singleview for account‑merge and transaction routing in the future AR‑master role.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-summary-txt-COM-001\\"] }, { \\"from\\": \\"a-com:COM-001\\", \\"to\\": \\"a-com:COM-002\\", \\"type\\": \\"sends\\", \\"label\\": \\"usage data\\", \\"detail\\": \\"Singleview forwards product‑usage records to ICMS for rating and billing processing.\\", \\"evidence\\": [\\"architxt-summary-txt-COM-001\\"] } ] }, \\"tables\\": [] }';
+    const realContent = '## Overview\n\n{ \\"narrative\\": \\"Singleview (a-com:COM-001) is the emerging canonical source for customer agreement, payment‑method and usage information. ICMS (a-com:COM-002) reads account and payment data from Singleview, depends on Singleview for account‑merge and transaction routing, and receives usage data forwarded by Singleview for rating and billing.\\", \\"graph\\": { \\"nodes\\": [ { \\"id\\": \\"a-com:COM-002\\", \\"name\\": \\"ICMS\\", \\"type\\": \\"component\\" }, { \\"id\\": \\"a-com:COM-001\\", \\"name\\": \\"Singleview\\", \\"type\\": \\"component\\" } ], \\"edges\\": [ { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"reads\\", \\"label\\": \\"account data\\", \\"detail\\": \\"ICMS reads account and payment‑method information from Singleview to populate credit‑account identifiers.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-capabilities-txt-COM-002\\"] }, { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"depends-on\\", \\"label\\": \\"account merge\\", \\"detail\\": \\"ICMS depends on Singleview for account‑merge and transaction routing in the future AR‑master role.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-summary-txt-COM-001\\"] }, { \\"from\\": \\"a-com:COM-001\\", \\"to\\": \\"a-com:COM-002\\", \\"type\\": \\"sends\\", \\"label\\": \\"usage data\\", \\"detail\\": \\"Singleview forwards product‑usage records to ICMS for rating and billing processing.\\", \\"evidence\\": [\\"architxt-summary-txt-COM-001\\"] } ] }, \\"tables\\": [], \"diagrams\\": [] }';
     const output = normalizeModelOutput(realContent);
     assert.equal(output.errors.length, 0);
     assert.equal(output.graph.edges.length, 3);
@@ -318,7 +327,7 @@ describe('applyModelOutput', () => {
   });
 
   it('normalizes JSON containing smart quotes inside string values', () => {
-    const content = '{\n  "narrative": "Uses \u201cFile: DBnnnn00\u201d interface.",\n  "graph": {"nodes": [], "edges": []},\n  "tables": []\n}';
+    const content = '{\n  "narrative": "Uses \u201cFile: DBnnnn00\u201d interface.",\n  "graph": {"nodes": [], "edges": []},\n  "tables": [],\n  "diagrams": []\n}';
     const output = normalizeModelOutput(content);
     assert.equal(output.errors.length, 0);
     assert.ok(output.narrative.includes('File: DBnnnn00'));
@@ -341,6 +350,7 @@ describe('applyModelOutput', () => {
         ],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-002|a-com:COM-001', 'sys_edge_context'), output);
@@ -373,6 +383,7 @@ describe('applyModelOutput', () => {
         ],
       },
       tables: [],
+      diagrams: [],
     }));
 
     const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-001|a-com:COM-002', 'sys_edge_context'), output);

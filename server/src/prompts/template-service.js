@@ -120,7 +120,7 @@ export function loadAndCompose(db, name, variables) {
 /**
  * Compose a full prompt for a derived mental model.
  *
- * @param {{graph?:string, table?:Array, narrative?:string}} sectionFocus
+ * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} sectionFocus
  * @returns {{active: string[], empty: string[]}}
  */
 function computeSectionState(sectionFocus) {
@@ -130,11 +130,13 @@ function computeSectionState(sectionFocus) {
   else empty.push('graph');
   if (sectionFocus?.table?.length) active.push('tables');
   else empty.push('tables');
+  if (sectionFocus?.diagram?.length) active.push('diagrams');
+  else empty.push('diagrams');
   if (sectionFocus?.narrative) active.push('narrative');
   else empty.push('narrative');
   // If no directives at all, narrative is the default fallback.
   if (active.length === 0) {
-    return { active: ['narrative'], empty: ['graph', 'tables'] };
+    return { active: ['narrative'], empty: ['graph', 'tables', 'diagrams'] };
   }
   return { active, empty };
 }
@@ -157,7 +159,7 @@ function formatNodeExamples({ include, exclude }) {
  * keeping prompt size minimal and preventing the LLM from hallucinating
  * unrequested sections.
  *
- * @param {{graph?:string, table?:Array, narrative?:string}} sectionFocus
+ * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} sectionFocus
  * @returns {string[]}
  */
 function buildConditionalFragments(sectionFocus) {
@@ -167,6 +169,9 @@ function buildConditionalFragments(sectionFocus) {
   }
   if (sectionFocus?.table) {
     extra.push('output-format-table-contextual.md');
+  }
+  if (sectionFocus?.diagram?.length) {
+    extra.push('output-format-diagram-contextual.md');
   }
   return extra;
 }
@@ -238,6 +243,7 @@ function buildFocusFromDirectives(topic) {
     focusVariables: {
       ARCHITXT_GRAPH_FOCUS: formatFocusVariable(sectionFocus?.graph || ''),
       ARCHITXT_TABLE_FOCUS: formatFocusVariable(sectionFocus?.table || ''),
+      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(sectionFocus?.diagram || ''),
       ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(sectionFocus?.narrative || ''),
     },
   };
@@ -254,11 +260,26 @@ function buildFocusFromDirectives(topic) {
  * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
  *   - #graph, #narrative → single string (one bullet)
  *   - #table             → TableDirective[] (one per table, with optional name)
+ *   - #diagram           → DiagramDirective[] with name, type, and content
  *
- * @param {string|string[]|{name?:string,content:string}[]} [raw]
+ * @param {string|string[]|{name?:string,content:string}[]|{name:string,type:string,content:string}[]} [raw]
  * @returns {string}
  */
 export function formatFocusVariable(raw) {
+  // Diagram directives
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'type' in raw[0]) {
+    const directives = /** @type {{name:string,type:string,content:string}[]} */ (raw);
+    const lines = directives
+      .filter((d) => d.type?.trim() !== '' && d.content?.trim() !== '')
+      .map((d) => {
+        const type = d.type.trim();
+        const content = d.content.trim();
+        if (d.name?.trim()) return `- **${d.name.trim()}** (${type}) — ${content}`;
+        return `- (${type}) — ${content}`;
+      });
+    return lines.join('\n');
+  }
+
   // Table directives
   if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'content' in raw[0]) {
     const directives = /** @type {{name?:string,content:string}[]} */ (raw);
@@ -289,9 +310,9 @@ export function formatFocusVariable(raw) {
  * focus variables (synthesize handler). We take the union of both so that
  * callers who supply section_focus as variables still get the right fragments.
  *
- * @param {{graph?:string, table?:Array, narrative?:string}} parsedSectionFocus
- * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} merged
- * @returns {{graph?:string, table?:Array, narrative?:string}}
+ * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} parsedSectionFocus
+ * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_DIAGRAM_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} merged
+ * @returns {{graph?:string, table?:Array, diagram?:Array, narrative?:string}}
  */
 function computeEffectiveFocus(parsedSectionFocus, merged) {
   const effectiveFocus = {
@@ -305,6 +326,16 @@ function computeEffectiveFocus(parsedSectionFocus, merged) {
     effectiveFocus.table = lines.map((line) => {
       const m = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
       if (m) return { name: m[1].trim(), content: m[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
+  }
+  if (merged.ARCHITXT_DIAGRAM_FOCUS?.trim()) {
+    const lines = merged.ARCHITXT_DIAGRAM_FOCUS.trim().split('\n').filter((l) => l.trim());
+    effectiveFocus.diagram = lines.map((line) => {
+      const namedMatch = line.match(/^- \*\*(.+?)\*\*\s*\((.+?)\)\s*—\s*(.+)$/);
+      if (namedMatch) return { name: namedMatch[1].trim(), type: namedMatch[2].trim(), content: namedMatch[3].trim() };
+      const anonMatch = line.match(/^- \((.+?)\)\s*—\s*(.+)$/);
+      if (anonMatch) return { type: anonMatch[1].trim(), content: anonMatch[2].trim() };
       return { content: line.replace(/^- /, '').trim() };
     });
   }
@@ -322,7 +353,7 @@ function computeEffectiveFocus(parsedSectionFocus, merged) {
  *   contextual-graph system templates, or mental_models.mm_returns for all others.
  * @param {string} topic - rendered mm_source_query after single-brace substitution
  * @param {Record<string, string>} [focusVariables] - Optional per-section focus variables
- *   (ARCHITXT_GRAPH_FOCUS, ARCHITXT_TABLE_FOCUS, ARCHITXT_NARRATIVE_FOCUS).
+ *   (ARCHITXT_GRAPH_FOCUS, ARCHITXT_TABLE_FOCUS, ARCHITXT_DIAGRAM_FOCUS, ARCHITXT_NARRATIVE_FOCUS).
  * @returns {Promise<string>}
  */
 export async function composeMentalModelPrompt(db, templateName, topic, focusVariables = {}) {
@@ -339,6 +370,7 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     ARCHITXT_TOPIC: parsedTopic || '',
     ARCHITXT_GRAPH_FOCUS: '',
     ARCHITXT_TABLE_FOCUS: '',
+    ARCHITXT_DIAGRAM_FOCUS: '',
     ARCHITXT_NARRATIVE_FOCUS: '',
     ...parsedFocus,
     ...focusVariables,
@@ -398,6 +430,7 @@ export async function composeMentalModelPromptBatch(db, items) {
         ARCHITXT_TOPIC: parsedTopic || '',
         ARCHITXT_GRAPH_FOCUS: '',
         ARCHITXT_TABLE_FOCUS: '',
+        ARCHITXT_DIAGRAM_FOCUS: '',
         ARCHITXT_NARRATIVE_FOCUS: '',
         ...parsedFocus,
       };

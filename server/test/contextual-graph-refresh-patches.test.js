@@ -55,7 +55,8 @@ describe('refreshContextualGraphPatches', () => {
       },
     });
 
-    const newContent = JSON.stringify({ narrative: 'Updated summary.', graph: { nodes: [], edges: [] }, tables: [] });
+    const newContent = JSON.stringify({ narrative: 'Updated summary.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
     const injectedList = async () => ({
       success: true,
       mentalModels: [{
@@ -76,7 +77,8 @@ describe('refreshContextualGraphPatches', () => {
   });
 
   it('skips application when content hash is unchanged and applied content exists', async () => {
-    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [] });
+    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
     const hash = contentHash(content);
 
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
@@ -110,7 +112,8 @@ describe('refreshContextualGraphPatches', () => {
 
     const injectedList = async () => ({
       success: true,
-      mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [] }) }],
+      mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] }) }],
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { dryRun: true, listAllMentalModels: injectedList });
@@ -145,7 +148,8 @@ describe('refreshContextualGraphPatches', () => {
   });
 
   it('re-applies when content hash is unchanged but applied content is missing', async () => {
-    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [] });
+    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
     const hash = contentHash(content);
 
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
