@@ -158,7 +158,9 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
     anyDirectiveFound = true;
 
     if (content) {
-      if (firstDirectiveContent === null) {
+      // table/diagram content is structured data (table rows / Mermaid source),
+      // not a user topic, so don't promote it as the fallback topic.
+      if (key !== 'table' && key !== 'diagram' && firstDirectiveContent === null) {
         firstDirectiveContent = content;
       }
 

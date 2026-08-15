@@ -117,6 +117,27 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
+  it('does not use diagram body as the implicit narrative topic', () => {
+    const result = parseSectionDirectives('#diagram #name test1 #type erDiagram ICMS ||--|| Singleview : dataflow #end');
+    assert.equal(result.intentText, '');
+    assert.equal(result.sectionFocus?.narrative, undefined);
+    const diagrams = result.sectionFocus?.diagram;
+    assert.equal(diagrams.length, 1);
+    assert.equal(diagrams[0].name, 'test1');
+    assert.equal(diagrams[0].type, 'erDiagram');
+    assert.equal(diagrams[0].content, 'ICMS ||--|| Singleview : dataflow');
+  });
+
+  it('does not use table body as the implicit narrative topic', () => {
+    const result = parseSectionDirectives('#table #name Billing list interface name and protocol #end');
+    assert.equal(result.intentText, '');
+    assert.equal(result.sectionFocus?.narrative, undefined);
+    const tables = result.sectionFocus?.table;
+    assert.equal(tables.length, 1);
+    assert.equal(tables[0].name, 'Billing');
+    assert.equal(tables[0].content, 'list interface name and protocol');
+  });
+
   it('parses inline directives without newlines', () => {
     const result = parseSectionDirectives('what is ICMS #graph show data flows #end #table #name Data Flows list interface name, protocol and destination systems for the data flows #end what is Singleview #table #name table-abc list Singleview capabilities #end');
     assert.equal(result.intentText, 'what is ICMS what is Singleview');
