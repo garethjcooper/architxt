@@ -34,6 +34,7 @@ export const SECTION_DIRECTIVE_CONFIG: Record<string, {
 }> = {
   graph:     { cardinality: 'single', merge: 'concat' },
   table:     { cardinality: 'multiple' },
+  diagram:   { cardinality: 'multiple' },
   narrative: { cardinality: 'single', merge: 'concat' },
 };
 
@@ -44,9 +45,58 @@ export interface TableDirective {
   content: string;
 }
 
+export interface DiagramDirective {
+  /** Explicit name from #name sub-directive */
+  name?: string;
+  /** Mermaid diagram type from #type sub-directive (e.g. sequenceDiagram) */
+  type?: string;
+  /** Remaining Mermaid source after #name/#type */
+  content: string;
+}
+
 export interface ParsedSectionFocus {
   intentText: string;
-  sectionFocus?: Record<string, string | string[] | TableDirective[]>;
+  sectionFocus?: Record<string, string | string[] | TableDirective[] | DiagramDirective[]>;
+}
+
+/**
+ * Extract #name and #type values from a diagram block.
+ * Returns { name, type, content } where content is the remaining Mermaid body.
+ */
+function extractDiagramAttributes(content: string): DiagramDirective {
+  const text = content.trim();
+
+  // Parse #name value, stopping at the next line break or the #type keyword.
+  let pos = 0;
+  if (text.startsWith('#name')) {
+    pos = 5;
+    while (pos < text.length && /\s/.test(text[pos])) pos += 1;
+  }
+  if (pos === 0) return { content: text };
+
+  let nameEnd = text.indexOf('\n', pos);
+  let typeStart = text.indexOf('#type', pos);
+  if (typeStart !== -1 && (nameEnd === -1 || typeStart < nameEnd)) {
+    nameEnd = typeStart;
+  }
+  if (nameEnd === -1) nameEnd = text.length;
+
+  const name = text.slice(pos, nameEnd).trim();
+  pos = nameEnd;
+  while (pos < text.length && /\s/.test(text[pos])) pos += 1;
+
+  // Parse #type value if present.
+  let type: string | undefined;
+  if (text.slice(pos).startsWith('#type')) {
+    pos += 5;
+    while (pos < text.length && /\s/.test(text[pos])) pos += 1;
+    const typeEnd = text.indexOf('\n', pos);
+    type = text.slice(pos, typeEnd === -1 ? text.length : typeEnd).trim();
+    pos = typeEnd === -1 ? text.length : typeEnd;
+    while (pos < text.length && /\s/.test(text[pos])) pos += 1;
+  }
+
+  return { name, type, content: text.slice(pos).trim() };
 }
 
 /**
@@ -94,7 +144,7 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
 
   // Block style: #directive ...content... #end
   // Content may start on the same line as the keyword or on the next line.
-  const blockRe = /#(graph|table|narrative)\b\s*([\s\S]*?)(?:\r?\n)?#end\b/gi;
+  const blockRe = /#(graph|table|diagram|narrative)\b\s*([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch: RegExpExecArray | null;
   let blockStripped = rawQuery;
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
@@ -109,9 +159,13 @@ export function parseSectionDirectives(rawQuery: string): ParsedSectionFocus {
 
       const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
       if (config.cardinality === 'multiple') {
-        // table: collect as TableDirective objects
+        // table/diagram: collect as directive objects
         if (!focus[key]) focus[key] = [];
-        (focus[key] as TableDirective[]).push(extractTableName(content));
+        if (key === 'diagram') {
+          (focus[key] as DiagramDirective[]).push(extractDiagramAttributes(content));
+        } else {
+          (focus[key] as TableDirective[]).push(extractTableName(content));
+        }
       } else {
         // single
         if (config.merge === 'concat' && focus[key]) {

@@ -934,6 +934,11 @@ export interface PrebuiltRoleResult {
       columns: string[];
       rows: Record<string, any>[];
     }>;
+    diagrams?: Array<{
+      name: string;
+      type: string;
+      content: string;
+    }>;
     errors?: Array<{ model?: string; error: string }>;
   };
 }
@@ -982,6 +987,11 @@ export interface DiscoverStepResponse {
       name: string;
       columns: string[];
       rows: Record<string, any>[];
+    }>;
+    diagrams?: Array<{
+      name: string;
+      type: string;
+      content: string;
     }>;
     meta?: GraphMeta;
   };
@@ -1088,7 +1098,7 @@ export const researchApi = {
     include_source_facts?: boolean;
     tags?: string[];
     tags_match?: string;
-    section_focus?: Record<string, string | string[] | { name?: string; content: string }[]>;
+    section_focus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/discover', {
       method: 'POST',
@@ -1149,7 +1159,7 @@ export const researchApi = {
     source_step_ids: number[];
     intent_text: string;
     max_tokens?: number;
-    section_focus?: Record<string, string | string[] | { name?: string; content: string }[]>;
+    section_focus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/synthesize', {
       method: 'POST',
