@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,12 +28,9 @@ import {
   Section,
   PropertyRow,
 } from '@/lib/contextual-graph/display';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Plus, FileText, GripVertical } from 'lucide-react';
 
 const logger = createLogger('WorkspacePage');
-
-type LibraryKind = 'entity' | 'edge' | 'model';
-type LibraryKindFilter = 'all' | LibraryKind;
 
 type WorkspaceModel = {
   id: number;
@@ -45,25 +42,16 @@ type WorkspaceModel = {
   updatedAt?: string;
 };
 
-type LibraryItem =
-  | { kind: 'entity'; data: DisplayNode }
-  | { kind: 'edge'; data: DisplayEdge }
-  | { kind: 'model'; data: WorkspaceModel };
-
-function getEntitySummary(entity: DisplayNode): string | undefined {
-  return entity.properties.summary || entity.properties.description || entity.properties.blurb;
-}
-
-function getModelLabel(model: WorkspaceModel): string {
-  return model.name || model.extId;
-}
-
 function isGroundedNodeForWorkspace(node: DisplayNode): boolean {
   return isGroundedNode(node) && !isCandidateNode(node);
 }
 
 function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
   return isGroundedEdge(edge) && !isCandidateEdge(edge);
+}
+
+function getModelLabel(model: WorkspaceModel): string {
+  return model.name || model.extId;
 }
 
 function ModelListRow({
@@ -76,7 +64,6 @@ function ModelListRow({
   onClick?: () => void;
 }) {
   const label = getModelLabel(model);
-  const kindLabel = model.isTemplate ? 'template' : 'standard';
   return (
     <button
       type="button"
@@ -92,10 +79,47 @@ function ModelListRow({
           <div className="text-[11px] text-white/40 truncate">{model.extId}</div>
         </div>
         <Badge variant="outline" className="text-[10px] h-5 border-white/20 text-white/60 shrink-0">
-          {kindLabel}
+          {model.templateRole || (model.isTemplate ? 'template' : 'standard')}
         </Badge>
       </div>
     </button>
+  );
+}
+
+function ResizeHandle({
+  direction,
+  onMouseDown,
+  onDoubleClick,
+  title,
+}: {
+  direction: 'vertical' | 'horizontal';
+  onMouseDown: (e: React.MouseEvent) => void;
+  onDoubleClick?: () => void;
+  title?: string;
+}) {
+  const isHorizontal = direction === 'horizontal';
+  return (
+    <div
+      role="separator"
+      aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
+      aria-label={title || `Resize ${direction} pane`}
+      onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
+      className={cn(
+        'shrink-0 flex items-center justify-center group',
+        isHorizontal
+          ? 'h-3 cursor-row-resize flex-row'
+          : 'w-3 cursor-col-resize flex-col'
+      )}
+      title={title}
+    >
+      <div
+        className={cn(
+          'rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors',
+          isHorizontal ? 'w-16 h-1' : 'w-1 h-16'
+        )}
+      />
+    </div>
   );
 }
 
@@ -105,54 +129,16 @@ export default function WorkspacePage() {
   const [loadingServers, setLoadingServers] = useState(false);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [kindFilter, setKindFilter] = useState<LibraryKindFilter>('all');
-  const [search, setSearch] = useState('');
 
   const [entities, setEntities] = useState<DisplayNode[]>([]);
   const [edges, setEdges] = useState<DisplayEdge[]>([]);
   const [models, setModels] = useState<WorkspaceModel[]>([]);
-  const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
 
-  const [libraryWidth, setLibraryWidth] = useState(320);
-  const isResizingRef = useRef(false);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(libraryWidth);
+  const [selectedEntity, setSelectedEntity] = useState<DisplayNode | null>(null);
+  const [selectedPatch, setSelectedPatch] = useState<WorkspaceModel | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<DisplayEdge | null>(null);
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    isResizingRef.current = true;
-    startXRef.current = e.clientX;
-    startWidthRef.current = libraryWidth;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [libraryWidth]);
-
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizingRef.current) return;
-    const deltaX = e.clientX - startXRef.current;
-    const nextWidth = Math.min(Math.max(startWidthRef.current + deltaX, 220), 720);
-    setLibraryWidth(nextWidth);
-  }, []);
-
-  const handleResizeEnd = useCallback(() => {
-    isResizingRef.current = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, []);
-
-  const handleResizeReset = useCallback(() => {
-    setLibraryWidth(320);
-  }, []);
-
-  useEffect(() => {
-    const move = (e: MouseEvent) => handleResizeMove(e);
-    const up = () => handleResizeEnd();
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-    return () => {
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-    };
-  }, [handleResizeMove, handleResizeEnd]);
+  const [spineSearch, setSpineSearch] = useState('');
 
   const [rawModelContent, setRawModelContent] = useState<{ content: string | object | null; updatedAt?: string; loading: boolean; error?: string }>({
     content: null,
@@ -168,6 +154,53 @@ export default function WorkspacePage() {
 
   const serverId = selectedServerId ? Number(selectedServerId) : 0;
   const bankId = selectedBankId;
+
+  // Layout sizing.
+  const [topHeight, setTopHeight] = useState(360);
+  const [patchesWidth, setPatchesWidth] = useState(260);
+  const [spineWidth, setSpineWidth] = useState(320);
+
+  const [resizing, setResizing] = useState<null | 'top' | 'patches' | 'spine'>(null);
+
+  const handleResizeStart = useCallback((pane: 'top' | 'patches' | 'spine') => (e: React.MouseEvent) => {
+    setResizing(pane);
+    document.body.style.cursor = pane === 'top' ? 'row-resize' : 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  const handleResizeMove = useCallback(
+    (e: MouseEvent) => {
+      if (!resizing) return;
+      if (resizing === 'top') {
+        const next = Math.min(Math.max(e.clientY - 180, 160), 560);
+        setTopHeight(next);
+      } else if (resizing === 'patches') {
+        const next = Math.min(Math.max(e.clientX - 16, 180), 420);
+        setPatchesWidth(next);
+      } else if (resizing === 'spine') {
+        const next = Math.min(Math.max(e.clientX - patchesWidth - 32, 220), 480);
+        setSpineWidth(next);
+      }
+    },
+    [resizing, patchesWidth]
+  );
+
+  const handleResizeEnd = useCallback(() => {
+    setResizing(null);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => handleResizeMove(e);
+    const up = () => handleResizeEnd();
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+  }, [handleResizeMove, handleResizeEnd]);
 
   const fetchServers = useCallback(async () => {
     try {
@@ -201,7 +234,9 @@ export default function WorkspacePage() {
       setEntities([]);
       setEdges([]);
       setModels([]);
-      setSelectedItem(null);
+      setSelectedEntity(null);
+      setSelectedPatch(null);
+      setSelectedEdge(null);
       return;
     }
     try {
@@ -212,27 +247,28 @@ export default function WorkspacePage() {
         mentalModelsApi.list({ limit: 1000 }),
       ]);
 
-      // Align with the Context Manager's grounded view: only canonical or
-      // grounded nodes that are not candidates. This keeps the workspace focused
-      // on the prebuilt/processed corpus graph rather than inferred/candidate
-      // items that still need review.
       const displayNodes = nodesData.map(backendNodeToDisplayNode).filter(isGroundedNodeForWorkspace);
       const displayEdges = edgesData.map(backendEdgeToDisplayEdge).filter(isGroundedEdgeForWorkspace);
 
       setEntities(displayNodes);
       setEdges(displayEdges);
 
-      setModels(
-        (Array.isArray(modelsData) ? modelsData : []).map((m) => ({
-          id: m.id,
-          extId: m.ext_id,
-          name: m.name || undefined,
-          sourceQuery: m.source_query || undefined,
-          isTemplate: Boolean(m.is_template || m.template_role),
-          templateRole: m.template_role || undefined,
-          updatedAt: m.updated_at || undefined,
-        }))
-      );
+      const mappedModels = (Array.isArray(modelsData) ? modelsData : []).map((m) => ({
+        id: m.id,
+        extId: m.ext_id,
+        name: m.name || undefined,
+        sourceQuery: m.source_query || undefined,
+        isTemplate: Boolean(m.is_template || m.template_role),
+        templateRole: m.template_role || undefined,
+        updatedAt: m.updated_at || undefined,
+      }));
+      setModels(mappedModels);
+
+      // Keep selected entity if it still exists, otherwise clear.
+      setSelectedEntity((prev) => {
+        if (!prev) return null;
+        return displayNodes.find((n) => n.id === prev.id) || null;
+      });
     } catch (err: any) {
       logger.error('Failed to load workspace data', { error: err, serverId, bankId });
       toast.error(`Failed to load workspace data: ${err.message || err}`);
@@ -263,234 +299,83 @@ export default function WorkspacePage() {
     return map;
   }, [entities]);
 
-  const allItems = useMemo<LibraryItem[]>(() => {
-    const items: LibraryItem[] = [
-      ...entities.map((e) => ({ kind: 'entity' as const, data: e })),
-      ...edges.map((e) => ({ kind: 'edge' as const, data: e })),
-      ...models.map((m) => ({ kind: 'model' as const, data: m })),
-    ];
-    // Stable sort: entities first, then edges, then models, each internally by label/id.
-    items.sort((a, b) => {
-      const kindRank = { entity: 0, edge: 1, model: 2 };
-      const rankDiff = kindRank[a.kind] - kindRank[b.kind];
-      if (rankDiff !== 0) return rankDiff;
-      const aKey = a.kind === 'entity' ? a.data.label : a.kind === 'edge' ? (a.data.label || a.data.id) : getModelLabel(a.data);
-      const bKey = b.kind === 'entity' ? b.data.label : b.kind === 'edge' ? (b.data.label || b.data.id) : getModelLabel(b.data);
-      return aKey.localeCompare(bKey);
-    });
-    return items;
-  }, [entities, edges, models]);
+  const spineEntities = useMemo(() => {
+    const q = spineSearch.trim().toLowerCase();
+    if (!q) return entities;
+    return entities.filter((e) =>
+      e.label.toLowerCase().includes(q) ||
+      e.id.toLowerCase().includes(q) ||
+      e.type.toLowerCase().includes(q)
+    );
+  }, [entities, spineSearch]);
 
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let items = allItems;
-    if (kindFilter !== 'all') {
-      items = items.filter((i) => i.kind === kindFilter);
-    }
-    if (!q) return items;
-    return items.filter((item) => {
-      if (item.kind === 'entity') {
-        const e = item.data;
-        return (
-          e.label.toLowerCase().includes(q) ||
-          e.id.toLowerCase().includes(q) ||
-          e.type.toLowerCase().includes(q) ||
-          (e.properties.summary || '').toLowerCase().includes(q)
-        );
-      }
-      if (item.kind === 'edge') {
-        const e = item.data;
-        const text = `${e.label || ''} ${e.detail || ''} ${e.source_id} ${e.target_id} ${e.type || ''}`.toLowerCase();
-        return text.includes(q);
-      }
-      const m = item.data;
-      return (
-        getModelLabel(m).toLowerCase().includes(q) ||
-        m.extId.toLowerCase().includes(q) ||
-        (m.templateRole || '').toLowerCase().includes(q) ||
-        (m.sourceQuery || '').toLowerCase().includes(q)
-      );
-    });
-  }, [allItems, search, kindFilter]);
+  const selectedEntityEdges = useMemo(() => {
+    if (!selectedEntity) return [];
+    return edges.filter(
+      (edge) => edge.source_id === selectedEntity.id || edge.target_id === selectedEntity.id
+    );
+  }, [edges, selectedEntity]);
 
-  const handleSelectItem = useCallback(async (item: LibraryItem) => {
-    setSelectedItem(item);
-    if (item.kind === 'model') {
+  const selectedEntityPatches = useMemo(() => {
+    if (!selectedEntity) return [];
+    const refs = selectedEntity.properties.provenance?.model_refs || [];
+    const refExtIds = new Set<string>((refs || []).map((ref: any) => ref.ext_id).filter(Boolean));
+    return models.filter((m) => refExtIds.has(m.extId));
+  }, [models, selectedEntity]);
+
+  const handleSelectEntity = useCallback((entity: DisplayNode) => {
+    setSelectedEntity(entity);
+    setSelectedPatch(null);
+    setSelectedEdge(null);
+    setRawModelContent({ content: null, loading: false });
+  }, []);
+
+  const handleSelectPatch = useCallback(
+    async (model: WorkspaceModel) => {
+      setSelectedPatch(model);
+      setSelectedEdge(null);
       setRawModelContent({ content: null, loading: true });
       try {
-        const result = await mentalModelsApi.fetchContent(serverId, bankId, item.data.extId);
+        const result = await mentalModelsApi.fetchContent(serverId, bankId, model.extId);
         setRawModelContent({
           content: result.content,
           updatedAt: result.updated_at || undefined,
           loading: false,
         });
       } catch (err: any) {
-        logger.error('Failed to fetch model content', { error: err, extId: item.data.extId });
+        logger.error('Failed to fetch model content', { error: err, extId: model.extId });
         setRawModelContent({ content: null, loading: false, error: err.message || 'Failed to load model content' });
       }
-    }
-  }, [serverId, bankId]);
+    },
+    [serverId, bankId]
+  );
 
-  const isSelected = useCallback((item: LibraryItem) => {
-    if (!selectedItem || selectedItem.kind !== item.kind) return false;
-    if (item.kind === 'entity') return selectedItem.data.id === item.data.id;
-    if (item.kind === 'edge') return selectedItem.data.id === item.data.id;
-    return selectedItem.data.id === item.data.id;
-  }, [selectedItem]);
+  const handleSelectEdge = useCallback((edge: DisplayEdge) => {
+    setSelectedEdge(edge);
+    setSelectedPatch(null);
+    setRawModelContent({ content: null, loading: false });
+  }, []);
 
-  const renderLibraryList = () => {
-    if (filteredItems.length === 0) {
-      return <div className="text-white/50 text-sm px-3 py-4">No library items match your filters.</div>;
-    }
-    return (
-      <div className="space-y-1">
-        {filteredItems.map((item) => {
-          if (item.kind === 'entity') {
-            return (
-              <EntityListRow
-                key={`entity-${item.data.id}`}
-                node={item.data}
-                active={isSelected(item)}
-                onClick={() => handleSelectItem(item)}
-              />
-            );
-          }
-          if (item.kind === 'edge') {
-            return (
-              <EdgeListRow
-                key={`edge-${item.data.id}`}
-                edge={item.data}
-                active={isSelected(item)}
-                sourceLabel={nodeById.get(item.data.source_id)?.label}
-                targetLabel={nodeById.get(item.data.target_id)?.label}
-                onClick={() => handleSelectItem(item)}
-              />
-            );
-          }
-          return (
-            <ModelListRow
-              key={`model-${item.data.id}`}
-              model={item.data}
-              active={isSelected(item)}
-              onClick={() => handleSelectItem(item)}
-            />
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderQuickView = () => {
-    if (!selectedItem) {
+  const renderPatchQuickView = () => {
+    if (!selectedPatch) {
       return (
         <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
-          Select an item from the library to inspect its contents.
+          Select a patch from the left panel to inspect its contents.
         </div>
       );
     }
-
-    if (selectedItem.kind === 'entity') {
-      const entity = selectedItem.data;
-      const summary = getEntitySummary(entity);
-      const modelRefs = entity.properties.provenance?.model_refs || [];
-      return (
-        <div className="space-y-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Entity</div>
-            <div className="text-lg font-semibold text-white/90">{entity.label}</div>
-            <div className="text-xs text-white/50 font-mono">{entity.id}</div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {entity.labels.map((label) => (
-              <Badge key={label} variant="outline" className="text-[10px] h-5">{label}</Badge>
-            ))}
-          </div>
-          {summary && <Section title="Summary"><PropertyRow label="" value={summary} /></Section>}
-          <Section title="Properties">
-            <div className="space-y-2">
-              {Object.entries(entity.properties).map(([key, value]) => (
-                <PropertyRow key={key} label={key} value={value} />
-              ))}
-            </div>
-          </Section>
-          {modelRefs.length > 0 && (
-            <Section title="Model refs">
-              <div className="space-y-2">
-                {modelRefs.map((ref: any, idx: number) => (
-                  <div key={idx} className="text-[11px] text-white/70 bg-black/20 rounded p-1.5">
-                    <div className="font-medium text-white/90">{ref.ext_id || 'unknown'}</div>
-                    <div className="text-white/50">{ref.role || 'no role'} · fetched {formatRelative(ref.fetched_at)}</div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-        </div>
-      );
-    }
-
-    if (selectedItem.kind === 'edge') {
-      const edge = selectedItem.data;
-      const modelRefs = edge.properties.provenance?.model_refs || [];
-      const sourceLabel = nodeById.get(edge.source_id)?.label;
-      const targetLabel = nodeById.get(edge.target_id)?.label;
-      return (
-        <div className="space-y-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Edge</div>
-            <div className="text-lg font-semibold text-white/90">
-              {sourceLabel || edge.source_id} <span className="text-white/40">→</span> {targetLabel || edge.target_id}
-            </div>
-            <div className="text-xs text-white/50 font-mono">{edge.id}</div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {edge.labels.map((label) => (
-              <Badge key={label} variant="outline" className="text-[10px] h-5">{label}</Badge>
-            ))}
-            {edge.type && <Badge variant="outline" className="text-[10px] h-5">{edge.type}</Badge>}
-          </div>
-          {(edge.label || edge.detail) && (
-            <Section title="Description">
-              {edge.label && <PropertyRow label="Label" value={edge.label} />}
-              {edge.detail && <PropertyRow label="Detail" value={edge.detail} />}
-            </Section>
-          )}
-          <Section title="Properties">
-            <div className="space-y-2">
-              {Object.entries(edge.properties).map(([key, value]) => (
-                <PropertyRow key={key} label={key} value={value} />
-              ))}
-            </div>
-          </Section>
-          {modelRefs.length > 0 && (
-            <Section title="Model refs">
-              <div className="space-y-2">
-                {modelRefs.map((ref: any, idx: number) => (
-                  <div key={idx} className="text-[11px] text-white/70 bg-black/20 rounded p-1.5">
-                    <div className="font-medium text-white/90">{ref.ext_id || 'unknown'}</div>
-                    <div className="text-white/50">{ref.role || 'no role'} · fetched {formatRelative(ref.fetched_at)}</div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-        </div>
-      );
-    }
-
-    const model = selectedItem.data;
     return (
       <div className="space-y-3">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Mental Model</div>
-          <div className="text-lg font-semibold text-white/90">{getModelLabel(model)}</div>
-          <div className="text-xs text-white/50 font-mono">{model.extId}</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Patch / Model</div>
+          <div className="text-lg font-semibold text-white/90">{getModelLabel(selectedPatch)}</div>
+          <div className="text-xs text-white/50 font-mono">{selectedPatch.extId}</div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {model.isTemplate && <Badge variant="outline" className="text-[10px] h-5">template</Badge>}
-          {model.templateRole && <Badge variant="outline" className="text-[10px] h-5">{model.templateRole}</Badge>}
+          {selectedPatch.isTemplate && <Badge variant="outline" className="text-[10px] h-5">template</Badge>}
+          {selectedPatch.templateRole && <Badge variant="outline" className="text-[10px] h-5">{selectedPatch.templateRole}</Badge>}
         </div>
-        {model.sourceQuery && <Section title="Source query"><PropertyRow label="" value={model.sourceQuery} /></Section>}
+        {selectedPatch.sourceQuery && <Section title="Source query"><PropertyRow label="" value={selectedPatch.sourceQuery} /></Section>}
         <Section title="Raw content">
           {rawModelContent.loading ? (
             <div className="space-y-2">
@@ -513,19 +398,89 @@ export default function WorkspacePage() {
     );
   };
 
-  const kindFilters: { value: LibraryKindFilter; label: string; count: number }[] = [
-    { value: 'all', label: 'All', count: allItems.length },
-    { value: 'entity', label: 'Entities', count: entities.length },
-    { value: 'edge', label: 'Edges', count: edges.length },
-    { value: 'model', label: 'Models', count: models.length },
-  ];
+  const renderEntityQuickView = () => {
+    if (!selectedEntity) {
+      return (
+        <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
+          Select an entity from the spine to see its context.
+        </div>
+      );
+    }
+    const entity = selectedEntity;
+    const summary = entity.properties.summary || entity.properties.description || entity.properties.blurb;
+    return (
+      <div className="space-y-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Entity</div>
+          <div className="text-lg font-semibold text-white/90">{entity.label}</div>
+          <div className="text-xs text-white/50 font-mono">{entity.id}</div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {entity.labels.map((label) => (
+            <Badge key={label} variant="outline" className="text-[10px] h-5">{label}</Badge>
+          ))}
+        </div>
+        {summary && <Section title="Summary"><PropertyRow label="" value={summary} /></Section>}
+        <Section title="Properties">
+          <div className="space-y-2">
+            {Object.entries(entity.properties).map(([key, value]) => (
+              <PropertyRow key={key} label={key} value={value} />
+            ))}
+          </div>
+        </Section>
+      </div>
+    );
+  };
+
+  const renderEdgeQuickView = () => {
+    if (!selectedEdge) {
+      return (
+        <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
+          Select an edge from the right panel to inspect it.
+        </div>
+      );
+    }
+    const edge = selectedEdge;
+    const sourceLabel = nodeById.get(edge.source_id)?.label;
+    const targetLabel = nodeById.get(edge.target_id)?.label;
+    return (
+      <div className="space-y-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Edge</div>
+          <div className="text-lg font-semibold text-white/90">
+            {sourceLabel || edge.source_id} <span className="text-white/40">→</span> {targetLabel || edge.target_id}
+          </div>
+          <div className="text-xs text-white/50 font-mono">{edge.id}</div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {edge.labels.map((label) => (
+            <Badge key={label} variant="outline" className="text-[10px] h-5">{label}</Badge>
+          ))}
+          {edge.type && <Badge variant="outline" className="text-[10px] h-5">{edge.type}</Badge>}
+        </div>
+        {(edge.label || edge.detail) && (
+          <Section title="Description">
+            {edge.label && <PropertyRow label="Label" value={edge.label} />}
+            {edge.detail && <PropertyRow label="Detail" value={edge.detail} />}
+          </Section>
+        )}
+        <Section title="Properties">
+          <div className="space-y-2">
+            {Object.entries(edge.properties).map(([key, value]) => (
+              <PropertyRow key={key} label={key} value={value} />
+            ))}
+          </div>
+        </Section>
+      </div>
+    );
+  };
 
   return (
     <PageShell
       title="Workspace"
-      subtitle="Efficient discovery and collation of prebuilt data."
-      count={filteredItems.length}
-      countLabel="item"
+      subtitle="Discovery and collation workbench."
+      count={entities.length}
+      countLabel="entity"
       loading={loadingServers || loadingBanks || loadingData}
     >
       <div className="flex flex-col flex-1 min-h-0 gap-3">
@@ -552,58 +507,159 @@ export default function WorkspacePage() {
           </Button>
         </div>
 
-        {/* Main workspace */}
-        <div className="flex-1 flex min-h-0 gap-3">
-          {/* Library */}
-          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: libraryWidth, minWidth: libraryWidth, maxWidth: libraryWidth }}>
+        {/* Top row: patches | entity spine | edges */}
+        <div className="flex min-h-0" style={{ height: topHeight }}>
+          {/* Patches */}
+          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: patchesWidth, minWidth: patchesWidth, maxWidth: patchesWidth }}>
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="text-xs font-medium text-white/80">Patches</div>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">{selectedEntity ? selectedEntityPatches.length : models.length}</Badge>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
+              {!selectedEntity ? (
+                models.map((m) => (
+                  <ModelListRow
+                    key={m.extId}
+                    model={m}
+                    active={selectedPatch?.id === m.id}
+                    onClick={() => handleSelectPatch(m)}
+                  />
+                ))
+              ) : selectedEntityPatches.length === 0 ? (
+                <div className="text-white/40 text-xs px-2 py-3">No patches for this entity.</div>
+              ) : (
+                selectedEntityPatches.map((m) => (
+                  <ModelListRow
+                    key={m.extId}
+                    model={m}
+                    active={selectedPatch?.id === m.id}
+                    onClick={() => handleSelectPatch(m)}
+                  />
+                ))
+              )}
+            </div>
+            <div className="p-2 border-t border-white/10">
+              <div className="text-[10px] text-white/40">
+                {selectedEntity ? `${selectedEntityPatches.length} related` : `${models.length} total`}
+              </div>
+            </div>
+          </div>
+
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('patches')} title="Drag to resize patches pane" />
+
+          {/* Entity spine */}
+          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: spineWidth, minWidth: spineWidth, maxWidth: spineWidth }}>
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="text-xs font-medium text-white/80">Entity spine</div>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">{spineEntities.length}</Badge>
+            </div>
             <div className="p-3 border-b border-white/10">
               <Input
-                placeholder="Search library..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filter entities..."
+                value={spineSearch}
+                onChange={(e) => setSpineSearch(e.target.value)}
                 className="h-8 text-sm"
               />
             </div>
-            <div className="px-3 py-2 border-b border-white/10">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {kindFilters.map((f) => (
-                  <button
-                    key={f.value}
-                    type="button"
-                    onClick={() => { setKindFilter(f.value); setSelectedItem(null); }}
-                    className={cn(
-                      'text-[11px] px-2 py-1 rounded border transition-colors',
-                      kindFilter === f.value
-                        ? 'bg-emerald-900/30 border-emerald-700/30 text-emerald-100'
-                        : 'border-white/10 text-white/60 hover:bg-white/5'
-                    )}
-                  >
-                    {f.label} <span className="text-white/40 ml-0.5">{f.count}</span>
-                  </button>
-                ))}
+            <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
+              {spineEntities.map((node) => (
+                <EntityListRow
+                  key={node.id}
+                  node={node}
+                  active={selectedEntity?.id === node.id}
+                  onClick={() => handleSelectEntity(node)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('spine')} title="Drag to resize entity spine" />
+
+          {/* Edges */}
+          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="text-xs font-medium text-white/80">Edges</div>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">{selectedEntity ? selectedEntityEdges.length : edges.length}</Badge>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
+              {!selectedEntity ? (
+                edges.map((edge) => (
+                  <EdgeListRow
+                    key={edge.id}
+                    edge={edge}
+                    active={selectedEdge?.id === edge.id}
+                    sourceLabel={nodeById.get(edge.source_id)?.label}
+                    targetLabel={nodeById.get(edge.target_id)?.label}
+                    onClick={() => handleSelectEdge(edge)}
+                  />
+                ))
+              ) : selectedEntityEdges.length === 0 ? (
+                <div className="text-white/40 text-xs px-2 py-3">No edges connected to this entity.</div>
+              ) : (
+                selectedEntityEdges.map((edge) => (
+                  <EdgeListRow
+                    key={edge.id}
+                    edge={edge}
+                    active={selectedEdge?.id === edge.id}
+                    sourceLabel={nodeById.get(edge.source_id)?.label}
+                    targetLabel={nodeById.get(edge.target_id)?.label}
+                    onClick={() => handleSelectEdge(edge)}
+                  />
+                ))
+              )}
+            </div>
+            <div className="p-2 border-t border-white/10">
+              <div className="text-[10px] text-white/40">
+                {selectedEntity ? `${selectedEntityEdges.length} connected` : `${edges.length} total`}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 min-h-0">
-              {renderLibraryList()}
+          </div>
+        </div>
+
+        <ResizeHandle
+          direction="horizontal"
+          onMouseDown={handleResizeStart('top')}
+          title="Drag to resize top and bottom panels"
+        />
+
+        {/* Bottom row: temporary content | workspace pages */}
+        <div className="flex-1 min-h-0 flex gap-3">
+          {/* Temporary content */}
+          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="text-xs font-medium text-white/80">Temporary content</div>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">0</Badge>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center min-h-0 overflow-y-auto">
+              <div className="text-white/40 text-sm mb-3">
+                Selections from patches/edges and Reflect queries will appear here.
+              </div>
+              <div className="flex items-center gap-2 text-white/30 text-xs">
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add sections from patches or edges to build temporary output.</span>
+              </div>
             </div>
           </div>
 
-          {/* Resize grab bar */}
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize library pane"
-            onMouseDown={handleResizeStart}
-            onDoubleClick={handleResizeReset}
-            className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
-            title="Drag to resize library and quick view panels; double-click to reset"
-          >
-            <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
-          </div>
-
-          {/* Quick view */}
-          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] p-4 overflow-y-auto">
-            {renderQuickView()}
+          {/* Workspace pages */}
+          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="text-xs font-medium text-white/80">Workspace pages</div>
+              <Button variant="outline" size="sm" className="h-6 text-[11px] gap-1">
+                <Plus className="w-3.5 h-3.5" /> New page
+              </Button>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center min-h-0 overflow-y-auto">
+              <FileText className="w-8 h-8 text-white/20 mb-3" />
+              <div className="text-white/40 text-sm mb-2">No workspace pages yet.</div>
+              <div className="text-white/30 text-xs">
+                Add temporary content to a new page to start a session.
+              </div>
+            </div>
+            <div className="px-3 py-2 border-t border-white/10 flex items-center gap-2">
+              <GripVertical className="w-3.5 h-3.5 text-white/30" />
+              <div className="text-[11px] text-white/50">Page tabs will appear here.</div>
+            </div>
           </div>
         </div>
       </div>
