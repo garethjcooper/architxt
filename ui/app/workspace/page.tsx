@@ -357,6 +357,13 @@ export default function WorkspacePage() {
       e.type.toLowerCase().includes(q)
     );
   }, [entities, spineSearch]);
+  const selectedEntityPatches = useMemo(() => {
+    if (!selectedEntity) return [];
+    const refExtIds = new Set<string>(
+      selectedEntity.modelRefs.map((ref) => ref.ext_id).filter((id): id is string => Boolean(id))
+    );
+    return models.filter((m) => refExtIds.has(m.extId));
+  }, [models, selectedEntity]);
 
   const selectedEntityEdges = useMemo(() => {
     if (!selectedEntity) return [];
@@ -364,13 +371,6 @@ export default function WorkspacePage() {
       (edge) => edge.source_id === selectedEntity.id || edge.target_id === selectedEntity.id
     );
   }, [edges, selectedEntity]);
-
-  const selectedEntityPatches = useMemo(() => {
-    if (!selectedEntity) return [];
-    const refs = selectedEntity.properties.provenance?.model_refs || [];
-    const refExtIds = new Set<string>((refs || []).map((ref: any) => ref.ext_id).filter(Boolean));
-    return models.filter((m) => refExtIds.has(m.extId));
-  }, [models, selectedEntity]);
 
   const handleSelectEntity = useCallback((entity: DisplayNode) => {
     setSelectedEntity(entity);
@@ -607,14 +607,9 @@ export default function WorkspacePage() {
             <PanelContent>
               <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
                 {!selectedEntity ? (
-                  models.map((m) => (
-                    <ModelListRow
-                      key={m.extId}
-                      model={m}
-                      active={selectedPatch?.id === m.id}
-                      onClick={() => handleSelectPatch(m)}
-                    />
-                  ))
+                  <div className="h-full flex items-center justify-center text-white/40 text-xs px-2 text-center">
+                    Select an entity from the spine to see its patches.
+                  </div>
                 ) : selectedEntityPatches.length === 0 ? (
                   <div className="text-white/40 text-xs px-2 py-3">No patches for this entity.</div>
                 ) : (
@@ -671,16 +666,9 @@ export default function WorkspacePage() {
             <PanelContent>
               <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
                 {!selectedEntity ? (
-                  edges.map((edge) => (
-                    <EdgeListRow
-                      key={edge.id}
-                      edge={edge}
-                      active={selectedEdge?.id === edge.id}
-                      sourceLabel={nodeById.get(edge.source_id)?.label}
-                      targetLabel={nodeById.get(edge.target_id)?.label}
-                      onClick={() => handleSelectEdge(edge)}
-                    />
-                  ))
+                  <div className="h-full flex items-center justify-center text-white/40 text-xs px-2 text-center">
+                    Select an entity from the spine to see its edges.
+                  </div>
                 ) : selectedEntityEdges.length === 0 ? (
                   <div className="text-white/40 text-xs px-2 py-3">No edges connected to this entity.</div>
                 ) : (
