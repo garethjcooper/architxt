@@ -103,7 +103,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         };
       }
 
-      const { narrative, graph, tables, errors: modelErrors } = normalizeModelOutput(content);
+      const { narrative, graph, tables: modelTables, diagrams: modelDiagrams, errors: modelErrors } = normalizeModelOutput(content);
       const graphNormalized = normalizeGraph(graph || { nodes: [], edges: [] }, { source: 'template_model' });
 
       return {
@@ -113,6 +113,8 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         content,
         narrative,
         graph: graphNormalized,
+        tables: modelTables || [],
+        diagrams: modelDiagrams || [],
         graph_error: modelErrors?.length ? modelErrors.join('; ') : undefined,
       };
     }),
@@ -120,6 +122,8 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
 
   const narratives = [];
   const graphs = [];
+  const tables = [];
+  const diagrams = [];
   const errors = [];
 
   for (const item of fetched) {
@@ -139,12 +143,18 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         errors.push({ model: item.name || item.ext_id, error: item.graph_error });
       }
     }
+    if (item.tables && item.tables.length > 0) {
+      tables.push(...item.tables);
+    }
+    if (item.diagrams && item.diagrams.length > 0) {
+      diagrams.push(...item.diagrams);
+    }
   }
 
   let narrative = narratives.join('\n\n');
   if (narrative) {
     narrative = `# Templates Query\n\n${narrative}`;
-  } else if (graphs.length > 0) {
+  } else if (graphs.length > 0 || tables.length > 0 || diagrams.length > 0) {
     narrative = `Found template data for ${graphs.length} selected model(s).`;
   }
 
@@ -158,6 +168,8 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
     success: true,
     narrative,
     graph,
+    tables,
+    diagrams,
     calls_used: ['list_template_models'],
     errors: errors.length > 0 ? errors : undefined,
   };

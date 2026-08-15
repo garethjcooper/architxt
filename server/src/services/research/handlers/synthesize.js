@@ -192,6 +192,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     ARCHITXT_CORPUS: corpus,
     ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
     ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+    ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(focus.diagram),
     ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
   };
   const systemPrompt = await composeMentalModelPrompt(db, 'generic', topic, focusVars);
@@ -283,6 +284,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     narrative: parsed.narrative,
     graph,
     tables: parsed.tables || [],
+    diagrams: parsed.diagrams || [],
     calls: [
       {
         mode: 'synthesize',

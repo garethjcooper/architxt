@@ -62,6 +62,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     composedQuery = await composeMentalModelPrompt(db, 'generic', query, {
       ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
       ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(focus.diagram),
       ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
     });
   } catch (err) {
@@ -145,6 +146,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     narrative: `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query),
     graph,
     tables: extracted.tables || [],
+    diagrams: extracted.diagrams || [],
     calls_used: ['reflect'],
     calls: [baseCall],
   };

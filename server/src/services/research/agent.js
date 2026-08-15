@@ -7,6 +7,7 @@ const logger = createLogger('research-agent');
 const EMPTY_CANVAS = {
   graph: { nodes: [], edges: [] },
   tables: [],
+  diagrams: [],
 };
 
 function buildCallLog(handlerResult, options, duration_ms) {
@@ -90,6 +91,7 @@ export async function runDiscoverStep(params) {
       ...EMPTY_CANVAS,
       graph: handlerResult.graph || { nodes: [], edges: [] },
       tables: handlerResult.tables || [],
+      diagrams: handlerResult.diagrams || [],
     };
 
     await updateStep(db, rstepId, {
