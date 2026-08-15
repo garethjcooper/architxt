@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
-import { MermaidDiagram } from '@/components/mermaid-diagram';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import cytoscape from 'cytoscape';
 
@@ -231,10 +230,6 @@ export function ResearchResultPanel({
     return text;
   }, [viewMode, mergedNarrative, result?.synthesis?.narrative, result?.canvas?.tables]);
 
-  const diagrams = useMemo(() => {
-    return result?.canvas?.diagrams ?? [];
-  }, [result?.canvas?.diagrams]);
-
   return (
     <div className="min-h-0 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
       {/* Narrative */}
@@ -351,14 +346,7 @@ export function ResearchResultPanel({
                 </div>
               )}
               {resultView === 'narrative' && (
-                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
-              )}
-              {diagrams.length > 0 && (
-                <div className="mt-2 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
-                  {diagrams.map((d, idx) => (
-                    <MermaidDiagram key={idx} name={d.name} type={d.type} content={d.content} />
-                  ))}
-                </div>
+                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} diagrams={result?.canvas?.diagrams} />
               )}
             </div>
           )}
