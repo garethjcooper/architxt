@@ -85,12 +85,17 @@ function extractDiagramAttributes(content: string): DiagramDirective {
   pos = nameEnd;
   while (pos < text.length && /\s/.test(text[pos])) pos += 1;
 
-  // Parse #type value if present.
+  // Parse #type value if present. Stop at first whitespace boundary so inline
+  // forms like "#type erDiagram ..." keep the diagram keyword separate from body.
   let type: string | undefined;
   if (text.slice(pos).startsWith('#type')) {
     pos += 5;
     while (pos < text.length && /\s/.test(text[pos])) pos += 1;
-    const typeEnd = text.indexOf('\n', pos);
+    let typeEnd = text.indexOf('\n', pos);
+    const nextSpace = text.indexOf(' ', pos);
+    if (nextSpace !== -1 && (typeEnd === -1 || nextSpace < typeEnd)) {
+      typeEnd = nextSpace;
+    }
     type = text.slice(pos, typeEnd === -1 ? text.length : typeEnd).trim();
     pos = typeEnd === -1 ? text.length : typeEnd;
     while (pos < text.length && /\s/.test(text[pos])) pos += 1;
