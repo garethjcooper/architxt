@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,16 +18,13 @@ import {
   DisplayEdge,
   EntityListRow,
   EdgeListRow,
+  colorForType,
   backendNodeToDisplayNode,
   backendEdgeToDisplayEdge,
   isGroundedNode,
   isCandidateNode,
   isCandidateEdge,
   isGroundedEdge,
-  formatRelative,
-  renderValue,
-  Section,
-  PropertyRow,
 } from '@/lib/contextual-graph/display';
 import { RefreshCw, Plus, FileText, GripVertical, Sparkles } from 'lucide-react';
 
@@ -38,10 +34,8 @@ type WorkspaceModel = {
   id: number;
   extId: string;
   name?: string;
-  sourceQuery?: string;
   isTemplate: boolean;
   templateRole?: string;
-  updatedAt?: string;
 };
 
 function isGroundedNodeForWorkspace(node: DisplayNode): boolean {
@@ -109,23 +103,22 @@ function ModelListRow({
   onClick?: () => void;
 }) {
   const label = getModelLabel(model);
+  const kind = model.templateRole || (model.isTemplate ? 'template' : 'standard');
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left px-3 py-1.5 transition-colors',
-        active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+        'w-full flex items-start gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
+        active
+          ? 'border-white/10 bg-white/10'
+          : 'border-white/5 bg-black/20 hover:bg-white/5'
       )}
+      style={{ borderLeftColor: colorForType(kind), borderLeftWidth: 3 }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-sm text-white/90 truncate">{label}</div>
-          <div className="text-[11px] text-white/40 truncate">{model.extId}</div>
-        </div>
-        <Badge variant="outline" className="text-[10px] h-5 border-white/20 text-white/60 shrink-0">
-          {model.templateRole || (model.isTemplate ? 'template' : 'standard')}
-        </Badge>
+      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+        <div className="text-xs text-white/90 truncate">{label}</div>
+        <div className="text-[10px] text-white/50 font-mono truncate">{model.extId}</div>
       </div>
     </button>
   );
@@ -134,12 +127,10 @@ function ModelListRow({
 function ResizeHandle({
   direction,
   onMouseDown,
-  onDoubleClick,
   title,
 }: {
   direction: 'vertical' | 'horizontal';
   onMouseDown: (e: React.MouseEvent) => void;
-  onDoubleClick?: () => void;
   title?: string;
 }) {
   const isHorizontal = direction === 'horizontal';
@@ -149,7 +140,6 @@ function ResizeHandle({
       aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
       aria-label={title || `Resize ${direction} pane`}
       onMouseDown={onMouseDown}
-      onDoubleClick={onDoubleClick}
       className={cn(
         'shrink-0 flex items-center justify-center group',
         isHorizontal
@@ -185,11 +175,6 @@ export default function WorkspacePage() {
 
   const [spineSearch, setSpineSearch] = useState('');
   const [reflectQuery, setReflectQuery] = useState('');
-
-  const [rawModelContent, setRawModelContent] = useState<{ content: string | object | null; updatedAt?: string; loading: boolean; error?: string }>({
-    content: null,
-    loading: false,
-  });
 
   const {
     selectedServerId,
@@ -307,10 +292,8 @@ export default function WorkspacePage() {
         id: m.id,
         extId: m.ext_id,
         name: m.name || undefined,
-        sourceQuery: m.source_query || undefined,
         isTemplate: Boolean(m.is_template || m.template_role),
         templateRole: m.template_role || undefined,
-        updatedAt: m.updated_at || undefined,
       }));
       setModels(mappedModels);
 
@@ -357,6 +340,7 @@ export default function WorkspacePage() {
       e.type.toLowerCase().includes(q)
     );
   }, [entities, spineSearch]);
+
   const selectedEntityPatches = useMemo(() => {
     if (!selectedEntity) return [];
     const refExtIds = new Set<string>(
@@ -376,33 +360,16 @@ export default function WorkspacePage() {
     setSelectedEntity(entity);
     setSelectedPatch(null);
     setSelectedEdge(null);
-    setRawModelContent({ content: null, loading: false });
   }, []);
 
-  const handleSelectPatch = useCallback(
-    async (model: WorkspaceModel) => {
-      setSelectedPatch(model);
-      setSelectedEdge(null);
-      setRawModelContent({ content: null, loading: true });
-      try {
-        const result = await mentalModelsApi.fetchContent(serverId, bankId, model.extId);
-        setRawModelContent({
-          content: result.content,
-          updatedAt: result.updated_at || undefined,
-          loading: false,
-        });
-      } catch (err: any) {
-        logger.error('Failed to fetch model content', { error: err, extId: model.extId });
-        setRawModelContent({ content: null, loading: false, error: err.message || 'Failed to load model content' });
-      }
-    },
-    [serverId, bankId]
-  );
+  const handleSelectPatch = useCallback((model: WorkspaceModel) => {
+    setSelectedPatch(model);
+    setSelectedEdge(null);
+  }, []);
 
   const handleSelectEdge = useCallback((edge: DisplayEdge) => {
     setSelectedEdge(edge);
     setSelectedPatch(null);
-    setRawModelContent({ content: null, loading: false });
   }, []);
 
   const handleReflect = useCallback(() => {
@@ -415,125 +382,6 @@ export default function WorkspacePage() {
     // TODO: Phase C will wire the Reflect API and add the result to temporary content.
     toast.info(`Reflect query staged: "${query}"`);
   }, [reflectQuery, serverId, bankId]);
-
-  const renderPatchQuickView = () => {
-    if (!selectedPatch) {
-      return (
-        <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
-          Select a patch from the patches panel to inspect its contents.
-        </div>
-      );
-    }
-    return (
-      <div className="space-y-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Patch / Model</div>
-          <div className="text-lg font-semibold text-white/90">{getModelLabel(selectedPatch)}</div>
-          <div className="text-xs text-white/50 font-mono">{selectedPatch.extId}</div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {selectedPatch.isTemplate && <Badge variant="outline" className="text-[10px] h-5">template</Badge>}
-          {selectedPatch.templateRole && <Badge variant="outline" className="text-[10px] h-5">{selectedPatch.templateRole}</Badge>}
-        </div>
-        {selectedPatch.sourceQuery && <Section title="Source query"><PropertyRow label="" value={selectedPatch.sourceQuery} /></Section>}
-        <Section title="Raw content">
-          {rawModelContent.loading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          ) : rawModelContent.error ? (
-            <div className="text-red-400 text-sm">{rawModelContent.error}</div>
-          ) : (
-            <div>
-              {rawModelContent.updatedAt && (
-                <div className="text-[10px] text-white/40 mb-1">Updated {formatRelative(rawModelContent.updatedAt)}</div>
-              )}
-              {renderValue(rawModelContent.content)}
-            </div>
-          )}
-        </Section>
-      </div>
-    );
-  };
-
-  const renderEntityQuickView = () => {
-    if (!selectedEntity) {
-      return (
-        <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
-          Select an entity from the spine to see its context.
-        </div>
-      );
-    }
-    const entity = selectedEntity;
-    const summary = entity.properties.summary || entity.properties.description || entity.properties.blurb;
-    return (
-      <div className="space-y-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Entity</div>
-          <div className="text-lg font-semibold text-white/90">{entity.label}</div>
-          <div className="text-xs text-white/50 font-mono">{entity.id}</div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {entity.labels.map((label) => (
-            <Badge key={label} variant="outline" className="text-[10px] h-5">{label}</Badge>
-          ))}
-        </div>
-        {summary && <Section title="Summary"><PropertyRow label="" value={summary} /></Section>}
-        <Section title="Properties">
-          <div className="space-y-2">
-            {Object.entries(entity.properties).map(([key, value]) => (
-              <PropertyRow key={key} label={key} value={value} />
-            ))}
-          </div>
-        </Section>
-      </div>
-    );
-  };
-
-  const renderEdgeQuickView = () => {
-    if (!selectedEdge) {
-      return (
-        <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
-          Select an edge from the edges panel to inspect it.
-        </div>
-      );
-    }
-    const edge = selectedEdge;
-    const sourceLabel = nodeById.get(edge.source_id)?.label;
-    const targetLabel = nodeById.get(edge.target_id)?.label;
-    return (
-      <div className="space-y-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Edge</div>
-          <div className="text-lg font-semibold text-white/90">
-            {sourceLabel || edge.source_id} <span className="text-white/40">→</span> {targetLabel || edge.target_id}
-          </div>
-          <div className="text-xs text-white/50 font-mono">{edge.id}</div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {edge.labels.map((label) => (
-            <Badge key={label} variant="outline" className="text-[10px] h-5">{label}</Badge>
-          ))}
-          {edge.type && <Badge variant="outline" className="text-[10px] h-5">{edge.type}</Badge>}
-        </div>
-        {(edge.label || edge.detail) && (
-          <Section title="Description">
-            {edge.label && <PropertyRow label="Label" value={edge.label} />}
-            {edge.detail && <PropertyRow label="Detail" value={edge.detail} />}
-          </Section>
-        )}
-        <Section title="Properties">
-          <div className="space-y-2">
-            {Object.entries(edge.properties).map(([key, value]) => (
-              <PropertyRow key={key} label={key} value={value} />
-            ))}
-          </div>
-        </Section>
-      </div>
-    );
-  };
 
   return (
     <PageShell
@@ -571,10 +419,7 @@ export default function WorkspacePage() {
         <div className="flex min-h-0" style={{ height: topHeight }}>
           {/* Reflect query */}
           <Panel style={{ width: queryWidth, minWidth: queryWidth, maxWidth: queryWidth }}>
-            <PanelHeader
-              title="Reflect query"
-              count={reflectQuery.trim() ? 1 : 0}
-            />
+            <PanelHeader title="Reflect query" />
             <PanelContent className="p-3">
               <div className="absolute inset-0 p-3 flex flex-col gap-2">
                 <Textarea
@@ -602,7 +447,7 @@ export default function WorkspacePage() {
           <Panel style={{ width: patchesWidth, minWidth: patchesWidth, maxWidth: patchesWidth }}>
             <PanelHeader
               title="Patches"
-              count={selectedEntity ? selectedEntityPatches.length : models.length}
+              count={selectedEntity ? selectedEntityPatches.length : undefined}
             />
             <PanelContent>
               <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
@@ -661,7 +506,7 @@ export default function WorkspacePage() {
           <Panel className="flex-1">
             <PanelHeader
               title="Edges"
-              count={selectedEntity ? selectedEntityEdges.length : edges.length}
+              count={selectedEntity ? selectedEntityEdges.length : undefined}
             />
             <PanelContent>
               <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
@@ -698,7 +543,7 @@ export default function WorkspacePage() {
         <div className="flex-1 min-h-0 flex gap-3">
           {/* Temporary content */}
           <Panel className="flex-1">
-            <PanelHeader title="Temporary content" count={0} />
+            <PanelHeader title="Temporary content" />
             <PanelContent>
               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
                 <div className="text-white/40 text-sm mb-3">
