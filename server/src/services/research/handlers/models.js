@@ -102,7 +102,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         };
       }
 
-      const { graph, narrative: modelNarrative, tables: modelTables, errors: modelErrors } = normalizeModelOutput(content);
+      const { graph, narrative: modelNarrative, tables: modelTables, diagrams: modelDiagrams, errors: modelErrors } = normalizeModelOutput(content);
 
       return {
         ext_id: extId,
@@ -112,6 +112,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         narrative: modelNarrative,
         graph,
         tables: modelTables || [],
+        diagrams: modelDiagrams || [],
         errors: modelErrors?.length ? modelErrors : undefined,
       };
     }),
@@ -120,6 +121,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
   const narratives = [];
   const graphs = [];
   const tables = [];
+  const diagrams = [];
   const errors = [];
 
   for (const item of fetched) {
@@ -138,6 +140,9 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
     if (item.tables && item.tables.length > 0) {
       tables.push(...item.tables);
     }
+    if (item.diagrams && item.diagrams.length > 0) {
+      diagrams.push(...item.diagrams);
+    }
     if (item.errors) {
       for (const err of item.errors) {
         errors.push({ model: item.name || item.ext_id, error: err });
@@ -148,7 +153,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
   let narrative = narratives.join('\n\n');
   if (narrative) {
     narrative = `# Models Query\n\n${narrative}`;
-  } else if (graphs.length > 0 || tables.length > 0) {
+  } else if (graphs.length > 0 || tables.length > 0 || diagrams.length > 0) {
     narrative = `Found model data for ${graphs.length} selected model(s).`;
   }
 
@@ -163,6 +168,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
     narrative,
     graph,
     tables,
+    diagrams,
     calls_used: ['list_mental_models'],
     errors: errors.length > 0 ? errors : undefined,
   };
