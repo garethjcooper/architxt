@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -55,6 +56,49 @@ function getModelLabel(model: WorkspaceModel): string {
   return model.name || model.extId;
 }
 
+function PanelHeader({ title, count }: { title: string; count?: number }) {
+  return (
+    <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
+      <div className="text-xs font-medium truncate">{title}</div>
+      {count !== undefined && (
+        <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-white/20 text-emerald-200/80">
+          {count}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function Panel({
+  children,
+  className,
+  style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <Card
+      className={cn(
+        'min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0',
+        className
+      )}
+      style={style}
+    >
+      {children}
+    </Card>
+  );
+}
+
+function PanelContent({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <CardContent className={cn('flex-1 min-h-0 p-0 relative', className)}>
+      {children}
+    </CardContent>
+  );
+}
+
 function ModelListRow({
   model,
   active,
@@ -70,7 +114,7 @@ function ModelListRow({
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left px-2 py-1.5 rounded transition-colors',
+        'w-full text-left px-3 py-1.5 transition-colors',
         active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
       )}
     >
@@ -159,9 +203,9 @@ export default function WorkspacePage() {
 
   // Layout sizing.
   const [topHeight, setTopHeight] = useState(360);
-  const [queryWidth, setQueryWidth] = useState(260);
-  const [patchesWidth, setPatchesWidth] = useState(260);
-  const [spineWidth, setSpineWidth] = useState(320);
+  const [queryWidth, setQueryWidth] = useState(220);
+  const [patchesWidth, setPatchesWidth] = useState(240);
+  const [spineWidth, setSpineWidth] = useState(280);
 
   const [resizing, setResizing] = useState<null | 'top' | 'query' | 'patches' | 'spine'>(null);
 
@@ -178,13 +222,13 @@ export default function WorkspacePage() {
         const next = Math.min(Math.max(e.clientY - 180, 160), 560);
         setTopHeight(next);
       } else if (resizing === 'query') {
-        const next = Math.min(Math.max(e.clientX - 16, 160), 420);
+        const next = Math.min(Math.max(e.clientX - 16, 160), 380);
         setQueryWidth(next);
       } else if (resizing === 'patches') {
-        const next = Math.min(Math.max(e.clientX - queryWidth - 32, 160), 420);
+        const next = Math.min(Math.max(e.clientX - queryWidth - 32, 160), 380);
         setPatchesWidth(next);
       } else if (resizing === 'spine') {
-        const next = Math.min(Math.max(e.clientX - queryWidth - patchesWidth - 48, 220), 480);
+        const next = Math.min(Math.max(e.clientX - queryWidth - patchesWidth - 48, 200), 440);
         setSpineWidth(next);
       }
     },
@@ -526,143 +570,134 @@ export default function WorkspacePage() {
         {/* Top row: reflect query | patches | entity spine | edges */}
         <div className="flex min-h-0" style={{ height: topHeight }}>
           {/* Reflect query */}
-          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: queryWidth, minWidth: queryWidth, maxWidth: queryWidth }}>
-            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-              <div className="text-xs font-medium text-white/80 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                Reflect query
+          <Panel style={{ width: queryWidth, minWidth: queryWidth, maxWidth: queryWidth }}>
+            <PanelHeader
+              title="Reflect query"
+              count={reflectQuery.trim() ? 1 : 0}
+            />
+            <PanelContent className="p-3">
+              <div className="absolute inset-0 p-3 flex flex-col gap-2">
+                <Textarea
+                  placeholder="Ask Reflect..."
+                  value={reflectQuery}
+                  onChange={(e) => setReflectQuery(e.target.value)}
+                  className="flex-1 resize-none text-sm min-h-0"
+                />
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={!reflectQuery.trim() || !serverId || !bankId}
+                  onClick={handleReflect}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Reflect
+                </Button>
               </div>
-            </div>
-            <div className="flex-1 flex flex-col p-3 min-h-0 gap-2">
-              <Textarea
-                placeholder="Ask Reflect..."
-                value={reflectQuery}
-                onChange={(e) => setReflectQuery(e.target.value)}
-                className="flex-1 resize-none text-sm min-h-0"
-              />
-              <Button
-                size="sm"
-                className="gap-1.5"
-                disabled={!reflectQuery.trim() || !serverId || !bankId}
-                onClick={handleReflect}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                Reflect
-              </Button>
-            </div>
-          </div>
+            </PanelContent>
+          </Panel>
 
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('query')} title="Drag to resize Reflect query pane" />
 
           {/* Patches */}
-          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: patchesWidth, minWidth: patchesWidth, maxWidth: patchesWidth }}>
-            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-              <div className="text-xs font-medium text-white/80">Patches</div>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                {selectedEntity ? selectedEntityPatches.length : models.length}
-              </Badge>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
-              {!selectedEntity ? (
-                models.map((m) => (
-                  <ModelListRow
-                    key={m.extId}
-                    model={m}
-                    active={selectedPatch?.id === m.id}
-                    onClick={() => handleSelectPatch(m)}
-                  />
-                ))
-              ) : selectedEntityPatches.length === 0 ? (
-                <div className="text-white/40 text-xs px-2 py-3">No patches for this entity.</div>
-              ) : (
-                selectedEntityPatches.map((m) => (
-                  <ModelListRow
-                    key={m.extId}
-                    model={m}
-                    active={selectedPatch?.id === m.id}
-                    onClick={() => handleSelectPatch(m)}
-                  />
-                ))
-              )}
-            </div>
-            <div className="p-2 border-t border-white/10">
-              <div className="text-[10px] text-white/40">
-                {selectedEntity ? `${selectedEntityPatches.length} related` : `${models.length} total`}
+          <Panel style={{ width: patchesWidth, minWidth: patchesWidth, maxWidth: patchesWidth }}>
+            <PanelHeader
+              title="Patches"
+              count={selectedEntity ? selectedEntityPatches.length : models.length}
+            />
+            <PanelContent>
+              <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
+                {!selectedEntity ? (
+                  models.map((m) => (
+                    <ModelListRow
+                      key={m.extId}
+                      model={m}
+                      active={selectedPatch?.id === m.id}
+                      onClick={() => handleSelectPatch(m)}
+                    />
+                  ))
+                ) : selectedEntityPatches.length === 0 ? (
+                  <div className="text-white/40 text-xs px-2 py-3">No patches for this entity.</div>
+                ) : (
+                  selectedEntityPatches.map((m) => (
+                    <ModelListRow
+                      key={m.extId}
+                      model={m}
+                      active={selectedPatch?.id === m.id}
+                      onClick={() => handleSelectPatch(m)}
+                    />
+                  ))
+                )}
               </div>
-            </div>
-          </div>
+            </PanelContent>
+          </Panel>
 
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('patches')} title="Drag to resize patches pane" />
 
           {/* Entity spine */}
-          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: spineWidth, minWidth: spineWidth, maxWidth: spineWidth }}>
-            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-              <div className="text-xs font-medium text-white/80">Entity spine</div>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5">{spineEntities.length}</Badge>
-            </div>
-            <div className="p-3 border-b border-white/10">
-              <Input
-                placeholder="Filter entities..."
-                value={spineSearch}
-                onChange={(e) => setSpineSearch(e.target.value)}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
-              {spineEntities.map((node) => (
-                <EntityListRow
-                  key={node.id}
-                  node={node}
-                  active={selectedEntity?.id === node.id}
-                  onClick={() => handleSelectEntity(node)}
-                />
-              ))}
-            </div>
-          </div>
+          <Panel style={{ width: spineWidth, minWidth: spineWidth, maxWidth: spineWidth }}>
+            <PanelHeader title="Entity spine" count={spineEntities.length} />
+            <PanelContent className="p-0">
+              <div className="absolute inset-0 overflow-y-auto">
+                <div className="p-3 sticky top-0 bg-[oklch(0.23_0_0)] z-10 border-b border-white/10">
+                  <Input
+                    placeholder="Filter entities..."
+                    value={spineSearch}
+                    onChange={(e) => setSpineSearch(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="p-2 space-y-1">
+                  {spineEntities.map((node) => (
+                    <EntityListRow
+                      key={node.id}
+                      node={node}
+                      active={selectedEntity?.id === node.id}
+                      onClick={() => handleSelectEntity(node)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </PanelContent>
+          </Panel>
 
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('spine')} title="Drag to resize entity spine" />
 
           {/* Edges */}
-          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
-            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-              <div className="text-xs font-medium text-white/80">Edges</div>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                {selectedEntity ? selectedEntityEdges.length : edges.length}
-              </Badge>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
-              {!selectedEntity ? (
-                edges.map((edge) => (
-                  <EdgeListRow
-                    key={edge.id}
-                    edge={edge}
-                    active={selectedEdge?.id === edge.id}
-                    sourceLabel={nodeById.get(edge.source_id)?.label}
-                    targetLabel={nodeById.get(edge.target_id)?.label}
-                    onClick={() => handleSelectEdge(edge)}
-                  />
-                ))
-              ) : selectedEntityEdges.length === 0 ? (
-                <div className="text-white/40 text-xs px-2 py-3">No edges connected to this entity.</div>
-              ) : (
-                selectedEntityEdges.map((edge) => (
-                  <EdgeListRow
-                    key={edge.id}
-                    edge={edge}
-                    active={selectedEdge?.id === edge.id}
-                    sourceLabel={nodeById.get(edge.source_id)?.label}
-                    targetLabel={nodeById.get(edge.target_id)?.label}
-                    onClick={() => handleSelectEdge(edge)}
-                  />
-                ))
-              )}
-            </div>
-            <div className="p-2 border-t border-white/10">
-              <div className="text-[10px] text-white/40">
-                {selectedEntity ? `${selectedEntityEdges.length} connected` : `${edges.length} total`}
+          <Panel className="flex-1">
+            <PanelHeader
+              title="Edges"
+              count={selectedEntity ? selectedEntityEdges.length : edges.length}
+            />
+            <PanelContent>
+              <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
+                {!selectedEntity ? (
+                  edges.map((edge) => (
+                    <EdgeListRow
+                      key={edge.id}
+                      edge={edge}
+                      active={selectedEdge?.id === edge.id}
+                      sourceLabel={nodeById.get(edge.source_id)?.label}
+                      targetLabel={nodeById.get(edge.target_id)?.label}
+                      onClick={() => handleSelectEdge(edge)}
+                    />
+                  ))
+                ) : selectedEntityEdges.length === 0 ? (
+                  <div className="text-white/40 text-xs px-2 py-3">No edges connected to this entity.</div>
+                ) : (
+                  selectedEntityEdges.map((edge) => (
+                    <EdgeListRow
+                      key={edge.id}
+                      edge={edge}
+                      active={selectedEdge?.id === edge.id}
+                      sourceLabel={nodeById.get(edge.source_id)?.label}
+                      targetLabel={nodeById.get(edge.target_id)?.label}
+                      onClick={() => handleSelectEdge(edge)}
+                    />
+                  ))
+                )}
               </div>
-            </div>
-          </div>
+            </PanelContent>
+          </Panel>
         </div>
 
         <ResizeHandle
@@ -674,42 +709,43 @@ export default function WorkspacePage() {
         {/* Bottom row: temporary content | workspace pages */}
         <div className="flex-1 min-h-0 flex gap-3">
           {/* Temporary content */}
-          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
-            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-              <div className="text-xs font-medium text-white/80">Temporary content</div>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5">0</Badge>
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center min-h-0 overflow-y-auto">
-              <div className="text-white/40 text-sm mb-3">
-                Selections from patches/edges and Reflect queries will appear here.
+          <Panel className="flex-1">
+            <PanelHeader title="Temporary content" count={0} />
+            <PanelContent>
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
+                <div className="text-white/40 text-sm mb-3">
+                  Selections from patches/edges and Reflect queries will appear here.
+                </div>
+                <div className="flex items-center gap-2 text-white/30 text-xs">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add sections from patches or edges to build temporary output.</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-white/30 text-xs">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add sections from patches or edges to build temporary output.</span>
-              </div>
-            </div>
-          </div>
+            </PanelContent>
+          </Panel>
 
           {/* Workspace pages */}
-          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
-            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-              <div className="text-xs font-medium text-white/80">Workspace pages</div>
+          <Panel className="flex-1">
+            <PanelHeader title="Workspace pages" />
+            <PanelContent>
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
+                <FileText className="w-8 h-8 text-white/20 mb-3" />
+                <div className="text-white/40 text-sm mb-2">No workspace pages yet.</div>
+                <div className="text-white/30 text-xs">
+                  Add temporary content to a new page to start a session.
+                </div>
+              </div>
+            </PanelContent>
+            <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white/50">
+                <GripVertical className="w-3.5 h-3.5" />
+                <div className="text-[11px]">Page tabs will appear here.</div>
+              </div>
               <Button variant="outline" size="sm" className="h-6 text-[11px] gap-1">
                 <Plus className="w-3.5 h-3.5" /> New page
               </Button>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center min-h-0 overflow-y-auto">
-              <FileText className="w-8 h-8 text-white/20 mb-3" />
-              <div className="text-white/40 text-sm mb-2">No workspace pages yet.</div>
-              <div className="text-white/30 text-xs">
-                Add temporary content to a new page to start a session.
-              </div>
-            </div>
-            <div className="px-3 py-2 border-t border-white/10 flex items-center gap-2">
-              <GripVertical className="w-3.5 h-3.5 text-white/30" />
-              <div className="text-[11px] text-white/50">Page tabs will appear here.</div>
-            </div>
-          </div>
+          </Panel>
         </div>
       </div>
     </PageShell>
