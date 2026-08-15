@@ -3,6 +3,13 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { parseBlocks, SmartBlock, getSectionBlockIds, getSidebarIndent, slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
+import { MermaidDiagram } from './mermaid-diagram';
+
+export interface NarrativeDiagram {
+  name: string;
+  type: string;
+  content: string;
+}
 
 export interface NarrativeViewerProps {
   /** Markdown narrative content to display/index. */
@@ -17,6 +24,8 @@ export interface NarrativeViewerProps {
   viewMode?: 'plain' | 'markdown';
   /** Whether to show the left-hand index sidebar. */
   showIndex?: boolean;
+  /** Optional Mermaid diagrams to render inline after the narrative content. */
+  diagrams?: NarrativeDiagram[];
 }
 
 export function NarrativeViewer({
@@ -26,6 +35,7 @@ export function NarrativeViewer({
   className = '',
   viewMode = 'plain',
   showIndex = true,
+  diagrams,
 }: NarrativeViewerProps) {
   const [blocks, setBlocks] = useState<SmartBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -161,6 +171,14 @@ export function NarrativeViewer({
               </div>
             );
           })
+        )}
+        {diagrams && diagrams.length > 0 && (
+          <div className="mt-6 flex flex-col gap-4">
+            <hr className="border-white/10" />
+            {diagrams.map((d, idx) => (
+              <MermaidDiagram key={idx} name={d.name} type={d.type} content={d.content} />
+            ))}
+          </div>
         )}
       </div>
     </div>
