@@ -37,15 +37,25 @@ describe('parseSectionDirectives', () => {
     assert.equal(diagrams[0].content, 'A --> B');
   });
 
-  it('parses an inline diagram block', () => {
-    const raw = 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain';
-    const result = parseSectionDirectives(raw);
-    assert.equal(result.intentText, 'what is ICMS explain');
+  it('parses a diagram-only block and derives topic from name and type', () => {
+    const result = parseSectionDirectives('#diagram\n#name test1\n#type erDiagram\nICMS ||--|| Singleview : dataflow\n#end');
+    assert.equal(result.intentText, 'test1 (erDiagram)');
+    assert.equal(result.sectionFocus?.narrative, undefined);
     const diagrams = result.sectionFocus?.diagram;
     assert.equal(diagrams.length, 1);
-    assert.equal(diagrams[0].name, 'Seq');
-    assert.equal(diagrams[0].type, 'sequenceDiagram');
-    assert.equal(diagrams[0].content, 'Alice->>Bob: Hello');
+    assert.equal(diagrams[0].name, 'test1');
+    assert.equal(diagrams[0].type, 'erDiagram');
+    assert.equal(diagrams[0].content, 'ICMS ||--|| Singleview : dataflow');
+  });
+
+  it('parses a table-only block and derives topic from name', () => {
+    const result = parseSectionDirectives('#table\n#name Billing\nlist interface name and protocol\n#end');
+    assert.equal(result.intentText, 'Billing');
+    assert.equal(result.sectionFocus?.narrative, undefined);
+    const tables = result.sectionFocus?.table;
+    assert.equal(tables.length, 1);
+    assert.equal(tables[0].name, 'Billing');
+    assert.equal(tables[0].content, 'list interface name and protocol');
   });
 
   it('parses a table block without #name', () => {
@@ -81,7 +91,7 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus?.graph, 'A\nB');
   });
 
-  it('unknown directives stay as loose text and trigger implicit narrative', () => {
+  it('leaves unknown directives as loose text and triggers implicit narrative', () => {
     // #unknown is not parsed; all text is loose text with zero parsed directives,
     // so implicit narrative fires on the whole string.
     const result = parseSectionDirectives('#unknown\nvalue\n#end\nWhat is this?');
@@ -90,14 +100,11 @@ describe('parseSectionDirectives', () => {
   });
 
   it('trims whitespace around the remaining intent text', () => {
-    const result = parseSectionDirectives('  Hello   #graph\nA\n#end  ');
+    const result = parseSectionDirectives('  Hello\n#graph\nA\n#end  ');
     assert.equal(result.intentText, 'Hello');
   });
 
-  it('preserves legacy behavior when #topic is absent', () => {
-    // Loose text before directives becomes implicit narrative ONLY when zero
-    // explicit directives are present.  With #graph present, implicit narrative
-    // is suppressed.
+  it('does not create implicit narrative when an explicit directive is present', () => {
     const result = parseSectionDirectives('Analyze billing\n#graph\nCRM, ERP\n#end');
     assert.equal(result.intentText, 'Analyze billing');
     assert.equal(result.sectionFocus?.graph, 'CRM, ERP');
@@ -117,35 +124,12 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
-  it('does not use diagram body as the implicit narrative topic', () => {
-    const result = parseSectionDirectives('#diagram #name test1 #type erDiagram ICMS ||--|| Singleview : dataflow #end');
-    assert.equal(result.intentText, '');
-    assert.equal(result.sectionFocus?.narrative, undefined);
-    const diagrams = result.sectionFocus?.diagram;
-    assert.equal(diagrams.length, 1);
-    assert.equal(diagrams[0].name, 'test1');
-    assert.equal(diagrams[0].type, 'erDiagram');
-    assert.equal(diagrams[0].content, 'ICMS ||--|| Singleview : dataflow');
-  });
-
-  it('does not use table body as the implicit narrative topic', () => {
-    const result = parseSectionDirectives('#table #name Billing list interface name and protocol #end');
-    assert.equal(result.intentText, '');
-    assert.equal(result.sectionFocus?.narrative, undefined);
-    const tables = result.sectionFocus?.table;
-    assert.equal(tables.length, 1);
-    assert.equal(tables[0].name, 'Billing');
-    assert.equal(tables[0].content, 'list interface name and protocol');
-  });
-
-  it('parses inline directives without newlines', () => {
-    const result = parseSectionDirectives('what is ICMS #graph show data flows #end #table #name Data Flows list interface name, protocol and destination systems for the data flows #end what is Singleview #table #name table-abc list Singleview capabilities #end');
-    assert.equal(result.intentText, 'what is ICMS what is Singleview');
-    assert.equal(result.sectionFocus?.graph, 'show data flows');
-    assert.equal(result.sectionFocus?.table?.length, 2);
-    assert.ok(result.sectionFocus?.table[0].name);
-    assert.ok(result.sectionFocus?.table[1].name);
-    assert.equal(result.sectionFocus?.narrative, undefined);
+  it('ignores inline single-line directive blocks', () => {
+    const raw = 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain';
+    const result = parseSectionDirectives(raw);
+    // Inline blocks are not recognized because each keyword must start on its own line.
+    assert.equal(result.intentText, 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain');
+    assert.equal(result.sectionFocus?.diagram, undefined);
   });
 });
 

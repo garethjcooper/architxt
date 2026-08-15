@@ -4,7 +4,7 @@
  * Shared logic between frontend and backend. Returns parsed directives
  * plus the remaining intent text (query with directive blocks stripped).
  *
- * Supported syntax (block style ONLY):
+ * Supported syntax (block style, line-based):
  *
  *   #graph
  *   CRM, ERP
@@ -15,12 +15,19 @@
  *   List all upstream and downstream dependencies
  *   #end
  *
+ *   #diagram
+ *   #name Entity lifecycle
+ *   #type sequenceDiagram
+ *   Alice->>Bob: Hello
+ *   #end
+ *
  *   #narrative
  *   business impact
  *   #end
  *
- * Directives must be explicitly closed with #end. No inline colon syntax.
- * Multiple blocks of the same type are collected according to cardinality
+ * Each block must start on its own line with a directive keyword and end on its
+ * own line with #end. Sub-directives (#name, #type) must also start on their own
+ * line. Multiple blocks of the same type are collected according to cardinality
  * rules in SECTION_DIRECTIVE_CONFIG.
  */
 
@@ -57,66 +64,31 @@ export const VALID_MERMAID_DIAGRAM_TYPES = new Set([
   'C4Deployment',
 ]);
 
-/**
- * Extract #name value from table block content.
- * Returns { name, content } where content is everything after #name.
- *
- * Supports both multiline and inline:
- *   #name Billing\nInvoices          → name="Billing", content="Invoices"
- *   #name Data Flows list items #end → name="Data Flows", content="list items"
- */
-/**
- * Extract #name and #type values from a diagram block.
- * Returns { name, type, content } where content is the remaining body.
- *
- * Supports both multiline and inline:
- *   #name Lifecycle\n#type sequenceDiagram\nAlice->>Bob  → name="Lifecycle", type="sequenceDiagram", content="Alice->>Bob"
- *   #name Flow #type flowchart LR A-->B #end → name="Flow", type="flowchart", content="LR A-->B"
- */
-export function extractDiagramAttributes(content) {
-  const text = content.trim();
-
-  // Capture the #name value without consuming the #type keyword (lookahead).
-  const nameMatch = text.match(/^#name\s+(.+?)(?=\r?\n|#type\b|$)/is);
-  if (!nameMatch) return { content: text };
-  const name = nameMatch[1].trim();
-
-  // Position after the consumed #name directive, skipping any whitespace before #type.
-  let pos = nameMatch[0].length;
-  while (pos < text.length && /\s/.test(text[pos])) pos += 1;
-
-  const typeMatch = text.slice(pos).match(/^#type\s+(\S+)/i);
-  if (!typeMatch) return { name, content: text.slice(pos).trim() };
-
-  const type = typeMatch[1].trim();
-  pos += typeMatch[0].length;
-  return { name, type, content: text.slice(pos).trim() };
+function matchDirectiveLine(line) {
+  const m = line.match(/^#(graph|table|diagram|narrative)\b/i);
+  return m ? m[1].toLowerCase() : null;
 }
 
-export function extractTableName(content) {
-  const nameRe = /^#name\s+(.+?)(?:\r?\n|$)/i;
-  const match = content.match(nameRe);
-  if (match) {
-    let name = match[1].trim();
-    let remaining = content.slice(match[0].length).trim();
+function matchSubDirective(line) {
+  const m = line.match(/^#(name|type)\s+(.*)$/i);
+  if (!m) return null;
+  const value = m[2].trim();
+  if (!value) return null;
+  return { key: m[1].toLowerCase(), value };
+}
 
-    // Inline case: no newline after #name and nothing remains.
-    // Take first 1–2 words as the name; the rest becomes content.
-    if (!remaining && !content.includes('\n')) {
-      const words = name.split(/\s+/);
-      if (words.length > 1) {
-        // Heuristic: if second word is lowercase, treat first word as name.
-        // Otherwise use first two words.
-        const secondLower = /^[a-z]/.test(words[1]);
-        const splitAt = secondLower ? 1 : 2;
-        remaining = words.slice(splitAt).join(' ');
-        name = words.slice(0, splitAt).join(' ');
-      }
-    }
+function matchEndLine(line) {
+  return /^#end\b/i.test(line);
+}
 
-    return { name, content: remaining };
+function deriveTopicFromDirective(directive, kind) {
+  if (kind === 'diagram') {
+    if (directive.name && directive.type) return `${directive.name} (${directive.type})`;
+    if (directive.name) return directive.name;
+    if (directive.type) return `Diagram (${directive.type})`;
+    return 'Diagram';
   }
-  return { content };
+  return directive.name || 'Table';
 }
 
 export function parseSectionDirectives(rawQuery) {
@@ -125,61 +97,88 @@ export function parseSectionDirectives(rawQuery) {
   }
 
   const focus = {};
-  let firstDirectiveContent = null;
-  let anyDirectiveFound = false;
+  const strippedLines = [];
+  const topicCandidates = [];
+  const lines = rawQuery.split(/\r?\n/);
 
-  // Block style: #directive ...content... #end
-  // Content may start on the same line as the keyword or on the next line.
-  const blockRe = /#(graph|table|diagram|narrative)\b\s*([\s\S]*?)(?:\r?\n)?#end\b/gi;
-  let blockMatch;
-  let blockStripped = rawQuery;
-  while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
-    const key = blockMatch[1].toLowerCase();
-    const content = blockMatch[2].trim();
-    anyDirectiveFound = true;
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    const directive = matchDirectiveLine(trimmed);
 
-    if (content) {
-      // table/diagram content is structured data (table rows / Mermaid source),
-      // not a user topic, so don't promote it as the fallback topic.
-      if (key !== 'table' && key !== 'diagram' && firstDirectiveContent === null) {
-        firstDirectiveContent = content;
-      }
-
-      const config = SECTION_DIRECTIVE_CONFIG[key] || { cardinality: 'single', merge: 'override' };
-      if (config.cardinality === 'multiple') {
-        // table: collect as TableDirective objects
-        if (!focus[key]) focus[key] = [];
-        if (key === 'diagram') {
-          focus[key].push(extractDiagramAttributes(content));
-        } else {
-          focus[key].push(extractTableName(content));
-        }
-      } else {
-        // single
-        if (config.merge === 'concat' && focus[key]) {
-          focus[key] = focus[key] + '\n' + content;
-        } else {
-          focus[key] = content;
-        }
-      }
+    if (!directive) {
+      strippedLines.push(lines[i]);
+      i += 1;
+      continue;
     }
-    blockStripped = blockStripped.replace(blockMatch[0], '');
+
+    const blockStart = i;
+    i += 1;
+    let name;
+    let type;
+    const bodyLines = [];
+    let closed = false;
+
+    while (i < lines.length) {
+      const lineTrimmed = lines[i].trim();
+      if (matchEndLine(lineTrimmed)) {
+        closed = true;
+        i += 1;
+        break;
+      }
+
+      const sub = matchSubDirective(lineTrimmed);
+      if (sub) {
+        if (sub.key === 'name') name = sub.value;
+        if (sub.key === 'type') type = sub.value;
+      } else {
+        bodyLines.push(lines[i]);
+      }
+      i += 1;
+    }
+
+    if (!closed) {
+      strippedLines.push(...lines.slice(blockStart, i));
+      continue;
+    }
+
+    const body = bodyLines.join('\n').trim();
+    const config = SECTION_DIRECTIVE_CONFIG[directive] || { cardinality: 'single', merge: 'override' };
+
+    if (config.cardinality === 'multiple') {
+      if (!focus[directive]) focus[directive] = [];
+      if (directive === 'diagram') {
+        const d = { name, type, content: body };
+        focus[directive].push(d);
+        topicCandidates.push(deriveTopicFromDirective(d, 'diagram'));
+      } else {
+        const t = { name, content: body };
+        focus[directive].push(t);
+        topicCandidates.push(deriveTopicFromDirective(t, 'table'));
+      }
+    } else {
+      if (config.merge === 'concat' && focus[directive]) {
+        focus[directive] = focus[directive] + (body ? '\n' + body : '');
+      } else {
+        focus[directive] = body;
+      }
+      if (body) topicCandidates.push(body);
+    }
   }
 
-  const remainingText = blockStripped.replace(/\s+/g, ' ').trim();
+  const remainingText = strippedLines
+    .map(l => l.trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  // Implicit narrative: loose text outside directives becomes narrative focus
-  // ONLY when no explicit directives are present. This makes plain queries
-  // produce narrative-only output, while any directive suppresses implicit
-  // narrative so the user controls output shape explicitly.
-  if (remainingText && !focus.narrative && !anyDirectiveFound) {
+  // Implicit narrative only for plain queries with no directives at all.
+  if (remainingText && Object.keys(focus).length === 0) {
     focus.narrative = remainingText;
   }
 
-  // Topic fallback: if no loose text remains after stripping directives,
-  // promote the first directive's content as the topic so ARCHITXT_TOPIC
-  // is never empty.
-  const intentText = remainingText || firstDirectiveContent || '';
+  const intentText = remainingText || topicCandidates[0] || '';
 
   return Object.keys(focus).length > 0
     ? { intentText, sectionFocus: focus }
