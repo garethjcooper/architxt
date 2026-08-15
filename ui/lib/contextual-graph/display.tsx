@@ -6,6 +6,32 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
+const TYPE_PALETTE = [
+  '#E06C75', // red
+  '#98C379', // green
+  '#E5C07B', // yellow
+  '#61AFEF', // blue
+  '#C678DD', // purple
+  '#56B6C2', // cyan
+  '#FFEB3B', // bright yellow
+  '#FF9800', // amber
+  '#00BCD4', // sky
+];
+
+function hashString(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+export function colorForType(type?: string | null): string {
+  if (!type) return '#64748b';
+  return TYPE_PALETTE[hashString(type) % TYPE_PALETTE.length];
+}
+
 export type BackendNode = {
   id: string;
   labels: string[];
@@ -190,14 +216,6 @@ export const MODEL_ROLE_LABELS: Record<string, string> = {
   sys_discovery_context: 'discovery',
 };
 
-function getNodeStatusBadge(node: DisplayNode): string {
-  if (node.labels.includes('canonical')) return 'canonical';
-  if (node.labels.includes('grounded')) return 'grounded';
-  if (node.labels.includes('discovered')) return 'discovered';
-  if (node.labels.includes('candidate')) return 'candidate';
-  return node.type;
-}
-
 export function EntityListRow({
   node,
   active,
@@ -208,34 +226,22 @@ export function EntityListRow({
   onClick?: () => void;
 }) {
   const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
-  const lastRefreshed = getLastRefreshedAt(node.modelRefs);
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left px-2 py-1.5 rounded transition-colors',
-        active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+        'w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
+        active
+          ? 'border-white/10 bg-white/10'
+          : 'border-white/5 bg-black/20 hover:bg-white/5'
       )}
+      style={{ borderLeftColor: colorForType(node.type), borderLeftWidth: 3 }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-sm text-white/90 truncate">{node.label}</div>
-          <div className="text-[11px] text-white/40 truncate">{typeLine}</div>
-        </div>
-        <Badge variant="outline" className="text-[10px] h-5 border-white/20 text-white/60 shrink-0">
-          {getNodeStatusBadge(node)}
-        </Badge>
+      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+        <div className="text-xs text-white/90 truncate">{node.label}</div>
+        <div className="text-[10px] text-white/50 font-mono truncate">{typeLine}</div>
       </div>
-      {node.modelRefs.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap mt-1">
-          {node.modelRefs.map((ref, i) => (
-            <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-              {MODEL_ROLE_LABELS[ref.role || ''] || ref.role}
-            </Badge>
-          ))}
-        </div>
-      )}
     </button>
   );
 }
@@ -257,38 +263,26 @@ export function EdgeListRow({
   const targetDisplay = targetLabel || edge.target_id;
   const secondary = edge.label || edge.type || edge.id;
   const description = edge.detail;
-  const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left px-2 py-1.5 rounded transition-colors',
-        active ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+        'w-full flex items-start gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
+        active
+          ? 'border-white/10 bg-white/10'
+          : 'border-white/5 bg-black/20 hover:bg-white/5'
       )}
+      style={{ borderLeftColor: colorForType(edge.type || 'edge'), borderLeftWidth: 3 }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-sm text-white/90 truncate">
-            {sourceDisplay} <span className="text-white/40">→</span> {targetDisplay}
-          </div>
-          <div className="text-[11px] text-white/40 truncate">
-            {description || secondary}
-          </div>
+      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+        <div className="text-xs text-white/90 truncate">
+          {sourceDisplay} <span className="text-white/40">→</span> {targetDisplay}
         </div>
-        {lastRefreshed && (
-          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
-        )}
+        <div className="text-[10px] text-white/50 font-mono truncate">
+          {description || secondary}
+        </div>
       </div>
-      {edge.modelRefs.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap mt-1">
-          {edge.modelRefs.map((ref, i) => (
-            <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-              {MODEL_ROLE_LABELS[ref.role || ''] || ref.role}
-            </Badge>
-          ))}
-        </div>
-      )}
     </button>
   );
 }
