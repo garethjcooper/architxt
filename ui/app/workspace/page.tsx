@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -28,7 +29,7 @@ import {
   Section,
   PropertyRow,
 } from '@/lib/contextual-graph/display';
-import { RefreshCw, Plus, FileText, GripVertical } from 'lucide-react';
+import { RefreshCw, Plus, FileText, GripVertical, Sparkles } from 'lucide-react';
 
 const logger = createLogger('WorkspacePage');
 
@@ -139,6 +140,7 @@ export default function WorkspacePage() {
   const [selectedEdge, setSelectedEdge] = useState<DisplayEdge | null>(null);
 
   const [spineSearch, setSpineSearch] = useState('');
+  const [reflectQuery, setReflectQuery] = useState('');
 
   const [rawModelContent, setRawModelContent] = useState<{ content: string | object | null; updatedAt?: string; loading: boolean; error?: string }>({
     content: null,
@@ -157,12 +159,13 @@ export default function WorkspacePage() {
 
   // Layout sizing.
   const [topHeight, setTopHeight] = useState(360);
+  const [queryWidth, setQueryWidth] = useState(260);
   const [patchesWidth, setPatchesWidth] = useState(260);
   const [spineWidth, setSpineWidth] = useState(320);
 
-  const [resizing, setResizing] = useState<null | 'top' | 'patches' | 'spine'>(null);
+  const [resizing, setResizing] = useState<null | 'top' | 'query' | 'patches' | 'spine'>(null);
 
-  const handleResizeStart = useCallback((pane: 'top' | 'patches' | 'spine') => (e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((pane: 'top' | 'query' | 'patches' | 'spine') => (e: React.MouseEvent) => {
     setResizing(pane);
     document.body.style.cursor = pane === 'top' ? 'row-resize' : 'col-resize';
     document.body.style.userSelect = 'none';
@@ -174,15 +177,18 @@ export default function WorkspacePage() {
       if (resizing === 'top') {
         const next = Math.min(Math.max(e.clientY - 180, 160), 560);
         setTopHeight(next);
+      } else if (resizing === 'query') {
+        const next = Math.min(Math.max(e.clientX - 16, 160), 420);
+        setQueryWidth(next);
       } else if (resizing === 'patches') {
-        const next = Math.min(Math.max(e.clientX - 16, 180), 420);
+        const next = Math.min(Math.max(e.clientX - queryWidth - 32, 160), 420);
         setPatchesWidth(next);
       } else if (resizing === 'spine') {
-        const next = Math.min(Math.max(e.clientX - patchesWidth - 32, 220), 480);
+        const next = Math.min(Math.max(e.clientX - queryWidth - patchesWidth - 48, 220), 480);
         setSpineWidth(next);
       }
     },
-    [resizing, patchesWidth]
+    [resizing, queryWidth, patchesWidth]
   );
 
   const handleResizeEnd = useCallback(() => {
@@ -264,7 +270,6 @@ export default function WorkspacePage() {
       }));
       setModels(mappedModels);
 
-      // Keep selected entity if it still exists, otherwise clear.
       setSelectedEntity((prev) => {
         if (!prev) return null;
         return displayNodes.find((n) => n.id === prev.id) || null;
@@ -356,11 +361,22 @@ export default function WorkspacePage() {
     setRawModelContent({ content: null, loading: false });
   }, []);
 
+  const handleReflect = useCallback(() => {
+    const query = reflectQuery.trim();
+    if (!query) return;
+    if (!serverId || !bankId) {
+      toast.error('Select a server and bank before running Reflect.');
+      return;
+    }
+    // TODO: Phase C will wire the Reflect API and add the result to temporary content.
+    toast.info(`Reflect query staged: "${query}"`);
+  }, [reflectQuery, serverId, bankId]);
+
   const renderPatchQuickView = () => {
     if (!selectedPatch) {
       return (
         <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
-          Select a patch from the left panel to inspect its contents.
+          Select a patch from the patches panel to inspect its contents.
         </div>
       );
     }
@@ -436,7 +452,7 @@ export default function WorkspacePage() {
     if (!selectedEdge) {
       return (
         <div className="h-full flex items-center justify-center text-white/50 text-sm px-6 text-center">
-          Select an edge from the right panel to inspect it.
+          Select an edge from the edges panel to inspect it.
         </div>
       );
     }
@@ -507,13 +523,44 @@ export default function WorkspacePage() {
           </Button>
         </div>
 
-        {/* Top row: patches | entity spine | edges */}
+        {/* Top row: reflect query | patches | entity spine | edges */}
         <div className="flex min-h-0" style={{ height: topHeight }}>
+          {/* Reflect query */}
+          <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: queryWidth, minWidth: queryWidth, maxWidth: queryWidth }}>
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="text-xs font-medium text-white/80 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                Reflect query
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col p-3 min-h-0 gap-2">
+              <Textarea
+                placeholder="Ask Reflect..."
+                value={reflectQuery}
+                onChange={(e) => setReflectQuery(e.target.value)}
+                className="flex-1 resize-none text-sm min-h-0"
+              />
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={!reflectQuery.trim() || !serverId || !bankId}
+                onClick={handleReflect}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Reflect
+              </Button>
+            </div>
+          </div>
+
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('query')} title="Drag to resize Reflect query pane" />
+
           {/* Patches */}
           <div className="flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)]" style={{ width: patchesWidth, minWidth: patchesWidth, maxWidth: patchesWidth }}>
             <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
               <div className="text-xs font-medium text-white/80">Patches</div>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5">{selectedEntity ? selectedEntityPatches.length : models.length}</Badge>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                {selectedEntity ? selectedEntityPatches.length : models.length}
+              </Badge>
             </div>
             <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
               {!selectedEntity ? (
@@ -579,7 +626,9 @@ export default function WorkspacePage() {
           <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.22_0_0)] flex flex-col">
             <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
               <div className="text-xs font-medium text-white/80">Edges</div>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5">{selectedEntity ? selectedEntityEdges.length : edges.length}</Badge>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                {selectedEntity ? selectedEntityEdges.length : edges.length}
+              </Badge>
             </div>
             <div className="flex-1 overflow-y-auto p-2 min-h-0 space-y-1">
               {!selectedEntity ? (
