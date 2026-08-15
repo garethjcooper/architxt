@@ -4,18 +4,19 @@ Return ONLY a valid, parseable JSON object. No Markdown fences, no Markdown head
 
 Required envelope:
 
-{"narrative":"Markdown prose with paragraphs, or empty string.","graph":{"nodes":[],"edges":[]},"tables":[]}
+{"narrative":"Markdown prose with paragraphs, or empty string.","graph":{"nodes":[],"edges":[]},"tables":[],"diagrams":[]}
 
-All three top-level keys are required. Empty arrays or an empty string are acceptable, but the keys must not be omitted.
+All four top-level keys are required. Empty arrays or an empty string are acceptable, but the keys must not be omitted.
 
 - `narrative` is for human-readable prose. Whether to populate it is governed by the **Section rules** injected below.
 - `graph` is for nodes and edges. Graph generation rules live in `output-format-graph-contextual.md`.
 - `tables` is for structured tables. Table generation rules live in `output-format-table-contextual.md`.
+- `diagrams` is for Mermaid diagrams. Diagram generation rules live in `output-format-diagram-contextual.md`.
 
 The example below shows the envelope structure with all sections empty. **Which sections to populate and which to leave empty is governed by the Section rules injected below.** Your actual response must NOT include the code fence, the triple backticks, or any backslash-escaped quotes:
 
 ```json
-{"narrative":"","graph":{"nodes":[],"edges":[]},"tables":[]}
+{"narrative":"","graph":{"nodes":[],"edges":[]},"tables":[],"diagrams":[]}
 ```
 
 Before finishing, verify that the response starts with `{` and ends with `}` and contains no unescaped control characters.

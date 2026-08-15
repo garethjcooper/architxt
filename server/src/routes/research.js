@@ -127,7 +127,7 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
   await updateStep(db, step.rstep_id, {
-    rstep_canvas_state: { graph: mergedGraph, tables: [] },
+    rstep_canvas_state: { graph: mergedGraph, tables: [], diagrams: [] },
     rstep_synthesis: { narrative: narratives.join('\n\n') },
     rstep_status: 'completed',
     rstep_error_message: null,
@@ -362,7 +362,7 @@ router.post('/discover', async (req, res) => {
       rstep_action_type: effectiveDepth,
       rstep_parameters: handlerOptions,
       rstep_viewpoint_ids: viewpoint_ids,
-      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [] },
+      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
       rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
@@ -595,7 +595,7 @@ router.post('/prebuilt', async (req, res) => {
       rstep_action_type: 'prebuilt',
       rstep_parameters: { roles },
       rstep_viewpoint_ids: [],
-      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [] },
+      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
       rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
@@ -650,6 +650,7 @@ router.post('/prebuilt', async (req, res) => {
     // Derive a merged canvas/synthesis for the step so it works in the trail.
     const mergedGraph = { nodes: [], edges: [] };
     const mergedTables = [];
+    const mergedDiagrams = [];
     const narratives = [];
     const parseErrors = [];
     for (const roleResult of result.roles || []) {
@@ -696,13 +697,16 @@ router.post('/prebuilt', async (req, res) => {
       if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
         mergedTables.push(...roleResult.result.tables);
       }
+      if (roleResult.result?.diagrams && roleResult.result.diagrams.length > 0) {
+        mergedDiagrams.push(...roleResult.result.diagrams);
+      }
     }
 
     const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
     const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
     await updateStep(db, stepId, {
-      rstep_canvas_state: { graph: mergedGraph, tables: mergedTables },
+      rstep_canvas_state: { graph: mergedGraph, tables: mergedTables, diagrams: mergedDiagrams },
       rstep_synthesis: { narrative: narratives.join('\n\n') },
       rstep_status: 'completed',
       rstep_error_message: parseErrors.length > 0 ? `Some mental models could not be parsed. ${parseErrors.map((e) => `${e.model}: ${e.error}`).join('; ')}` : null,
@@ -1256,7 +1260,7 @@ router.post('/synthesize', async (req, res) => {
       rstep_action_type: 'synthesize',
       rstep_parameters: handlerOptions,
       rstep_viewpoint_ids: [],
-      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [] },
+      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
       rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',

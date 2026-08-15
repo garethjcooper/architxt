@@ -7,7 +7,8 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { handleReflect } from '../src/services/research/handlers/reflect.js';
 
 function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
-  return JSON.stringify({ narrative, graph: { nodes, edges }, tables: [] });
+  return JSON.stringify({ narrative, graph: { nodes, edges }, tables: [],
+      diagrams: [] });
 }
 
 const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
@@ -21,7 +22,8 @@ const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
   ],
 });
 
-const REFLECT_TEXT_NO_GRAPH = JSON.stringify({ narrative: 'Just a plain text response with no graph data.', graph: { nodes: [], edges: [] }, tables: [] });
+const REFLECT_TEXT_NO_GRAPH = JSON.stringify({ narrative: 'Just a plain text response with no graph data.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-reflect-handler-${Date.now()}.db`);

@@ -27,6 +27,27 @@ describe('parseSectionDirectives', () => {
     assert.equal(tables[0].content, 'Upstreams and downstreams');
   });
 
+  it('parses a diagram block with explicit #name and #type', () => {
+    const result = parseSectionDirectives('Q\n#diagram\n#name Billing flow\n#type flowchart\nA --> B\n#end');
+    assert.equal(result.intentText, 'Q');
+    const diagrams = result.sectionFocus?.diagram;
+    assert.equal(diagrams.length, 1);
+    assert.equal(diagrams[0].name, 'Billing flow');
+    assert.equal(diagrams[0].type, 'flowchart');
+    assert.equal(diagrams[0].content, 'A --> B');
+  });
+
+  it('parses an inline diagram block', () => {
+    const raw = 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain';
+    const result = parseSectionDirectives(raw);
+    assert.equal(result.intentText, 'what is ICMS explain');
+    const diagrams = result.sectionFocus?.diagram;
+    assert.equal(diagrams.length, 1);
+    assert.equal(diagrams[0].name, 'Seq');
+    assert.equal(diagrams[0].type, 'sequenceDiagram');
+    assert.equal(diagrams[0].content, 'Alice->>Bob: Hello');
+  });
+
   it('parses a table block without #name', () => {
     const result = parseSectionDirectives('Q\n#table\nCapabilities and gaps\n#end');
     assert.equal(result.intentText, 'Q');
@@ -124,6 +145,20 @@ describe('formatFocusVariable with TableDirective', () => {
       { content: 'Gaps' },
     ]);
     assert.equal(out, '- **Billing** — Invoices\n- Gaps');
+  });
+
+  it('renders diagram directives with name and type', () => {
+    const out = formatFocusVariable([
+      { name: 'Billing flow', type: 'flowchart', content: 'A --> B' },
+    ]);
+    assert.equal(out, '- **Billing flow** (flowchart) — A --> B');
+  });
+
+  it('renders diagram directives without name', () => {
+    const out = formatFocusVariable([
+      { type: 'sequenceDiagram', content: 'Alice->>Bob' },
+    ]);
+    assert.equal(out, '- (sequenceDiagram) — Alice->>Bob');
   });
 
   it('renders string array as legacy bullets', () => {

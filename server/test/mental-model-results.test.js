@@ -38,6 +38,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
         edges: [{ from: 'a-com:COM-002', to: 'a-com:COM-269', type: 'sends' }],
       },
       tables: [],
+      diagrams: [],
     });
     const { graph, errors, narrative } = normalizeModelOutput(content);
     assert.equal(errors.length, 0);
@@ -55,14 +56,16 @@ describe('normalizeModelOutput (contextual envelope)', () => {
   });
 
   it('returns empty graph when graph shape is empty', () => {
-    const content = JSON.stringify({ narrative: 'Nothing to graph.', graph: { unrelated: 'data' }, tables: [] });
+    const content = JSON.stringify({ narrative: 'Nothing to graph.', graph: { unrelated: 'data' }, tables: [],
+      diagrams: [] });
     const { graph, errors } = normalizeModelOutput(content);
     assert.equal(graph.nodes.length, 0);
     assert.equal(graph.edges.length, 0);
   });
 
   it('returns empty graph when JSON parses to empty nodes/edges', () => {
-    const content = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] }, tables: [] });
+    const content = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
     const { graph, errors } = normalizeModelOutput(content);
     assert.ok(graph, 'expected graph to be returned');
     assert.deepEqual(graph, { nodes: [], edges: [] });
@@ -84,6 +87,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
         edges: [{ from: 'a-svc:SVC-019', to: 'a-svc:SVC-020', type: 'sends' }],
       },
       tables: [],
+      diagrams: [],
     })}\n\`\`\``;
     const { graph, errors } = normalizeModelOutput(content);
     assert.equal(errors.length, 0);

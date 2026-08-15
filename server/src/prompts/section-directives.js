@@ -27,8 +27,35 @@
 export const SECTION_DIRECTIVE_CONFIG = {
   graph:     { cardinality: 'single', merge: 'concat' },
   table:     { cardinality: 'multiple' },
+  diagram:   { cardinality: 'multiple' },
   narrative: { cardinality: 'single', merge: 'concat' },
 };
+
+/**
+ * Supported Mermaid diagram types for #diagram directives.
+ * This is the single source of truth for what #type values are accepted.
+ */
+export const VALID_MERMAID_DIAGRAM_TYPES = new Set([
+  'flowchart',
+  'graph',
+  'sequenceDiagram',
+  'classDiagram',
+  'stateDiagram',
+  'stateDiagram-v2',
+  'erDiagram',
+  'gantt',
+  'pie',
+  'mindmap',
+  'timeline',
+  'gitGraph',
+  'architecture-beta',
+  'requirementDiagram',
+  'journey',
+  'C4Context',
+  'C4Container',
+  'C4Component',
+  'C4Deployment',
+]);
 
 /**
  * Extract #name value from table block content.
@@ -38,6 +65,34 @@ export const SECTION_DIRECTIVE_CONFIG = {
  *   #name Billing\nInvoices          → name="Billing", content="Invoices"
  *   #name Data Flows list items #end → name="Data Flows", content="list items"
  */
+/**
+ * Extract #name and #type values from a diagram block.
+ * Returns { name, type, content } where content is the remaining body.
+ *
+ * Supports both multiline and inline:
+ *   #name Lifecycle\n#type sequenceDiagram\nAlice->>Bob  → name="Lifecycle", type="sequenceDiagram", content="Alice->>Bob"
+ *   #name Flow #type flowchart LR A-->B #end → name="Flow", type="flowchart", content="LR A-->B"
+ */
+export function extractDiagramAttributes(content) {
+  const text = content.trim();
+
+  // Capture the #name value without consuming the #type keyword (lookahead).
+  const nameMatch = text.match(/^#name\s+(.+?)(?=\r?\n|#type\b|$)/is);
+  if (!nameMatch) return { content: text };
+  const name = nameMatch[1].trim();
+
+  // Position after the consumed #name directive, skipping any whitespace before #type.
+  let pos = nameMatch[0].length;
+  while (pos < text.length && /\s/.test(text[pos])) pos += 1;
+
+  const typeMatch = text.slice(pos).match(/^#type\s+(\S+)/i);
+  if (!typeMatch) return { name, content: text.slice(pos).trim() };
+
+  const type = typeMatch[1].trim();
+  pos += typeMatch[0].length;
+  return { name, type, content: text.slice(pos).trim() };
+}
+
 export function extractTableName(content) {
   const nameRe = /^#name\s+(.+?)(?:\r?\n|$)/i;
   const match = content.match(nameRe);
@@ -75,7 +130,7 @@ export function parseSectionDirectives(rawQuery) {
 
   // Block style: #directive ...content... #end
   // Content may start on the same line as the keyword or on the next line.
-  const blockRe = /#(graph|table|narrative)\b\s*([\s\S]*?)(?:\r?\n)?#end\b/gi;
+  const blockRe = /#(graph|table|diagram|narrative)\b\s*([\s\S]*?)(?:\r?\n)?#end\b/gi;
   let blockMatch;
   let blockStripped = rawQuery;
   while ((blockMatch = blockRe.exec(rawQuery)) !== null) {
@@ -92,7 +147,11 @@ export function parseSectionDirectives(rawQuery) {
       if (config.cardinality === 'multiple') {
         // table: collect as TableDirective objects
         if (!focus[key]) focus[key] = [];
-        focus[key].push(extractTableName(content));
+        if (key === 'diagram') {
+          focus[key].push(extractDiagramAttributes(content));
+        } else {
+          focus[key].push(extractTableName(content));
+        }
       } else {
         // single
         if (config.merge === 'concat' && focus[key]) {
