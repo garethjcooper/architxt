@@ -187,6 +187,17 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   });
 
   const focus = options?.section_focus || {};
+  const requestedNarrative = focus.narrative && focus.narrative.trim().length > 0;
+  const activeSections = [
+    focus.graph && 'graph',
+    focus.table?.length && 'tables',
+    focus.diagram?.length && 'diagrams',
+    requestedNarrative && 'narrative',
+  ].filter(Boolean);
+  const requestedStructured = activeSections.includes('tables') || activeSections.includes('diagrams') || activeSections.includes('graph');
+  // When the caller gave no directives at all, keep the legacy default: narrative is active.
+  const hasAnyDirective = requestedNarrative || requestedStructured;
+
   const topic = intentText;
   const focusVars = {
     ARCHITXT_CORPUS: corpus,
@@ -197,9 +208,22 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   };
   const systemPrompt = await composeMentalModelPrompt(db, 'generic', topic, focusVars);
 
+  // Make the user request match the active section directives. Avoid asking
+  // for narrative when only structured sections are active.
+  let userInstruction;
+  if (requestedNarrative && requestedStructured) {
+    userInstruction = 'Synthesize the source material above into a narrative and structured output. Follow the output format exactly.';
+  } else if (requestedNarrative || !hasAnyDirective) {
+    userInstruction = 'Synthesize the source material above into a narrative. Follow the output format exactly.';
+  } else if (requestedStructured) {
+    userInstruction = `Synthesize the source material above into the active structured output sections (${activeSections.join(', ')}). Do not produce narrative prose. Set narrative to an empty string. Follow the output format exactly.`;
+  } else {
+    userInstruction = 'Synthesize the source material above into a concise narrative and graph. Follow the output format exactly.';
+  }
+
   const messages = [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: 'Synthesize the source material above into a narrative and graph. Follow the output format exactly.' },
+    { role: 'user', content: userInstruction },
   ];
 
   const completionFn = typeof options?.generateCompletion === 'function'
@@ -268,6 +292,12 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     knownCatalogSize: knownCatalog.size,
     allowDiscovery,
   });
+
+  // Defense in depth: if narrative was not requested, scrub any model-generated
+  // narrative so downstream consumers only see structured output.
+  if (hasAnyDirective && !requestedNarrative) {
+    parsed.narrative = '';
+  }
 
   const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
 

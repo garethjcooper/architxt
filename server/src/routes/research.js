@@ -26,6 +26,7 @@ import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
 import { normalizeModelOutput } from '../services/contextual-graph/normalize-model-output.js';
+import { parseSectionDirectives } from '../prompts/section-directives.js';
 
 const logger = createLogger('research-route');
 const router = Router();
@@ -1235,9 +1236,11 @@ router.post('/synthesize', async (req, res) => {
       sourceSteps.push(step);
     }
 
+    const parsed = section_focus ? { sectionFocus: section_focus, intentText: intent_text } : parseSectionDirectives(intent_text);
+
     const handlerOptions = {
       ...(max_tokens !== undefined && { max_tokens }),
-      ...(section_focus !== undefined && { section_focus }),
+      ...(parsed.sectionFocus !== undefined && { section_focus: parsed.sectionFocus }),
       source_steps: sourceSteps.map((s) => ({
         intent_text: s.rstep_intent_text,
         action_type: s.rstep_action_type,
@@ -1255,7 +1258,7 @@ router.post('/synthesize', async (req, res) => {
     const stepResult = await createStep(db, {
       rs_id: session_id,
       rstep_parent_step_id: parentStepId,
-      rstep_intent_text: intent_text,
+      rstep_intent_text: parsed.intentText,
       rstep_selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
       rstep_action_type: 'synthesize',
       rstep_parameters: handlerOptions,
@@ -1287,7 +1290,7 @@ router.post('/synthesize', async (req, res) => {
         serverId: server_id,
         bankId: bank_id,
         queryDepth: 'synthesize',
-        intentText: intent_text,
+        intentText: parsed.intentText,
         selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
         options: handlerOptions,
         rsId: session_id,
