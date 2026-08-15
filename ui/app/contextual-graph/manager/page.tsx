@@ -39,23 +39,16 @@ import {
   getEdgeContextPairKey,
   getEdgeSortGroup,
   getEdgeSortRank,
-  getLastRefreshedAt,
   Section,
   PropertyRow,
   formatRelative,
   renderValue,
+  getLastRefreshedAt,
+  MODEL_ROLE_LABELS,
 } from '@/lib/contextual-graph/display';
-
 export type { BackendNode, BackendEdge, ModelRef, DisplayNode, DisplayEdge } from '@/lib/contextual-graph/display';
 
-type PatchRole = 'sys_entity_summary' | 'sys_entity_capabilities' | 'sys_edge_context' | 'sys_discovery_context' | string;
-
-const ROLE_LABELS: Record<string, string> = {
-  sys_entity_summary: 'summary',
-  sys_entity_capabilities: 'capabilities',
-  sys_edge_context: 'edge context',
-  sys_discovery_context: 'discovery',
-};
+const ROLE_LABELS = MODEL_ROLE_LABELS;
 
 const logger = createLogger('ContextManagerPage');
 

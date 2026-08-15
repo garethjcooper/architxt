@@ -5,39 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
 import { Search } from 'lucide-react';
-import type { DisplayNode, DisplayEdge, ModelRef } from './page';
+import { formatRelative, getLastRefreshedAt, MODEL_ROLE_LABELS, isCandidateNode, isCandidateEdge } from '@/lib/contextual-graph/display';
+import type { DisplayNode, DisplayEdge } from './page';
 
-const ROLE_LABELS: Record<string, string> = {
-  sys_entity_summary: 'summary',
-  sys_entity_capabilities: 'capabilities',
-  sys_edge_context: 'edge context',
-  sys_discovery_context: 'discovery',
-};
-
-function formatRelative(value?: string | null): string {
-  if (!value) return 'never';
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return value;
-  return formatDistanceToNow(d, { addSuffix: true });
-}
-
-function getLastRefreshedAt(modelRefs: ModelRef[]): string | null {
-  const timestamps = modelRefs
-    .filter((r) => r.fetched_at)
-    .map((r) => new Date(r.fetched_at!).getTime())
-    .filter((t) => !isNaN(t));
-  return timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
-}
-
-function isCandidateNode(node: DisplayNode): boolean {
-  return node.labels.includes('candidate');
-}
-
-function isCandidateEdge(edge: DisplayEdge): boolean {
-  return edge.properties.labels?.includes('candidate') ?? false;
-}
+const ROLE_LABELS = MODEL_ROLE_LABELS;
 
 export interface CandidatesTabProps {
   nodes: DisplayNode[];

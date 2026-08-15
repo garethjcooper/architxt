@@ -159,8 +159,8 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
 
       // Preserve nodes that are seeds for their own discovery model.
       const isOwnSeed = refs.byNodeId.get(node.cgn_id)?.some((extId) => {
-        const role = refs.byExtId?.get(extId)?.role || roleFromExtId(extId);
-        return role === ROLES.discover && extId === `discover-${node.cgn_id}`;
+        const ref = refs.byExtId?.get(extId);
+        return ref?.role === ROLES.discover && ref?.scope?.seed_id === node.cgn_id;
       });
       if (isOwnSeed) continue;
 
@@ -299,18 +299,4 @@ function roleFromExtId(extId) {
   if (extId.startsWith('edge-ctx-')) return ROLES.edge;
   if (extId.startsWith('discover-')) return ROLES.discover;
   return 'model';
-}
-
-/**
- * Map a canonical model type shorthand to the generated id prefix used by
- * contextual-graph mental models.
- */
-export function modelTypeToPrefix(modelType) {
-  const role = MODEL_TYPE_TO_ROLE[modelType];
-  if (!role) return null;
-  if (role === ROLES.entitySummary) return 'entity-summary-';
-  if (role === ROLES.entityCapabilities) return 'entity-capabilities-';
-  if (role === ROLES.edge) return 'edge-ctx-';
-  if (role === ROLES.discover) return 'discover-';
-  return null;
 }

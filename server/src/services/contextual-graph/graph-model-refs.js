@@ -14,7 +14,6 @@ const KNOWN_ROLES = new Set(Object.values(CONTEXTUAL_GRAPH_ROLES));
  * @param {Object} properties
  * @param {Object} [options]
  * @param {string} [options.role] - exact contextual role to include
- * @param {string} [options.rolePrefix] - kept for compat; treated as startsWith(role)
  * @param {Function} [options.filterFn] - receives { role, ext_id, scope }
  * @returns {string[]}
  */
@@ -36,10 +35,9 @@ export function extractRefsFromProperties(properties, options = {}) {
     }
   }
 
-  const { role, rolePrefix, filterFn } = options;
+  const { role, filterFn } = options;
   const filtered = refs.filter((item) => {
     if (role && item.role !== role) return false;
-    if (rolePrefix && !item.role?.startsWith?.(rolePrefix)) return false;
     if (typeof filterFn === 'function' && !filterFn(item)) return false;
     return true;
   });
@@ -69,10 +67,9 @@ function extractRefObjectsFromProperties(properties, options = {}) {
     }
   }
 
-  const { role, rolePrefix, filterFn } = options;
+  const { role, filterFn } = options;
   return refs.filter((item) => {
     if (role && item.role !== role) return false;
-    if (rolePrefix && !item.role?.startsWith?.(rolePrefix)) return false;
     if (typeof filterFn === 'function' && !filterFn(item)) return false;
     return true;
   });
@@ -90,7 +87,6 @@ function extractRefObjectsFromProperties(properties, options = {}) {
  * @param {Array<Object>} graph.edges
  * @param {Object} [options]
  * @param {string} [options.role]
- * @param {string} [options.rolePrefix]
  * @param {Function} [options.filterFn]
  * @returns {{ extIds: string[], byExtId: Map<string, {role, ext_id, scope}>, byNodeId: Map<string, string[]>, byEdgeId: Map<string, string[]> }}
  */
