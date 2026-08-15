@@ -216,6 +216,28 @@ export const MODEL_ROLE_LABELS: Record<string, string> = {
   sys_discovery_context: 'discovery',
 };
 
+const CONTEXTUAL_ROLE_PREFIXES = [
+  { role: 'sys_entity_summary', prefix: 'entity-summary-', label: 'summary' },
+  { role: 'sys_entity_capabilities', prefix: 'entity-capabilities-', label: 'capabilities' },
+  { role: 'sys_edge_context', prefix: 'edge-ctx-', label: 'edge context' },
+  { role: 'sys_discovery_context', prefix: 'discover-', label: 'discovery' },
+];
+
+export function inferContextualRole(ref: ModelRef): { role: string; label: string } | null {
+  const extId = ref.ext_id;
+  if (!extId) return null;
+  for (const entry of CONTEXTUAL_ROLE_PREFIXES) {
+    if (extId.startsWith(entry.prefix)) {
+      return { role: entry.role, label: entry.label };
+    }
+  }
+  return null;
+}
+
+export function getContextualPatchRefs(node: DisplayNode | DisplayEdge): ModelRef[] {
+  return node.modelRefs.filter((ref) => inferContextualRole(ref) !== null);
+}
+
 export function EntityListRow({
   node,
   active,
@@ -282,6 +304,50 @@ export function EdgeListRow({
         <div className="text-[10px] text-white/50 font-mono truncate">
           {description || secondary}
         </div>
+      </div>
+    </button>
+  );
+}
+
+export function PatchRefRow({
+  ref,
+  active,
+  onClick,
+}: {
+  ref: ModelRef;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const inferred = inferContextualRole(ref);
+  const label = inferred?.label || ref.role || 'patch';
+  const type = inferred?.role || ref.role || 'patch';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full flex items-start gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
+        active
+          ? 'border-white/10 bg-white/10'
+          : 'border-white/5 bg-black/20 hover:bg-white/5'
+      )}
+      style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
+    >
+      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <Badge className="text-[10px] h-4 px-1 bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
+            {label}
+          </Badge>
+          {ref.last_refresh_status && (
+            <span className={cn(
+              'text-[10px]',
+              ref.last_refresh_status === 'error' ? 'text-red-400' : 'text-emerald-400'
+            )}>
+              {ref.last_refresh_status}
+            </span>
+          )}
+        </div>
+        <div className="text-[10px] text-white/50 font-mono truncate">{ref.ext_id}</div>
       </div>
     </button>
   );
