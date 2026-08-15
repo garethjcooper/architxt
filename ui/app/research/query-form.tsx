@@ -699,10 +699,15 @@ export function QueryForm(props: QueryFormProps) {
         }
       }
 
-      // Plain Enter inside the editor should not create a newline; the wrapping form
-      // onSubmit runs the query.
+      // Enter inserts a newline so directives can span multiple lines.
+      // Ctrl/Cmd+Enter submits the wrapping form.
       if (e.key === 'Enter') {
+        if (e.ctrlKey || e.metaKey) {
+          // Allow default form submission.
+          return;
+        }
         e.preventDefault();
+        document.execCommand('insertLineBreak');
         return;
       }
 
