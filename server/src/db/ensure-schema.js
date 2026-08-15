@@ -288,10 +288,10 @@ const BUILTIN_TEMPLATES = [
   {
     name: 'generic',
     mode: 'generic',
-    description: 'Universal template. Returns narrative + graph + tables based on user directives.',
-    body: `Answer the topic below.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}`,
+    description: 'Universal template. Returns narrative + graph + tables + diagrams based on user directives.',
+    body: `Produce output for the topic below according to the Section rules. Do not write narrative prose unless the narrative section is active.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}`,
     fragments: '["contextual-patch.md","section-focus.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS","ARCHITXT_DIAGRAM_FOCUS"]',
     examplesHeuristic: null,
   },
   {

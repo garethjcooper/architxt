@@ -213,7 +213,10 @@ function formatSectionInstructions({ active, empty }) {
   lines.push(`Empty output sections (must remain exactly as shown in the envelope example): ${empty.map((s) => `\`${s}\``).join(', ')}.`);
   lines.push('');
   if (!active.includes('narrative')) {
-    lines.push('Do not answer the topic in narrative prose. All findings must be expressed through the structured output sections above.');
+    lines.push('Do not answer the topic in narrative prose. Set `narrative` to an empty string and express all findings through the structured output sections above.');
+    lines.push('');
+  } else {
+    lines.push('Narrative is active: you may use it for concise human-readable prose.');
     lines.push('');
   }
   return lines.join('\n');

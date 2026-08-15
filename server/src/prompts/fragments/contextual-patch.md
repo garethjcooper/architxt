@@ -8,7 +8,7 @@ Required envelope:
 
 All four top-level keys are required. Empty arrays or an empty string are acceptable, but the keys must not be omitted.
 
-- `narrative` is for human-readable prose. Whether to populate it is governed by the **Section rules** injected below.
+- `narrative` is for human-readable prose. Only populate it when the narrative section is active. If the active sections are graph, tables, or diagrams only, set `narrative` to an empty string and express all findings through those structured sections.
 - `graph` is for nodes and edges. Graph generation rules live in `output-format-graph-contextual.md`.
 - `tables` is for structured tables. Table generation rules live in `output-format-table-contextual.md`.
 - `diagrams` is for Mermaid diagrams. Diagram generation rules live in `output-format-diagram-contextual.md`.
