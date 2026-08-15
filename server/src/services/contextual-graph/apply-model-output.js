@@ -36,6 +36,7 @@ function buildModelRef(model, rawContent, now = new Date().toISOString()) {
   return {
     role: model.mm_template_role,
     ext_id: model.mm_ext_id,
+    scope: model.scope,
     attached_at: now,
     fetched_at: now,
     content_hash: contentHash(rawContent),
@@ -96,9 +97,9 @@ function parseNodeIdFromExtId(extId, prefix) {
 }
 
 function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
-  const nodeId = parseNodeIdFromExtId(model.mm_ext_id, 'entity-summary-');
+  const nodeId = model.scope?.node_id;
   if (!nodeId) {
-    return { success: false, error: 'Cannot resolve node id from entity-summary ext_id', code: 'BAD_EXT_ID' };
+    return { success: false, error: 'Cannot resolve node id from entity-summary model scope', code: 'BAD_SCOPE' };
   }
 
   const nodeResult = getNode(db, serverId, bankId, nodeId);
@@ -134,9 +135,9 @@ function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
 }
 
 function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp) {
-  const nodeId = parseNodeIdFromExtId(model.mm_ext_id, 'entity-capabilities-');
+  const nodeId = model.scope?.node_id;
   if (!nodeId) {
-    return { success: false, error: 'Cannot resolve node id from entity-capabilities ext_id', code: 'BAD_EXT_ID' };
+    return { success: false, error: 'Cannot resolve node id from entity-capabilities model scope', code: 'BAD_SCOPE' };
   }
 
   const nodeResult = getNode(db, serverId, bankId, nodeId);
@@ -172,23 +173,10 @@ function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp)
 }
 
 function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
-  const pairPart = parseNodeIdFromExtId(model.mm_ext_id, 'edge-ctx-');
-  if (!pairPart) {
-    return { success: false, error: 'Cannot resolve pair from edge-ctx ext_id', code: 'BAD_EXT_ID' };
-  }
-
-  // The ext_id uses raw source|target (canonical form from system template).
-  let sourceId;
-  let targetId;
-  if (pairPart.includes('|')) {
-    const parts = pairPart.split('|');
-    if (parts.length === 2) {
-      [sourceId, targetId] = parts;
-    }
-  }
-
+  const sourceId = model.scope?.source_id;
+  const targetId = model.scope?.target_id;
   if (!sourceId || !targetId) {
-    return { success: false, error: 'edge-ctx ext_id does not contain a node pair', code: 'BAD_EXT_ID' };
+    return { success: false, error: 'Cannot resolve pair from edge-ctx model scope', code: 'BAD_SCOPE' };
   }
 
   const warnings = [];
@@ -396,9 +384,9 @@ function resolveModelNodeId(modelId, existingNodeIdsOrMap, nodeIdByModelId) {
 }
 
 function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
-  const seedId = parseNodeIdFromExtId(model.mm_ext_id, 'discover-');
+  const seedId = model.scope?.seed_id;
   if (!seedId) {
-    return { success: false, error: 'Cannot resolve seed id from discover ext_id', code: 'BAD_EXT_ID' };
+    return { success: false, error: 'Cannot resolve seed id from discover model scope', code: 'BAD_SCOPE' };
   }
 
   const seedNodeResult = getNode(db, serverId, bankId, seedId);

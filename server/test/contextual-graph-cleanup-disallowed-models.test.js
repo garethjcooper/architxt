@@ -48,8 +48,8 @@ test('removes summary and capabilities from nodes when roles are disallowed', as
     provenance: {
       source: 'contextual-graph',
       model_refs: [
-        { role: 'sys_entity_summary', ext_id: `entity-summary-${nodeId}`, attached_at: '2026-01-01T00:00:00Z' },
-        { role: 'sys_entity_capabilities', ext_id: `entity-capabilities-${nodeId}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_entity_summary', ext_id: `entity-summary-${nodeId}`, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_entity_capabilities', ext_id: `entity-capabilities-${nodeId}`, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },
       ],
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -108,7 +108,7 @@ test('deletes directed edge-ctx edges when role is disallowed', async () => {
     provenance: {
       source: 'contextual-graph',
       model_refs: [
-        { role: 'sys_edge_context', ext_id: 'edge-ctx-src|dst', attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_edge_context', ext_id: 'edge-ctx-src|dst', scope: { source_id: 'src', target_id: 'dst' }, attached_at: '2026-01-01T00:00:00Z' },
       ],
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -139,7 +139,7 @@ test('removes model ref from mixed provenance without deleting the edge', async 
     label: 'foo',
     provenance: {
       model_refs: [
-        { role: 'sys_edge_context', ext_id: 'edge-ctx-src|dst', attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_edge_context', ext_id: 'edge-ctx-src|dst', scope: { source_id: 'src', target_id: 'dst' }, attached_at: '2026-01-01T00:00:00Z' },
         { role: 'manual', ext_id: 'manual-ref', attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
@@ -170,7 +170,7 @@ test('removes discovery-generated subgraph when discover is disallowed', async (
     display_name: 'Seed',
     provenance: {
       model_refs: [
-        { role: 'sys_discovery_context', ext_id: `discover-${seedId}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_discovery_context', ext_id: `discover-${seedId}`, scope: { seed_id: seedId }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });
@@ -180,7 +180,7 @@ test('removes discovery-generated subgraph when discover is disallowed', async (
     provenance: {
       discovery: 'discovered',
       model_refs: [
-        { role: 'sys_discovery_context', ext_id: `discover-${seedId}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_discovery_context', ext_id: `discover-${seedId}`, scope: { seed_id: seedId }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });
@@ -190,7 +190,7 @@ test('removes discovery-generated subgraph when discover is disallowed', async (
     provenance: {
       discovery: 'discovered',
       model_refs: [
-        { role: 'sys_discovery_context', ext_id: `discover-${seedId}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_discovery_context', ext_id: `discover-${seedId}`, scope: { seed_id: seedId }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });
@@ -225,8 +225,8 @@ test('preserves seed node that is its own discovery seed', async () => {
     display_name: 'Seed A',
     provenance: {
       model_refs: [
-        { role: 'sys_discovery_context', ext_id: `discover-${seedB}`, attached_at: '2026-01-01T00:00:00Z' },
-        { role: 'sys_discovery_context', ext_id: `discover-${seedA}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_discovery_context', ext_id: `discover-${seedB}`, scope: { seed_id: seedB }, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_discovery_context', ext_id: `discover-${seedA}`, scope: { seed_id: seedA }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });
@@ -235,7 +235,7 @@ test('preserves seed node that is its own discovery seed', async () => {
     display_name: 'Seed B',
     provenance: {
       model_refs: [
-        { role: 'sys_discovery_context', ext_id: `discover-${seedB}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_discovery_context', ext_id: `discover-${seedB}`, scope: { seed_id: seedB }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });
@@ -267,7 +267,7 @@ test('does nothing when all referenced roles are allowed', async () => {
     summary: 'Keep me',
     provenance: {
       model_refs: [
-        { role: 'sys_entity_summary', ext_id: `entity-summary-${nodeId}`, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_entity_summary', ext_id: `entity-summary-${nodeId}`, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });

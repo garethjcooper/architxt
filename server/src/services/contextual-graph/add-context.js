@@ -8,7 +8,6 @@ import {
   deriveDiscoverContextModel,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
-import { inferRole } from './specs.js';
 
 const logger = createLogger('contextual-graph-add-context');
 
@@ -282,8 +281,9 @@ export async function addContext(
   }
 
   const now = new Date().toISOString();
-  for (const modelId of deployResult.deployed) {
-    await recordModelProvenance(db, serverId, bankId, modelId, now);
+  for (const spec of allSpecs) {
+    if (!deployResult.deployed.includes(spec.ext_id)) continue;
+    await recordModelProvenance(db, serverId, bankId, spec, now);
   }
 
   return {
@@ -303,50 +303,55 @@ export async function addContext(
   };
 }
 
-async function recordModelProvenance(db, serverId, bankId, modelId, now) {
-  const role = modelIdToRole(modelId);
+async function recordModelProvenance(db, serverId, bankId, spec, now) {
+  const role = spec.role;
+  const scope = spec.scope;
 
-  if (modelId.startsWith('entity-summary-')) {
-    const nodeId = modelId.slice('entity-summary-'.length);
+  if (role === 'sys_entity_summary') {
+    const nodeId = scope?.node_id;
+    if (!nodeId) return;
     const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) return;
 
-    const properties = mergeProperties(node.cgn_properties, modelId, role, now);
+    const properties = mergeProperties(node.cgn_properties, spec, now);
     upsertNode(db, serverId, bankId, nodeId, node.cgn_labels, properties);
     return;
   }
 
-  if (modelId.startsWith('entity-capabilities-')) {
-    const nodeId = modelId.slice('entity-capabilities-'.length);
+  if (role === 'sys_entity_capabilities') {
+    const nodeId = scope?.node_id;
+    if (!nodeId) return;
     const node = getNode(db, serverId, bankId, nodeId)?.data;
     if (!node) return;
 
-    const properties = mergeProperties(node.cgn_properties, modelId, role, now);
+    const properties = mergeProperties(node.cgn_properties, spec, now);
     upsertNode(db, serverId, bankId, nodeId, node.cgn_labels, properties);
     return;
   }
 
-  if (modelId.startsWith('edge-ctx-')) {
-    const pairPart = modelId.slice('edge-ctx-'.length);
+  if (role === 'sys_edge_context') {
+    const sourceId = scope?.source_id;
+    const targetId = scope?.target_id;
+    if (!sourceId || !targetId) return;
+
     const edge = listEdges(db, serverId, bankId)?.data?.find((e) => {
-      const raw = `${e.cge_source_id}|${e.cge_target_id}`;
-      return raw === pairPart;
+      return e.cge_source_id === sourceId && e.cge_target_id === targetId;
     });
     if (!edge) return;
 
-    const properties = mergeProperties(edge.cge_properties, modelId, role, now);
+    const properties = mergeProperties(edge.cge_properties, spec, now);
     upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, properties);
     return;
   }
 
-  if (modelId.startsWith('discover-')) {
-    const seedId = modelId.slice('discover-'.length);
+  if (role === 'sys_discovery_context') {
+    const seedId = scope?.seed_id;
     if (!seedId) return;
 
     // Attach to the seed node that triggered discovery.
     const seedNode = getNode(db, serverId, bankId, seedId)?.data;
     if (seedNode) {
-      const properties = mergeProperties(seedNode.cgn_properties, modelId, role, now);
+      const properties = mergeProperties(seedNode.cgn_properties, spec, now);
       upsertNode(db, serverId, bankId, seedId, seedNode.cgn_labels, properties);
     }
 
@@ -362,14 +367,10 @@ function hasModelRef(properties, role) {
   return false;
 }
 
-function modelIdToRole(modelId) {
-  return inferRole(modelId) || 'model';
-}
-
-function mergeProperties(current, modelId, role, now) {
+function mergeProperties(current, spec, now) {
   const existingRefs = current?.provenance?.model_refs || [];
-  const dedupedRefs = existingRefs.filter((ref) => ref?.ext_id !== modelId);
-  const modelRefs = [...dedupedRefs, { role, ext_id: modelId, attached_at: now }];
+  const dedupedRefs = existingRefs.filter((ref) => ref?.ext_id !== spec.ext_id);
+  const modelRefs = [...dedupedRefs, { role: spec.role, ext_id: spec.ext_id, scope: spec.scope, attached_at: now }];
   return {
     ...current,
     provenance: {

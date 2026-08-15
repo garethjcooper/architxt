@@ -24,11 +24,23 @@ const NODE_ID = 'svc-001';
 const EXT_ID = 'entity-summary-svc-001';
 
 function seedNodeWithRef(db, nodeId = NODE_ID, extId = EXT_ID, role = 'sys_entity_summary') {
+  const scope = role === 'sys_entity_summary' || role === 'sys_entity_capabilities'
+    ? { node_id: nodeId }
+    : role === 'sys_edge_context'
+      ? (() => {
+          const pair = extId.replace(/^edge-ctx-/, '');
+          const [sourceId, targetId] = pair.split('|');
+          return { source_id: sourceId, target_id: targetId };
+        })()
+      : role === 'sys_discovery_context'
+        ? { seed_id: nodeId }
+        : undefined;
+
   upsertNode(db, serverId, bankId, nodeId, ['grounded', 'active'], {
     display_name: 'Billing Service',
     provenance: {
       source: 'contextual-graph',
-      model_refs: [{ ext_id: extId, role, attached_at: '2026-01-01T00:00:00Z' }],
+      model_refs: [{ ext_id: extId, role, scope, attached_at: '2026-01-01T00:00:00Z' }],
     },
   });
 }
@@ -198,7 +210,7 @@ describe('syncContextualMentalModelConfig', () => {
       directed: false,
       provenance: {
         source: 'contextual-graph',
-        model_refs: [{ ext_id: 'edge-ctx-svc:SVC-001|svc:SVC-002', role: 'sys_edge_context', attached_at: '2026-01-01T00:00:00Z' }],
+        model_refs: [{ ext_id: 'edge-ctx-svc:SVC-001|svc:SVC-002', role: 'sys_edge_context', scope: { source_id: 'svc:SVC-001', target_id: 'svc:SVC-002' }, attached_at: '2026-01-01T00:00:00Z' }],
       },
     });
     db.prepare("UPDATE mental_models SET mm_refresh_mode = 'delta' WHERE mm_template_role = 'sys_edge_context'").run();

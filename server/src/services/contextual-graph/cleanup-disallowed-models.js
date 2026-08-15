@@ -9,29 +9,13 @@ import {
   deleteNode,
   deleteEdge,
 } from '../../db/crud/contextual-graph.js';
+import { CONTEXTUAL_GRAPH_ROLES, MODEL_TYPE_TO_ROLE } from './template-models.js';
 
 const logger = createLogger('contextual-graph-cleanup');
 
-const ROLE_TO_PREFIX = Object.freeze({
-  sys_entity_summary: 'entity-summary-',
-  sys_entity_capabilities: 'entity-capabilities-',
-  sys_edge_context: 'edge-ctx-',
-  sys_discovery_context: 'discover-',
-});
+const ROLES = CONTEXTUAL_GRAPH_ROLES;
 
-const MODEL_TYPE_TO_ROLE = Object.freeze({
-  'entity-summary': 'sys_entity_summary',
-  'entity-capabilities': 'sys_entity_capabilities',
-  'edge-ctx': 'sys_edge_context',
-  discover: 'sys_discovery_context',
-});
-
-const ROLES = Object.freeze({
-  entitySummary: 'sys_entity_summary',
-  entityCapabilities: 'sys_entity_capabilities',
-  edgeContext: 'sys_edge_context',
-  discoveryContext: 'sys_discovery_context',
-});
+const KNOWN_ROLES = new Set(Object.values(ROLES));
 
 /**
  * Delete generated contextual-graph mental models whose role is not in the
@@ -44,7 +28,8 @@ const ROLES = Object.freeze({
  * or surfaced in the UI.
  *
  * Hindsight is the source of truth for which remote models exist; we delete by
- * role prefix so orphaned models that no longer have local refs are also purged.
+ * checking the known contextual id prefixes so orphaned models that no longer
+ * have local refs are also purged.
  *
  * @param {Object} db
  * @param {number} serverId
@@ -72,13 +57,6 @@ export async function cleanupDisallowedModels(
       : [],
   );
 
-  const KNOWN_ROLES = new Set([
-    'sys_entity_summary',
-    'sys_entity_capabilities',
-    'sys_edge_context',
-    'sys_discovery_context',
-  ]);
-
   const disallowedRoles = [...KNOWN_ROLES].filter((role) => !allowedRoles.has(role));
 
   // Use Hindsight as the source of truth for remote models so orphaned models
@@ -91,7 +69,7 @@ export async function cleanupDisallowedModels(
 
   const remoteModels = listResult.mentalModels || [];
   const disallowedRemoteModels = remoteModels.filter((model) => {
-    const role = inferRoleFromExtId(model.id);
+    const role = roleFromExtId(model.id);
     return KNOWN_ROLES.has(role) && !allowedRoles.has(role);
   });
 
@@ -143,7 +121,7 @@ export async function cleanupDisallowedModels(
 async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
   const byRole = new Map();
   for (const extId of removeSet) {
-    const role = inferRoleFromExtId(extId);
+    const role = refs.byExtId?.get(extId)?.role || roleFromExtId(extId);
     if (!byRole.has(role)) byRole.set(role, new Set());
     byRole.get(role).add(extId);
   }
@@ -164,7 +142,7 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
 
   // 1. Discovery cleanup first, using the original snapshot so ref-stripping
   //    later does not hide the nodes/edges we need to remove.
-  const discoveryIds = byRole.get(ROLES.discoveryContext);
+  const discoveryIds = byRole.get(ROLES.discover);
   if (discoveryIds && discoveryIds.size > 0) {
     for (const edge of edges) {
       const disallowedRefsOnEdge = refs.byEdgeId.get(edge.cge_id) || [];
@@ -180,7 +158,10 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
       if (!disallowedRefsOnNode.some((extId) => discoveryIds.has(extId))) continue;
 
       // Preserve nodes that are seeds for their own discovery model.
-      const isOwnSeed = disallowedRefsOnNode.some((extId) => extId === `discover-${node.cgn_id}`);
+      const isOwnSeed = refs.byNodeId.get(node.cgn_id)?.some((extId) => {
+        const role = refs.byExtId?.get(extId)?.role || roleFromExtId(extId);
+        return role === ROLES.discover && extId === `discover-${node.cgn_id}`;
+      });
       if (isOwnSeed) continue;
 
       deleteNode(db, serverId, bankId, node.cgn_id);
@@ -198,7 +179,9 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
     const effectiveProperties = nextProperties || { ...properties };
 
     let changed = nextProperties !== null;
-    changed = clearNodeRoleData(effectiveProperties, byRole, node.cgn_id) || changed;
+
+    const disallowedRefsOnNode = refs.byNodeId.get(node.cgn_id) || [];
+    changed = clearNodeRoleData(effectiveProperties, byRole, node.cgn_id, disallowedRefsOnNode) || changed;
 
     if (changed) {
       cleanupEmptyProvenance(effectiveProperties);
@@ -212,7 +195,10 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
 
     const properties = edge.cge_properties || edge.properties || {};
     const disallowedRefsOnEdge = refs.byEdgeId.get(edge.cge_id) || [];
-    const edgeCtxRefsOnEdge = disallowedRefsOnEdge.filter((extId) => extId.startsWith('edge-ctx-'));
+    const edgeCtxRefsOnEdge = disallowedRefsOnEdge.filter((extId) => {
+      const role = refs.byExtId?.get(extId)?.role || roleFromExtId(extId);
+      return role === ROLES.edge;
+    });
 
     const nextProperties = stripModelRefsFromProperties(properties, removeSet);
     const effectiveProperties = nextProperties || { ...properties };
@@ -255,22 +241,35 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs) {
   return { nodes: nodesCleared, edges: edgesCleared };
 }
 
-function clearNodeRoleData(properties, byRole, nodeId) {
+function clearNodeRoleData(properties, byRole, nodeId, disallowedRefsOnNode) {
   let changed = false;
 
   const entitySummaryExtIds = byRole.get(ROLES.entitySummary);
-  if (entitySummaryExtIds && entitySummaryExtIds.has(`entity-summary-${nodeId}`)) {
-    if (properties.summary !== undefined) {
+  if (entitySummaryExtIds) {
+    const hasSummaryRef = disallowedRefsOnNode.some((extId) => entitySummaryExtIds.has(extId));
+    if (hasSummaryRef && properties.summary !== undefined) {
       delete properties.summary;
       changed = true;
     }
   }
 
   const entityCapabilitiesExtIds = byRole.get(ROLES.entityCapabilities);
-  if (entityCapabilitiesExtIds && entityCapabilitiesExtIds.has(`entity-capabilities-${nodeId}`)) {
-    if (properties.capabilities !== undefined) {
+  if (entityCapabilitiesExtIds) {
+    const hasCapabilitiesRef = disallowedRefsOnNode.some((extId) => entityCapabilitiesExtIds.has(extId));
+    if (hasCapabilitiesRef && properties.capabilities !== undefined) {
       delete properties.capabilities;
       changed = true;
+    }
+  }
+
+  const discoveryExtIds = byRole.get(ROLES.discover);
+  if (discoveryExtIds) {
+    const hasDiscoveryRef = disallowedRefsOnNode.some((extId) => discoveryExtIds.has(extId));
+    if (hasDiscoveryRef) {
+      if (properties.display_name !== undefined && nodeId.startsWith('discovered-')) {
+        delete properties.display_name;
+        changed = true;
+      }
     }
   }
 
@@ -288,12 +287,17 @@ function cleanupEmptyProvenance(properties) {
   }
 }
 
-function inferRoleFromExtId(extId) {
+/**
+ * Infer role from the known contextual-graph ext_id prefixes.
+ * This is only used for remote models where no local ref exists yet; local
+ * refs always carry an explicit role and are never inferred.
+ */
+function roleFromExtId(extId) {
   if (typeof extId !== 'string') return 'model';
   if (extId.startsWith('entity-summary-')) return ROLES.entitySummary;
   if (extId.startsWith('entity-capabilities-')) return ROLES.entityCapabilities;
-  if (extId.startsWith('edge-ctx-')) return ROLES.edgeContext;
-  if (extId.startsWith('discover-')) return ROLES.discoveryContext;
+  if (extId.startsWith('edge-ctx-')) return ROLES.edge;
+  if (extId.startsWith('discover-')) return ROLES.discover;
   return 'model';
 }
 
@@ -302,5 +306,11 @@ function inferRoleFromExtId(extId) {
  * contextual-graph mental models.
  */
 export function modelTypeToPrefix(modelType) {
-  return ROLE_TO_PREFIX[modelType] || null;
+  const role = MODEL_TYPE_TO_ROLE[modelType];
+  if (!role) return null;
+  if (role === ROLES.entitySummary) return 'entity-summary-';
+  if (role === ROLES.entityCapabilities) return 'entity-capabilities-';
+  if (role === ROLES.edge) return 'edge-ctx-';
+  if (role === ROLES.discover) return 'discover-';
+  return null;
 }

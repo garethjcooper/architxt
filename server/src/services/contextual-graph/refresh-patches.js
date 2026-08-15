@@ -4,7 +4,7 @@ import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge, findEdg
 import { normalizeModelOutput, contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { createLogger } from '../../utils/logger.js';
-import { inferRole } from './specs.js';
+import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
 
 const logger = createLogger('contextual-graph-refresh-patches');
 
@@ -15,12 +15,17 @@ function getModelContent(model) {
   throw new Error(`Mental model ${model?.id} has no content`);
 }
 
-function buildLocalModel(model) {
+function buildLocalModel(model, scope) {
+  const refRole = scope?.ref?.role;
+  if (!refRole || !Object.values(CONTEXTUAL_GRAPH_ROLES).includes(refRole)) {
+    throw new Error(`Cannot build local model without known role: ${refRole}`);
+  }
   return {
     mm_ext_id: model.id,
-    mm_template_role: inferRole(model.id),
-    mm_dimension: inferRole(model.id),
+    mm_template_role: refRole,
+    mm_dimension: refRole,
     mm_name: model.name || model.id,
+    scope: scope?.ref?.scope,
   };
 }
 
@@ -123,7 +128,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
   for (const node of nodes) {
     const refs = node.properties?.provenance?.model_refs || [];
     for (const ref of refs) {
-      if (!ref?.ext_id || !inferRole(ref.ext_id)) continue;
+      if (!ref?.ext_id || !ref?.role) continue;
       byExtId.set(ref.ext_id, { type: 'node', id: node.cgn_id, ref, node });
     }
   }
@@ -133,7 +138,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
   for (const edge of edges) {
     const refs = edge.cge_properties?.provenance?.model_refs || [];
     for (const ref of refs) {
-      if (!ref?.ext_id || !inferRole(ref.ext_id)) continue;
+      if (!ref?.ext_id || !ref?.role) continue;
       byExtId.set(ref.ext_id, { type: 'edge', id: edge.cge_id, ref, edge });
     }
   }
@@ -319,8 +324,6 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      const role = inferRole(model.id);
-
       const content = getModelContent(model);
       const newHash = contentHash(content);
 
@@ -350,7 +353,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      const localModel = buildLocalModel(model);
+      const localModel = buildLocalModel(model, scope);
       const applyResult = await applyModelOutput(db, serverId, bankId, localModel, output, { now: timestamp });
       if (!applyResult.success) {
         stats.failed += 1;

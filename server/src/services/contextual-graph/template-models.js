@@ -8,6 +8,20 @@ export const CONTEXTUAL_GRAPH_ROLES = {
   discover: 'sys_discovery_context',
 };
 
+export const MODEL_TYPE_TO_ROLE = Object.freeze({
+  'entity-summary': CONTEXTUAL_GRAPH_ROLES.entitySummary,
+  'entity-capabilities': CONTEXTUAL_GRAPH_ROLES.entityCapabilities,
+  'edge-ctx': CONTEXTUAL_GRAPH_ROLES.edge,
+  discover: CONTEXTUAL_GRAPH_ROLES.discover,
+});
+
+export const ROLE_TO_MODEL_TYPE = Object.freeze({
+  [CONTEXTUAL_GRAPH_ROLES.entitySummary]: 'entity-summary',
+  [CONTEXTUAL_GRAPH_ROLES.entityCapabilities]: 'entity-capabilities',
+  [CONTEXTUAL_GRAPH_ROLES.edge]: 'edge-ctx',
+  [CONTEXTUAL_GRAPH_ROLES.discover]: 'discover',
+});
+
 /**
  * Fetch a contextual-graph system template by role.
  * Returns the normalized row with tags array, or null if not seeded.
@@ -60,6 +74,7 @@ export async function deriveEntitySummaryModel(db, node) {
 
   return {
     role: template.role,
+    scope: { node_id: node.id },
     ext_id: substituteTemplateFields(template.ext_id, values),
     name: substituteTemplateFields(template.name, values),
     source_query: substituteTemplateFields(template.source_query, values),
@@ -86,6 +101,7 @@ export async function deriveEntityCapabilitiesModel(db, node) {
 
   return {
     role: template.role,
+    scope: { node_id: node.id },
     ext_id: substituteTemplateFields(template.ext_id, values),
     name: substituteTemplateFields(template.name, values),
     source_query: substituteTemplateFields(template.source_query, values),
@@ -114,6 +130,7 @@ export async function deriveEdgeContextModel(db, sourceNode, targetNode) {
 
   return {
     role: template.role,
+    scope: { source_id: sourceNode.id, target_id: targetNode.id },
     ext_id: substituteTemplateFields(template.ext_id, values),
     name: substituteTemplateFields(template.name, values),
     source_query: substituteTemplateFields(template.source_query, values),
@@ -140,6 +157,7 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = []) {
 
   return {
     role: template.role,
+    scope: { seed_id: seedNode.id },
     ext_id: substituteTemplateFields(template.ext_id, values),
     name: substituteTemplateFields(template.name, values),
     source_query: substituteTemplateFields(template.source_query, values),

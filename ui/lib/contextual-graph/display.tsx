@@ -47,9 +47,15 @@ export type BackendEdge = {
   properties: Record<string, any>;
 };
 
+export type ModelScope =
+  | { node_id: string }
+  | { source_id: string; target_id: string }
+  | { seed_id: string };
+
 export type ModelRef = {
   role?: string;
   ext_id?: string;
+  scope?: ModelScope;
   attached_at?: string;
   fetched_at?: string;
   content_hash?: string;
@@ -131,13 +137,9 @@ export function hasEdgeContextRef(edge: DisplayEdge): boolean {
 }
 
 export function getEdgeContextPairKey(edge: DisplayEdge): string | null {
-  const ref = edge.modelRefs.find(
-    (r) => r.role === 'sys_edge_context' && r.ext_id?.startsWith('edge-ctx-')
-  );
-  if (!ref?.ext_id) return null;
-  const pairPart = ref.ext_id.slice('edge-ctx-'.length);
-  if (!pairPart.includes('|')) return null;
-  const [a, b] = pairPart.split('|');
+  const ref = edge.modelRefs.find((r) => r.role === 'sys_edge_context');
+  if (!ref?.scope || !('source_id' in ref.scope) || !('target_id' in ref.scope)) return null;
+  const { source_id: a, target_id: b } = ref.scope as { source_id: string; target_id: string };
   return [a, b].sort().join('|');
 }
 
@@ -216,26 +218,27 @@ export const MODEL_ROLE_LABELS: Record<string, string> = {
   sys_discovery_context: 'discovery',
 };
 
-const CONTEXTUAL_ROLE_PREFIXES = [
-  { role: 'sys_entity_summary', prefix: 'entity-summary-', label: 'summary' },
-  { role: 'sys_entity_capabilities', prefix: 'entity-capabilities-', label: 'capabilities' },
-  { role: 'sys_edge_context', prefix: 'edge-ctx-', label: 'edge context' },
-  { role: 'sys_discovery_context', prefix: 'discover-', label: 'discovery' },
-];
+const CONTEXTUAL_ROLES = new Set([
+  'sys_entity_summary',
+  'sys_entity_capabilities',
+  'sys_edge_context',
+  'sys_discovery_context',
+]);
 
-export function inferContextualRole(ref: ModelRef): { role: string; label: string } | null {
-  const extId = ref.ext_id;
-  if (!extId) return null;
-  for (const entry of CONTEXTUAL_ROLE_PREFIXES) {
-    if (extId.startsWith(entry.prefix)) {
-      return { role: entry.role, label: entry.label };
-    }
-  }
-  return null;
+function roleIsEntityLike(role?: string): boolean {
+  return role === 'sys_entity_summary' || role === 'sys_entity_capabilities' || role === 'sys_discovery_context';
 }
 
-export function getContextualPatchRefs(node: DisplayNode | DisplayEdge): ModelRef[] {
-  return node.modelRefs.filter((ref) => inferContextualRole(ref) !== null);
+export function isContextualRole(role?: string): boolean {
+  return typeof role === 'string' && CONTEXTUAL_ROLES.has(role);
+}
+
+export function getContextualPatchRefs(item: DisplayNode | DisplayEdge): ModelRef[] {
+  const refs = item.modelRefs.filter((ref) => ref.ext_id && isContextualRole(ref.role));
+  if ('source_id' in item && 'target_id' in item) {
+    return refs.filter((ref) => ref.role === 'sys_edge_context');
+  }
+  return refs.filter((ref) => roleIsEntityLike(ref.role));
 }
 
 export function EntityListRow({
@@ -318,9 +321,8 @@ export function PatchRefRow({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const inferred = inferContextualRole(ref);
-  const label = inferred?.label || ref.role || 'patch';
-  const type = inferred?.role || ref.role || 'patch';
+  const label = MODEL_ROLE_LABELS[ref.role || ''] || ref.role || 'patch';
+  const type = ref.role || 'patch';
   return (
     <button
       type="button"
