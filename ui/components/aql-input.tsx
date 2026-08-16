@@ -13,16 +13,10 @@ import {
   formatEntityToken,
   formatEdgeToken,
   parseReferences,
-  type Reference as AqlReference,
 } from '@architxt/aql';
 import {
   renderAqlToHtml,
-  serializeEditable,
-  getCaretOffset,
-  setCaretOffset,
-  restoreCaret,
-  getCaretCoordinates,
-  findAdjacentToken,
+  tokenizeAql,
   type AqlReferenceResolver,
 } from './aql-tokens';
 import {
@@ -96,23 +90,6 @@ export interface AqlInputProps {
   style?: React.CSSProperties;
 }
 
-function tokenLabel(reference: AqlReference, entities: EntityLike[], edges: EdgeLike[]): string {
-  if (reference.kind === 'entity') {
-    const entity = entities.find((e) => e.id === reference.id);
-    return entity?.label || reference.label || reference.id || reference.raw;
-  }
-  const from = reference.from || '';
-  const to = reference.to || '';
-  const edgeLabel = reference.edgeLabel || 'edge';
-  const edge = edges.find(
-    (e) => e.from === from && e.to === to && (e.label || e.type || '') === edgeLabel,
-  );
-  const s = edge?.from || from;
-  const t = edge?.to || to;
-  const l = edge?.label || edge?.type || edgeLabel || 'edge';
-  return `${s} — ${l} → ${t}`;
-}
-
 function defaultReferenceResolver(
   entities: EntityLike[],
   edges: EdgeLike[],
@@ -166,9 +143,9 @@ function findOpenEntityTrigger(query: string, offset: number): string | null {
 /**
  * Reusable AQL query input.
  *
- * Renders directives and entity/edge references as colored chips using the same
- * tokenization as AqlView, while remaining fully editable. Supports autocomplete
- * for `[[` references and `#` directives.
+ * Uses a transparent <textarea> over a colored background layer so the whole
+ * query behaves like plain text for selection/cursor movement, while directives
+ * and references are still syntax-highlighted.
  */
 export function AqlInput({
   id,
@@ -184,15 +161,16 @@ export function AqlInput({
   className,
   style,
 }: AqlInputProps) {
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteFilter, setAutocompleteFilter] = useState('');
   const [autocompleteKind, setAutocompleteKind] = useState<'entity' | 'directive'>('entity');
   const [autocompletePos, setAutocompletePos] = useState({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const lastHandledKeyRef = useRef<string | null>(null);
-  const lastHtmlRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
   const isComposingRef = useRef(false);
   const [internalCursor, setInternalCursor] = useState(0);
@@ -203,61 +181,145 @@ export function AqlInput({
     setInternalCursor(offset);
   }, []);
 
-  const entityMap = useMemo(() => {
-    const map = new Map<string, EntityLike>();
-    for (const e of availableEntities) map.set(e.id, e);
-    return map;
-  }, [availableEntities]);
-
   const effectiveResolver = useMemo(() => {
     return resolveReference || defaultReferenceResolver(availableEntities, availableEdges);
   }, [resolveReference, availableEntities, availableEdges]);
 
-  const updateAutocompleteState = useCallback(() => {
+  // Colored HTML shown in the background layer.
+  const coloredHtml = useMemo(() => {
+    return renderAqlToHtml(value, effectiveResolver);
+  }, [value, effectiveResolver]);
+
+  // Restore pending caret position after controlled value updates.
+  useLayoutEffect(() => {
     const el = editorRef.current;
-    if (!el) return;
+    if (!el || pendingCaretRef.current === null) return;
+    const pos = Math.min(pendingCaretRef.current, value.length);
+    el.selectionStart = pos;
+    el.selectionEnd = pos;
+    pendingCaretRef.current = null;
+  }, [value]);
 
-    const lastKey = lastHandledKeyRef.current;
-    lastHandledKeyRef.current = null;
-    if (lastKey === 'ArrowUp' || lastKey === 'ArrowDown' || lastKey === 'Escape' || lastKey === 'Enter' || lastKey === 'Tab') {
-      return;
-    }
+  const getCaretOffset = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return 0;
+    return Math.min(el.selectionStart ?? 0, value.length);
+  }, [value.length]);
 
-    const offset = getCaretOffset(el);
-    updateCursor(offset);
-    if (offset < 0) return;
-    const liveText = serializeEditable(el);
+  /**
+   * Compute the pixel position of the caret inside the textarea content area.
+   * Uses a hidden mirror <div> with identical styling and a marker span.
+   */
+  const getCaretCoordinates = useCallback(
+    (explicitOffset?: number, explicitValue?: string): { top: number; left: number } => {
+      const el = editorRef.current;
+      const mirror = mirrorRef.current;
+      if (!el || !mirror) return { top: 0, left: 0 };
 
-    // Only sync cursor position back to the parent when the value has not
-    // changed since the last input event. Otherwise the stale `value` prop
-    // would overwrite the freshly-typed character before React has batched
-    // the parent update.
-    if (liveText === value) {
-      onChange(value, offset);
-    }
+      const currentValue = explicitValue ?? value;
+      const offset = explicitOffset ?? getCaretOffset();
+      const textBefore = currentValue.slice(0, offset);
+      const lastNewline = textBefore.lastIndexOf('\n');
+      const linePrefix = textBefore.slice(lastNewline + 1);
 
-    const entityFilter = findOpenEntityTrigger(liveText, offset);
-    if (entityFilter != null) {
-      setShowAutocomplete(true);
-      setAutocompleteKind('entity');
-      setAutocompleteFilter(entityFilter);
-      setAutocompletePos(getCaretCoordinates(el));
-      setSelectedIndex(0);
-      return;
-    }
+      const escape = (s: string) =>
+        s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/ /g, '&nbsp;')
+          .replace(/\n/g, '<br>');
 
-    const directiveTrigger = findDirectiveTrigger(liveText, offset);
-    if (directiveTrigger != null) {
-      setShowAutocomplete(true);
-      setAutocompleteKind('directive');
-      setAutocompleteFilter(directiveTrigger.filter);
-      setAutocompletePos(getCaretCoordinates(el));
-      setSelectedIndex(0);
-      return;
-    }
+      // Match the textarea content box width so wrapping is identical.
+      const computed = window.getComputedStyle(el);
+      const padLeft = parseFloat(computed.paddingLeft) || 0;
+      const padRight = parseFloat(computed.paddingRight) || 0;
+      mirror.style.width = `${el.clientWidth - padLeft - padRight}px`;
+      mirror.style.fontFamily = computed.fontFamily;
+      mirror.style.fontSize = computed.fontSize;
+      mirror.style.fontWeight = computed.fontWeight;
+      mirror.style.lineHeight = computed.lineHeight;
+      mirror.style.letterSpacing = computed.letterSpacing;
+      mirror.style.whiteSpace = 'pre-wrap';
+      mirror.style.wordWrap = 'break-word';
+      mirror.style.overflowWrap = 'break-word';
 
-    setShowAutocomplete(false);
-  }, [value, onChange]);
+      mirror.innerHTML = `${escape(linePrefix)}<span id="aql-caret-marker">\u200b</span>`;
+      const marker = mirror.querySelector('#aql-caret-marker');
+      if (!marker) return { top: 0, left: 0 };
+
+      const markerRect = marker.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+
+      return {
+        top: markerRect.top - elRect.top + el.scrollTop,
+        left: markerRect.left - elRect.left + el.scrollLeft,
+      };
+    },
+    [getCaretOffset, value],
+  );
+
+  const updateAutocompleteState = useCallback(
+    (nextValue?: string, nextOffset?: number) => {
+      const el = editorRef.current;
+      if (!el) return;
+
+      const lastKey = lastHandledKeyRef.current;
+      lastHandledKeyRef.current = null;
+      if (
+        lastKey === 'ArrowUp' ||
+        lastKey === 'ArrowDown' ||
+        lastKey === 'ArrowLeft' ||
+        lastKey === 'ArrowRight' ||
+        lastKey === 'Escape' ||
+        lastKey === 'Enter' ||
+        lastKey === 'Tab'
+      ) {
+        return;
+      }
+
+      const offset = nextOffset ?? getCaretOffset();
+      const currentValue = nextValue ?? value;
+      updateCursor(offset);
+      onChange(currentValue, offset);
+
+      const entityFilter = findOpenEntityTrigger(currentValue, offset);
+      if (entityFilter != null) {
+        setShowAutocomplete(true);
+        setAutocompleteKind('entity');
+        setAutocompleteFilter(entityFilter);
+        setAutocompletePos(getCaretCoordinates(offset, currentValue));
+        setSelectedIndex(0);
+        return;
+      }
+
+      const directiveTrigger = findDirectiveTrigger(currentValue, offset);
+      if (directiveTrigger != null) {
+        setShowAutocomplete(true);
+        setAutocompleteKind('directive');
+        setAutocompleteFilter(directiveTrigger.filter);
+        setAutocompletePos(getCaretCoordinates(offset, currentValue));
+        setSelectedIndex(0);
+        return;
+      }
+
+      setShowAutocomplete(false);
+    },
+    [value, onChange, getCaretOffset, getCaretCoordinates, updateCursor],
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const next = e.target.value;
+      const offset = e.target.selectionStart ?? 0;
+      updateCursor(offset);
+      onChange(next, offset);
+      requestAnimationFrame(() => {
+        updateAutocompleteState(next, offset);
+      });
+    },
+    [onChange, updateCursor, updateAutocompleteState],
+  );
 
   const insertAtCursor = useCallback(
     (rawToken: string) => {
@@ -265,7 +327,7 @@ export function AqlInput({
       const el = editorRef.current;
       if (!el) return;
 
-      const offset = getCaretOffset(el);
+      const offset = getCaretOffset();
       const textBefore = value.slice(0, offset);
       const openIdx = textBefore.lastIndexOf('[[');
       const before = openIdx >= 0 ? value.slice(0, openIdx) : value.slice(0, offset);
@@ -276,7 +338,7 @@ export function AqlInput({
       pendingCaretRef.current = pos;
       setShowAutocomplete(false);
     },
-    [value, onChange, disabled],
+    [value, onChange, disabled, getCaretOffset],
   );
 
   const insertDirectiveAtCursor = useCallback(
@@ -285,7 +347,7 @@ export function AqlInput({
       const el = editorRef.current;
       if (!el) return;
 
-      const offset = getCaretOffset(el);
+      const offset = getCaretOffset();
       const trigger = findDirectiveTrigger(value, offset);
       if (!trigger) return;
 
@@ -298,70 +360,59 @@ export function AqlInput({
       pendingCaretRef.current = pos;
       setShowAutocomplete(false);
     },
-    [value, onChange, disabled],
+    [value, onChange, disabled, getCaretOffset],
   );
 
-  const removeToken = useCallback(
-    (raw: string) => {
-      const idx = value.indexOf(raw);
-      if (idx === -1) return;
-      const next = value.slice(0, idx) + value.slice(idx + raw.length);
-      const cleaned = raw.trimStart().startsWith('#')
-        ? next.replace(/[ \t]+/g, ' ')
-        : next.replace(/\s+/g, ' ').trim();
-      const newPos = Math.min(idx, cleaned.length);
-      onChange(cleaned, newPos);
-      pendingCaretRef.current = newPos;
+  /**
+   * Remove the token adjacent to the caret in the given direction.
+   * For a directive like #table or #end, delete the whole directive token.
+   * For a reference like [[...]], delete the whole reference.
+   */
+  const removeAdjacentToken = useCallback(
+    (direction: -1 | 1) => {
+      const offset = getCaretOffset();
+      const tokens = tokenizeAql(value);
+
+      for (const token of tokens) {
+        if (token.kind === 'directive' && token.index !== undefined) {
+          const raw = token.value ? `#${token.keyword} ${token.value}` : `#${token.keyword}`;
+          const idx = token.index;
+          if (direction === -1 && offset === idx + raw.length) {
+            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/[ \t]+/g, ' ');
+            const newPos = Math.min(idx, next.length);
+            onChange(next, newPos);
+            pendingCaretRef.current = newPos;
+            return;
+          }
+          if (direction === 1 && offset === idx) {
+            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/[ \t]+/g, ' ');
+            const newPos = Math.min(idx, next.length);
+            onChange(next, newPos);
+            pendingCaretRef.current = newPos;
+            return;
+          }
+        } else if (token.kind === 'reference' && token.reference && token.index !== undefined) {
+          const raw = token.reference.raw;
+          const idx = token.index;
+          if (direction === -1 && offset === idx + raw.length) {
+            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/\s+/g, ' ').trim();
+            const newPos = Math.min(idx, next.length);
+            onChange(next, newPos);
+            pendingCaretRef.current = newPos;
+            return;
+          }
+          if (direction === 1 && offset === idx) {
+            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/\s+/g, ' ').trim();
+            const newPos = Math.min(idx, next.length);
+            onChange(next, newPos);
+            pendingCaretRef.current = newPos;
+            return;
+          }
+        }
+      }
     },
-    [value, onChange],
+    [value, onChange, getCaretOffset],
   );
-
-  // Keep the editor HTML in sync with the external value. During typing
-  // handleInput updates lastHtmlRef so the DOM is not rewritten on every keystroke,
-  // which is what causes the caret to jump.
-  useLayoutEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const html = renderAqlToHtml(value, effectiveResolver);
-    if (html === lastHtmlRef.current) return;
-
-    const active = document.activeElement === el;
-    const shouldRestoreCaret = pendingCaretRef.current !== null;
-    const offset = pendingCaretRef.current ?? (active ? getCaretOffset(el) : Math.min(0, value.length));
-    pendingCaretRef.current = null;
-
-    el.innerHTML = html;
-    lastHtmlRef.current = html;
-
-    if (shouldRestoreCaret) {
-      restoreCaret(el, Math.min(offset, value.length));
-    } else if (active) {
-      setCaretOffset(el, Math.min(offset, value.length));
-    }
-  }, [value, effectiveResolver]);
-
-  const syncCursor = useCallback(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const offset = getCaretOffset(el);
-    updateCursor(offset);
-    onChange(value, offset);
-  }, [value, onChange, updateCursor]);
-
-  const handleInput = useCallback(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const next = serializeEditable(el);
-    const offset = getCaretOffset(el);
-    updateCursor(offset);
-    if (next !== value) {
-      onChange(next, offset);
-      lastHtmlRef.current = renderAqlToHtml(next, effectiveResolver);
-    } else {
-      onChange(value, offset);
-    }
-    updateAutocompleteState();
-  }, [value, onChange, effectiveResolver, updateAutocompleteState, updateCursor]);
 
   const directiveAutocompleteItems = useMemo(() => {
     if (!showAutocomplete || autocompleteKind !== 'directive') return [];
@@ -412,7 +463,14 @@ export function AqlInput({
             <span
               className="w-3 h-3 shrink-0"
               style={{
-                borderLeftColor: effectiveResolver({ kind: 'entity', id: e.id, raw: e.id, label: e.label || e.id, type: e.type })?.color || '#64748b',
+                borderLeftColor:
+                  effectiveResolver({
+                    kind: 'entity',
+                    id: e.id,
+                    raw: e.id,
+                    label: e.label || e.id,
+                    type: e.type,
+                  })?.color || '#64748b',
                 borderLeftWidth: 3,
                 backgroundColor: 'transparent',
               }}
@@ -462,7 +520,14 @@ export function AqlInput({
                 <span
                   className="w-3 h-3 shrink-0"
                   style={{
-                    borderLeftColor: effectiveResolver({ kind: 'edge', from: e.from, to: e.to, raw: formatEdgeToken(e.from, e.to, l), edgeLabel: l })?.color || '#64748b',
+                    borderLeftColor:
+                      effectiveResolver({
+                        kind: 'edge',
+                        from: e.from,
+                        to: e.to,
+                        raw: formatEdgeToken(e.from, e.to, l),
+                        edgeLabel: l,
+                      })?.color || '#64748b',
                     borderLeftWidth: 3,
                     backgroundColor: 'transparent',
                   }}
@@ -475,8 +540,16 @@ export function AqlInput({
             const firstToken = tokens[0] || rawTerm;
             const aRel = a.label.toLowerCase();
             const bRel = b.label.toLowerCase();
-            const aScore = aRel.startsWith(firstToken) ? 2 : tokens.length > 1 && tokens.every((t) => aRel.includes(t)) ? 1 : 0;
-            const bScore = bRel.startsWith(firstToken) ? 2 : tokens.length > 1 && tokens.every((t) => bRel.includes(t)) ? 1 : 0;
+            const aScore = aRel.startsWith(firstToken)
+              ? 2
+              : tokens.length > 1 && tokens.every((t) => aRel.includes(t))
+                ? 1
+                : 0;
+            const bScore = bRel.startsWith(firstToken)
+              ? 2
+              : tokens.length > 1 && tokens.every((t) => bRel.includes(t))
+                ? 1
+                : 0;
             if (bScore !== aScore) return bScore - aScore;
             return a.label.localeCompare(b.label);
           })
@@ -491,7 +564,16 @@ export function AqlInput({
       : entityItems;
 
     return [...topEntities, ...edgeItems].slice(0, 8);
-  }, [showAutocomplete, autocompleteKind, autocompleteFilter, availableEntities, availableEdges, includeEdges, directiveAutocompleteItems, effectiveResolver]);
+  }, [
+    showAutocomplete,
+    autocompleteKind,
+    autocompleteFilter,
+    availableEntities,
+    availableEdges,
+    includeEdges,
+    directiveAutocompleteItems,
+    effectiveResolver,
+  ]);
 
   useEffect(() => {
     if (!showAutocomplete) return;
@@ -504,14 +586,8 @@ export function AqlInput({
     return () => document.removeEventListener('mousedown', handleDocClick);
   }, [showAutocomplete]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertText', false, text);
-  }, []);
-
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const el = editorRef.current;
       if (!el) return;
 
@@ -544,7 +620,7 @@ export function AqlInput({
         if (e.key === 'Escape') {
           e.preventDefault();
           lastHandledKeyRef.current = 'Escape';
-          const offset = getCaretOffset(el);
+          const offset = el.selectionStart ?? 0;
           const textBefore = value.slice(0, offset);
           const openIdx = textBefore.lastIndexOf('[[');
           if (openIdx >= 0) {
@@ -557,46 +633,19 @@ export function AqlInput({
         }
       }
 
-      if (e.key === '#') {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          if (range.collapsed) {
-            const node = range.startContainer;
-            const text = node.textContent || '';
-            const offsetInNode = range.startOffset;
-            const textBefore = text.slice(0, offsetInNode);
-            if (textBefore.trim() === '') {
-              e.preventDefault();
-              document.execCommand('insertText', false, '#');
-              return;
-            }
-          }
-        }
-      }
-
-      if (e.key === 'Enter') {
-        if (e.ctrlKey || e.metaKey) {
-          onSubmit?.();
-          return;
-        }
-        e.preventDefault();
-        document.execCommand('insertLineBreak');
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        onSubmit?.();
         return;
       }
 
       if (e.key === 'Backspace' || e.key === 'Delete') {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          if (range.collapsed) {
-            const direction = e.key === 'Backspace' ? -1 : 1;
-            const adjacent = findAdjacentToken(el, range, direction);
-            if (adjacent) {
-              e.preventDefault();
-              removeToken(adjacent.raw);
-              return;
-            }
+        const offset = el.selectionStart ?? 0;
+        const end = el.selectionEnd ?? 0;
+        if (offset === end) {
+          const direction = e.key === 'Backspace' ? -1 : 1;
+          removeAdjacentToken(direction);
+          if (pendingCaretRef.current !== null) {
+            e.preventDefault();
           }
         }
       }
@@ -610,46 +659,90 @@ export function AqlInput({
       onSubmit,
       insertAtCursor,
       insertDirectiveAtCursor,
-      removeToken,
+      removeAdjacentToken,
     ],
   );
 
+  const syncScroll = useCallback(() => {
+    const el = editorRef.current;
+    const highlight = highlightRef.current;
+    if (!el || !highlight) return;
+    highlight.scrollTop = el.scrollTop;
+    highlight.scrollLeft = el.scrollLeft;
+  }, []);
+
   return (
-    <div ref={wrapperRef} id={id} className="flex flex-col flex-1 min-h-0 relative" aria-labelledby={id ? undefined : undefined}>
-      <div
-        ref={editorRef}
-        contentEditable={!disabled}
-        suppressContentEditableWarning
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onClick={syncCursor}
-        onKeyUp={updateAutocompleteState}
-        onPaste={handlePaste}
-        onCompositionStart={() => {
-          isComposingRef.current = true;
-        }}
-        onCompositionEnd={() => {
-          isComposingRef.current = false;
-          handleInput();
-          updateAutocompleteState();
-        }}
-        className={cn(
-          'flex-1 min-h-0 w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-xs text-white overflow-y-auto outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 whitespace-pre-wrap',
-          disabled && 'opacity-50 cursor-not-allowed',
-          className,
+    <div ref={wrapperRef} id={id} className={cn('flex flex-col flex-1 min-h-0 relative', className)} style={style}>
+      <div className="relative flex-1 min-h-0 w-full">
+        {/* Hidden mirror for caret coordinate measurement. */}
+        <div
+          ref={mirrorRef}
+          aria-hidden="true"
+          className="absolute top-0 left-0 invisible pointer-events-none whitespace-pre-wrap"
+          style={{
+            fontFamily: 'inherit',
+            fontSize: 'inherit',
+            fontWeight: 'inherit',
+            lineHeight: 'inherit',
+            letterSpacing: 'inherit',
+            padding: 0,
+            border: 0,
+            overflow: 'hidden',
+            wordWrap: 'break-word',
+            whiteSpace: 'pre-wrap',
+          }}
+        />
+
+        {/* Colored background layer */}
+        <div
+          ref={highlightRef}
+          aria-hidden="true"
+          className="absolute inset-0 px-2 py-1.5 text-xs overflow-hidden pointer-events-none whitespace-pre-wrap select-none"
+          dangerouslySetInnerHTML={{ __html: coloredHtml || '<br>' }}
+        />
+
+        {/* Placeholder shown behind the transparent textarea */}
+        {!disabled && value.trim() === '' && placeholder && (
+          <div className="absolute inset-0 px-2 py-1.5 text-xs text-white/40 pointer-events-none overflow-hidden whitespace-pre-wrap select-none">
+            {placeholder}
+          </div>
         )}
-        style={style}
-        aria-label="Query"
-        role="textbox"
-        aria-disabled={disabled}
-        tabIndex={disabled ? -1 : 0}
-      />
+
+        {/* Transparent textarea for input */}
+        <textarea
+          ref={editorRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onKeyUp={() => updateAutocompleteState()}
+          onClick={() => updateAutocompleteState()}
+          onScroll={syncScroll}
+          onCompositionStart={() => {
+            isComposingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            isComposingRef.current = false;
+            updateAutocompleteState();
+          }}
+          disabled={disabled}
+          spellCheck={false}
+          className={cn(
+            'absolute inset-0 w-full h-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-xs outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 resize-none overflow-y-auto whitespace-pre-wrap',
+            disabled && 'opacity-50 cursor-not-allowed',
+          )}
+          style={{ color: 'transparent', caretColor: 'white' }}
+          aria-label="Query"
+          role="textbox"
+          aria-disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
+        />
+      </div>
 
       {showAutocomplete && autocompleteItems.length > 0 && (
         <div
           className="absolute z-20 rounded border border-white/10 bg-[oklch(0.23_0_0)] shadow-lg max-h-40 overflow-y-auto min-w-[180px]"
           style={{
-            top: Math.min(autocompletePos.top + 18, (editorRef.current?.clientHeight || 200) - 8),
+            top: autocompletePos.top + 18,
             left: autocompletePos.left,
           }}
         >
@@ -684,12 +777,6 @@ export function AqlInput({
               </div>
             </button>
           ))}
-        </div>
-      )}
-
-      {!disabled && value.trim() === '' && placeholder && (
-        <div className="absolute inset-0 px-2 py-1.5 text-xs text-white/40 pointer-events-none overflow-hidden">
-          {placeholder}
         </div>
       )}
     </div>

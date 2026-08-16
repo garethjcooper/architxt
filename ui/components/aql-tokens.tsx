@@ -36,6 +36,8 @@ export interface AqlToken {
   reference?: Reference & { index: number };
   /** For #end tokens, the keyword of the matching block opener. */
   matchingKeyword?: string;
+  /** Absolute character index in the raw AQL string. */
+  index?: number;
 }
 
 function ReferenceToken({
@@ -94,7 +96,7 @@ function splitTextByReferences(
     if (localStart > cursor) {
       out.push({ kind: 'text', text: text.slice(cursor, localStart) });
     }
-    out.push({ kind: 'reference', reference: ref });
+    out.push({ kind: 'reference', reference: ref, index: idx });
     cursor = Math.max(cursor, localEnd);
   }
   if (cursor < text.length) {
@@ -126,16 +128,17 @@ export function tokenizeAql(query: string): AqlToken[] {
   for (const token of rendered) {
     if (token.kind === 'directive') {
       const keyword = token.keyword!;
+      const raw = token.value ? `#${keyword} ${token.value}` : `#${keyword}`;
       if (keyword === 'end') {
         const matchingKeyword = blockStack.pop();
-        out.push({ kind: 'directive', keyword, value: token.value, matchingKeyword });
+        out.push({ kind: 'directive', keyword, value: token.value, matchingKeyword, index: cursor });
       } else {
         if (BLOCK_COLORS[keyword]) {
           blockStack.push(keyword);
         }
-        out.push({ kind: 'directive', keyword, value: token.value });
+        out.push({ kind: 'directive', keyword, value: token.value, index: cursor });
       }
-      cursor += token.value ? `#${keyword} ${token.value}`.length : `#${keyword}`.length;
+      cursor += raw.length;
     } else if (token.kind === 'text') {
       out.push(...splitTextByReferences(token.text, refs, cursor));
       cursor += token.text.length;
