@@ -26,6 +26,15 @@ describe('refreshContextualGraphPatches', () => {
     db = createDb();
   });
 
+  function mentalModelWithContent(extId, content) {
+    const structuredOutput = typeof content === 'string' ? JSON.parse(content) : content;
+    return {
+      id: extId,
+      content,
+      reflect_response: { structured_output: structuredOutput },
+    };
+  }
+
   it('returns early when no model_refs exist', async () => {
     const result = await refreshContextualGraphPatches(db, serverId, bankId);
     assert.equal(result.success, true);
@@ -59,10 +68,7 @@ describe('refreshContextualGraphPatches', () => {
       diagrams: [] });
     const injectedList = async () => ({
       success: true,
-      mentalModels: [{
-        id: 'entity-summary-svc-001',
-        content: newContent,
-      }],
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', newContent)],
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, {
@@ -92,7 +98,7 @@ describe('refreshContextualGraphPatches', () => {
 
     const injectedList = async () => ({
       success: true,
-      mentalModels: [{ id: 'entity-summary-svc-001', content }],
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', content)],
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
@@ -112,8 +118,8 @@ describe('refreshContextualGraphPatches', () => {
 
     const injectedList = async () => ({
       success: true,
-      mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
-      diagrams: [] }) }],
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] }))],
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { dryRun: true, listAllMentalModels: injectedList });
@@ -163,7 +169,7 @@ describe('refreshContextualGraphPatches', () => {
 
     const injectedList = async () => ({
       success: true,
-      mentalModels: [{ id: 'entity-summary-svc-001', content }],
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', content)],
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
