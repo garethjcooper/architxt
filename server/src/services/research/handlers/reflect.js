@@ -11,6 +11,7 @@ import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';
 import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../../contextual-graph/unified-response-schema.js';
 
 const logger = createLogger('research-handler-reflect');
 
@@ -75,6 +76,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const body = {
     query: composedQuery,
     budget: options.budget || 'low',
+    response_schema: UNIFIED_RESPONSE_SCHEMA,
   };
   if (options.max_tokens) body.max_tokens = options.max_tokens;
   if (options.types?.length) body.types = options.types;
@@ -112,7 +114,8 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   }
 
   const text = result.data?.text;
-  const extracted = normalizeModelOutput(text || '');
+  const structuredOutput = result.data?.structured_output;
+  const extracted = structuredOutput || normalizeModelOutput(text || '');
   const knownCatalog = await knownCatalogPromise;
   const normalizedGraph = normalizeGraph(extracted.graph, {
     activity: 'reflect',

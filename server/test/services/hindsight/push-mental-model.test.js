@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 process.env.NODE_ENV = 'test';
 
 const { buildPayload } = await import('../../../src/services/hindsight/push-mental-model.js');
+const { UNIFIED_RESPONSE_SCHEMA } = await import('../../../src/services/contextual-graph/unified-response-schema.js');
 
 describe('push-mental-model buildPayload', () => {
   it('uses composed_query when present', () => {
@@ -44,5 +45,6 @@ describe('push-mental-model buildPayload', () => {
     assert.equal(payload.trigger.mode, 'full');
     assert.equal(payload.trigger.refresh_after_consolidation, false);
     assert.equal(payload.trigger.tags_match, 'all_strict');
+    assert.deepEqual(payload.trigger.response_schema, UNIFIED_RESPONSE_SCHEMA);
   });
 });

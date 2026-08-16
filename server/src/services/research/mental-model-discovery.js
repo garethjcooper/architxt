@@ -209,7 +209,7 @@ async function fetchCandidateContents(serverId, bankId, candidates, timeoutMs) {
       }
 
       const result = await getHindsightMentalModel(serverId, bankId, extId, {
-        detail: 'content',
+        detail: 'full',
         timeoutMs,
       });
 
@@ -230,10 +230,12 @@ async function fetchCandidateContents(serverId, bankId, candidates, timeoutMs) {
         };
       }
 
+      const structuredOutput = mentalModel.reflect_response?.structured_output;
+
       return {
         ...candidate,
         found: true,
-        content: mentalModel.content ?? null,
+        content: structuredOutput || (mentalModel.content ?? null),
       };
     })
   );

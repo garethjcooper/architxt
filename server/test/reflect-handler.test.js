@@ -84,19 +84,20 @@ describe('reflect handler', () => {
     assert.equal(result.graph.edges.length, 0);
   });
 
-  it('composes the generic template by default', async () => {
-    let capturedQuery = null;
+  it('composes the generic template by default and requests a structured response schema', async () => {
+    let capturedBody = null;
     const reflectFn = async (body) => {
-      capturedQuery = body.query;
-      return { success: true, data: { text: 'ok' } };
+      capturedBody = body;
+      return { success: true, data: { text: 'ok', structured_output: { narrative: 'ok', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
     await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
 
-    assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('test query'));
-    assert.ok(!capturedQuery.includes('{{ARCHITXT_TOPIC}}'));
-    assert.ok(capturedQuery.includes('## Topic'));
+    assert.ok(capturedBody);
+    assert.ok(capturedBody.query.includes('test query'));
+    assert.ok(!capturedBody.query.includes('{{ARCHITXT_TOPIC}}'));
+    assert.ok(capturedBody.query.includes('## Topic'));
+    assert.deepEqual(capturedBody.response_schema, (await import('../src/services/contextual-graph/unified-response-schema.js')).UNIFIED_RESPONSE_SCHEMA);
   });
 
   it('injects section focus variables when provided', async () => {
