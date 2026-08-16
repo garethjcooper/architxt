@@ -566,12 +566,12 @@ export function useResearchSession({
   const handleLoadStepDetails = useCallback(async (stepId: number) => {
     try {
       const step = await researchApi.getStep(stepId);
-      if (step.action_type === 'synthesize') {
-        toast.info('"Use details" is not available for synthesis steps yet');
+      if (!step.intent_text) {
+        toast.info('No query text available for this step');
         return;
       }
 
-      setQuery(step.intent_text || '');
+      setQuery(step.intent_text);
 
       if (VALID_QUERY_MODES.has(step.action_type as any)) {
         setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates');
@@ -634,7 +634,7 @@ export function useResearchSession({
         bank_id: bankId,
         session_id: activeSessionId,
         source_step_ids: sourceStepIds,
-        intent_text: parsed.intentText,
+        intent_text: intentText.trim(),
         ...(queryOptions.synthesize?.maxTokens != null
           ? { max_tokens: queryOptions.synthesize.maxTokens }
           : {}),
