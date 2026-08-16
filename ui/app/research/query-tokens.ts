@@ -15,15 +15,17 @@ import { colorForType } from '@/components/research-canvas';
  * text itself; the old >>Verb<< markers have been removed.
  */
 
-export type TokenKind = 'entity' | 'edge';
+export type TokenKind = 'entity' | 'edge' | 'directive';
 
 export interface QueryToken {
-  kind: 'entity' | 'edge';
+  kind: 'entity' | 'edge' | 'directive';
   raw: string;
   id: string;
   label: string;
   type?: string | null;
   index: number;
+  /** For directive tokens: the full line text including the directive and value. */
+  directive?: { keyword: string; value: string };
 }
 
 export interface EntityLike {
@@ -39,6 +41,62 @@ export interface EdgeLike {
   to: string;
   label?: string | null;
   type?: string | null;
+}
+
+const VALID_DIRECTIVES = new Set([
+  'diagram',
+  'table',
+  'graph',
+  'narrative',
+  'name',
+  'type',
+  'end',
+]);
+
+// Known directive line. We capture the leading whitespace separately so the chip
+// starts at the #, while the raw token excludes the newline.
+const DIRECTIVE_LINE_RE = /^[ \t]*(#(diagram|table|graph|narrative|name|type|end))(?:[ \t]+([^\n]*?))?[ \t]*$/gim;
+
+function colorForDirective(keyword: string): string {
+  switch (keyword.toLowerCase()) {
+    case 'diagram':
+      return '#a855f7'; // purple
+    case 'table':
+      return '#06b6d4'; // cyan
+    case 'graph':
+      return '#f97316'; // orange
+    case 'narrative':
+      return '#22c55e'; // green
+    case 'name':
+      return '#3b82f6'; // blue
+    case 'type':
+      return '#eab308'; // yellow
+    case 'end':
+      return '#ef4444'; // red
+    default:
+      return '#9ca3af'; // gray
+  }
+}
+
+function iconForDirective(keyword: string): string {
+  switch (keyword.toLowerCase()) {
+    case 'diagram':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>';
+    case 'table':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/></svg>';
+    case 'graph':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49"/><path d="M15.41 6.51 8.59 10.49"/></svg>';
+    case 'narrative':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>';
+    case 'name':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/><path d="M2 20c0-3.31 4.69-6 10-6s10 2.69 10 6"/></svg>';
+    case 'type':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+    case 'end':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+    default:
+      return '';
+  }
 }
 
 export function formatEntityToken(label: string, id: string, type?: string | null): string {
@@ -62,6 +120,27 @@ function parseQualifiedId(rawId: string): { type: string | null; id: string } {
     return { type: rawId.slice(0, colonIdx), id: rawId.slice(colonIdx + 1) };
   }
   return { type: null, id: rawId };
+}
+
+function parseDirectiveTokens(query: string): QueryToken[] {
+  const tokens: QueryToken[] = [];
+  for (const match of query.matchAll(DIRECTIVE_LINE_RE)) {
+    const fullMatch = match[0];
+    const hashIdx = fullMatch.indexOf('#');
+    const raw = fullMatch.slice(hashIdx); // exclude leading whitespace
+    const keyword = match[2].toLowerCase();
+    const value = (match[3] || '').trim();
+    const index = (match.index ?? 0) + hashIdx;
+    tokens.push({
+      kind: 'directive',
+      raw,
+      id: keyword,
+      label: raw.trim(),
+      index,
+      directive: { keyword, value },
+    });
+  }
+  return tokens;
 }
 
 export function parseQueryTokens(query: string): QueryToken[] {
@@ -100,6 +179,8 @@ export function parseQueryTokens(query: string): QueryToken[] {
       });
     }
   }
+
+  tokens.push(...parseDirectiveTokens(query));
 
   return tokens.sort((a, b) => a.index - b.index);
 }
@@ -161,6 +242,21 @@ export function renderQueryHtml(
     }
 
     const fullRaw = token.raw;
+
+    if (token.kind === 'directive') {
+      const keyword = token.directive!.keyword;
+      const value = token.directive!.value;
+      const chipColor = colorForDirective(keyword);
+      const iconSvg = iconForDirective(keyword);
+      const chipHtml = value
+        ? `${escapeHtml(`#${keyword}`)} <span style="color:#e5e7eb;font-weight:500">${escapeHtml(value)}</span>`
+        : escapeHtml(`#${keyword}`);
+
+      html += `<span contenteditable="false" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none" style="background-color:${chipColor}20;border-color:${chipColor}40;color:${chipColor}" data-token-raw="${encodeURIComponent(fullRaw)}" title="${escapeHtml(token.label)}">${iconSvg}<span>${chipHtml}</span></span>`;
+      lastIndex = token.index + fullRaw.length;
+      continue;
+    }
+
     let chipText = token.label || fullRaw;
     if (token.kind === 'edge') {
       const [fromId, toId, relLabel] = token.id.split('|');
@@ -233,12 +329,14 @@ export function serializeEditable(el: HTMLElement): string {
 export function buildSelectionPayload(
   tokens: QueryToken[],
 ): Array<{ id: string; kind: TokenKind; label: string; type?: string | null }> {
-  return tokens.map((t) => ({
-    id: t.id,
-    kind: t.kind,
-    label: t.label,
-    ...(t.kind === 'entity' && t.type ? { type: t.type } : {}),
-  }));
+  return tokens
+    .filter((t) => t.kind === 'entity' || t.kind === 'edge')
+    .map((t) => ({
+      id: t.id,
+      kind: t.kind,
+      label: t.label,
+      ...(t.kind === 'entity' && t.type ? { type: t.type } : {}),
+    }));
 }
 
 /** Sum text/token lengths from the start of the container up to (but not including) the target node. */
