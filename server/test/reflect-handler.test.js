@@ -84,19 +84,22 @@ describe('reflect handler', () => {
     assert.equal(result.graph.edges.length, 0);
   });
 
-  it('composes the generic template by default', async () => {
-    let capturedQuery = null;
+  it('composes the generic template by default and requests a structured response schema', async () => {
+    let capturedBody = null;
     const reflectFn = async (body) => {
-      capturedQuery = body.query;
+      capturedBody = body;
       return { success: true, data: { text: 'ok' } };
     };
 
     await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
 
-    assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('test query'));
-    assert.ok(!capturedQuery.includes('{{ARCHITXT_TOPIC}}'));
-    assert.ok(capturedQuery.includes('## Topic'));
+    assert.ok(capturedBody);
+    assert.ok(capturedBody.query);
+    assert.ok(capturedBody.query.includes('test query'));
+    assert.ok(!capturedBody.query.includes('{{ARCHITXT_TOPIC}}'));
+    assert.ok(capturedBody.query.includes('## Topic'));
+    assert.ok(capturedBody.response_schema, 'reflect request should include response_schema');
+    assert.deepEqual(capturedBody.response_schema.required, ['narrative', 'graph', 'tables', 'diagrams']);
   });
 
   it('injects section focus variables when provided', async () => {

@@ -75,6 +75,23 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const body = {
     query: composedQuery,
     budget: options.budget || 'low',
+    response_schema: {
+      type: 'object',
+      properties: {
+        narrative: { type: 'string' },
+        graph: {
+          type: 'object',
+          properties: {
+            nodes: { type: 'array' },
+            edges: { type: 'array' },
+          },
+          required: ['nodes', 'edges'],
+        },
+        tables: { type: 'array' },
+        diagrams: { type: 'array' },
+      },
+      required: ['narrative', 'graph', 'tables', 'diagrams'],
+    },
   };
   if (options.max_tokens) body.max_tokens = options.max_tokens;
   if (options.types?.length) body.types = options.types;
