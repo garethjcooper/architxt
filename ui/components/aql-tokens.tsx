@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { cn } from '@/lib/utils';
 import {
   renderAqlTokens,
   parseReferences,
@@ -46,40 +45,15 @@ function ReferenceToken({
 }) {
   const resolved = resolver?.(reference) || { label: reference.label || reference.raw };
   const color = resolved.color || '#fbbf24';
-  const isEntity = reference.kind === 'entity';
 
   return (
     <span
-      className={cn(
-        'aql-token aql-reference inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none',
-      )}
-      style={{
-        backgroundColor: `${color}20`,
-        borderColor: `${color}40`,
-        color,
-      }}
+      className="aql-token aql-reference whitespace-pre-wrap"
+      style={{ color }}
       data-token-raw={reference.raw}
       title={reference.raw}
     >
-      {isEntity ? (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="shrink-0"
-        >
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
-      ) : null}
-      <span>{resolved.label}</span>
+      [[{resolved.label}]]
     </span>
   );
 }
@@ -89,17 +63,13 @@ function DirectiveToken({ keyword, value }: { keyword: string; value?: string })
   const raw = value ? `#${keyword} ${value}` : `#${keyword}`;
   return (
     <span
-      className="aql-token aql-directive inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none"
-      style={{
-        backgroundColor: `${color}20`,
-        borderColor: `${color}40`,
-        color,
-      }}
+      className="aql-token aql-directive whitespace-pre-wrap"
+      style={{ color }}
       data-token-raw={raw}
       title={raw}
     >
-      <span>#{keyword}</span>
-      {value ? <span className="text-white/80 font-medium">{value}</span> : null}
+      #{keyword}
+      {value ? <span style={{ color: '#e5e7eb', fontWeight: 500 }}> {value}</span> : null}
     </span>
   );
 }
@@ -212,21 +182,18 @@ export function renderAqlToHtml(
       case 'directive': {
         const color = directiveColor(token.keyword!);
         const raw = token.value ? `#${token.keyword} ${token.value}` : `#${token.keyword}`;
-        const chipHtml = token.value
-          ? `${escapeHtml(`#${token.keyword}`)} <span style="color:#e5e7eb;font-weight:500">${escapeHtml(token.value)}</span>`
-          : escapeHtml(`#${token.keyword}`);
-        html += `<span contenteditable="false" class="aql-token aql-directive inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none" style="background-color:${color}20;border-color:${color}40;color:${color}" data-token-raw="${encodeURIComponent(raw)}" title="${escapeHtml(raw)}">${chipHtml}</span>`;
+        const valueSpan = token.value
+          ? ` <span style="color:#e5e7eb;font-weight:500">${escapeHtml(token.value)}</span>`
+          : '';
+        html += `<span contenteditable="false" class="aql-token aql-directive whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(raw)}" title="${escapeHtml(raw)}">${escapeHtml(`#${token.keyword}`)}${valueSpan}</span>`;
         break;
       }
       case 'reference': {
         const ref = token.reference!;
         const resolved = resolveReference?.(ref) || { label: ref.label || ref.raw };
         const color = resolved.color || '#fbbf24';
-        const isEntity = ref.kind === 'entity';
-        const iconSvg = isEntity
-          ? `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:${color};flex-shrink:0"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`
-          : '';
-        html += `<span contenteditable="false" class="aql-token aql-reference inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none" style="background-color:${color}20;border-color:${color}40;color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">${iconSvg}<span>${escapeHtml(resolved.label)}</span></span>`;
+        const label = escapeHtml(resolved.label || ref.raw);
+        html += `<span contenteditable="false" class="aql-token aql-reference whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">[[${label}]]</span>`;
         break;
       }
       case 'text': {
