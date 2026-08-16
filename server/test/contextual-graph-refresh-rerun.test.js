@@ -36,6 +36,15 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
     };
   });
 
+  function mentalModelWithContent(extId, content) {
+    const structuredOutput = typeof content === 'string' ? JSON.parse(content) : content;
+    return {
+      id: extId,
+      content,
+      reflect_response: { structured_output: structuredOutput },
+    };
+  }
+
   it('queues Hindsight refresh and records a pending_operations row', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
@@ -57,7 +66,7 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
       },
       listAllMentalModels: async () => ({
         success: true,
-        mentalModels: [{ id: 'entity-summary-svc-001', content }],
+        mentalModels: [mentalModelWithContent('entity-summary-svc-001', content)],
       }),
     });
 
@@ -90,8 +99,8 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
       refreshMentalModel: async () => ({ success: true, operationId: 'op-2', status: 'completed' }),
       listAllMentalModels: async () => ({
         success: true,
-        mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
-      diagrams: [] }) }],
+        mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] }))],
       }),
     });
 
@@ -117,7 +126,7 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
       refreshMentalModel: async () => ({ success: false, error: 'Hindsight busy' }),
       listAllMentalModels: async () => ({
         success: true,
-        mentalModels: [{ id: 'entity-summary-svc-001', content }],
+        mentalModels: [mentalModelWithContent('entity-summary-svc-001', content)],
       }),
     });
 
@@ -147,8 +156,8 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
       },
       listAllMentalModels: async () => ({
         success: true,
-        mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
-      diagrams: [] }) }],
+        mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] }))],
       }),
     });
 
@@ -174,8 +183,8 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
       },
       listAllMentalModels: async () => ({
         success: true,
-        mentalModels: [{ id: 'entity-summary-svc-001', content: JSON.stringify({ narrative: 'New summary.', graph: { nodes: [], edges: [] }, tables: [],
-      diagrams: [] }) }],
+        mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narrative: 'New summary.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] }))],
       }),
     });
 

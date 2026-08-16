@@ -1,8 +1,8 @@
 /**
  * Hindsight Service Client - Mental Model Operations
  *
- * List mental models in a bank. We request detail=content so we can compare
- * against architxt local values without pulling the reflect_response payload.
+ * List mental models in a bank. Callers that need `reflect_response` for
+ * structured output should pass `detail: 'full'`.
  */
 
 import { createLogger } from '../../utils/logger.js';

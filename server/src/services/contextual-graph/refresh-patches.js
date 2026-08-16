@@ -9,10 +9,18 @@ import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
 const logger = createLogger('contextual-graph-refresh-patches');
 
 function getModelContent(model) {
-  if (typeof model?.content === 'string' && model.content.length > 0) {
-    return model.content;
+  const structuredOutput = model?.reflect_response?.structured_output;
+  if (structuredOutput && typeof structuredOutput === 'object') {
+    return structuredOutput;
   }
-  throw new Error(`Mental model ${model?.id} has no content`);
+  throw new Error(`Mental model ${model?.id} has no reflect_response.structured_output`);
+}
+
+function getModelContentHashSource(model) {
+  // Use the markdown content as the stable source for the hash so we detect
+  // changes even if Hindsight's structured representation shifts slightly.
+  if (typeof model?.content === 'string') return model.content;
+  return JSON.stringify(model?.reflect_response?.structured_output || '');
 }
 
 function buildLocalModel(model, scope) {
@@ -203,7 +211,7 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
 /**
  * Refresh contextual-graph patches from Hindsight.
  *
- * Fetches mental models (detail=content) for every model_ref attached to the local
+ * Fetches mental models (detail=full) for every model_ref attached to the local
  * graph, compares normalized output against current working-graph state, and applies
  * only when they diverge. Disabled roles are skipped but still get fetched_at updated.
  *
@@ -305,7 +313,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     // We now fetch whatever content is currently available. Re-run operations that
     // are still pending will not yet have fresh content; the caller can refresh
     // again once the daemon marks those operations completed.
-    const listResult = await listModels(serverId, bankId, { detail: 'content' });
+    const listResult = await listModels(serverId, bankId, { detail: 'full' });
     if (!listResult.success) {
       return { success: false, error: listResult.error, stats };
     }
@@ -324,8 +332,19 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      const content = getModelContent(model);
-      const newHash = contentHash(content);
+      let content;
+      try {
+        content = getModelContent(model);
+      } catch (err) {
+        stats.failed += 1;
+        const error = `Missing structured output: ${err.message}`;
+        stats.errors.push({ extId: model.id, error });
+        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
+        logger.warn('Mental model has no structured output; treating as failed', { extId: model.id, error: err.message });
+        continue;
+      }
+
+      const newHash = contentHash(getModelContentHashSource(model));
 
       // Dry-run still fetches and normalizes, but never applies.
       if (dryRun) {
@@ -336,7 +355,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const output = normalizeModelOutput(content);
       if (output.errors.length > 0) {
         stats.failed += 1;
-        const error = output.errors.map((e) => typeof e === 'string' ? e : e.message).join('; ');
+        const error = output.errors.map((e) => (typeof e === 'string' ? e : e.message)).join('; ');
         stats.errors.push({ extId: model.id, errors: output.errors });
         updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
         logger.warn('Normalized output has errors; treating as failed', { extId: model.id, errors: output.errors });
