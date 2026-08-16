@@ -271,6 +271,10 @@ export function AqlInput({
         lastKey === 'ArrowDown' ||
         lastKey === 'ArrowLeft' ||
         lastKey === 'ArrowRight' ||
+        lastKey === 'Home' ||
+        lastKey === 'End' ||
+        lastKey === 'PageUp' ||
+        lastKey === 'PageDown' ||
         lastKey === 'Escape' ||
         lastKey === 'Enter' ||
         lastKey === 'Tab'
@@ -636,6 +640,20 @@ export function AqlInput({
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         onSubmit?.();
         return;
+      }
+
+      // Mark caret-navigation keys so autocomplete does not re-open after moving the cursor.
+      if (
+        e.key === 'ArrowUp' ||
+        e.key === 'ArrowDown' ||
+        e.key === 'ArrowLeft' ||
+        e.key === 'ArrowRight' ||
+        e.key === 'Home' ||
+        e.key === 'End' ||
+        e.key === 'PageUp' ||
+        e.key === 'PageDown'
+      ) {
+        lastHandledKeyRef.current = e.key;
       }
 
       if (e.key === 'Backspace' || e.key === 'Delete') {
