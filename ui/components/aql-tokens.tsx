@@ -213,8 +213,8 @@ export function renderAqlToHtml(
         const color = directiveColor(token.keyword!);
         const raw = token.value ? `#${token.keyword} ${token.value}` : `#${token.keyword}`;
         const chipHtml = token.value
-          ? `#{${token.keyword}} <span style="color:#e5e7eb;font-weight:500">${escapeHtml(token.value)}</span>`
-          : `#{${token.keyword}}`;
+          ? `${escapeHtml(`#${token.keyword}`)} <span style="color:#e5e7eb;font-weight:500">${escapeHtml(token.value)}</span>`
+          : escapeHtml(`#${token.keyword}`);
         html += `<span contenteditable="false" class="aql-token aql-directive inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none" style="background-color:${color}20;border-color:${color}40;color:${color}" data-token-raw="${encodeURIComponent(raw)}" title="${escapeHtml(raw)}">${chipHtml}</span>`;
         break;
       }

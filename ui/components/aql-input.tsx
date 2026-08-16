@@ -140,11 +140,13 @@ function defaultReferenceResolver(
 }
 
 function findOpenEntityTrigger(query: string, offset: number): string | null {
+  // Strip out reference tokens so we only inspect the plain text before the cursor.
   const refs = parseReferences(query);
   let cursor = 0;
   let plainBefore = '';
   for (const ref of refs) {
-    const idx = query.indexOf(ref.raw);
+    const idx = query.indexOf(ref.raw, cursor);
+    if (idx === -1) continue;
     if (idx >= offset) break;
     if (cursor < idx) {
       const slice = query.slice(cursor, Math.min(idx, offset));
@@ -152,7 +154,7 @@ function findOpenEntityTrigger(query: string, offset: number): string | null {
       cursor += slice.length;
       if (cursor >= offset) break;
     }
-    cursor += ref.raw.length;
+    cursor = idx + ref.raw.length;
   }
   if (cursor < offset) {
     plainBefore += query.slice(cursor, offset);
@@ -193,6 +195,13 @@ export function AqlInput({
   const lastHtmlRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
   const isComposingRef = useRef(false);
+  const [internalCursor, setInternalCursor] = useState(0);
+  const cursorRef = useRef(0);
+
+  const updateCursor = useCallback((offset: number) => {
+    cursorRef.current = offset;
+    setInternalCursor(offset);
+  }, []);
 
   const entityMap = useMemo(() => {
     const map = new Map<string, EntityLike>();
@@ -215,6 +224,7 @@ export function AqlInput({
     }
 
     const offset = getCaretOffset(el);
+    updateCursor(offset);
     if (offset < 0) return;
     const liveText = serializeEditable(el);
 
@@ -334,14 +344,16 @@ export function AqlInput({
     const el = editorRef.current;
     if (!el) return;
     const offset = getCaretOffset(el);
+    updateCursor(offset);
     onChange(value, offset);
-  }, [value, onChange]);
+  }, [value, onChange, updateCursor]);
 
   const handleInput = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
     const next = serializeEditable(el);
     const offset = getCaretOffset(el);
+    updateCursor(offset);
     if (next !== value) {
       onChange(next, offset);
       lastHtmlRef.current = renderAqlToHtml(next, effectiveResolver);
@@ -349,14 +361,15 @@ export function AqlInput({
       onChange(value, offset);
     }
     updateAutocompleteState();
-  }, [value, onChange, effectiveResolver, updateAutocompleteState]);
+  }, [value, onChange, effectiveResolver, updateAutocompleteState, updateCursor]);
 
   const directiveAutocompleteItems = useMemo(() => {
     if (!showAutocomplete || autocompleteKind !== 'directive') return [];
-    const trigger = findDirectiveTrigger(value, 0);
+    const cursorOffset = internalCursor;
+    const trigger = findDirectiveTrigger(value, cursorOffset);
     if (!trigger) return [];
-    return getDirectiveAutocompleteItems(value, 0, trigger.filter, trigger.isTypeLine);
-  }, [showAutocomplete, autocompleteKind, value]);
+    return getDirectiveAutocompleteItems(value, cursorOffset, trigger.filter, trigger.isTypeLine);
+  }, [showAutocomplete, autocompleteKind, value, internalCursor]);
 
   const autocompleteItems = useMemo((): AutocompleteItem[] => {
     if (!showAutocomplete) return [];
