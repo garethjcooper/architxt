@@ -887,8 +887,26 @@ export function QueryForm(props: QueryFormProps) {
                 <button
                   key={`${item.kind}:${item.id}`}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => ('token' in item ? insertAtCursor(item.token) : insertDirectiveAtCursor(item))}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if ('token' in item) {
+                      insertAtCursor(item.token);
+                    } else {
+                      insertDirectiveAtCursor(item);
+                    }
+                    // Refocus after the layout effect has rewritten the DOM.
+                    requestAnimationFrame(() => {
+                      const el = editorRef.current;
+                      if (!el) return;
+                      const target = pendingCaretRef.current ?? cursor;
+                      restoreCaret(el, Math.min(target, query.length));
+                    });
+                  }}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs ${
                     idx === selectedIndex ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'
