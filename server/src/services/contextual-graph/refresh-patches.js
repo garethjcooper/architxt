@@ -17,9 +17,8 @@ function getModelContent(model) {
 }
 
 function getModelContentHashSource(model) {
-  // Use the markdown content as the stable source for the hash so we detect
-  // changes even if Hindsight's structured representation shifts slightly.
-  if (typeof model?.content === 'string') return model.content;
+  // Hash the canonical structured output. Schema changes are intentionally
+  // treated as model changes and will re-trigger application.
   return JSON.stringify(model?.reflect_response?.structured_output || '');
 }
 
