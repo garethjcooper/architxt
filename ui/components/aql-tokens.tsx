@@ -34,6 +34,8 @@ export interface AqlToken {
   keyword?: string;
   value?: string;
   reference?: Reference & { index: number };
+  /** For #end tokens, the keyword of the matching block opener. */
+  matchingKeyword?: string;
 }
 
 function ReferenceToken({
@@ -58,8 +60,8 @@ function ReferenceToken({
   );
 }
 
-function DirectiveToken({ keyword, value }: { keyword: string; value?: string }) {
-  const color = directiveColor(keyword);
+function DirectiveToken({ keyword, value, matchingKeyword }: { keyword: string; value?: string; matchingKeyword?: string }) {
+  const color = directiveColor(matchingKeyword || keyword);
   const raw = value ? `#${keyword} ${value}` : `#${keyword}`;
   return (
     <span
@@ -120,10 +122,20 @@ export function tokenizeAql(query: string): AqlToken[] {
 
   const out: AqlToken[] = [];
   let cursor = 0;
+  const blockStack: string[] = [];
   for (const token of rendered) {
     if (token.kind === 'directive') {
-      out.push({ kind: 'directive', keyword: token.keyword!, value: token.value });
-      cursor += token.value ? `#${token.keyword} ${token.value}`.length : `#${token.keyword}`.length;
+      const keyword = token.keyword!;
+      if (keyword === 'end') {
+        const matchingKeyword = blockStack.pop();
+        out.push({ kind: 'directive', keyword, value: token.value, matchingKeyword });
+      } else {
+        if (BLOCK_COLORS[keyword] || SUB_COLORS[keyword]) {
+          blockStack.push(keyword);
+        }
+        out.push({ kind: 'directive', keyword, value: token.value });
+      }
+      cursor += token.value ? `#${keyword} ${token.value}`.length : `#${keyword}`.length;
     } else if (token.kind === 'text') {
       out.push(...splitTextByReferences(token.text, refs, cursor));
       cursor += token.text.length;
@@ -147,7 +159,7 @@ export function AqlTokenList({
       {tokens.map((token, i) => {
         switch (token.kind) {
           case 'directive':
-            return <DirectiveToken key={i} keyword={token.keyword!} value={token.value} />;
+            return <DirectiveToken key={i} keyword={token.keyword!} value={token.value} matchingKeyword={token.matchingKeyword} />;
           case 'reference':
             return <ReferenceToken key={i} reference={token.reference!} resolver={resolveReference} />;
           case 'text':
@@ -180,7 +192,7 @@ export function renderAqlToHtml(
   for (const token of tokens) {
     switch (token.kind) {
       case 'directive': {
-        const color = directiveColor(token.keyword!);
+        const color = directiveColor(token.matchingKeyword || token.keyword!);
         const raw = token.value ? `#${token.keyword} ${token.value}` : `#${token.keyword}`;
         const valueSpan = token.value
           ? ` <span style="color:#e5e7eb;font-weight:500">${escapeHtml(token.value)}</span>`
