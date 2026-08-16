@@ -113,9 +113,23 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     };
   }
 
-  const text = result.data?.text;
   const structuredOutput = result.data?.structured_output;
-  const extracted = structuredOutput || normalizeModelOutput(text || '');
+  if (!structuredOutput || typeof structuredOutput !== 'object') {
+    const keys = Object.keys(result.data || {});
+    logger.warn('Reflect response missing structured_output', { keys });
+    return {
+      success: false,
+      error: 'Reflect response missing structured_output',
+      code: 'INVALID_REFLECT_RESPONSE',
+      calls: [{
+        ...baseCall,
+        status: 'failure',
+        error: 'Reflect response missing structured_output',
+        code: 'INVALID_REFLECT_RESPONSE',
+      }],
+    };
+  }
+  const extracted = structuredOutput;
   const knownCatalog = await knownCatalogPromise;
   const normalizedGraph = normalizeGraph(extracted.graph, {
     activity: 'reflect',
