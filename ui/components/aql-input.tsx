@@ -216,8 +216,15 @@ export function AqlInput({
 
     const offset = getCaretOffset(el);
     if (offset < 0) return;
-    onChange(value, offset);
     const liveText = serializeEditable(el);
+
+    // Only sync cursor position back to the parent when the value has not
+    // changed since the last input event. Otherwise the stale `value` prop
+    // would overwrite the freshly-typed character before React has batched
+    // the parent update.
+    if (liveText === value) {
+      onChange(value, offset);
+    }
 
     const entityFilter = findOpenEntityTrigger(liveText, offset);
     if (entityFilter != null) {
