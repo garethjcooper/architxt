@@ -17,6 +17,7 @@ import {
   DEFAULT_REFRESH_MODE,
   DEFAULT_TAGS_MATCH_MODE,
 } from '../../db/crud/mental-models.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../../services/contextual-graph/unified-response-schema.js';
 
 const logger = createLogger('hindsight-mental-model-push');
 
@@ -97,6 +98,7 @@ export function buildPayload(model) {
       exclude_mental_models: toDbBool(model.exclude_all_mental_models) === 'true',
       exclude_mental_model_ids: normalizeCsv(model.exclude_mental_model_list),
       tags_match: normaliseTagsMatchMode(model.tags_match_mode) ?? DEFAULT_TAGS_MATCH_MODE,
+      response_schema: UNIFIED_RESPONSE_SCHEMA,
     },
   };
 }
