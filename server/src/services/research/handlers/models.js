@@ -12,7 +12,6 @@
  */
 
 import { getMentalModel as getHindsightMentalModel } from '../../hindsight/mental-models.js';
-import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('research-handler-models');
@@ -62,7 +61,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
   logger.info('Models query', { serverId, bankId, modelCount: models.length });
 
   const fetchMentalModel = injectFetch || ((extId) => getHindsightMentalModel(serverId, bankId, extId, {
-    detail: 'content',
+    detail: 'full',
     timeoutMs,
   }));
 
@@ -90,30 +89,34 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         };
       }
 
-      const content = result.mentalModel.content ?? null;
-      if (!content) {
+      const structuredOutput = result.mentalModel.reflect_response?.structured_output ?? null;
+      if (!structuredOutput || typeof structuredOutput !== 'object') {
         return {
           ext_id: extId,
           name,
-          found: true,
           content: null,
+          found: true,
           graph: { nodes: [], edges: [] },
-          graph_error: 'Mental-model content is empty or missing.',
+          graph_error: 'Mental-model reflect_response.structured_output is empty or missing.',
         };
       }
 
-      const { graph, narrative: modelNarrative, tables: modelTables, diagrams: modelDiagrams, errors: modelErrors } = normalizeModelOutput(content);
+      const content = structuredOutput;
+      const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
+      const narrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const tables = Array.isArray(content.tables) ? content.tables : [];
+      const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
 
       return {
         ext_id: extId,
         name,
         content,
         found: true,
-        narrative: modelNarrative,
+        narrative,
         graph,
-        tables: modelTables || [],
-        diagrams: modelDiagrams || [],
-        errors: modelErrors?.length ? modelErrors : undefined,
+        tables,
+        diagrams,
+        errors: undefined,
       };
     }),
   );

@@ -22,14 +22,22 @@ const logger = createLogger('research-mental-model-edges');
 const MENTAL_MODEL_ID_PATTERN = /^architxt-sequences-json-(.+)$/i;
 
 /**
- * Parse mental-model content into a graph using the shared parser.
- * Unlike the strict normalizer, this keeps any node with an id and any edge with
- * from/to/type for edge-fetch purposes.
+ * Parse mental-model structured output into a graph.
  * @param {string|object|null} value
  * @returns {{ nodes: object[], edges: object[] } | null}
  */
 function parseMentalModelContent(value) {
   if (!value) return null;
+  if (typeof value === 'object') {
+    const graph = value.graph && typeof value.graph === 'object' ? value.graph : null;
+    if (!graph || (Array.isArray(graph.nodes) && graph.nodes.length === 0 && Array.isArray(graph.edges) && graph.edges.length === 0)) {
+      return null;
+    }
+    return {
+      nodes: graph.nodes || [],
+      edges: graph.edges || [],
+    };
+  }
   const graph = extractGraph(value);
   if (!graph || (graph.nodes.length === 0 && graph.edges.length === 0)) return null;
 
@@ -131,7 +139,7 @@ export async function fetchMentalModelEdgesForEntities(serverId, bankId, entityI
     return { success: false, error: 'server_id and bank_id are required', code: 'MISSING_PARAMS' };
   }
 
-  const listResult = await listAllMentalModels(serverId, bankId, { detail: 'content' });
+  const listResult = await listAllMentalModels(serverId, bankId, { detail: 'full' });
   if (!listResult.success) {
     logger.warn('Failed to list mental models for edge fetch', { error: listResult.error });
     return { success: false, error: listResult.error, code: listResult.code || 'LIST_MENTAL_MODELS_FAILED' };
@@ -146,7 +154,7 @@ export async function fetchMentalModelEdgesForEntities(serverId, bankId, entityI
     if (!model || !model.id) continue;
 
     const patternMatch = MENTAL_MODEL_ID_PATTERN.exec(model.id);
-    const content = parseMentalModelContent(model.content);
+    const content = parseMentalModelContent(model.reflect_response?.structured_output);
 
     if (!content) {
       unmatchedReasons.noContent++;

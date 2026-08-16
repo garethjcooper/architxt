@@ -10,7 +10,6 @@
  */
 
 import { getMentalModel as getHindsightMentalModel } from '../../hindsight/mental-models.js';
-import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { createLogger } from '../../../utils/logger.js';
 
@@ -63,7 +62,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
   logger.info('Templates query', { serverId, bankId, modelCount: models.length });
 
   const fetchMentalModel = injectFetch || ((extId) => getHindsightMentalModel(serverId, bankId, extId, {
-    detail: 'content',
+    detail: 'full',
     timeoutMs,
   }));
 
@@ -91,20 +90,24 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         };
       }
 
-      const content = result.mentalModel.content ?? null;
-      if (!content) {
+      const structuredOutput = result.mentalModel.reflect_response?.structured_output ?? null;
+      if (!structuredOutput || typeof structuredOutput !== 'object') {
         return {
           ext_id: extId,
           name,
           found: true,
           content: null,
           graph: { nodes: [], edges: [] },
-          graph_error: 'Mental-model content is empty or missing.',
+          graph_error: 'Mental-model reflect_response.structured_output is empty or missing.',
         };
       }
 
-      const { narrative, graph, tables: modelTables, diagrams: modelDiagrams, errors: modelErrors } = normalizeModelOutput(content);
-      const graphNormalized = normalizeGraph(graph || { nodes: [], edges: [] }, { source: 'template_model' });
+      const content = structuredOutput;
+      const narrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
+      const tables = Array.isArray(content.tables) ? content.tables : [];
+      const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
+      const graphNormalized = normalizeGraph(graph, { source: 'template_model' });
 
       return {
         ext_id: extId,
@@ -113,9 +116,9 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         content,
         narrative,
         graph: graphNormalized,
-        tables: modelTables || [],
-        diagrams: modelDiagrams || [],
-        graph_error: modelErrors?.length ? modelErrors.join('; ') : undefined,
+        tables,
+        diagrams,
+        graph_error: undefined,
       };
     }),
   );
