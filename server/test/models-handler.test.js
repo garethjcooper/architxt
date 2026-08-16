@@ -50,9 +50,10 @@ describe('models handler graph extraction', () => {
 
 describe('models handler integration', () => {
   function makeFetch(content) {
+    const structuredOutput = typeof content === 'string' ? parseJsonString(content) : content;
     return async (extId) => ({
       success: true,
-      mentalModel: { content },
+      mentalModel: { reflect_response: { structured_output: structuredOutput } },
     });
   }
 

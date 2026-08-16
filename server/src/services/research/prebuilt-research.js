@@ -21,7 +21,7 @@
 
 import { discoverMentalModelsByRoles } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
+import { normalizeGraph } from '../prompts/normalize-graph.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt');
@@ -45,7 +45,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   }
 
   const hindsightResult = await getHindsightMentalModel(serverId, bankId, extId, {
-    detail: 'content',
+    detail: 'full',
     timeoutMs,
   });
 
@@ -58,11 +58,11 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   }
 
   const mentalModel = hindsightResult.mentalModel;
-  const content = mentalModel.content ?? null;
-  const contentLength = typeof content === 'string' ? content.length : content ? JSON.stringify(content).length : 0;
+  const structuredOutput = mentalModel.reflect_response?.structured_output ?? null;
+  const contentLength = structuredOutput ? JSON.stringify(structuredOutput).length : 0;
 
-  if (!content) {
-    logger.info('Prebuilt candidate content missing', {
+  if (!structuredOutput || typeof structuredOutput !== 'object') {
+    logger.info('Prebuilt candidate structured output missing', {
       serverId,
       bankId,
       extId,
@@ -75,11 +75,18 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
       content: null,
       narrative: '',
       graph: { nodes: [], edges: [] },
-      graph_error: 'Mental-model content is empty or missing.',
+      graph_error: 'Mental-model reflect_response.structured_output is empty or missing.',
     };
   }
 
-  const { narrative, graph, tables, diagrams, errors: modelErrors } = normalizeModelOutput(content);
+  const content = structuredOutput;
+  const { narrative, graph, tables, diagrams, errors: modelErrors } = {
+    narrative: typeof content.narrative === 'string' ? content.narrative : '',
+    graph: normalizeGraph(content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] }),
+    tables: Array.isArray(content.tables) ? content.tables : [],
+    diagrams: Array.isArray(content.diagrams) ? content.diagrams : [],
+    errors: [],
+  };
   logger.info('Prebuilt candidate envelope extracted', {
     serverId,
     bankId,
