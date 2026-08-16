@@ -1,7 +1,7 @@
 'use client';
 
 import type { GraphNode } from '@/lib/api/client';
-import { formatEntityToken } from './query-tokens';
+import { formatEntityToken } from '@architxt/aql';
 import { colorForType } from '@/components/research-canvas';
 
 export type EntityTab = 'entities' | 'global';

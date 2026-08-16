@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   parseAql,
+  toSectionFocus,
   parseReferences,
   parseEntityReferences,
   parseEdgeReferences,
@@ -11,16 +12,21 @@ import {
 } from './index.js';
 
 describe('parseAql', () => {
-  it('parses a plain query with implicit intent text', () => {
+  it('parses a plain query with intent text', () => {
     const q = parseAql('What is the impact of ICMS on Billing?');
     assert.equal(q.intentText, 'What is the impact of ICMS on Billing?');
     assert.deepEqual(q.blocks, []);
     assert.equal(q.errors, undefined);
+    const focus = toSectionFocus(q);
+    assert.equal(focus.sectionFocus.narrative, 'What is the impact of ICMS on Billing?');
   });
 
   it('parses a graph block', () => {
     const q = parseAql('#graph\nCRM, Billing\n#end');
-    assert.equal(q.intentText, 'CRM, Billing');
+    assert.equal(q.intentText, '');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.intentText, 'CRM, Billing');
+    assert.equal(focus.sectionFocus.graph, 'CRM, Billing');
     assert.equal(q.blocks.length, 1);
     assert.equal(q.blocks[0].kind, 'graph');
     assert.equal(q.blocks[0].body, 'CRM, Billing');
@@ -33,7 +39,9 @@ describe('parseAql', () => {
     assert.equal(q.blocks[0].kind, 'table');
     assert.equal(q.blocks[0].name, 'Dependencies');
     assert.equal(q.blocks[0].body, 'list upstream relationships');
-    assert.equal(q.intentText, 'Dependencies');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.intentText, 'Dependencies');
+    assert.equal(focus.sectionFocus.table[0].name, 'Dependencies');
   });
 
   it('parses a diagram block with quoted name and type', () => {
@@ -43,7 +51,16 @@ describe('parseAql', () => {
     assert.equal(q.blocks[0].name, 'Entity lifecycle');
     assert.equal(q.blocks[0].type, 'sequenceDiagram');
     assert.equal(q.blocks[0].body, 'Alice->>Bob: Hello');
-    assert.equal(q.intentText, 'Entity lifecycle (sequenceDiagram)');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.intentText, 'Entity lifecycle (sequenceDiagram)');
+  });
+
+  it('keeps intent text outside blocks', () => {
+    const q = parseAql('compare current and desired state\n#graph\nCRM\n#end');
+    assert.equal(q.intentText, 'compare current and desired state');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.intentText, 'compare current and desired state');
+    assert.equal(focus.sectionFocus.graph, 'CRM');
   });
 
   it('returns errors for unclosed blocks', () => {
@@ -80,11 +97,6 @@ describe('parseAql', () => {
     const q = parseAql('#table\n#name ""\ncontent\n#end');
     assert.equal(q.blocks[0].name, '');
     assert.equal(q.errors, undefined);
-  });
-
-  it('keeps intent text outside blocks', () => {
-    const q = parseAql('compare current and desired state\n#graph\nCRM\n#end');
-    assert.equal(q.intentText, 'compare current and desired state');
   });
 });
 
@@ -130,8 +142,8 @@ describe('renderAqlTokens', () => {
 
 describe('MERMAID_DIAGRAM_TYPES', () => {
   it('contains expected diagram types', () => {
-    assert.ok(MERMAID_DIAGRAM_TYPES.has('sequenceDiagram'));
-    assert.ok(MERMAID_DIAGRAM_TYPES.has('flowchart'));
-    assert.ok(!MERMAID_DIAGRAM_TYPES.has('notARealDiagram'));
+    assert.ok(MERMAID_DIAGRAM_TYPES.includes('sequenceDiagram'));
+    assert.ok(MERMAID_DIAGRAM_TYPES.includes('flowchart'));
+    assert.ok(!MERMAID_DIAGRAM_TYPES.includes('notARealDiagram'));
   });
 });

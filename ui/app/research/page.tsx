@@ -27,7 +27,10 @@ import { QueryForm } from './query-form';
 import { QueryInspectDialog } from './query-inspect-dialog';
 import { ServerBankSelectors, type SelectorServer, type SelectorBank } from './server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
-import { formatEntityToken, formatEdgeToken } from './query-tokens';
+import {
+  formatEntityToken,
+  formatEdgeToken,
+} from '@architxt/aql';
 import { QueryTrail } from './query-trail';
 import { CompositeEntities, type EntityTab } from './composite-entities';
 import { CompositeEdges } from './composite-edges';

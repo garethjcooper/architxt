@@ -4,25 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Play } from 'lucide-react';
-import {
-  formatEntityToken,
-  formatEdgeToken,
-  parseQueryTokens,
-  getAutocompleteFilter,
-  renderQueryHtml as renderQueryHtmlExported,
-  type EntityLike,
-  type EdgeLike,
-  type QueryToken,
-} from './query-tokens';
 import { colorForType } from '@/components/research-canvas';
 import { type ResearchQueryOptions } from './use-research-session';
 import { type ResearchStepSummary } from '@/lib/api/client';
 import { researchApi } from '@/lib/api/client';
 import {
+  formatEntityToken,
+  formatEdgeToken,
+  parseReferences,
+  type Reference as AqlReference,
+} from '@architxt/aql';
+import {
   type DirectiveAutocompleteItem,
   findDirectiveTrigger,
   getDirectiveAutocompleteItems,
-  validateDirectives,
 } from './directive-autocomplete';
 
 export type Server = {
@@ -66,6 +61,23 @@ export interface QueryFormProps {
   viewMode?: 'step' | 'session';
 }
 
+export interface EntityLike {
+  id: string;
+  entity_id?: string | null;
+  name?: string | null;
+  label?: string | null;
+  type?: string | null;
+}
+
+export interface EdgeLike {
+  from: string;
+  to: string;
+  label?: string | null;
+  type?: string | null;
+}
+
+export type TokenKind = 'entity' | 'edge' | 'directive';
+
 type EntityAutocompleteItem = {
   kind: 'entity';
   id: string;
@@ -98,20 +110,73 @@ const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
   templates: 'Double-click an entity in the Entities panel to add it to the template lookup list.',
 };
 
-function tokenLabel(token: QueryToken, entities: EntityLike[], edges: EdgeLike[]): string {
-  if (token.kind === 'entity') {
-    const entity = entities.find((e) => e.id === token.id);
-    return entity?.label || token.label || token.id;
+function tokenLabel(reference: AqlReference, entities: EntityLike[], edges: EdgeLike[]): string {
+  if (reference.kind === 'entity') {
+    const entity = entities.find((e) => e.id === reference.id);
+    return entity?.label || reference.label || reference.id || reference.raw;
   }
-  const parts = token.id.split('|');
-  const [source, target, label] = parts;
+  const from = reference.from || '';
+  const to = reference.to || '';
+  const edgeLabel = reference.edgeLabel || 'edge';
   const edge = edges.find(
-    (e) => e.from === source && e.to === target && (e.label || e.type || '') === label,
+    (e) => e.from === from && e.to === to && (e.label || e.type || '') === edgeLabel,
   );
-  const s = edge?.from || source;
-  const t = edge?.to || target;
-  const l = edge?.label || edge?.type || label || 'edge';
+  const s = edge?.from || from;
+  const t = edge?.to || to;
+  const l = edge?.label || edge?.type || edgeLabel || 'edge';
   return `${s} — ${l} → ${t}`;
+}
+
+function formatReferenceChip(reference: AqlReference, entities: EntityLike[], edges: EdgeLike[]): string {
+  if (reference.kind === 'entity') {
+    const entity = entities.find((e) => e.id === reference.id);
+    const id = reference.id || '';
+    const entityType = reference.type || entity?.type || null;
+    const chipText = reference.label || reference.raw;
+    return entityType
+      ? `${escapeHtml(chipText)} (${escapeHtml(id.startsWith(`${entityType}:`) ? id : `${entityType}:${id}`)})`
+      : escapeHtml(chipText);
+  }
+  const from = reference.from || '';
+  const to = reference.to || '';
+  const edgeLabel = reference.edgeLabel || 'edge';
+  const sourceLabel = entities.find((e) => e.id === from)?.label || from;
+  const targetLabel = entities.find((e) => e.id === to)?.label || to;
+  return `${escapeHtml(sourceLabel)} — ${escapeHtml(edgeLabel)} → ${escapeHtml(targetLabel)}`;
+}
+
+function resolveEdgeType(reference: AqlReference, entities: EntityLike[], edges: EdgeLike[]): string | null {
+  if (reference.kind !== 'edge') return null;
+  const fromId = reference.from || '';
+  const toId = reference.to || '';
+  const relLabel = reference.edgeLabel || '';
+  const entityLabelById = new Map(entities.map((e) => [e.id, e.name || e.label || e.id]));
+  const sourceLabel = entityLabelById.get(fromId);
+  const targetLabel = entityLabelById.get(toId);
+
+  const exact = edges.find(
+    (e) => e.from === fromId && e.to === toId && (e.type === relLabel || e.label === relLabel),
+  );
+  if (exact?.type) return exact.type;
+
+  if (sourceLabel && targetLabel) {
+    const byLabel = edges.find((e) => {
+      const sLabel = entityLabelById.get(e.from);
+      const tLabel = entityLabelById.get(e.to);
+      return (
+        lowerLabel(sLabel || e.from) === lowerLabel(sourceLabel) &&
+        lowerLabel(tLabel || e.to) === lowerLabel(targetLabel) &&
+        (e.type === relLabel || e.label === relLabel)
+      );
+    });
+    if (byLabel?.type) return byLabel.type;
+  }
+
+  return relLabel || null;
+}
+
+function lowerLabel(s: string): string {
+  return s.toLowerCase();
 }
 
 /** Escape text so it can be safely injected into the contenteditable innerHTML. */
@@ -123,13 +188,77 @@ function escapeHtml(text: string): string {
     .replace(/\n/g, '<br>');
 }
 
-/** Render the query string as inline HTML: styled chips for tokens, escaped text otherwise. */
+/** Render the query string as inline HTML: styled chips for references/directives, escaped text otherwise. */
 function renderQueryHtml(
   query: string,
   entities: EntityLike[],
   edges: EdgeLike[],
 ): string {
-  return renderQueryHtmlExported(query, entities, edges);
+  const references = parseReferences(query);
+  const refsByIndex = new Map(references.map((r) => [query.indexOf(r.raw), r]));
+  const directiveRe = /(^|[\n])([ \t]*)(#[a-zA-Z][a-zA-Z0-9_-]*)(?:[ \t]+([^\n]*?))?[ \t]*(?=[\n]|$)/g;
+  let html = '';
+  let lastIndex = 0;
+
+  function pushText(start: number, end: number) {
+    if (end > start) {
+      html += escapeHtml(query.slice(start, end));
+    }
+  }
+
+  function colorForDirective(keyword: string): string {
+    switch (keyword.toLowerCase()) {
+      case 'diagram': return '#a855f7';
+      case 'table': return '#06b6d4';
+      case 'graph': return '#f97316';
+      case 'narrative': return '#22c55e';
+      case 'name': return '#3b82f6';
+      case 'type': return '#eab308';
+      case 'end': return '#ef4444';
+      default: return '#9ca3af';
+    }
+  }
+
+  for (const match of query.matchAll(directiveRe)) {
+    const matchStart = (match.index ?? 0) + match[1].length;
+    const raw = match[0].slice(match[1].length);
+    const keyword = match[3].slice(1).toLowerCase();
+    const value = match[4] || '';
+    const chipColor = colorForDirective(keyword);
+    const chipHtml = value
+      ? `${escapeHtml(`#${keyword}`)} <span style="color:#e5e7eb;font-weight:500">${escapeHtml(value)}</span>`
+      : escapeHtml(`#${keyword}`);
+
+    pushText(lastIndex, matchStart);
+    html += `<span contenteditable="false" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none" style="background-color:${chipColor}20;border-color:${chipColor}40;color:${chipColor}" data-token-raw="${encodeURIComponent(raw)}" title="${escapeHtml(raw)}">${chipHtml}</span>`;
+    lastIndex = matchStart + raw.length;
+  }
+
+  for (const reference of references) {
+    const idx = query.indexOf(reference.raw);
+    if (idx < lastIndex) continue;
+    pushText(lastIndex, idx);
+
+    const chipText = formatReferenceChip(reference, entities, edges);
+    const chipColor = reference.kind === 'entity'
+      ? (reference.type ? colorForType(reference.type) : undefined)
+      : resolveEdgeType(reference, entities, edges)
+        ? colorForType(resolveEdgeType(reference, entities, edges)!)
+        : undefined;
+    const iconColor = chipColor || '#fbbf24';
+    const iconSvg = reference.kind === 'entity'
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:${iconColor};flex-shrink:0"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`
+      : '';
+    const chipStyle = chipColor
+      ? `background-color:${chipColor}20;border-color:${chipColor}40;color:${chipColor}`
+      : 'background-color:rgba(251,191,36,0.13);border-color:rgba(251,191,36,0.25);color:#fbbf24';
+
+    html += `<span contenteditable="false" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] border mx-0.5 align-middle whitespace-nowrap select-none" style="${chipStyle}" data-token-raw="${encodeURIComponent(reference.raw)}" title="${escapeHtml(tokenLabel(reference, entities, edges))}">${iconSvg}<span>${chipText}</span></span>`;
+    lastIndex = idx + reference.raw.length;
+  }
+
+  pushText(lastIndex, query.length);
+  return html || '<br>';
 }
 
 /** Serialize a contenteditable element back to a plain text string, preserving [[...]] tokens. */
@@ -376,7 +505,7 @@ export function QueryForm(props: QueryFormProps) {
       .filter((s) => ids.has(s.id))
       .sort((a, b) => trail.indexOf(a) - trail.indexOf(b));
   }, [queryMode, trail, selectedStepIds, activeStepId]);
-  const tokens = useMemo(() => parseQueryTokens(query), [query]);
+  const tokens = useMemo(() => parseReferences(query), [query]);
 
   // Fetch eligible templates whenever selected entities change in templates mode.
   useEffect(() => {
@@ -447,11 +576,33 @@ export function QueryForm(props: QueryFormProps) {
     setCursor(offset);
     const liveText = serializeEditable(el);
 
-    const entityFilter = getAutocompleteFilter(liveText, offset);
+    function findOpenEntityTrigger(query: string, offset: number): string | null {
+      const refs = parseReferences(query);
+      let cursor = 0;
+      let plainBefore = '';
+      for (const ref of refs) {
+        const idx = query.indexOf(ref.raw);
+        if (idx >= offset) break;
+        if (cursor < idx) {
+          const slice = query.slice(cursor, Math.min(idx, offset));
+          plainBefore += slice;
+          cursor += slice.length;
+          if (cursor >= offset) break;
+        }
+        cursor += ref.raw.length;
+      }
+      if (cursor < offset) {
+        plainBefore += query.slice(cursor, offset);
+      }
+      const entityMatch = plainBefore.match(/\[\[([^\]]*)$/);
+      return entityMatch ? entityMatch[1] : null;
+    }
+
+    const entityFilter = findOpenEntityTrigger(liveText, offset);
     if (entityFilter != null) {
       setShowAutocomplete(true);
       setAutocompleteKind('entity');
-      setAutocompleteFilter(entityFilter.filter);
+      setAutocompleteFilter(entityFilter);
       setAutocompletePos(getCaretCoordinates(el));
       setSelectedIndex(0);
       return;
@@ -492,7 +643,7 @@ export function QueryForm(props: QueryFormProps) {
   );
 
   const allTokenRaws = useMemo(() => {
-    return parseQueryTokens(query).map((t: { raw: string }) => t.raw);
+    return parseReferences(query).map((r) => r.raw);
   }, [query]);
 
   const insertDirectiveAtCursor = useCallback(
@@ -579,7 +730,7 @@ export function QueryForm(props: QueryFormProps) {
       setCursor(offset);
       // Mark the DOM as already representing the new query so the sync effect
       // does not clobber the selection by rewriting innerHTML.
-      lastHtmlRef.current = renderQueryHtml(next, availableEntities, availableEdges);
+        lastHtmlRef.current = renderQueryHtml(next, availableEntities, availableEdges);
     }
     // Re-evaluate autocomplete on every input change, not just keyup, so typing
     // '[[' after a chip opens the popup immediately.

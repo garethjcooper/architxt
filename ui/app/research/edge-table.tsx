@@ -2,7 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 import type { GraphEdge, GraphNode } from '@/lib/api/client';
-import { formatEdgeToken } from './query-tokens';
+import { formatEdgeToken } from '@architxt/aql';
 import { colorForType } from '@/components/research-canvas';
 
 export interface EdgeTableProps {

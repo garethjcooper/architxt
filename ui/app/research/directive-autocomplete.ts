@@ -7,6 +7,12 @@
  * scaffold to fill in.
  */
 
+import {
+  BLOCK_DIRECTIVES as AQL_BLOCK_DIRECTIVES,
+  SUB_DIRECTIVE_KEYS as AQL_SUB_DIRECTIVE_KEYS,
+  MERMAID_DIAGRAM_TYPES,
+} from '@architxt/aql';
+
 export type DirectiveKind = 'graph' | 'table' | 'diagram' | 'narrative' | 'name' | 'type' | 'end';
 
 export interface DirectiveAutocompleteItem {
@@ -21,54 +27,27 @@ export interface DirectiveAutocompleteItem {
   chain?: boolean;
 }
 
-export const BLOCK_DIRECTIVES: DirectiveKind[] = ['graph', 'table', 'diagram', 'narrative'];
-
-export const SUB_DIRECTIVES: DirectiveKind[] = ['name', 'type', 'end'];
-
-export const MERMAID_DIAGRAM_TYPES = [
-  'flowchart',
-  'sequenceDiagram',
-  'classDiagram',
-  'stateDiagram',
-  'erDiagram',
-  'gantt',
-  'pie',
-  'journey',
-  'gitGraph',
-  'requirementDiagram',
-  'mindmap',
-  'timeline',
-  'c4Context',
-  'c4Container',
-  'c4Component',
-  'c4Dynamic',
-  'c4Deployment',
-  'quadrantChart',
-  'block',
-  'network',
-  'architecture',
-  'xychart-beta',
-  'sankey-beta',
-];
-
+// Re-export the canonical block/sub-directive lists from the shared AQL package
+// so the UI autocomplete cannot drift from the server-side parser.
+export { AQL_BLOCK_DIRECTIVES as BLOCK_DIRECTIVES, AQL_SUB_DIRECTIVE_KEYS as SUB_DIRECTIVES, MERMAID_DIAGRAM_TYPES };
 const ALL_DIRECTIVE_ITEMS: DirectiveAutocompleteItem[] = [
-  ...BLOCK_DIRECTIVES.map((d) => ({
+  ...AQL_BLOCK_DIRECTIVES.map((d) => ({
     kind: 'directive' as const,
     id: `#${d}`,
     label: `#${d}`,
     sublabel: 'block directive',
     // Insert a scaffold with a trailing #end. For diagram/table, add the most
     // common sub-directives to guide the user.
-    insert: makeBlockScaffold(d),
-    cursorOffset: makeCursorOffset(d),
+    insert: makeBlockScaffold(d as DirectiveKind),
+    cursorOffset: makeCursorOffset(d as DirectiveKind),
   })),
-  ...SUB_DIRECTIVES.map((d) => ({
+  ...AQL_SUB_DIRECTIVE_KEYS.map((d) => ({
     kind: 'directive' as const,
     id: `#${d}`,
     label: `#${d}`,
     sublabel: d === 'end' ? 'close block' : 'sub-directive',
     insert: `#${d} `,
-    cursorOffset: d === 'end' ? `#${d} `.length : `#${d} `.length,
+    cursorOffset: `#${d} `.length,
   })),
 ];
 
@@ -195,7 +174,7 @@ export interface DirectiveValidationIssue {
   line?: number;
 }
 
-const VALID_DIRECTIVES = new Set(['#graph', '#table', '#diagram', '#narrative', '#name', '#type', '#end']);
+const VALID_DIRECTIVES = new Set([...AQL_BLOCK_DIRECTIVES, ...AQL_SUB_DIRECTIVE_KEYS].map((d) => `#${d}`));
 
 /**
  * Validate directive markup and return human-readable issues.
@@ -221,7 +200,7 @@ export function validateDirectives(query: string): DirectiveValidationIssue[] {
       } else {
         stack.pop();
       }
-    } else if (BLOCK_DIRECTIVES.includes(word.slice(1) as DirectiveKind)) {
+    } else if (AQL_BLOCK_DIRECTIVES.includes(word.slice(1) as DirectiveKind)) {
       stack.push({ directive: word, line: i + 1 });
     }
   }

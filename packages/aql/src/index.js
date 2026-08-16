@@ -7,10 +7,20 @@
  * [[Label (type:id)]] / [[src — label → target]].
  */
 
-export const BLOCK_DIRECTIVES = new Set(['graph', 'table', 'diagram', 'narrative']);
-export const SUB_DIRECTIVE_KEYS = new Set(['name', 'type', 'end']);
+export const BLOCK_DIRECTIVES = Object.freeze([
+  'graph',
+  'table',
+  'diagram',
+  'narrative',
+]);
 
-export const MERMAID_DIAGRAM_TYPES = new Set([
+export const SUB_DIRECTIVE_KEYS = Object.freeze([
+  'name',
+  'type',
+  'end',
+]);
+
+export const MERMAID_DIAGRAM_TYPES = Object.freeze([
   'flowchart',
   'graph',
   'sequenceDiagram',
@@ -73,6 +83,76 @@ export const ALLOWED_KEYS_BY_BLOCK = Object.freeze({
  * @property {Block[]} blocks
  * @property {ParseError[]} [errors]
  */
+
+/**
+ * Convert parsed AQL blocks into the legacy section-focus shape used by the server
+ * prompt templates and the UI API callers.
+ *
+ *   graph     -> string (concatenated bodies)
+ *   narrative -> string (concatenated bodies)
+ *   table     -> Array<{name?, content}>
+ *   diagram   -> Array<{name?, type, content}>
+ *
+ * If the query has no directives and only plain text, it is returned as an
+ * implicit narrative (matching the old behavior).
+ */
+export function toSectionFocus(aqlQuery) {
+  const { intentText, blocks, errors } = aqlQuery;
+  if (errors?.length) {
+    return { intentText, sectionFocus: {} };
+  }
+  if (blocks.length === 0) {
+    return intentText ? { intentText, sectionFocus: { narrative: intentText } } : { intentText: '' };
+  }
+
+  const sectionFocus = {};
+  const topicCandidates = [];
+
+  for (const block of blocks) {
+    const { kind, name, type, body } = block;
+    if (kind === 'graph' || kind === 'narrative') {
+      if (sectionFocus[kind]) {
+        sectionFocus[kind] = sectionFocus[kind] + (body ? '\n' + body : '');
+      } else {
+        sectionFocus[kind] = body;
+      }
+      if (body) topicCandidates.push(body);
+      continue;
+    }
+
+    if (kind === 'table') {
+      if (!sectionFocus.table) sectionFocus.table = [];
+      sectionFocus.table.push({ name, content: body });
+      topicCandidates.push(name || 'Table');
+      continue;
+    }
+
+    if (kind === 'diagram') {
+      if (!sectionFocus.diagram) sectionFocus.diagram = [];
+      sectionFocus.diagram.push({ name, type, content: body });
+      if (name && type) topicCandidates.push(`${name} (${type})`);
+      else if (name) topicCandidates.push(name);
+      else if (type) topicCandidates.push(`Diagram (${type})`);
+      else topicCandidates.push('Diagram');
+    }
+  }
+
+  const effectiveIntent = intentText || topicCandidates[0] || '';
+
+  return {
+    intentText: effectiveIntent,
+    sectionFocus,
+  };
+}
+
+export function formatEntityToken(label, id, type) {
+  const qualified = type && !id.startsWith(`${type}:`) ? `${type}:${id}` : id;
+  return `[[${label} (${qualified})]]`;
+}
+
+export function formatEdgeToken(source, target, label) {
+  return `[[${source} — ${label} → ${target}]]`;
+}
 
 /**
  * @param {string} rawId
@@ -207,7 +287,6 @@ export function parseAql(rawQuery) {
   const errors = [];
   const blocks = [];
   const strippedLines = [];
-  const topicCandidates = [];
   const lines = rawQuery.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const blockStack = [];
 
@@ -237,13 +316,12 @@ export function parseAql(rawQuery) {
       if (blockStack.length === 0) {
         errors.push({ message: 'No opening directive for #end', line: lineNum });
       } else {
-        const block = blockStack.pop();
-        blocks.push(block);
+        blocks.push(blockStack.pop());
       }
       continue;
     }
 
-    if (BLOCK_DIRECTIVES.has(keyword)) {
+    if (BLOCK_DIRECTIVES.includes(keyword)) {
       blockStack.push({
         kind: keyword,
         name: undefined,
@@ -254,7 +332,7 @@ export function parseAql(rawQuery) {
       continue;
     }
 
-    if (SUB_DIRECTIVE_KEYS.has(keyword)) {
+    if (SUB_DIRECTIVE_KEYS.includes(keyword)) {
       if (blockStack.length === 0) {
         errors.push({ message: `Sub-directive #${keyword} appears outside a block`, line: lineNum });
         continue;
@@ -268,7 +346,7 @@ export function parseAql(rawQuery) {
 
       const parsedValue = parseValue(value);
 
-      if (keyword === 'type' && parsedValue && !MERMAID_DIAGRAM_TYPES.has(parsedValue)) {
+      if (keyword === 'type' && parsedValue && !MERMAID_DIAGRAM_TYPES.includes(parsedValue)) {
         errors.push({ message: `Unknown diagram type '${parsedValue}'`, line: lineNum });
       }
 
@@ -306,22 +384,8 @@ export function parseAql(rawQuery) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Derive topic candidates from blocks that have names or types.
-  for (const block of builtBlocks) {
-    if (block.kind === 'diagram') {
-      if (block.name && block.type) topicCandidates.push(`${block.name} (${block.type})`);
-      else if (block.name) topicCandidates.push(block.name);
-      else if (block.type) topicCandidates.push(`Diagram (${block.type})`);
-      else topicCandidates.push('Diagram');
-    } else if (block.kind === 'table') {
-      topicCandidates.push(block.name || 'Table');
-    } else if (block.body) {
-      topicCandidates.push(block.body);
-    }
-  }
-
-  const intentText = remainingText || topicCandidates[0] || '';
   const allReferences = parseReferences(rawQuery);
+  const intentText = remainingText;
 
   return errors.length > 0
     ? { intentText, references: allReferences, blocks: builtBlocks, errors }

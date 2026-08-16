@@ -91,12 +91,13 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.sectionFocus?.graph, 'A\nB');
   });
 
-  it('leaves unknown directives as loose text and triggers implicit narrative', () => {
-    // #unknown is not parsed; all text is loose text with zero parsed directives,
-    // so implicit narrative fires on the whole string.
+  it('rejects unknown directives as invalid AQL', () => {
+    // AQL is strict: #unknown is not a valid directive so it produces errors.
+    // The body line 'value' is treated as loose text (no open block) and the
+    // text after the block becomes the intent.
     const result = parseSectionDirectives('#unknown\nvalue\n#end\nWhat is this?');
-    assert.equal(result.intentText, '#unknown value #end What is this?');
-    assert.equal(result.sectionFocus?.narrative, '#unknown value #end What is this?');
+    assert.equal(result.intentText, 'value What is this?');
+    assert.deepEqual(result.sectionFocus, {});
   });
 
   it('trims whitespace around the remaining intent text', () => {
