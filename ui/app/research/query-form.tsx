@@ -18,6 +18,12 @@ import { colorForType } from '@/components/research-canvas';
 import { type ResearchQueryOptions } from './use-research-session';
 import { type ResearchStepSummary } from '@/lib/api/client';
 import { researchApi } from '@/lib/api/client';
+import {
+  type DirectiveAutocompleteItem,
+  findDirectiveTrigger,
+  getDirectiveAutocompleteItems,
+  validateDirectives,
+} from './directive-autocomplete';
 
 export type Server = {
   id: number;
@@ -59,6 +65,29 @@ export interface QueryFormProps {
   /** Current view mode; used to decide which steps to preview. */
   viewMode?: 'step' | 'session';
 }
+
+type EntityAutocompleteItem = {
+  kind: 'entity';
+  id: string;
+  label: string;
+  type: string | null | undefined;
+  render: string;
+  sublabel: string;
+  token: string;
+  icon: React.ReactElement;
+};
+
+type EdgeAutocompleteItem = {
+  kind: 'edge';
+  id: string;
+  label: string;
+  render: string;
+  sublabel: string;
+  token: string;
+  icon: React.ReactElement;
+};
+
+type AutocompleteItem = EntityAutocompleteItem | EdgeAutocompleteItem | DirectiveAutocompleteItem;
 
 const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
   prebuilt: 'Double-click an entity to add it to the prebuilt lookup list, then select one or more template roles to run.',
@@ -315,7 +344,7 @@ export function QueryForm(props: QueryFormProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteFilter, setAutocompleteFilter] = useState('');
-  const [autocompleteKind, setAutocompleteKind] = useState<'entity'>('entity');
+  const [autocompleteKind, setAutocompleteKind] = useState<'entity' | 'directive'>('entity');
   const [autocompletePos, setAutocompletePos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [eligibleTemplates, setEligibleTemplates] = useState<Array<{
@@ -419,15 +448,28 @@ export function QueryForm(props: QueryFormProps) {
     if (offset < 0) return;
     setCursor(offset);
     const liveText = serializeEditable(el);
-    const filterResult = getAutocompleteFilter(liveText, offset);
-    if (filterResult != null) {
+
+    const entityFilter = getAutocompleteFilter(liveText, offset);
+    if (entityFilter != null) {
       setShowAutocomplete(true);
-      setAutocompleteFilter(filterResult.filter);
+      setAutocompleteKind('entity');
+      setAutocompleteFilter(entityFilter.filter);
       setAutocompletePos(getCaretCoordinates(el));
       setSelectedIndex(0);
-    } else {
-      setShowAutocomplete(false);
+      return;
     }
+
+    const directiveTrigger = findDirectiveTrigger(liveText, offset);
+    if (directiveTrigger != null) {
+      setShowAutocomplete(true);
+      setAutocompleteKind('directive');
+      setAutocompleteFilter(directiveTrigger.filter);
+      setAutocompletePos(getCaretCoordinates(el));
+      setSelectedIndex(0);
+      return;
+    }
+
+    setShowAutocomplete(false);
   }, [setCursor]);
 
   const insertAtCursor = useCallback(
@@ -454,6 +496,30 @@ export function QueryForm(props: QueryFormProps) {
   const allTokenRaws = useMemo(() => {
     return parseQueryTokens(query).map((t: { raw: string }) => t.raw);
   }, [query]);
+
+  const insertDirectiveAtCursor = useCallback(
+    (item: DirectiveAutocompleteItem) => {
+      if (isRunning) return;
+      const el = editorRef.current;
+      if (!el) return;
+
+      const offset = getCaretOffset(el);
+      const trigger = findDirectiveTrigger(query, offset);
+      if (!trigger) return;
+
+      const before = query.slice(0, trigger.replaceStart);
+      const after = query.slice(trigger.replaceEnd);
+      const insert = item.insert;
+      const next = before + insert + after;
+      // Place caret at the offset defined by the item (relative to the inserted text).
+      const pos = before.length + item.cursorOffset;
+      setQuery(next);
+      setCursor(pos);
+      setShowAutocomplete(false);
+      pendingCaretRef.current = pos;
+    },
+    [query, setQuery, setCursor, isRunning],
+  );
 
   const removeToken = useCallback(
     (raw: string) => {
@@ -518,8 +584,17 @@ export function QueryForm(props: QueryFormProps) {
     updateAutocompleteState();
   }, [query, setQuery, setCursor, availableEntities, availableEdges, updateAutocompleteState]);
 
-  const autocompleteItems = useMemo(() => {
+  const directiveAutocompleteItems = useMemo(() => {
+    if (!showAutocomplete || autocompleteKind !== 'directive') return [];
+    const trigger = findDirectiveTrigger(query, cursor);
+    if (!trigger) return [];
+    return getDirectiveAutocompleteItems(query, cursor, trigger.filter, trigger.isTypeLine);
+  }, [showAutocomplete, autocompleteKind, query, cursor]);
+
+  const autocompleteItems = useMemo((): AutocompleteItem[] => {
     if (!showAutocomplete) return [];
+    if (autocompleteKind === 'directive') return directiveAutocompleteItems;
+
     const rawTerm = autocompleteFilter.toLowerCase().trim();
     const entityLabelMap = new Map(availableEntities.map((e) => [e.id, e.label || e.id]));
 
@@ -679,7 +754,11 @@ export function QueryForm(props: QueryFormProps) {
           e.preventDefault();
           lastHandledKeyRef.current = e.key;
           const item = autocompleteItems[selectedIndex];
-          insertAtCursor(item.token);
+          if ('token' in item) {
+            insertAtCursor(item.token);
+          } else {
+            insertDirectiveAtCursor(item as DirectiveAutocompleteItem);
+          }
           return;
         }
         if (e.key === 'Escape') {
@@ -696,6 +775,28 @@ export function QueryForm(props: QueryFormProps) {
           }
           setShowAutocomplete(false);
           return;
+        }
+      }
+
+      // Insert # at the start of an empty line if the user types it so the
+      // directive autocomplete opens immediately.
+      if (e.key === '#') {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          if (range.collapsed) {
+            const node = range.startContainer;
+            const text = node.textContent || '';
+            const offsetInNode = range.startOffset;
+            const textBefore = text.slice(0, offsetInNode);
+            const onlyWhitespaceBefore = textBefore.trim() === '';
+            if (onlyWhitespaceBefore) {
+              e.preventDefault();
+              document.execCommand('insertText', false, '#');
+              // Autocomplete will be re-evaluated by handleInput/onKeyUp.
+              return;
+            }
+          }
         }
       }
 
@@ -783,15 +884,15 @@ export function QueryForm(props: QueryFormProps) {
                   key={`${item.kind}:${item.id}`}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => insertAtCursor(item.token)}
+                  onClick={() => ('token' in item ? insertAtCursor(item.token) : insertDirectiveAtCursor(item))}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs ${
                     idx === selectedIndex ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'
                   }`}
                 >
-                {item.icon}
+                {'icon' in item && item.icon}
                 <div className="min-w-0 flex flex-col">
-                  <span className="truncate">{item.render}</span>
+                  <span className="truncate">{'render' in item ? item.render : item.label}</span>
                   {'sublabel' in item && item.sublabel && (
                     <span className="truncate text-[10px] text-white/40 font-mono">{item.sublabel}</span>
                   )}
