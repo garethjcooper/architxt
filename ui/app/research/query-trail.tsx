@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { ResearchStepSummary } from '@/lib/api/client';
+import { AqlView } from '@/components/aql-view';
 
 export interface QueryTrailProps {
   trail: ResearchStepSummary[];
@@ -131,7 +132,7 @@ export function QueryTrail(props: QueryTrailProps) {
                     </span>
                   </div>
                   <div className="text-[10px] text-white/50 font-mono truncate">
-                    {step.intent_text || 'Untitled query'}
+                    <AqlView query={step.intent_text || ''} compact className="text-[10px] leading-tight" />
                   </div>
                 </button>
                 <DropdownMenu>
@@ -151,7 +152,7 @@ export function QueryTrail(props: QueryTrailProps) {
                         e.stopPropagation();
                         onUseDetails?.(step.id);
                       }}
-                      disabled={step.status === 'running' || isSynthesize}
+                      disabled={step.status === 'running'}
                     >
                       <ClipboardList className="h-3 w-3 mr-2" /> Re-use
                     </DropdownMenuItem>
