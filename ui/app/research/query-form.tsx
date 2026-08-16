@@ -19,6 +19,7 @@ import {
   findDirectiveTrigger,
   getDirectiveAutocompleteItems,
 } from './directive-autocomplete';
+import { AqlInput } from '@/components/aql-input';
 
 export type Server = {
   id: number;
@@ -996,89 +997,20 @@ export function QueryForm(props: QueryFormProps) {
     <form onSubmit={onSubmit} className="flex flex-col h-full p-2 gap-2 overflow-hidden">
       <div className="flex flex-1 min-h-0 gap-2">
         {queryMode !== 'models' && queryMode !== 'templates' && queryMode !== 'prebuilt' && (
-          <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0 relative">
-            <div
-              ref={editorRef}
-              contentEditable={!isRunning}
-              suppressContentEditableWarning
-              onInput={handleInput}
-              onKeyDown={handleKeyDown}
-              onClick={syncCursor}
-              onKeyUp={updateAutocompleteState}
-              onPaste={handlePaste}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
+          <div className="flex flex-col flex-1 min-h-0 relative">
+            <AqlInput
+              value={query}
+              onChange={(value, newCursor) => {
+                setQuery(value);
+                setCursor(newCursor);
               }}
-              onCompositionEnd={() => {
-                isComposingRef.current = false;
-                handleInput();
-                updateAutocompleteState();
-              }}
-              className={`flex-1 min-h-0 w-full bg-black/20 border border-white/10 rounded px-2 py-1.5 text-xs text-white overflow-y-auto outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 whitespace-pre-wrap ${
-                isRunning ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              style={{ minHeight: '3rem' }}
-              aria-label="Query"
-              role="textbox"
-              aria-disabled={isRunning}
-              tabIndex={isRunning ? -1 : 0}
+              disabled={isRunning}
+              placeholder={QUERY_PLACEHOLDERS[queryMode]}
+              availableEntities={availableEntities}
+              availableEdges={availableEdges}
+              className="flex-1 min-h-0"
             />
-
-          {showAutocomplete && autocompleteItems.length > 0 && (
-            <div
-              className="absolute z-20 rounded border border-white/10 bg-[oklch(0.23_0_0)] shadow-lg max-h-40 overflow-y-auto min-w-[180px]"
-              style={{
-                top: Math.min(autocompletePos.top + 18, (editorRef.current?.clientHeight || 200) - 8),
-                left: autocompletePos.left,
-              }}
-            >
-              {autocompleteItems.map((item, idx) => (
-                <button
-                  key={`${item.kind}:${item.id}`}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if ('token' in item) {
-                      insertAtCursor(item.token);
-                    } else {
-                      insertDirectiveAtCursor(item);
-                    }
-                    // Refocus after the layout effect has rewritten the DOM.
-                    requestAnimationFrame(() => {
-                      const el = editorRef.current;
-                      if (!el) return;
-                      const target = pendingCaretRef.current ?? cursor;
-                      restoreCaret(el, Math.min(target, query.length));
-                    });
-                  }}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs ${
-                    idx === selectedIndex ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'
-                  }`}
-                >
-                {'icon' in item && item.icon}
-                <div className="min-w-0 flex flex-col">
-                  <span className="truncate">{'render' in item ? item.render : item.label}</span>
-                  {'sublabel' in item && item.sublabel && (
-                    <span className="truncate text-[10px] text-white/40 font-mono">{item.sublabel}</span>
-                  )}
-                </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {!isRunning && query.trim() === '' && (
-            <div className="absolute inset-0 px-2 py-1.5 text-xs text-white/40 pointer-events-none overflow-hidden">
-              {QUERY_PLACEHOLDERS[queryMode]}
-            </div>
-          )}
-        </div>
+          </div>
         )}
 
         {queryMode === 'prebuilt' && availableTemplateRoles.length > 0 && (
