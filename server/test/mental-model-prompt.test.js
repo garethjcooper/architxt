@@ -50,18 +50,23 @@ describe('formatFocusVariable', () => {
       },
     ]);
     assert.ok(!result.includes('[['), 'result should not contain entity bracket tags');
+    assert.ok(!result.includes('(Company:COM-001)'), 'result should strip parenthetical IDs');
+    assert.ok(!result.includes('(COM-001)'), 'result should strip any parenthetical ID');
     assert.ok(result.includes('System'), 'result should keep non-entity words');
+    assert.ok(result.includes('Singleview'), 'result should preserve entity label');
     assert.ok(result.includes('context'), 'result should keep non-entity words');
     assert.ok(result.includes('generating reports'), 'result should keep directive content words');
   });
 
-  it('strips entity tags from table and narrative focus too', () => {
+  it('strips entity tags and parenthetical IDs from table and narrative focus too', () => {
     const table = formatFocusVariable([{ name: '[[CRM (App:APP-001)]]', content: 'List [[CRM (App:APP-001)]] fields' }]);
     assert.ok(!table.includes('[['));
+    assert.ok(!table.includes('(App:APP-001)'));
     assert.ok(table.includes('CRM'));
 
     const narrative = formatFocusVariable('Summarize [[CRM (App:APP-001)]] capabilities');
     assert.ok(!narrative.includes('[['));
+    assert.ok(!narrative.includes('(App:APP-001)'));
     assert.ok(narrative.includes('CRM'));
     assert.ok(narrative.includes('capabilities'));
   });

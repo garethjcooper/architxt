@@ -252,17 +252,31 @@ function buildFocusFromDirectives(topic) {
   };
 }
 const ENTITY_TAG_RE = /\[\[(.*?)\s*(?:\(([^)]*)\))?\]\]/g;
+const PARENTHETICAL_ID_RE = /\s*\([^)]*\)/g;
 
 /**
- * Strip UI entity tokens from a string so they do not leak into generated output
- * formats that have their own bracket syntax (e.g. Mermaid diagrams).
- * Preserves the matched text (the human-readable label) so the entity reference
- * is not lost entirely.
+ * Strip UI entity tokens and parenthetical IDs from a string so they do not leak
+ * into generated output formats that have their own bracket or parenthesis syntax
+ * (e.g. Mermaid diagrams).
+ *
+ * Entity tags like `[[Singleview (Company:COM-001)]]` are replaced with their
+ * matched text (`Singleview`). Any remaining parenthetical identifiers, such as
+ * catalog names that include `(COM-001)`, are also removed.
+ */
+function sanitizeOutputTokens(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(ENTITY_TAG_RE, (_, matchedText) => matchedText.trim())
+    .replace(PARENTHETICAL_ID_RE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * @deprecated Use sanitizeOutputTokens.
  */
 function stripEntityTags(str) {
-  return typeof str === 'string'
-    ? str.replace(ENTITY_TAG_RE, (_, matchedText) => matchedText.trim()).replace(/\s+/g, ' ').trim()
-    : str;
+  return sanitizeOutputTokens(str);
 }
 
 /**
