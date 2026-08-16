@@ -62,8 +62,25 @@ function ReferenceToken({
   );
 }
 
-function DirectiveToken({ keyword, value, matchingKeyword }: { keyword: string; value?: string; matchingKeyword?: string }) {
-  const color = directiveColor(matchingKeyword || keyword);
+function DirectiveToken({
+  keyword,
+  value,
+  matchingKeyword,
+  resolver,
+}: {
+  keyword: string;
+  value?: string;
+  matchingKeyword?: string;
+  resolver?: AqlReferenceResolver;
+}) {
+  let color = directiveColor(matchingKeyword || keyword);
+  if (keyword === 'name' && value) {
+    const refs = parseReferences(value);
+    if (refs.length > 0) {
+      const resolved = resolver?.(refs[0]);
+      if (resolved?.color) color = resolved.color;
+    }
+  }
   const raw = value ? `#${keyword} ${value}` : `#${keyword}`;
   return (
     <span
@@ -162,7 +179,15 @@ export function AqlTokenList({
       {tokens.map((token, i) => {
         switch (token.kind) {
           case 'directive':
-            return <DirectiveToken key={i} keyword={token.keyword!} value={token.value} matchingKeyword={token.matchingKeyword} />;
+            return (
+              <DirectiveToken
+                key={i}
+                keyword={token.keyword!}
+                value={token.value}
+                matchingKeyword={token.matchingKeyword}
+                resolver={resolveReference}
+              />
+            );
           case 'reference':
             return <ReferenceToken key={i} reference={token.reference!} resolver={resolveReference} />;
           case 'text':
