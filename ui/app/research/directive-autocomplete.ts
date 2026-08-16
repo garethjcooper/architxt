@@ -130,18 +130,27 @@ export function findDirectiveTrigger(query: string, offset: number): DirectiveTr
   if (!trimmed.startsWith('#')) return null;
 
   // Determine whether this is a #type line inside a #diagram block.
-  const isTypeLine = /^#type\s*/i.test(trimmed);
+  const typeMatch = trimmed.match(/^#type\s*/i);
+  if (typeMatch) {
+    const prefixLen = typeMatch[0].length;
+    return {
+      filter: trimmed.slice(prefixLen).toLowerCase(),
+      replaceStart: trimmedStart + prefixLen,
+      replaceEnd: offset,
+      isTypeLine: true,
+    };
+  }
 
   const afterHash = trimmed.slice(1);
   // Only trigger autocomplete when we are still typing the keyword (no spaces
   // after the partial word yet). Once the user hits space we close the picker.
-  if (/\s/.test(afterHash) && !isTypeLine) return null;
+  if (/\s/.test(afterHash)) return null;
 
   return {
     filter: afterHash.toLowerCase(),
     replaceStart: trimmedStart,
     replaceEnd: offset,
-    isTypeLine,
+    isTypeLine: false,
   };
 }
 
