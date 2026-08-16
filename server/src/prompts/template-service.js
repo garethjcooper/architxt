@@ -251,6 +251,20 @@ function buildFocusFromDirectives(topic) {
     },
   };
 }
+const ENTITY_TAG_RE = /\[\[(.*?)\s*(?:\(([^)]*)\))?\]\]/g;
+
+/**
+ * Strip UI entity tokens from a string so they do not leak into generated output
+ * formats that have their own bracket syntax (e.g. Mermaid diagrams).
+ * Preserves the matched text (the human-readable label) so the entity reference
+ * is not lost entirely.
+ */
+function stripEntityTags(str) {
+  return typeof str === 'string'
+    ? str.replace(ENTITY_TAG_RE, (_, matchedText) => matchedText.trim()).replace(/\s+/g, ' ').trim()
+    : str;
+}
+
 /**
  * Format a raw focus string (or array of strings / table directives) into bullet
  * or blank.
@@ -276,8 +290,9 @@ export function formatFocusVariable(raw) {
       .filter((d) => d.type?.trim() !== '' && d.content?.trim() !== '')
       .map((d) => {
         const type = d.type.trim();
-        const content = d.content.trim();
-        if (d.name?.trim()) return `- **${d.name.trim()}** (${type}) — ${content}`;
+        const content = stripEntityTags(d.content.trim());
+        const name = d.name?.trim() ? stripEntityTags(d.name.trim()) : '';
+        if (name) return `- **${name}** (${type}) — ${content}`;
         return `- (${type}) — ${content}`;
       });
     return lines.join('\n');
@@ -289,8 +304,9 @@ export function formatFocusVariable(raw) {
     const lines = directives
       .filter((d) => d.content?.trim() !== '')
       .map((d) => {
-        const content = d.content.trim();
-        if (d.name?.trim()) return `- **${d.name.trim()}** — ${content}`;
+        const content = stripEntityTags(d.content.trim());
+        const name = d.name?.trim() ? stripEntityTags(d.name.trim()) : '';
+        if (name) return `- **${name}** — ${content}`;
         return `- ${content}`;
       });
     return lines.join('\n');
@@ -298,12 +314,14 @@ export function formatFocusVariable(raw) {
 
   // String array (graph/narrative multiple scopes, or legacy table array)
   if (Array.isArray(raw)) {
-    const lines = raw.filter((s) => typeof s === 'string' && s.trim() !== '').map((s) => `- ${s.trim()}`);
+    const lines = raw
+      .filter((s) => typeof s === 'string' && s.trim() !== '')
+      .map((s) => `- ${stripEntityTags(s.trim())}`);
     return lines.join('\n');
   }
 
   if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
-  return `- ${raw.trim()}`;
+  return `- ${stripEntityTags(raw.trim())}`;
 }
 
 /**
