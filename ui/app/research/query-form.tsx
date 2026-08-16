@@ -526,7 +526,11 @@ export function QueryForm(props: QueryFormProps) {
       const idx = query.indexOf(raw);
       if (idx === -1) return;
       const next = query.slice(0, idx) + query.slice(idx + raw.length);
-      const cleaned = next.replace(/\s+/g, ' ').trim();
+      // Preserve newlines for directive tokens so line-based block structure
+      // isn't destroyed when a chip is deleted.
+      const cleaned = raw.trimStart().startsWith('#')
+        ? next.replace(/[ \t]+/g, ' ')
+        : next.replace(/\s+/g, ' ').trim();
       const newPos = Math.min(idx, cleaned.length);
       setQuery(cleaned);
       setCursor(newPos);
