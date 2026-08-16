@@ -6,7 +6,6 @@
  */
 
 import { reflect } from '../../hindsight/index.js';
-import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
 import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';

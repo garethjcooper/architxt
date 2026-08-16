@@ -61,7 +61,7 @@ function now() {
  * @param {string} bankId
  * @param {object} model - mental_model row from Hindsight-ish shape:
  *   mm_ext_id, mm_template_role, mm_dimension, mm_name, etc.
- * @param {object} output - normalized envelope from normalizeModelOutput.
+ * @param {object} output - unified envelope from Hindsight reflect_response.structured_output.
  * @param {object} [options]
  * @param {string} [options.now] - ISO timestamp override.
  * @returns {Promise<{success: boolean, applied: object, warnings?: string[], error?: string, code?: string}>}
