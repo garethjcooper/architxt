@@ -1,5 +1,5 @@
 /**
- * CommonJS build of @architxt/rql.
+ * CommonJS build of @architxt/aql.
  * Generated mirror of src/index.js for require() consumers.
  */
 
@@ -82,7 +82,7 @@ function matchDirectiveLine(line) {
   return { raw: m[0], keyword: m[3].toLowerCase(), value: m[4] || '', lineStartOffset: m[1].length };
 }
 
-function parseRql(rawQuery) {
+function parseAql(rawQuery) {
   if (!rawQuery || typeof rawQuery !== 'string') {
     return { intentText: '', references: [], blocks: [] };
   }
@@ -168,7 +168,7 @@ function parseRql(rawQuery) {
     : { intentText, references: allReferences, blocks: builtBlocks };
 }
 
-function renderRqlTokens(query) {
+function renderAqlTokens(query) {
   if (!query) return [];
   const tokens = [];
   let lastIndex = 0;
@@ -205,6 +205,6 @@ module.exports = {
   parseEdgeReferences,
   parseReferences,
   stripReferences,
-  parseRql,
-  renderRqlTokens,
+  parseAql,
+  renderAqlTokens,
 };

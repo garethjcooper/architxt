@@ -1,5 +1,5 @@
 /**
- * Research Query Language (RQL) types.
+ * Architxt Query Language (AQL) types.
  */
 
 export type TokenKind = 'entity' | 'edge' | 'directive';
@@ -28,7 +28,7 @@ export interface Block {
   type?: string;
 }
 
-export interface RqlQuery {
+export interface AqlQuery {
   intentText: string;
   references: Reference[];
   blocks: Block[];
@@ -52,5 +52,5 @@ export function parseEntityReferences(text: string): Reference[];
 export function parseEdgeReferences(text: string): Reference[];
 export function parseReferences(text: string): Reference[];
 export function stripReferences(text: string): string;
-export function parseRql(rawQuery: string): RqlQuery;
-export function renderRqlTokens(query: string): RenderToken[];
+export function parseAql(rawQuery: string): AqlQuery;
+export function renderAqlTokens(query: string): RenderToken[];

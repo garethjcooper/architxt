@@ -1,5 +1,5 @@
 /**
- * Research Query Language (RQL) parser.
+ * Architxt Query Language (AQL) parser.
  *
  * Shared source of truth for both server and UI. Parses a compact line-based
  * query syntax with block directives (#graph, #table, #diagram, #narrative),
@@ -67,7 +67,7 @@ export const ALLOWED_KEYS_BY_BLOCK = Object.freeze({
  */
 
 /**
- * @typedef {Object} RqlQuery
+ * @typedef {Object} AqlQuery
  * @property {string} intentText
  * @property {Reference[]} references
  * @property {Block[]} blocks
@@ -194,12 +194,12 @@ function matchDirectiveLine(line) {
 }
 
 /**
- * Parse an RQL query string.
+ * Parse an AQL query string.
  *
  * @param {string} rawQuery
- * @returns {RqlQuery}
+ * @returns {AqlQuery}
  */
-export function parseRql(rawQuery) {
+export function parseAql(rawQuery) {
   if (!rawQuery || typeof rawQuery !== 'string') {
     return { intentText: '', references: [], blocks: [] };
   }
@@ -336,7 +336,7 @@ export function parseRql(rawQuery) {
  * @param {string} query
  * @returns {Array<{ kind: 'directive'|'reference'|'text', text: string, keyword?: string, value?: string, reference?: Reference }>}
  */
-export function renderRqlTokens(query) {
+export function renderAqlTokens(query) {
   if (!query) return [];
   const tokens = [];
   let lastIndex = 0;
