@@ -7,11 +7,10 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { handleReflect } from '../src/services/research/handlers/reflect.js';
 
 function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
-  return JSON.stringify({ narrative, graph: { nodes, edges }, tables: [],
-      diagrams: [] });
+  return { narrative, graph: { nodes, edges }, tables: [], diagrams: [] };
 }
 
-const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
+const REFLECT_STRUCT_WITH_GRAPH = buildEnvelope({
   narrative: 'Here is the analysis.',
   nodes: [
     { id: 'a', name: 'Alpha' },
@@ -22,8 +21,7 @@ const REFLECT_TEXT_WITH_GRAPH = buildEnvelope({
   ],
 });
 
-const REFLECT_TEXT_NO_GRAPH = JSON.stringify({ narrative: 'Just a plain text response with no graph data.', graph: { nodes: [], edges: [] }, tables: [],
-      diagrams: [] });
+const REFLECT_STRUCT_NO_GRAPH = buildEnvelope({ narrative: 'Just a plain text response with no graph data.', nodes: [], edges: [] });
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-reflect-handler-${Date.now()}.db`);
@@ -52,16 +50,16 @@ describe('reflect handler', () => {
     cleanupTestDb(db, file);
   });
 
-  function makeReflectFn(text) {
+  function makeReflectFn(structuredOutput) {
     return async () => ({
       success: true,
-      data: { text },
+      data: { structured_output: structuredOutput },
     });
   }
 
   it('extracts graph from contextual envelope when present', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
-      reflectFn: makeReflectFn(REFLECT_TEXT_WITH_GRAPH),
+      reflectFn: makeReflectFn(REFLECT_STRUCT_WITH_GRAPH),
     }, db);
 
     assert.equal(result.success, true);
@@ -75,7 +73,7 @@ describe('reflect handler', () => {
 
   it('returns empty graph when envelope graph is empty', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
-      reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
+      reflectFn: makeReflectFn(REFLECT_STRUCT_NO_GRAPH),
     }, db);
 
     assert.equal(result.success, true);
@@ -104,7 +102,7 @@ describe('reflect handler', () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
-      return { success: true, data: { text: 'ok' } };
+      return { success: true, data: { structured_output: { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
     await handleReflect(1, 'bank', 'test query', {
@@ -120,7 +118,7 @@ describe('reflect handler', () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
-      return { success: true, data: { text: REFLECT_TEXT_WITH_GRAPH } };
+      return { success: true, data: { structured_output: REFLECT_STRUCT_WITH_GRAPH } };
     };
 
     const result = await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
@@ -136,7 +134,7 @@ describe('reflect handler', () => {
     const reflectFn = async (body) => ({
       success: true,
       data: {
-        text: JSON.stringify({
+        structured_output: {
           narrative: '',
           graph: { nodes: [], edges: [] },
           tables: [],
@@ -145,7 +143,7 @@ describe('reflect handler', () => {
             type: 'erDiagram',
             content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
           }],
-        }),
+        },
       },
     });
 
@@ -164,12 +162,12 @@ describe('reflect handler', () => {
     const reflectFn = async (body) => ({
       success: true,
       data: {
-        text: JSON.stringify({
+        structured_output: {
           narrative: '',
           graph: { nodes: [], edges: [] },
           tables: [],
           diagrams: [],
-        }),
+        },
       },
     });
 
@@ -186,7 +184,7 @@ describe('reflect handler', () => {
     const reflectFn = async (body) => ({
       success: true,
       data: {
-        text: JSON.stringify({
+        structured_output: {
           narrative: 'The model should not have written this.',
           graph: { nodes: [], edges: [] },
           tables: [],
@@ -195,7 +193,7 @@ describe('reflect handler', () => {
             type: 'erDiagram',
             content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
           }],
-        }),
+        },
       },
     });
 
@@ -211,7 +209,7 @@ describe('reflect handler', () => {
 
   it('fails fast without db', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
-      reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
+      reflectFn: makeReflectFn(REFLECT_STRUCT_NO_GRAPH),
     });
 
     assert.equal(result.success, false);

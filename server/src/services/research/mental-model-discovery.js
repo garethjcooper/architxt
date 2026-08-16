@@ -21,8 +21,6 @@
 import { listMentalModels as listLocalMentalModels, deriveMentalModels, isSystemTemplateRole } from '../../db/crud/mental-models.js';
 import { listEdges } from '../../db/crud/contextual-graph.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { normalizeModelOutput } from '../contextual-graph/normalize-model-output.js';
-import { normalizeGraph } from '../../prompts/normalize-graph.js';
 import { modelMatchesEntities } from '../../prompts/graph-parser.js';
 import { createLogger } from '../../utils/logger.js';
 
@@ -231,11 +229,18 @@ async function fetchCandidateContents(serverId, bankId, candidates, timeoutMs) {
       }
 
       const structuredOutput = mentalModel.reflect_response?.structured_output;
+      if (!structuredOutput || typeof structuredOutput !== 'object') {
+        return {
+          ...candidate,
+          found: false,
+          error: 'Hindsight mental model missing reflect_response.structured_output',
+        };
+      }
 
       return {
         ...candidate,
         found: true,
-        content: structuredOutput || (mentalModel.content ?? null),
+        content: structuredOutput,
       };
     })
   );
@@ -252,7 +257,15 @@ async function mergeRoleResult(candidates, entityIds) {
     if (!candidate.found || !candidate.content) continue;
     if (!modelMatchesEntities({ content: candidate.content }, entityIds)) continue;
 
-    const { narrative, graph, errors: modelErrors } = normalizeModelOutput(candidate.content);
+    const content = candidate.content;
+    const narrative = typeof content.narrative === 'string' ? content.narrative : '';
+    let graph = { nodes: [], edges: [] };
+    if (content.graph && typeof content.graph === 'object') {
+      graph = {
+        nodes: Array.isArray(content.graph.nodes) ? content.graph.nodes : [],
+        edges: Array.isArray(content.graph.edges) ? content.graph.edges : [],
+      };
+    }
 
     if (narrative) {
       narratives.push(narrative);
@@ -268,8 +281,6 @@ async function mergeRoleResult(candidates, entityIds) {
         edgeKeys.add(key);
         edges.push(e);
       }
-    } else if (modelErrors?.length) {
-      errors.push({ model: candidate.name || candidate.ext_id, error: modelErrors.join('; ') });
     }
   }
 
