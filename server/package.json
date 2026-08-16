@@ -16,6 +16,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@architxt/aql": "^0.3.5",
     "@architxt/entity-matcher": "^0.3.5",
     "better-sqlite3": "^12.10.0",
     "cors": "^2.8.6",

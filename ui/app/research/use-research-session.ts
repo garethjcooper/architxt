@@ -9,8 +9,11 @@ import {
   type GraphEdge,
   ApiError,
 } from '@/lib/api/client';
-import { parseQueryTokens, buildSelectionPayload } from './query-tokens';
-import { parseSectionDirectives } from './section-directives';
+import {
+  parseAql,
+  toSectionFocus,
+  parseReferences,
+} from '@architxt/aql';
 import { transformPrebuiltToDiscoverResponse } from './prebuilt';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -625,7 +628,7 @@ export function useResearchSession({
     setLoading(true);
     setError(null);
     try {
-      const parsed = parseSectionDirectives(intentText.trim());
+      const parsed = toSectionFocus(parseAql(intentText.trim()));
       const response = await researchApi.synthesize({
         server_id: parseInt(serverId, 10),
         bank_id: bankId,
@@ -693,10 +696,11 @@ export function useResearchSession({
       }
     }
 
-    const tokens = parseQueryTokens(query);
+    const tokens = parseReferences(query);
     const entityIds = tokens
-      .filter((t) => t.kind === 'entity')
-      .map((t) => (t.type ? `${t.type}:${t.id}` : t.id));
+      .filter((r): r is import('@architxt/aql').Reference & { kind: 'entity' } => r.kind === 'entity')
+      .map((r) => (r.type ? `${r.type}:${r.id}` : r.id))
+      .filter((id): id is string => Boolean(id));
 
     if (queryMode === 'prebuilt') {
       if (selectedTemplateRoles.length === 0) {
@@ -779,13 +783,13 @@ export function useResearchSession({
     setLoading(true);
     setError(null);
     try {
-      const parsed = parseSectionDirectives(
+      const parsed = toSectionFocus(parseAql(
         queryMode === 'models'
           ? 'Mental models: ' + (queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`).join(', ') || '')
           : queryMode === 'templates'
             ? 'Templates: ' + (queryOptions.templates?.selections?.map((s) => s.name || s.ext_id).join(', ') || '')
             : query.trim(),
-      );
+      ));
 
       const response = await researchApi.discover({
         server_id: parseInt(serverId, 10),

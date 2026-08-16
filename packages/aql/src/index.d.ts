@@ -43,9 +43,12 @@ export interface RenderToken {
   reference?: Reference;
 }
 
-export const BLOCK_DIRECTIVES: Set<string>;
-export const SUB_DIRECTIVE_KEYS: Set<string>;
-export const MERMAID_DIAGRAM_TYPES: Set<string>;
+/** Canonical block directive keywords. */
+export const BLOCK_DIRECTIVES: readonly string[];
+/** Canonical sub-directive keywords allowed inside block directives. */
+export const SUB_DIRECTIVE_KEYS: readonly string[];
+/** Supported Mermaid diagram types. */
+export const MERMAID_DIAGRAM_TYPES: readonly string[];
 export const ALLOWED_KEYS_BY_BLOCK: Record<string, Set<string>>;
 
 export function parseEntityReferences(text: string): Reference[];
@@ -53,4 +56,7 @@ export function parseEdgeReferences(text: string): Reference[];
 export function parseReferences(text: string): Reference[];
 export function stripReferences(text: string): string;
 export function parseAql(rawQuery: string): AqlQuery;
+export function toSectionFocus(aqlQuery: AqlQuery): { intentText: string; sectionFocus: Record<string, string | string[] | Array<{ name?: string; content: string }> | Array<{ name?: string; type?: string; content: string }>> };
 export function renderAqlTokens(query: string): RenderToken[];
+export function formatEntityToken(label: string, id: string, type?: string | null): string;
+export function formatEdgeToken(source: string, target: string, label: string): string;

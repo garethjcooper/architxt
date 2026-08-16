@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { createLogger } from '../../utils/logger.js';
-import { VALID_MERMAID_DIAGRAM_TYPES } from '../../prompts/section-directives.js';
+import { MERMAID_DIAGRAM_TYPES } from '@architxt/aql';
 
 const logger = createLogger('contextual-graph-normalize-model-output');
 
@@ -330,7 +330,7 @@ function normalizeDiagram(d) {
   const content = typeof d.content === 'string' ? d.content.trim() : '';
   if (!name) return null;
   if (!type) return null;
-  if (!VALID_MERMAID_DIAGRAM_TYPES.has(type)) return null;
+  if (!MERMAID_DIAGRAM_TYPES.includes(type)) return null;
   if (!content) return null;
   return { name, type, content };
 }
