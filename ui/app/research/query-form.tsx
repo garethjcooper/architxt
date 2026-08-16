@@ -156,28 +156,48 @@ function serializeEditable(el: HTMLElement): string {
   return text;
 }
 
-/** Sum text/token lengths from the start of the container up to (but not including) the target node. */
+/** Sum text/token lengths from the start of the container up to (but not including) the target node.
+ *  Mirrors serializeEditable so <div> line wraps and token chips are counted once. */
 function getTextLengthBeforeNode(container: Node, target: Node): number {
   let length = 0;
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT + NodeFilter.SHOW_ELEMENT, null);
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    if (node === target) return length;
-    if (node.nodeType === Node.TEXT_NODE) {
-      length += node.textContent?.length || 0;
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as HTMLElement;
-      const raw = el.getAttribute('data-token-raw');
-      if (raw) {
-        length += decodeURIComponent(raw).length;
-      } else if (el.tagName === 'BR') {
-        length += 1;
-      } else {
-        length += el.textContent?.length || 0;
+  for (const child of container.childNodes) {
+    if (child === target) return length;
+    if (child.contains(target)) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement;
+        const raw = el.getAttribute('data-token-raw');
+        if (raw) {
+          // The target is somehow inside a chip; treat the whole chip as before.
+          return length + decodeURIComponent(raw).length;
+        }
+        if (el.tagName === 'BR') return length + 1;
+        if (el.tagName === 'DIV') length += 1;
       }
+      return length + getTextLengthBeforeNode(child, target);
     }
+    length += nodeQueryLength(child);
   }
   return length;
+}
+
+/** Query-string length contribution of a single DOM node. */
+function nodeQueryLength(node: Node): number {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent?.length || 0;
+  if (node.nodeType !== Node.ELEMENT_NODE) return 0;
+  const el = node as HTMLElement;
+  const raw = el.getAttribute('data-token-raw');
+  if (raw) return decodeURIComponent(raw).length;
+  if (el.tagName === 'BR') return 1;
+  if (el.tagName === 'DIV') return 1 + childrenQueryLength(el);
+  return childrenQueryLength(el);
+}
+
+function childrenQueryLength(container: Node): number {
+  let len = 0;
+  for (const child of container.childNodes) {
+    len += nodeQueryLength(child);
+  }
+  return len;
 }
 
 /** Get the caret offset in the underlying query string (raw token lengths, not visible text). */
@@ -187,7 +207,7 @@ function getCaretOffset(el: HTMLElement): number {
   const range = selection.getRangeAt(0);
   if (!el.contains(range.startContainer)) return 0;
 
-  // If the caret is inside a token chip, report the position at the token boundary based on direction.
+  // If the caret is inside a token chip, report the position at the chip boundary.
   let container: Node | null = range.startContainer;
   while (container && container !== el) {
     if (container.nodeType === Node.ELEMENT_NODE) {
@@ -201,82 +221,60 @@ function getCaretOffset(el: HTMLElement): number {
     container = container.parentNode;
   }
 
-  // Caret is in a text node. Walk the tree up to the caret node.
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT + NodeFilter.SHOW_ELEMENT, null);
-  let node: Node | null;
-  let length = 0;
-  while ((node = walker.nextNode())) {
-    if (node === range.startContainer) {
-      return length + Math.min(range.startOffset, node.textContent?.length || 0);
-    }
-    if (node.nodeType === Node.TEXT_NODE) {
-      length += node.textContent?.length || 0;
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as HTMLElement;
-      const raw = element.getAttribute('data-token-raw');
-      if (raw) {
-        length += decodeURIComponent(raw).length;
-      } else if (element.tagName === 'BR') {
-        length += 1;
-      } else {
-        length += element.textContent?.length || 0;
-      }
-    }
-  }
-
-  return length;
+  return getTextLengthBeforeNode(el, range.startContainer) + Math.min(range.startOffset, range.startContainer.textContent?.length || 0);
 }
 
 /** Place the caret at the given query-string offset inside the editor. */
 function setCaretOffset(el: HTMLElement, offset: number): void {
   const selection = window.getSelection();
   if (!selection) return;
-  let remaining = offset;
 
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT + NodeFilter.SHOW_ELEMENT, null);
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    let length = 0;
-    if (node.nodeType === Node.TEXT_NODE) {
-      length = node.textContent?.length || 0;
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const elNode = node as HTMLElement;
-      const raw = elNode.getAttribute('data-token-raw');
-      if (raw) {
-        length = decodeURIComponent(raw).length;
-      } else if (elNode.tagName === 'BR') {
-        length = 1;
-      } else {
-        length = elNode.textContent?.length || 0;
-      }
-    }
-
-    if (remaining <= length) {
-      const range = document.createRange();
-      if (node.nodeType === Node.TEXT_NODE) {
-        range.setStart(node, Math.max(0, Math.min(remaining, node.textContent?.length || 0)));
-      } else if ((node as HTMLElement).getAttribute('data-token-raw')) {
-        // For token chips, place the caret before or after the chip element, never inside.
-        if (remaining === 0) {
-          range.setStartBefore(node);
-        } else {
-          range.setStartAfter(node);
+  function find(parent: Node, remaining: number): { node: Node; offset: number } | null {
+    for (const child of parent.childNodes) {
+      const len = nodeQueryLength(child);
+      if (remaining <= len) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          return { node: child, offset: Math.min(remaining, child.textContent?.length || 0) };
         }
-      } else {
-        range.setStart(node, 0);
+        const childEl = child as HTMLElement;
+        const raw = childEl.getAttribute('data-token-raw');
+        if (raw) {
+          return { node: child, offset: remaining === 0 ? 0 : 1 };
+        }
+        if (childEl.tagName === 'BR') {
+          return { node: child, offset: 0 };
+        }
+        if (childEl.tagName === 'DIV') {
+          if (remaining === 0) return { node: child, offset: 0 };
+          const inner = find(child, remaining - 1);
+          if (inner) return inner;
+          return { node: child, offset: 0 };
+        }
+        const inner = find(child, remaining);
+        if (inner) return inner;
+        return { node: child, offset: 0 };
       }
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
+      remaining -= len;
     }
-    remaining -= length;
+    return null;
   }
 
-  // Place at the end if offset exceeded.
+  const found = find(el, offset);
   const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
+  if (found) {
+    if (found.node.nodeType === Node.TEXT_NODE) {
+      range.setStart(found.node, found.offset);
+    } else if ((found.node as HTMLElement).getAttribute('data-token-raw')) {
+      if (found.offset === 0) range.setStartBefore(found.node);
+      else range.setStartAfter(found.node);
+    } else {
+      range.setStart(found.node, Math.min(found.offset, found.node.childNodes.length));
+    }
+  } else {
+    range.selectNodeContents(el);
+    range.collapse(false);
+  }
+  range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
 }
