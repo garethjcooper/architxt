@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
 import type { MentalModel, StandardDimension } from '@/lib/types/index';
 import { mentalModelsApi } from '@/lib/api/client';
+import { AqlInput } from '@/components/aql-input';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -203,11 +202,14 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
 
       <div className="space-y-2">
         <Label htmlFor="mm-source-query" className="text-xs uppercase text-white/50 font-medium">Source Query *</Label>
-        <Textarea
+        <AqlInput
           id="mm-source-query"
           value={sourceQuery}
-          onChange={(e) => setSourceQuery(e.target.value)}
+          onChange={(value) => setSourceQuery(value)}
+          disabled={false}
           placeholder="Query used to source this model"
+          availableEntities={[]}
+          availableEdges={[]}
           className={inputClass}
           style={{ ...inputFocusStyle, minHeight: '80px' }}
         />
