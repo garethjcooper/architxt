@@ -1,7 +1,7 @@
 import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
 import { refreshMentalModel } from '../../services/hindsight/mental-models.js';
 import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge, findEdgeByEndpoints } from '../../db/crud/contextual-graph.js';
-import { normalizeModelOutput, contentHash } from './normalize-model-output.js';
+import { contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { createLogger } from '../../utils/logger.js';
 import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
@@ -351,13 +351,13 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      const output = normalizeModelOutput(content);
-      if (output.errors.length > 0) {
+      const output = content;
+      if (!output.graph || typeof output.graph !== 'object') {
         stats.failed += 1;
-        const error = output.errors.map((e) => (typeof e === 'string' ? e : e.message)).join('; ');
-        stats.errors.push({ extId: model.id, errors: output.errors });
+        const error = 'Mental model structured output is missing a valid graph';
+        stats.errors.push({ extId: model.id, error });
         updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
-        logger.warn('Normalized output has errors; treating as failed', { extId: model.id, errors: output.errors });
+        logger.warn(error, { extId: model.id });
         continue;
       }
 

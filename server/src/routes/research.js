@@ -25,7 +25,6 @@ import { discoverMentalModelsByRoles } from '../services/research/mental-model-d
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
-import { normalizeModelOutput } from '../services/contextual-graph/normalize-model-output.js';
 import { parseSectionDirectives } from '../prompts/section-directives.js';
 
 const logger = createLogger('research-route');
@@ -926,7 +925,7 @@ router.post('/mental-models/health', async (req, res) => {
       }
 
       const hindsightResult = await getHindsightMentalModel(server_id, bank_id, extId, {
-        detail: 'content',
+        detail: 'full',
         timeoutMs: 15000,
       });
 
@@ -938,31 +937,29 @@ router.post('/mental-models/health', async (req, res) => {
         };
       }
 
-      const content = hindsightResult.mentalModel.content ?? null;
-      if (!content) {
+      const content = hindsightResult.mentalModel.reflect_response?.structured_output ?? null;
+      if (!content || typeof content !== 'object') {
         return {
           ext_id: extId,
           healthy: false,
           found: true,
           content: null,
           content_length: 0,
-          error: 'Mental-model content is empty',
+          error: 'Mental-model reflect_response.structured_output is empty or missing',
         };
       }
 
-      const { graph, errors: modelErrors } = normalizeModelOutput(content);
-      const healthy = !modelErrors?.length;
+      const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
+      const healthy = Array.isArray(graph.nodes) && graph.nodes.length > 0;
       return {
         ext_id: extId,
         healthy,
         found: true,
-        content,
-        content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
-        parsed: healthy ? { graph } : undefined,
+        content_length: JSON.stringify(content).length,
         graph_present: healthy,
-        node_count: graph?.nodes.length ?? 0,
-        edge_count: graph?.edges.length ?? 0,
-        error: modelErrors?.length ? modelErrors.join('; ') : null,
+        node_count: graph?.nodes?.length ?? 0,
+        edge_count: graph?.edges?.length ?? 0,
+        error: healthy ? null : 'Mental-model structured output has no graph nodes',
       };
     }));
 
