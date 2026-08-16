@@ -130,7 +130,7 @@ export function tokenizeAql(query: string): AqlToken[] {
         const matchingKeyword = blockStack.pop();
         out.push({ kind: 'directive', keyword, value: token.value, matchingKeyword });
       } else {
-        if (BLOCK_COLORS[keyword] || SUB_COLORS[keyword]) {
+        if (BLOCK_COLORS[keyword]) {
           blockStack.push(keyword);
         }
         out.push({ kind: 'directive', keyword, value: token.value });
