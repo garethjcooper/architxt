@@ -1255,7 +1255,10 @@ router.post('/synthesize', async (req, res) => {
     const stepResult = await createStep(db, {
       rs_id: session_id,
       rstep_parent_step_id: parentStepId,
-      rstep_intent_text: parsed.intentText,
+      // Store the raw user query so "Use details" / reuse can restore the full
+      // AQL including block directives. The parsed/stripped intent is passed to
+      // the agent below while the original query lives in the step record.
+      rstep_intent_text: intent_text,
       rstep_selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
       rstep_action_type: 'synthesize',
       rstep_parameters: handlerOptions,

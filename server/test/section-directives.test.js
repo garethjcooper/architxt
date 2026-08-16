@@ -132,6 +132,19 @@ describe('parseSectionDirectives', () => {
     assert.equal(result.intentText, 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain');
     assert.equal(result.sectionFocus?.diagram, undefined);
   });
+
+  it('strips block bodies from intentText, requiring callers to preserve raw query for reuse', () => {
+    const raw = 'Analyze billing\n#graph\nCRM, ERP\n#end\n#table\n#name Gaps\nlist gaps\n#end';
+    const result = parseSectionDirectives(raw);
+    assert.equal(result.intentText, 'Analyze billing');
+    assert.equal(result.sectionFocus?.graph, 'CRM, ERP');
+    assert.equal(result.sectionFocus?.table?.length, 1);
+    // This test documents why the synthesize route must store `intent_text`
+    // (raw) rather than `parsed.intentText` — otherwise "Use details" would
+    // return a reduced query with block bodies missing.
+    assert.notEqual(result.intentText, raw);
+    assert.ok(!result.intentText.includes('#graph'));
+  });
 });
 
 describe('formatFocusVariable with TableDirective', () => {
