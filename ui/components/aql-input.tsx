@@ -366,11 +366,6 @@ export function AqlInput({
         cancelAnimationFrame(autocompleteRafRef.current);
         autocompleteRafRef.current = null;
       }
-      // Apply the change to the DOM immediately so the controlled textarea does
-      // not reset the caret to the end when React re-renders.
-      el.value = next;
-      el.selectionStart = pos;
-      el.selectionEnd = pos;
       onChange(next, pos);
       pendingCaretRef.current = pos;
       updateCursor(pos);
@@ -400,9 +395,6 @@ export function AqlInput({
         cancelAnimationFrame(autocompleteRafRef.current);
         autocompleteRafRef.current = null;
       }
-      el.value = next;
-      el.selectionStart = pos;
-      el.selectionEnd = pos;
       onChange(next, pos);
       pendingCaretRef.current = pos;
       updateCursor(pos);
