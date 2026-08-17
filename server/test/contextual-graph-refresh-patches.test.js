@@ -130,28 +130,7 @@ describe('refreshContextualGraphPatches', () => {
     assert.equal(node.properties.summary, undefined);
   });
 
-  it('treats malformed structured_output as failures and does not update hash', async () => {
-    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
-      display_name: 'Billing Service',
-      provenance: {
-        source: 'contextual-graph',
-        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
-      },
-    });
 
-    const injectedList = async () => ({
-      success: true,
-      mentalModels: [{ id: 'entity-summary-svc-001', content: 'not valid json', reflect_response: { content: 'not valid json' } }],
-    });
-
-    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
-    assert.equal(result.success, true);
-    assert.equal(result.stats.failed, 1);
-    assert.equal(result.stats.applied, 0);
-
-    const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.provenance.model_refs[0].content_hash, 'oldhash');
-  });
 
   it('re-applies when content hash is unchanged but applied content is missing', async () => {
     const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [],
@@ -239,5 +218,57 @@ describe('refreshContextualGraphPatches', () => {
     const ref = node.properties.provenance.model_refs[0];
     assert.equal(ref.last_refresh_status, 'pending_build');
     assert.equal(ref.content_hash, undefined);
+  });
+
+  it('skips models with reflect_response but no structured_output as pending_build', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', name: 'Entity summary: Billing Service', reflect_response: { content: 'old markdown output' } }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, {
+      listAllMentalModels: injectedList,
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedBuilding, 1);
+    assert.equal(result.stats.applied, 0);
+    assert.equal(result.stats.failed, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    const ref = node.properties.provenance.model_refs[0];
+    assert.equal(ref.last_refresh_status, 'pending_build');
+    assert.equal(ref.content_hash, undefined);
+  });
+
+  it('fails models with malformed structured_output', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', content: 'not valid json', reflect_response: { structured_output: 'not an object' } }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.failed, 1);
+    assert.equal(result.stats.applied, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.provenance.model_refs[0].content_hash, 'oldhash');
   });
 });

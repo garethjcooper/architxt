@@ -15,11 +15,17 @@ function getModelContent(model) {
     // been run. Treat as pending, not as an error.
     return null;
   }
+  if (!('structured_output' in reflectResponse)) {
+    // A reflect_response without structured_output means the model was run under an
+    // older config (e.g. before response_schema was added). It needs a re-run under
+    // the current schema, not a hard failure.
+    return null;
+  }
   const structuredOutput = reflectResponse.structured_output;
   if (structuredOutput && typeof structuredOutput === 'object') {
     return structuredOutput;
   }
-  throw new Error(`Mental model ${model?.id} has no reflect_response.structured_output`);
+  throw new Error(`Mental model ${model?.id} has malformed reflect_response.structured_output`);
 }
 
 function getModelContentHashSource(model) {
