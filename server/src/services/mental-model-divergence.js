@@ -53,7 +53,7 @@ function schemaDiffers(a, b) {
 
 export function buildMentalModelDivergence(arch, hind) {
   const nameDiffers = arch.name !== (hind.name ?? null);
-  const sourceQueryDiffers = arch.composed_query !== (hind.source_query ?? null);
+  const sourceQueryDiffers = (arch.composed_query ?? '').trimEnd() !== (hind.source_query ?? '').trimEnd();
   const maxTokensDiffers = Number(arch.max_tokens) !== Number(hind.max_tokens);
   const refreshModeDiffers = arch.refresh_mode !== hind.refresh_mode;
   const refreshAfterConsolidationDiffers = !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation;
