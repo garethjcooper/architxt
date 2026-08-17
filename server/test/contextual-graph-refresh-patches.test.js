@@ -130,7 +130,7 @@ describe('refreshContextualGraphPatches', () => {
     assert.equal(node.properties.summary, undefined);
   });
 
-  it('treats normalization errors as failures and does not update hash', async () => {
+  it('treats malformed structured_output as failures and does not update hash', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
       provenance: {
@@ -141,7 +141,7 @@ describe('refreshContextualGraphPatches', () => {
 
     const injectedList = async () => ({
       success: true,
-      mentalModels: [{ id: 'entity-summary-svc-001', content: 'not valid json' }],
+      mentalModels: [{ id: 'entity-summary-svc-001', content: 'not valid json', reflect_response: { content: 'not valid json' } }],
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
@@ -199,6 +199,35 @@ describe('refreshContextualGraphPatches', () => {
     const result = await refreshContextualGraphPatches(db, serverId, bankId, {
       listAllMentalModels: injectedList,
       newlyDeployedExtIds: ['entity-summary-svc-001'],
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedBuilding, 1);
+    assert.equal(result.stats.applied, 0);
+    assert.equal(result.stats.failed, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    const ref = node.properties.provenance.model_refs[0];
+    assert.equal(ref.last_refresh_status, 'pending_build');
+    assert.equal(ref.content_hash, undefined);
+  });
+
+  it('skips models with no reflect_response as pending_build instead of failing', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [{ id: 'entity-summary-svc-001', name: 'Entity summary: Billing Service' }],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, {
+      listAllMentalModels: injectedList,
     });
 
     assert.equal(result.success, true);
