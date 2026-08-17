@@ -17,7 +17,25 @@ Rules:
 - Do not include entity catalog IDs or type prefixes such as `(Company:COM-001)` in visible labels unless they are inside a quoted label.
 - Use `-->` for directed arrows. Label arrows with `A -->|sends| B` only when the relationship needs annotation.
 
-Example diagrams:
+## Mermaid syntax safety
+
+The `content` field must be valid Mermaid syntax. Mermaid is strict about characters in labels and identifiers.
+
+- Use `graph TD` or `graph LR` for flowcharts. Pick the direction that best matches the flow.
+- Node IDs must be plain identifiers with no spaces, slashes, parentheses, brackets, quotes, colons, pipes, or special characters. Good: `ICMS`, `BillingSystem`, `MozartAPI`. Bad: `ICMS/API`, `Billing (system)`, `Mozart::API`.
+- Every node label must be wrapped in double quotes. Good: `ICMS["Billing System"]`. Bad: `ICMS[Billing System]`.
+- Inside quoted labels, do NOT use: `/`, `(`, `)`, `[`, `]`, `{`, `}`, `"`, `#`, `;`, `|`, `--`, or newlines.
+- Replace `/` in prose with a space or hyphen: `rental/usage feed` → `rental usage feed` or `rental-usage-feed`.
+- Remove or rewrite parentheses and brackets in labels: `(async)` → `async`, `[batch]` → `batch`, `foo(bar)` → `foo bar`.
+- Labels may contain ASCII letters, digits, spaces, hyphens, periods, commas, and apostrophes only.
+- One edge per line. No trailing comments, no inline CSS (`classDef`, `style`), no subgraphs.
+- Do not put blank lines inside the Mermaid source.
+- Do not wrap the `content` in Markdown fences or triple backticks; it must be the raw Mermaid source.
+
+Example of a safe edge:
+```json
+{ "name": "Integration flow", "type": "graph", "content": "graph TD\n  ICMS[\"ICMS\"] -->|\"sends rental usage feed\"| BILL[\"Billing System\"]" }
+```
 
 ```json
 { "name": "Order sequence", "type": "sequenceDiagram", "content": "Alice->>Bob: Hello\nBob-->>Alice: Hi" }
