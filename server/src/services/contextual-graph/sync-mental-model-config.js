@@ -2,6 +2,7 @@ import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
 import { pushMentalModel } from '../../services/hindsight/push-mental-model.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 import { buildMentalModelDivergence, hasDivergence } from '../../services/mental-model-divergence.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../../services/contextual-graph/unified-response-schema.js';
 import { createLogger } from '../../utils/logger.js';
 import { getContextualGraphTemplate } from './template-models.js';
 import { extractModelRefsFromDb } from './refresh-patches.js';
@@ -20,6 +21,7 @@ function buildArchCandidate(spec, composed) {
     exclude_mental_model_list: spec.exclude_mental_model_list || '',
     tags_match_mode: spec.tags_match_mode || 'any',
     tags: Array.isArray(spec.tags) ? spec.tags : [],
+    response_schema: UNIFIED_RESPONSE_SCHEMA,
   };
 }
 
@@ -34,6 +36,7 @@ function buildHindCandidate(hind) {
     exclude_mental_model_ids: Array.isArray(hind.trigger?.exclude_mental_model_ids) ? hind.trigger.exclude_mental_model_ids : [],
     tags_match_mode: hind.trigger?.tags_match || 'any',
     tags: Array.isArray(hind.tags) ? hind.tags : [],
+    response_schema: hind.trigger?.response_schema || null,
   };
 }
 

@@ -20,6 +20,7 @@ import { pushMentalModel, createMentalModel } from '../services/hindsight/push-m
 import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import { getBankConfig } from '../services/hindsight/bank-config.js';
 import { buildMentalModelDivergence } from '../services/mental-model-divergence.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../services/contextual-graph/unified-response-schema.js';
 import { db } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
 import { getExpandedDocumentMetadata } from '../db/crud/document-metadata.js';
@@ -133,6 +134,7 @@ function deriveMentalModelsForDiff(template) {
       tags_match_mode: template.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
       tags: template.mm_tag_names || [],
       is_derived: true,
+      response_schema: UNIFIED_RESPONSE_SCHEMA,
       derived_entity: { id: entity.id, mm_id: template.mm_id, entity_id: entity.entity_id, name: entity.name },
       __rawOverrides: overrides,
     };
@@ -422,6 +424,7 @@ router.get('/diff', async (req, res) => {
           max_tokens: mm.max_tokens,
           tags_match_mode: mm.trigger?.tags_match || DEFAULT_TAGS_MATCH_MODE,
           tags: Array.isArray(mm.tags) ? mm.tags : [],
+          response_schema: mm.trigger?.response_schema || null,
         });
       }
 
@@ -476,6 +479,7 @@ router.get('/diff', async (req, res) => {
           tags: r.mm_tag_names || [],
           is_derived: false,
           composed_query: composed.composed_query,
+          response_schema: UNIFIED_RESPONSE_SCHEMA,
           ...(composed.compose_error ? { compose_error: composed.compose_error } : {}),
         };
       });
