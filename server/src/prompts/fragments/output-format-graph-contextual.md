@@ -23,4 +23,4 @@ Example edge:
 ```
 
 Connected-node rule:
-Every node in the `nodes` array must be an endpoint of at least one emitted edge (as `from` or `to`). Do not return a graph that has nodes but zero edges. Before returning the graph, remove any isolated node. If this leaves no edges, return an empty graph instead: `{"nodes":[],"edges":[]}`. If no graph is justified, return an empty graph object.
+Every node in the `nodes` array must be an endpoint of at least one emitted edge (as `from` or `to`). Do not return a graph that has nodes but zero edges. Before returning the graph, remove any isolated node. If this leaves no edges, return an empty graph instead: {"nodes":[],"edges":[]}. If no graph is justified, return an empty graph object.

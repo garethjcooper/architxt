@@ -323,11 +323,12 @@ describe('syncContextualMentalModelConfig', () => {
     assert.equal(secondPushed.length, 0);
   });
 
-  it('preserves remote source_query for derived specs when trigger config matches', async () => {
-    // Regression: derived specs used to recompose the prompt every cycle and compare
-    // it to Hindsight's stored source_query. If a prompt fragment changed, the composed
-    // output would differ from the stored query (e.g. Hindsight normalizes backticks
-    // out) and the daemon would push every cycle even though trigger config matched.
+  it('skips derived edge-ctx spec when trigger config and composed prompt match', async () => {
+    // Regression: Hindsight normalizes backticks out of inline JSON examples in
+    // source_query. A fragment with `{"nodes":[],"edges":[]}` would compose
+    // locally with backticks but compare against a Hindsight-stored query without
+    // them, causing source_query_differs every cycle. The fragment must match
+    // Hindsight's normalized form.
     upsertNode(db, serverId, bankId, 'svc:SVC-001', ['active'], { display_name: 'A' });
     upsertNode(db, serverId, bankId, 'svc:SVC-002', ['active'], { display_name: 'B' });
     upsertEdge(db, serverId, bankId, 'e1', 'svc:SVC-001', 'svc:SVC-002', null, {
@@ -340,9 +341,6 @@ describe('syncContextualMentalModelConfig', () => {
 
     const localSpec = await deriveEdgeContextModel(db, { id: 'svc:SVC-001', displayName: 'A' }, { id: 'svc:SVC-002', displayName: 'B' });
     const localComposed = await composeMentalModelPrompt(db, 'sys_edge_context', localSpec.source_query);
-    // Simulate a stored query that differs only by Hindsight-normalized formatting
-    // (e.g. backticks stripped around inline JSON) but has matching trigger config.
-    const storedSourceQuery = localComposed.replaceAll('\`{\\"nodes\\":[],\\"edges\\":[]}\`', '{\\"nodes\\":[],\\"edges\\":[]}');
 
     const pushed = [];
     const result = await syncContextualMentalModelConfig(db, serverId, bankId, {
@@ -351,7 +349,7 @@ describe('syncContextualMentalModelConfig', () => {
         mentalModels: [{
           id: 'edge-ctx-svc:SVC-001|svc:SVC-002',
           name: 'Edge context: A ↔ B',
-          source_query: storedSourceQuery,
+          source_query: localComposed,
           max_tokens: localSpec.max_tokens,
           trigger: {
             mode: localSpec.refresh_mode,
