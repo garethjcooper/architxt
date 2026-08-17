@@ -245,13 +245,20 @@ describe('syncContextualMentalModelConfig', () => {
       },
     });
 
+    // Pre-compute what Hindsight currently stores: an already-wrapped/bloated source_query.
+    // The fallback path must preserve this query and only patch trigger-level config;
+    // recomposing would append another prompt wrapper and make it grow every cycle.
+    const rawSourceQuery = 'Entity: svc-001 (Billing Service).\n#narrative\nDescribe its core architectural role, responsibilities, and relationships to other components.\n#end';
+    const singleWrapped = await composeMentalModelPrompt(db, 'sys_entity_summary', rawSourceQuery);
+    const bloatedRemoteSourceQuery = singleWrapped + '\n\n## Topic\n\nExtra wrapper that should not be re-wrapped.';
+
     const result = await syncContextualMentalModelConfig(db, serverId, bankId, {
       listAllMentalModels: async () => ({
         success: true,
         mentalModels: [{
           id: EXT_ID,
           name: 'Entity summary: Billing Service',
-          source_query: 'Old query.',
+          source_query: bloatedRemoteSourceQuery,
           max_tokens: 4096,
           trigger: {
             mode: 'full',
@@ -274,9 +281,46 @@ describe('syncContextualMentalModelConfig', () => {
     assert.equal(result.stats.checked, 1);
     assert.equal(result.stats.updated, 1);
     assert.equal(pushed.length, 1);
-    // Fallback uses the role template, so refresh_mode and tags_match_mode come from the template.
+    // The fallback path must preserve Hindsight's existing source_query as the composed query,
+    // not recompose from the template. This prevents repeatedly appending prompt wrappers.
+    assert.equal(pushed[0].composed_query, bloatedRemoteSourceQuery);
+    // Trigger-level config still comes from the role template.
     assert.equal(pushed[0].refresh_mode, 'full');
     assert.equal(pushed[0].tags_match_mode, 'any');
+
+    // Second sync cycle: Hindsight still has the same bloated query, trigger config now matches.
+    // There should be no divergence and no second push.
+    const secondPushed = [];
+    const secondResult = await syncContextualMentalModelConfig(db, serverId, bankId, {
+      listAllMentalModels: async () => ({
+        success: true,
+        mentalModels: [{
+          id: EXT_ID,
+          name: 'Entity summary: Billing Service',
+          source_query: bloatedRemoteSourceQuery,
+          max_tokens: 8192,
+          trigger: {
+            mode: 'full',
+            refresh_after_consolidation: false,
+            exclude_mental_models: true,
+            tags_match: 'any',
+            response_schema: UNIFIED_RESPONSE_SCHEMA,
+          },
+          tags: [],
+          content: '',
+        }],
+      }),
+      pushMentalModel: async (_serverId, _bankId, spec) => {
+        secondPushed.push(spec);
+        return { success: true };
+      },
+    });
+
+    assert.equal(secondResult.success, true);
+    assert.equal(secondResult.stats.checked, 1);
+    assert.equal(secondResult.stats.skippedNoChange, 1);
+    assert.equal(secondResult.stats.updated, 0);
+    assert.equal(secondPushed.length, 0);
   });
 
   it('pushes updates for edge-ctx refs', async () => {
