@@ -131,7 +131,17 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       }
 
       try {
-        const composed = await composeMentalModelPrompt(db, role, spec.source_query);
+        // For stale refs whose backing node/edge is missing, we cannot reliably
+        // re-derive the raw topic from the template. Recomposing from the
+        // template would wrap Hindsight's already-wrapped source_query again,
+        // causing the prompt to grow every cycle. Preserve the remote query
+        // as-is for fallback specs, and only patch trigger-level config.
+        let composed;
+        if (reason === 'fallback' && hind.source_query) {
+          composed = hind.source_query;
+        } else {
+          composed = await composeMentalModelPrompt(db, role, spec.source_query);
+        }
         const archCandidate = buildArchCandidate(spec, composed);
         const hindCandidate = buildHindCandidate(hind);
         const divergence = buildMentalModelDivergence(archCandidate, hindCandidate);
