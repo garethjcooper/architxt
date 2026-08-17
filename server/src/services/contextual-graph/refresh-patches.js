@@ -9,7 +9,13 @@ import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
 const logger = createLogger('contextual-graph-refresh-patches');
 
 function getModelContent(model) {
-  const structuredOutput = model?.reflect_response?.structured_output;
+  const reflectResponse = model?.reflect_response;
+  if (!reflectResponse) {
+    // No reflect response at all means the model is still building or has never
+    // been run. Treat as pending, not as an error.
+    return null;
+  }
+  const structuredOutput = reflectResponse.structured_output;
   if (structuredOutput && typeof structuredOutput === 'object') {
     return structuredOutput;
   }
@@ -355,6 +361,19 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         stats.errors.push({ extId: model.id, error });
         updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
         logger.warn('Mental model has no structured output; treating as failed', { extId: model.id, error: err.message });
+        continue;
+      }
+
+      if (content === null) {
+        // Model exists in Hindsight but has no reflect_response yet (still building
+        // or never run). Skip it like a newly deployed model and let a later
+        // refresh pick it up.
+        stats.skippedBuilding += 1;
+        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, {
+          status: 'pending_build',
+          error: 'Model has no Hindsight reflect response yet',
+        });
+        logger.debug('Skipping mental model with no reflect_response', { extId: model.id });
         continue;
       }
 
