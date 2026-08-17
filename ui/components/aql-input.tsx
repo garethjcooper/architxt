@@ -610,7 +610,7 @@ export function AqlInput({
           setSelectedIndex((i) => (i - 1 + autocompleteItems.length) % autocompleteItems.length);
           return;
         }
-        if (e.key === 'Tab' || e.key === 'Enter') {
+        if (e.key === 'Tab') {
           e.preventDefault();
           lastHandledKeyRef.current = e.key;
           const item = autocompleteItems[selectedIndex];
