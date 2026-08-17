@@ -6,11 +6,12 @@ Start with `venn-beta`.
 - `union {id1},{id2}["{label}"] (: {size})?` — declare the intersection of two or more sets.
 - `intersection` and `disjunction` are also valid keywords instead of `union`.
 - Nested text nodes:
-  ```
-  set A["Frontend"]
-    text A1["React"]
-    text A2["Design Systems"]
-  ```
+
+```text
+set A["Frontend"]
+  text A1["React"]
+  text A2["Design Systems"]
+```
 
 Example:
 

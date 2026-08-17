@@ -155,7 +155,6 @@ function formatNodeExamples({ include, exclude }) {
 const DIAGRAM_TYPE_TO_FRAGMENT = {
   flowchart: 'output-format-diagram-flowchart.md',
   graph: 'output-format-diagram-flowchart.md',
-  'swimlane-beta': 'output-format-diagram-swimlane.md',
   sequenceDiagram: 'output-format-diagram-sequence.md',
   classDiagram: 'output-format-diagram-class.md',
   'stateDiagram-v2': 'output-format-diagram-state.md',

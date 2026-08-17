@@ -2,16 +2,23 @@
 
 Start with `gantt`.
 
-- Optional date format: `dateFormat YYYY-MM-DD` (place before tasks).
-- Optional title: `title My Title`.
-- Sections group tasks: `section Section Name`.
-- Task syntax: `Task description : status, startDate, durationOrEndDate`.
-- Status values: `done`, `active`, `crit`, or omit for default.
-- Date formats: `YYYY-MM-DD`, `after taskId`, or durations like `3d`, `1w`, `2m`.
-- One task per line.
-- No blank lines inside the Mermaid source.
+- `title {text}` — optional title.
+- `dateFormat {format}` — sets how dates are parsed, e.g. `YYYY-MM-DD`.
+- `excludes weekends` — optional; omits Saturdays and Sundays.
+- `section {name}` — begins a task section.
+- `{taskName} : {status}, {id}, {startDate}, {duration}` — a task line.
+  - `status` can be `done`, `active`, `crit`, or omitted.
+  - `id` is an optional reference for dependencies.
+  - `startDate` can be an absolute date or `after {id}`.
+  - `duration` like `1d`, `2w`, `3m`.
 
 Example:
+
 ```json
-{ "type": "gantt", "content": "gantt\n  dateFormat YYYY-MM-DD\n  title Project plan\n  section Build\n    Foundation :done, 2026-01-01, 7d\n    Walls :active, after Foundation, 5d" }
+{ "type": "gantt", "content": "gantt\n  title Project plan\n  dateFormat YYYY-MM-DD\n  section Design\n    Draft :done, a1, 2026-01-01, 5d\n    Review :active, a2, after a1, 3d\n  section Build\n    Code :crit, b1, after a2, 10d" }
 ```
+
+Rules:
+- Use the exact colon-separated task syntax shown above.
+- One `section` or task per line.
+- No blank lines inside the Mermaid source.
