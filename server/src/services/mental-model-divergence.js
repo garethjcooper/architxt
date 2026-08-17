@@ -29,9 +29,22 @@ export function arraySetEqual(a, b) {
  *   exclude_all_mental_models, exclude_mental_model_ids, tags_match_mode, tags.
  * @returns {object} divergence flags.
  */
+function sortKeysDeep(value) {
+  if (value == null) return value;
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (typeof value === 'object') {
+    const sorted = {};
+    for (const key of Object.keys(value).sort()) {
+      sorted[key] = sortKeysDeep(value[key]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
 function canonicalJson(value) {
   if (value == null) return null;
-  return JSON.stringify(value);
+  return JSON.stringify(sortKeysDeep(value));
 }
 
 function schemaDiffers(a, b) {
