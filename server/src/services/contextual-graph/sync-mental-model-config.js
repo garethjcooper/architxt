@@ -18,8 +18,9 @@ function roleFromExtId(extId) {
   return null;
 }
 
-function buildFallbackSpecFromTemplate(template, hind, role) {
+function buildFallbackSpecFromTemplate(template, hind, role, extId) {
   return {
+    ext_id: extId,
     role,
     name: hind.name || template.data.name || null,
     source_query: hind.source_query || template.data.source_query || '',
@@ -186,7 +187,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       if (!role) continue;
       const template = getContextualGraphTemplate(db, role);
       if (!template?.data) continue;
-      const fallbackSpec = buildFallbackSpecFromTemplate(template, hindByExtId.get(extId), role);
+      const fallbackSpec = buildFallbackSpecFromTemplate(template, hindByExtId.get(extId), role, extId);
       await syncOne(extId, fallbackSpec, 'fallback');
     }
 
