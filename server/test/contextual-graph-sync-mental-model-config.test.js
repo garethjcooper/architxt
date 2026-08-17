@@ -5,7 +5,7 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { clearCache } from '../src/cache.js';
 import { upsertNode, upsertEdge } from '../src/db/crud/contextual-graph.js';
 import { syncContextualMentalModelConfig } from '../src/services/contextual-graph/sync-mental-model-config.js';
-import { deriveEntitySummaryModel } from '../src/services/contextual-graph/template-models.js';
+import { deriveEntitySummaryModel, deriveEdgeContextModel } from '../src/services/contextual-graph/template-models.js';
 import { composeMentalModelPrompt } from '../src/prompts/template-service.js';
 import { UNIFIED_RESPONSE_SCHEMA } from '../src/services/contextual-graph/unified-response-schema.js';
 
@@ -321,6 +321,60 @@ describe('syncContextualMentalModelConfig', () => {
     assert.equal(secondResult.stats.skippedNoChange, 1);
     assert.equal(secondResult.stats.updated, 0);
     assert.equal(secondPushed.length, 0);
+  });
+
+  it('preserves remote source_query for derived specs when trigger config matches', async () => {
+    // Regression: derived specs used to recompose the prompt every cycle and compare
+    // it to Hindsight's stored source_query. If a prompt fragment changed, the composed
+    // output would differ from the stored query (e.g. Hindsight normalizes backticks
+    // out) and the daemon would push every cycle even though trigger config matched.
+    upsertNode(db, serverId, bankId, 'svc:SVC-001', ['active'], { display_name: 'A' });
+    upsertNode(db, serverId, bankId, 'svc:SVC-002', ['active'], { display_name: 'B' });
+    upsertEdge(db, serverId, bankId, 'e1', 'svc:SVC-001', 'svc:SVC-002', null, {
+      directed: false,
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'edge-ctx-svc:SVC-001|svc:SVC-002', role: 'sys_edge_context', scope: { source_id: 'svc:SVC-001', target_id: 'svc:SVC-002' }, attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const localSpec = await deriveEdgeContextModel(db, { id: 'svc:SVC-001', displayName: 'A' }, { id: 'svc:SVC-002', displayName: 'B' });
+    const localComposed = await composeMentalModelPrompt(db, 'sys_edge_context', localSpec.source_query);
+    // Simulate a stored query that differs only by Hindsight-normalized formatting
+    // (e.g. backticks stripped around inline JSON) but has matching trigger config.
+    const storedSourceQuery = localComposed.replaceAll('\`{\\"nodes\\":[],\\"edges\\":[]}\`', '{\\"nodes\\":[],\\"edges\\":[]}');
+
+    const pushed = [];
+    const result = await syncContextualMentalModelConfig(db, serverId, bankId, {
+      listAllMentalModels: async () => ({
+        success: true,
+        mentalModels: [{
+          id: 'edge-ctx-svc:SVC-001|svc:SVC-002',
+          name: 'Edge context: A ↔ B',
+          source_query: storedSourceQuery,
+          max_tokens: localSpec.max_tokens,
+          trigger: {
+            mode: localSpec.refresh_mode,
+            refresh_after_consolidation: localSpec.refresh_after_consolidation,
+            exclude_mental_models: localSpec.exclude_all_mental_models,
+            tags_match: localSpec.tags_match_mode,
+            response_schema: UNIFIED_RESPONSE_SCHEMA,
+          },
+          tags: localSpec.tags,
+          content: '',
+        }],
+      }),
+      pushMentalModel: async (_serverId, _bankId, spec) => {
+        pushed.push(spec);
+        return { success: true };
+      },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.checked, 1);
+    assert.equal(result.stats.skippedNoChange, 1);
+    assert.equal(result.stats.updated, 0);
+    assert.equal(pushed.length, 0);
   });
 
   it('pushes updates for edge-ctx refs', async () => {
