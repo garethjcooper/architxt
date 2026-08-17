@@ -621,6 +621,20 @@ export function AqlInput({
           }
           return;
         }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          lastHandledKeyRef.current = e.key;
+          const offset = el.selectionStart ?? 0;
+          const textBefore = value.slice(0, offset);
+          const openIdx = textBefore.lastIndexOf('[[');
+          if (openIdx >= 0) {
+            const next = value.slice(0, openIdx) + value.slice(offset);
+            onChange(next, openIdx);
+            pendingCaretRef.current = openIdx;
+          }
+          setShowAutocomplete(false);
+          return;
+        }
         if (e.key === 'Escape') {
           e.preventDefault();
           lastHandledKeyRef.current = 'Escape';
