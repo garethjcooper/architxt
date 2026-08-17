@@ -371,15 +371,45 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       }
 
       if (content === null) {
-        // Model exists in Hindsight but has no reflect_response yet (still building
-        // or never run). Skip it like a newly deployed model and let a later
-        // refresh pick it up.
-        stats.skippedBuilding += 1;
+        if (!model?.reflect_response) {
+          // Model exists in Hindsight but has no reflect_response at all (still building
+          // or never run). Skip it like a newly deployed model and let a later
+          // refresh pick it up.
+          stats.skippedBuilding += 1;
+          updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, {
+            status: 'pending_build',
+            error: 'Model has no Hindsight reflect response yet',
+          });
+          logger.debug('Skipping mental model with no reflect_response', { extId: model.id });
+          continue;
+        }
+
+        // reflect_response exists but structured_output is missing: the model config
+        // is stale (e.g. response_schema was added after the last run). Queue a
+        // rebuild under the current config and skip it in this pass.
+        stats.rerunRequested += 1;
+        const refreshResult = await refreshFn(serverId, bankId, model.id);
+        if (!refreshResult.success) {
+          stats.rerunFailed += 1;
+          stats.failed += 1;
+          const error = refreshResult.error || 'Failed to queue refresh for stale mental model';
+          stats.errors.push({ extId: model.id, error, phase: 'rerun' });
+          updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, { status: 'error', error });
+          logger.error('Failed to queue contextual mental model re-run after stale schema', { extId: model.id, error });
+          continue;
+        }
+
+        if (['completed', 'success', 'done'].includes(refreshResult.status)) {
+          stats.rerunCompleted += 1;
+        } else {
+          stats.rerunPending += 1;
+        }
+        stats.skippedPendingRerun += 1;
         updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, {
-          status: 'pending_build',
-          error: 'Model has no Hindsight reflect response yet',
+          status: 'pending_refresh',
+          error: 'Waiting for re-run after response schema/config update',
         });
-        logger.debug('Skipping mental model with no reflect_response', { extId: model.id });
+        logger.info('Queued re-run for stale mental model missing structured_output', { extId: model.id, status: refreshResult.status });
         continue;
       }
 
