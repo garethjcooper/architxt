@@ -3,6 +3,7 @@ import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 import { getMentalModel } from '../../services/hindsight/mental-models.js';
 import { buildMentalModelDivergence, hasDivergence } from '../../services/mental-model-divergence.js';
 import { createLogger } from '../../utils/logger.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../../services/contextual-graph/unified-response-schema.js';
 
 const logger = createLogger('contextual-graph-deploy-models');
 
@@ -45,6 +46,7 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
       exclude_mental_model_list: spec.exclude_mental_model_list || '',
       tags_match_mode: spec.tags_match_mode || 'any',
       tags: Array.isArray(spec.tags) ? spec.tags : [],
+      response_schema: UNIFIED_RESPONSE_SCHEMA,
     };
 
     // Prompt-drift guard: skip re-pushing if Hindsight already has an identical model.
@@ -61,6 +63,7 @@ export async function deployMentalModel(db, serverId, bankId, spec) {
         exclude_mental_model_ids: Array.isArray(hind.trigger?.exclude_mental_model_ids) ? hind.trigger.exclude_mental_model_ids : [],
         tags_match_mode: hind.trigger?.tags_match || 'any',
         tags: Array.isArray(hind.tags) ? hind.tags : [],
+        response_schema: hind.trigger?.response_schema || null,
       };
       const divergence = buildMentalModelDivergence(archCandidate, hindCandidate);
       if (!hasDivergence(divergence)) {

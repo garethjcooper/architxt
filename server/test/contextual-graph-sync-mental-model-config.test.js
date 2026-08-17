@@ -7,6 +7,7 @@ import { upsertNode, upsertEdge } from '../src/db/crud/contextual-graph.js';
 import { syncContextualMentalModelConfig } from '../src/services/contextual-graph/sync-mental-model-config.js';
 import { deriveEntitySummaryModel } from '../src/services/contextual-graph/template-models.js';
 import { composeMentalModelPrompt } from '../src/prompts/template-service.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../src/services/contextual-graph/unified-response-schema.js';
 
 function createDb() {
   clearCache();
@@ -56,6 +57,7 @@ function makeRemoteModel(overrides = {}) {
       refresh_after_consolidation: false,
       exclude_mental_models: false,
       tags_match: 'all_strict',
+      response_schema: UNIFIED_RESPONSE_SCHEMA,
     },
     tags: [],
     content: '',
@@ -101,6 +103,7 @@ describe('syncContextualMentalModelConfig', () => {
             refresh_after_consolidation: spec.refresh_after_consolidation,
             exclude_mental_models: spec.exclude_all_mental_models,
             tags_match: spec.tags_match_mode,
+            response_schema: UNIFIED_RESPONSE_SCHEMA,
           },
           tags: spec.tags,
           content: '',
@@ -113,6 +116,34 @@ describe('syncContextualMentalModelConfig', () => {
     assert.equal(result.stats.checked, 1);
     assert.equal(result.stats.skippedNoChange, 1);
     assert.equal(result.stats.updated, 0);
+  });
+
+  it('pushes update when remote response_schema is missing', async () => {
+    seedNodeWithRef(db);
+
+    const result = await syncContextualMentalModelConfig(db, serverId, bankId, {
+      listAllMentalModels: async () => ({
+        success: true,
+        mentalModels: [makeRemoteModel({
+          trigger: {
+            mode: 'full',
+            refresh_after_consolidation: false,
+            exclude_mental_models: false,
+            tags_match: 'all_strict',
+            // response_schema intentionally omitted
+          },
+        })],
+      }),
+      pushMentalModel: async (_serverId, _bankId, spec) => {
+        pushed.push(spec);
+        return { success: true };
+      },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.checked, 1);
+    assert.equal(result.stats.updated, 1);
+    assert.equal(pushed.length, 1);
   });
 
   it('returns updatedExtIds when config diverges', async () => {

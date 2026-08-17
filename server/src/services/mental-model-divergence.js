@@ -29,6 +29,15 @@ export function arraySetEqual(a, b) {
  *   exclude_all_mental_models, exclude_mental_model_ids, tags_match_mode, tags.
  * @returns {object} divergence flags.
  */
+function canonicalJson(value) {
+  if (value == null) return null;
+  return JSON.stringify(value);
+}
+
+function schemaDiffers(a, b) {
+  return canonicalJson(a) !== canonicalJson(b);
+}
+
 export function buildMentalModelDivergence(arch, hind) {
   const nameDiffers = arch.name !== (hind.name ?? null);
   const sourceQueryDiffers = arch.composed_query !== (hind.source_query ?? null);
@@ -45,6 +54,7 @@ export function buildMentalModelDivergence(arch, hind) {
     (arch.tags || []).slice().sort(),
     (hind.tags || []).slice().sort()
   );
+  const responseSchemaDiffers = schemaDiffers(arch.response_schema, hind.response_schema);
 
   return {
     name_differs: nameDiffers,
@@ -56,6 +66,7 @@ export function buildMentalModelDivergence(arch, hind) {
     exclude_all_mental_models_differs: excludeAllDiffers,
     exclude_mental_model_list_differs: excludeListDiffers,
     tags_match_mode_differs: tagsMatchModeDiffers,
+    response_schema_differs: responseSchemaDiffers,
   };
 }
 
