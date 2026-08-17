@@ -131,13 +131,13 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       }
 
       try {
-        // For existing Hindsight models, do not recompose the prompt body every
-        // cycle. Local prompt/template drift would otherwise push the same model
-        // repeatedly because Hindsight may normalize the stored query differently
-        // than our composed output. Preserve the remote query and only patch
-        // trigger-level config (schema, tokens, mode, tags, excludes).
+        // For stale refs whose backing node/edge is missing, we cannot reliably
+        // re-derive the raw topic from the template. Recomposing from the
+        // template would wrap Hindsight's already-wrapped source_query again,
+        // causing the prompt to grow every cycle. Preserve the remote query
+        // as-is for fallback specs, and only patch trigger-level config.
         let composed;
-        if (hind.source_query) {
+        if (reason === 'fallback' && hind.source_query) {
           composed = hind.source_query;
         } else {
           composed = await composeMentalModelPrompt(db, role, spec.source_query);
