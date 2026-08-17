@@ -10,6 +10,29 @@ import { deriveSpecsForRefs } from './specs.js';
 
 const logger = createLogger('contextual-graph-sync-mental-model-config');
 
+function roleFromExtId(extId) {
+  if (extId.startsWith('entity-summary-')) return 'sys_entity_summary';
+  if (extId.startsWith('entity-capabilities-')) return 'sys_entity_capabilities';
+  if (extId.startsWith('edge-ctx-')) return 'sys_edge_context';
+  if (extId.startsWith('discover-')) return 'sys_discovery_context';
+  return null;
+}
+
+function buildFallbackSpecFromTemplate(template, hind, role) {
+  return {
+    role,
+    name: hind.name || template.data.name || null,
+    source_query: hind.source_query || template.data.source_query || '',
+    max_tokens: template.data.max_tokens,
+    refresh_mode: template.data.refresh_mode,
+    refresh_after_consolidation: template.data.refresh_after_consolidation,
+    exclude_all_mental_models: template.data.exclude_all_mental_models,
+    exclude_mental_model_list: template.data.exclude_mental_model_list,
+    tags_match_mode: template.data.tags_match_mode,
+    tags: Array.isArray(hind.tags) ? hind.tags : [],
+  };
+}
+
 function buildArchCandidate(spec, composed) {
   return {
     name: spec.name || null,
@@ -90,20 +113,20 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
 
     const derived = await deriveSpecsForRefs(db, serverId, bankId, refs);
 
-    for (const { extId, spec } of derived) {
+    async function syncOne(extId, spec, reason) {
       const role = spec.role;
       stats.checked += 1;
 
       const template = getContextualGraphTemplate(db, role);
       if (!template?.data) {
         stats.skippedNoTemplate += 1;
-        continue;
+        return;
       }
 
       const hind = hindByExtId.get(extId);
       if (!hind) {
         stats.skippedMissingRemote += 1;
-        continue;
+        return;
       }
 
       try {
@@ -116,6 +139,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
         logger.info('Checked contextual mental model config', {
           extId,
           role,
+          reason,
           shouldPush,
           divergence,
           archResponseSchema: archCandidate.response_schema,
@@ -124,13 +148,13 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
 
         if (!shouldPush) {
           stats.skippedNoChange += 1;
-          continue;
+          return;
         }
 
         if (dryRun) {
           stats.updated += 1;
           updatedExtIds.push(extId);
-          continue;
+          return;
         }
 
         const pushResult = await pushFn(serverId, bankId, { ...spec, composed_query: composed }, db);
@@ -138,17 +162,32 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
           stats.failed += 1;
           stats.errors.push({ extId, error: pushResult.error });
           logger.error('Failed to push contextual mental model config update', { extId, error: pushResult.error });
-          continue;
+          return;
         }
 
         stats.updated += 1;
         updatedExtIds.push(extId);
-        logger.info('Pushed contextual mental model config update', { extId, role, status: pushResult.status, operationId: pushResult.operationId });
+        logger.info('Pushed contextual mental model config update', { extId, role, reason, status: pushResult.status, operationId: pushResult.operationId });
       } catch (err) {
         stats.failed += 1;
         stats.errors.push({ extId, error: err.message });
         logger.error('Failed to sync contextual mental model config', { extId, error: err.message });
       }
+    }
+
+    for (const { extId, spec } of derived) {
+      await syncOne(extId, spec, 'derived');
+    }
+
+    for (const [extId, { ref }] of refs) {
+      if (derived.some((d) => d.extId === extId)) continue;
+      if (!hindByExtId.has(extId)) continue;
+      const role = ref.role || roleFromExtId(extId);
+      if (!role) continue;
+      const template = getContextualGraphTemplate(db, role);
+      if (!template?.data) continue;
+      const fallbackSpec = buildFallbackSpecFromTemplate(template, hindByExtId.get(extId), role);
+      await syncOne(extId, fallbackSpec, 'fallback');
     }
 
     stats.skippedNoSpec = refs.size - derived.length;
