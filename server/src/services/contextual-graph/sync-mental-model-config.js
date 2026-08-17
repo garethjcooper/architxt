@@ -111,8 +111,18 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
         const archCandidate = buildArchCandidate(spec, composed);
         const hindCandidate = buildHindCandidate(hind);
         const divergence = buildMentalModelDivergence(archCandidate, hindCandidate);
+        const shouldPush = hasDivergence(divergence);
 
-        if (!hasDivergence(divergence)) {
+        logger.info('Checked contextual mental model config', {
+          extId,
+          role,
+          shouldPush,
+          divergence,
+          archResponseSchema: archCandidate.response_schema,
+          hindResponseSchema: hindCandidate.response_schema,
+        });
+
+        if (!shouldPush) {
           stats.skippedNoChange += 1;
           continue;
         }
@@ -133,7 +143,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
 
         stats.updated += 1;
         updatedExtIds.push(extId);
-        logger.info('Pushed contextual mental model config update', { extId, role });
+        logger.info('Pushed contextual mental model config update', { extId, role, status: pushResult.status, operationId: pushResult.operationId });
       } catch (err) {
         stats.failed += 1;
         stats.errors.push({ extId, error: err.message });
