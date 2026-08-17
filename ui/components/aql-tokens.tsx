@@ -49,9 +49,6 @@ function ReferenceToken({
 }) {
   const resolved = resolver?.(reference) || { label: reference.label || reference.raw };
   const color = resolved.color || '#fbbf24';
-  const label = resolved.label || reference.label || reference.id || reference.raw;
-  const id = reference.id || reference.raw;
-  const display = id && id !== label ? `[[${label} (${id})]]` : `[[${label}]]`;
 
   return (
     <span
@@ -60,7 +57,7 @@ function ReferenceToken({
       data-token-raw={reference.raw}
       title={reference.raw}
     >
-      {display}
+      [[{resolved.label}]]
     </span>
   );
 }
@@ -235,10 +232,8 @@ export function renderAqlToHtml(
         const ref = token.reference!;
         const resolved = resolveReference?.(ref) || { label: ref.label || ref.raw };
         const color = resolved.color || '#fbbf24';
-        const label = escapeHtml(resolved.label || ref.label || ref.id || ref.raw);
-        const id = escapeHtml(ref.id || ref.raw);
-        const display = id && id !== label ? `[[${label} (${id})]]` : `[[${label}]]`;
-        html += `<span contenteditable="false" class="aql-token aql-reference whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">${display}</span>`;
+        const label = escapeHtml(resolved.label || ref.raw);
+        html += `<span contenteditable="false" class="aql-token aql-reference whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">[[${label}]]</span>`;
         break;
       }
       case 'text': {
