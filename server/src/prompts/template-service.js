@@ -422,7 +422,7 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
   const { prompt } = composePrompt(effectiveTemplate, merged);
   const sectionState = computeSectionState(effectiveFocus);
   const instructions = formatSectionInstructions(sectionState);
-  return injectBeforeOutputDirectives(prompt, instructions);
+  return injectBeforeOutputDirectives(prompt, instructions).trimEnd();
 }
 
 /**
@@ -476,7 +476,7 @@ export async function composeMentalModelPromptBatch(db, items) {
       const { prompt } = composePrompt(effectiveTemplate, variables);
       const sectionState = computeSectionState(effectiveFocus);
       const instructions = formatSectionInstructions(sectionState);
-      const finalPrompt = injectBeforeOutputDirectives(prompt, instructions);
+      const finalPrompt = injectBeforeOutputDirectives(prompt, instructions).trimEnd();
       results.push({ composed_query: finalPrompt });
     } catch (err) {
       logger.warn('Failed to compose mental model prompt in batch', {
