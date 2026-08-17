@@ -220,7 +220,7 @@ describe('refreshContextualGraphPatches', () => {
     assert.equal(ref.content_hash, undefined);
   });
 
-  it('skips models with reflect_response but no structured_output as pending_build', async () => {
+  it('queues a refresh for models with reflect_response but no structured_output', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
       provenance: {
@@ -234,18 +234,28 @@ describe('refreshContextualGraphPatches', () => {
       mentalModels: [{ id: 'entity-summary-svc-001', name: 'Entity summary: Billing Service', reflect_response: { content: 'old markdown output' } }],
     });
 
+    let queuedExtId = null;
+    const injectedRefresh = async (srv, bank, extId) => {
+      queuedExtId = extId;
+      return { success: true, status: 'pending' };
+    };
+
     const result = await refreshContextualGraphPatches(db, serverId, bankId, {
       listAllMentalModels: injectedList,
+      refreshMentalModel: injectedRefresh,
     });
 
     assert.equal(result.success, true);
-    assert.equal(result.stats.skippedBuilding, 1);
+    assert.equal(queuedExtId, 'entity-summary-svc-001');
+    assert.equal(result.stats.rerunRequested, 1);
+    assert.equal(result.stats.rerunPending, 1);
+    assert.equal(result.stats.skippedPendingRerun, 1);
     assert.equal(result.stats.applied, 0);
     assert.equal(result.stats.failed, 0);
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
     const ref = node.properties.provenance.model_refs[0];
-    assert.equal(ref.last_refresh_status, 'pending_build');
+    assert.equal(ref.last_refresh_status, 'pending_refresh');
     assert.equal(ref.content_hash, undefined);
   });
 
