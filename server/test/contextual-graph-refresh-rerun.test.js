@@ -45,9 +45,10 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
     };
   }
 
-  it('queues Hindsight refresh and records a pending_operations row', async () => {
+  it('queues Hindsight refresh and skips pending reruns in the same pass', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
+      summary: 'Existing summary',
       provenance: {
         source: 'contextual-graph',
         model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
@@ -75,14 +76,15 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
     assert.equal(result.stats.rerunRequested, 1);
     assert.equal(result.stats.rerunPending, 1);
     assert.equal(result.stats.rerunFailed, 0);
-    assert.equal(result.stats.applied, 1);
+    assert.equal(result.stats.skippedPendingRerun, 1);
+    assert.equal(result.stats.applied, 0);
 
     // In production refreshMentalModel creates a pending_operations row for the
     // poll daemon. When using an injected mock we do not expect that side effect.
 
     const nodeResult = await import('../src/db/crud/contextual-graph.js').then((m) => m.getNode(db, serverId, bankId, 'svc-001'));
-    assert.equal(nodeResult.data.properties.summary, 'Updated summary.');
-    assert.equal(nodeResult.data.properties.provenance.model_refs[0].content_hash, contentHash(content));
+    assert.equal(nodeResult.data.properties.summary, 'Existing summary');
+    assert.equal(nodeResult.data.properties.provenance.model_refs[0].last_refresh_status, 'pending_refresh');
   });
 
   it('records completed status when Hindsight returns terminal status', async () => {
