@@ -49,10 +49,9 @@ function ReferenceToken({
 }) {
   const resolved = resolver?.(reference) || { label: reference.label || reference.raw };
   const color = resolved.color || '#fbbf24';
-  const label = resolved.label || reference.label || reference.raw;
-  const id = reference.id;
-  const display = id ? `[[${label} (${id})]]` : `[[${label}]]`;
 
+  // Render the raw reference string exactly so the highlight layer stays in 1:1
+  // character alignment with the transparent textarea.
   return (
     <span
       className="aql-token aql-reference whitespace-pre-wrap"
@@ -60,7 +59,7 @@ function ReferenceToken({
       data-token-raw={reference.raw}
       title={reference.raw}
     >
-      {display}
+      {reference.raw}
     </span>
   );
 }
@@ -235,10 +234,9 @@ export function renderAqlToHtml(
         const ref = token.reference!;
         const resolved = resolveReference?.(ref) || { label: ref.label || ref.raw };
         const color = resolved.color || '#fbbf24';
-        const label = escapeHtml(resolved.label || ref.label || ref.raw);
-        const id = ref.id;
-        const display = id ? `[[${label} (${escapeHtml(id)})]]` : `[[${label}]]`;
-        html += `<span contenteditable="false" class="aql-token aql-reference whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">${display}</span>`;
+        // Render the raw reference string exactly so the highlight layer matches
+        // the transparent textarea character-for-character.
+        html += `<span contenteditable="false" class="aql-token aql-reference whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">${escapeHtml(ref.raw)}</span>`;
         break;
       }
       case 'text': {
