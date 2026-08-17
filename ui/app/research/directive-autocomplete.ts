@@ -144,7 +144,7 @@ export function getDirectiveAutocompleteItems(
     const matches = term
       ? MERMAID_DIAGRAM_TYPES.filter((t) => t.toLowerCase().startsWith(term) || t.toLowerCase().includes(term))
       : MERMAID_DIAGRAM_TYPES;
-    return matches.slice(0, 8).map((t) => ({
+    return matches.map((t) => ({
       kind: 'directive' as const,
       id: `type:${t}`,
       label: t,
