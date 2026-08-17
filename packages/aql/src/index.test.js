@@ -144,6 +144,9 @@ describe('MERMAID_DIAGRAM_TYPES', () => {
   it('contains expected diagram types', () => {
     assert.ok(MERMAID_DIAGRAM_TYPES.includes('sequenceDiagram'));
     assert.ok(MERMAID_DIAGRAM_TYPES.includes('flowchart'));
+    assert.ok(MERMAID_DIAGRAM_TYPES.includes('erDiagram'));
+    assert.ok(MERMAID_DIAGRAM_TYPES.includes('swimlane-beta'));
+    assert.ok(!MERMAID_DIAGRAM_TYPES.includes('gitGraph'));
     assert.ok(!MERMAID_DIAGRAM_TYPES.includes('notARealDiagram'));
   });
 });

@@ -4,12 +4,62 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ensureSchema } from '../src/db/ensure-schema.js';
-import { composeMentalModelPrompt, formatFocusVariable } from '../src/prompts/template-service.js';
+import {
+  composeMentalModelPrompt,
+  formatFocusVariable,
+  buildConditionalFragments,
+} from '../src/prompts/template-service.js';
 import { validateEntityTemplateEligibility } from '../src/db/crud/mental-models.js';
 
 const NON_CONTEXTUAL_MODES = [
   'generic',
 ];
+
+describe('buildConditionalFragments', () => {
+  it('includes no diagram fragments when no diagram section is requested', () => {
+    const fragments = buildConditionalFragments({ narrative: 'hello' });
+    assert.deepEqual(fragments, []);
+  });
+
+  it('includes all diagram fragments when type is not specified', () => {
+    const fragments = buildConditionalFragments({ diagram: [{ name: 'D', content: 'A --> B' }] });
+    assert.ok(fragments.includes('output-format-diagram-contextual.md'));
+    assert.ok(fragments.includes('output-format-diagram-flowchart.md'));
+    assert.ok(fragments.includes('output-format-diagram-er.md'));
+    assert.ok(fragments.includes('output-format-diagram-sequence.md'));
+  });
+
+  it('includes only the requested diagram type fragment', () => {
+    const fragments = buildConditionalFragments({ diagram: [{ name: 'D', type: 'erDiagram', content: 'A ||--|| B : data' }] });
+    assert.ok(fragments.includes('output-format-diagram-contextual.md'));
+    assert.ok(fragments.includes('output-format-diagram-er.md'));
+    assert.ok(!fragments.includes('output-format-diagram-flowchart.md'));
+    assert.ok(!fragments.includes('output-format-diagram-sequence.md'));
+  });
+
+  it('maps graph alias to flowchart fragment', () => {
+    const fragments = buildConditionalFragments({ diagram: [{ name: 'D', type: 'graph', content: 'A --> B' }] });
+    assert.ok(fragments.includes('output-format-diagram-flowchart.md'));
+    assert.equal(fragments.filter((f) => f.startsWith('output-format-diagram-')).length, 2);
+  });
+
+  it('ignores unknown diagram types', () => {
+    const fragments = buildConditionalFragments({ diagram: [{ name: 'D', type: 'fakeDiagram', content: 'A' }] });
+    assert.ok(fragments.includes('output-format-diagram-contextual.md'));
+    assert.ok(!fragments.includes('output-format-diagram-flowchart.md'));
+  });
+
+  it('deduplicates fragments for multiple matching types', () => {
+    const fragments = buildConditionalFragments({
+      diagram: [
+        { name: 'A', type: 'flowchart', content: 'A --> B' },
+        { name: 'B', type: 'graph', content: 'C --> D' },
+      ],
+    });
+    const flowchartFragments = fragments.filter((f) => f === 'output-format-diagram-flowchart.md');
+    assert.equal(flowchartFragments.length, 1);
+  });
+});
 
 describe('composeMentalModelPrompt', () => {
   it('includes the rendered topic in every non-contextual built-in template', async () => {
