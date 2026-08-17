@@ -253,6 +253,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     matched: 0,
     skippedUnchanged: 0,
     skippedBuilding: 0,
+    skippedPendingRerun: 0,
     applied: 0,
     failed: 0,
     rerunRequested: 0,
@@ -281,13 +282,16 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       });
     }
 
+    // Track which reruns are still pending so we can skip them during this fetch
+    // pass. A prompt/config change does not automatically regenerate content;
+    // refreshMentalModel records a pending_operations row so the Hindsight poll
+    // daemon monitors it. We do not inline-poll here; a later refresh (or daemon
+    // pass) will fetch the new content once ready.
+    const pendingRerunExtIds = new Set();
+
     // Explicitly request fresh Hindsight output for models whose config just changed.
-    // A prompt/config change does not automatically regenerate content; this is the
-    // caller's way of saying "these models need to run under the new config".
     // Mental-model refresh is long-running and async; refreshMentalModel records a
     // pending_operations row so the existing Hindsight poll daemon monitors it.
-    // We do not inline-poll here; the UI should poll pending operations (or simply
-    // call refresh again after a reasonable delay) to fetch the refreshed content.
     for (const extId of rerunExtIds) {
       if (!localRefs.has(extId)) continue;
       stats.rerunRequested += 1;
@@ -300,12 +304,19 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       }
 
       // If the refresh already completed synchronously (unusual, but possible if
-      // Hindsight returns a terminal status), reflect that. Otherwise it is
-      // pending and the daemon will update it.
+      // Hindsight returns a terminal status), reflect that. Otherwise mark it as
+      // pending and skip reading its content in this pass; it is not expected to
+      // have usable output yet under the new config.
       if (['completed', 'success', 'done'].includes(refreshResult.status)) {
         stats.rerunCompleted += 1;
       } else {
         stats.rerunPending += 1;
+        pendingRerunExtIds.add(extId);
+        const scope = localRefs.get(extId);
+        updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, {
+          status: 'pending_refresh',
+          error: 'Waiting for re-run to complete after config update',
+        });
       }
     }
 
@@ -325,9 +336,13 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       if (!scope) continue;
       stats.matched += 1;
 
-      // Skip models that were just deployed in this sync; their Hindsight content
-      // is not expected to be ready yet. They are already marked pending_build above.
-      if (newlyDeployedExtIds.has(model.id)) {
+      // Skip models that were just deployed or just queued for a config-driven re-run.
+      // Their Hindsight content is not expected to be ready yet; they are already
+      // marked pending_build / pending_refresh above.
+      if (newlyDeployedExtIds.has(model.id) || pendingRerunExtIds.has(model.id)) {
+        if (pendingRerunExtIds.has(model.id)) {
+          stats.skippedPendingRerun += 1;
+        }
         continue;
       }
 
