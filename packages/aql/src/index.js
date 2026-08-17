@@ -23,7 +23,6 @@ export const SUB_DIRECTIVE_KEYS = Object.freeze([
 export const MERMAID_DIAGRAM_TYPES = Object.freeze([
   'flowchart',
   'graph',
-  'swimlane-beta',
   'sequenceDiagram',
   'classDiagram',
   'stateDiagram-v2',

@@ -2,15 +2,17 @@
 
 Start with `timeline`.
 
-- Optional title: `title My Title`.
-- Section headers: `section Section Name`.
-- Event syntax: `time period : event description`.
-- You may add a second colon and another event: `time period : event1 : event2`.
-- Use double quotes around event text that contains special characters or colons.
-- One event line per time period.
-- No blank lines inside the Mermaid source.
+- `title {text}` — optional title.
+- `section {name}` — groups time periods.
+- `{time period} : {event}` or `{time period} : {event1} : {event2} : ...` — events in a period.
 
 Example:
+
 ```json
-{ "type": "timeline", "content": "timeline\n  title Release history\n  section 2026\n    Q1 : \"Initial release\"\n    Q2 : \"API support\"" }
+{ "type": "timeline", "content": "timeline\n  title Product history\n  section 2024\n    Q1 : Prototype\n    Q2 : Alpha\n  section 2025\n    Q1 : Beta\n    Q2 : GA" }
 ```
+
+Rules:
+- Use `section` to group periods.
+- One `section` header or period line per line.
+- No blank lines inside the Mermaid source.

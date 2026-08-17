@@ -2,15 +2,22 @@
 
 Start with `pie`.
 
-- Optional `showData` after `pie` to display values.
-- Optional title: `title My Title`.
-- Data rows: `"Label" : numericValue`.
-- Labels with spaces must be in double quotes. Inside quoted labels, do NOT use `"`, `[`, `]`, `{`, `}`, or `|`.
-- Values must be non-negative numbers (integers or decimals).
-- One data row per line.
-- No blank lines inside the Mermaid source.
+- `pie title {text}` — optional title.
+- `pie showData title {text}` — show percentages on slices.
+- `"{label}" : {value}` — a slice.
+
+Donut chart:
+
+- `pie showData` plus the slice lines renders a donut in Mermaid v11.16+.
 
 Example:
+
 ```json
-{ "type": "pie", "content": "pie\n  title Error sources\n  \"Validation\" : 12\n  \"Network\" : 5" }
+{ "type": "pie", "content": "pie title Adoption by channel\n  \"Web\" : 386\n  \"Mobile\" : 85\n  \"Store\" : 15" }
 ```
+
+Rules:
+- Labels must be in double quotes.
+- Values must be numbers.
+- One slice per line.
+- No blank lines inside the Mermaid source.

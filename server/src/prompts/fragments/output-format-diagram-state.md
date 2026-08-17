@@ -1,17 +1,47 @@
 ### State diagram syntax
 
-Start with `stateDiagram-v2`. Do not use `stateDiagram`.
+Start with `stateDiagram-v2`. Use `stateDiagram` only for legacy diagrams.
 
-- State names must be plain ASCII identifiers. If a state name contains spaces, wrap it in double quotes: `state "Idle State" as idle`.
-- Start/end states: `[*]`.
-- Transitions: `idle --> active`.
-- Composite state: `state Active { active --> waiting }`.
-- Choice: `state choice <<choice>>`.
-- Fork/join: `state fork <<fork>>`.
-- One transition per line.
-- No blank lines inside the Mermaid source.
+States:
+
+- `stateName` — simple state
+- `stateName : label` — state with a label
+- `[*]` — start/end pseudo-state
+- `state "Label" as stateName` — alias a long label to an id
+- `state stateName { ... }` — composite / nested state
+
+Transitions:
+
+- `[*] --> stateName` — initial transition
+- `stateA --> stateB` — transition
+- `stateA --> stateB : event` — labeled transition
+- `stateA --> stateB : event [guard] / action`
+
+Choice / fork:
+
+- `state choiceName <<choice>>`
+- `state forkName <<fork>>`
+- `state joinName <<join>>`
+
+Concurrency:
+
+```text
+state Active {
+  [*] --> NumLockOff
+  NumLockOff --> NumLockOn : EvNumLockPressed
+  --
+  [*] --> CapsLockOff
+  CapsLockOff --> CapsLockOn : EvCapsLockPressed
+}
+```
 
 Example:
+
 ```json
-{ "type": "stateDiagram-v2", "content": "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Active : \"start\"\n  Active --> [*]" }
+{ "type": "stateDiagram-v2", "content": "stateDiagram-v2\n  [*] --\u003e Idle\n  Idle --\u003e Running : start\n  Running --\u003e Idle : stop\n  Running --\u003e Error : fail\n  Error --\u003e [*]" }
 ```
+
+Rules:
+- State names must be plain identifiers; put human-readable labels inside the braces or use the `as` alias syntax.
+- One transition per line.
+- No blank lines inside the Mermaid source.
