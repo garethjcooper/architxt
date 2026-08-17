@@ -116,7 +116,13 @@ function defaultReferenceResolver(
   };
 }
 
-function findOpenEntityTrigger(query: string, offset: number): string | null {
+interface EntityTriggerBounds {
+  filter: string;
+  start: number;
+  end: number;
+}
+
+function findOpenEntityTriggerBounds(query: string, offset: number): EntityTriggerBounds | null {
   // Strip out reference tokens so we only inspect the plain text before the cursor.
   const refs = parseReferences(query);
   let cursor = 0;
@@ -137,7 +143,16 @@ function findOpenEntityTrigger(query: string, offset: number): string | null {
     plainBefore += query.slice(cursor, offset);
   }
   const entityMatch = plainBefore.match(/\[\[([^\]]*)$/);
-  return entityMatch ? entityMatch[1] : null;
+  if (!entityMatch) return null;
+  return {
+    filter: entityMatch[1],
+    start: offset - entityMatch[0].length,
+    end: offset,
+  };
+}
+
+function findOpenEntityTrigger(query: string, offset: number): string | null {
+  return findOpenEntityTriggerBounds(query, offset)?.filter ?? null;
 }
 
 /**
@@ -175,6 +190,7 @@ export function AqlInput({
   const isComposingRef = useRef(false);
   const [internalCursor, setInternalCursor] = useState(0);
   const cursorRef = useRef(0);
+  const autocompleteRafRef = useRef<number | null>(null);
 
   const updateCursor = useCallback((offset: number) => {
     cursorRef.current = offset;
@@ -318,7 +334,11 @@ export function AqlInput({
       const offset = e.target.selectionStart ?? 0;
       updateCursor(offset);
       onChange(next, offset);
-      requestAnimationFrame(() => {
+      if (autocompleteRafRef.current != null) {
+        cancelAnimationFrame(autocompleteRafRef.current);
+      }
+      autocompleteRafRef.current = requestAnimationFrame(() => {
+        autocompleteRafRef.current = null;
         updateAutocompleteState(next, offset);
       });
     },
@@ -331,18 +351,27 @@ export function AqlInput({
       const el = editorRef.current;
       if (!el) return;
 
-      const offset = getCaretOffset();
-      const textBefore = value.slice(0, offset);
-      const openIdx = textBefore.lastIndexOf('[[');
-      const before = openIdx >= 0 ? value.slice(0, openIdx) : value.slice(0, offset);
-      const after = value.slice(offset);
+      // Read the live DOM value so we do not slice against a stale prop.
+      const liveValue = el.value;
+      const offset = el.selectionStart ?? 0;
+      const bounds = findOpenEntityTriggerBounds(liveValue, offset);
+      if (!bounds) return;
+
+      const before = liveValue.slice(0, bounds.start);
+      const after = liveValue.slice(bounds.end);
       const next = before + rawToken + after;
       const pos = before.length + rawToken.length;
+
+      if (autocompleteRafRef.current != null) {
+        cancelAnimationFrame(autocompleteRafRef.current);
+        autocompleteRafRef.current = null;
+      }
       onChange(next, pos);
       pendingCaretRef.current = pos;
+      updateCursor(pos);
       setShowAutocomplete(false);
     },
-    [value, onChange, disabled, getCaretOffset],
+    [onChange, disabled, updateCursor],
   );
 
   const insertDirectiveAtCursor = useCallback(
@@ -351,20 +380,27 @@ export function AqlInput({
       const el = editorRef.current;
       if (!el) return;
 
-      const offset = getCaretOffset();
-      const trigger = findDirectiveTrigger(value, offset);
+      const liveValue = el.value;
+      const offset = el.selectionStart ?? 0;
+      const trigger = findDirectiveTrigger(liveValue, offset);
       if (!trigger) return;
 
-      const before = value.slice(0, trigger.replaceStart);
-      const after = value.slice(trigger.replaceEnd);
+      const before = liveValue.slice(0, trigger.replaceStart);
+      const after = liveValue.slice(trigger.replaceEnd);
       const insert = item.insert;
       const next = before + insert + after;
       const pos = before.length + item.cursorOffset;
+
+      if (autocompleteRafRef.current != null) {
+        cancelAnimationFrame(autocompleteRafRef.current);
+        autocompleteRafRef.current = null;
+      }
       onChange(next, pos);
       pendingCaretRef.current = pos;
+      updateCursor(pos);
       setShowAutocomplete(false);
     },
-    [value, onChange, disabled, getCaretOffset],
+    [onChange, disabled, updateCursor],
   );
 
   /**
@@ -624,13 +660,14 @@ export function AqlInput({
         if (e.key === 'Escape') {
           e.preventDefault();
           lastHandledKeyRef.current = 'Escape';
+          const liveValue = el.value;
           const offset = el.selectionStart ?? 0;
-          const textBefore = value.slice(0, offset);
-          const openIdx = textBefore.lastIndexOf('[[');
-          if (openIdx >= 0) {
-            const next = value.slice(0, openIdx) + value.slice(offset);
-            onChange(next, openIdx);
-            pendingCaretRef.current = openIdx;
+          const bounds = findOpenEntityTriggerBounds(liveValue, offset);
+          if (bounds) {
+            const next = liveValue.slice(0, bounds.start) + liveValue.slice(bounds.end);
+            onChange(next, bounds.start);
+            pendingCaretRef.current = bounds.start;
+            updateCursor(bounds.start);
           }
           setShowAutocomplete(false);
           return;
