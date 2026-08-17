@@ -266,6 +266,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     skippedUnchanged: 0,
     skippedBuilding: 0,
     skippedPendingRerun: 0,
+    skippedStaleRef: 0,
     applied: 0,
     failed: 0,
     rerunRequested: 0,
@@ -444,6 +445,24 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const localModel = buildLocalModel(model, scope);
       const applyResult = await applyModelOutput(db, serverId, bankId, localModel, output, { now: timestamp });
       if (!applyResult.success) {
+        // If the model's backing node/edge is gone, treat it as a stale ref rather
+        // than a hard failure. The sync-config stage still patches trigger config,
+        // but we can't apply output until the node/edge is restored or the ref is
+        // removed. This avoids repeated failure churn every refresh cycle.
+        if (applyResult.code === 'NODE_NOT_FOUND' || applyResult.code === 'BAD_SCOPE') {
+          stats.skippedStaleRef += 1;
+          updateRefOnScope(db, serverId, bankId, scope, scope.ref, timestamp, {
+            status: 'stale_ref',
+            error: applyResult.error,
+          });
+          logger.warn('Skipping stale contextual model ref; backing node/edge is missing', {
+            extId: model.id,
+            role: scope.ref?.role,
+            code: applyResult.code,
+          });
+          continue;
+        }
+
         stats.failed += 1;
         const error = applyResult.error || applyResult.code || 'apply failed';
         stats.errors.push({ extId: model.id, error: applyResult.error, code: applyResult.code });
