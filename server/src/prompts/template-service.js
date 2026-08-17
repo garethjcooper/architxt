@@ -152,6 +152,25 @@ function formatNodeExamples({ include, exclude }) {
   return lines.join('\n');
 }
 
+const DIAGRAM_TYPE_TO_FRAGMENT = {
+  flowchart: 'output-format-diagram-flowchart.md',
+  graph: 'output-format-diagram-flowchart.md',
+  'swimlane-beta': 'output-format-diagram-swimlane.md',
+  sequenceDiagram: 'output-format-diagram-sequence.md',
+  classDiagram: 'output-format-diagram-class.md',
+  'stateDiagram-v2': 'output-format-diagram-state.md',
+  erDiagram: 'output-format-diagram-er.md',
+  journey: 'output-format-diagram-journey.md',
+  gantt: 'output-format-diagram-gantt.md',
+  pie: 'output-format-diagram-pie.md',
+  timeline: 'output-format-diagram-timeline.md',
+  'radar-beta': 'output-format-diagram-radar.md',
+  'architecture-beta': 'output-format-diagram-architecture.md',
+  block: 'output-format-diagram-block.md',
+  mindmap: 'output-format-diagram-mindmap.md',
+  'venn-beta': 'output-format-diagram-venn.md',
+};
+
 /**
  * Build conditional output-format fragments based on parsed section directives.
  *
@@ -162,7 +181,7 @@ function formatNodeExamples({ include, exclude }) {
  * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} sectionFocus
  * @returns {string[]}
  */
-function buildConditionalFragments(sectionFocus) {
+export function buildConditionalFragments(sectionFocus) {
   const extra = [];
   if (sectionFocus?.graph) {
     extra.push('output-format-graph-contextual.md');
@@ -172,6 +191,27 @@ function buildConditionalFragments(sectionFocus) {
   }
   if (sectionFocus?.diagram?.length) {
     extra.push('output-format-diagram-contextual.md');
+    const requestedTypes = new Set(
+      sectionFocus.diagram
+        .map((d) => d.type?.trim())
+        .filter(Boolean)
+    );
+    if (requestedTypes.size > 0) {
+      for (const type of requestedTypes) {
+        const fragment = DIAGRAM_TYPE_TO_FRAGMENT[type];
+        if (fragment && !extra.includes(fragment)) {
+          extra.push(fragment);
+        }
+      }
+    } else {
+      // No explicit type requested; include all diagram syntax fragments so the
+      // model can pick a valid type safely.
+      for (const fragment of Object.values(DIAGRAM_TYPE_TO_FRAGMENT)) {
+        if (!extra.includes(fragment)) {
+          extra.push(fragment);
+        }
+      }
+    }
   }
   return extra;
 }
