@@ -79,7 +79,12 @@ describe('refreshContextualGraphPatches', () => {
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
     assert.equal(node.properties.summary, 'Updated summary.');
-    assert.notEqual(node.properties.provenance.model_refs[0].content_hash, 'oldhash');
+    const storedHash = node.properties.provenance.model_refs[0].content_hash;
+    assert.notEqual(storedHash, 'oldhash');
+
+    // Regression: the stored hash must match the hash of the canonical structured
+    // output so the next refresh does not treat identical content as changed.
+    assert.equal(storedHash, contentHash(newContent));
   });
 
   it('skips application when content hash is unchanged and applied content exists', async () => {
@@ -102,6 +107,43 @@ describe('refreshContextualGraphPatches', () => {
     });
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedUnchanged, 1);
+    assert.equal(result.stats.applied, 0);
+
+    // Regression: the stored hash must equal the canonical content hash so the
+    // next refresh skips correctly.
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.provenance.model_refs[0].content_hash, contentHash(content));
+  });
+
+  it('skips application on second refresh when content has not changed', async () => {
+    const content = JSON.stringify({ narrative: 'Stable summary.', graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
+    const hash = contentHash(content);
+
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      summary: 'Stable summary.',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', content)],
+    });
+
+    // First refresh: should skip as unchanged.
+    let result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.skippedUnchanged, 1);
+    assert.equal(result.stats.applied, 0);
+
+    // Second refresh with the same content: must still skip as unchanged.
+    result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
     assert.equal(result.success, true);
     assert.equal(result.stats.skippedUnchanged, 1);
     assert.equal(result.stats.applied, 0);
