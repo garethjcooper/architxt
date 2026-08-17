@@ -422,7 +422,10 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      const output = content;
+      // Pass a consistent envelope to applyModelOutput so the content_hash it
+      // stores matches the hash we compute above from reflect_response.structured_output.
+      const raw = JSON.stringify(content);
+      const output = { ...content, raw };
       if (!output.graph || typeof output.graph !== 'object') {
         stats.failed += 1;
         const error = 'Mental model structured output is missing a valid graph';
