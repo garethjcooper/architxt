@@ -37,10 +37,11 @@ describe('buildConditionalFragments', () => {
     assert.ok(!fragments.includes('output-format-diagram-sequence.md'));
   });
 
-  it('maps graph alias to flowchart fragment', () => {
+  it('treats graph as unknown diagram type', () => {
     const fragments = buildConditionalFragments({ diagram: [{ name: 'D', type: 'graph', content: 'A --> B' }] });
-    assert.ok(fragments.includes('output-format-diagram-flowchart.md'));
-    assert.equal(fragments.filter((f) => f.startsWith('output-format-diagram-')).length, 2);
+    assert.ok(!fragments.includes('output-format-diagram-flowchart.md'));
+    assert.ok(fragments.includes('output-format-diagram-contextual.md'));
+    assert.equal(fragments.filter((f) => f.startsWith('output-format-diagram-')).length, 1);
   });
 
   it('ignores unknown diagram types', () => {
@@ -53,7 +54,7 @@ describe('buildConditionalFragments', () => {
     const fragments = buildConditionalFragments({
       diagram: [
         { name: 'A', type: 'flowchart', content: 'A --> B' },
-        { name: 'B', type: 'graph', content: 'C --> D' },
+        { name: 'B', type: 'flowchart', content: 'C --> D' },
       ],
     });
     const flowchartFragments = fragments.filter((f) => f === 'output-format-diagram-flowchart.md');
