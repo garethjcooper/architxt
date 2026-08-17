@@ -234,6 +234,51 @@ describe('syncContextualMentalModelConfig', () => {
     assert.equal(result.error, 'unreachable');
   });
 
+  it('pushes update when backing node/edge is missing (fallback spec)', async () => {
+    // Ref is attached to a node, but the scope lacks node_id so deriveSpecForRef returns null.
+    // This mirrors production logs: "Missing node_id in entity-summary ref scope".
+    upsertNode(db, serverId, bankId, NODE_ID, ['grounded'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: EXT_ID, role: 'sys_entity_summary', scope: {}, attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const result = await syncContextualMentalModelConfig(db, serverId, bankId, {
+      listAllMentalModels: async () => ({
+        success: true,
+        mentalModels: [{
+          id: EXT_ID,
+          name: 'Entity summary: Billing Service',
+          source_query: 'Old query.',
+          max_tokens: 4096,
+          trigger: {
+            mode: 'full',
+            refresh_after_consolidation: false,
+            exclude_mental_models: false,
+            tags_match: 'all_strict',
+            // response_schema intentionally omitted
+          },
+          tags: [],
+          content: '',
+        }],
+      }),
+      pushMentalModel: async (_serverId, _bankId, spec) => {
+        pushed.push(spec);
+        return { success: true };
+      },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.checked, 1);
+    assert.equal(result.stats.updated, 1);
+    assert.equal(pushed.length, 1);
+    // Fallback uses the role template, so refresh_mode and tags_match_mode come from the template.
+    assert.equal(pushed[0].refresh_mode, 'full');
+    assert.equal(pushed[0].tags_match_mode, 'any');
+  });
+
   it('pushes updates for edge-ctx refs', async () => {
     upsertNode(db, serverId, bankId, 'svc:SVC-001', ['active'], { display_name: 'A' });
     upsertNode(db, serverId, bankId, 'svc:SVC-002', ['active'], { display_name: 'B' });
