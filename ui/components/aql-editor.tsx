@@ -53,24 +53,12 @@ export interface AqlEditorProps {
 }
 
 const tDirective = Tag.define();
-const tDirectiveDiagram = Tag.define();
-const tDirectiveTable = Tag.define();
-const tDirectiveGraph = Tag.define();
-const tDirectiveNarrative = Tag.define();
-const tDirectiveDiagramName = Tag.define();
-const tDirectiveDiagramType = Tag.define();
-const tDirectiveTableName = Tag.define();
+const tDirectiveSub = Tag.define();
 const tReference = Tag.define();
 
 const aqlHighlightStyle = tagHighlighter([
   { tag: tDirective, class: 'aql-directive' },
-  { tag: tDirectiveDiagram, class: 'aql-directive-diagram' },
-  { tag: tDirectiveTable, class: 'aql-directive-table' },
-  { tag: tDirectiveGraph, class: 'aql-directive-graph' },
-  { tag: tDirectiveNarrative, class: 'aql-directive-narrative' },
-  { tag: tDirectiveDiagramName, class: 'aql-directive-diagram-name' },
-  { tag: tDirectiveDiagramType, class: 'aql-directive-diagram-type' },
-  { tag: tDirectiveTableName, class: 'aql-directive-table-name' },
+  { tag: tDirectiveSub, class: 'aql-directive-sub' },
   { tag: tReference, class: 'aql-reference' },
 ]);
 
@@ -84,21 +72,15 @@ const aqlLanguage = new LanguageSupport(
         const word = stream.string.slice(start, stream.pos).toLowerCase();
         switch (word) {
           case 'diagram':
-            return 'directive-diagram';
           case 'table':
-            return 'directive-table';
           case 'graph':
-            return 'directive-graph';
           case 'narrative':
-            return 'directive-narrative';
-          case 'diagram-name':
-            return 'directive-diagram-name';
-          case 'diagram-type':
-            return 'directive-diagram-type';
-          case 'table-name':
-            return 'directive-table-name';
           case 'end':
             return 'directive';
+          case 'diagram-name':
+          case 'diagram-type':
+          case 'table-name':
+            return 'directive-sub';
           default:
             return 'directive';
         }
@@ -114,13 +96,7 @@ const aqlLanguage = new LanguageSupport(
     },
     tokenTable: {
       directive: tDirective,
-      'directive-diagram': tDirectiveDiagram,
-      'directive-table': tDirectiveTable,
-      'directive-graph': tDirectiveGraph,
-      'directive-narrative': tDirectiveNarrative,
-      'directive-diagram-name': tDirectiveDiagramName,
-      'directive-diagram-type': tDirectiveDiagramType,
-      'directive-table-name': tDirectiveTableName,
+      'directive-sub': tDirectiveSub,
       reference: tReference,
     },
   }),
@@ -163,14 +139,8 @@ const aqlTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'rgba(255, 255, 255, 0.4)',
   },
-  '.aql-directive': { color: '#9ca3af', fontWeight: 500 },
-  '.aql-directive-diagram': { color: '#a855f7', fontWeight: 500 },
-  '.aql-directive-table': { color: '#06b6d4', fontWeight: 500 },
-  '.aql-directive-graph': { color: '#f97316', fontWeight: 500 },
-  '.aql-directive-narrative': { color: '#22c55e', fontWeight: 500 },
-  '.aql-directive-diagram-name': { color: '#3b82f6', fontWeight: 500 },
-  '.aql-directive-diagram-type': { color: '#eab308', fontWeight: 500 },
-  '.aql-directive-table-name': { color: '#06b6d4', fontWeight: 500 },
+  '.aql-directive': { color: '#94a3b8', fontWeight: 500 },
+  '.aql-directive-sub': { color: '#64748b', fontWeight: 500 },
   '.aql-reference': { color: '#fbbf24' },
   '.cm-tooltip': {
     backgroundColor: '#1e293b',
