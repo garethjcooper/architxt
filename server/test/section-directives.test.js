@@ -18,8 +18,8 @@ describe('parseSectionDirectives', () => {
     assert.deepEqual(result.sectionFocus?.graph, 'CRM, ERP');
   });
 
-  it('parses a table block with explicit #name', () => {
-    const result = parseSectionDirectives('Q\n#table\n#name Billing Dependencies\nUpstreams and downstreams\n#end');
+  it('parses a table block with explicit #table-name', () => {
+    const result = parseSectionDirectives('Q\n#table\n#table-name Billing Dependencies\nUpstreams and downstreams\n#end');
     assert.equal(result.intentText, 'Q');
     const tables = result.sectionFocus?.table;
     assert.equal(tables.length, 1);
@@ -27,8 +27,8 @@ describe('parseSectionDirectives', () => {
     assert.equal(tables[0].content, 'Upstreams and downstreams');
   });
 
-  it('parses a diagram block with explicit #name and #type', () => {
-    const result = parseSectionDirectives('Q\n#diagram\n#name Billing flow\n#type flowchart\nA --> B\n#end');
+  it('parses a diagram block with explicit #diagram-name and #diagram-type', () => {
+    const result = parseSectionDirectives('Q\n#diagram\n#diagram-name Billing flow\n#diagram-type flowchart\nA --> B\n#end');
     assert.equal(result.intentText, 'Q');
     const diagrams = result.sectionFocus?.diagram;
     assert.equal(diagrams.length, 1);
@@ -38,7 +38,7 @@ describe('parseSectionDirectives', () => {
   });
 
   it('parses a diagram-only block and derives topic from name and type', () => {
-    const result = parseSectionDirectives('#diagram\n#name test1\n#type erDiagram\nICMS ||--|| Singleview : dataflow\n#end');
+    const result = parseSectionDirectives('#diagram\n#diagram-name test1\n#diagram-type erDiagram\nICMS ||--|| Singleview : dataflow\n#end');
     assert.equal(result.intentText, 'test1 (erDiagram)');
     assert.equal(result.sectionFocus?.narrative, undefined);
     const diagrams = result.sectionFocus?.diagram;
@@ -49,7 +49,7 @@ describe('parseSectionDirectives', () => {
   });
 
   it('parses a table-only block and derives topic from name', () => {
-    const result = parseSectionDirectives('#table\n#name Billing\nlist interface name and protocol\n#end');
+    const result = parseSectionDirectives('#table\n#table-name Billing\nlist interface name and protocol\n#end');
     assert.equal(result.intentText, 'Billing');
     assert.equal(result.sectionFocus?.narrative, undefined);
     const tables = result.sectionFocus?.table;
@@ -58,7 +58,7 @@ describe('parseSectionDirectives', () => {
     assert.equal(tables[0].content, 'list interface name and protocol');
   });
 
-  it('parses a table block without #name', () => {
+  it('parses a table block without #table-name', () => {
     const result = parseSectionDirectives('Q\n#table\nCapabilities and gaps\n#end');
     assert.equal(result.intentText, 'Q');
     const tables = result.sectionFocus?.table;
@@ -68,7 +68,7 @@ describe('parseSectionDirectives', () => {
   });
 
   it('parses multiple table blocks with and without names', () => {
-    const raw = 'Q\n#table\n#name Billing\nInvoices and payments\n#end\n#table\nCapabilities\n#end';
+    const raw = 'Q\n#table\n#table-name Billing\nInvoices and payments\n#end\n#table\nCapabilities\n#end';
     const result = parseSectionDirectives(raw);
     const tables = result.sectionFocus?.table;
     assert.equal(tables.length, 2);
@@ -126,15 +126,15 @@ describe('parseSectionDirectives', () => {
   });
 
   it('ignores inline single-line directive blocks', () => {
-    const raw = 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain';
+    const raw = 'what is ICMS #diagram #diagram-name Seq #diagram-type sequenceDiagram Alice->>Bob: Hello #end explain';
     const result = parseSectionDirectives(raw);
     // Inline blocks are not recognized because each keyword must start on its own line.
-    assert.equal(result.intentText, 'what is ICMS #diagram #name Seq #type sequenceDiagram Alice->>Bob: Hello #end explain');
+    assert.equal(result.intentText, 'what is ICMS #diagram #diagram-name Seq #diagram-type sequenceDiagram Alice->>Bob: Hello #end explain');
     assert.equal(result.sectionFocus?.diagram, undefined);
   });
 
   it('strips block bodies from intentText, requiring callers to preserve raw query for reuse', () => {
-    const raw = 'Analyze billing\n#graph\nCRM, ERP\n#end\n#table\n#name Gaps\nlist gaps\n#end';
+    const raw = 'Analyze billing\n#graph\nCRM, ERP\n#end\n#table\n#table-name Gaps\nlist gaps\n#end';
     const result = parseSectionDirectives(raw);
     assert.equal(result.intentText, 'Analyze billing');
     assert.equal(result.sectionFocus?.graph, 'CRM, ERP');

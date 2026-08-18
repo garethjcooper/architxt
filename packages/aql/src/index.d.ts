@@ -45,7 +45,7 @@ export interface RenderToken {
 
 /** Canonical block directive keywords. */
 export const BLOCK_DIRECTIVES: readonly string[];
-/** Canonical sub-directive keywords allowed inside block directives. */
+/** Canonical block-scoped sub-directive keywords allowed inside block directives. */
 export const SUB_DIRECTIVE_KEYS: readonly string[];
 /** Supported Mermaid diagram types. */
 export const MERMAID_DIAGRAM_TYPES: readonly string[];

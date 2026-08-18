@@ -47,8 +47,9 @@ const tDirectiveDiagram = Tag.define();
 const tDirectiveTable = Tag.define();
 const tDirectiveGraph = Tag.define();
 const tDirectiveNarrative = Tag.define();
-const tDirectiveName = Tag.define();
-const tDirectiveType = Tag.define();
+const tDirectiveDiagramName = Tag.define();
+const tDirectiveDiagramType = Tag.define();
+const tDirectiveTableName = Tag.define();
 const tDirectiveEnd = Tag.define();
 const tReference = Tag.define();
 
@@ -58,8 +59,9 @@ const aqlHighlightStyle = tagHighlighter([
   { tag: tDirectiveTable, class: 'aql-directive-table' },
   { tag: tDirectiveGraph, class: 'aql-directive-graph' },
   { tag: tDirectiveNarrative, class: 'aql-directive-narrative' },
-  { tag: tDirectiveName, class: 'aql-directive-name' },
-  { tag: tDirectiveType, class: 'aql-directive-type' },
+  { tag: tDirectiveDiagramName, class: 'aql-directive-diagram-name' },
+  { tag: tDirectiveDiagramType, class: 'aql-directive-diagram-type' },
+  { tag: tDirectiveTableName, class: 'aql-directive-table-name' },
   { tag: tDirectiveEnd, class: 'aql-directive-end' },
   { tag: tReference, class: 'aql-reference' },
 ]);
@@ -81,10 +83,12 @@ const aqlLanguage = new LanguageSupport(
             return 'directive-graph';
           case 'narrative':
             return 'directive-narrative';
-          case 'name':
-            return 'directive-name';
-          case 'type':
-            return 'directive-type';
+          case 'diagram-name':
+            return 'directive-diagram-name';
+          case 'diagram-type':
+            return 'directive-diagram-type';
+          case 'table-name':
+            return 'directive-table-name';
           case 'end':
             return 'directive-end';
           default:
@@ -106,8 +110,9 @@ const aqlLanguage = new LanguageSupport(
       'directive-table': tDirectiveTable,
       'directive-graph': tDirectiveGraph,
       'directive-narrative': tDirectiveNarrative,
-      'directive-name': tDirectiveName,
-      'directive-type': tDirectiveType,
+      'directive-diagram-name': tDirectiveDiagramName,
+      'directive-diagram-type': tDirectiveDiagramType,
+      'directive-table-name': tDirectiveTableName,
       'directive-end': tDirectiveEnd,
       reference: tReference,
     },
@@ -150,8 +155,9 @@ const aqlTheme = EditorView.theme({
   '.aql-directive-table': { color: '#06b6d4', fontWeight: 500 },
   '.aql-directive-graph': { color: '#f97316', fontWeight: 500 },
   '.aql-directive-narrative': { color: '#22c55e', fontWeight: 500 },
-  '.aql-directive-name': { color: '#3b82f6', fontWeight: 500 },
-  '.aql-directive-type': { color: '#eab308', fontWeight: 500 },
+  '.aql-directive-diagram-name': { color: '#3b82f6', fontWeight: 500 },
+  '.aql-directive-diagram-type': { color: '#eab308', fontWeight: 500 },
+  '.aql-directive-table-name': { color: '#06b6d4', fontWeight: 500 },
   '.aql-directive-end': { color: '#ef4444', fontWeight: 500 },
   '.aql-reference': { color: '#fbbf24' },
   '.cm-tooltip': {
@@ -176,14 +182,14 @@ const aqlTheme = EditorView.theme({
   },
 });
 
-const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'name', 'type', 'end'];
+const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'diagram-name', 'diagram-type', 'table-name', 'end'];
 
 function buildDirectiveCompletions(filter: string): Completion[] {
   const term = filter.toLowerCase();
   return DIRECTIVE_KEYWORDS.filter((kw) => kw.startsWith(term)).map((kw) => {
     let apply: string;
     if (kw === 'end') apply = '#end';
-    else if (kw === 'name' || kw === 'type') apply = `#${kw} `;
+    else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name') apply = `#${kw} `;
     else apply = `#${kw}`;
     return { label: `#${kw}`, apply, type: 'keyword' };
   });
@@ -255,14 +261,12 @@ function aqlCompletions(
     const line = state.doc.lineAt(pos);
     const beforeCursor = line.text.slice(0, pos - line.from);
 
-    // #type value completion
-    const typeMatch = beforeCursor.match(/^#type\s+(.*)$/i);
-    if (typeMatch) {
-      const filter = typeMatch[1];
-      const exact = MERMAID_DIAGRAM_TYPES.some((t) => t.toLowerCase() === filter.toLowerCase());
-      if (exact) return null;
+    // #diagram-type value completion
+    const diagramTypeMatch = beforeCursor.match(/^#diagram-type\s+(.*)$/i);
+    if (diagramTypeMatch) {
+      const filter = diagramTypeMatch[1];
       return {
-        from: pos - filter.length,
+        from: line.from + '#diagram-type '.length,
         to: pos,
         options: buildTypeCompletions(filter),
       };

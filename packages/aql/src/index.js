@@ -3,7 +3,8 @@
  *
  * Shared source of truth for both server and UI. Parses a compact line-based
  * query syntax with block directives (#graph, #table, #diagram, #narrative),
- * sub-directives (#name, #type), terminator (#end), and entity/edge references
+ * block-scoped sub-directives (#diagram-name, #diagram-type, #table-name),
+ * terminator (#end), and entity/edge references
  * [[Label (type:id)]] / [[src — label → target]].
  */
 
@@ -15,8 +16,9 @@ export const BLOCK_DIRECTIVES = Object.freeze([
 ]);
 
 export const SUB_DIRECTIVE_KEYS = Object.freeze([
-  'name',
-  'type',
+  'diagram-name',
+  'diagram-type',
+  'table-name',
   'end',
 ]);
 
@@ -39,8 +41,8 @@ export const MERMAID_DIAGRAM_TYPES = Object.freeze([
 export const ALLOWED_KEYS_BY_BLOCK = Object.freeze({
   graph: new Set(),
   narrative: new Set(),
-  table: new Set(['name']),
-  diagram: new Set(['name', 'type']),
+  table: new Set(['table-name']),
+  diagram: new Set(['diagram-name', 'diagram-type']),
 });
 
 /**
@@ -340,11 +342,15 @@ export function parseAql(rawQuery) {
 
       const parsedValue = parseValue(value);
 
-      if (keyword === 'type' && parsedValue && !MERMAID_DIAGRAM_TYPES.includes(parsedValue)) {
+      if (keyword === 'diagram-type' && parsedValue && !MERMAID_DIAGRAM_TYPES.includes(parsedValue)) {
         errors.push({ message: `Unknown diagram type '${parsedValue}'`, line: lineNum });
       }
 
-      current[keyword] = parsedValue;
+      if (keyword === 'diagram-type') {
+        current.type = parsedValue;
+      } else if (keyword === 'diagram-name' || keyword === 'table-name') {
+        current.name = parsedValue;
+      }
       continue;
     }
 
