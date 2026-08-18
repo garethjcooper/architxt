@@ -94,7 +94,7 @@ export function NarrativeViewer({
     scrollToBlock(sectionId);
   }, [blocks, scrollToBlock]);
 
-  if ((!content || blocks.length === 0) && (!diagrams || diagrams.length === 0)) {
+  if (!content || blocks.length === 0) {
     return (
       <div className={`flex items-center justify-center text-sm text-white/40 ${className}`}>
         No narrative available.
