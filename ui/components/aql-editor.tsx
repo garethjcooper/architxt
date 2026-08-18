@@ -306,9 +306,9 @@ const completionInputHandler = EditorView.inputHandler.of((view, from, to, text)
     setTimeout(() => startCompletion(view), 0);
     return true;
   }
-  if (text === '[') {
+  if (text === '@') {
     view.dispatch({
-      changes: { from, to, insert: '[' },
+      changes: { from, to, insert: '@' },
       selection: { anchor: from + 1, head: from + 1 },
     });
     setTimeout(() => startCompletion(view), 0);
@@ -352,16 +352,16 @@ function aqlCompletions(
       };
     }
 
-    // entity/edge reference completion — open on the nearest unclosed [[
+    // entity/edge reference completion — open on @mention-style trigger
     const allBefore = state.doc.toString().slice(0, pos);
-    const openIdx = allBefore.lastIndexOf('[[');
-    if (openIdx < 0) {
-      // Single [ can also open the picker (user can type "[Cust" to filter)
-      const singleOpenIdx = allBefore.lastIndexOf('[');
-      if (singleOpenIdx >= 0 && allBefore.indexOf(']]', singleOpenIdx) === -1) {
-        const filter = allBefore.slice(singleOpenIdx + 1, pos);
+    const atIdx = allBefore.lastIndexOf('@');
+    if (atIdx >= 0) {
+      // make sure there's whitespace or start of doc before the @
+      const charBefore = allBefore.charAt(atIdx - 1);
+      if (charBefore === ' ' || charBefore === '\n' || charBefore === '\t' || atIdx === 0) {
+        const filter = allBefore.slice(atIdx + 1, pos);
         return {
-          from: singleOpenIdx,
+          from: atIdx,
           to: pos,
           options: buildEntityCompletions(
             propsRef.current.entities,
@@ -372,6 +372,9 @@ function aqlCompletions(
         };
       }
     }
+
+    // legacy [[ reference completion
+    const openIdx = allBefore.lastIndexOf('[[');
     const closeIdx = allBefore.indexOf(']]', openIdx);
     if (openIdx >= 0 && (closeIdx === -1 || closeIdx >= pos)) {
       const filter = allBefore.slice(openIdx + 2, pos);

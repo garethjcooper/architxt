@@ -66,12 +66,12 @@ export interface EdgeLike {
   type?: string | null;
 }
 
-const QUERY_PLACEHOLDERS: Record<QueryFormProps['queryMode'], string> = {
+const QUERY_PLACEHOLDERS: Record<string, string> = {
   prebuilt: 'Double-click an entity to add it to the prebuilt lookup list, then select one or more template roles to run.',
-  recall: 'Returns facts for the given query in a table format. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
-  reflect: 'Returns a generated narrative for the given query. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
-  synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
-  models: 'Select one or more mental models and enter a query to explore their content. Type [[ to show list of existing known entities.',
+  recall: 'Returns facts for the given query in a table format. Type @ to show list of existing known entities. Double click an entity or edge to add to this query.',
+  reflect: 'Returns a generated narrative for the given query. Type @ to show list of existing known entities. Double click an entity or edge to add to this query.',
+  synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type @ to show list of existing known entities. Double click an entity or edge to add to this query.',
+  models: 'Select one or more mental models and enter a query to explore their content. Type @ to show list of existing known entities.',
   templates: 'Double-click an entity in the Entities panel to add it to the template lookup list.',
 };
 
