@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import {
   autocompletion,
@@ -17,6 +18,9 @@ import {
   formatEntityToken,
   formatEdgeToken,
   MERMAID_DIAGRAM_TYPES,
+  BLOCK_DIRECTIVES,
+  SUB_DIRECTIVE_KEYS,
+  ALLOWED_KEYS_BY_BLOCK,
 } from '@architxt/aql';
 
 export interface EntityLike {
@@ -56,7 +60,6 @@ const tDirectiveNarrative = Tag.define();
 const tDirectiveDiagramName = Tag.define();
 const tDirectiveDiagramType = Tag.define();
 const tDirectiveTableName = Tag.define();
-const tDirectiveEnd = Tag.define();
 const tReference = Tag.define();
 
 const aqlHighlightStyle = tagHighlighter([
@@ -68,7 +71,6 @@ const aqlHighlightStyle = tagHighlighter([
   { tag: tDirectiveDiagramName, class: 'aql-directive-diagram-name' },
   { tag: tDirectiveDiagramType, class: 'aql-directive-diagram-type' },
   { tag: tDirectiveTableName, class: 'aql-directive-table-name' },
-  { tag: tDirectiveEnd, class: 'aql-directive-end' },
   { tag: tReference, class: 'aql-reference' },
 ]);
 
@@ -96,7 +98,7 @@ const aqlLanguage = new LanguageSupport(
           case 'table-name':
             return 'directive-table-name';
           case 'end':
-            return 'directive-end';
+            return 'directive';
           default:
             return 'directive';
         }
@@ -119,7 +121,6 @@ const aqlLanguage = new LanguageSupport(
       'directive-diagram-name': tDirectiveDiagramName,
       'directive-diagram-type': tDirectiveDiagramType,
       'directive-table-name': tDirectiveTableName,
-      'directive-end': tDirectiveEnd,
       reference: tReference,
     },
   }),
@@ -170,7 +171,6 @@ const aqlTheme = EditorView.theme({
   '.aql-directive-diagram-name': { color: '#3b82f6', fontWeight: 500 },
   '.aql-directive-diagram-type': { color: '#eab308', fontWeight: 500 },
   '.aql-directive-table-name': { color: '#06b6d4', fontWeight: 500 },
-  '.aql-directive-end': { color: '#ef4444', fontWeight: 500 },
   '.aql-reference': { color: '#fbbf24' },
   '.cm-tooltip': {
     backgroundColor: '#1e293b',
@@ -196,9 +196,39 @@ const aqlTheme = EditorView.theme({
 
 const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'diagram-name', 'diagram-type', 'table-name', 'end'];
 
-function buildDirectiveCompletions(filter: string): Completion[] {
+function getCurrentBlockKind(state: EditorState): string | null {
+  const text = state.doc.toString();
+  let currentBlock: string | null = null;
+  let i = 0;
+  while (i < text.length) {
+    const nl = text.indexOf('\n', i);
+    const lineEnd = nl === -1 ? text.length : nl;
+    const line = text.slice(i, lineEnd);
+    const blockMatch = line.match(/^#(diagram|table|graph|narrative)\b/);
+    if (blockMatch) {
+      currentBlock = blockMatch[1];
+    } else if (/^#end\b/.test(line)) {
+      currentBlock = null;
+    }
+    i = lineEnd + 1;
+  }
+  return currentBlock;
+}
+
+function buildDirectiveCompletions(filter: string, state: EditorState): Completion[] {
   const term = filter.toLowerCase();
-  return DIRECTIVE_KEYWORDS.filter((kw) => kw.startsWith(term)).map((kw) => {
+  const blockKind = getCurrentBlockKind(state);
+  const allowed = new Set<string>(['end']);
+  if (blockKind) {
+    const blockAllowed = ALLOWED_KEYS_BY_BLOCK[blockKind as keyof typeof ALLOWED_KEYS_BY_BLOCK];
+    if (blockAllowed) {
+      blockAllowed.forEach((k) => allowed.add(k));
+    }
+  } else {
+    BLOCK_DIRECTIVES.forEach((k) => allowed.add(k));
+  }
+  const keywords = DIRECTIVE_KEYWORDS.filter((kw) => allowed.has(kw));
+  return keywords.filter((kw) => kw.startsWith(term)).map((kw) => {
     let apply: Completion['apply'];
     if (kw === 'diagram') {
       apply = (view, _completion, from, to) => {
@@ -336,7 +366,7 @@ function aqlCompletions(
     // directive keyword completion
     const dirMatch = beforeCursor.match(/^#([a-zA-Z0-9_-]*)$/);
     if (dirMatch) {
-      const options = buildDirectiveCompletions(dirMatch[1]);
+      const options = buildDirectiveCompletions(dirMatch[1], state);
       if (options.length === 0) return null;
       return {
         from: line.from + beforeCursor.indexOf('#'),
