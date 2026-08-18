@@ -294,7 +294,7 @@ function buildEntityCompletions(
     });
   }
 
-  return options.sort((a, b) => a.label.localeCompare(b.label)).slice(0, 8);
+  return options;
 }
 
 const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
