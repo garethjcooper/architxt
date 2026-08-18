@@ -5,6 +5,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
+import { linter, type Diagnostic } from '@codemirror/lint';
 import {
   autocompletion,
   insertCompletionText,
@@ -21,6 +22,7 @@ import {
   BLOCK_DIRECTIVES,
   SUB_DIRECTIVE_KEYS,
   ALLOWED_KEYS_BY_BLOCK,
+  parseAql,
 } from '@architxt/aql';
 
 export interface EntityLike {
@@ -162,9 +164,97 @@ const aqlTheme = EditorView.theme({
   '.cm-completionIcon': {
     color: '#94a3b8',
   },
+  '.cm-diagnostic': {
+    color: '#e5e7eb',
+  },
+  '.cm-diagnosticText': {
+    color: '#e5e7eb',
+  },
+  '.cm-diagnostic-error': {
+    color: '#f87171',
+  },
+  '.cm-lintRange': {
+    backgroundImage: 'none',
+  },
+  '.cm-lintRange-error': {
+    backgroundColor: 'rgba(248, 113, 113, 0.15)',
+    borderBottom: '1px dashed #f87171',
+  },
+  '.cm-lintRange-warning': {
+    backgroundColor: 'rgba(250, 204, 21, 0.15)',
+    borderBottom: '1px dashed #facc15',
+  },
+  '.cm-lintMarker': {
+    color: '#f87171',
+  },
+  '.cm-panel.cm-lintPanel': {
+    backgroundColor: '#1e293b',
+    borderTop: '1px solid rgba(255,255,255,0.2)',
+  },
+  '.cm-lintPanel .cm-diagnostic': {
+    padding: '4px 8px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
 });
 
-const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'diagram-name', 'diagram-type', 'table-name', 'end'];
+const aqlLinter = linter((view) => {
+  const diagnostics: Diagnostic[] = [];
+  const result = parseAql(view.state.doc.toString());
+  const errors = result.errors ?? [];
+  const text = view.state.doc.toString();
+  const lines = text.split('\n');
+
+  for (const err of errors) {
+    const lineIndex = Math.max(0, (err.line ?? 1) - 1);
+    const lineText = lines[lineIndex] ?? '';
+    const from = view.state.doc.line(lineIndex + 1).from;
+    const to = from + lineText.length;
+    diagnostics.push({
+      from,
+      to,
+      severity: 'error',
+      message: err.message,
+    });
+  }
+
+  // Extra structural diagnostics the parser doesn't surface per-line.
+  for (const block of result.blocks ?? []) {
+    if (block.kind === 'diagram') {
+      if (!block.name) {
+        const lineIdx = (block.startLine ?? 1) - 1;
+        const from = view.state.doc.line(lineIdx + 1).from;
+        diagnostics.push({
+          from,
+          to: from + (lines[lineIdx]?.length ?? 0),
+          severity: 'warning',
+          message: 'Diagram is missing a #diagram-name',
+        });
+      }
+      if (!block.type) {
+        const lineIdx = (block.startLine ?? 1) - 1;
+        const from = view.state.doc.line(lineIdx + 1).from;
+        diagnostics.push({
+          from,
+          to: from + (lines[lineIdx]?.length ?? 0),
+          severity: 'warning',
+          message: 'Diagram is missing a #diagram-type',
+        });
+      }
+    }
+    if (block.kind === 'table' && !block.name) {
+      const lineIdx = (block.startLine ?? 1) - 1;
+      const from = view.state.doc.line(lineIdx + 1).from;
+      diagnostics.push({
+        from,
+        to: from + (lines[lineIdx]?.length ?? 0),
+        severity: 'warning',
+        message: 'Table is missing a #table-name',
+      });
+    }
+  }
+
+  return diagnostics;
+});
 
 function getCurrentBlockKind(state: EditorState): string | null {
   const text = state.doc.toString();
@@ -185,6 +275,8 @@ function getCurrentBlockKind(state: EditorState): string | null {
   return currentBlock;
 }
 
+const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'diagram-name', 'diagram-type', 'table-name', 'end'];
+
 function buildDirectiveCompletions(filter: string, state: EditorState): Completion[] {
   const term = filter.toLowerCase();
   const blockKind = getCurrentBlockKind(state);
@@ -200,6 +292,7 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
   const keywords = DIRECTIVE_KEYWORDS.filter((kw) => allowed.has(kw));
   return keywords.filter((kw) => kw.startsWith(term)).map((kw) => {
     let apply: Completion['apply'];
+    let boost = 0;
     if (kw === 'diagram') {
       apply = (view, _completion, from, to) => {
         const text = '#diagram\n#diagram-name \n#diagram-type \n#end';
@@ -209,6 +302,7 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
           selection: { anchor: cursor, head: cursor },
         });
       };
+      boost = 99;
     } else if (kw === 'table') {
       apply = (view, _completion, from, to) => {
         const text = '#table\n#table-name \n#end';
@@ -218,6 +312,27 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
           selection: { anchor: cursor, head: cursor },
         });
       };
+      boost = 99;
+    } else if (kw === 'graph') {
+      apply = (view, _completion, from, to) => {
+        const text = '#graph\n#end';
+        const cursor = from + '#graph\n'.length;
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: cursor, head: cursor },
+        });
+      };
+      boost = 99;
+    } else if (kw === 'narrative') {
+      apply = (view, _completion, from, to) => {
+        const text = '#narrative\n#end';
+        const cursor = from + '#narrative\n'.length;
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: cursor, head: cursor },
+        });
+      };
+      boost = 99;
     } else if (kw === 'end') {
       apply = '#end';
     } else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name') {
@@ -225,7 +340,7 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
     } else {
       apply = `#${kw}`;
     }
-    return { label: `#${kw}`, apply, type: 'keyword' };
+    return { label: `#${kw}`, apply, type: 'keyword', boost };
   });
 }
 
@@ -407,6 +522,7 @@ export function AqlEditor(props: AqlEditorProps) {
       aqlTheme,
       syntaxHighlighting(aqlHighlightStyle),
       autocompletion({ override: [aqlCompletions(propsRef)] }),
+      aqlLinter,
       completionInputHandler,
       keymap.of([
         {
