@@ -164,7 +164,6 @@ const DIAGRAM_TYPE_TO_FRAGMENT = {
   timeline: 'output-format-diagram-timeline.md',
   'radar-beta': 'output-format-diagram-radar.md',
   'architecture-beta': 'output-format-diagram-architecture.md',
-  block: 'output-format-diagram-block.md',
   mindmap: 'output-format-diagram-mindmap.md',
   'venn-beta': 'output-format-diagram-venn.md',
 };
