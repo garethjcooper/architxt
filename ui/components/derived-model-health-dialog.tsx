@@ -640,7 +640,8 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               <div className="flex-1 overflow-auto p-3">
                 {selectedEnvelope ? (
                   <NarrativeViewer
-                    envelope={selectedEnvelope}
+                    content={selectedEnvelope.narrative}
+                    diagrams={selectedEnvelope.diagrams}
                     title="Model output"
                     viewMode="markdown"
                     showIndex={false}
