@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import {
@@ -298,13 +298,22 @@ function buildEntityCompletions(
 }
 
 const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  // eslint-disable-next-line no-console
+  console.log('[AQL inputHandler]', { text, from, to, doc: view.state.doc.toString() });
   if (text !== '[' && text !== '#') return false;
   const pos = from + text.length;
   const before = view.state.doc.toString().slice(Math.max(0, pos - 2), pos);
   const shouldOpen = before === '[[' || before.slice(-1) === '#';
+  // eslint-disable-next-line no-console
+  console.log('[AQL inputHandler check]', { before, shouldOpen });
   if (shouldOpen) {
-    // Defer so the default input transaction is fully applied.
-    requestAnimationFrame(() => startCompletion(view));
+    requestAnimationFrame(() => {
+      // eslint-disable-next-line no-console
+      console.log('[AQL startCompletion] calling startCompletion');
+      const opened = startCompletion(view);
+      // eslint-disable-next-line no-console
+      console.log('[AQL startCompletion] returned', opened);
+    });
   }
   return false;
 });
@@ -318,6 +327,8 @@ function aqlCompletions(
 ): CompletionSource {
   return (context) => {
     const { state, pos } = context;
+    // eslint-disable-next-line no-console
+    console.log('[AQL aqlCompletions] pos', pos, 'doc', state.doc.toString());
     const line = state.doc.lineAt(pos);
     const beforeCursor = line.text.slice(0, pos - line.from);
 
@@ -337,6 +348,8 @@ function aqlCompletions(
     if (dirMatch) {
       const options = buildDirectiveCompletions(dirMatch[1]);
       if (options.length === 0) return null;
+      // eslint-disable-next-line no-console
+      console.log('[AQL aqlCompletions] directive options', options.length);
       return {
         from: line.from + beforeCursor.indexOf('#'),
         to: pos,
@@ -350,18 +363,23 @@ function aqlCompletions(
     const closeIdx = allBefore.indexOf(']]', openIdx);
     if (openIdx >= 0 && (closeIdx === -1 || closeIdx >= pos)) {
       const filter = allBefore.slice(openIdx + 2, pos);
+      const options = buildEntityCompletions(
+        propsRef.current.entities,
+        propsRef.current.edges,
+        propsRef.current.includeEdges,
+        filter,
+      );
+      // eslint-disable-next-line no-console
+      console.log('[AQL aqlCompletions] entity options', options.length, 'from', openIdx, 'to', pos);
       return {
         from: openIdx,
         to: pos,
-        options: buildEntityCompletions(
-          propsRef.current.entities,
-          propsRef.current.edges,
-          propsRef.current.includeEdges,
-          filter,
-        ),
+        options,
       };
     }
 
+    // eslint-disable-next-line no-console
+    console.log('[AQL aqlCompletions] no match');
     return null;
   };
 }
@@ -387,6 +405,17 @@ export function AqlEditor(props: AqlEditorProps) {
   }, [availableEntities, availableEdges, includeEdges]);
 
   const lastCursorRef = useRef(0);
+  const cmRef = useRef<ReactCodeMirrorRef | null>(null);
+
+  useEffect(() => {
+    const view = cmRef.current?.view;
+    if (!view) return;
+    (window as unknown as Record<string, unknown>).__aqlView = view;
+    (window as unknown as Record<string, unknown>).__aqlStartCompletion = () => {
+      // eslint-disable-next-line no-console
+      console.log('manual startCompletion result:', startCompletion(view));
+    };
+  });
 
   const handleChange = useCallback(
     (newValue: string, viewUpdate: ViewUpdate) => {
@@ -422,6 +451,7 @@ export function AqlEditor(props: AqlEditorProps) {
   return (
     <div id={id} className={cn('flex flex-col flex-1 min-h-0 relative', className)} style={style}>
       <CodeMirror
+        ref={cmRef}
         value={value}
         onChange={handleChange}
         extensions={extensions}
