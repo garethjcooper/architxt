@@ -50,7 +50,10 @@ export function MermaidDiagram({ content, className = '', name, type }: MermaidD
 
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`;
-        const { svg: rendered } = await mermaid.render(id, source, containerRef.current ?? undefined);
+        // Do not pass a React-managed DOM node to mermaid.render; the node may
+        // carry circular React fiber references that break JSON serialization
+        // inside Mermaid's error handling. We only need the SVG string.
+        const { svg: rendered } = await mermaid.render(id, source);
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
