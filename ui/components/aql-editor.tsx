@@ -417,6 +417,7 @@ export function AqlEditor(props: AqlEditorProps) {
           foldGutter: false,
           highlightActiveLineGutter: false,
           highlightActiveLine: false,
+          closeBrackets: false,
         }}
       />
     </div>
