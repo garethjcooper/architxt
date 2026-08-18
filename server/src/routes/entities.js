@@ -29,6 +29,10 @@ import {
   getNextEntityIdForType,
   findDocumentsForEntities,
 } from '../db/crud/entities.js';
+import {
+  buildEntityInfoMap,
+  validateEntityInfoPayload,
+} from '../services/entity-info.js';
 
 const logger = createLogger('entities-route');
 const router = Router();
@@ -345,6 +349,98 @@ router.get('/', async (req, res) => {
     res, result, notFoundError: null, successStatus: 200,
     successData: result.success ? result.data.map(toApiEntity) : null,
     logger, method: 'GET', path: '/entities', start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/info:
+ *   post:
+ *     summary: Consolidated discoverable info for one or more entities
+ *     description: |
+ *       Read-only aggregation that returns, for each requested entity id, the
+ *       contextual graph node, catalog metadata, system contextual refs,
+ *       user-defined template-derived models, plain mental models, and edge
+ *       contexts between any pair of requested entities. Optionally fetches
+ *       the current Hindsight content for each referenced mental model.
+ *     tags: [Entities]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, entity_ids]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *                 description: Server ID configured in Architxt
+ *               bank_id:
+ *                 type: string
+ *                 description: Hindsight bank name
+ *               entity_ids:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Canonical contextual-graph node ids (e.g. "svc:SVC-005")
+ *               include_content:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Fetch each mental model's content from Hindsight
+ *     responses:
+ *       200:
+ *         description: Consolidated entity info map
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 entities:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: object
+ *                 meta:
+ *                   type: object
+ *                 content:
+ *                   type: object
+ *                   nullable: true
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Internal error
+ */
+router.post('/info', async (req, res) => {
+  const start = Date.now();
+  const path = '/entities/info';
+
+  const validation = validateEntityInfoPayload(req.body);
+  if (!validation.valid) {
+    sendResponse({
+      res, status: 400, error: validation.error, code: validation.code,
+      logger, method: 'POST', path, duration: Date.now() - start,
+    });
+    return;
+  }
+
+  const result = await buildEntityInfoMap(
+    req.app.locals.db || db,
+    validation.serverId,
+    validation.bankId,
+    validation.entityIds,
+    { includeContent: validation.includeContent },
+  );
+
+  if (!result.success) {
+    const status = result.code === 'VALIDATION_ERROR' ? 400 : 500;
+    sendResponse({
+      res, status, error: result.error, code: result.code || 'INTERNAL_ERROR',
+      logger, method: 'POST', path, duration: Date.now() - start,
+    });
+    return;
+  }
+
+  sendResponse({
+    res, status: 200, data: result.data, logger, method: 'POST', path,
+    duration: Date.now() - start,
   });
 });
 
