@@ -154,6 +154,26 @@ const aqlTheme = EditorView.theme({
   '.aql-directive-type': { color: '#eab308', fontWeight: 500 },
   '.aql-directive-end': { color: '#ef4444', fontWeight: 500 },
   '.aql-reference': { color: '#fbbf24' },
+  '.cm-tooltip': {
+    backgroundColor: '#1e293b',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '6px',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete': {
+    padding: '4px 0',
+  },
+  '.cm-tooltip-autocomplete ul li': {
+    padding: '4px 10px',
+    color: '#e5e7eb',
+  },
+  '.cm-tooltip-autocomplete ul li[aria-selected]': {
+    backgroundColor: 'rgba(52, 211, 153, 0.2)',
+    color: '#34d399',
+  },
+  '.cm-completionIcon': {
+    color: '#94a3b8',
+  },
 });
 
 const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'name', 'type', 'end'];
