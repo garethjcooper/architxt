@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
-import { autocompletion, type Completion, type CompletionSource } from '@codemirror/autocomplete';
+import { autocompletion, insertCompletionText, type Completion, type CompletionSource } from '@codemirror/autocomplete';
 import { Tag, tagHighlighter } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
 import {
@@ -193,10 +193,32 @@ const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'diagram-n
 function buildDirectiveCompletions(filter: string): Completion[] {
   const term = filter.toLowerCase();
   return DIRECTIVE_KEYWORDS.filter((kw) => kw.startsWith(term)).map((kw) => {
-    let apply: string;
-    if (kw === 'end') apply = '#end';
-    else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name') apply = `#${kw} `;
-    else apply = `#${kw}`;
+    let apply: Completion['apply'];
+    if (kw === 'diagram') {
+      apply = (view, _completion, from, to) => {
+        const text = '#diagram\n#diagram-name \n#diagram-type \n#end';
+        const cursor = from + '#diagram\n#diagram-name '.length;
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: cursor, head: cursor },
+        });
+      };
+    } else if (kw === 'table') {
+      apply = (view, _completion, from, to) => {
+        const text = '#table\n#table-name \n#end';
+        const cursor = from + '#table\n#table-name '.length;
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: cursor, head: cursor },
+        });
+      };
+    } else if (kw === 'end') {
+      apply = '#end';
+    } else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name') {
+      apply = `#${kw} `;
+    } else {
+      apply = `#${kw}`;
+    }
     return { label: `#${kw}`, apply, type: 'keyword' };
   });
 }
