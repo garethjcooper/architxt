@@ -292,6 +292,8 @@ function buildEntityCompletions(
       apply: () => {},
       type: 'text',
     });
+  } else {
+    options.sort((a, b) => a.label.length - b.label.length);
   }
 
   return options;
