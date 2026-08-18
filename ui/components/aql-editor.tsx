@@ -353,7 +353,7 @@ function aqlCompletions(
             propsRef.current.edges,
             propsRef.current.includeEdges,
             filter,
-          ).slice(0, 50),
+          ).slice(0, 8),
         };
       }
     }
