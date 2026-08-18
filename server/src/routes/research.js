@@ -950,24 +950,16 @@ router.post('/mental-models/health', async (req, res) => {
       }
 
       const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
-      const hasNodes = Array.isArray(graph.nodes) && graph.nodes.length > 0;
-      const hasEdges = Array.isArray(graph.edges) && graph.edges.length > 0;
-      const hasTables = Array.isArray(content.tables) && content.tables.length > 0;
-      const hasDiagrams = Array.isArray(content.diagrams) && content.diagrams.length > 0;
-      const hasNarrative = typeof content.narrative === 'string' && content.narrative.trim().length > 0;
-      const healthy = hasNodes || hasTables || hasDiagrams || hasNarrative;
+      const healthy = Array.isArray(graph.nodes) && graph.nodes.length > 0;
       return {
         ext_id: extId,
         healthy,
         found: true,
         content_length: JSON.stringify(content).length,
-        graph_present: hasNodes,
+        graph_present: healthy,
         node_count: graph?.nodes?.length ?? 0,
         edge_count: graph?.edges?.length ?? 0,
-        table_count: content.tables?.length ?? 0,
-        diagram_count: content.diagrams?.length ?? 0,
-        has_narrative: hasNarrative,
-        error: healthy ? null : 'Mental-model structured output has no graph nodes, tables, diagrams, or narrative',
+        error: healthy ? null : 'Mental-model structured output has no graph nodes',
       };
     }));
 
