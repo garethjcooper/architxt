@@ -204,7 +204,8 @@ export function ResearchResultPanel({
     if (viewMode === 'session' && mergedNarrative) {
       text = mergedNarrative;
     } else {
-      text = result?.synthesis?.narrative || 'No narrative available.';
+      const rawNarrative = result?.synthesis?.narrative;
+      text = typeof rawNarrative === 'string' ? rawNarrative : JSON.stringify(rawNarrative ?? null, null, 2);
     }
 
     const tables = result?.canvas?.tables ?? [];
@@ -227,8 +228,18 @@ export function ResearchResultPanel({
       }).join('\n');
       text = `${text}${mdTables}`;
     }
+
+    const diagrams = result?.canvas?.diagrams ?? [];
+    if (diagrams.length > 0) {
+      const mdDiagrams = diagrams.map((d) => {
+        const diagramContent = typeof d.content === 'string' ? d.content : JSON.stringify(d.content ?? null, null, 2);
+        return `\n\n## Diagram: ${d.name || d.type || 'Untitled'}\n\n\`\`\`mermaid\n${diagramContent}\n\`\`\``;
+      }).join('\n');
+      text = `${text}${mdDiagrams}`;
+    }
+
     return text;
-  }, [viewMode, mergedNarrative, result?.synthesis?.narrative, result?.canvas?.tables]);
+  }, [viewMode, mergedNarrative, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams]);
 
   return (
     <div className="min-h-0 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
@@ -346,7 +357,7 @@ export function ResearchResultPanel({
                 </div>
               )}
               {resultView === 'narrative' && (
-                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} diagrams={result?.canvas?.diagrams} />
+                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
               )}
             </div>
           )}
