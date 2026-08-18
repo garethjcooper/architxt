@@ -24,7 +24,7 @@ export interface NarrativeViewerProps {
   viewMode?: 'plain' | 'markdown';
   /** Whether to show the left-hand index sidebar. */
   showIndex?: boolean;
-  /** Optional Mermaid diagrams to render inline after the narrative content. */
+  /** Optional Mermaid diagrams to render inline after the narrative content. @deprecated Diagrams should now be included in the Markdown content itself as fenced mermaid blocks. */
   diagrams?: NarrativeDiagram[];
 }
 
@@ -175,6 +175,7 @@ export function NarrativeViewer({
         {diagrams && diagrams.length > 0 && (
           <div className="mt-6 flex flex-col gap-4">
             <hr className="border-white/10" />
+            <div className="text-[10px] uppercase text-white/40 font-medium">Legacy diagram pane (deprecated)</div>
             {diagrams.map((d, idx) => (
               <MermaidDiagram key={idx} name={d.name} type={d.type} content={d.content} />
             ))}

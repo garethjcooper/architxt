@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { slugifyHeading } from './smart-document-editor';
+import { MermaidDiagram } from './mermaid-diagram';
 
 interface MarkdownProps {
   children: string;
@@ -37,6 +38,18 @@ export function Markdown({ children, className = '' }: MarkdownProps) {
     }
   };
 
+  const renderCode = ({ node, inline, className: codeClassName, children, ...props }: any) => {
+    const match = /language-(\w+)/.exec(codeClassName || '');
+    const language = match ? match[1] : '';
+    const content = String(children || '').replace(/\n$/, '');
+
+    if (!inline && language === 'mermaid') {
+      return <MermaidDiagram content={content} />;
+    }
+
+    return <code className="bg-white/10 rounded px-1 py-0.5 text-xs" {...props}>{children}</code>;
+  };
+
   return (
     <div className={`markdown-body ${className}`}>
       <ReactMarkdown
@@ -52,7 +65,7 @@ export function Markdown({ children, className = '' }: MarkdownProps) {
           h4: headingWithId,
           h5: headingWithId,
           h6: headingWithId,
-          code: ({ ...props }) => <code className="bg-white/10 rounded px-1 py-0.5 text-xs" {...props} />,
+          code: renderCode,
           pre: ({ ...props }) => <pre className="bg-white/5 rounded p-2 overflow-x-auto text-xs mb-3" {...props} />,
           a: ({ ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
           strong: ({ ...props }) => <strong className="font-semibold text-white" {...props} />,
