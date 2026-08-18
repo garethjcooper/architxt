@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Activity, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import type { DerivedMentalModel, MentalModelReturns } from '@/lib/types/index';
+import type { DerivedMentalModel } from '@/lib/types/index';
 import { mentalModelsApi, hindsightApi, serversApi } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorServer, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
@@ -19,15 +19,8 @@ interface DerivedModelHealthDialogProps {
 
 type HealthResult = {
   ext_id: string;
-  healthy: boolean;
-  found?: boolean;
-  content?: string | object | null;
-  content_length?: number;
-  parsed?: { narrative?: string; graph?: { nodes: unknown[]; edges: unknown[] } };
-  node_count?: number;
-  edge_count?: number;
-  narrative_length?: number;
-  graph_present?: boolean;
+  found: boolean;
+  content: string | object | null;
   error?: string;
 };
 
@@ -48,7 +41,7 @@ type HealthStatus =
   | { state: 'idle' }
   | { state: 'loading' }
   | { state: 'error'; message: string }
-  | { state: 'done'; results: HealthResult[] };
+  | { state: 'done'; results: Record<string, HealthResult> };
 
 const isTerminalStatus = (s: string) => ['completed', 'failed', 'acknowledged', 'cancelled', 'canceled'].includes(s);
 
@@ -63,7 +56,8 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     setSelectedBankId,
   } = usePersistentServerBank(servers, banks);
   const [status, setStatus] = useState<HealthStatus>({ state: 'idle' });
-  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
+  const [selectedExtId, setSelectedExtId] = useState<string | null>(null);
+  const [contentErrors, setContentErrors] = useState<Record<string, string>>({});
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
   const [refreshingIds, setRefreshingIds] = useState<Set<number>>(new Set());
   const [confirmRefreshAllOpen, setConfirmRefreshAllOpen] = useState(false);
@@ -186,20 +180,55 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     if (!isOpen) {
       activeRefreshIdsRef.current = new Set();
       setStatus({ state: 'idle' });
-      setSelectedResultId(null);
+      setSelectedExtId(null);
+      setContentErrors({});
       setPendingOps([]);
       setRefreshingIds(new Set());
     }
   }, [isOpen]);
 
-  const runHealthCheck = async (models: { ext_id: string; returns?: MentalModelReturns }[], opts: { silent?: boolean } = {}) => {
-    if (!selectedServerId || !selectedBankId || models.length === 0) return null;
-    const response = await mentalModelsApi.healthCheck({
-      server_id: Number(selectedServerId),
-      bank_id: selectedBankId,
-      models,
-    });
-    return response.results || [];
+  const runHealthCheck = async (models: { ext_id: string }[], opts: { silent?: boolean } = {}) => {
+    if (!selectedServerId || !selectedBankId || models.length === 0) return;
+    try {
+      const results = await Promise.all(
+        models.map(async (model) => {
+          const extId = model.ext_id;
+          if (!extId) {
+            return { ext_id: extId || '', found: false, content: null, error: 'ext_id is required' };
+          }
+          try {
+            const result = await mentalModelsApi.fetchContent(
+              Number(selectedServerId),
+              selectedBankId,
+              extId,
+            );
+            return {
+              ext_id: extId,
+              found: result.found,
+              content: result.content,
+              error: result.found ? undefined : 'Mental model not found in Hindsight',
+            };
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            setContentErrors((prev) => ({ ...prev, [extId]: message }));
+            return { ext_id: extId, found: false, content: null, error: message };
+          }
+        }),
+      );
+
+      const nextResults: Record<string, HealthResult> = {};
+      for (const r of results) {
+        nextResults[r.ext_id] = r;
+      }
+      setStatus({ state: 'done', results: nextResults });
+      return results;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!opts.silent) {
+        setStatus({ state: 'error', message });
+        toast.error(`Health check failed: ${message}`);
+      }
+    }
   };
 
   const handleRun = async () => {
@@ -210,14 +239,14 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     if (derived.length === 0) return;
 
     setStatus({ state: 'loading' });
-    setSelectedResultId(null);
+    setSelectedExtId(null);
+    setContentErrors({});
     try {
-      const results = await runHealthCheck(
-        derived.map((d) => ({ ext_id: d.ext_id || '', returns: 'generic' })),
-      );
-      setStatus({ state: 'done', results: results || [] });
-      if ((results || []).length > 0) {
-        setSelectedResultId(0);
+      const models = derived.map((d) => ({ ext_id: d.ext_id || '' })).filter((m) => m.ext_id);
+      await runHealthCheck(models);
+      if (derived.length > 0) {
+        const first = derived.find((d) => d.ext_id) ?? null;
+        if (first) setSelectedExtId(first.ext_id || null);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -325,31 +354,14 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     if (justCompleted.length === 0) return;
 
     const targets = justCompleted
-      .map((op) => {
-        const idx = derived.findIndex((d) => d.ext_id === op.pop_ext_id);
-        if (idx === -1 || !op.pop_ext_id) return null;
-        return {
-          idx,
-          model: { ext_id: op.pop_ext_id, returns: 'generic' },
-        };
-      })
-      .filter(Boolean) as { idx: number; model: { ext_id: string; returns?: MentalModelReturns } }[];
+      .map((op) => op.pop_ext_id)
+      .filter((extId): extId is string => Boolean(extId));
 
     if (targets.length === 0) return;
 
     (async () => {
       try {
-        const fresh = await runHealthCheck(targets.map((t) => t.model), { silent: true });
-        if (!fresh) return;
-        setStatus((prev) => {
-          if (prev.state !== 'done') return prev;
-          const next = [...prev.results];
-          for (const t of targets) {
-            const match = fresh.find((r) => r.ext_id === t.model.ext_id);
-            if (match) next[t.idx] = match;
-          }
-          return { state: 'done', results: next };
-        });
+        await runHealthCheck(targets.map((extId) => ({ ext_id: extId })), { silent: true });
       } catch (err) {
         // silent fail — don't spam on background refresh
       }
@@ -372,26 +384,20 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     return latest ? latest.pop_status : null;
   };
 
-  const results = status.state === 'done' ? status.results : [];
-  const selectedResult = selectedResultId != null ? results[selectedResultId] : null;
+  const results = status.state === 'done' ? status.results : {};
+  const selectedResult = selectedExtId != null ? results[selectedExtId] || null : null;
+  const selectedContentError = selectedExtId != null ? contentErrors[selectedExtId] || null : null;
 
-  const formatPreview = (result: HealthResult | null): string => {
+  const formatPreview = (result: HealthResult | null, error: string | null): string => {
+    if (error) return `Error:\n${error}`;
     if (!result) return '';
-    if (result.error) {
-      let out = `Error:\n${result.error}`;
-      if (result.content != null) {
-        const contentText = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-        out += `\n\nReturned content:\n${contentText}`;
-      }
-      return out;
-    }
     if (result.content != null) {
       return typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
     }
     return 'No content available';
   };
 
-  const selectedPreviewText = selectedResult ? formatPreview(selectedResult) : '';
+  const selectedPreviewText = formatPreview(selectedResult, selectedContentError);
 
   return (
     <>
@@ -423,38 +429,37 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                 <Table className="w-full caption-bottom text-sm table-fixed">
                   <TableHeader>
                     <TableRow className="border-b border-white/10 hover:bg-transparent">
-                      <TableHead className="w-[22%] text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
-                      <TableHead className="w-[18%] text-xs uppercase text-white/60 font-medium py-2 px-3">Entity</TableHead>
-                      <TableHead className="w-[10%] text-xs uppercase text-white/60 font-medium py-2 px-3">Health</TableHead>
-                      <TableHead className="w-[10%] text-xs uppercase text-white/60 font-medium py-2 px-3">Chars</TableHead>
-                      <TableHead className="w-[10%] text-xs uppercase text-white/60 font-medium py-2 px-3">Narr Chars</TableHead>
-                      <TableHead className="w-[8%] text-xs uppercase text-white/60 font-medium py-2 px-3">Nodes</TableHead>
-                      <TableHead className="w-[8%] text-xs uppercase text-white/60 font-medium py-2 px-3">Edges</TableHead>
-                      <TableHead className="w-[10%] text-xs uppercase text-white/60 font-medium py-2 px-3">Status</TableHead>
-                      <TableHead className="w-[8%] text-xs uppercase text-white/60 font-medium py-2 px-3 text-right">Refresh</TableHead>
+                      <TableHead className="w-[30%] text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
+                      <TableHead className="w-[22%] text-xs uppercase text-white/60 font-medium py-2 px-3">Entity</TableHead>
+                      <TableHead className="w-[12%] text-xs uppercase text-white/60 font-medium py-2 px-3">Health</TableHead>
+                      <TableHead className="w-[12%] text-xs uppercase text-white/60 font-medium py-2 px-3">Chars</TableHead>
+                      <TableHead className="w-[14%] text-xs uppercase text-white/60 font-medium py-2 px-3">Status</TableHead>
+                      <TableHead className="w-[10%] text-xs uppercase text-white/60 font-medium py-2 px-3 text-right">Refresh</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {derived.map((d, idx) => {
-                      const result = results[idx];
-                      const selected = selectedResultId === idx;
-                      const op = getOperationForRow(d.ext_id || undefined);
-                      const refreshStatus = getLatestRefreshStatus(d.ext_id || undefined);
+                      const extId = d.ext_id || '';
+                      const result = results[extId] as HealthResult | undefined;
+                      const contentError = contentErrors[extId];
+                      const selected = selectedExtId === extId;
+                      const op = getOperationForRow(extId || undefined);
+                      const refreshStatus = getLatestRefreshStatus(extId || undefined);
 
                       let healthBadge: React.ReactNode = <span className="text-white/40">-</span>;
                       if (status.state === 'loading') {
                         healthBadge = <Loader2 className="h-4 w-4 animate-spin text-white/50" />;
                       } else if (result) {
-                        healthBadge = result.healthy ? (
+                        healthBadge = result.found ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
                             OK
                           </span>
                         ) : (
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-red-500/15 text-red-300 border-red-500/30"
-                            title={result.error || 'Unhealthy'}
+                            title={result.error || contentError || 'Missing'}
                           >
-                            {result.found === false ? 'Missing' : 'Error'}
+                            Missing
                           </span>
                         );
                       }
@@ -475,18 +480,18 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
 
                       const isRefreshing = refreshingIds.has(d.id);
 
-                      const previewLength = result ? formatPreview(result).length : 0;
+                      const previewLength = result ? formatPreview(result, contentErrors[extId] || null).length : 0;
 
                       return (
                         <TableRow
                           key={d.id}
-                          onClick={() => result && setSelectedResultId(idx)}
+                          onClick={() => result && setSelectedExtId(extId)}
                           className={`border-b border-white/5 cursor-pointer transition-colors ${
                             selected ? 'bg-purple-900/30' : result ? 'hover:bg-white/5' : ''
                           }`}
                         >
-                          <TableCell className="py-2 px-3 text-xs font-mono text-white/60 truncate" title={d.ext_id || '-'}>
-                            {d.ext_id || '-'}
+                          <TableCell className="py-2 px-3 text-xs font-mono text-white/60 truncate" title={extId || '-'}>
+                            {extId || '-'}
                           </TableCell>
                           <TableCell className="py-2 px-3 text-xs text-white/60 truncate" title={`${d.derived_entity?.entity_id} — ${d.derived_entity?.name}`}>
                             {d.derived_entity?.entity_id} — {d.derived_entity?.name}
@@ -504,31 +509,6 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                             )}
                           </TableCell>
                           <TableCell className="py-2 px-3">
-                            {result && (
-                              <span className="text-[10px] text-white/50 tabular-nums" title={`${(result.narrative_length ?? 0).toLocaleString()} narrative characters`}>
-                                {result.narrative_length?.toLocaleString() ?? '-'}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-2 px-3">
-                            {result?.graph_present ? (
-                              <span className="text-[10px] text-white/50 tabular-nums">
-                                {(result.node_count ?? 0).toLocaleString()}
-                              </span>
-                            ) : (
-                              result && <span className="text-[10px] text-white/30">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-2 px-3">
-                            {result?.graph_present ? (
-                              <span className="text-[10px] text-white/50 tabular-nums">
-                                {(result.edge_count ?? 0).toLocaleString()}
-                              </span>
-                            ) : (
-                              result && <span className="text-[10px] text-white/30">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-2 px-3">
                             <div className="flex flex-row flex-wrap items-center gap-2">
                               {statusBadge}
                             </div>
@@ -538,15 +518,13 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                               size="icon"
                               variant="ghost"
                               className="h-6 w-6 text-white/50 hover:text-purple-300 hover:bg-purple-500/10 disabled:opacity-30"
-                              disabled={!selectedServerId || !selectedBankId || isRefreshing || !!op || !result}
+                              disabled={!selectedServerId || !selectedBankId || isRefreshing || !!op}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRefresh(d, idx);
                               }}
                               title={
-                                !result
-                                  ? 'Run health check first'
-                                  : !!op
+                                !!op
                                   ? 'Refresh in progress'
                                   : 'Refresh mental model on Hindsight'
                               }
@@ -592,18 +570,18 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                       {selectedPreviewText.length.toLocaleString()} chars
                     </span>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
-                      selectedResult.healthy
+                      selectedResult.found
                         ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                         : 'bg-red-500/15 text-red-300 border-red-500/30'
                     }`}>
-                      {selectedResult.healthy ? 'Healthy' : selectedResult.found === false ? 'Missing' : 'Error'}
+                      {selectedResult.found ? 'Found' : 'Missing'}
                     </span>
                   </div>
                 )}
               </div>
               <div className="flex-1 overflow-auto p-3">
                 <pre className="text-xs font-mono text-white/80 whitespace-pre-wrap break-all">
-                  {formatPreview(selectedResult)}
+                  {selectedPreviewText}
                 </pre>
               </div>
             </div>
