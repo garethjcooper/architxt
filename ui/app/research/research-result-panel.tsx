@@ -189,6 +189,30 @@ export function ResearchResultPanel({
       .join('\n\n---\n\n');
   }, [trail, selectedStepIds, viewMode]);
 
+  const mergedTables = useMemo(() => {
+    if (viewMode !== 'session') return null;
+    const selected = trail.filter((s) => selectedStepIds.has(s.id));
+    if (selected.length === 0) return null;
+    const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
+    for (const s of selected) {
+      const stepTables = s.canvas?.tables;
+      if (stepTables?.length) tables.push(...stepTables);
+    }
+    return tables.length > 0 ? tables : null;
+  }, [trail, selectedStepIds, viewMode]);
+
+  const mergedDiagrams = useMemo(() => {
+    if (viewMode !== 'session') return null;
+    const selected = trail.filter((s) => selectedStepIds.has(s.id));
+    if (selected.length === 0) return null;
+    const diagrams: Array<{ name: string; type: string; content: string }> = [];
+    for (const s of selected) {
+      const stepDiagrams = s.canvas?.diagrams;
+      if (stepDiagrams?.length) diagrams.push(...stepDiagrams);
+    }
+    return diagrams.length > 0 ? diagrams : null;
+  }, [trail, selectedStepIds, viewMode]);
+
   const sourceSteps = useMemo(() => {
     if (result?.action_type !== 'synthesize' || !Array.isArray(result?.parameters?.source_steps)) return [];
     return result.parameters.source_steps
@@ -208,8 +232,8 @@ export function ResearchResultPanel({
       text = typeof rawNarrative === 'string' ? rawNarrative : JSON.stringify(rawNarrative ?? null, null, 2);
     }
 
-    const tables = result?.canvas?.tables ?? [];
-    if (tables.length > 0) {
+    const tables = viewMode === 'session' ? mergedTables : result?.canvas?.tables;
+    if (tables && tables.length > 0) {
       const mdTables = tables.map((t) => {
         if (!t.rows || t.rows.length === 0) return '';
         const cols = t.columns?.length ? t.columns : Object.keys(t.rows[0]);
@@ -229,8 +253,8 @@ export function ResearchResultPanel({
       text = `${text}${mdTables}`;
     }
 
-    const diagrams = result?.canvas?.diagrams ?? [];
-    if (diagrams.length > 0) {
+    const diagrams = viewMode === 'session' ? mergedDiagrams : result?.canvas?.diagrams;
+    if (diagrams && diagrams.length > 0) {
       const mdDiagrams = diagrams.map((d) => {
         const diagramContent = typeof d.content === 'string' ? d.content : JSON.stringify(d.content ?? null, null, 2);
         return `\n\n## Diagram: ${d.name || d.type || 'Untitled'}\n\n\`\`\`mermaid\n${diagramContent}\n\`\`\``;
@@ -239,7 +263,7 @@ export function ResearchResultPanel({
     }
 
     return text;
-  }, [viewMode, mergedNarrative, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams]);
+  }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams]);
 
   return (
     <div className="min-h-0 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
