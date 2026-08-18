@@ -191,7 +191,7 @@ export function QueryForm(props: QueryFormProps) {
               placeholder={QUERY_PLACEHOLDERS[queryMode]}
               availableEntities={availableEntities}
               availableEdges={availableEdges}
-              className="flex-1 min-h-0"
+              className="flex-1 min-h-0 rounded-lg border border-white/20 bg-transparent"
             />
           </div>
         )}
