@@ -297,24 +297,19 @@ function buildEntityCompletions(
   return options;
 }
 
-const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (text === '#') {
+const completionInputHandler = EditorView.domEventHandlers({
+  keydown: (event, view) => {
+    if (event.key !== '@' && event.key !== '#') return false;
+    event.preventDefault();
+    const from = view.state.selection.main.head;
+    const char = event.key;
     view.dispatch({
-      changes: { from, to, insert: '#' },
+      changes: { from, to: from, insert: char },
       selection: { anchor: from + 1, head: from + 1 },
     });
-    setTimeout(() => startCompletion(view), 0);
+    startCompletion(view);
     return true;
-  }
-  if (text === '@') {
-    view.dispatch({
-      changes: { from, to, insert: '@' },
-      selection: { anchor: from + 1, head: from + 1 },
-    });
-    setTimeout(() => startCompletion(view), 0);
-    return true;
-  }
-  return false;
+  },
 });
 
 function aqlCompletions(
