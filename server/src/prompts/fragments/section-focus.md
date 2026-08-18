@@ -1,5 +1,7 @@
 ## Output directives
 
+The following named output sections were requested. Use the provided titles exactly as given.
+
 {{ARCHITXT_NARRATIVE_FOCUS}}
 
 {{ARCHITXT_GRAPH_FOCUS}}
