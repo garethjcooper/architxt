@@ -298,7 +298,12 @@ function buildEntityCompletions(
 }
 
 const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (text !== '@' && text !== '#') return false;
+  if (text !== '[' && text !== '#') return false;
+  // For '[', only trigger when the user is typing [[ (previous char is [).
+  if (text === '[') {
+    const prev = view.state.doc.sliceString(Math.max(0, from - 1), from);
+    if (prev !== '[') return false;
+  }
   Promise.resolve().then(() => startCompletion(view));
   return false;
 });
@@ -338,28 +343,8 @@ function aqlCompletions(
       };
     }
 
-    // entity/edge reference completion — open on @mention-style trigger
+    // entity/edge reference completion — open on [[ trigger
     const allBefore = state.doc.toString().slice(0, pos);
-    const atIdx = allBefore.lastIndexOf('@');
-    if (atIdx >= 0) {
-      const charBefore = allBefore.charAt(atIdx - 1);
-      if (charBefore === ' ' || charBefore === '\n' || charBefore === '\t' || atIdx === 0) {
-        const filter = allBefore.slice(atIdx + 1, pos);
-        return {
-          from: atIdx,
-          to: pos,
-          filter: false,
-          options: buildEntityCompletions(
-            propsRef.current.entities,
-            propsRef.current.edges,
-            propsRef.current.includeEdges,
-            filter,
-          ).slice(0, 50),
-        };
-      }
-    }
-
-    // legacy [[ reference completion
     const openIdx = allBefore.lastIndexOf('[[');
     const closeIdx = allBefore.indexOf(']]', openIdx);
     if (openIdx >= 0 && (closeIdx === -1 || closeIdx >= pos)) {
