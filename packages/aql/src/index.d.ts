@@ -26,6 +26,7 @@ export interface Block {
   bodyReferences: Reference[];
   name?: string;
   type?: string;
+  startLine?: number;
 }
 
 export interface AqlQuery {

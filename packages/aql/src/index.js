@@ -372,6 +372,7 @@ export function parseAql(rawQuery) {
       kind: b.kind,
       name: b.name,
       type: b.type,
+      startLine: b.startLine,
       body,
       bodyReferences: refs,
     };
