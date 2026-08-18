@@ -93,6 +93,7 @@ function ensureMissingTables(db) {
         rs_id INTEGER NOT NULL,
         rstep_parent_step_id INTEGER,
         rstep_intent_text TEXT NOT NULL,
+        rstep_raw_query TEXT,
         rstep_selections JSON,
         rstep_action_type TEXT NOT NULL,
         rstep_parameters JSON,
@@ -666,8 +667,10 @@ function relaxResearchStepsParentCascade(db) {
 
   logger.warn('Recreating research_steps with ON DELETE SET NULL for rstep_parent_step_id');
 
+  // SQLite only supports a limited subset of ALTER TABLE, so recreate the
+  // table when adding a column. Existing columns are preserved.
   const columns = [
-    'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_selections',
+    'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
     'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_canvas_state',
     'rstep_synthesis', 'rstep_proposed_actions', 'rstep_anchors', 'rstep_intent_tag',
     'rstep_status', 'rstep_error_message',
@@ -684,6 +687,7 @@ function relaxResearchStepsParentCascade(db) {
       rs_id INTEGER NOT NULL,
       rstep_parent_step_id INTEGER,
       rstep_intent_text TEXT NOT NULL,
+      rstep_raw_query TEXT,
       rstep_selections JSON,
       rstep_action_type TEXT NOT NULL,
       rstep_parameters JSON,
@@ -996,6 +1000,10 @@ function ensureMissingColumns(db) {
         {
           name: 'rstep_calls',
           ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_calls JSON'
+        },
+        {
+          name: 'rstep_raw_query',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_raw_query TEXT'
         }
       ]
     },

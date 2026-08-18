@@ -571,7 +571,7 @@ export function useResearchSession({
         return;
       }
 
-      setQuery(step.intent_text);
+      setQuery(step.raw_query || step.intent_text);
 
       if (VALID_QUERY_MODES.has(step.action_type as any)) {
         setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates');
@@ -634,10 +634,9 @@ export function useResearchSession({
         bank_id: bankId,
         session_id: activeSessionId,
         source_step_ids: sourceStepIds,
-        intent_text: intentText.trim(),
-        ...(queryOptions.synthesize?.maxTokens != null
-          ? { max_tokens: queryOptions.synthesize.maxTokens }
-          : {}),
+        intent_text: parsed.intentText,
+        raw_query: query.trim() || undefined,
+        max_tokens: queryOptions.synthesize?.maxTokens,
         ...(parsed.sectionFocus ? { section_focus: parsed.sectionFocus } : {}),
       });
       setActiveSessionId(response.session_id);
@@ -725,6 +724,7 @@ export function useResearchSession({
           entities: entityIds,
           roles: selectedTemplateRoles,
           session_id: activeSessionId ?? undefined,
+          raw_query: query.trim() || undefined,
         });
         if (!prebuilt.success) {
           throw new Error(prebuilt.error || 'Prebuilt research failed');
@@ -797,6 +797,7 @@ export function useResearchSession({
         bank_id: bankId,
         viewpoint_ids: [],
         intent_text: parsed.intentText,
+        raw_query: query.trim() || undefined,
         query_depth: queryMode,
         ...buildDiscoverOptions(queryMode, queryOptions),
         ...(parsed.sectionFocus ? { section_focus: parsed.sectionFocus } : {}),

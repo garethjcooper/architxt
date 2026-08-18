@@ -31,7 +31,7 @@ export const deleteSession = sessionBase.del;
 export const getStep = stepBase.get;
 export const updateStep = (db, stepId, data) => dbExec(() => {
   const id = requireInt('stepId', stepId);
-  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_created_at']);
+  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_raw_query', 'rstep_created_at']);
   const entries = Object.entries(data).filter(([key]) => allowedFields.has(key));
   if (entries.length === 0) {
     throw new Error('No allowed fields to update');
@@ -175,16 +175,17 @@ export const createStep = (db, data) => dbExec(() => {
 
   const prepared = toJson(data, STEP_JSON_FIELDS);
   const sql = `INSERT INTO ${STEP_TABLE} (
-    rs_id, rstep_parent_step_id, rstep_intent_text, rstep_selections,
+    rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
     rstep_action_type, rstep_parameters, rstep_viewpoint_ids, rstep_canvas_state,
     rstep_synthesis, rstep_status, rstep_error_message,
     rstep_tool_calls_used, rstep_calls
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     prepared.rs_id,
     prepared.rstep_parent_step_id ?? null,
     prepared.rstep_intent_text,
+    prepared.rstep_raw_query ?? null,
     prepared.rstep_selections ?? null,
     prepared.rstep_action_type,
     prepared.rstep_parameters ?? null,
