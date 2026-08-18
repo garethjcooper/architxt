@@ -136,8 +136,11 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
     }
     if (item.narrative) {
       narratives.push(`## ${item.name || item.ext_id}\n\n${item.narrative}`);
-    } else if (item.content) {
-      narratives.push(`## ${item.name || item.ext_id}\n\n${item.content}`);
+    } else if (item.diagrams?.length > 0 || item.tables?.length > 0 || item.graph?.nodes?.length > 0 || item.graph?.edges?.length > 0) {
+      narratives.push(`## ${item.name || item.ext_id}\n\nNo narrative text provided.`);
+    } else if (item.content != null) {
+      const fallback = typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
+      narratives.push(`## ${item.name || item.ext_id}\n\n${fallback}`);
     }
     if (item.graph) {
       if (item.graph.nodes.length > 0 || item.graph.edges.length > 0) {
