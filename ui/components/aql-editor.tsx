@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { EditorView, ViewPlugin, keymap, type ViewUpdate } from '@codemirror/view';
+import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import { autocompletion, startCompletion, type Completion, type CompletionSource } from '@codemirror/autocomplete';
 import { Tag, tagHighlighter } from '@lezer/highlight';
@@ -277,20 +277,6 @@ function buildEntityCompletions(
   return options.sort((a, b) => a.label.localeCompare(b.label)).slice(0, 8);
 }
 
-const completionTriggerPlugin = ViewPlugin.fromClass(
-  class {
-    update(update: ViewUpdate) {
-      const userEvent = update.transactions.some((tr) => tr.isUserEvent('input.type'));
-      if (!userEvent) return;
-      const pos = update.state.selection.main.head;
-      const before = update.state.doc.toString().slice(Math.max(0, pos - 2), pos);
-      if (before === '[[' || before.slice(-1) === '#') {
-        setTimeout(() => startCompletion(update.view), 0);
-      }
-    }
-  },
-);
-
 function aqlCompletions(
   propsRef: React.MutableRefObject<{
     entities: EntityLike[];
@@ -382,23 +368,49 @@ export function AqlEditor(props: AqlEditorProps) {
   );
 
   const extensions = useMemo(
-    () => [
-      aqlLanguage,
-      aqlTheme,
-      syntaxHighlighting(aqlHighlightStyle),
-      autocompletion({ override: [aqlCompletions(propsRef)] }),
-      completionTriggerPlugin,
-      keymap.of([
-        {
-          key: 'Mod-Enter',
-          run: () => {
-            onSubmit?.();
-            return true;
-          },
+  () => [
+    aqlLanguage,
+    aqlTheme,
+    syntaxHighlighting(aqlHighlightStyle),
+    autocompletion({ override: [aqlCompletions(propsRef)] }),
+    keymap.of([
+      {
+        key: 'Mod-Enter',
+        run: () => {
+          onSubmit?.();
+          return true;
         },
-      ]),
-    ],
-    [onSubmit],
+      },
+      {
+        key: '#',
+        run: (view) => {
+          const { from, to } = view.state.selection.main;
+          view.dispatch({
+            changes: { from, to, insert: '#' },
+            selection: { anchor: from + 1, head: from + 1 },
+          });
+          startCompletion(view);
+          return true;
+        },
+      },
+      {
+        key: '[',
+        run: (view) => {
+          const { from, to } = view.state.selection.main;
+          const prev = view.state.doc.sliceString(Math.max(0, from - 1), from);
+          view.dispatch({
+            changes: { from, to, insert: '[' },
+            selection: { anchor: from + 1, head: from + 1 },
+          });
+          if (prev === '[') {
+            startCompletion(view);
+          }
+          return true;
+        },
+      },
+    ]),
+  ],
+  [onSubmit],
   );
 
   return (
