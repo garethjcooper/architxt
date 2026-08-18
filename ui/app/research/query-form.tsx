@@ -8,7 +8,7 @@ import { colorForType } from '@/components/research-canvas';
 import { type ResearchQueryOptions } from './use-research-session';
 import { type ResearchStepSummary } from '@/lib/api/client';
 import { researchApi } from '@/lib/api/client';
-import { AqlInput } from '@/components/aql-input';
+import { AqlEditor } from '@/components/aql-editor';
 
 export type Server = {
   id: number;
@@ -181,7 +181,7 @@ export function QueryForm(props: QueryFormProps) {
       <div className="flex flex-1 min-h-0 gap-2">
         {queryMode !== 'models' && queryMode !== 'templates' && queryMode !== 'prebuilt' && (
           <div className="flex flex-col flex-1 min-h-0 relative">
-            <AqlInput
+            <AqlEditor
               value={query}
               onChange={(value, newCursor) => {
                 setQuery(value);

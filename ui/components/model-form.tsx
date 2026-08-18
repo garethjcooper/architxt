@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { MentalModel, StandardDimension } from '@/lib/types/index';
 import { mentalModelsApi } from '@/lib/api/client';
-import { AqlInput } from '@/components/aql-input';
+import { AqlEditor } from '@/components/aql-editor';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -202,7 +202,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
 
       <div className="space-y-2">
         <Label htmlFor="mm-source-query" className="text-xs uppercase text-white/50 font-medium">Source Query *</Label>
-        <AqlInput
+        <AqlEditor
           id="mm-source-query"
           value={sourceQuery}
           onChange={(value) => setSourceQuery(value)}

@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { AqlInput } from '@/components/aql-input';
+import { AqlEditor } from '@/components/aql-editor';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -495,12 +495,12 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-white/50 font-medium">
             Source Query *
           </Label>
-          <AqlInput
+          <AqlEditor
             id="mm-detail-source-query"
             value={sourceQuery}
             onChange={(value) => handleSourceQueryChange(value)}
-            disabled={false}
-            placeholder="Query used to source this model"
+            disabled={isSystemTemplate}
+            placeholder="AQL query used to source this model"
             availableEntities={[]}
             availableEdges={[]}
             className={inputClass}
