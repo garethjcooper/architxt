@@ -24,6 +24,7 @@ import {
   findDirectiveTrigger,
   getDirectiveCompletion,
   getDirectiveAutocompleteItems,
+  MERMAID_DIAGRAM_TYPES,
 } from '@/app/research/directive-autocomplete';
 
 export interface EntityLike {
@@ -171,6 +172,7 @@ export function AqlInput({
   const [autocompleteKind, setAutocompleteKind] = useState<'entity' | 'directive'>('entity');
   const [autocompletePos, setAutocompletePos] = useState({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [autocompleteReplaceRange, setAutocompleteReplaceRange] = useState<{ start: number; end: number } | null>(null);
   const [directiveGhost, setDirectiveGhost] = useState<{ suffix: string; replaceStart: number; replaceEnd: number } | null>(null);
   const lastHandledKeyRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
@@ -305,7 +307,22 @@ export function AqlInput({
 
       const directiveTrigger = findDirectiveTrigger(currentValue, offset);
       if (directiveTrigger != null) {
-        const completion = getDirectiveCompletion(directiveTrigger.filter, directiveTrigger.isTypeLine);
+        if (directiveTrigger.isTypeLine) {
+          const exactType = MERMAID_DIAGRAM_TYPES.some(
+            (t) => t.toLowerCase() === directiveTrigger.filter.toLowerCase().trim(),
+          );
+          if (!exactType) {
+            setShowAutocomplete(true);
+            setAutocompleteKind('directive');
+            setAutocompleteFilter(directiveTrigger.filter);
+            setAutocompletePos(getCaretCoordinates(offset, currentValue));
+            setSelectedIndex(0);
+            setAutocompleteReplaceRange({ start: directiveTrigger.replaceStart, end: directiveTrigger.replaceEnd });
+            setDirectiveGhost(null);
+            return;
+          }
+        }
+        const completion = getDirectiveCompletion(directiveTrigger.filter, false);
         if (completion != null) {
           setDirectiveGhost({
             suffix: completion,
@@ -316,13 +333,14 @@ export function AqlInput({
           setDirectiveGhost(null);
         }
         setShowAutocomplete(false);
+        setAutocompleteReplaceRange(null);
         return;
       }
 
       setShowAutocomplete(false);
       setDirectiveGhost(null);
     },
-    [value, getCaretOffset, getCaretCoordinates, updateCursor],
+    [value, getCaretOffset, getCaretCoordinates, updateCursor, MERMAID_DIAGRAM_TYPES],
   );
 
   const handleChange = useCallback(
@@ -390,6 +408,29 @@ export function AqlInput({
     pendingCaretRef.current = pos;
     setDirectiveGhost(null);
   }, [directiveGhost, onChange, disabled]);
+
+  const insertDirectiveAutocomplete = useCallback(
+    (item: DirectiveAutocompleteItem) => {
+      const el = editorRef.current;
+      if (!el || !autocompleteReplaceRange || disabled) return;
+
+      const liveValue = el.value;
+      const before = liveValue.slice(0, autocompleteReplaceRange.start);
+      const after = liveValue.slice(autocompleteReplaceRange.end);
+      const next = before + item.insert + after;
+      const pos = before.length + item.cursorOffset;
+
+      el.value = next;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
+      onChange(next, pos);
+      pendingCaretRef.current = pos;
+      setShowAutocomplete(false);
+      setDirectiveGhost(null);
+      setAutocompleteReplaceRange(null);
+    },
+    [autocompleteReplaceRange, disabled, onChange],
+  );
 
   /**
    * Remove the token adjacent to the caret in the given direction.
@@ -474,8 +515,9 @@ export function AqlInput({
   );
 
   const directiveAutocompleteItems = useMemo(() => {
-    return [];
-  }, []);
+    if (!showAutocomplete || autocompleteKind !== 'directive' || !autocompleteReplaceRange) return [];
+    return getDirectiveAutocompleteItems(value, internalCursor, autocompleteFilter, true);
+  }, [showAutocomplete, autocompleteKind, autocompleteFilter, autocompleteReplaceRange, value, internalCursor]);
 
   const autocompleteItems = useMemo((): AutocompleteItem[] => {
     if (!showAutocomplete) return [];
@@ -665,7 +707,9 @@ export function AqlInput({
           e.preventDefault();
           lastHandledKeyRef.current = e.key;
           const item = autocompleteItems[selectedIndex];
-          if ('token' in item) {
+          if (item.kind === 'directive') {
+            insertDirectiveAutocomplete(item);
+          } else if ('token' in item) {
             insertAtCursor(item.token);
           }
           return;
@@ -675,7 +719,9 @@ export function AqlInput({
           lastHandledKeyRef.current = e.key;
           const item = autocompleteItems[selectedIndex];
           if (item) {
-            if ('token' in item) {
+            if (item.kind === 'directive') {
+              insertDirectiveAutocomplete(item);
+            } else if ('token' in item) {
               insertAtCursor(item.token);
             }
             return;
@@ -770,6 +816,7 @@ export function AqlInput({
       onChange,
       onSubmit,
       insertAtCursor,
+      insertDirectiveAutocomplete,
       applyDirectiveGhost,
       removeAdjacentToken,
     ],
@@ -869,7 +916,9 @@ export function AqlInput({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if ('token' in item) {
+                if (item.kind === 'directive') {
+                  insertDirectiveAutocomplete(item as DirectiveAutocompleteItem);
+                } else if ('token' in item) {
                   insertAtCursor(item.token);
                 }
               }}
