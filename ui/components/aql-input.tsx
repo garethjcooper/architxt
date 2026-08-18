@@ -191,9 +191,15 @@ export function AqlInput({
   }, [resolveReference, availableEntities, availableEdges]);
 
   // Colored HTML shown in the background layer.
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), 80);
+    return () => clearTimeout(timer);
+  }, [value]);
+
   const coloredHtml = useMemo(() => {
-    return renderAqlToHtml(value, effectiveResolver);
-  }, [value, effectiveResolver]);
+    return renderAqlToHtml(debouncedValue, effectiveResolver);
+  }, [debouncedValue, effectiveResolver]);
 
   // Restore pending caret position after controlled value updates.
   useLayoutEffect(() => {
