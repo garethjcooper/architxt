@@ -1047,6 +1047,7 @@ export interface ResearchStep {
   session_id: number;
   parent_step_id: number | null;
   intent_text: string;
+  raw_query: string | null;
   action_type: string;
   parameters: Record<string, any> | null;
   selections: any[] | null;
@@ -1065,6 +1066,7 @@ export interface ResearchStepSummary {
   session_id: number;
   parent_step_id: number | null;
   intent_text: string;
+  raw_query: string | null;
   action_type: string;
   parameters: Record<string, any> | null;
   created_at: string;
@@ -1085,6 +1087,7 @@ export const researchApi = {
     bank_id: string;
     viewpoint_ids: number[];
     intent_text: string;
+    raw_query?: string;
     query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
     dimension?: string;
     selections?: any[];
@@ -1110,6 +1113,7 @@ export const researchApi = {
     entities: string[];
     roles: string[];
     session_id?: number;
+    raw_query?: string;
   }) =>
     fetchApi<PrebuiltResponse>('/research/prebuilt', {
       method: 'POST',
@@ -1158,6 +1162,7 @@ export const researchApi = {
     session_id: number;
     source_step_ids: number[];
     intent_text: string;
+    raw_query?: string;
     max_tokens?: number;
     section_focus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>

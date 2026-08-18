@@ -376,6 +376,7 @@ CREATE TABLE research_steps (
   rs_id INTEGER NOT NULL,
   rstep_parent_step_id INTEGER,
   rstep_intent_text TEXT NOT NULL,
+  rstep_raw_query TEXT,
   rstep_selections JSON,
   rstep_action_type TEXT NOT NULL,
   rstep_parameters JSON,
