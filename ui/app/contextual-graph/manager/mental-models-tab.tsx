@@ -569,8 +569,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
               </div>
             ) : parsedEnvelope ? (
               <NarrativeViewer
-                content={parsedEnvelope.narrative}
-                diagrams={parsedEnvelope.diagrams}
+                envelope={parsedEnvelope}
                 title="Model output"
                 viewMode="markdown"
                 showIndex={false}

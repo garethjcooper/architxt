@@ -11,9 +11,18 @@ export interface NarrativeDiagram {
   content: string;
 }
 
+export interface ModelEnvelope {
+  narrative: string;
+  diagrams?: NarrativeDiagram[];
+}
+
 export interface NarrativeViewerProps {
   /** Markdown narrative content to display/index. */
-  content: string;
+  content?: string;
+  /** Optional Mermaid diagrams to render inline after the narrative content. */
+  diagrams?: NarrativeDiagram[];
+  /** Standard model envelope; if provided, content and diagrams are read from it. */
+  envelope?: ModelEnvelope;
   /** Optional title shown above the index sidebar. */
   title?: string;
   /** Called when the user clicks a heading in the index. */
@@ -24,19 +33,21 @@ export interface NarrativeViewerProps {
   viewMode?: 'plain' | 'markdown';
   /** Whether to show the left-hand index sidebar. */
   showIndex?: boolean;
-  /** Optional Mermaid diagrams to render inline after the narrative content. */
-  diagrams?: NarrativeDiagram[];
 }
 
 export function NarrativeViewer({
   content,
+  diagrams,
+  envelope,
   title = 'Narrative',
   onHeadingClick,
   className = '',
   viewMode = 'plain',
   showIndex = true,
-  diagrams,
 }: NarrativeViewerProps) {
+  const narrative = envelope ? envelope.narrative : content;
+  const effectiveDiagrams = envelope ? envelope.diagrams : diagrams;
+
   const [blocks, setBlocks] = useState<SmartBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [activeRangeIds, setActiveRangeIds] = useState<Set<string>>(new Set());
@@ -44,10 +55,10 @@ export function NarrativeViewer({
   const markdownContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setBlocks(parseBlocks(content));
+    setBlocks(parseBlocks(narrative || ''));
     setActiveBlockId(null);
     setActiveRangeIds(new Set());
-  }, [content]);
+  }, [narrative]);
 
   const structuralBlocks = useMemo(() => blocks.filter(b => b.type !== 'text'), [blocks]);
 
@@ -94,7 +105,7 @@ export function NarrativeViewer({
     scrollToBlock(sectionId);
   }, [blocks, scrollToBlock]);
 
-  if ((!content || blocks.length === 0) && (!diagrams || diagrams.length === 0)) {
+  if ((!narrative || blocks.length === 0) && (!effectiveDiagrams || effectiveDiagrams.length === 0)) {
     return (
       <div className={`flex items-center justify-center text-sm text-white/40 ${className}`}>
         No narrative available.
@@ -146,7 +157,7 @@ export function NarrativeViewer({
         }`}
       >
         {viewMode === 'markdown' ? (
-          <Markdown className="text-[13px] leading-relaxed">{content}</Markdown>
+          <Markdown className="text-[13px] leading-relaxed">{narrative || ''}</Markdown>
         ) : (
           blocks.map(b => {
             const isActive = activeRangeIds.has(b.id);
