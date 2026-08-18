@@ -112,9 +112,9 @@ export function getDirectiveCompletion(filter: string, isTypeLine: boolean): str
     const rest = matches[0].slice(term.length);
     return rest || null;
   }
-  const matches = ALL_DIRECTIVE_ITEMS.filter((item) => item.id.toLowerCase().startsWith(term));
+  const matches = ALL_DIRECTIVE_ITEMS.filter((item) => item.id.toLowerCase().startsWith(`#${term}`));
   if (matches.length !== 1) return null;
-  const rest = matches[0].id.slice(term.length);
+  const rest = matches[0].id.slice(`#${term}`.length);
   return rest || null;
 }
 
