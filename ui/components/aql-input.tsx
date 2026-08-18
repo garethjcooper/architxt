@@ -22,6 +22,7 @@ import {
 import {
   type DirectiveAutocompleteItem,
   findDirectiveTrigger,
+  getDirectiveCompletion,
   getDirectiveAutocompleteItems,
 } from '@/app/research/directive-autocomplete';
 
@@ -170,6 +171,7 @@ export function AqlInput({
   const [autocompleteKind, setAutocompleteKind] = useState<'entity' | 'directive'>('entity');
   const [autocompletePos, setAutocompletePos] = useState({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [directiveGhost, setDirectiveGhost] = useState<{ suffix: string; replaceStart: number; replaceEnd: number } | null>(null);
   const lastHandledKeyRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
   const pendingRafRef = useRef<number | null>(null);
@@ -297,20 +299,28 @@ export function AqlInput({
         setAutocompleteFilter(entityFilter);
         setAutocompletePos(getCaretCoordinates(offset, currentValue));
         setSelectedIndex(0);
+        setDirectiveGhost(null);
         return;
       }
 
       const directiveTrigger = findDirectiveTrigger(currentValue, offset);
       if (directiveTrigger != null) {
-        setShowAutocomplete(true);
-        setAutocompleteKind('directive');
-        setAutocompleteFilter(directiveTrigger.filter);
-        setAutocompletePos(getCaretCoordinates(offset, currentValue));
-        setSelectedIndex(0);
+        const completion = getDirectiveCompletion(directiveTrigger.filter, directiveTrigger.isTypeLine);
+        if (completion != null) {
+          setDirectiveGhost({
+            suffix: completion,
+            replaceStart: directiveTrigger.replaceStart,
+            replaceEnd: directiveTrigger.replaceEnd,
+          });
+        } else {
+          setDirectiveGhost(null);
+        }
+        setShowAutocomplete(false);
         return;
       }
 
       setShowAutocomplete(false);
+      setDirectiveGhost(null);
     },
     [value, getCaretOffset, getCaretCoordinates, updateCursor],
   );
@@ -356,38 +366,30 @@ export function AqlInput({
       onChange(next, pos);
       pendingCaretRef.current = pos;
       setShowAutocomplete(false);
+      setDirectiveGhost(null);
     },
     [onChange, disabled],
   );
 
-  const insertDirectiveAtCursor = useCallback(
-    (item: DirectiveAutocompleteItem) => {
-      if (disabled) return;
-      const el = editorRef.current;
-      if (!el) return;
+  const applyDirectiveGhost = useCallback(() => {
+    const el = editorRef.current;
+    const ghost = directiveGhost;
+    if (!el || !ghost || disabled) return;
 
-      // Use the live DOM value so a second insertion does not accidentally
-      // replay a stale React prop value and overwrite prior content.
-      const liveValue = el.value;
-      const offset = el.selectionStart ?? 0;
-      const trigger = findDirectiveTrigger(liveValue, offset);
-      if (!trigger) return;
+    const liveValue = el.value;
+    const before = liveValue.slice(0, ghost.replaceStart);
+    const after = liveValue.slice(ghost.replaceEnd);
+    const prefix = liveValue.slice(ghost.replaceStart, ghost.replaceEnd);
+    const next = before + prefix + ghost.suffix + after;
+    const pos = ghost.replaceStart + prefix.length + ghost.suffix.length;
 
-      const before = liveValue.slice(0, trigger.replaceStart);
-      const after = liveValue.slice(trigger.replaceEnd);
-      const insert = item.insert;
-      const next = before + insert + after;
-      const pos = before.length + item.cursorOffset;
-
-      el.value = next;
-      el.selectionStart = pos;
-      el.selectionEnd = pos;
-      onChange(next, pos);
-      pendingCaretRef.current = pos;
-      setShowAutocomplete(false);
-    },
-    [onChange, disabled],
-  );
+    el.value = next;
+    el.selectionStart = pos;
+    el.selectionEnd = pos;
+    onChange(next, pos);
+    pendingCaretRef.current = pos;
+    setDirectiveGhost(null);
+  }, [directiveGhost, onChange, disabled]);
 
   /**
    * Remove the token adjacent to the caret in the given direction.
@@ -472,12 +474,8 @@ export function AqlInput({
   );
 
   const directiveAutocompleteItems = useMemo(() => {
-    if (!showAutocomplete || autocompleteKind !== 'directive') return [];
-    const cursorOffset = internalCursor;
-    const trigger = findDirectiveTrigger(value, cursorOffset);
-    if (!trigger) return [];
-    return getDirectiveAutocompleteItems(value, cursorOffset, trigger.filter, trigger.isTypeLine);
-  }, [showAutocomplete, autocompleteKind, value, internalCursor]);
+    return [];
+  }, []);
 
   const autocompleteItems = useMemo((): AutocompleteItem[] => {
     if (!showAutocomplete) return [];
@@ -669,8 +667,6 @@ export function AqlInput({
           const item = autocompleteItems[selectedIndex];
           if ('token' in item) {
             insertAtCursor(item.token);
-          } else {
-            insertDirectiveAtCursor(item as DirectiveAutocompleteItem);
           }
           return;
         }
@@ -681,8 +677,6 @@ export function AqlInput({
           if (item) {
             if ('token' in item) {
               insertAtCursor(item.token);
-            } else {
-              insertDirectiveAtCursor(item as DirectiveAutocompleteItem);
             }
             return;
           }
@@ -716,6 +710,22 @@ export function AqlInput({
             pendingCaretRef.current = openIdx;
           }
           setShowAutocomplete(false);
+          return;
+        }
+      }
+
+      // Directive ghost completion (inline suffix). Accept with Tab/Enter, dismiss with Escape.
+      if (directiveGhost && !showAutocomplete) {
+        if (e.key === 'Tab' || e.key === 'Enter') {
+          e.preventDefault();
+          lastHandledKeyRef.current = e.key;
+          applyDirectiveGhost();
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          lastHandledKeyRef.current = 'Escape';
+          setDirectiveGhost(null);
           return;
         }
       }
@@ -756,10 +766,11 @@ export function AqlInput({
       autocompleteItems,
       selectedIndex,
       value,
+      directiveGhost,
       onChange,
       onSubmit,
       insertAtCursor,
-      insertDirectiveAtCursor,
+      applyDirectiveGhost,
       removeAdjacentToken,
     ],
   );
@@ -860,8 +871,6 @@ export function AqlInput({
                 e.stopPropagation();
                 if ('token' in item) {
                   insertAtCursor(item.token);
-                } else {
-                  insertDirectiveAtCursor(item);
                 }
               }}
               onMouseEnter={() => setSelectedIndex(idx)}
@@ -880,6 +889,35 @@ export function AqlInput({
           ))}
         </div>
       )}
+
+      {directiveGhost && !showAutocomplete && (
+        <GhostOverlay value={value} suffix={directiveGhost.suffix} offset={directiveGhost.replaceEnd} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Renders the inline "ghost" suffix at the current caret position. The text
+ * before the caret is hidden (invisible) and only the faded suffix is shown,
+ * so it appears to sit exactly where the next characters will go.
+ */
+function GhostOverlay({
+  value,
+  suffix,
+  offset,
+}: {
+  value: string;
+  suffix: string;
+  offset: number;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 px-2 py-1.5 text-xs overflow-hidden pointer-events-none whitespace-pre-wrap select-none"
+    >
+      <span className="opacity-0">{value.slice(0, offset)}</span>
+      <span className="text-white/30">{suffix}</span>
     </div>
   );
 }

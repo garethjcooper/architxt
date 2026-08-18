@@ -30,16 +30,15 @@ export interface DirectiveAutocompleteItem {
 // Re-export the canonical block/sub-directive lists from the shared AQL package
 // so the UI autocomplete cannot drift from the server-side parser.
 export { AQL_BLOCK_DIRECTIVES as BLOCK_DIRECTIVES, AQL_SUB_DIRECTIVE_KEYS as SUB_DIRECTIVES, MERMAID_DIAGRAM_TYPES };
+
 const ALL_DIRECTIVE_ITEMS: DirectiveAutocompleteItem[] = [
   ...AQL_BLOCK_DIRECTIVES.map((d) => ({
     kind: 'directive' as const,
     id: `#${d}`,
     label: `#${d}`,
     sublabel: 'block directive',
-    // Insert a scaffold with a trailing #end. For diagram/table, add the most
-    // common sub-directives to guide the user.
-    insert: makeBlockScaffold(d as DirectiveKind),
-    cursorOffset: makeCursorOffset(d as DirectiveKind),
+    insert: `#${d}`,
+    cursorOffset: `#${d}`.length,
   })),
   ...AQL_SUB_DIRECTIVE_KEYS.map((d) => ({
     kind: 'directive' as const,
@@ -50,36 +49,6 @@ const ALL_DIRECTIVE_ITEMS: DirectiveAutocompleteItem[] = [
     cursorOffset: `#${d} `.length,
   })),
 ];
-
-function makeBlockScaffold(d: DirectiveKind): string {
-  switch (d) {
-    case 'diagram':
-      return '#diagram\n#name \n#type \n\n#end';
-    case 'table':
-      return '#table\n#name \n\n#end';
-    case 'graph':
-      return '#graph\n\n#end';
-    case 'narrative':
-      return '#narrative\n\n#end';
-    default:
-      return `#${d}\n#end`;
-  }
-}
-
-function makeCursorOffset(d: DirectiveKind): number {
-  switch (d) {
-    case 'diagram':
-      return '#diagram\n#name '.length;
-    case 'table':
-      return '#table\n#name '.length;
-    case 'graph':
-      return '#graph\n'.length;
-    case 'narrative':
-      return '#narrative\n'.length;
-    default:
-      return `#${d}\n`.length;
-  }
-}
 
 export interface DirectiveTrigger {
   filter: string;
@@ -131,6 +100,22 @@ export function findDirectiveTrigger(query: string, offset: number): DirectiveTr
     replaceEnd: offset,
     isTypeLine: false,
   };
+}
+
+export function getDirectiveCompletion(filter: string, isTypeLine: boolean): string | null {
+  const term = filter.toLowerCase();
+  if (isTypeLine) {
+    const matches = term
+      ? MERMAID_DIAGRAM_TYPES.filter((t) => t.toLowerCase().startsWith(term))
+      : MERMAID_DIAGRAM_TYPES;
+    if (matches.length !== 1) return null;
+    const rest = matches[0].slice(term.length);
+    return rest || null;
+  }
+  const matches = ALL_DIRECTIVE_ITEMS.filter((item) => item.id.toLowerCase().startsWith(term));
+  if (matches.length !== 1) return null;
+  const rest = matches[0].id.slice(term.length);
+  return rest || null;
 }
 
 export function getDirectiveAutocompleteItems(
