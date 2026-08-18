@@ -32,7 +32,6 @@ export const MERMAID_DIAGRAM_TYPES = Object.freeze([
   'timeline',
   'radar-beta',
   'architecture-beta',
-  'block',
   'mindmap',
   'venn-beta',
 ]);
