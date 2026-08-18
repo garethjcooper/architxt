@@ -426,12 +426,46 @@ function buildEntityCompletions(
 }
 
 const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (text !== '[' && text !== '#') return false;
+  if (text !== '[' && text !== '#' && text !== '\n') return false;
+
+  // Expand a bare block directive followed by Enter into its scaffold.
+  if (text === '\n') {
+    const line = view.state.doc.lineAt(from);
+    const lineText = line.text.trim().toLowerCase();
+    const blockMatch = lineText.match(/^#(diagram|table|graph|narrative)$/);
+    if (blockMatch) {
+      const block = blockMatch[1];
+      let insert = '';
+      let cursorOffset = 0;
+      if (block === 'diagram') {
+        insert = '#diagram\n#diagram-name \n#diagram-type \n#end';
+        cursorOffset = '#diagram\n#diagram-name '.length;
+      } else if (block === 'table') {
+        insert = '#table\n#table-name \n#end';
+        cursorOffset = '#table\n#table-name '.length;
+      } else if (block === 'graph') {
+        insert = '#graph\n#end';
+        cursorOffset = '#graph\n'.length;
+      } else if (block === 'narrative') {
+        insert = '#narrative\n#end';
+        cursorOffset = '#narrative\n'.length;
+      }
+      Promise.resolve().then(() => {
+        view.dispatch({
+          changes: { from: line.from, to: line.to, insert },
+          selection: { anchor: line.from + cursorOffset, head: line.from + cursorOffset },
+        });
+      });
+      return true;
+    }
+  }
+
   // For '[', only trigger when the user is typing [[ (previous char is [).
   if (text === '[') {
     const prev = view.state.doc.sliceString(Math.max(0, from - 1), from);
     if (prev !== '[') return false;
   }
+
   Promise.resolve().then(() => startCompletion(view));
   return false;
 });
