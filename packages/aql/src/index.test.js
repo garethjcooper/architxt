@@ -34,7 +34,7 @@ describe('parseAql', () => {
   });
 
   it('parses a table block with name', () => {
-    const q = parseAql('#table\n#name Dependencies\nlist upstream relationships\n#end');
+    const q = parseAql('#table\n#table-name Dependencies\nlist upstream relationships\n#end');
     assert.equal(q.blocks.length, 1);
     assert.equal(q.blocks[0].kind, 'table');
     assert.equal(q.blocks[0].name, 'Dependencies');
@@ -45,7 +45,7 @@ describe('parseAql', () => {
   });
 
   it('parses a diagram block with quoted name and type', () => {
-    const q = parseAql('#diagram\n#name "Entity lifecycle"\n#type sequenceDiagram\nAlice->>Bob: Hello\n#end');
+    const q = parseAql('#diagram\n#diagram-name "Entity lifecycle"\n#diagram-type sequenceDiagram\nAlice->>Bob: Hello\n#end');
     assert.equal(q.blocks.length, 1);
     assert.equal(q.blocks[0].kind, 'diagram');
     assert.equal(q.blocks[0].name, 'Entity lifecycle');
@@ -76,7 +76,7 @@ describe('parseAql', () => {
   });
 
   it('returns errors for disallowed sub-directive keys', () => {
-    const q = parseAql('#table\n#type flowchart\n#name T\n#end');
+    const q = parseAql('#table\n#diagram-type flowchart\n#table-name T\n#end');
     assert.ok(q.errors);
     assert.ok(q.errors.some((e) => /not allowed/.test(e.message)));
   });
@@ -88,13 +88,13 @@ describe('parseAql', () => {
   });
 
   it('returns errors for unknown diagram type', () => {
-    const q = parseAql('#diagram\n#type notARealDiagram\n#end');
+    const q = parseAql('#diagram\n#diagram-type notARealDiagram\n#end');
     assert.ok(q.errors);
     assert.ok(q.errors.some((e) => /Unknown diagram type/.test(e.message)));
   });
 
   it('allows quoted empty name', () => {
-    const q = parseAql('#table\n#name ""\ncontent\n#end');
+    const q = parseAql('#table\n#table-name ""\ncontent\n#end');
     assert.equal(q.blocks[0].name, '');
     assert.equal(q.errors, undefined);
   });
@@ -130,11 +130,11 @@ describe('parseReferences', () => {
 
 describe('renderAqlTokens', () => {
   it('emits directive tokens', () => {
-    const tokens = renderAqlTokens('#diagram\n#name Foo\n#end');
+    const tokens = renderAqlTokens('#diagram\n#diagram-name Foo\n#end');
     const directives = tokens.filter((t) => t.kind === 'directive');
     assert.equal(directives.length, 3);
     assert.equal(directives[0].keyword, 'diagram');
-    assert.equal(directives[1].keyword, 'name');
+    assert.equal(directives[1].keyword, 'diagram-name');
     assert.equal(directives[1].value, 'Foo');
     assert.equal(directives[2].keyword, 'end');
   });

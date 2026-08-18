@@ -15,8 +15,9 @@ const BLOCK_COLORS: Record<string, string> = {
 };
 
 const SUB_COLORS: Record<string, string> = {
-  name: '#3b82f6',
-  type: '#eab308',
+  'diagram-name': '#3b82f6',
+  'diagram-type': '#eab308',
+  'table-name': '#06b6d4',
   end: '#ef4444',
 };
 
@@ -76,7 +77,7 @@ function DirectiveToken({
   resolver?: AqlReferenceResolver;
 }) {
   let color = directiveColor(matchingKeyword || keyword);
-  if (keyword === 'name' && value) {
+  if ((keyword === 'diagram-name' || keyword === 'table-name') && value) {
     const refs = parseReferences(value);
     if (refs.length > 0) {
       const resolved = resolver?.(refs[0]);

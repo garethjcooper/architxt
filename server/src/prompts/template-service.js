@@ -327,8 +327,8 @@ function stripEntityTags(str) {
  *
  * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
  *   - #graph, #narrative → single string (one bullet)
- *   - #table             → TableDirective[] (one per table, with optional name)
- *   - #diagram           → DiagramDirective[] with name, type, and content
+ *   - #table             → TableDirective[] (one per table, with optional #table-name)
+ *   - #diagram           → DiagramDirective[] with #diagram-name, #diagram-type, and content
  *
  * @param {string|string[]|{name?:string,content:string}[]|{name:string,type:string,content:string}[]} [raw]
  * @returns {string}
