@@ -331,18 +331,26 @@ export function AqlInput({
       const el = editorRef.current;
       if (!el) return;
 
-      const offset = getCaretOffset();
-      const textBefore = value.slice(0, offset);
+      // Read the live DOM value and apply the insertion synchronously. This
+      // prevents React's controlled textarea reconciliation from resetting the
+      // caret or reverting the value when state updates are batched.
+      const liveValue = el.value;
+      const offset = el.selectionStart ?? 0;
+      const textBefore = liveValue.slice(0, offset);
       const openIdx = textBefore.lastIndexOf('[[');
-      const before = openIdx >= 0 ? value.slice(0, openIdx) : value.slice(0, offset);
-      const after = value.slice(offset);
+      const before = openIdx >= 0 ? liveValue.slice(0, openIdx) : liveValue.slice(0, offset);
+      const after = liveValue.slice(offset);
       const next = before + rawToken + after;
       const pos = before.length + rawToken.length;
+
+      el.value = next;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
       onChange(next, pos);
       pendingCaretRef.current = pos;
       setShowAutocomplete(false);
     },
-    [value, onChange, disabled, getCaretOffset],
+    [onChange, disabled],
   );
 
   const insertDirectiveAtCursor = useCallback(
@@ -351,71 +359,109 @@ export function AqlInput({
       const el = editorRef.current;
       if (!el) return;
 
-      const offset = getCaretOffset();
-      const trigger = findDirectiveTrigger(value, offset);
+      // Use the live DOM value so a second insertion does not accidentally
+      // replay a stale React prop value and overwrite prior content.
+      const liveValue = el.value;
+      const offset = el.selectionStart ?? 0;
+      const trigger = findDirectiveTrigger(liveValue, offset);
       if (!trigger) return;
 
-      const before = value.slice(0, trigger.replaceStart);
-      const after = value.slice(trigger.replaceEnd);
+      const before = liveValue.slice(0, trigger.replaceStart);
+      const after = liveValue.slice(trigger.replaceEnd);
       const insert = item.insert;
       const next = before + insert + after;
       const pos = before.length + item.cursorOffset;
+
+      el.value = next;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
       onChange(next, pos);
       pendingCaretRef.current = pos;
       setShowAutocomplete(false);
     },
-    [value, onChange, disabled, getCaretOffset],
+    [onChange, disabled],
   );
 
   /**
    * Remove the token adjacent to the caret in the given direction.
-   * For a directive like #table or #end, delete the whole directive token.
-   * For a reference like [[...]], delete the whole reference.
+   * For a directive like #table or #end, delete the whole directive token only
+   * when the caret is at the boundary of the directive keyword, not after a
+   * user-typed value such as #name Foo. For a reference like [[...]], delete the
+   * whole reference.
    */
   const removeAdjacentToken = useCallback(
     (direction: -1 | 1) => {
-      const offset = getCaretOffset();
-      const tokens = tokenizeAql(value);
+      const el = editorRef.current;
+      if (!el) return false;
+      const liveValue = el.value;
+      const offset = el.selectionStart ?? 0;
+      const tokens = tokenizeAql(liveValue);
 
       for (const token of tokens) {
-        if (token.kind === 'directive' && token.index !== undefined) {
-          const raw = token.value ? `#${token.keyword} ${token.value}` : `#${token.keyword}`;
+        if (token.kind === 'directive' && token.index !== undefined && token.keyword !== undefined) {
+          const keyword = token.keyword;
+          const value = token.value;
+          const raw = value ? `#${keyword} ${value}` : `#${keyword}`;
           const idx = token.index;
+          // For sub-directives with a user-typed value, only whole-token delete
+          // when the caret is right after the keyword boundary, not inside the
+          // value. Otherwise fall through to normal single-character deletion.
+          const keywordBoundary = idx + 1 + keyword.length + (value ? 1 : 0);
+
           if (direction === -1 && offset === idx + raw.length) {
-            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/[ \t]+/g, ' ');
+            if (value && offset > keywordBoundary) {
+              // Caret is after the value (e.g. #name Foo|) -- let the default
+              // Backspace delete the last character of the value instead of the
+              // whole row.
+              return false;
+            }
+            const next = (liveValue.slice(0, idx) + liveValue.slice(idx + raw.length)).replace(/[ \t]+/g, ' ');
             const newPos = Math.min(idx, next.length);
+            el.value = next;
+            el.selectionStart = newPos;
+            el.selectionEnd = newPos;
             onChange(next, newPos);
             pendingCaretRef.current = newPos;
-            return;
+            return true;
           }
           if (direction === 1 && offset === idx) {
-            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/[ \t]+/g, ' ');
+            const next = (liveValue.slice(0, idx) + liveValue.slice(idx + raw.length)).replace(/[ \t]+/g, ' ');
             const newPos = Math.min(idx, next.length);
+            el.value = next;
+            el.selectionStart = newPos;
+            el.selectionEnd = newPos;
             onChange(next, newPos);
             pendingCaretRef.current = newPos;
-            return;
+            return true;
           }
         } else if (token.kind === 'reference' && token.reference && token.index !== undefined) {
           const raw = token.reference.raw;
           const idx = token.index;
           if (direction === -1 && offset === idx + raw.length) {
-            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/\s+/g, ' ').trim();
+            const next = (liveValue.slice(0, idx) + liveValue.slice(idx + raw.length)).replace(/\s+/g, ' ').trim();
             const newPos = Math.min(idx, next.length);
+            el.value = next;
+            el.selectionStart = newPos;
+            el.selectionEnd = newPos;
             onChange(next, newPos);
             pendingCaretRef.current = newPos;
-            return;
+            return true;
           }
           if (direction === 1 && offset === idx) {
-            const next = (value.slice(0, idx) + value.slice(idx + raw.length)).replace(/\s+/g, ' ').trim();
+            const next = (liveValue.slice(0, idx) + liveValue.slice(idx + raw.length)).replace(/\s+/g, ' ').trim();
             const newPos = Math.min(idx, next.length);
+            el.value = next;
+            el.selectionStart = newPos;
+            el.selectionEnd = newPos;
             onChange(next, newPos);
             pendingCaretRef.current = newPos;
-            return;
+            return true;
           }
         }
       }
+      return false;
     },
-    [value, onChange, getCaretOffset],
+    [onChange],
   );
 
   const directiveAutocompleteItems = useMemo(() => {
@@ -624,11 +670,24 @@ export function AqlInput({
         if (e.key === 'Enter') {
           e.preventDefault();
           lastHandledKeyRef.current = e.key;
+          const item = autocompleteItems[selectedIndex];
+          if (item) {
+            if ('token' in item) {
+              insertAtCursor(item.token);
+            } else {
+              insertDirectiveAtCursor(item as DirectiveAutocompleteItem);
+            }
+            return;
+          }
+          // No selected item: close an open [[ trigger without inserting.
           const offset = el.selectionStart ?? 0;
           const textBefore = value.slice(0, offset);
           const openIdx = textBefore.lastIndexOf('[[');
           if (openIdx >= 0) {
             const next = value.slice(0, openIdx) + value.slice(offset);
+            el.value = next;
+            el.selectionStart = openIdx;
+            el.selectionEnd = openIdx;
             onChange(next, openIdx);
             pendingCaretRef.current = openIdx;
           }
@@ -643,6 +702,9 @@ export function AqlInput({
           const openIdx = textBefore.lastIndexOf('[[');
           if (openIdx >= 0) {
             const next = value.slice(0, openIdx) + value.slice(offset);
+            el.value = next;
+            el.selectionStart = openIdx;
+            el.selectionEnd = openIdx;
             onChange(next, openIdx);
             pendingCaretRef.current = openIdx;
           }
@@ -675,8 +737,8 @@ export function AqlInput({
         const end = el.selectionEnd ?? 0;
         if (offset === end) {
           const direction = e.key === 'Backspace' ? -1 : 1;
-          removeAdjacentToken(direction);
-          if (pendingCaretRef.current !== null) {
+          const handled = removeAdjacentToken(direction);
+          if (handled) {
             e.preventDefault();
           }
         }
