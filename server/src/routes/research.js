@@ -960,6 +960,7 @@ router.post('/mental-models/health', async (req, res) => {
         ext_id: extId,
         healthy,
         found: true,
+        content,
         content_length: JSON.stringify(content).length,
         graph_present: hasNodes,
         node_count: graph?.nodes?.length ?? 0,

@@ -9,6 +9,7 @@ import type { DerivedMentalModel, MentalModelReturns } from '@/lib/types/index';
 import { mentalModelsApi, hindsightApi, serversApi } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorServer, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
+import { NarrativeViewer } from '@/components/narrative-viewer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface DerivedModelHealthDialogProps {
@@ -391,7 +392,42 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     return 'No content available';
   };
 
-  const selectedPreviewText = selectedResult ? formatPreview(selectedResult) : '';
+  const parseEnvelope = (result: HealthResult | null) => {
+    if (!result || result.error) return null;
+    const raw = result.content;
+    if (!raw) return null;
+    let parsed: unknown;
+    if (typeof raw === 'string') {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    } else {
+      parsed = raw;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const obj = parsed as Record<string, unknown>;
+    if (
+      typeof obj.narrative !== 'string' ||
+      !obj.graph || typeof obj.graph !== 'object' ||
+      !Array.isArray(obj.tables) ||
+      !Array.isArray(obj.diagrams)
+    ) {
+      return null;
+    }
+    return {
+      narrative: obj.narrative,
+      diagrams: obj.diagrams as { name: string; type: string; content: string }[],
+    };
+  };
+
+  const selectedEnvelope = useMemo(() => parseEnvelope(selectedResult), [selectedResult]);
+
+  const selectedPreviewText = useMemo(() => {
+    if (selectedEnvelope) return selectedEnvelope.narrative;
+    return selectedResult ? formatPreview(selectedResult) : '';
+  }, [selectedResult, selectedEnvelope]);
 
   return (
     <>
@@ -602,9 +638,20 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                 )}
               </div>
               <div className="flex-1 overflow-auto p-3">
-                <pre className="text-xs font-mono text-white/80 whitespace-pre-wrap break-all">
-                  {formatPreview(selectedResult)}
-                </pre>
+                {selectedEnvelope ? (
+                  <NarrativeViewer
+                    content={selectedEnvelope.narrative}
+                    diagrams={selectedEnvelope.diagrams}
+                    title="Model output"
+                    viewMode="markdown"
+                    showIndex={false}
+                    className="min-h-full"
+                  />
+                ) : (
+                  <pre className="text-xs font-mono text-white/80 whitespace-pre-wrap break-all">
+                    {formatPreview(selectedResult)}
+                  </pre>
+                )}
               </div>
             </div>
           </div>
