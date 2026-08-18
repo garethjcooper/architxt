@@ -172,6 +172,7 @@ export function AqlInput({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const lastHandledKeyRef = useRef<string | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
+  const pendingRafRef = useRef<number | null>(null);
   const isComposingRef = useRef(false);
   const [internalCursor, setInternalCursor] = useState(0);
   const cursorRef = useRef(0);
@@ -285,7 +286,9 @@ export function AqlInput({
       const offset = nextOffset ?? getCaretOffset();
       const currentValue = nextValue ?? value;
       updateCursor(offset);
-      onChange(currentValue, offset);
+      // Do not call onChange here. handleChange (and the direct DOM edit helpers)
+      // already notify the parent. Re-notifying on every keyup/click caused a
+      // parent state update/re-render on every keystroke, producing input lag.
 
       const entityFilter = findOpenEntityTrigger(currentValue, offset);
       if (entityFilter != null) {
@@ -309,7 +312,7 @@ export function AqlInput({
 
       setShowAutocomplete(false);
     },
-    [value, onChange, getCaretOffset, getCaretCoordinates, updateCursor],
+    [value, getCaretOffset, getCaretCoordinates, updateCursor],
   );
 
   const handleChange = useCallback(
@@ -318,7 +321,11 @@ export function AqlInput({
       const offset = e.target.selectionStart ?? 0;
       updateCursor(offset);
       onChange(next, offset);
-      requestAnimationFrame(() => {
+      if (pendingRafRef.current != null) {
+        cancelAnimationFrame(pendingRafRef.current);
+      }
+      pendingRafRef.current = requestAnimationFrame(() => {
+        pendingRafRef.current = null;
         updateAutocompleteState(next, offset);
       });
     },
