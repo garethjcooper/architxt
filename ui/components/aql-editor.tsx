@@ -348,12 +348,13 @@ function aqlCompletions(
         return {
           from: atIdx,
           to: pos,
+          filter: false,
           options: buildEntityCompletions(
             propsRef.current.entities,
             propsRef.current.edges,
             propsRef.current.includeEdges,
             filter,
-          ).slice(0, 8),
+          ).slice(0, 50),
         };
       }
     }
@@ -366,12 +367,13 @@ function aqlCompletions(
       return {
         from: openIdx,
         to: pos,
+        filter: false,
         options: buildEntityCompletions(
           propsRef.current.entities,
           propsRef.current.edges,
           propsRef.current.includeEdges,
           filter,
-        ),
+        ).slice(0, 50),
       };
     }
 
