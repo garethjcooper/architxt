@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
 import { MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
-import { NarrativeViewer } from '@/components/narrative-viewer';
 import type { ModelRef } from './page';
 
 const ROLE_LABELS = MODEL_ROLE_LABELS;
@@ -282,48 +281,14 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
     return 'No content available';
   };
 
-  const parsedEnvelope = useMemo(() => {
-    if (!selectedContent) return null;
-    const raw = selectedContent.content;
-    if (!raw) return null;
-    let parsed: unknown;
-    if (typeof raw === 'string') {
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    } else {
-      parsed = raw;
-    }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const obj = parsed as Record<string, unknown>;
-    if (
-      typeof obj.narrative !== 'string' ||
-      !obj.graph || typeof obj.graph !== 'object' ||
-      !Array.isArray(obj.tables) ||
-      !Array.isArray(obj.diagrams)
-    ) {
-      return null;
-    }
-    return {
-      narrative: obj.narrative,
-      diagrams: obj.diagrams as { name: string; type: string; content: string }[],
-    };
-  }, [selectedContent]);
-
-  const rawFallbackText = useMemo(() => {
-    return formatPreview(selectedContent, selectedContentError);
-  }, [selectedContent, selectedContentError]);
-
   const copyContent = useCallback(() => {
-    const text = rawFallbackText;
+    const text = formatPreview(selectedContent, selectedContentError);
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => toast.success('Content copied to clipboard'));
-  }, [rawFallbackText]);
+  }, [selectedContent, selectedContentError]);
 
   const downloadContent = useCallback(() => {
-    const text = rawFallbackText;
+    const text = formatPreview(selectedContent, selectedContentError);
     if (!text) return;
     const extId = selectedExtId || 'model';
     const blob = new Blob([text], { type: 'text/plain' });
@@ -335,7 +300,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [rawFallbackText, selectedExtId]);
+  }, [selectedContent, selectedContentError, selectedExtId]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -567,18 +532,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
               <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">
                 {selectedContentError}
               </div>
-            ) : parsedEnvelope ? (
-              <NarrativeViewer
-                content={parsedEnvelope.narrative}
-                diagrams={parsedEnvelope.diagrams}
-                title="Model output"
-                viewMode="markdown"
-                showIndex={false}
-                className="min-h-full"
-              />
             ) : (
               <pre className="text-xs text-white/80 whitespace-pre-wrap font-mono bg-black/20 rounded border border-white/10 p-3">
-                {rawFallbackText}
+                {formatPreview(selectedContent, selectedContentError)}
               </pre>
             )}
           </div>
