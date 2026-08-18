@@ -290,7 +290,18 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
     BLOCK_DIRECTIVES.forEach((k) => allowed.add(k));
   }
   const keywords = DIRECTIVE_KEYWORDS.filter((kw) => allowed.has(kw));
-  return keywords.filter((kw) => kw.startsWith(term)).map((kw) => {
+
+  // If the user has typed an exact block-directive prefix, exclude longer
+  // sub-directives that merely happen to start with the same text so that
+  // #table does not jump to #table-name.
+  const typedExactBlock = BLOCK_DIRECTIVES.includes(term);
+  const filteredKeywords = keywords.filter((kw) => {
+    if (!kw.startsWith(term)) return false;
+    if (typedExactBlock) return BLOCK_DIRECTIVES.includes(kw) || kw === term;
+    return true;
+  });
+
+  return filteredKeywords.map((kw) => {
     let apply: Completion['apply'];
     let boost = 0;
     if (kw === 'diagram') {
