@@ -3,8 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
-import { StreamLanguage, LanguageSupport } from '@codemirror/language';
+import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import { autocompletion, type Completion, type CompletionSource } from '@codemirror/autocomplete';
+import { Tag, tagHighlighter } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
 import {
   formatEntityToken,
@@ -40,6 +41,28 @@ export interface AqlEditorProps {
   className?: string;
   style?: React.CSSProperties;
 }
+
+const tDirective = Tag.define();
+const tDirectiveDiagram = Tag.define();
+const tDirectiveTable = Tag.define();
+const tDirectiveGraph = Tag.define();
+const tDirectiveNarrative = Tag.define();
+const tDirectiveName = Tag.define();
+const tDirectiveType = Tag.define();
+const tDirectiveEnd = Tag.define();
+const tReference = Tag.define();
+
+const aqlHighlightStyle = tagHighlighter([
+  { tag: tDirective, class: 'aql-directive' },
+  { tag: tDirectiveDiagram, class: 'aql-directive-diagram' },
+  { tag: tDirectiveTable, class: 'aql-directive-table' },
+  { tag: tDirectiveGraph, class: 'aql-directive-graph' },
+  { tag: tDirectiveNarrative, class: 'aql-directive-narrative' },
+  { tag: tDirectiveName, class: 'aql-directive-name' },
+  { tag: tDirectiveType, class: 'aql-directive-type' },
+  { tag: tDirectiveEnd, class: 'aql-directive-end' },
+  { tag: tReference, class: 'aql-reference' },
+]);
 
 const aqlLanguage = new LanguageSupport(
   StreamLanguage.define({
@@ -77,6 +100,17 @@ const aqlLanguage = new LanguageSupport(
       stream.next();
       return null;
     },
+    tokenTable: {
+      directive: tDirective,
+      'directive-diagram': tDirectiveDiagram,
+      'directive-table': tDirectiveTable,
+      'directive-graph': tDirectiveGraph,
+      'directive-narrative': tDirectiveNarrative,
+      'directive-name': tDirectiveName,
+      'directive-type': tDirectiveType,
+      'directive-end': tDirectiveEnd,
+      reference: tReference,
+    },
   }),
 );
 
@@ -85,6 +119,8 @@ const aqlTheme = EditorView.theme({
     height: '100%',
     fontSize: '12px',
     lineHeight: '1.5',
+    backgroundColor: 'transparent',
+    color: '#e5e7eb',
   },
   '.cm-scroller': {
     overflow: 'auto',
@@ -101,7 +137,7 @@ const aqlTheme = EditorView.theme({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   '.cm-activeLine': {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   '.cm-gutters': {
     display: 'none',
@@ -109,15 +145,15 @@ const aqlTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'rgba(255, 255, 255, 0.4)',
   },
-  '.cm-directive': { color: '#9ca3af', fontWeight: 500 },
-  '.cm-directive-diagram': { color: '#a855f7', fontWeight: 500 },
-  '.cm-directive-table': { color: '#06b6d4', fontWeight: 500 },
-  '.cm-directive-graph': { color: '#f97316', fontWeight: 500 },
-  '.cm-directive-narrative': { color: '#22c55e', fontWeight: 500 },
-  '.cm-directive-name': { color: '#3b82f6', fontWeight: 500 },
-  '.cm-directive-type': { color: '#eab308', fontWeight: 500 },
-  '.cm-directive-end': { color: '#ef4444', fontWeight: 500 },
-  '.cm-reference': { color: '#fbbf24' },
+  '.aql-directive': { color: '#9ca3af', fontWeight: 500 },
+  '.aql-directive-diagram': { color: '#a855f7', fontWeight: 500 },
+  '.aql-directive-table': { color: '#06b6d4', fontWeight: 500 },
+  '.aql-directive-graph': { color: '#f97316', fontWeight: 500 },
+  '.aql-directive-narrative': { color: '#22c55e', fontWeight: 500 },
+  '.aql-directive-name': { color: '#3b82f6', fontWeight: 500 },
+  '.aql-directive-type': { color: '#eab308', fontWeight: 500 },
+  '.aql-directive-end': { color: '#ef4444', fontWeight: 500 },
+  '.aql-reference': { color: '#fbbf24' },
 });
 
 const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'name', 'type', 'end'];
@@ -283,6 +319,7 @@ export function AqlEditor(props: AqlEditorProps) {
     () => [
       aqlLanguage,
       aqlTheme,
+      syntaxHighlighting(aqlHighlightStyle),
       autocompletion({ override: [aqlCompletions(propsRef)] }),
       keymap.of([
         {
@@ -305,6 +342,7 @@ export function AqlEditor(props: AqlEditorProps) {
         extensions={extensions}
         editable={!disabled}
         placeholder={placeholder}
+        theme="none"
         height="100%"
         className="flex-1 min-h-0"
         basicSetup={{
