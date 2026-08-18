@@ -4,7 +4,13 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
-import { autocompletion, startCompletion, type Completion, type CompletionSource } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  insertCompletionText,
+  startCompletion,
+  type Completion,
+  type CompletionSource,
+} from '@codemirror/autocomplete';
 import { Tag, tagHighlighter } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
 import {
@@ -249,10 +255,13 @@ function buildEntityCompletions(
     const hay = `${e.type || ''} ${e.label || ''} ${e.id || ''}`.toLowerCase();
     if (!matchesTokens(hay)) continue;
     const qualified = e.type && !e.id.startsWith(`${e.type}:`) ? `${e.type}:${e.id}` : e.id;
+    const insertText = formatEntityToken(e.label || e.id, e.id, e.type);
     options.push({
       label: e.label || e.id,
       detail: qualified,
-      apply: formatEntityToken(e.label || e.id, e.id, e.type),
+      apply: (view, _completion, from, to) => {
+        view.dispatch(insertCompletionText(view.state, insertText, from, to));
+      },
       type: 'property',
     });
   }
@@ -265,17 +274,40 @@ function buildEntityCompletions(
       const rel = edge.label || edge.type || 'edge';
       const hay = `${sourceLabel} ${edge.from} ${targetLabel} ${edge.to} ${rel}`.toLowerCase();
       if (!matchesTokens(hay)) continue;
+      const insertText = formatEdgeToken(edge.from, edge.to, rel);
       options.push({
         label: `${sourceLabel} — ${rel} → ${targetLabel}`,
         detail: `${edge.from} → ${edge.to}`,
-        apply: formatEdgeToken(edge.from, edge.to, rel),
+        apply: (view, _completion, from, to) => {
+          view.dispatch(insertCompletionText(view.state, insertText, from, to));
+        },
         type: 'enum',
       });
     }
   }
 
+  if (options.length === 0) {
+    options.push({
+      label: 'No matching entities or edges',
+      apply: () => {},
+      type: 'text',
+    });
+  }
+
   return options.sort((a, b) => a.label.localeCompare(b.label)).slice(0, 8);
 }
+
+const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  if (text !== '[' && text !== '#') return false;
+  const pos = from + text.length;
+  const before = view.state.doc.toString().slice(Math.max(0, pos - 2), pos);
+  const shouldOpen = before === '[[' || before.slice(-1) === '#';
+  if (shouldOpen) {
+    // Defer so the default input transaction is fully applied.
+    requestAnimationFrame(() => startCompletion(view));
+  }
+  return false;
+});
 
 function aqlCompletions(
   propsRef: React.MutableRefObject<{
@@ -368,49 +400,23 @@ export function AqlEditor(props: AqlEditorProps) {
   );
 
   const extensions = useMemo(
-  () => [
-    aqlLanguage,
-    aqlTheme,
-    syntaxHighlighting(aqlHighlightStyle),
-    autocompletion({ override: [aqlCompletions(propsRef)] }),
-    keymap.of([
-      {
-        key: 'Mod-Enter',
-        run: () => {
-          onSubmit?.();
-          return true;
+    () => [
+      aqlLanguage,
+      aqlTheme,
+      syntaxHighlighting(aqlHighlightStyle),
+      autocompletion({ override: [aqlCompletions(propsRef)] }),
+      completionInputHandler,
+      keymap.of([
+        {
+          key: 'Mod-Enter',
+          run: () => {
+            onSubmit?.();
+            return true;
+          },
         },
-      },
-      {
-        key: '#',
-        run: (view) => {
-          const { from, to } = view.state.selection.main;
-          view.dispatch({
-            changes: { from, to, insert: '#' },
-            selection: { anchor: from + 1, head: from + 1 },
-          });
-          startCompletion(view);
-          return true;
-        },
-      },
-      {
-        key: '[',
-        run: (view) => {
-          const { from, to } = view.state.selection.main;
-          const prev = view.state.doc.sliceString(Math.max(0, from - 1), from);
-          view.dispatch({
-            changes: { from, to, insert: '[' },
-            selection: { anchor: from + 1, head: from + 1 },
-          });
-          if (prev === '[') {
-            startCompletion(view);
-          }
-          return true;
-        },
-      },
-    ]),
-  ],
-  [onSubmit],
+      ]),
+    ],
+    [onSubmit],
   );
 
   return (
