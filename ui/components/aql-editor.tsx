@@ -298,9 +298,14 @@ function buildEntityCompletions(
 }
 
 const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  // eslint-disable-next-line no-console
+  console.log('[AQL inputHandler]', JSON.stringify({ text, from, to }));
   if (text !== '@' && text !== '#') return false;
-  // Defer until after CodeMirror has applied the typed character.
-  Promise.resolve().then(() => startCompletion(view));
+  Promise.resolve().then(() => {
+    const result = startCompletion(view);
+    // eslint-disable-next-line no-console
+    console.log('[AQL startCompletion]', { text, result });
+  });
   return false;
 });
 
@@ -331,6 +336,8 @@ function aqlCompletions(
     const dirMatch = beforeCursor.match(/^#([a-zA-Z0-9_-]*)$/);
     if (dirMatch) {
       const options = buildDirectiveCompletions(dirMatch[1]);
+      // eslint-disable-next-line no-console
+      console.log('[AQL # result]', { from: line.from + beforeCursor.indexOf('#'), to: pos, count: options.length });
       if (options.length === 0) return null;
       return {
         from: line.from + beforeCursor.indexOf('#'),
@@ -343,19 +350,24 @@ function aqlCompletions(
     const allBefore = state.doc.toString().slice(0, pos);
     const atIdx = allBefore.lastIndexOf('@');
     if (atIdx >= 0) {
-      // make sure there's whitespace or start of doc before the @
       const charBefore = allBefore.charAt(atIdx - 1);
-      if (charBefore === ' ' || charBefore === '\n' || charBefore === '\t' || atIdx === 0) {
+      const match = charBefore === ' ' || charBefore === '\n' || charBefore === '\t' || atIdx === 0;
+      // eslint-disable-next-line no-console
+      console.log('[AQL @ check]', { atIdx, charBefore, match, pos });
+      if (match) {
         const filter = allBefore.slice(atIdx + 1, pos);
+        const result = buildEntityCompletions(
+          propsRef.current.entities,
+          propsRef.current.edges,
+          propsRef.current.includeEdges,
+          filter,
+        );
+        // eslint-disable-next-line no-console
+        console.log('[AQL @ result]', { from: atIdx, to: pos, count: result.length });
         return {
           from: atIdx,
           to: pos,
-          options: buildEntityCompletions(
-            propsRef.current.entities,
-            propsRef.current.edges,
-            propsRef.current.includeEdges,
-            filter,
-          ),
+          options: result,
         };
       }
     }
