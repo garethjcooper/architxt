@@ -297,19 +297,11 @@ function buildEntityCompletions(
   return options;
 }
 
-const completionInputHandler = EditorView.domEventHandlers({
-  keydown: (event, view) => {
-    if (event.key !== '@' && event.key !== '#') return false;
-    event.preventDefault();
-    const from = view.state.selection.main.head;
-    const char = event.key;
-    view.dispatch({
-      changes: { from, to: from, insert: char },
-      selection: { anchor: from + 1, head: from + 1 },
-    });
-    startCompletion(view);
-    return true;
-  },
+const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  if (text !== '@' && text !== '#') return false;
+  // Defer until after CodeMirror has applied the typed character.
+  Promise.resolve().then(() => startCompletion(view));
+  return false;
 });
 
 function aqlCompletions(
