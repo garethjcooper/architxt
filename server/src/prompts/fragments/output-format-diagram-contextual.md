@@ -3,7 +3,7 @@
 The `diagrams` envelope section must contain a list of diagram objects.
 
 Each diagram must have:
-- `name`: a short human-readable identifier for the diagram (used as its title/label when rendered).
+- `name`: a short human-readable identifier for the diagram (used as its title/label when rendered). **This MUST be the exact title provided via `#diagram-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If no name is provided, generate a short descriptive name (4–6 words) based on the diagram's content.
 - `type`: a valid Mermaid diagram type. Valid types are: `flowchart`, `graph`, `swimlane-beta`, `sequenceDiagram`, `classDiagram`, `stateDiagram-v2`, `erDiagram`, `journey`, `gantt`, `pie`, `timeline`, `radar-beta`, `architecture-beta`, `block`, `mindmap`, `venn-beta`.
 - `content`: a single string of valid Mermaid diagram notation. Preserve newlines inside the string as `\n` so the envelope remains JSON-parseable.
 
