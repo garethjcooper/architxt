@@ -180,7 +180,7 @@ export function QueryForm(props: QueryFormProps) {
     <form onSubmit={onSubmit} className="flex flex-col h-full p-2 gap-2 overflow-hidden">
       <div className="flex flex-1 min-h-0 gap-2">
         {queryMode !== 'models' && queryMode !== 'templates' && queryMode !== 'prebuilt' && (
-          <div className="flex flex-col flex-1 min-h-0 relative">
+          <div className="flex flex-col flex-1 min-h-0 min-w-0 relative">
             <AqlEditor
               value={query}
               onChange={(value, newCursor) => {
@@ -191,7 +191,7 @@ export function QueryForm(props: QueryFormProps) {
               placeholder={QUERY_PLACEHOLDERS[queryMode]}
               availableEntities={availableEntities}
               availableEdges={availableEdges}
-              className="flex-1 min-h-0 rounded-lg border border-white/20 bg-transparent"
+              className="flex-1 min-h-0 w-full rounded-lg border border-white/20 bg-transparent"
             />
           </div>
         )}

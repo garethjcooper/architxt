@@ -122,6 +122,7 @@ const aqlLanguage = new LanguageSupport(
 const aqlTheme = EditorView.theme({
   '&': {
     height: '100%',
+    width: '100%',
     fontSize: '12px',
     lineHeight: '1.5',
     backgroundColor: 'transparent',
@@ -132,8 +133,13 @@ const aqlTheme = EditorView.theme({
     fontFamily: 'inherit',
   },
   '.cm-content': {
+    width: '100%',
+    minWidth: '0',
     padding: '6px 8px',
     caretColor: 'white',
+  },
+  '.cm-line': {
+    whiteSpace: 'pre-wrap',
   },
   '.cm-cursor': {
     borderLeftColor: 'white',
