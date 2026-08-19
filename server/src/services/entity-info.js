@@ -258,11 +258,13 @@ async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntity
 
       for (const entityId of requestedEntityIds) {
         if (scopeSource === entityId || scopeTarget === entityId) {
+          const isHindsightEdge = edge.cge_id.startsWith('hindsight-');
           byEntityId.get(entityId).push({
             source_id: edge.cge_source_id,
             target_id: edge.cge_target_id,
             edge_id: edge.cge_id,
             edge_type: edge.cge_type,
+            origin: isHindsightEdge ? 'hindsight' : 'derived',
             scope: { source_id: scopeSource, target_id: scopeTarget },
             refs: [ref],
           });
