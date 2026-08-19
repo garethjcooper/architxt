@@ -293,6 +293,7 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(a.edge_contexts[0].edge_id, 'edge-1');
     assert.equal(a.edge_contexts[0].refs[0].ext_id, 'edge-ctx-svc:SVC-005|app:APP-001');
     assert.deepEqual(a.edge_contexts[0].scope, { source_id: 'svc:SVC-005', target_id: 'app:APP-001' });
+    assert.equal(a.edge_contexts[0].origin, 'derived');
   });
 
   it('returns edge contexts for a single requested entity when the other endpoint is not requested', async () => {
