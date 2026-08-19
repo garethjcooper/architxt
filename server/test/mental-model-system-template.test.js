@@ -45,7 +45,7 @@ function makeTag(db) {
 }
 
 function makeEntity(db) {
-  const typeId = db.prepare("INSERT INTO entity_types (et_type_name) VALUES (?)").run('test-type').lastInsertRowid;
+  const typeId = db.prepare("INSERT INTO entity_types (et_type_name, et_id_format_prefix) VALUES (?, ?)").run('test-type', 'test-type').lastInsertRowid;
   const entId = db.prepare(
     "INSERT INTO entities (ent_type_id, ent_entity_id, ent_name, ent_generated_by) VALUES (?, ?, ?, 'user')"
   ).run(typeId, 'ent-1', 'Test Entity').lastInsertRowid;

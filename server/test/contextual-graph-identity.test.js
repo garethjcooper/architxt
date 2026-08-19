@@ -40,8 +40,8 @@ function seedEntities(db, entities) {
     if (existingType) {
       typeId = existingType.et_id;
     } else {
-      db.prepare('INSERT INTO entity_types (et_type_name, et_id_label, et_name_label) VALUES (?, ?, ?)').run(
-        e.type, 'ID', 'Name');
+      db.prepare('INSERT INTO entity_types (et_type_name, et_id_label, et_name_label, et_id_format_prefix) VALUES (?, ?, ?, ?)').run(
+        e.type, 'ID', 'Name', e.type);
       typeId = db.prepare('SELECT last_insert_rowid() AS id').get().id;
     }
     db.prepare('INSERT INTO entities (ent_entity_id, ent_name, ent_type_id, ent_aliases, ent_generated_by) VALUES (?, ?, ?, ?, ?)').run(

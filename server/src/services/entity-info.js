@@ -49,12 +49,69 @@ export function validateEntityInfoPayload(body) {
 }
 
 /**
- * Strip a type prefix from a graph node id (e.g. "svc:SVC-005" -> "SVC-005").
+ * Split an entity id into prefix and local id, if it has one.
+ * Used for catalog lookup only; the full id is the graph node identity.
  */
-function localEntityId(graphNodeId) {
-  if (!graphNodeId || typeof graphNodeId !== 'string') return graphNodeId;
-  const idx = graphNodeId.indexOf(':');
-  return idx >= 0 ? graphNodeId.slice(idx + 1) : graphNodeId;
+function parseEntityId(id) {
+  if (!id || typeof id !== 'string') return { prefix: null, localId: id };
+  const idx = id.indexOf(':');
+  if (idx <= 0 || idx === id.length - 1) return { prefix: null, localId: id };
+  return {
+    prefix: id.slice(0, idx),
+    localId: id.slice(idx + 1),
+  };
+}
+
+/**
+ * Load catalog entities for the requested ids. Matching is by the local part
+ * after the prefix, or by the full id when no prefix is present.
+ */
+function loadCatalogEntities(db, entityIds) {
+  return dbExec(() => {
+    if (entityIds.length === 0) return [];
+
+    const localIds = entityIds.map((id) => parseEntityId(id).localId);
+    const uniqueIds = [...new Set(localIds)];
+    const placeholders = uniqueIds.map(() => '?').join(',');
+
+    const sql = `
+      SELECT e.ent_id, e.ent_entity_id, e.ent_name, e.ent_description,
+             e.ent_aliases, et.et_type_name
+      FROM entities e
+      JOIN entity_types et ON e.ent_type_id = et.et_id
+      WHERE e.ent_entity_id IN (${placeholders})
+    `;
+    const rows = stmt(db, sql).all(...uniqueIds);
+    return rows.map((r) => ({
+      id: r.ent_id,
+      entity_id: r.ent_entity_id,
+      name: r.ent_name,
+      description: r.ent_description,
+      aliases: JSON.parse(r.ent_aliases || '[]'),
+      type_name: r.et_type_name,
+    }));
+  }, 'entityInfo.loadCatalogEntities');
+}
+
+/**
+ * Load graph nodes for the requested entity ids in a single query.
+ */
+function loadGraphNodes(db, serverId, bankId, entityIds) {
+  return dbExec(() => {
+    if (entityIds.length === 0) return [];
+    const placeholders = entityIds.map(() => '?').join(',');
+    const sql = `
+      SELECT cgn_id, cgn_labels, cgn_properties
+      FROM contextual_graph_nodes
+      WHERE cgn_server_id = ? AND cgn_bank_id = ? AND cgn_id IN (${placeholders})
+    `;
+    const rows = stmt(db, sql).all(serverId, bankId, ...entityIds);
+    return rows.map((r) => ({
+      id: r.cgn_id,
+      labels: JSON.parse(r.cgn_labels || '[]'),
+      properties: JSON.parse(r.cgn_properties || '{}'),
+    }));
+  }, 'entityInfo.loadGraphNodes');
 }
 
 /**
@@ -81,58 +138,6 @@ function extractContextualRefs(properties) {
       last_refresh_at: ref.last_refresh_at || null,
       last_refresh_error: ref.last_refresh_error || null,
     }));
-}
-
-/**
- * Load graph nodes for the requested entity ids in a single query.
- */
-function loadGraphNodes(db, serverId, bankId, entityIds) {
-  return dbExec(() => {
-    if (entityIds.length === 0) return [];
-    const placeholders = entityIds.map(() => '?').join(',');
-    const sql = `
-      SELECT cgn_id, cgn_labels, cgn_properties
-      FROM contextual_graph_nodes
-      WHERE cgn_server_id = ? AND cgn_bank_id = ? AND cgn_id IN (${placeholders})
-    `;
-    const rows = stmt(db, sql).all(serverId, bankId, ...entityIds);
-    return rows.map((r) => ({
-      id: r.cgn_id,
-      labels: JSON.parse(r.cgn_labels || '[]'),
-      properties: JSON.parse(r.cgn_properties || '{}'),
-    }));
-  }, 'entityInfo.loadGraphNodes');
-}
-
-/**
- * Load catalog entities for the requested ids. Matching is by graph node id
- * (with type prefix) or by the local entity id (after stripping the prefix).
- */
-function loadCatalogEntities(db, entityIds) {
-  return dbExec(() => {
-    if (entityIds.length === 0) return [];
-
-    const localIds = entityIds.map(localEntityId);
-    const allMatchIds = [...new Set([...entityIds, ...localIds])];
-    const placeholders = allMatchIds.map(() => '?').join(',');
-
-    const sql = `
-      SELECT e.ent_id, e.ent_entity_id, e.ent_name, e.ent_description,
-             e.ent_aliases, et.et_type_name
-      FROM entities e
-      JOIN entity_types et ON e.ent_type_id = et.et_id
-      WHERE e.ent_entity_id IN (${placeholders})
-    `;
-    const rows = stmt(db, sql).all(...allMatchIds);
-    return rows.map((r) => ({
-      id: r.ent_id,
-      entity_id: r.ent_entity_id,
-      name: r.ent_name,
-      description: r.ent_description,
-      aliases: JSON.parse(r.ent_aliases || '[]'),
-      type_name: r.et_type_name,
-    }));
-  }, 'entityInfo.loadCatalogEntities');
 }
 
 /**
@@ -346,8 +351,8 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
     // Determine which catalog entity (if any) matches each requested id.
     const requestedToCatalog = new Map();
     for (const id of entityIds) {
-      const localId = localEntityId(id);
-      const catalog = catalogByEntityId.get(id) || catalogByEntityId.get(localId) || null;
+      const localId = parseEntityId(id).localId;
+      const catalog = catalogByEntityId.get(localId) || null;
       if (catalog) requestedToCatalog.set(id, catalog);
     }
 
@@ -414,7 +419,7 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
     for (const id of entityIds) {
       const graphNode = graphNodeById.get(id) || null;
       const catalog = requestedToCatalog.get(id) || null;
-      const localId = localEntityId(id);
+      const localId = parseEntityId(id).localId;
 
       const contextualRefs = graphNode ? extractContextualRefs(graphNode.properties) : [];
       for (const ref of contextualRefs) allExtIds.add(ref.ext_id);
