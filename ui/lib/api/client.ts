@@ -371,13 +371,14 @@ export const metadataApi = {
 
 // Entity info API
 export const entityInfoApi = {
-  info: (serverId: number, bankId: string, entityIds: string[]) =>
+  info: (serverId: number, bankId: string, entityIds: string[], includeContent = true) =>
     fetchApi<{
       entities: Record<string, EntityInfo>;
+      content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
       meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
     }>('/entities/info', {
       method: 'POST',
-      body: JSON.stringify({ server_id: serverId, bank_id: bankId, entity_ids: entityIds }),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, entity_ids: entityIds, include_content: includeContent }),
     }),
 };
 
@@ -962,6 +963,18 @@ export interface EntityInfoEdgeContext {
   refs: EntityInfoContextualRef[];
 }
 
+export interface MentalModelContent {
+  ext_id: string;
+  narrative?: string;
+  concatenation?: string;
+  graph?: { nodes: unknown[]; edges: unknown[] };
+  diagrams?: Array<{ name: string; type: string; content: string }>;
+  tables?: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
+  findings?: Array<{ summary: string; confidence?: number; evidence?: string }>;
+  seams?: Array<{ target: string; issue: string }>;
+  [key: string]: unknown;
+}
+
 export interface EntityInfo {
   graph_node: EntityInfoGraphNode | null;
   catalog: EntityInfoCatalog | null;
@@ -969,6 +982,7 @@ export interface EntityInfo {
   derived_models: EntityInfoMentalModel[];
   plain_models: EntityInfoMentalModel[];
   edge_contexts: EntityInfoEdgeContext[];
+  content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
 }
 
 export interface GraphMeta {
