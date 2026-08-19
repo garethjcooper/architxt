@@ -5,12 +5,12 @@ import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
-import { serversApi, contextualGraphApi, entityInfoApi, type Server, type EntityInfo } from '@/lib/api/client';
+import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
+import { serversApi, contextualGraphApi, entityInfoApi, hindsightApi, type Server, type EntityInfo } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
@@ -305,6 +305,23 @@ export default function WorkspacePage() {
     return map;
   }, [entities]);
 
+  const aqlEntities: AqlEntityLike[] = useMemo(() => {
+    return entities.map((node) => ({
+      id: node.id,
+      label: node.label,
+      type: node.type,
+    }));
+  }, [entities]);
+
+  const aqlEdges: AqlEdgeLike[] = useMemo(() => {
+    return edges.map((edge) => ({
+      from: edge.source_id,
+      to: edge.target_id,
+      label: edge.label || edge.type,
+      type: edge.type,
+    }));
+  }, [edges]);
+
   const spineEntities = useMemo(() => {
     const q = spineSearch.trim().toLowerCase();
     if (!q) return entities;
@@ -343,15 +360,24 @@ export default function WorkspacePage() {
     setSelectedPatch(null);
   }, []);
 
-  const handleReflect = useCallback(() => {
+  const handleReflect = useCallback(async () => {
     const query = reflectQuery.trim();
     if (!query) return;
     if (!serverId || !bankId) {
       toast.error('Select a server and bank before running Reflect.');
       return;
     }
-    // Phase 1: Reflect sends only the free-text query; corpus integration later.
-    toast.info(`Reflect query staged: "${query}"`);
+    try {
+      // Phase 1: Reflect sends only the free-text query; corpus integration later.
+      const cleanedQuery = query.replace(/\[\[[^\]]+\]\]/g, '').replace(/\s+/g, ' ').trim();
+      const result = await hindsightApi.reflect(serverId, bankId, { query: cleanedQuery || query });
+      toast.success('Reflect response received');
+      logger.info('Reflect result', { result });
+      // TODO: render result in workspace output panel (next slice).
+    } catch (err: any) {
+      logger.error('Reflect query failed', { error: err, serverId, bankId, query });
+      toast.error(`Reflect failed: ${err.message || err}`);
+    }
   }, [reflectQuery, serverId, bankId]);
 
   const handleAttachEntity = useCallback((entityId: string) => {
@@ -392,6 +418,29 @@ export default function WorkspacePage() {
     };
   }, [serverId, bankId, attachedEntityIds]);
 
+  // Sync [[...]] entity mentions in the query to the attached entity list.
+  useEffect(() => {
+    const mentioned: string[] = [];
+    const tokenRegex = /\[\[((?:[^\[\]]|\[[^\]])+?)\]\]/g;
+    let match;
+    while ((match = tokenRegex.exec(reflectQuery)) !== null) {
+      const inner = match[1];
+      const parenMatch = inner.match(/\(([^)]+)\)$/);
+      if (parenMatch) {
+        mentioned.push(parenMatch[1]);
+      } else if (/^[\w-]+:[\w-]+$/.test(inner)) {
+        mentioned.push(inner);
+      }
+    }
+    setAttachedEntityIds((prev) => {
+      const next = [...prev];
+      for (const id of mentioned) {
+        if (!next.includes(id)) next.push(id);
+      }
+      return next;
+    });
+  }, [reflectQuery]);
+
   return (
     <PageShell
       title="Workspace"
@@ -431,11 +480,16 @@ export default function WorkspacePage() {
             <PanelHeader title="Reflect query" />
             <PanelContent className="p-3">
               <div className="absolute inset-0 p-3 flex flex-col gap-2">
-                <Textarea
-                  placeholder="Ask Reflect..."
+                <AqlEditor
                   value={reflectQuery}
-                  onChange={(e) => setReflectQuery(e.target.value)}
-                  className="flex-1 resize-none text-sm min-h-0"
+                  onChange={(value) => setReflectQuery(value)}
+                  onSubmit={handleReflect}
+                  disabled={false}
+                  placeholder="Ask Reflect... Type [[ to reference an entity."
+                  availableEntities={aqlEntities}
+                  availableEdges={aqlEdges}
+                  includeEdges={false}
+                  className="flex-1 min-h-0 w-full rounded-lg border border-white/20 bg-transparent"
                 />
                 {attachedEntityIds.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
