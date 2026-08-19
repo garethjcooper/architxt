@@ -120,7 +120,7 @@ export async function resolveHindsightNode(db, serverId, bankId, lookups, { labe
   const candidateEntityId = parts.length >= 2 ? parts.slice(1).join(':') : label;
   const canonicalEntity = lookups.find(candidateEntityId, label);
   if (canonicalEntity) {
-    const typeLabel = canonicalEntity.et_id_format_prefix || canonicalEntity.et_type_name || null;
+    const typeLabel = canonicalEntity.et_type_name || null;
     return {
       id: buildNodeId({ canonicalId: canonicalEntity.ent_entity_id, typeLabel }),
       taxonomy: 'canonical',
