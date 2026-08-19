@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
+import { NarrativeViewer } from '@/components/narrative-viewer';
 import { serversApi, contextualGraphApi, entityInfoApi, hindsightApi, type Server, type EntityInfo } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
@@ -38,6 +39,28 @@ function isGroundedNodeForWorkspace(node: DisplayNode): boolean {
 
 function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
   return isGroundedEdge(edge) && !isCandidateEdge(edge);
+}
+
+function extractReflectNarrative(result: unknown): string {
+  if (result == null) return '';
+  if (typeof result === 'string') return result;
+  if (typeof result !== 'object') return String(result);
+  const obj = result as Record<string, unknown>;
+  const candidateKeys = ['response', 'narrative', 'content', 'answer', 'output', 'structured_output', 'text', 'markdown'];
+  for (const key of candidateKeys) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  // Hindsight sometimes nests under data.
+  if (typeof obj.data === 'string' && obj.data.trim()) return obj.data;
+  if (typeof obj.data === 'object' && obj.data != null) {
+    const data = obj.data as Record<string, unknown>;
+    for (const key of candidateKeys) {
+      const value = data[key];
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+  }
+  return JSON.stringify(result, null, 2);
 }
 
 function PanelHeader({ title, count }: { title: string; count?: number }) {
@@ -133,9 +156,32 @@ export default function WorkspacePage() {
 
   const [spineSearch, setSpineSearch] = useState('');
   const [reflectQuery, setReflectQuery] = useState('');
-  const [attachedEntityIds, setAttachedEntityIds] = useState<string[]>([]);
+  const [manuallyAttachedIds, setManuallyAttachedIds] = useState<string[]>([]);
   const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfo> | null>(null);
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
+  const [reflectResult, setReflectResult] = useState<unknown | null>(null);
+  const [reflectLoading, setReflectLoading] = useState(false);
+  const [reflectError, setReflectError] = useState<string | null>(null);
+
+  const mentionedEntityIds = useMemo(() => {
+    const mentioned: string[] = [];
+    const tokenRegex = /\[\[((?:[^\[\]]|\[[^\]])+?)\]\]/g;
+    let match;
+    while ((match = tokenRegex.exec(reflectQuery)) !== null) {
+      const inner = match[1];
+      const parenMatch = inner.match(/\(([^)]+)\)$/);
+      if (parenMatch) {
+        mentioned.push(parenMatch[1]);
+      } else if (/^[\w-]+:[\w-]+$/.test(inner)) {
+        mentioned.push(inner);
+      }
+    }
+    return mentioned;
+  }, [reflectQuery]);
+
+  const attachedEntityIds = useMemo(() => {
+    return Array.from(new Set([...manuallyAttachedIds, ...mentionedEntityIds]));
+  }, [manuallyAttachedIds, mentionedEntityIds]);
 
   const {
     selectedServerId,
@@ -368,27 +414,42 @@ export default function WorkspacePage() {
       return;
     }
     try {
+      setReflectLoading(true);
+      setReflectError(null);
+      setReflectResult(null);
       // Phase 1: Reflect sends only the free-text query; corpus integration later.
       const cleanedQuery = query.replace(/\[\[[^\]]+\]\]/g, '').replace(/\s+/g, ' ').trim();
       const result = await hindsightApi.reflect(serverId, bankId, { query: cleanedQuery || query });
+      setReflectResult(result);
       toast.success('Reflect response received');
-      logger.info('Reflect result', { result });
-      // TODO: render result in workspace output panel (next slice).
     } catch (err: any) {
+      setReflectError(err.message || String(err));
       logger.error('Reflect query failed', { error: err, serverId, bankId, query });
       toast.error(`Reflect failed: ${err.message || err}`);
+    } finally {
+      setReflectLoading(false);
     }
   }, [reflectQuery, serverId, bankId]);
 
   const handleAttachEntity = useCallback((entityId: string) => {
-    setAttachedEntityIds((prev) => {
+    setManuallyAttachedIds((prev) => {
       if (prev.includes(entityId)) return prev;
       return [...prev, entityId];
     });
   }, []);
 
   const handleDetachEntity = useCallback((entityId: string) => {
-    setAttachedEntityIds((prev) => prev.filter((id) => id !== entityId));
+    setManuallyAttachedIds((prev) => prev.filter((id) => id !== entityId));
+    // If the entity is still present as a [[...]] token, remove that token from the query
+    // so the user isn't stuck with an attachment they explicitly removed.
+    setReflectQuery((prev) => {
+      const tokenRegex = /\[\[((?:[^\[\]]|\[[^\]])+?)\]\]/g;
+      return prev.replace(tokenRegex, (match, inner: string) => {
+        const parenMatch = inner.match(/\(([^)]+)\)$/);
+        const id = parenMatch ? parenMatch[1] : inner;
+        return id === entityId ? '' : match;
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -417,29 +478,6 @@ export default function WorkspacePage() {
       cancelled = true;
     };
   }, [serverId, bankId, attachedEntityIds]);
-
-  // Sync [[...]] entity mentions in the query to the attached entity list.
-  useEffect(() => {
-    const mentioned: string[] = [];
-    const tokenRegex = /\[\[((?:[^\[\]]|\[[^\]])+?)\]\]/g;
-    let match;
-    while ((match = tokenRegex.exec(reflectQuery)) !== null) {
-      const inner = match[1];
-      const parenMatch = inner.match(/\(([^)]+)\)$/);
-      if (parenMatch) {
-        mentioned.push(parenMatch[1]);
-      } else if (/^[\w-]+:[\w-]+$/.test(inner)) {
-        mentioned.push(inner);
-      }
-    }
-    setAttachedEntityIds((prev) => {
-      const next = [...prev];
-      for (const id of mentioned) {
-        if (!next.includes(id)) next.push(id);
-      }
-      return next;
-    });
-  }, [reflectQuery]);
 
   return (
     <PageShell
@@ -709,18 +747,43 @@ export default function WorkspacePage() {
 
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('query')} title="Drag to resize temporary/workspace split" />
 
-          {/* Workspace pages */}
+          {/* Workspace pages / Reflect result */}
           <Panel style={{ width: 320, minWidth: 240, maxWidth: 440 }}>
-            <PanelHeader title="Workspace pages" />
-            <PanelContent className="p-4">
-              <div className="h-full flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-white/60">Session pages will appear here.</div>
-                  <Button variant="outline" size="sm" className="gap-1.5" disabled>
-                    <Plus className="w-3.5 h-3.5" />
-                    Add
-                  </Button>
-                </div>
+            <PanelHeader
+              title={(reflectResult != null || reflectError != null) ? 'Reflect result' : 'Workspace pages'}
+              count={undefined}
+            />
+            <PanelContent className="p-0">
+              <div className="absolute inset-0 flex flex-col">
+                {reflectLoading && (
+                  <div className="flex-1 flex items-center justify-center text-white/40 text-xs">Reflecting…</div>
+                )}
+                {reflectError && !reflectLoading && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-white/40 text-xs px-4 text-center gap-2">
+                    <span className="text-red-400">Reflect failed</span>
+                    <span>{reflectError}</span>
+                  </div>
+                )}
+                {reflectResult != null && !reflectLoading && (
+                  <NarrativeViewer
+                    content={extractReflectNarrative(reflectResult)}
+                    title="Response"
+                    viewMode="markdown"
+                    showIndex={false}
+                    className="flex-1 min-h-0"
+                  />
+                )}
+                {!reflectLoading && !reflectError && reflectResult == null && (
+                  <div className="flex-1 flex flex-col gap-3 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-white/60">Session pages will appear here.</div>
+                      <Button variant="outline" size="sm" className="gap-1.5" disabled>
+                        <Plus className="w-3.5 h-3.5" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </PanelContent>
           </Panel>
