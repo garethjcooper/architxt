@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
-import { serversApi, contextualGraphApi, type Server } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, entityInfoApi, type Server, type EntityInfo } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
@@ -133,6 +133,9 @@ export default function WorkspacePage() {
 
   const [spineSearch, setSpineSearch] = useState('');
   const [reflectQuery, setReflectQuery] = useState('');
+  const [attachedEntityIds, setAttachedEntityIds] = useState<string[]>([]);
+  const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfo> | null>(null);
+  const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
 
   const {
     selectedServerId,
@@ -347,9 +350,47 @@ export default function WorkspacePage() {
       toast.error('Select a server and bank before running Reflect.');
       return;
     }
-    // TODO: Phase C will wire the Reflect API and add the result to temporary content.
+    // Phase 1: Reflect sends only the free-text query; corpus integration later.
     toast.info(`Reflect query staged: "${query}"`);
   }, [reflectQuery, serverId, bankId]);
+
+  const handleAttachEntity = useCallback((entityId: string) => {
+    setAttachedEntityIds((prev) => {
+      if (prev.includes(entityId)) return prev;
+      return [...prev, entityId];
+    });
+  }, []);
+
+  const handleDetachEntity = useCallback((entityId: string) => {
+    setAttachedEntityIds((prev) => prev.filter((id) => id !== entityId));
+  }, []);
+
+  useEffect(() => {
+    if (!serverId || !bankId || attachedEntityIds.length === 0) {
+      setEntityInfoMap(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingEntityInfo(true);
+    entityInfoApi
+      .info(serverId, bankId, attachedEntityIds)
+      .then((result) => {
+        if (cancelled) return;
+        setEntityInfoMap(result.entities);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: attachedEntityIds });
+        toast.error(`Failed to load entity info: ${err.message || err}`);
+        setEntityInfoMap(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingEntityInfo(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId, bankId, attachedEntityIds]);
 
   return (
     <PageShell
@@ -396,15 +437,43 @@ export default function WorkspacePage() {
                   onChange={(e) => setReflectQuery(e.target.value)}
                   className="flex-1 resize-none text-sm min-h-0"
                 />
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={!reflectQuery.trim() || !serverId || !bankId}
-                  onClick={handleReflect}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Reflect
-                </Button>
+                {attachedEntityIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {attachedEntityIds.map((id) => (
+                      <Badge
+                        key={id}
+                        variant="secondary"
+                        className="gap-1 px-2 py-1 text-xs cursor-pointer hover:bg-white/20"
+                        onClick={() => handleDetachEntity(id)}
+                        title="Click to remove"
+                      >
+                        {entityInfoMap?.[id]?.graph_node?.display_name || id}
+                        <span className="text-white/50">×</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="gap-1.5 flex-1"
+                    disabled={!reflectQuery.trim() || !serverId || !bankId}
+                    onClick={handleReflect}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Reflect
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={!selectedEntity}
+                    onClick={() => selectedEntity && handleAttachEntity(selectedEntity.id)}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Attach
+                  </Button>
+                </div>
               </div>
             </PanelContent>
           </Panel>
@@ -432,7 +501,7 @@ export default function WorkspacePage() {
                     .
                   </div>
                 ) : (
-                  selectedEntityPatches.map((ref, i) => (
+                  selectedEntityPatches.map((ref: ModelRef, i: number) => (
                     <PatchRefRow
                       key={`${ref.ext_id || ref.role || 'ref'}-${i}`}
                       ref={ref}
@@ -513,16 +582,73 @@ export default function WorkspacePage() {
         <div className="flex-1 min-h-0 flex">
           {/* Temporary content */}
           <Panel className="flex-1">
-            <PanelHeader title="Temporary content" />
-            <PanelContent className="p-4">
-              <div className="h-full flex flex-col items-center justify-center text-white/40 text-sm px-6 text-center gap-3">
-                <div className="flex items-center gap-2 text-white/50">
-                  <FileText className="w-5 h-5" />
-                  <span>Temporary content scratchpad</span>
-                </div>
-                <p className="text-xs max-w-md">
-                  Select a patch or edge above, or run a Reflect query, to add sections here.
-                </p>
+            <PanelHeader
+              title="Attached entities"
+              count={attachedEntityIds.length > 0 ? attachedEntityIds.length : undefined}
+            />
+            <PanelContent className="p-0">
+              <div className="absolute inset-0 overflow-y-auto p-3 space-y-2">
+                {attachedEntityIds.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-white/40 text-sm px-6 text-center gap-3">
+                    <div className="flex items-center gap-2 text-white/50">
+                      <FileText className="w-5 h-5" />
+                      <span>Attached entity info</span>
+                    </div>
+                    <p className="text-xs max-w-md">
+                      Select an entity in the spine and click Attach, or type an entity id with [[...]] in the query.
+                    </p>
+                  </div>
+                ) : loadingEntityInfo ? (
+                  <div className="h-full flex items-center justify-center text-white/40 text-xs">Loading entity info…</div>
+                ) : entityInfoMap ? (
+                  attachedEntityIds.map((id) => {
+                    const info = entityInfoMap[id];
+                    if (!info) return null;
+                    return (
+                      <div key={id} className="rounded-md border border-white/10 bg-black/20 p-2.5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-emerald-200 truncate">
+                            {info.catalog?.name || info.graph_node?.display_name || id}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-1.5 text-white/40 hover:text-white"
+                            onClick={() => handleDetachEntity(id)}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                        <div className="text-xs text-white/50 truncate">{id}</div>
+                        {info.catalog?.description && (
+                          <div className="text-xs text-white/70 line-clamp-2">{info.catalog.description}</div>
+                        )}
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {info.contextual_refs.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1 border-white/20">
+                              {info.contextual_refs.length} refs
+                            </Badge>
+                          )}
+                          {info.derived_models.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1 border-white/20">
+                              {info.derived_models.length} derived
+                            </Badge>
+                          )}
+                          {info.plain_models.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1 border-white/20">
+                              {info.plain_models.length} plain
+                            </Badge>
+                          )}
+                          {info.edge_contexts.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1 border-white/20">
+                              {info.edge_contexts.length} edges
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : null}
               </div>
             </PanelContent>
           </Panel>
