@@ -369,6 +369,18 @@ export const metadataApi = {
   delete: (id: number) => fetchApi<void>(`/metadata/${id}`, { method: 'DELETE' }),
 };
 
+// Entity info API
+export const entityInfoApi = {
+  info: (serverId: number, bankId: string, entityIds: string[]) =>
+    fetchApi<{
+      entities: Record<string, EntityInfo>;
+      meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
+    }>('/entities/info', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, entity_ids: entityIds }),
+    }),
+};
+
 // Entities API
 export const entitiesApi = {
   list: () => fetchApi<Entity[]>('/entities'),
@@ -882,6 +894,81 @@ export interface GraphEdge {
 export interface GraphCanvas {
   nodes: GraphNode[];
   edges: GraphEdge[];
+}
+
+export interface EntityInfoGraphNode {
+  id: string;
+  labels: string[];
+  display_name: string;
+  is_grounded: boolean;
+  is_candidate: boolean;
+}
+
+export interface EntityInfoCatalog {
+  id: number;
+  entity_id: string;
+  name: string;
+  type_name: string;
+  description: string | null;
+  aliases: string[];
+}
+
+export interface EntityInfoContextualRef {
+  role: string;
+  ext_id: string;
+  scope: Record<string, unknown> | null;
+  attached_at: string | null;
+  fetched_at: string | null;
+  content_hash: string | null;
+  last_refresh_status: string | null;
+  last_refresh_at: string | null;
+  last_refresh_error: string | null;
+}
+
+export interface EntityInfoMentalModel {
+  id: number | string;
+  ext_id: string;
+  name: string;
+  source_query: string | null;
+  template_role: string | null;
+  is_template: boolean;
+  returns: string | null;
+  refresh_mode: string | null;
+  refresh_after_consolidation: boolean;
+  exclude_all_mental_models: boolean;
+  exclude_mental_model_list: string | null;
+  max_tokens: number | null;
+  tags_match_mode: string | null;
+  description: string | null;
+  meta: Record<string, unknown>;
+  concatenation: string | null;
+  created_at: string;
+  updated_at: string;
+  overrides: {
+    refresh_mode: string | null;
+    refresh_after_consolidation: boolean;
+    exclude_all_mental_models: boolean;
+    max_tokens: number | null;
+  };
+}
+
+export interface EntityInfoEdgeContext {
+  source_id: string;
+  target_id: string;
+  edge_id: string;
+  edge_type: string | null;
+  origin: 'hindsight' | 'derived';
+  scope: { source_id: string; target_id: string } | null;
+  refs: EntityInfoContextualRef[];
+}
+
+export interface EntityInfo {
+  graph_node: EntityInfoGraphNode | null;
+  catalog: EntityInfoCatalog | null;
+  contextual_refs: EntityInfoContextualRef[];
+  derived_models: EntityInfoMentalModel[];
+  plain_models: EntityInfoMentalModel[];
+  edge_contexts: EntityInfoEdgeContext[];
 }
 
 export interface GraphMeta {
