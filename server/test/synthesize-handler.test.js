@@ -12,8 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = path.join(__dirname, '../../tmp/test-synthesize-handler.db');
 
 function seedTestEntities(db) {
-  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label) VALUES ('com', 'COM', 'Component')").run();
-  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label) VALUES ('svc', 'SVC', 'Service')").run();
+  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label, et_id_format_prefix) VALUES ('com', 'COM', 'Component', 'com')").run();
+  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label, et_id_format_prefix) VALUES ('svc', 'SVC', 'Service', 'svc')").run();
   const comType = db.prepare("SELECT et_id FROM entity_types WHERE et_type_name = 'com'").pluck().get();
   const svcType = db.prepare("SELECT et_id FROM entity_types WHERE et_type_name = 'svc'").pluck().get();
   db.prepare("INSERT OR IGNORE INTO entities (ent_entity_id, ent_name, ent_type_id, ent_description) VALUES (?, ?, ?, ?)").run('a-com:COM-001', 'Singleview', comType, 'Billing CRM');

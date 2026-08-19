@@ -130,6 +130,7 @@ describe('POST /api/v1/entities/info', () => {
 
   it('returns empty info for unknown entities', async () => {
     const app = makeApp({ db });
+    seedEntityType(db, 'Service', 'svc');
     const res = await makeRequest(app, {
       server_id: serverId,
       bank_id: bankId,
@@ -149,7 +150,7 @@ describe('POST /api/v1/entities/info', () => {
 
   it('returns graph node, catalog metadata and contextual refs', async () => {
     const app = makeApp({ db });
-    const typeId = seedEntityType(db, 'Service', 'SVC');
+    const typeId = seedEntityType(db, 'Service', 'svc');
     seedEntity(db, typeId, 'SVC-005', 'Payment Service');
 
     seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
@@ -285,30 +286,27 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(a.edge_contexts[0].refs[0].ext_id, 'edge-ctx-svc:SVC-005|app:APP-001');
   });
 
-  it('supports multiple entities in a single request', async () => {
+  it('accepts whatever prefix is configured in the entity type table', async () => {
     const app = makeApp({ db });
-    const typeId = seedEntityType(db, 'Service', 'SVC');
+    // User-chosen prefix "foo-bar" with type name "Service"
+    const typeId = seedEntityType(db, 'Service', 'foo-bar');
     seedEntity(db, typeId, 'SVC-005', 'Payment Service');
-    seedEntity(db, typeId, 'SVC-006', 'Ledger Service');
 
-    seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
-      provenance: { model_refs: [] },
-    });
-    seedGraphNode(db, serverId, bankId, 'svc:SVC-006', ['grounded', 'Service'], {
+    seedGraphNode(db, serverId, bankId, 'foo-bar:SVC-005', ['grounded', 'Service'], {
+      display_name: 'Payment Service',
       provenance: { model_refs: [] },
     });
 
     const res = await makeRequest(app, {
       server_id: serverId,
       bank_id: bankId,
-      entity_ids: ['svc:SVC-005', 'svc:SVC-006'],
+      entity_ids: ['foo-bar:SVC-005'],
     });
 
     assert.equal(res.status, 200);
-    assert.equal(res.body.meta.requested_count, 2);
-    assert.equal(res.body.meta.graph_nodes_found, 2);
-    assert.ok(res.body.entities['svc:SVC-005']);
-    assert.ok(res.body.entities['svc:SVC-006']);
+    const info = res.body.entities['foo-bar:SVC-005'];
+    assert.equal(info.graph_node.id, 'foo-bar:SVC-005');
+    assert.equal(info.catalog.type_name, 'Service');
   });
 });
 

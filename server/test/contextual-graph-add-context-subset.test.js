@@ -25,7 +25,7 @@ function seedServer(db) {
 function seedEntities(db, rows) {
   for (const { type, entityId, name } of rows) {
     const typeRow = db.prepare('SELECT et_id FROM entity_types WHERE et_type_name = ?').get(type);
-    const etId = typeRow ? typeRow.et_id : db.prepare('INSERT INTO entity_types (et_type_name, et_case_match) VALUES (?, ?)').run(type, 'insensitive').lastInsertRowid;
+    const etId = typeRow ? typeRow.et_id : db.prepare('INSERT INTO entity_types (et_type_name, et_case_match, et_id_format_prefix) VALUES (?, ?, ?)').run(type, 'insensitive', type).lastInsertRowid;
     db.prepare('INSERT OR IGNORE INTO entities (ent_type_id, ent_entity_id, ent_name) VALUES (?, ?, ?)').run(etId, entityId, name);
   }
 }

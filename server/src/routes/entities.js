@@ -381,7 +381,7 @@ router.get('/', async (req, res) => {
  *               entity_ids:
  *                 type: array
  *                 items: { type: string }
- *                 description: Canonical contextual-graph node ids (e.g. "svc:SVC-005")
+ *                 description: Contextual-graph node ids (e.g. "svc:SVC-005").
  *               include_content:
  *                 type: boolean
  *                 default: false
