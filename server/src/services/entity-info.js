@@ -150,11 +150,7 @@ function loadMentalModelsByEntities(db, entIds) {
 
     const placeholders = entIds.map(() => '?').join(',');
     const sql = `
-      SELECT m.mm_id, m.mm_ext_id, m.mm_name, m.mm_source_query,
-             m.mm_template_role, m.mm_is_template, m.mm_dimension,
-             m.mm_returns, m.mm_refresh_mode, m.mm_refresh_after_consolidation,
-             m.mm_exclude_all_mental_models, m.mm_exclude_mental_model_list,
-             m.mm_max_tokens, m.mm_tags_match_mode,
+      SELECT m.*,
              e.ent_id, e.ent_entity_id, e.ent_name, e.ent_description,
              e.ent_aliases, et.et_type_name,
              mme.mm_ent_refresh_mode, mme.mm_ent_refresh_after_consolidation,
@@ -178,7 +174,6 @@ function loadMentalModelsByEntities(db, entIds) {
           source_query: r.mm_source_query,
           template_role: r.mm_template_role,
           is_template: r.mm_is_template === 'true',
-          dimension: r.mm_dimension,
           returns: r.mm_returns,
           refresh_mode: r.mm_refresh_mode,
           refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
@@ -186,6 +181,11 @@ function loadMentalModelsByEntities(db, entIds) {
           exclude_mental_model_list: r.mm_exclude_mental_model_list,
           max_tokens: r.mm_max_tokens,
           tags_match_mode: r.mm_tags_match_mode,
+          description: r.mm_viewp_description,
+          meta: JSON.parse(r.mm_viewp_meta || '{}'),
+          concatenation: r.mm_concatenation,
+          created_at: r.mm_created_at,
+          updated_at: r.mm_updated_at,
           entities: [],
         });
       }
@@ -383,15 +383,36 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
           const key = entity.entity_id;
           if (!derivedByEntityId.has(key)) derivedByEntityId.set(key, []);
           derivedByEntityId.get(key).push({
-            template_id: model.id,
-            template_role: model.template_role,
+            id: derived.id,
             ext_id: derived.ext_id,
             name: derived.name,
             source_query: derived.source_query,
-            refresh_mode: derived.refresh_mode,
-            max_tokens: derived.max_tokens,
-            dimension: model.dimension,
+            template_role: model.template_role,
+            is_template: true,
             returns: model.returns,
+            refresh_mode: derived.refresh_mode,
+            refresh_after_consolidation: model.refresh_after_consolidation,
+            exclude_all_mental_models: model.exclude_all_mental_models,
+            exclude_mental_model_list: model.exclude_mental_model_list,
+            max_tokens: derived.max_tokens,
+            tags_match_mode: model.tags_match_mode,
+            description: model.description,
+            meta: {
+              ...model.meta,
+              derived_from: {
+                template_id: model.id,
+                template_ext_id: model.ext_id,
+              },
+            },
+            concatenation: model.concatenation,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            overrides: {
+              refresh_mode: entity.overrides.refresh_mode,
+              refresh_after_consolidation: entity.overrides.refresh_after_consolidation,
+              exclude_all_mental_models: entity.overrides.exclude_all_mental_models,
+              max_tokens: entity.overrides.max_tokens,
+            },
           });
         }
       } else {
@@ -399,12 +420,30 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
           const key = entity.entity_id;
           if (!plainByEntityId.has(key)) plainByEntityId.set(key, []);
           plainByEntityId.get(key).push({
-            model_id: model.id,
+            id: model.id,
             ext_id: model.ext_id,
             name: model.name,
+            source_query: model.source_query,
             template_role: model.template_role,
-            dimension: model.dimension,
+            is_template: model.is_template,
             returns: model.returns,
+            refresh_mode: model.refresh_mode,
+            refresh_after_consolidation: model.refresh_after_consolidation,
+            exclude_all_mental_models: model.exclude_all_mental_models,
+            exclude_mental_model_list: model.exclude_mental_model_list,
+            max_tokens: model.max_tokens,
+            tags_match_mode: model.tags_match_mode,
+            description: model.description,
+            meta: model.meta,
+            concatenation: model.concatenation,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            overrides: {
+              refresh_mode: entity.overrides.refresh_mode,
+              refresh_after_consolidation: entity.overrides.refresh_after_consolidation,
+              exclude_all_mental_models: entity.overrides.exclude_all_mental_models,
+              max_tokens: entity.overrides.max_tokens,
+            },
           });
         }
       }

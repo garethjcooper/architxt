@@ -234,12 +234,20 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(info.derived_models[0].template_role, 'user_entity_derived');
     assert.equal(info.derived_models[0].ext_id, 'user-template-risk-SVC-005');
     assert.equal(info.derived_models[0].name, 'Risk profile: Payment Service');
+    assert.equal(info.derived_models[0].meta.derived_from.template_id, userTemplateId);
+    assert.equal(info.derived_models[0].meta.derived_from.template_ext_id, 'user-template-risk-{entity-id}');
 
     assert.equal(info.plain_models.length, 1);
+    assert.equal(info.plain_models[0].id, plainModelId);
     assert.equal(info.plain_models[0].ext_id, 'plain-security-review');
+    assert.equal(info.plain_models[0].returns, 'table');
 
     // System template linked directly to the entity must not appear in derived_models.
     assert.ok(!info.derived_models.some((m) => m.template_role.startsWith('sys_')));
+    // Plain and derived models share the same top-level schema.
+    const derivedKeys = Object.keys(info.derived_models[0]).sort();
+    const plainKeys = Object.keys(info.plain_models[0]).sort();
+    assert.deepEqual(derivedKeys, plainKeys);
   });
 
   it('returns edge contexts between any two requested entities', async () => {
