@@ -229,36 +229,49 @@ function deriveInstancesForEntity(template, entity, serverId, bankId) {
 }
 
 /**
- * Find edges between any pair of requested entity ids and return edge-context refs.
+ * Load edge-context refs for the requested entity ids.
  *
- * NOTE: this scans edges for the (server_id, bank_id) scope and filters in
- * memory. For very large graphs, switch to an IN-clause query on endpoints.
+ * Returns every physical edge in the bank whose provenance includes a
+ * sys_edge_context ref where the requested entity appears in the ref scope.
+ * The other endpoint in the scope need not be part of the request.
+ *
+ * For very large graphs, switch the edge scan to an IN-clause query on endpoints.
  */
-async function loadEdgeContextsForPairs(db, serverId, bankId, entityIdSet) {
+async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntityIds) {
   const edgesResult = await listEdges(db, serverId, bankId, { limit: 10000 });
   if (!edgesResult.success) {
     logger.warn('Failed to load edges for entity info', { serverId, bankId, error: edgesResult.error });
-    return [];
+    return { success: true, data: new Map() };
   }
 
-  const results = [];
-  for (const edge of edgesResult.data || []) {
-    const sourceInSet = entityIdSet.has(edge.cge_source_id);
-    const targetInSet = entityIdSet.has(edge.cge_target_id);
-    if (!sourceInSet || !targetInSet || edge.cge_source_id === edge.cge_target_id) continue;
+  const byEntityId = new Map();
+  for (const entityId of requestedEntityIds) byEntityId.set(entityId, []);
 
+  for (const edge of edgesResult.data || []) {
     const refs = extractContextualRefs(edge.properties).filter((r) => r.role === 'sys_edge_context');
     if (refs.length === 0) continue;
 
-    results.push({
-      source_id: edge.cge_source_id,
-      target_id: edge.cge_target_id,
-      edge_id: edge.cge_id,
-      edge_type: edge.cge_type,
-      refs,
-    });
+    for (const ref of refs) {
+      const scopeSource = ref.scope?.source_id;
+      const scopeTarget = ref.scope?.target_id;
+      if (typeof scopeSource !== 'string' || typeof scopeTarget !== 'string') continue;
+
+      for (const entityId of requestedEntityIds) {
+        if (scopeSource === entityId || scopeTarget === entityId) {
+          byEntityId.get(entityId).push({
+            source_id: edge.cge_source_id,
+            target_id: edge.cge_target_id,
+            edge_id: edge.cge_id,
+            edge_type: edge.cge_type,
+            scope: { source_id: scopeSource, target_id: scopeTarget },
+            refs: [ref],
+          });
+        }
+      }
+    }
   }
-  return results;
+
+  return { success: true, data: byEntityId };
 }
 
 /**
@@ -345,8 +358,6 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
     for (const e of catalogEntities) {
       catalogByEntityId.set(e.entity_id, e);
     }
-
-    const requestedEntityIdSet = new Set(entityIds);
 
     // Determine which catalog entity (if any) matches each requested id.
     const requestedToCatalog = new Map();
@@ -449,7 +460,11 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       }
     }
 
-    const edgeContexts = await loadEdgeContextsForPairs(db, serverId, bankId, requestedEntityIdSet);
+    const edgeContextsResult = await loadEdgeContextsForEntities(db, serverId, bankId, entityIds);
+    if (!edgeContextsResult.success) {
+      return { success: false, error: edgeContextsResult.error, code: edgeContextsResult.code };
+    }
+    const edgeContextsByEntityId = edgeContextsResult.data;
 
     // Build per-requested-id result.
     const entities = {};
@@ -469,9 +484,7 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       for (const m of derivedModels) allExtIds.add(m.ext_id);
       for (const m of plainModels) allExtIds.add(m.ext_id);
 
-      const entityEdgeContexts = edgeContexts.filter(
-        (ec) => ec.source_id === id || ec.target_id === id,
-      );
+      const entityEdgeContexts = edgeContextsByEntityId.get(id) || [];
 
       entities[id] = buildEntityInfo({
         graphNode,

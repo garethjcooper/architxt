@@ -273,7 +273,7 @@ describe('POST /api/v1/entities/info', () => {
           {
             role: 'sys_edge_context',
             ext_id: 'edge-ctx-svc:SVC-005|app:APP-001',
-            scope: 'edge',
+            scope: { source_id: 'svc:SVC-005', target_id: 'app:APP-001' },
           },
         ],
       },
@@ -292,6 +292,49 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(b.edge_contexts.length, 1);
     assert.equal(a.edge_contexts[0].edge_id, 'edge-1');
     assert.equal(a.edge_contexts[0].refs[0].ext_id, 'edge-ctx-svc:SVC-005|app:APP-001');
+    assert.deepEqual(a.edge_contexts[0].scope, { source_id: 'svc:SVC-005', target_id: 'app:APP-001' });
+  });
+
+  it('returns edge contexts for a single requested entity when the other endpoint is not requested', async () => {
+    const app = makeApp({ db });
+    const svcTypeId = seedEntityType(db, 'Service', 'SVC');
+    const appTypeId = seedEntityType(db, 'Application', 'APP');
+    seedEntity(db, svcTypeId, 'SVC-005', 'Payment Service');
+    seedEntity(db, appTypeId, 'APP-001', 'Web App');
+
+    seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
+      display_name: 'Payment Service',
+      provenance: { model_refs: [] },
+    });
+    seedGraphNode(db, serverId, bankId, 'app:APP-001', ['grounded', 'Application'], {
+      display_name: 'Web App',
+      provenance: { model_refs: [] },
+    });
+
+    seedGraphEdge(db, serverId, bankId, 'edge-1', 'svc:SVC-005', 'app:APP-001', 'CALLS', {
+      directed: false,
+      provenance: {
+        model_refs: [
+          {
+            role: 'sys_edge_context',
+            ext_id: 'edge-ctx-svc:SVC-005|app:APP-001',
+            scope: { source_id: 'svc:SVC-005', target_id: 'app:APP-001' },
+          },
+        ],
+      },
+    });
+
+    const res = await makeRequest(app, {
+      server_id: serverId,
+      bank_id: bankId,
+      entity_ids: ['svc:SVC-005'],
+    });
+
+    assert.equal(res.status, 200);
+    const info = res.body.entities['svc:SVC-005'];
+    assert.equal(info.edge_contexts.length, 1);
+    assert.equal(info.edge_contexts[0].edge_id, 'edge-1');
+    assert.deepEqual(info.edge_contexts[0].scope, { source_id: 'svc:SVC-005', target_id: 'app:APP-001' });
   });
 
   it('accepts whatever prefix is configured in the entity type table', async () => {
