@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Loader2, FileText, Undo2, Hash, Trash2, ArrowUp, ArrowDown, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,12 +23,19 @@ function buildBlocks(content: string | null | undefined): SmartBlock[] {
   return parseBlocks(content);
 }
 
+export interface SessionPageEditorRef {
+  appendBlocks: (markdown: string) => void;
+}
+
 interface SessionPageEditorProps {
   step: ResearchStepSummary;
   onSaved?: (updated: ResearchStepSummary) => void;
 }
 
-export function SessionPageEditor({ step, onSaved }: SessionPageEditorProps) {
+export const SessionPageEditor = forwardRef(function SessionPageEditor(
+  { step, onSaved }: SessionPageEditorProps,
+  ref: React.Ref<SessionPageEditorRef>
+) {
   const [title, setTitle] = useState(step.intent_text || '');
   const [blocks, setBlocks] = useState<SmartBlock[]>(() => buildBlocks(step.synthesis?.narrative));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -38,6 +45,21 @@ export function SessionPageEditor({ step, onSaved }: SessionPageEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+
+  useImperativeHandle(ref, () => ({
+    appendBlocks: (markdown: string) => {
+      if (!markdown) return;
+      const parsed = parseBlocks(markdown);
+      setBlocks((prev) => {
+        const maxId = prev.reduce((max, b) => {
+          const n = Number(b.id.replace(/^b/, ''));
+          return Number.isNaN(n) ? max : Math.max(max, n);
+        }, -1);
+        const next = parsed.map((b, i) => ({ ...b, id: `b${maxId + 1 + i}` }));
+        return [...prev, ...next];
+      });
+    },
+  }));
 
   const originalTitle = useMemo(() => step.intent_text || '', [step.intent_text]);
   const originalContent = useMemo(() => step.synthesis?.narrative || '', [step.synthesis?.narrative]);
@@ -387,4 +409,4 @@ export function SessionPageEditor({ step, onSaved }: SessionPageEditorProps) {
       </PanelContent>
     </Panel>
   );
-}
+});

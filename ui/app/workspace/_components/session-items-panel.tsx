@@ -173,18 +173,17 @@ export function SessionItemsPanel({
       return;
     }
     try {
-      const result = await researchApi.createSessionPage(activeSessionId, title);
+      const page = await researchApi.createSessionPage(activeSessionId, title);
       toast.success('Page created');
       setCreatingPage(false);
       setNewPageTitle('');
       await loadItems(activeSessionId);
-      const step = items.find((s) => s.id === result.step_id);
+      const step = items.find((s) => s.id === page.id);
       if (step) {
         onEditPage(step);
       } else {
-        // Fetch full step details if the new step isn't in the list yet.
         try {
-          const full = await researchApi.getStep(result.step_id);
+          const full = await researchApi.getStep(page.id);
           if (isWorkspaceItem(full)) {
             onEditPage(full);
           }
