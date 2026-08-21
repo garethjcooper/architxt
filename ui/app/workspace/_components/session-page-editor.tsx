@@ -13,8 +13,8 @@ import {
   type NarrativeBlock,
 } from '@/components/narrative-blocks';
 import { NarrativeViewer } from '@/components/narrative-viewer';
+import { MermaidDiagram } from '@/components/mermaid-diagram';
 import { researchApi, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
-import { Panel, PanelHeader, PanelContent } from './panel-layout';
 
 function buildContent(blocks: NarrativeBlock[]): string {
   return buildNarrativeContent(blocks);
@@ -297,6 +297,23 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
 
   const renderBlock = useCallback((b: NarrativeBlock, { isActive }: { isActive: boolean }) => {
     const isEditing = editingBlockId === b.id;
+
+    // Render mermaid code blocks as live diagrams in the editor, matching the read-only preview.
+    if (b.type === 'code' && b.language === 'mermaid' && !isEditing) {
+      const content = (b.edited ?? b.raw).replace(/^```mermaid\n?/, '').replace(/\n?```\s*$/, '');
+      const name = b.title || 'diagram';
+      return (
+        <div
+          onClick={() => scrollToBlock(b.id)}
+          className={`rounded border border-white/10 p-2 cursor-pointer transition-colors ${
+            isActive ? 'bg-emerald-500/10' : 'hover:bg-white/5'
+          }`}
+        >
+          <MermaidDiagram name={name} type={name} content={content} />
+        </div>
+      );
+    }
+
     return (
       <div
         onClick={!isEditing ? () => scrollToBlock(b.id) : undefined}
@@ -394,86 +411,78 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
     );
   }, [editingBlockId, editValue, startEditingBlock, scrollToBlock]);
 
+  const header = (
+    <>
+      <div className="px-3 py-2 border-b border-white/10 flex items-center gap-3 shrink-0">
+        <FileText className="w-4 h-4 text-emerald-300 shrink-0" />
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Page title"
+          className="flex-1 h-8 text-sm bg-black/20 border-white/10"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDiscard}
+          disabled={!hasChanges || isSaving}
+          className="h-8 text-xs gap-1"
+        >
+          <Undo2 className="w-3 h-3" />
+          Reset
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={!hasChanges || isSaving}
+          className="h-8 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+        >
+          {isSaving && <Loader2 className="w-3 h-3 animate-spin" />}
+          <Save className="w-3 h-3" />
+          Save
+        </Button>
+      </div>
+      <div className="px-3 py-1.5 border-b border-white/10 flex items-center justify-between shrink-0">
+        <p className="text-[11px] text-white/40 flex items-center gap-2">
+          <span>{blocks.length - removedCount} of {blocks.length} blocks visible</span>
+          {removedCount > 0 && <span className="text-amber-400">({removedCount} removed)</span>}
+          {nodeCount > 0 && <span className="flex items-center gap-0.5"><Network className="h-3 w-3" /> {nodeCount} nodes</span>}
+          {tableCount > 0 && <span className="flex items-center gap-0.5"><Table2 className="h-3 w-3" /> {tableCount} tables</span>}
+          {diagramCount > 0 && <span className="flex items-center gap-0.5"><Shapes className="h-3 w-3" /> {diagramCount} diagrams</span>}
+        </p>
+        <button
+          onClick={() => setShowRemoved((v) => !v)}
+          className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+            showRemoved
+              ? 'border-amber-500/30 text-amber-400 hover:border-amber-500/50'
+              : 'border-white/10 text-white/40 hover:text-white/60'
+          }`}
+        >
+          {showRemoved ? 'Hide removed' : 'Show removed'}
+        </button>
+      </div>
+    </>
+  );
+
   return (
-    <Panel className="flex-1 min-h-0">
-      <PanelHeader title="Edit page" />
-      <PanelContent className="p-0">
-        <div className="absolute inset-0 flex flex-col overflow-hidden">
-          {/* Title + actions */}
-          <div className="px-3 py-2 border-b border-white/10 flex items-center gap-3 shrink-0">
-            <FileText className="w-4 h-4 text-emerald-300 shrink-0" />
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Page title"
-              className="flex-1 h-8 text-sm bg-black/20 border-white/10"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDiscard}
-              disabled={!hasChanges || isSaving}
-              className="h-8 text-xs gap-1"
-            >
-              <Undo2 className="w-3 h-3" />
-              Reset
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={!hasChanges || isSaving}
-              className="h-8 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
-            >
-              {isSaving && <Loader2 className="w-3 h-3 animate-spin" />}
-              <Save className="w-3 h-3" />
-              Save
-            </Button>
-          </div>
-
-          {/* Stats */}
-          <div className="px-3 py-1.5 border-b border-white/10 flex items-center justify-between shrink-0">
-            <p className="text-[11px] text-white/40 flex items-center gap-2">
-              <span>{blocks.length - removedCount} of {blocks.length} blocks visible</span>
-              {removedCount > 0 && <span className="text-amber-400">({removedCount} removed)</span>}
-              {nodeCount > 0 && <span className="flex items-center gap-0.5"><Network className="h-3 w-3" /> {nodeCount} nodes</span>}
-              {tableCount > 0 && <span className="flex items-center gap-0.5"><Table2 className="h-3 w-3" /> {tableCount} tables</span>}
-              {diagramCount > 0 && <span className="flex items-center gap-0.5"><Shapes className="h-3 w-3" /> {diagramCount} diagrams</span>}
-            </p>
-            <button
-              onClick={() => setShowRemoved((v) => !v)}
-              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                showRemoved
-                  ? 'border-amber-500/30 text-amber-400 hover:border-amber-500/50'
-                  : 'border-white/10 text-white/40 hover:text-white/60'
-              }`}
-            >
-              {showRemoved ? 'Hide removed' : 'Show removed'}
-            </button>
-          </div>
-
-          {/* Editor workspace */}
-          <div className="flex-1 min-h-0 flex gap-3 overflow-hidden p-3">
-            <NarrativeViewer
-              ref={viewerRef}
-              blocks={visibleBlocks}
-              title="Sections"
-              activeBlockId={activeBlockId}
-              activeRangeIds={activeRangeIds}
-              viewMode="plain"
-              showIndex={true}
-              keyPrefix={keyPrefix}
-              renderSidebarRow={renderSidebarRow}
-              renderBlock={renderBlock}
-              onBlockClick={(b) => {
-                if (editingBlockId !== b.id) {
-                  scrollToBlock(b.id);
-                }
-              }}
-              className="min-h-0"
-            />
-          </div>
-        </div>
-      </PanelContent>
-    </Panel>
+    <NarrativeViewer
+      ref={viewerRef}
+      blocks={visibleBlocks}
+      title="Sections"
+      activeBlockId={activeBlockId}
+      activeRangeIds={activeRangeIds}
+      viewMode="plain"
+      showIndex={true}
+      keyPrefix={keyPrefix}
+      header={header}
+      renderSidebarRow={renderSidebarRow}
+      renderBlock={renderBlock}
+      onBlockClick={(b) => {
+        if (editingBlockId !== b.id) {
+          scrollToBlock(b.id);
+        }
+      }}
+      className="min-h-0"
+    />
   );
 });
