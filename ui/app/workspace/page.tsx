@@ -29,7 +29,7 @@ import { EntityScopePanel } from './_components/entity-scope-panel';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
-import { type ResearchSession, type ResearchStepSummary, type DiscoverStepResponse } from '@/lib/api/client';
+import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { type ResearchQueryOptions, buildDiscoverOptions } from '@/app/research/use-research-session';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
@@ -71,10 +71,9 @@ export default function WorkspacePage() {
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
   const [selectedModelKeys, setSelectedModelKeys] = useState<Record<string, string | null>>({});
-  const [reflectResult, setReflectResult] = useState<DiscoverStepResponse | ResearchStepSummary | null>(null);
+  const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
   const [reflectLoading, setReflectLoading] = useState(false);
   const [reflectError, setReflectError] = useState<string | null>(null);
-  const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
@@ -360,7 +359,6 @@ export default function WorkspacePage() {
     try {
       setReflectLoading(true);
       setReflectError(null);
-      setReflectResult(null);
       const parsed = toSectionFocus(parseAql(query));
       const refs = parseReferences(query).filter((r) => r.kind === 'entity');
       const entityIds = refs
@@ -379,7 +377,7 @@ export default function WorkspacePage() {
       });
 
       // The discover route returns 202 immediately; poll the session steps until
-      // the new step finishes so the result viewer can show the real output.
+      // the new step finishes, then select it like any other existing step.
       const sessionId = response.session_id;
       const stepId = response.step_id;
       const start = Date.now();
@@ -403,7 +401,7 @@ export default function WorkspacePage() {
       if (completedStep.error_message) {
         toast.warning(`Reflect completed with warnings: ${completedStep.error_message}`);
       }
-      setReflectResult(completedStep);
+      setSelectedStep(completedStep);
       setSessionRefreshSignal((n) => n + 1);
       toast.success('Reflect query completed');
     } catch (err: any) {
@@ -700,7 +698,7 @@ export default function WorkspacePage() {
               <PanelContent className="p-0 overflow-hidden">
                 <div className="h-full flex flex-col">
                   <WorkspaceResultPanel
-                    result={selectedStep || reflectResult}
+                    result={selectedStep}
                     loading={reflectLoading}
                     error={reflectError}
                     sessionName={activeSession?.title}
