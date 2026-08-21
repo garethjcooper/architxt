@@ -1,59 +1,57 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
-import { Sparkles } from 'lucide-react';
-import { PanelHeader, Panel, PanelContent } from './panel-layout';
-import { cn } from '@/lib/utils';
+import { QueryForm, type EntityLike, type EdgeLike } from '@/app/research/query-form';
+import type { ResearchQueryOptions } from '@/app/research/use-research-session';
 
 interface ReflectQueryPanelProps {
   query: string;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  aqlEntities: AqlEntityLike[];
-  aqlEdges: AqlEdgeLike[];
-  disabled: boolean;
+  cursor: number;
+  setQuery: (q: string) => void;
+  setCursor: (c: number) => void;
+  onSubmit: (e?: React.FormEvent) => void;
+  aqlEntities: EntityLike[];
+  aqlEdges: EdgeLike[];
+  loading: boolean;
+  queryOptions: ResearchQueryOptions;
+  onQueryOptionsChange: (opts: ResearchQueryOptions | ((prev: ResearchQueryOptions) => ResearchQueryOptions)) => void;
   style?: React.CSSProperties;
   className?: string;
 }
 
 export function ReflectQueryPanel({
   query,
-  onChange,
+  cursor,
+  setQuery,
+  setCursor,
   onSubmit,
   aqlEntities,
   aqlEdges,
-  disabled,
+  loading,
+  queryOptions,
+  onQueryOptionsChange,
   style,
   className,
 }: ReflectQueryPanelProps) {
   return (
-    <Panel className={cn('flex-1', className)} style={style}>
-      <PanelHeader title="Reflect query" />
-      <PanelContent className="p-3">
-        <div className="absolute inset-0 p-3 flex flex-col gap-2">
-          <AqlEditor
-            value={query}
-            onChange={onChange}
-            onSubmit={onSubmit}
-            disabled={false}
-            placeholder="Ask Reflect... Type [[ to reference an entity."
-            availableEntities={aqlEntities}
-            availableEdges={aqlEdges}
-            includeEdges={false}
-            className="flex-1 min-h-0 w-full rounded-lg border border-white/20 bg-transparent"
-          />
-          <Button
-            size="sm"
-            className="gap-1.5 w-full"
-            disabled={disabled}
-            onClick={onSubmit}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Reflect
-          </Button>
-        </div>
-      </PanelContent>
-    </Panel>
+    <div className={className} style={style}>
+      <QueryForm
+        query={query}
+        setQuery={setQuery}
+        cursor={cursor}
+        setCursor={setCursor}
+        loading={loading}
+        isRunning={loading}
+        availableEntities={aqlEntities}
+        availableEdges={aqlEdges}
+        onSubmit={onSubmit}
+        queryMode="reflect"
+        selectedTemplateRoles={[]}
+        setSelectedTemplateRoles={() => {}}
+        availableTemplateRoles={[]}
+        queryOptions={queryOptions}
+        setQueryOptions={onQueryOptionsChange}
+        availableMentalModels={[]}
+      />
+    </div>
   );
 }

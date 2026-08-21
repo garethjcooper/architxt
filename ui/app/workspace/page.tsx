@@ -17,6 +17,8 @@ import {
   backendEdgeToDisplayEdge,
 } from '@/lib/contextual-graph/display';
 import { RefreshCw } from 'lucide-react';
+import { parseAql, toSectionFocus, parseReferences } from '@architxt/aql';
+import { canonicalNodeId, resolveNodeType } from '@/app/research/graph-utils';
 import {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,
@@ -28,8 +30,9 @@ import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
-import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { type ResearchQueryOptions, buildDiscoverOptions } from '@/app/research/use-research-session';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
+import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
 
 import { SessionPageEditor } from './_components/session-page-editor';
 import type { SessionPageEditorRef } from './_components/session-page-editor';
@@ -50,6 +53,16 @@ export default function WorkspacePage() {
   const [loadingArchitxtEntities, setLoadingArchitxtEntities] = useState(false);
 
   const [reflectQuery, setReflectQuery] = useState('');
+  const [reflectCursor, setReflectCursor] = useState(0);
+  const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
+    reflect: {
+      includeSourceFacts: false,
+      budget: 'low',
+      maxTokens: 4096,
+      factTypes: ['world', 'observation'],
+      excludeMentalModels: false,
+    },
+  });
   const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfoWithContent> | null>(null);
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
@@ -308,12 +321,16 @@ export default function WorkspacePage() {
   }, []);
 
   const aqlEntities: AqlEntityLike[] = useMemo(() => {
-    return entities.map((node) => ({
-      id: node.id,
-      label: node.label,
-      type: node.type,
-    }));
-  }, [entities]);
+    return architxtEntities.map((entity) => {
+      const type = resolveNodeType({ id: entity.entity_id, name: entity.name, type: entity.type_name });
+      return {
+        id: canonicalNodeId({ id: entity.entity_id, name: entity.name, type: entity.type_name }),
+        entity_id: entity.entity_id,
+        label: entity.name,
+        type,
+      };
+    });
+  }, [architxtEntities]);
 
   const aqlEdges: AqlEdgeLike[] = useMemo(() => {
     return edges.map((edge) => ({
@@ -324,7 +341,8 @@ export default function WorkspacePage() {
     }));
   }, [edges]);
 
-  const handleReflect = useCallback(async () => {
+  const handleReflect = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const query = reflectQuery.trim();
     if (!query) return;
     if (!serverId || !bankId) {
@@ -339,15 +357,21 @@ export default function WorkspacePage() {
       setReflectLoading(true);
       setReflectError(null);
       setReflectResult(null);
-      const cleanedQuery = query.replace(/\[\[[^\]]+\]\]/g, '').replace(/\s+/g, ' ').trim();
+      const parsed = toSectionFocus(parseAql(query));
+      const refs = parseReferences(query).filter((r) => r.kind === 'entity');
+      const entityIds = refs
+        .map((r) => (r.type ? `${r.type}:${r.id}` : r.id))
+        .filter((id): id is string => Boolean(id));
       const result = await researchApi.discover({
         server_id: serverId,
         bank_id: bankId,
         session_id: activeSession.id,
         viewpoint_ids: activeSession.viewpoint_ids || [],
-        intent_text: cleanedQuery || query,
+        intent_text: parsed.intentText || query,
+        raw_query: query,
         query_depth: 'reflect',
-        budget: 'low',
+        ...buildDiscoverOptions('reflect', queryOptions),
+        ...(entityIds.length ? { types: [...new Set(entityIds.map((id) => id.split(':')[0]).filter(Boolean))] } : {}),
       });
       setReflectResult(result);
       setSessionRefreshSignal((n) => n + 1);
@@ -359,7 +383,7 @@ export default function WorkspacePage() {
     } finally {
       setReflectLoading(false);
     }
-  }, [reflectQuery, serverId, bankId, activeSession]);
+  }, [reflectQuery, serverId, bankId, activeSession, queryOptions]);
 
   const handleCopySection = useCallback(async (event: EnvelopeCopyEvent) => {
     if (!activeSession) {
@@ -576,11 +600,15 @@ export default function WorkspacePage() {
                 />
                 <ReflectQueryPanel
                   query={reflectQuery}
-                  onChange={setReflectQuery}
+                  cursor={reflectCursor}
+                  setQuery={setReflectQuery}
+                  setCursor={setReflectCursor}
                   onSubmit={handleReflect}
                   aqlEntities={aqlEntities}
                   aqlEdges={aqlEdges}
-                  disabled={!reflectQuery.trim() || !serverId || !bankId}
+                  loading={reflectLoading}
+                  queryOptions={queryOptions}
+                  onQueryOptionsChange={setQueryOptions}
                   style={{ flex: 0.65, minWidth: 220 }}
                 />
               </div>
