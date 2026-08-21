@@ -1061,6 +1061,7 @@ export interface ResearchSession {
   server_id: number | null;
   bank_id: string;
   viewpoint_ids: number[];
+  scope_entity_ids: string[] | null;
   status: 'active' | 'closed' | 'archived';
   current_step_id: number | null;
   created_at: string;
@@ -1295,14 +1296,27 @@ export const researchApi = {
     viewpoint_ids: number[];
     title?: string;
     description?: string;
+    scope_entity_ids?: string[];
   }) =>
     fetchApi<{ session_id: number }>('/research/sessions', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
-  updateSession: (sessionId: number, data: { title?: string; description?: string; status?: 'active' | 'closed' | 'archived' }) =>
+  updateSession: (sessionId: number, data: { title?: string; description?: string; status?: 'active' | 'closed' | 'archived'; scope_entity_ids?: string[] }) =>
     fetchApi<{ updated: true; session_id: number }>(`/research/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  createSessionPage: (sessionId: number, title: string) =>
+    fetchApi<{ step_id: number; session_id: number; action_type: string; intent_text: string }>(`/research/sessions/${sessionId}/pages`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }),
+
+  updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string } }) =>
+    fetchApi<{ updated: true; step_id: number }>(`/research/steps/${stepId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
