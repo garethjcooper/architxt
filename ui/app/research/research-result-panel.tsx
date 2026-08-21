@@ -105,8 +105,8 @@ export interface ResearchResultPanelProps {
   error: string | null;
   result: DiscoverStepResponse | ResearchStepSummary | null;
   viewMode: 'step' | 'session';
-  trail: ResearchStepSummary[];
-  selectedStepIds: Set<number>;
+  trail?: ResearchStepSummary[];
+  selectedStepIds?: Set<number>;
   resultView: ResultView;
   canvasView: CanvasView;
   setCanvasView: (v: CanvasView) => void;
@@ -123,7 +123,7 @@ export interface ResearchResultPanelProps {
   toggleEdgeFilter: (type: string) => void;
   nodeFilters: Set<string>;
   toggleNodeFilter: (type: string) => void;
-  onGraphAddToQuery: (selection: { kind: string; ids: string[]; source?: string }) => void;
+  onGraphAddToQuery?: (selection: { kind: string; ids: string[]; source?: string }) => void;
   bottomFlex?: number;
   narrativeWidth?: number;
   sessionName?: string;
@@ -142,8 +142,8 @@ export function ResearchResultPanel({
   error,
   result,
   viewMode,
-  trail,
-  selectedStepIds,
+  trail: trailProp,
+  selectedStepIds: selectedStepIdsProp,
   resultView,
   canvasView,
   setCanvasView,
@@ -171,6 +171,8 @@ export function ResearchResultPanel({
   onCopy,
   showCanvas = true,
 }: ResearchResultPanelProps) {
+  const trail = trailProp ?? [];
+  const selectedStepIds = selectedStepIdsProp ?? new Set<number>();
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [hoveredInfo, setHoveredInfo] = useState<{ kind: 'node' | 'edge'; data: any } | null>(null);
