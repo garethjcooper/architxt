@@ -80,6 +80,7 @@ describe('reflect handler', () => {
     assert.ok(result.graph);
     assert.equal(result.graph.nodes.length, 0);
     assert.equal(result.graph.edges.length, 0);
+    assert.ok(result.narrative.includes('Just a plain text response with no graph data.'));
   });
 
   it('composes the generic template by default and requests a structured response schema', async () => {

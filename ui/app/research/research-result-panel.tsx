@@ -284,7 +284,7 @@ export function ResearchResultPanel({
   }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams]);
 
   return (
-    <div className="min-h-0 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
+    <div className="min-h-0 flex-1 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
       {/* Narrative */}
       <div
         className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
