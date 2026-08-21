@@ -91,7 +91,7 @@ export function QueryTrail(props: QueryTrailProps) {
                   type="button"
                   onClick={() => (isMerge ? onToggleStep(step.id) : onActivateStep(step.id))}
                   className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
-                  title={step.intent_text || 'Untitled query'}
+                  title={step.raw_query || step.intent_text || 'Untitled query'}
                 >
                   <div className="flex items-center justify-between text-xs text-white/90">
                     <span className="truncate flex items-center gap-2 min-w-0">
@@ -132,7 +132,7 @@ export function QueryTrail(props: QueryTrailProps) {
                     </span>
                   </div>
                   <div className="text-[10px] text-white/50 font-mono truncate">
-                    <AqlView query={step.intent_text || ''} compact className="text-[10px] leading-tight" />
+                    <AqlView query={step.raw_query || step.intent_text || ''} compact className="text-[10px] leading-tight" />
                   </div>
                 </button>
                 <DropdownMenu>

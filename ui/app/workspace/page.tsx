@@ -465,7 +465,7 @@ export default function WorkspacePage() {
   }, [activeSession]);
 
   const handleReuseStep = useCallback((step: ResearchStepSummary) => {
-    setReflectQuery(step.intent_text || '');
+    setReflectQuery(step.raw_query || step.intent_text || '');
     toast.success('Query copied to Reflect input');
   }, []);
 

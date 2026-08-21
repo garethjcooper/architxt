@@ -188,29 +188,39 @@ function StepProvenance({ step }: { step: ResearchStepSummary | null }) {
   if (!step) return <p className="text-xs text-white/40 py-2">No step selected.</p>;
   const params = step.parameters || {};
   const entries = Object.entries(params);
-  if (entries.length === 0) {
-    return <p className="text-xs text-white/40 py-2">No provenance parameters recorded for this step.</p>;
-  }
   return (
     <div className="space-y-2 py-1">
+      <div className="rounded bg-black/30 border border-white/10 px-2 py-1 space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] text-white/40 font-medium">Raw query</div>
+          {step.raw_query && <CopyButton text={step.raw_query} label="Raw query" />}
+        </div>
+        <pre className="text-[10px] text-white/60 font-mono whitespace-pre-wrap max-h-48 overflow-auto">
+          {step.raw_query || step.intent_text || 'No query text recorded'}
+        </pre>
+      </div>
       <div className="text-[10px] text-white/40 font-medium">Normalized step settings</div>
       <div className="rounded bg-black/30 border border-white/10 overflow-hidden">
-        <table className="w-full text-[11px]">
-          <tbody>
-            {entries.map(([key, value]) => (
-              <tr key={key} className="border-b border-white/5 last:border-0">
-                <td className="px-2 py-1 text-white/50 font-mono align-top w-1/3">{key}</td>
-                <td className="px-2 py-1 text-white/80 align-top">
-                  {typeof value === 'boolean' ? (
-                    <span className={value ? 'text-emerald-400' : 'text-white/40'}>{value ? 'true' : 'false'}</span>
-                  ) : (
-                    <span className="font-mono">{formatValue(value)}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {entries.length === 0 ? (
+          <p className="text-xs text-white/40 px-2 py-2">No normalized settings recorded for this step.</p>
+        ) : (
+          <table className="w-full text-[11px]">
+            <tbody>
+              {entries.map(([key, value]) => (
+                <tr key={key} className="border-b border-white/5 last:border-0">
+                  <td className="px-2 py-1 text-white/50 font-mono align-top w-1/3">{key}</td>
+                  <td className="px-2 py-1 text-white/80 align-top">
+                    {typeof value === 'boolean' ? (
+                      <span className={value ? 'text-emerald-400' : 'text-white/40'}>{value ? 'true' : 'false'}</span>
+                    ) : (
+                      <span className="font-mono">{formatValue(value)}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
       {step.selections && step.selections.length > 0 && (
         <div className="rounded bg-black/30 border border-white/10 px-2 py-1">
@@ -238,7 +248,7 @@ export function QueryInspectDialog({ open, onOpenChange, step }: Props) {
       <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-base font-semibold text-white">
-            Query: {step?.intent_text || '—'}
+            Query: {step?.raw_query || step?.intent_text || '—'}
           </DialogTitle>
           <div className="flex items-center gap-2 text-[11px] text-white/50">
             <span>#{step?.id}</span>
