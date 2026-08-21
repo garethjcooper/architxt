@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { parseBlocks, SmartBlock, getSectionBlockIds, getSidebarIndent, slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
+import { Copy } from 'lucide-react';
 
 export interface NarrativeDiagram {
   name: string;
@@ -18,6 +19,8 @@ export interface NarrativeViewerProps {
   title?: string;
   /** Called when the user clicks a heading in the index. */
   onHeadingClick?: (id: string, title?: string) => void;
+  /** Called when the user chooses to copy a section (heading + its content). Receives the raw markdown. */
+  onCopySection?: (markdown: string, title?: string) => void;
   /** Optional extra className for the outer container. */
   className?: string;
   /** Display mode: 'plain' keeps the raw block view; 'markdown' renders formatted Markdown. */
@@ -32,6 +35,7 @@ export function NarrativeViewer({
   content,
   title = 'Narrative',
   onHeadingClick,
+  onCopySection,
   className = '',
   viewMode = 'plain',
   showIndex = true,
@@ -116,23 +120,46 @@ export function NarrativeViewer({
               <p className="text-xs text-white/30 p-1">No sections found</p>
             ) : (
               structuralBlocks.map((b, idx) => (
-                <button
+                <div
                   key={b.id}
-                  type="button"
-                  onClick={() => scrollToBlock(b.id)}
-                  className={`w-full text-left rounded-md px-2 py-1 text-[11px] transition-colors ${
-                    activeBlockId === b.id
-                      ? 'bg-emerald-500/20 text-emerald-300'
-                      : 'text-white/60 hover:bg-white/5 hover:text-white/90'
-                  }`}
-                  style={{ paddingLeft: `${0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75}rem` }}
+                  className="flex items-center gap-1 group/copy"
                 >
-                  {b.type === 'heading' ? (
-                    <span className="truncate block" title={b.title}>{b.title}</span>
-                  ) : b.type === 'image' ? (
-                    <span className="truncate block text-amber-400/70" title={`[IMAGE:${b.title}]`}>[IMAGE:{b.title}]</span>
-                  ) : null}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollToBlock(b.id)}
+                    className={`flex-1 min-w-0 text-left rounded-md px-2 py-1 text-[11px] transition-colors ${
+                      activeBlockId === b.id
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : 'text-white/60 hover:bg-white/5 hover:text-white/90'
+                    }`}
+                    style={{ paddingLeft: `${0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75}rem` }}
+                  >
+                    {b.type === 'heading' ? (
+                      <span className="truncate block" title={b.title}>{b.title}</span>
+                    ) : b.type === 'image' ? (
+                      <span className="truncate block text-amber-400/70" title={`[IMAGE:${b.title}]`}>[IMAGE:{b.title}]</span>
+                    ) : null}
+                  </button>
+                  {onCopySection && b.type === 'heading' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const ids = getSectionBlockIds(blocks, b.id);
+                        const markdown = blocks
+                          .filter((bb) => ids.includes(bb.id))
+                          .map((bb) => bb.raw)
+                          .join('');
+                        onCopySection(markdown, b.title);
+                      }}
+                      className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 flex-shrink-0 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
+                      title="Copy section to page editor"
+                      aria-label="Copy section"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>

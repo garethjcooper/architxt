@@ -1537,7 +1537,13 @@ router.post('/sessions/:id/pages', async (req, res) => {
     return;
   }
 
-  sendResponse({ res, status: 201, data: { step_id: result.data }, logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+  const step = await db.researchSteps.read(result.data);
+  if (!step) {
+    sendResponse({ res, status: 500, error: 'Created step could not be loaded', code: 'DATABASE_ERROR', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  sendResponse({ res, status: 201, data: toApiStepSummary(step), logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
 });
 
 /**

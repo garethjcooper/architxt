@@ -30,6 +30,7 @@ import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { Switch } from '@/components/ui/switch';
 import { SessionPageEditor } from './_components/session-page-editor';
+import type { SessionPageEditorRef } from './_components/session-page-editor';
 
 const logger = createLogger('WorkspacePage');
 
@@ -59,6 +60,7 @@ export default function WorkspacePage() {
   const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
   const [previewPlain, setPreviewPlain] = useState(false);
   const [previewShowIndex, setPreviewShowIndex] = useState(true);
+  const editorRef = useRef<SessionPageEditorRef | null>(null);
 
   const mentionedEntityIds = useMemo(() => {
     const mentioned: string[] = [];
@@ -302,6 +304,35 @@ export default function WorkspacePage() {
     }
   }, [reflectQuery, serverId, bankId, activeSession]);
 
+  const handleCopySection = useCallback(async (markdown: string, sectionTitle?: string) => {
+    if (!activeSession) {
+      toast.error('No active session. Select a server and bank first.');
+      return;
+    }
+    if (!editingStep) {
+      const pageTitle = sectionTitle || 'Copied section';
+      try {
+        const page = await researchApi.createSessionPage(activeSession.id, pageTitle);
+        const updated = await researchApi.updateCuratedPage(page.id, {
+          intent_text: pageTitle,
+          synthesis: { narrative: markdown },
+          canvas: page.canvas || undefined,
+        });
+        const nextStep: ResearchStepSummary = { ...page, intent_text: updated.intent_text ?? pageTitle, synthesis: updated.synthesis, canvas: updated.canvas };
+        setSelectedStep(nextStep);
+        setEditingStep(nextStep);
+        setSessionRefreshSignal((n) => n + 1);
+        toast.success(`Created page "${pageTitle}" with copied section`);
+        return;
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to create page for copied section');
+        return;
+      }
+    }
+    editorRef.current?.appendBlocks(markdown);
+    toast.success(`Copied "${sectionTitle || 'section'}" into the open page`);
+  }, [activeSession, editingStep, editorRef]);
+
   const handleAttachEntity = useCallback((entityId: string) => {
     setManuallyAttachedIds((prev) => {
       if (prev.includes(entityId)) return prev;
@@ -498,6 +529,7 @@ export default function WorkspacePage() {
                         viewMode={previewPlain ? 'plain' : 'markdown'}
                         showIndex={previewShowIndex}
                         className="h-full"
+                        onCopySection={handleCopySection}
                       />
                     ) : (
                       <div className="h-full flex items-center justify-center text-white/40 text-xs">
@@ -515,7 +547,7 @@ export default function WorkspacePage() {
           {/* Column 3: session page editor */}
           <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
             {editingStep ? (
-              <SessionPageEditor step={editingStep} onSaved={handlePageSaved} />
+              <SessionPageEditor ref={editorRef} step={editingStep} onSaved={handlePageSaved} />
             ) : (
               <Panel className="flex-1 min-h-0">
                 <PanelHeader title="Page editor" />

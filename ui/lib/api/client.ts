@@ -1310,7 +1310,7 @@ export const researchApi = {
     }),
 
   createSessionPage: (sessionId: number, title: string) =>
-    fetchApi<{ step_id: number; session_id: number; action_type: string; intent_text: string }>(`/research/sessions/${sessionId}/pages`, {
+    fetchApi<ResearchStepSummary>(`/research/sessions/${sessionId}/pages`, {
       method: 'POST',
       body: JSON.stringify({ title }),
     }),
