@@ -313,7 +313,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
                     const isActive = activeBlockId === b.id;
                     return (
                       <div
-                        key={b.id}
+                        key={`sidebar-${b.id}`}
                         id={`sidebar-row-${b.id}`}
                         className={`group flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
                           isActive
@@ -377,7 +377,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
                   const isActive = activeRangeIds.has(b.id);
                   return (
                     <div
-                      key={b.id}
+                      key={`content-${b.id}`}
                       ref={(el) => { blockRefs.current.set(b.id, el); }}
                       onClick={!isEditing ? () => scrollToBlock(b.id) : undefined}
                       className={`group/row block whitespace-pre-wrap transition-colors rounded px-2 py-0.5 ${
