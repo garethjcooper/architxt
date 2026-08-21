@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
-import { serversApi, contextualGraphApi, entityInfoApi, hindsightApi, researchApi, type Server } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, entityInfoApi, entitiesApi, researchApi, type Server, type Entity } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
@@ -23,6 +23,7 @@ import {
   type EntityInfoWithContent,
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
+import { EntityScopePanel } from './_components/entity-scope-panel';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
@@ -44,9 +45,10 @@ export default function WorkspacePage() {
   const [entities, setEntities] = useState<DisplayNode[]>([]);
   const [edges, setEdges] = useState<DisplayEdge[]>([]);
 
-  const [spineSearch, setSpineSearch] = useState('');
+  const [architxtEntities, setArchitxtEntities] = useState<Entity[]>([]);
+  const [loadingArchitxtEntities, setLoadingArchitxtEntities] = useState(false);
+
   const [reflectQuery, setReflectQuery] = useState('');
-  const [manuallyAttachedIds, setManuallyAttachedIds] = useState<string[]>([]);
   const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfoWithContent> | null>(null);
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
@@ -60,33 +62,9 @@ export default function WorkspacePage() {
   const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
   const editorRef = useRef<SessionPageEditorRef | null>(null);
 
-  const mentionedEntityIds = useMemo(() => {
-    const mentioned: string[] = [];
-    const tokenRegex = /\[\[((?:[^\[\]]|\[[^\]])+?)\]\]/g;
-    let match;
-    while ((match = tokenRegex.exec(reflectQuery)) !== null) {
-      const inner = match[1];
-      const parenMatch = inner.match(/\(([^)]+)\)$/);
-      if (parenMatch) {
-        mentioned.push(parenMatch[1]);
-      } else if (/^[\w-]+:[\w-]+$/.test(inner)) {
-        mentioned.push(inner);
-      }
-    }
-    return mentioned;
-  }, [reflectQuery]);
-
-  const attachedEntityIds = useMemo(() => {
-    return Array.from(new Set([...manuallyAttachedIds, ...mentionedEntityIds]));
-  }, [manuallyAttachedIds, mentionedEntityIds]);
-
   const scopeEntityIds = useMemo(() => {
     return activeSession?.scope_entity_ids ?? [];
   }, [activeSession?.scope_entity_ids]);
-
-  const contextualEntityIds = useMemo(() => {
-    return Array.from(new Set([...scopeEntityIds, ...attachedEntityIds]));
-  }, [scopeEntityIds, attachedEntityIds]);
 
   const {
     selectedServerId,
@@ -305,6 +283,28 @@ export default function WorkspacePage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingArchitxtEntities(true);
+    entitiesApi
+      .list()
+      .then((data) => {
+        if (cancelled) return;
+        setArchitxtEntities(Array.isArray(data) ? data : []);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        logger.error('Failed to load Architxt entities', err);
+        toast.error('Failed to load entities for scope');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingArchitxtEntities(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const aqlEntities: AqlEntityLike[] = useMemo(() => {
     return entities.map((node) => ({
       id: node.id,
@@ -321,16 +321,6 @@ export default function WorkspacePage() {
       type: edge.type,
     }));
   }, [edges]);
-
-  const spineEntities = useMemo(() => {
-    const q = spineSearch.trim().toLowerCase();
-    if (!q) return entities;
-    return entities.filter((e) =>
-      e.label.toLowerCase().includes(q) ||
-      e.id.toLowerCase().includes(q) ||
-      e.type.toLowerCase().includes(q)
-    );
-  }, [entities, spineSearch]);
 
   const handleReflect = useCallback(async () => {
     const query = reflectQuery.trim();
@@ -446,36 +436,24 @@ export default function WorkspacePage() {
     toast.success(`Copied ${event.type}${event.label ? ` "${event.label}"` : ''} into the open page`);
   }, [activeSession, editingStep, editorRef]);
 
-  const handleAttachEntity = useCallback((entityId: string) => {
-    setManuallyAttachedIds((prev) => {
-      if (prev.includes(entityId)) return prev;
-      return [...prev, entityId];
-    });
-  }, []);
+  const handleToggleScopeEntity = useCallback(async (entityId: string, inScope: boolean) => {
+    if (!activeSession) return;
+    const currentIds = activeSession.scope_entity_ids ?? [];
+    const nextIds = inScope
+      ? Array.from(new Set([...currentIds, entityId]))
+      : currentIds.filter((id) => id !== entityId);
 
-  const handleDetachEntity = useCallback((entityId: string) => {
-    setManuallyAttachedIds((prev) => prev.filter((id) => id !== entityId));
-    setExpandedEntityIds((prev) => {
-      const next = new Set(prev);
-      next.delete(entityId);
-      return next;
-    });
-    setSelectedModelKeys((prev) => {
-      const next = { ...prev };
-      delete next[entityId];
-      return next;
-    });
-    // If the entity is still present as a [[...]] token, remove that token from the query
-    // so the user isn't stuck with an attachment they explicitly removed.
-    setReflectQuery((prev) => {
-      const tokenRegex = /\[\[((?:[^\[\]]|\[[^\]])+?)\]\]/g;
-      return prev.replace(tokenRegex, (match, inner: string) => {
-        const parenMatch = inner.match(/\(([^)]+)\)$/);
-        const id = parenMatch ? parenMatch[1] : inner;
-        return id === entityId ? '' : match;
-      });
-    });
-  }, []);
+    setActiveSession((prev) => (prev ? { ...prev, scope_entity_ids: nextIds } : prev));
+
+    try {
+      await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
+      setSessionRefreshSignal((n) => n + 1);
+    } catch (err: any) {
+      logger.error('Failed to update session scope', { error: err, sessionId: activeSession.id, entityId });
+      toast.error(`Failed to update scope: ${err.message || err}`);
+      setSessionRefreshSignal((n) => n + 1);
+    }
+  }, [activeSession]);
 
   const toggleEntityExpanded = useCallback((entityId: string) => {
     setExpandedEntityIds((prev) => {
@@ -494,14 +472,14 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
-    if (!serverId || !bankId || contextualEntityIds.length === 0) {
+    if (!serverId || !bankId || scopeEntityIds.length === 0) {
       setEntityInfoMap(null);
       return;
     }
     let cancelled = false;
     setLoadingEntityInfo(true);
     entityInfoApi
-      .info(serverId, bankId, contextualEntityIds)
+      .info(serverId, bankId, scopeEntityIds)
       .then((result) => {
         if (cancelled) return;
         const contentMap = result.content || {};
@@ -513,7 +491,7 @@ export default function WorkspacePage() {
       })
       .catch((err: any) => {
         if (cancelled) return;
-        logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: contextualEntityIds });
+        logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: scopeEntityIds });
         toast.error(`Failed to load entity info: ${err.message || err}`);
         setEntityInfoMap(null);
       })
@@ -523,7 +501,7 @@ export default function WorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [serverId, bankId, contextualEntityIds]);
+  }, [serverId, bankId, scopeEntityIds]);
 
   return (
     <PageShell
@@ -559,20 +537,27 @@ export default function WorkspacePage() {
 
         {/* Main three-column workbench */}
         <div ref={mainRowRef} className="flex-1 min-h-0 flex">
-          {/* Column 1: query + entities | session items | contextual data */}
+          {/* Column 1: scope + query | session items | contextual data */}
           <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
             <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
-              <ReflectQueryPanel
-                query={reflectQuery}
-                onChange={setReflectQuery}
-                onSubmit={handleReflect}
-                attachedEntityIds={attachedEntityIds}
-                entityInfoMap={entityInfoMap}
-                aqlEntities={aqlEntities}
-                aqlEdges={aqlEdges}
-                onDetachEntity={handleDetachEntity}
-                disabled={!reflectQuery.trim() || !serverId || !bankId}
-              />
+              <div className="flex-1 min-h-0 flex">
+                <EntityScopePanel
+                  entities={architxtEntities}
+                  scopeEntityIds={scopeEntityIds}
+                  onToggle={handleToggleScopeEntity}
+                  loading={loadingArchitxtEntities}
+                  style={{ flex: 0.35, minWidth: 180 }}
+                />
+                <ReflectQueryPanel
+                  query={reflectQuery}
+                  onChange={setReflectQuery}
+                  onSubmit={handleReflect}
+                  aqlEntities={aqlEntities}
+                  aqlEdges={aqlEdges}
+                  disabled={!reflectQuery.trim() || !serverId || !bankId}
+                  style={{ flex: 0.65, minWidth: 220 }}
+                />
+              </div>
             </div>
 
             <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} title="Drag to resize query / session items" />
@@ -605,12 +590,11 @@ export default function WorkspacePage() {
 
             <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 120 }}>
               <AttachedEntitiesPanel
-                entityIds={contextualEntityIds}
+                entityIds={scopeEntityIds}
                 entityInfoMap={entityInfoMap}
                 loading={loadingEntityInfo}
                 expandedEntityIds={expandedEntityIds}
                 selectedModelKeys={selectedModelKeys}
-                onDetach={handleDetachEntity}
                 onToggleExpand={toggleEntityExpanded}
                 onSelectModel={selectEntityModel}
               />
