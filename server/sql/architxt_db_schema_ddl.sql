@@ -353,6 +353,7 @@ CREATE TABLE research_sessions (
   rs_server_id INTEGER,
   rs_bank_id TEXT NOT NULL,
   rs_viewpoint_ids JSON NOT NULL,
+  rs_scope_entity_ids JSON,
   rs_status TEXT NOT NULL DEFAULT 'active',
   rs_current_step_id INTEGER,
   rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
