@@ -24,7 +24,33 @@ export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOpt
     viewMode: 'step',
   });
 
-  const { sessions, sessionsLoading, activeSessionId, trail, trailLoading, fetchSessions, fetchTrail, setActiveSessionId } = research;
+  const {
+    sessions,
+    sessionsLoading,
+    activeSessionId,
+    trail,
+    trailLoading,
+    fetchSessions,
+    fetchTrail,
+    setActiveSessionId,
+    query,
+    setQuery,
+    queryOptions,
+    setQueryOptions,
+    loading,
+    error,
+    result,
+    activeStepId,
+    runningStepId: researchRunningStepId,
+    handleSubmit,
+    setQueryMode,
+  } = research;
+
+  // Workspace is always in Reflect mode; pin the underlying research hook so
+  // submissions use the existing working discover/poll path.
+  useEffect(() => {
+    setQueryMode('reflect');
+  }, [setQueryMode]);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) || null,
@@ -38,8 +64,8 @@ export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOpt
 
   const runningStepId = useMemo(() => {
     const running = workspaceItems.find((s) => s.status === 'running');
-    return running?.id ?? null;
-  }, [workspaceItems]);
+    return running?.id ?? researchRunningStepId ?? null;
+  }, [workspaceItems, researchRunningStepId]);
 
   const refresh = useCallback(async () => {
     if (!serverId || !bankId) return;
