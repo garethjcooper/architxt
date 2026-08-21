@@ -92,10 +92,18 @@ function generateMermaid(
 export type ResultView = 'narrative';
 export type CanvasView = 'graph' | 'components';
 
+export interface ResearchCopyEvent {
+  type: 'narrative' | 'graph' | 'tables' | 'diagrams';
+  /** Markdown for narrative sections; JSON stringified payloads for structured types. */
+  payload: string;
+  /** Human-readable label for the copied chunk. */
+  label?: string;
+}
+
 export interface ResearchResultPanelProps {
   loading: boolean;
   error: string | null;
-  result: DiscoverStepResponse | null;
+  result: DiscoverStepResponse | ResearchStepSummary | null;
   viewMode: 'step' | 'session';
   trail: ResearchStepSummary[];
   selectedStepIds: Set<number>;
@@ -123,6 +131,8 @@ export interface ResearchResultPanelProps {
   setShowNarrativePlain?: (v: boolean) => void;
   onResizeNarrativeStart?: (e: React.MouseEvent) => void;
   onResizeNarrativeReset?: () => void;
+  /** If provided, copy actions are delegated to this handler instead of the default clipboard/download behavior. */
+  onCopy?: (event: ResearchCopyEvent) => void;
 }
 
 export function ResearchResultPanel({
@@ -156,6 +166,7 @@ export function ResearchResultPanel({
   setShowNarrativePlain,
   onResizeNarrativeStart,
   onResizeNarrativeReset,
+  onCopy,
 }: ResearchResultPanelProps) {
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
@@ -163,6 +174,8 @@ export function ResearchResultPanel({
   const [showNarrativeControls, setShowNarrativeControls] = useState(false);
   const [showNarrativeIndex, setShowNarrativeIndex] = useState(true);
   const cyRef = useRef<cytoscape.Core | null>(null);
+
+  const resultQueryDepth = result && 'query_depth' in result ? result.query_depth : undefined;
 
   const nodeTypes = useMemo(() => {
     return Array.from(new Set(graphNodes.map((n) => n.type).filter((t): t is string => Boolean(t) && t !== 'system'))).sort();
@@ -282,9 +295,9 @@ export function ResearchResultPanel({
               />
               Controls
             </label>
-            {result?.query_depth && (
+            {resultQueryDepth && (
               <span className="text-[10px] text-white/50 px-2 py-0.5 rounded border border-white/10 bg-black/20">
-                {result.query_depth.replace('_', ' ')}
+                {resultQueryDepth.replace('_', ' ')}
               </span>
             )}
           </div>
@@ -313,6 +326,10 @@ export function ResearchResultPanel({
                 type="button"
                 onClick={() => {
                   if (!narrative) return;
+                  if (onCopy) {
+                    onCopy({ type: 'narrative', payload: narrative, label: sessionName });
+                    return;
+                  }
                   navigator.clipboard.writeText(narrative).then(() => toast.success('Narrative copied to clipboard'));
                 }}
                 className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-emerald-300 transition-colors"
@@ -325,8 +342,12 @@ export function ResearchResultPanel({
                 type="button"
                 onClick={() => {
                   if (!narrative) return;
+                  if (onCopy) {
+                    onCopy({ type: 'narrative', payload: narrative, label: sessionName });
+                    return;
+                  }
                   const date = new Date().toISOString().split('T')[0];
-                  const sanitized = sessionName.replace(/[^a-zA-Z0-9\-_]/g, '_').slice(0, 50);
+                  const sanitized = sessionName.replace(/[^a-zA-Z0-9\\-_]/g, '_').slice(0, 50);
                   const filename = `${sanitized}-${date}.md`;
                   const blob = new Blob([narrative], { type: 'text/markdown' });
                   const url = URL.createObjectURL(blob);
@@ -381,7 +402,7 @@ export function ResearchResultPanel({
                 </div>
               )}
               {resultView === 'narrative' && (
-                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} />
+                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} onCopySection={onCopy ? (markdown, title) => onCopy({ type: 'narrative', payload: markdown, label: title }) : undefined} />
               )}
             </div>
           )}
