@@ -40,6 +40,9 @@ import { type ResearchCopyEvent } from '@/app/research/research-result-panel';
 
 const logger = createLogger('WorkspacePage');
 
+const MAX_POLL_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 1500;
+
 export default function WorkspacePage() {
   const [servers, setServers] = useState<Server[]>([]);
   const [banks, setBanks] = useState<SelectorBank[]>([]);
@@ -68,7 +71,7 @@ export default function WorkspacePage() {
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
   const [selectedModelKeys, setSelectedModelKeys] = useState<Record<string, string | null>>({});
-  const [reflectResult, setReflectResult] = useState<DiscoverStepResponse | null>(null);
+  const [reflectResult, setReflectResult] = useState<DiscoverStepResponse | ResearchStepSummary | null>(null);
   const [reflectLoading, setReflectLoading] = useState(false);
   const [reflectError, setReflectError] = useState<string | null>(null);
   const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
@@ -363,7 +366,7 @@ export default function WorkspacePage() {
       const entityIds = refs
         .map((r) => (r.type ? `${r.type}:${r.id}` : r.id))
         .filter((id): id is string => Boolean(id));
-      const result = await researchApi.discover({
+      const response = await researchApi.discover({
         server_id: serverId,
         bank_id: bankId,
         session_id: activeSession.id,
@@ -374,9 +377,35 @@ export default function WorkspacePage() {
         ...buildDiscoverOptions('reflect', queryOptions),
         ...(entityIds.length ? { types: [...new Set(entityIds.map((id) => id.split(':')[0]).filter(Boolean))] } : {}),
       });
-      setReflectResult(result);
+
+      // The discover route returns 202 immediately; poll the session steps until
+      // the new step finishes so the result viewer can show the real output.
+      const sessionId = response.session_id;
+      const stepId = response.step_id;
+      const start = Date.now();
+      let completedStep: ResearchStepSummary | null = null;
+      while (Date.now() - start < MAX_POLL_MS) {
+        const steps = await researchApi.getSessionSteps(sessionId);
+        const step = steps.find((s) => s.id === stepId);
+        if (step?.status === 'completed') {
+          completedStep = step;
+          break;
+        }
+        if (step?.status === 'failed') {
+          throw new Error(step.error_message || 'Reflect step failed');
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        setSessionRefreshSignal((n) => n + 1);
+      }
+      if (!completedStep) {
+        throw new Error('Timed out waiting for Reflect step to complete');
+      }
+      if (completedStep.error_message) {
+        toast.warning(`Reflect completed with warnings: ${completedStep.error_message}`);
+      }
+      setReflectResult(completedStep);
       setSessionRefreshSignal((n) => n + 1);
-      toast.success('Reflect query started');
+      toast.success('Reflect query completed');
     } catch (err: any) {
       setReflectError(err.message || String(err));
       logger.error('Reflect query failed', { error: err, serverId, bankId, query });
