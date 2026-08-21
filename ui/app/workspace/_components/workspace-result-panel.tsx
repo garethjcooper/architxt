@@ -95,6 +95,7 @@ export function WorkspaceResultPanel({
       showNarrativePlain={showNarrativePlain}
       setShowNarrativePlain={setShowNarrativePlain}
       onCopy={onCopy}
+      showCanvas={false}
     />
   );
 }
