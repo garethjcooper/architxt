@@ -13,7 +13,7 @@ import {
 interface EntityInfoCardProps {
   id: string;
   info: EntityInfoWithContent;
-  onDetach: () => void;
+  onDetach?: () => void;
   expanded: boolean;
   onToggleExpand: () => void;
   selectedModelKey: string | null;
@@ -113,14 +113,16 @@ function EntityInfoCard({
           </div>
           <div className="text-xs text-white/50 truncate">{id}</div>
         </button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-1.5 text-white/40 hover:text-white shrink-0"
-          onClick={onDetach}
-        >
-          ×
-        </Button>
+        {onDetach && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-white/40 hover:text-white shrink-0"
+            onClick={onDetach}
+          >
+            ×
+          </Button>
+        )}
       </div>
 
       {info.catalog?.description && (
