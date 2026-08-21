@@ -83,7 +83,7 @@ export interface ResearchQueryOptions {
 
 const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>(['prebuilt', 'recall', 'reflect', 'synthesize', 'models', 'templates']);
 
-function buildDiscoverOptions(
+export function buildDiscoverOptions(
   queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates',
   queryOptions?: ResearchQueryOptions,
 ): Partial<Parameters<typeof researchApi.discover>[0]> {
