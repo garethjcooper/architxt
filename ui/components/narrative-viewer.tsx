@@ -40,6 +40,8 @@ export interface NarrativeViewerProps {
   diagrams?: NarrativeDiagram[];
   /** Optional key namespace so multiple NarrativeViewers on the same page don't share React keys. */
   keyPrefix?: string;
+  /** Optional header content rendered above the sidebar/content panes. */
+  header?: React.ReactNode;
   /** Optional render prop for a sidebar row. Receives the block, whether it's active, its index, and computed indent (rem). */
   renderSidebarRow?: (block: NarrativeBlock, ctx: { isActive: boolean; index: number; indent: number }) => React.ReactNode;
   /** Optional render prop for a content block. Receives the block and whether it's in the active range. */
@@ -60,6 +62,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   showIndex = true,
   diagrams,
   keyPrefix = '',
+  header,
   renderSidebarRow,
   renderBlock,
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
@@ -217,57 +220,60 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   );
 
   return (
-    <div className={`flex flex-1 min-h-0 gap-3 overflow-hidden ${className}`}>
-      {/* Index sidebar */}
-      {showIndex && (
-        <div className="w-[13rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
-          <div className="px-2 py-1.5 border-b border-white/10">
-            <span className="text-[11px] font-medium text-white/70">{title}</span>
-            <span className="text-[10px] text-white/40 ml-1">({structuralBlocks.length})</span>
+    <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${className}`}>
+      {header}
+      <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
+        {/* Index sidebar */}
+        {showIndex && (
+          <div className="w-[13rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+            <div className="px-2 py-1.5 border-b border-white/10">
+              <span className="text-[11px] font-medium text-white/70">{title}</span>
+              <span className="text-[10px] text-white/40 ml-1">({structuralBlocks.length})</span>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-1.5 space-y-0.5">
+              {structuralBlocks.length === 0 ? (
+                <p className="text-xs text-white/30 p-1">No sections found</p>
+              ) : (
+                structuralBlocks.map((b, idx) => {
+                  const isActive = activeBlockId === b.id;
+                  if (renderSidebarRow) {
+                    const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
+                    return <Fragment key={`${prefix}index-${b.id}`}>{renderSidebarRow(b, { isActive, index: idx, indent })}</Fragment>;
+                  }
+                  return defaultSidebarRow(b, idx, isActive);
+                })
+              )}
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-1.5 space-y-0.5">
-            {structuralBlocks.length === 0 ? (
-              <p className="text-xs text-white/30 p-1">No sections found</p>
-            ) : (
-              structuralBlocks.map((b, idx) => {
-                const isActive = activeBlockId === b.id;
-                if (renderSidebarRow) {
-                  const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
-                  return <Fragment key={`${prefix}index-${b.id}`}>{renderSidebarRow(b, { isActive, index: idx, indent })}</Fragment>;
-                }
-                return defaultSidebarRow(b, idx, isActive);
-              })
-            )}
-          </div>
-        </div>
-      )}
+        )}
 
-      <div
-        ref={markdownContainerRef}
-        className={`flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-y-auto custom-scrollbar ${
-          viewMode === 'plain' ? 'py-3 pl-3 pr-5 text-[13px] leading-relaxed font-mono' : 'p-4'
-        }`}
-      >
-        {viewMode === 'markdown' ? (
-          <Markdown className="text-[13px] leading-relaxed">{content || ''}</Markdown>
-        ) : (
-          blocks.map(b => {
-            const isActive = activeRangeIds.has(b.id);
-            if (renderBlock) {
-              return <Fragment key={`${prefix}block-${b.id}`}>{renderBlock(b, { isActive })}</Fragment>;
-            }
-            return defaultBlock(b, isActive);
-          })
-        )}
-        {diagrams && diagrams.length > 0 && (
-          <div className="mt-6 flex flex-col gap-4">
-            <hr className="border-white/10" />
-            <div className="text-[10px] uppercase text-white/40 font-medium">Legacy diagram pane (deprecated)</div>
-            {diagrams.map((d, idx) => (
-              <MermaidDiagram key={idx} name={d.name} type={d.type} content={d.content} />
-            ))}
-          </div>
-        )}
+        <div
+          ref={markdownContainerRef}
+          className={`flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-y-auto custom-scrollbar ${
+            viewMode === 'plain' ? 'py-3 pl-3 pr-5 text-[13px] leading-relaxed font-mono' : 'p-4'
+          }`}
+        >
+          {viewMode === 'markdown' ? (
+            <Markdown className="text-[13px] leading-relaxed">{content || ''}</Markdown>
+          ) : (
+            blocks.map(b => {
+              const isActive = activeRangeIds.has(b.id);
+              if (renderBlock) {
+                return <Fragment key={`${prefix}block-${b.id}`}>{renderBlock(b, { isActive })}</Fragment>;
+              }
+              return defaultBlock(b, isActive);
+            })
+          )}
+          {diagrams && diagrams.length > 0 && (
+            <div className="mt-6 flex flex-col gap-4">
+              <hr className="border-white/10" />
+              <div className="text-[10px] uppercase text-white/40 font-medium">Legacy diagram pane (deprecated)</div>
+              {diagrams.map((d, idx) => (
+                <MermaidDiagram key={idx} name={d.name} type={d.type} content={d.content} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
