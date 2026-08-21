@@ -27,8 +27,8 @@ import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
-import { NarrativeViewer } from '@/components/narrative-viewer';
-import { Switch } from '@/components/ui/switch';
+import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+
 import { SessionPageEditor } from './_components/session-page-editor';
 import type { SessionPageEditorRef } from './_components/session-page-editor';
 
@@ -58,8 +58,6 @@ export default function WorkspacePage() {
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
   const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
-  const [previewPlain, setPreviewPlain] = useState(false);
-  const [previewShowIndex, setPreviewShowIndex] = useState(true);
   const editorRef = useRef<SessionPageEditorRef | null>(null);
 
   const mentionedEntityIds = useMemo(() => {
@@ -371,33 +369,81 @@ export default function WorkspacePage() {
     }
   }, [reflectQuery, serverId, bankId, activeSession]);
 
-  const handleCopySection = useCallback(async (markdown: string, sectionTitle?: string) => {
+  const handleCopySection = useCallback(async (event: EnvelopeCopyEvent) => {
     if (!activeSession) {
       toast.error('No active session. Select a server and bank first.');
       return;
     }
     if (!editingStep) {
-      const pageTitle = sectionTitle || 'Copied section';
+      const pageTitle = event.label || 'Copied section';
       try {
         const page = await researchApi.createSessionPage(activeSession.id, pageTitle);
-        const updated = await researchApi.updateCuratedPage(page.id, {
+        let updateData: Parameters<typeof researchApi.updateCuratedPage>[1] = {
           intent_text: pageTitle,
-          synthesis: { narrative: markdown },
           canvas: page.canvas || undefined,
-        });
+        };
+        switch (event.type) {
+          case 'narrative':
+            updateData.synthesis = { narrative: event.payload };
+            break;
+          case 'graph': {
+            const parsedGraph = JSON.parse(event.payload);
+            updateData.canvas = {
+              ...(page.canvas || { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
+              graph: parsedGraph,
+            };
+            break;
+          }
+          case 'tables': {
+            const parsedTables = JSON.parse(event.payload);
+            updateData.canvas = {
+              ...(page.canvas || { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
+              tables: parsedTables,
+            };
+            break;
+          }
+          case 'diagrams': {
+            const parsedDiagrams = JSON.parse(event.payload);
+            updateData.canvas = {
+              ...(page.canvas || { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
+              diagrams: parsedDiagrams,
+            };
+            break;
+          }
+        }
+        const updated = await researchApi.updateCuratedPage(page.id, updateData);
         const nextStep: ResearchStepSummary = { ...page, intent_text: updated.intent_text ?? pageTitle, synthesis: updated.synthesis, canvas: updated.canvas };
         setSelectedStep(nextStep);
         setEditingStep(nextStep);
         setSessionRefreshSignal((n) => n + 1);
-        toast.success(`Created page "${pageTitle}" with copied section`);
+        toast.success(`Created page "${pageTitle}" with copied ${event.type}`);
         return;
       } catch (err: any) {
-        toast.error(err.message || 'Failed to create page for copied section');
+        toast.error(err.message || `Failed to create page for copied ${event.type}`);
         return;
       }
     }
-    editorRef.current?.appendBlocks(markdown);
-    toast.success(`Copied "${sectionTitle || 'section'}" into the open page`);
+    switch (event.type) {
+      case 'narrative':
+        editorRef.current?.appendBlocks(event.payload);
+        break;
+      case 'graph': {
+        const parsedGraph = JSON.parse(event.payload);
+        editorRef.current?.appendGraph(parsedGraph.nodes || [], parsedGraph.edges || []);
+        break;
+      }
+      case 'tables': {
+        const parsedTables = JSON.parse(event.payload);
+        editorRef.current?.appendTables(parsedTables);
+        break;
+      }
+      case 'diagrams': {
+        const parsedDiagrams = JSON.parse(event.payload);
+        editorRef.current?.appendDiagrams(parsedDiagrams);
+        break;
+      }
+    }
+    toast.success(`Copied ${event.type}${event.label ? ` "${event.label}"` : ''} into the open page`);
   }, [activeSession, editingStep, editorRef]);
 
   const handleAttachEntity = useCallback((entityId: string) => {
@@ -581,42 +627,12 @@ export default function WorkspacePage() {
                 count={selectedStep ? (selectedStep.synthesis?.narrative ? undefined : 0) : undefined}
               />
               <PanelContent className="p-0">
-                <div className="h-full flex flex-col overflow-hidden">
-                  <div className="px-3 py-2 border-b border-white/10 flex items-center gap-4 shrink-0">
-                    <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                      <Switch
-                        checked={previewShowIndex}
-                        onCheckedChange={(checked) => setPreviewShowIndex(Boolean(checked))}
-                        size="sm"
-                      />
-                      Show index
-                    </label>
-                    <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                      <Switch
-                        checked={previewPlain}
-                        onCheckedChange={(checked) => setPreviewPlain(Boolean(checked))}
-                        size="sm"
-                      />
-                      Plain text
-                    </label>
-                  </div>
-                  <div className="flex-1 min-h-0 p-3">
-                    {selectedStep ? (
-                      <NarrativeViewer
-                        content={selectedStep.synthesis?.narrative ?? ''}
-                        title="Sections"
-                        viewMode={previewPlain ? 'plain' : 'markdown'}
-                        showIndex={previewShowIndex}
-                        className="h-full"
-                        onCopySection={handleCopySection}
-                      />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-white/40 text-xs">
-                        Select a Reflect output or page from the session list to preview it here.
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <EnvelopeViewer
+                  envelope={selectedStep}
+                  title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
+                  onCopy={handleCopySection}
+                  className="h-full"
+                />
               </PanelContent>
             </Panel>
           </div>
