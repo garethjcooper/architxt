@@ -138,6 +138,10 @@ export function NarrativeViewer({
                       <span className="truncate block" title={b.title}>{b.title}</span>
                     ) : b.type === 'image' ? (
                       <span className="truncate block text-amber-400/70" title={`[IMAGE:${b.title}]`}>[IMAGE:{b.title}]</span>
+                    ) : b.type === 'code' ? (
+                      <span className="truncate block text-blue-400/70" title={b.title}>{b.title}</span>
+                    ) : b.type === 'table' ? (
+                      <span className="truncate block text-emerald-400/70" title="Table">Table</span>
                     ) : null}
                   </button>
                   {onCopySection && b.type === 'heading' && (
@@ -191,7 +195,11 @@ export function NarrativeViewer({
                       ? 'text-emerald-400 font-semibold'
                       : b.type === 'image'
                         ? 'text-amber-400/80 italic'
-                        : 'text-white/80'
+                        : b.type === 'code'
+                          ? 'text-blue-400/80'
+                          : b.type === 'table'
+                            ? 'text-emerald-400/80'
+                            : 'text-white/80'
                 }`}
               >
                 {b.raw}
