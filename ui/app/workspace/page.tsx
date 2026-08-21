@@ -17,7 +17,6 @@ import {
   backendEdgeToDisplayEdge,
 } from '@/lib/contextual-graph/display';
 import { RefreshCw } from 'lucide-react';
-import { parseAql, toSectionFocus, parseReferences } from '@architxt/aql';
 import { canonicalNodeId, resolveNodeType } from '@/app/research/graph-utils';
 import {
   isGroundedNodeForWorkspace,
@@ -30,8 +29,6 @@ import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
-import { pollForStepCompletion } from '@/lib/api/poll-step';
-import { type ResearchQueryOptions, buildDiscoverOptions } from '@/app/research/use-research-session';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
@@ -55,24 +52,15 @@ export default function WorkspacePage() {
   const [architxtEntities, setArchitxtEntities] = useState<Entity[]>([]);
   const [loadingArchitxtEntities, setLoadingArchitxtEntities] = useState(false);
 
-  const [reflectQuery, setReflectQuery] = useState('');
-  const [reflectCursor, setReflectCursor] = useState(0);
-  const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
-    reflect: {
-      includeSourceFacts: false,
-      budget: 'low',
-      maxTokens: 4096,
-      factTypes: ['world', 'observation'],
-      excludeMentalModels: false,
-    },
-  });
   const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfoWithContent> | null>(null);
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
   const [selectedModelKeys, setSelectedModelKeys] = useState<Record<string, string | null>>({});
   const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
-  const [reflectLoading, setReflectLoading] = useState(false);
-  const [reflectError, setReflectError] = useState<string | null>(null);
+  const selectedStepHasGraph = useMemo(() => {
+    if (!selectedStep?.canvas?.graph) return false;
+    return selectedStep.canvas.graph.nodes?.length > 0;
+  }, [selectedStep]);
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
   const editorRef = useRef<SessionPageEditorRef | null>(null);
@@ -93,6 +81,18 @@ export default function WorkspacePage() {
   useEffect(() => {
     setActiveSession(workspaceSession.activeSession);
   }, [workspaceSession.activeSession]);
+
+  // Sync workspace query state into the underlying research hook so submissions
+  // use the existing working discover/poll path instead of a parallel one.
+  const reflectQuery = workspaceSession.query;
+  const setReflectQuery = workspaceSession.setQuery;
+  const queryOptions = workspaceSession.queryOptions;
+  const setQueryOptions = workspaceSession.setQueryOptions;
+  const reflectLoading = workspaceSession.loading;
+  const reflectError = workspaceSession.error;
+
+  // Local cursor is managed by the AQL editor component.
+  const [reflectCursor, setReflectCursor] = useState(0);
 
   const scopeEntityIds = useMemo(() => {
     return activeSession?.scope_entity_ids ?? [];
@@ -347,63 +347,28 @@ export default function WorkspacePage() {
     }));
   }, [edges]);
 
-  const handleReflect = useCallback(async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const query = reflectQuery.trim();
-    if (!query) return;
-    if (!serverId || !bankId) {
-      toast.error('Select a server and bank before running Reflect.');
-      return;
-    }
-    if (!activeSession) {
-      toast.error('Wait for a workspace session to load before running Reflect.');
-      return;
-    }
-    try {
-      setReflectLoading(true);
-      setReflectError(null);
-      const parsed = toSectionFocus(parseAql(query));
-      const refs = parseReferences(query).filter((r) => r.kind === 'entity');
-      const entityIds = refs
-        .map((r) => (r.type ? `${r.type}:${r.id}` : r.id))
-        .filter((id): id is string => Boolean(id));
-      const response = await researchApi.discover({
-        server_id: serverId,
-        bank_id: bankId,
-        session_id: activeSession.id,
-        viewpoint_ids: activeSession.viewpoint_ids || [],
-        intent_text: parsed.intentText || query,
-        raw_query: query,
-        query_depth: 'reflect',
-        ...buildDiscoverOptions('reflect', queryOptions),
-        ...(entityIds.length ? { types: [...new Set(entityIds.map((id) => id.split(':')[0]).filter(Boolean))] } : {}),
-      });
+  const handleReflect = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!activeSession) {
+        toast.error('Wait for a workspace session to load before running Reflect.');
+        return;
+      }
+      await workspaceSession.handleSubmit(e);
+    },
+    [activeSession, workspaceSession.handleSubmit],
+  );
 
-      // The discover route returns 202 immediately; poll the session steps until
-      // the new step finishes, then select it like any other existing step.
-      const completedStep = await pollForStepCompletion(response.session_id, response.step_id, {
-        onPoll: () => workspaceSession.refresh(),
-      });
-      if (!completedStep) {
-        throw new Error('Timed out waiting for Reflect step to complete');
-      }
-      if (completedStep.status === 'failed') {
-        throw new Error(completedStep.error_message || 'Reflect step failed');
-      }
-      if (completedStep.error_message) {
-        toast.warning(`Reflect completed with warnings: ${completedStep.error_message}`);
-      }
-      setSelectedStep(completedStep);
+  // When the research hook produces a completed result, mirror it into the
+  // workspace's selected-step state so the page editor and result panel render.
+  useEffect(() => {
+    if (!workspaceSession.result) return;
+    const step = workspaceSession.trail.find((s) => s.id === workspaceSession.result?.step_id);
+    if (step) {
+      setSelectedStep(step);
       void workspaceSession.refresh();
-      toast.success('Reflect query completed');
-    } catch (err: any) {
-      setReflectError(err.message || String(err));
-      logger.error('Reflect query failed', { error: err, serverId, bankId, query });
-      toast.error(`Reflect failed: ${err.message || err}`);
-    } finally {
-      setReflectLoading(false);
     }
-  }, [reflectQuery, serverId, bankId, activeSession, queryOptions]);
+  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh]);
 
   const handleCopySection = useCallback(async (event: ResearchCopyEvent) => {
     if (!activeSession) {
@@ -684,7 +649,7 @@ export default function WorkspacePage() {
             <Panel className="flex-1 min-h-0">
               <PanelHeader
                 title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
-                count={selectedStep ? (selectedStep.synthesis?.narrative ? undefined : 0) : undefined}
+                count={selectedStep ? (selectedStep.synthesis?.narrative || selectedStepHasGraph ? undefined : 0) : undefined}
               />
               <PanelContent className="p-0 overflow-hidden">
                 <div className="h-full flex flex-col">

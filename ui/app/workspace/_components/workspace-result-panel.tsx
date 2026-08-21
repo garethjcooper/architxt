@@ -25,6 +25,12 @@ export function WorkspaceResultPanel({
   sessionName,
   onCopy,
 }: WorkspaceResultPanelProps) {
+  // Structured-output Reflect steps can carry their payload in canvas.graph while
+  // leaving synthesis.narrative empty. Show the diagrams/canvas pane in that
+  // case so the workspace viewer consumes the full standard envelope, not just
+  // narrative.
+  const hasGraph = !!(result?.canvas?.graph?.nodes?.length);
+
   const panelState = useResearchResultPanel({
     nodes: result?.canvas?.graph?.nodes,
     edges: result?.canvas?.graph?.edges,
@@ -39,7 +45,7 @@ export function WorkspaceResultPanel({
       resultView="narrative"
       sessionName={sessionName || 'reflect'}
       onCopy={onCopy}
-      showCanvas={false}
+      showCanvas={hasGraph}
       {...panelState}
     />
   );
