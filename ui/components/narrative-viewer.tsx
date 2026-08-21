@@ -30,6 +30,8 @@ export interface NarrativeViewerProps {
   showIndex?: boolean;
   /** Optional Mermaid diagrams to render inline after the narrative content. @deprecated Diagrams should now be included in the Markdown content itself as fenced mermaid blocks. */
   diagrams?: NarrativeDiagram[];
+  /** Optional key namespace so multiple NarrativeViewers on the same page don't share React keys. */
+  keyPrefix?: string;
 }
 
 export function NarrativeViewer({
@@ -41,7 +43,9 @@ export function NarrativeViewer({
   viewMode = 'plain',
   showIndex = true,
   diagrams,
+  keyPrefix = '',
 }: NarrativeViewerProps) {
+  const prefix = keyPrefix ? `${keyPrefix}-` : '';
   const [blocks, setBlocks] = useState<NarrativeBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [activeRangeIds, setActiveRangeIds] = useState<Set<string>>(new Set());
@@ -122,7 +126,7 @@ export function NarrativeViewer({
             ) : (
               structuralBlocks.map((b, idx) => (
                 <div
-                  key={`index-${b.id}`}
+                  key={`${prefix}index-${b.id}`}
                   className="flex items-center gap-1 group/copy"
                 >
                   <button
@@ -184,7 +188,7 @@ export function NarrativeViewer({
             const isActive = activeRangeIds.has(b.id);
             return (
               <div
-                key={`block-${b.id}`}
+                key={`${prefix}block-${b.id}`}
                 ref={el => { blockRefs.current.set(b.id, el); }}
                 onClick={() => handleContentClick(b)}
                 className={`block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${

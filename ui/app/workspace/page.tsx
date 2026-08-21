@@ -659,6 +659,7 @@ export default function WorkspacePage() {
                     error={reflectError}
                     sessionName={activeSession?.title}
                     onCopy={handleCopySection}
+                    keyPrefix="preview"
                   />
                 </div>
               </PanelContent>
@@ -670,7 +671,7 @@ export default function WorkspacePage() {
           {/* Column 3: session page editor */}
           <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
             {editingStep ? (
-              <SessionPageEditor ref={editorRef} step={editingStep} onSaved={handlePageSaved} />
+              <SessionPageEditor ref={editorRef} step={editingStep} onSaved={handlePageSaved} keyPrefix="editor" />
             ) : (
               <Panel className="flex-1 min-h-0">
                 <PanelHeader title="Page editor" />
