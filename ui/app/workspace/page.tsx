@@ -29,13 +29,14 @@ import { EntityScopePanel } from './_components/entity-scope-panel';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
-import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
+import { type ResearchSession, type ResearchStepSummary, type DiscoverStepResponse } from '@/lib/api/client';
 import { type ResearchQueryOptions, buildDiscoverOptions } from '@/app/research/use-research-session';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
-import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
 import { SessionPageEditor } from './_components/session-page-editor';
 import type { SessionPageEditorRef } from './_components/session-page-editor';
+import { type ResearchCopyEvent } from '@/app/research/research-result-panel';
 
 const logger = createLogger('WorkspacePage');
 
@@ -67,7 +68,7 @@ export default function WorkspacePage() {
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
   const [selectedModelKeys, setSelectedModelKeys] = useState<Record<string, string | null>>({});
-  const [reflectResult, setReflectResult] = useState<unknown | null>(null);
+  const [reflectResult, setReflectResult] = useState<DiscoverStepResponse | null>(null);
   const [reflectLoading, setReflectLoading] = useState(false);
   const [reflectError, setReflectError] = useState<string | null>(null);
   const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
@@ -385,7 +386,7 @@ export default function WorkspacePage() {
     }
   }, [reflectQuery, serverId, bankId, activeSession, queryOptions]);
 
-  const handleCopySection = useCallback(async (event: EnvelopeCopyEvent) => {
+  const handleCopySection = useCallback(async (event: ResearchCopyEvent) => {
     if (!activeSession) {
       toast.error('No active session. Select a server and bank first.');
       return;
@@ -660,19 +661,20 @@ export default function WorkspacePage() {
 
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/middle columns" />
 
-          {/* Column 2: read-only NarrativeViewer */}
+          {/* Column 2: result viewer */}
           <div className="flex flex-col min-h-0" style={{ flex: columnWidths.middle, minWidth: 280 }}>
             <Panel className="flex-1 min-h-0">
               <PanelHeader
                 title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
                 count={selectedStep ? (selectedStep.synthesis?.narrative ? undefined : 0) : undefined}
               />
-              <PanelContent className="p-0">
-                <EnvelopeViewer
-                  envelope={selectedStep}
-                  title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
+              <PanelContent className="p-0 overflow-hidden">
+                <WorkspaceResultPanel
+                  result={selectedStep || reflectResult}
+                  loading={reflectLoading}
+                  error={reflectError}
+                  sessionName={activeSession?.title}
                   onCopy={handleCopySection}
-                  className="h-full"
                 />
               </PanelContent>
             </Panel>
