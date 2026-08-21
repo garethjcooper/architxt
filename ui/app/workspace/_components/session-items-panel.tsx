@@ -260,15 +260,15 @@ export function SessionItemsPanel({
               return (
                 <div
                   key={step.id}
-                  onClick={() => onSelectStep(step)}
                   className={[
-                    'group w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] cursor-pointer text-left transition-colors text-xs',
+                    'group w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors text-xs cursor-pointer hover:text-white',
                     isSelected || isEditing
                       ? 'bg-emerald-500/20 text-emerald-100 border-emerald-500/30'
-                      : 'text-white/90 border-white/5 bg-black/20 hover:bg-white/5',
+                      : 'text-white/90 border-white/5 bg-black/20',
                   ].join(' ')}
+                  onClick={() => (isPage ? onEditPage(step) : onSelectStep(step))}
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 h-full">
                     {isPage ? (
                       <FileText className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
                     ) : (

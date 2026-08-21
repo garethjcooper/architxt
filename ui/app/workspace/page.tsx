@@ -29,6 +29,7 @@ import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { Switch } from '@/components/ui/switch';
+import { SessionPageEditor } from './_components/session-page-editor';
 
 const logger = createLogger('WorkspacePage');
 
@@ -159,6 +160,13 @@ export default function WorkspacePage() {
   const handleEditPage = useCallback((step: ResearchStepSummary) => {
     setSelectedStep(step);
     setEditingStep(step);
+  }, []);
+
+  const handlePageSaved = useCallback((updated: ResearchStepSummary) => {
+    setEditingStep(updated);
+    setSelectedStep((prev) => (prev?.id === updated.id ? updated : prev));
+    setSessionRefreshSignal((n) => n + 1);
+    toast.success('Page updated');
   }, []);
 
   const fetchServers = useCallback(async () => {
@@ -506,20 +514,18 @@ export default function WorkspacePage() {
 
           {/* Column 3: session page editor */}
           <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
-            <Panel className="flex-1 min-h-0">
-              <PanelHeader title={editingStep ? 'Edit page' : 'Page editor'} />
-              <PanelContent className="p-4">
-                {editingStep ? (
-                  <div className="text-white/60 text-sm">
-                    Editing: {editingStep.intent_text || 'Untitled'}
-                  </div>
-                ) : (
+            {editingStep ? (
+              <SessionPageEditor step={editingStep} onSaved={handlePageSaved} />
+            ) : (
+              <Panel className="flex-1 min-h-0">
+                <PanelHeader title="Page editor" />
+                <PanelContent className="p-4">
                   <div className="text-white/40 text-xs">
                     Open a page from the session list to edit it here.
                   </div>
-                )}
-              </PanelContent>
-            </Panel>
+                </PanelContent>
+              </Panel>
+            )}
           </div>
         </div>
       </div>
