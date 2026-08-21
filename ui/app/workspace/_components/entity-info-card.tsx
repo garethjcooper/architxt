@@ -18,6 +18,7 @@ interface EntityInfoCardProps {
   onToggleExpand: () => void;
   selectedModelKey: string | null;
   onSelectModel: (key: string) => void;
+  origin?: 'scope' | 'manual' | 'derived';
 }
 
 
@@ -29,6 +30,7 @@ function EntityInfoCard({
   onToggleExpand,
   selectedModelKey,
   onSelectModel,
+  origin = 'manual',
 }: EntityInfoCardProps) {
   const contentMap = info.content;
   const tabs = useMemo(() => {
@@ -124,6 +126,12 @@ function EntityInfoCard({
       {info.catalog?.description && (
         <div className="text-xs text-white/70 line-clamp-2">{info.catalog.description}</div>
       )}
+
+      <div className="flex flex-wrap gap-1">
+        <Badge variant="outline" className="text-[10px] h-4 px-1 border-white/20">
+          {origin === 'scope' ? 'session scope' : origin === 'manual' ? 'attached' : 'derived'}
+        </Badge>
+      </div>
 
       <div className="flex flex-wrap gap-1">
         {info.contextual_refs.length > 0 && (
