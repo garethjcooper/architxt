@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Loader2, FileText, Undo2, Hash, Image, Trash2, Eye } from 'lucide-react';
+import { Loader2, FileText, Undo2, Hash, Image, Trash2, Eye, Code, Table } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { documentsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
@@ -12,12 +12,13 @@ import { buildCleanToRawMap as sharedBuildCleanToRawMap } from '@architxt/entity
 
 export interface SmartBlock {
   id: string;
-  type: 'text' | 'heading' | 'image';
+  type: 'text' | 'heading' | 'image' | 'code' | 'table';
   raw: string;        // original, never changes
   edited?: string;    // working copy, any block can have one
   deleted?: boolean;
   level?: number;
   title?: string;
+  language?: string;
 }
 
 export function parseBlocks(content: string): SmartBlock[] {
@@ -38,6 +39,8 @@ export function parseBlocks(content: string): SmartBlock[] {
     const line = lines[i];
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     const imageOpenMatch = line.match(/^\[IMAGE:([^\]]+)\]$/);
+    const codeFenceMatch = line.match(/^```(\w*)\s*$/);
+    const tableMatch = (line.match(/\|/g) || []).length >= 2;
 
     if (headingMatch) {
       flushText();
@@ -69,6 +72,39 @@ export function parseBlocks(content: string): SmartBlock[] {
         title: imageId,
       });
       i = j + 1;
+    } else if (codeFenceMatch) {
+      flushText();
+      const language = codeFenceMatch[1];
+      const codeLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length) {
+        codeLines.push(lines[j]);
+        if (lines[j].match(/^```\s*$/)) break;
+        j++;
+      }
+      blocks.push({
+        id: `b${blockId++}`,
+        type: 'code',
+        raw: codeLines.join('\n') + '\n',
+        title: language || 'code',
+        language,
+      });
+      i = j + 1;
+    } else if (tableMatch) {
+      flushText();
+      const tableLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length && lines[j].includes('|')) {
+        tableLines.push(lines[j]);
+        j++;
+      }
+      blocks.push({
+        id: `b${blockId++}`,
+        type: 'table',
+        raw: tableLines.join('\n') + '\n',
+        title: tableLines[0]?.replace(/\|/g, ' ').trim() || 'table',
+      });
+      i = j;
     } else {
       textBuffer.push(line);
       i++;
@@ -551,7 +587,11 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
         isActive
           ? block.type === 'image'
             ? `bg-amber-500/20 text-amber-300 ${isDeleted ? 'line-through' : ''}`
-            : `bg-emerald-500/20 text-emerald-300 ${isDeleted ? 'line-through' : ''}`
+            : block.type === 'code'
+              ? `bg-blue-500/20 text-blue-300 ${isDeleted ? 'line-through' : ''}`
+              : block.type === 'table'
+                ? `bg-emerald-500/20 text-emerald-300 ${isDeleted ? 'line-through' : ''}`
+                : `bg-emerald-500/20 text-emerald-300 ${isDeleted ? 'line-through' : ''}`
           : isDeleted
             ? 'text-white/30 line-through'
             : 'text-white/60 hover:bg-white/5 hover:text-white/90'
@@ -567,13 +607,25 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
             <span className="truncate">{block.title}</span>
             {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
           </div>
-        ) : (
+        ) : block.type === 'code' ? (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Code className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-blue-400/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-blue-400/70'}`}>{block.title}</span>
+            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
+          </div>
+        ) : block.type === 'table' ? (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Table className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-emerald-400/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-emerald-400/70'}`}>Table</span>
+            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
+          </div>
+        ) : block.type === 'image' ? (
           <div className="flex items-center gap-1.5 min-w-0">
             <Image className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-amber-400/50'}`} />
             <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-amber-400/70'}`}>[IMAGE:{block.title}]</span>
             {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
           </div>
-        )}
+        ) : null}
       </button>
       <div className={`flex items-center gap-0.5 transition-opacity flex-shrink-0 ${isDeleted ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         {block.type === 'image' && onPreview && (
