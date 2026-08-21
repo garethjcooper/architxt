@@ -27,6 +27,8 @@ import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
+import { NarrativeViewer } from '@/components/narrative-viewer';
+import { Switch } from '@/components/ui/switch';
 
 const logger = createLogger('WorkspacePage');
 
@@ -54,6 +56,8 @@ export default function WorkspacePage() {
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
   const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
+  const [previewPlain, setPreviewPlain] = useState(false);
+  const [previewShowIndex, setPreviewShowIndex] = useState(true);
 
   const mentionedEntityIds = useMemo(() => {
     const mentioned: string[] = [];
@@ -454,17 +458,46 @@ export default function WorkspacePage() {
           {/* Column 2: read-only NarrativeViewer */}
           <div className="flex flex-col min-h-0" style={{ flex: columnWidths.middle, minWidth: 280 }}>
             <Panel className="flex-1 min-h-0">
-              <PanelHeader title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'} />
-              <PanelContent className="p-4">
-                {selectedStep ? (
-                  <div className="text-white/60 text-sm">
-                    Selected: {selectedStep.intent_text || 'Untitled'} ({selectedStep.action_type})
+              <PanelHeader
+                title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
+                count={selectedStep ? (selectedStep.synthesis?.narrative ? undefined : 0) : undefined}
+              />
+              <PanelContent className="p-0">
+                <div className="h-full flex flex-col overflow-hidden">
+                  <div className="px-3 py-2 border-b border-white/10 flex items-center gap-4 shrink-0">
+                    <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+                      <Switch
+                        checked={previewShowIndex}
+                        onCheckedChange={(checked) => setPreviewShowIndex(Boolean(checked))}
+                        size="sm"
+                      />
+                      Show index
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+                      <Switch
+                        checked={previewPlain}
+                        onCheckedChange={(checked) => setPreviewPlain(Boolean(checked))}
+                        size="sm"
+                      />
+                      Plain text
+                    </label>
                   </div>
-                ) : (
-                  <div className="text-white/40 text-xs">
-                    Select a Reflect output or page from the session list to preview it here.
+                  <div className="flex-1 min-h-0 p-3">
+                    {selectedStep ? (
+                      <NarrativeViewer
+                        content={selectedStep.synthesis?.narrative ?? ''}
+                        title="Sections"
+                        viewMode={previewPlain ? 'plain' : 'markdown'}
+                        showIndex={previewShowIndex}
+                        className="h-full"
+                      />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-white/40 text-xs">
+                        Select a Reflect output or page from the session list to preview it here.
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </PanelContent>
             </Panel>
           </div>
