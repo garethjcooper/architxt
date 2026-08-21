@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Loader2, FileText, Undo2, Hash, Trash2, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { Loader2, FileText, Undo2, Hash, Trash2, ArrowUp, ArrowDown, Save, Network, Table2, Shapes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -11,7 +11,7 @@ import {
   getSidebarIndent,
   type SmartBlock,
 } from '@/components/smart-document-editor';
-import { researchApi, type ResearchStepSummary } from '@/lib/api/client';
+import { researchApi, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
 import { Panel, PanelHeader, PanelContent } from './panel-layout';
 
 function buildContent(blocks: SmartBlock[]): string {
@@ -25,11 +25,28 @@ function buildBlocks(content: string | null | undefined): SmartBlock[] {
 
 export interface SessionPageEditorRef {
   appendBlocks: (markdown: string) => void;
+  appendGraph: (nodes: GraphNode[], edges: GraphEdge[]) => void;
+  appendTables: (tables: Array<{ name: string; columns?: string[]; rows: Record<string, any>[] }>) => void;
+  appendDiagrams: (diagrams: Array<{ name: string; type: string; content: string }>) => void;
+}
+
+interface CanvasShape {
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] };
+  tables: Array<{ name: string; columns?: string[]; rows: Record<string, any>[] }>;
+  diagrams: Array<{ name: string; type: string; content: string }>;
 }
 
 interface SessionPageEditorProps {
   step: ResearchStepSummary;
   onSaved?: (updated: ResearchStepSummary) => void;
+}
+
+function defaultCanvas(canvas: ResearchStepSummary['canvas']): CanvasShape {
+  return {
+    graph: canvas?.graph || { nodes: [], edges: [] },
+    tables: canvas?.tables || [],
+    diagrams: canvas?.diagrams || [],
+  };
 }
 
 export const SessionPageEditor = forwardRef(function SessionPageEditor(
@@ -46,6 +63,8 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
   const [showRemoved, setShowRemoved] = useState(false);
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
+  const [canvas, setCanvas] = useState<CanvasShape>(() => defaultCanvas(step.canvas));
+
   useImperativeHandle(ref, () => ({
     appendBlocks: (markdown: string) => {
       if (!markdown) return;
@@ -59,27 +78,74 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
         return [...prev, ...next];
       });
     },
+    appendGraph: (nodes, edges) => {
+      setCanvas((prev) => {
+        const existingNodeIds = new Set(prev.graph.nodes.map((n) => n.id));
+        const existingEdgeKeys = new Set(prev.graph.edges.map((e) => e.id));
+        const newNodes = nodes.filter((n) => !existingNodeIds.has(n.id));
+        const newEdges = edges.filter((e) => !existingEdgeKeys.has(e.id));
+        if (newNodes.length === 0 && newEdges.length === 0) {
+          toast.info('Graph data already present in this page');
+          return prev;
+        }
+        return {
+          ...prev,
+          graph: {
+            nodes: [...prev.graph.nodes, ...newNodes],
+            edges: [...prev.graph.edges, ...newEdges],
+          },
+        };
+      });
+    },
+    appendTables: (tables) => {
+      setCanvas((prev) => {
+        const existingNames = new Set((prev.tables ?? []).map((t) => t.name));
+        const newTables = tables.filter((t) => !existingNames.has(t.name));
+        if (newTables.length === 0) {
+          toast.info('Table(s) already present in this page');
+          return prev;
+        }
+        return { ...prev, tables: [...(prev.tables ?? []), ...newTables] };
+      });
+    },
+    appendDiagrams: (diagrams) => {
+      setCanvas((prev) => {
+        const existingNames = new Set((prev.diagrams ?? []).map((d) => d.name));
+        const newDiagrams = diagrams.filter((d) => !existingNames.has(d.name));
+        if (newDiagrams.length === 0) {
+          toast.info('Diagram(s) already present in this page');
+          return prev;
+        }
+        return { ...prev, diagrams: [...(prev.diagrams ?? []), ...newDiagrams] };
+      });
+    },
   }));
 
   const originalTitle = useMemo(() => step.intent_text || '', [step.intent_text]);
   const originalContent = useMemo(() => step.synthesis?.narrative || '', [step.synthesis?.narrative]);
+  const originalCanvas = useMemo(() => JSON.stringify(defaultCanvas(step.canvas)), [step.canvas]);
   const currentContent = useMemo(() => buildContent(blocks), [blocks]);
+  const currentCanvas = useMemo(() => JSON.stringify(canvas), [canvas]);
   const hasChanges = useMemo(
-    () => title !== originalTitle || currentContent !== originalContent,
-    [title, originalTitle, currentContent, originalContent]
+    () => title !== originalTitle || currentContent !== originalContent || currentCanvas !== originalCanvas,
+    [title, originalTitle, currentContent, originalContent, currentCanvas, originalCanvas]
   );
 
   useEffect(() => {
     setTitle(step.intent_text || '');
-    const nextBlocks = buildBlocks(step.synthesis?.narrative);
-    setBlocks(nextBlocks);
+    setBlocks(buildBlocks(step.synthesis?.narrative));
+    setCanvas(defaultCanvas(step.canvas));
     setActiveBlockId(null);
     setActiveRangeIds(new Set());
     setEditingBlockId(null);
-  }, [step.id, step.intent_text, step.synthesis?.narrative]);
+  }, [step.id, step.intent_text, step.synthesis?.narrative, step.canvas]);
 
   const structuralBlocks = useMemo(() => blocks.filter((b) => b.type !== 'text'), [blocks]);
   const removedCount = useMemo(() => blocks.filter((b) => b.deleted).length, [blocks]);
+  const tableCount = canvas.tables.length;
+  const diagramCount = canvas.diagrams.length;
+  const nodeCount = canvas.graph.nodes.length;
+  const edgeCount = canvas.graph.edges.length;
 
   const toggleDelete = useCallback((id: string) => {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, deleted: !b.deleted } : b)));
@@ -131,7 +197,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
       const updated = await researchApi.updateCuratedPage(step.id, {
         intent_text: title,
         synthesis: { narrative: currentContent },
-        canvas: step.canvas || undefined,
+        canvas,
       });
       toast.success('Page saved');
       onSaved?.({ ...step, intent_text: updated.intent_text ?? title, synthesis: updated.synthesis, canvas: updated.canvas });
@@ -140,15 +206,16 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
     } finally {
       setIsSaving(false);
     }
-  }, [hasChanges, step, title, currentContent, onSaved]);
+  }, [hasChanges, step, title, currentContent, canvas, onSaved]);
 
   const handleDiscard = useCallback(() => {
     setTitle(originalTitle);
     setBlocks(buildBlocks(originalContent));
+    setCanvas(defaultCanvas(step.canvas));
     setActiveBlockId(null);
     setActiveRangeIds(new Set());
     setEditingBlockId(null);
-  }, [originalTitle, originalContent]);
+  }, [originalTitle, originalContent, step.canvas]);
 
   const scrollToBlock = useCallback((id: string) => {
     setActiveBlockId(id);
@@ -209,9 +276,12 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
 
           {/* Stats */}
           <div className="px-3 py-1.5 border-b border-white/10 flex items-center justify-between shrink-0">
-            <p className="text-[11px] text-white/40">
-              {blocks.length - removedCount} of {blocks.length} blocks visible
-              {removedCount > 0 && <span className="text-amber-400"> ({removedCount} removed)</span>}
+            <p className="text-[11px] text-white/40 flex items-center gap-2">
+              <span>{blocks.length - removedCount} of {blocks.length} blocks visible</span>
+              {removedCount > 0 && <span className="text-amber-400">({removedCount} removed)</span>}
+              {nodeCount > 0 && <span className="flex items-center gap-0.5"><Network className="h-3 w-3" /> {nodeCount} nodes</span>}
+              {tableCount > 0 && <span className="flex items-center gap-0.5"><Table2 className="h-3 w-3" /> {tableCount} tables</span>}
+              {diagramCount > 0 && <span className="flex items-center gap-0.5"><Shapes className="h-3 w-3" /> {diagramCount} diagrams</span>}
             </p>
             <button
               onClick={() => setShowRemoved((v) => !v)}
@@ -298,7 +368,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
             {/* Content pane */}
             <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
               {blocks.length === 0 ? (
-                <p className="text-white/30 italic">This page has no content. Copy sections from a Reflect output or type below.</p>
+                <p className="text-white/30 italic">This page has no narrative content. Copy sections from a Reflect output or type below.</p>
               ) : (
                 blocks.map((b) => {
                   if (b.deleted && !showRemoved) return null;
