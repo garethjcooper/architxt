@@ -12,6 +12,7 @@ import {
   getSidebarIndent,
   type NarrativeBlock,
 } from '@/components/narrative-blocks';
+import { NarrativeViewer } from '@/components/narrative-viewer';
 import { researchApi, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
 import { Panel, PanelHeader, PanelContent } from './panel-layout';
 
@@ -56,7 +57,6 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
   { step, onSaved, keyPrefix = '' }: SessionPageEditorProps,
   ref: React.Ref<SessionPageEditorRef>
 ) {
-  const prefix = keyPrefix ? `${keyPrefix}-` : '';
   const [title, setTitle] = useState(step.intent_text || '');
   const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => buildBlocks(step.synthesis?.narrative));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
-  const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const viewerRef = useRef<{ scrollToBlock: (id: string) => void } | null>(null);
 
   const [canvas, setCanvas] = useState<CanvasShape>(() => defaultCanvas(step.canvas));
 
@@ -225,10 +225,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
     setActiveBlockId(id);
     const rangeIds = getSectionBlockIds(blocks, id);
     setActiveRangeIds(new Set(rangeIds));
-    if (rangeIds.length > 0) {
-      const firstEl = blockRefs.current.get(rangeIds[0]);
-      if (firstEl) firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    viewerRef.current?.scrollToBlock(id);
   }, [blocks]);
 
   const startEditingBlock = useCallback((b: NarrativeBlock) => {
@@ -241,6 +238,161 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
     setActiveBlockId(b.id);
     setActiveRangeIds(new Set([b.id]));
   }, []);
+
+  const visibleBlocks = useMemo(() => {
+    return showRemoved ? blocks : blocks.filter((b) => !b.deleted);
+  }, [blocks, showRemoved]);
+
+  const renderSidebarRow = useCallback((b: NarrativeBlock, { isActive, index, indent }: { isActive: boolean; index: number; indent: number }) => {
+    return (
+      <div
+        id={`sidebar-row-${b.id}`}
+        className={`group flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+          isActive
+            ? 'bg-emerald-500/20 text-emerald-300'
+            : b.deleted
+              ? 'text-white/30 line-through'
+              : 'text-white/60 hover:bg-white/5 hover:text-white/90'
+        }`}
+        style={{ paddingLeft: `${indent}rem` }}
+      >
+        <button onClick={() => scrollToBlock(b.id)} className="flex items-center gap-1.5 flex-1 min-w-0 text-left">
+          {b.type === 'heading' ? (
+            <span className="text-white/30 flex-shrink-0 select-none">{'#'.repeat(b.level!)}&nbsp;</span>
+          ) : (
+            <Hash className="h-3 w-3 flex-shrink-0 text-white/30" />
+          )}
+          <span className="truncate">{b.title || b.raw.trim()}</span>
+        </button>
+        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); moveSection(b.id, 'up'); }}
+            className="p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10"
+            title="Move up"
+          >
+            <ArrowUp className="h-3 w-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); moveSection(b.id, 'down'); }}
+            className="p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10"
+            title="Move down"
+          >
+            <ArrowDown className="h-3 w-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); b.type === 'heading' ? (b.deleted ? restoreSection(b.id) : removeSection(b.id)) : toggleDelete(b.id); }}
+            className={`p-0.5 rounded transition-colors ${
+              b.deleted
+                ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                : 'text-white/40 hover:text-red-400 hover:bg-red-500/20'
+            }`}
+            title={b.deleted ? 'Restore' : 'Remove section'}
+          >
+            {b.deleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
+          </button>
+        </div>
+      </div>
+    );
+  }, [moveSection, removeSection, restoreSection, toggleDelete]);
+
+  const renderBlock = useCallback((b: NarrativeBlock, { isActive }: { isActive: boolean }) => {
+    const isEditing = editingBlockId === b.id;
+    return (
+      <div
+        onClick={!isEditing ? () => scrollToBlock(b.id) : undefined}
+        className={`group/row block whitespace-pre-wrap transition-colors rounded px-2 py-0.5 ${
+          isActive
+            ? b.deleted
+              ? 'bg-white/5 text-white/20 line-through'
+              : 'bg-emerald-500/15 text-emerald-300'
+            : b.deleted
+              ? 'opacity-25 line-through text-white/30'
+              : b.edited
+                ? 'text-white/90 border-l-2 border-blue-500/40 pl-1'
+                : b.type === 'heading'
+                  ? 'text-emerald-400 font-semibold'
+                  : 'text-white/80'
+        }`}
+      >
+        {isEditing ? (
+          <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+            <textarea
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  e.preventDefault();
+                  const edited = b.type === 'heading'
+                    ? `${'#'.repeat(b.level ?? 1)} ${editValue}\n`
+                    : `${editValue}\n`;
+                  setBlocks((prev) => prev.map((bb) => (bb.id === b.id ? { ...bb, edited } : bb)));
+                  setEditingBlockId(null);
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setEditingBlockId(null);
+                }
+              }}
+              className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-[13px] text-white/90 font-mono leading-relaxed resize-none focus:outline-none focus:border-blue-500/50"
+              rows={Math.min(10, editValue.split('\n').length + 1)}
+              spellCheck={false}
+              autoFocus
+            />
+            <div className="flex justify-end gap-1.5">
+              <button
+                onClick={() => setEditingBlockId(null)}
+                className="text-[10px] px-2 py-0.5 rounded text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const edited = b.type === 'heading'
+                    ? `${'#'.repeat(b.level ?? 1)} ${editValue}\n`
+                    : `${editValue}\n`;
+                  setBlocks((prev) => prev.map((bb) => (bb.id === b.id ? { ...bb, edited } : bb)));
+                  setEditingBlockId(null);
+                }}
+                className="text-[10px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+              >
+                Ctrl+Enter to save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-1">
+            <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
+            {!b.deleted && (
+              <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                {b.edited && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBlocks((prev) => prev.map((bb) => (bb.id === b.id ? { ...bb, edited: undefined } : bb)));
+                    }}
+                    className="p-0.5 rounded text-white/30 hover:text-blue-400 hover:bg-blue-500/10"
+                    title="Revert to original"
+                  >
+                    <Undo2 className="h-3 w-3" />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); startEditingBlock(b); }}
+                  className="p-0.5 rounded text-white/30 hover:text-blue-400 hover:bg-blue-500/10"
+                  title="Edit block"
+                >
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }, [editingBlockId, editValue, startEditingBlock, scrollToBlock]);
 
   return (
     <Panel className="flex-1 min-h-0">
@@ -301,183 +453,24 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
 
           {/* Editor workspace */}
           <div className="flex-1 min-h-0 flex gap-3 overflow-hidden p-3">
-            {/* Sidebar */}
-            <div className="w-[13rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
-              <div className="px-2 py-1.5 border-b border-white/10">
-                <span className="text-[11px] font-medium text-white/70">Sections</span>
-                <span className="text-[10px] text-white/40 ml-1">({structuralBlocks.length})</span>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-1.5 space-y-0.5">
-                {structuralBlocks.length === 0 ? (
-                  <p className="text-xs text-white/30 p-1">No sections found</p>
-                ) : (
-                  structuralBlocks.map((b, idx) => {
-                    if (b.deleted && !showRemoved) return null;
-                    const isActive = activeBlockId === b.id;
-                    return (
-                      <div
-                        key={`${prefix}sidebar-${b.id}`}
-                        id={`sidebar-row-${b.id}`}
-                        className={`group flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
-                          isActive
-                            ? 'bg-emerald-500/20 text-emerald-300'
-                            : b.deleted
-                              ? 'text-white/30 line-through'
-                              : 'text-white/60 hover:bg-white/5 hover:text-white/90'
-                        }`}
-                        style={{ paddingLeft: `${0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75}rem` }}
-                      >
-                        <button onClick={() => scrollToBlock(b.id)} className="flex items-center gap-1.5 flex-1 min-w-0 text-left">
-                          {b.type === 'heading' ? (
-                            <span className="text-white/30 flex-shrink-0 select-none">{'#'.repeat(b.level!)}&nbsp;</span>
-                          ) : (
-                            <Hash className="h-3 w-3 flex-shrink-0 text-white/30" />
-                          )}
-                          <span className="truncate">{b.title || b.raw.trim()}</span>
-                        </button>
-                        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); moveSection(b.id, 'up'); }}
-                            className="p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10"
-                            title="Move up"
-                          >
-                            <ArrowUp className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); moveSection(b.id, 'down'); }}
-                            className="p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10"
-                            title="Move down"
-                          >
-                            <ArrowDown className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); b.type === 'heading' ? (b.deleted ? restoreSection(b.id) : removeSection(b.id)) : toggleDelete(b.id); }}
-                            className={`p-0.5 rounded transition-colors ${
-                              b.deleted
-                                ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-                                : 'text-white/40 hover:text-red-400 hover:bg-red-500/20'
-                            }`}
-                            title={b.deleted ? 'Restore' : 'Remove section'}
-                          >
-                            {b.deleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Content pane */}
-            <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
-              {blocks.length === 0 ? (
-                <p className="text-white/30 italic">This page has no narrative content. Copy sections from a Reflect output or type below.</p>
-              ) : (
-                blocks.map((b) => {
-                  if (b.deleted && !showRemoved) return null;
-                  const isEditing = editingBlockId === b.id;
-                  const isActive = activeRangeIds.has(b.id);
-                  return (
-                    <div
-                      key={`${prefix}content-${b.id}`}
-                      ref={(el) => { blockRefs.current.set(b.id, el); }}
-                      onClick={!isEditing ? () => scrollToBlock(b.id) : undefined}
-                      className={`group/row block whitespace-pre-wrap transition-colors rounded px-2 py-0.5 ${
-                        isActive
-                          ? b.deleted
-                            ? 'bg-white/5 text-white/20 line-through'
-                            : 'bg-emerald-500/15 text-emerald-300'
-                          : b.deleted
-                            ? 'opacity-25 line-through text-white/30'
-                            : b.edited
-                              ? 'text-white/90 border-l-2 border-blue-500/40 pl-1'
-                              : b.type === 'heading'
-                                ? 'text-emerald-400 font-semibold'
-                                : 'text-white/80'
-                      }`}
-                    >
-                      {isEditing ? (
-                        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-                          <textarea
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && e.ctrlKey) {
-                                e.preventDefault();
-                                const edited = b.type === 'heading'
-                                  ? `${'#'.repeat(b.level ?? 1)} ${editValue}\n`
-                                  : `${editValue}\n`;
-                                setBlocks((prev) => prev.map((bb) => (bb.id === b.id ? { ...bb, edited } : bb)));
-                                setEditingBlockId(null);
-                              }
-                              if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setEditingBlockId(null);
-                              }
-                            }}
-                            className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-[13px] text-white/90 font-mono leading-relaxed resize-none focus:outline-none focus:border-blue-500/50"
-                            rows={Math.min(10, editValue.split('\n').length + 1)}
-                            spellCheck={false}
-                            autoFocus
-                          />
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              onClick={() => setEditingBlockId(null)}
-                              className="text-[10px] px-2 py-0.5 rounded text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => {
-                                const edited = b.type === 'heading'
-                                  ? `${'#'.repeat(b.level ?? 1)} ${editValue}\n`
-                                  : `${editValue}\n`;
-                                setBlocks((prev) => prev.map((bb) => (bb.id === b.id ? { ...bb, edited } : bb)));
-                                setEditingBlockId(null);
-                              }}
-                              className="text-[10px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
-                            >
-                              Ctrl+Enter to save
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-start gap-1">
-                          <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
-                          {!b.deleted && (
-                            <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                              {b.edited && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBlocks((prev) => prev.map((bb) => (bb.id === b.id ? { ...bb, edited: undefined } : bb)));
-                                  }}
-                                  className="p-0.5 rounded text-white/30 hover:text-blue-400 hover:bg-blue-500/10"
-                                  title="Revert to original"
-                                >
-                                  <Undo2 className="h-3 w-3" />
-                                </button>
-                              )}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); startEditingBlock(b); }}
-                                className="p-0.5 rounded text-white/30 hover:text-blue-400 hover:bg-blue-500/10"
-                                title="Edit block"
-                              >
-                                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            <NarrativeViewer
+              ref={viewerRef}
+              blocks={visibleBlocks}
+              title="Sections"
+              activeBlockId={activeBlockId}
+              activeRangeIds={activeRangeIds}
+              viewMode="plain"
+              showIndex={true}
+              keyPrefix={keyPrefix}
+              renderSidebarRow={renderSidebarRow}
+              renderBlock={renderBlock}
+              onBlockClick={(b) => {
+                if (editingBlockId !== b.id) {
+                  scrollToBlock(b.id);
+                }
+              }}
+              className="min-h-0"
+            />
           </div>
         </div>
       </PanelContent>

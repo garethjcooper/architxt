@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment } from 'react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
@@ -14,10 +14,18 @@ export interface NarrativeDiagram {
 }
 
 export interface NarrativeViewerProps {
+  /** Markdown narrative content to display/index. Either this or `blocks` must be provided. */
+  content?: string;
+  /** Controlled block list. When provided, the viewer uses these blocks directly instead of parsing `content`. */
+  blocks?: NarrativeBlock[];
+  /** Controlled active block id for sidebar highlighting. */
+  activeBlockId?: string | null;
+  /** Controlled set of active range ids for content highlighting. */
+  activeRangeIds?: Set<string>;
   /** Markdown narrative content to display/index. */
-  content: string;
-  /** Optional title shown above the index sidebar. */
   title?: string;
+  /** Called when the user clicks a block in the content pane. */
+  onBlockClick?: (block: NarrativeBlock) => void;
   /** Called when the user clicks a heading in the index. */
   onHeadingClick?: (id: string, title?: string) => void;
   /** Called when the user chooses to copy a section (heading + its content). Receives the raw markdown. */
@@ -32,11 +40,19 @@ export interface NarrativeViewerProps {
   diagrams?: NarrativeDiagram[];
   /** Optional key namespace so multiple NarrativeViewers on the same page don't share React keys. */
   keyPrefix?: string;
+  /** Optional render prop for a sidebar row. Receives the block, whether it's active, its index, and computed indent (rem). */
+  renderSidebarRow?: (block: NarrativeBlock, ctx: { isActive: boolean; index: number; indent: number }) => React.ReactNode;
+  /** Optional render prop for a content block. Receives the block and whether it's in the active range. */
+  renderBlock?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
 }
 
-export function NarrativeViewer({
+export const NarrativeViewer = forwardRef(function NarrativeViewer({
   content,
+  blocks: blocksProp,
+  activeBlockId: activeBlockIdProp,
+  activeRangeIds: activeRangeIdsProp,
   title = 'Narrative',
+  onBlockClick,
   onHeadingClick,
   onCopySection,
   className = '',
@@ -44,19 +60,25 @@ export function NarrativeViewer({
   showIndex = true,
   diagrams,
   keyPrefix = '',
-}: NarrativeViewerProps) {
+  renderSidebarRow,
+  renderBlock,
+}: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
   const prefix = keyPrefix ? `${keyPrefix}-` : '';
-  const [blocks, setBlocks] = useState<NarrativeBlock[]>([]);
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
-  const [activeRangeIds, setActiveRangeIds] = useState<Set<string>>(new Set());
+  const [internalBlocks, setInternalBlocks] = useState<NarrativeBlock[]>([]);
+  const [internalActiveBlockId, setInternalActiveBlockId] = useState<string | null>(null);
+  const [internalActiveRangeIds, setInternalActiveRangeIds] = useState<Set<string>>(new Set());
+  const blocks = blocksProp ?? internalBlocks;
+  const activeBlockId = activeBlockIdProp ?? internalActiveBlockId;
+  const activeRangeIds = activeRangeIdsProp ?? internalActiveRangeIds;
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const markdownContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setBlocks(parseNarrativeBlocks(content));
-    setActiveBlockId(null);
-    setActiveRangeIds(new Set());
-  }, [content]);
+    if (blocksProp) return;
+    setInternalBlocks(parseNarrativeBlocks(content || ''));
+    setInternalActiveBlockId(null);
+    setInternalActiveRangeIds(new Set());
+  }, [content, blocksProp]);
 
   const structuralBlocks = useMemo(() => blocks.filter(b => b.type !== 'text'), [blocks]);
 
@@ -68,7 +90,7 @@ export function NarrativeViewer({
       const container = markdownContainerRef.current;
       const el = container?.querySelector(`#${CSS.escape(slug)}`) as HTMLElement | null;
       if (el) {
-        setActiveBlockId(id);
+        if (!blocksProp) setInternalActiveBlockId(id);
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       onHeadingClick?.(id, block.title);
@@ -76,8 +98,10 @@ export function NarrativeViewer({
     }
 
     const rangeIds = getSectionBlockIds(blocks, id);
-    setActiveBlockId(id);
-    setActiveRangeIds(new Set(rangeIds));
+    if (!blocksProp) {
+      setInternalActiveBlockId(id);
+      setInternalActiveRangeIds(new Set(rangeIds));
+    }
     if (rangeIds.length > 0) {
       const firstEl = blockRefs.current.get(rangeIds[0]);
       if (firstEl) {
@@ -85,9 +109,15 @@ export function NarrativeViewer({
       }
     }
     onHeadingClick?.(id, blocks.find(b => b.id === id)?.title);
-  }, [blocks, onHeadingClick, viewMode]);
+  }, [blocks, blocksProp, onHeadingClick, viewMode]);
+
+  useImperativeHandle(ref, () => ({ scrollToBlock }), [scrollToBlock]);
 
   const handleContentClick = useCallback((block: NarrativeBlock) => {
+    if (onBlockClick) {
+      onBlockClick(block);
+      return;
+    }
     let sectionId = block.id;
     if (block.type !== 'heading') {
       const bIdx = blocks.findIndex(bb => bb.id === block.id);
@@ -101,15 +131,90 @@ export function NarrativeViewer({
       }
     }
     scrollToBlock(sectionId);
-  }, [blocks, scrollToBlock]);
+  }, [blocks, onBlockClick, scrollToBlock]);
 
-  if (!content || blocks.length === 0) {
+  if (blocks.length === 0) {
     return (
       <div className={`flex items-center justify-center text-sm text-white/40 ${className}`}>
         No narrative available.
       </div>
     );
   }
+
+  const defaultSidebarRow = (b: NarrativeBlock, idx: number, isActive: boolean) => {
+    const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
+    return (
+      <div
+        key={`${prefix}index-${b.id}`}
+        className="flex items-center gap-1 group/copy"
+      >
+        <button
+          type="button"
+          onClick={() => scrollToBlock(b.id)}
+          className={`flex-1 min-w-0 text-left rounded-md px-2 py-1 text-[11px] transition-colors ${
+            isActive
+              ? 'bg-emerald-500/20 text-emerald-300'
+              : 'text-white/60 hover:bg-white/5 hover:text-white/90'
+          }`}
+          style={{ paddingLeft: `${indent}rem` }}
+        >
+          {b.type === 'heading' ? (
+            <span className="truncate block" title={b.title}>{b.title}</span>
+          ) : b.type === 'image' ? (
+            <span className="truncate block text-amber-400/70" title={`[IMAGE:${b.title}]`}>[IMAGE:{b.title}]</span>
+          ) : b.type === 'code' ? (
+            <span className="truncate block text-blue-400/70" title={b.title}>{b.title}</span>
+          ) : b.type === 'table' ? (
+            <span className="truncate block text-emerald-400/70" title="Table">Table</span>
+          ) : null}
+        </button>
+        {onCopySection && b.type === 'heading' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const ids = getSectionBlockIds(blocks, b.id);
+              const markdown = blocks
+                .filter((bb) => ids.includes(bb.id))
+                .map((bb) => bb.raw)
+                .join('');
+              onCopySection(markdown, b.title);
+            }}
+            className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 flex-shrink-0 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
+            title="Copy section to page editor"
+            aria-label="Copy section"
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const defaultBlock = (b: NarrativeBlock, isActive: boolean) => (
+    <div
+      key={`${prefix}block-${b.id}`}
+      ref={el => { blockRefs.current.set(b.id, el); }}
+      onClick={() => handleContentClick(b)}
+      className={`block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${
+        isActive
+          ? b.type === 'heading'
+            ? 'bg-emerald-500/15 text-emerald-300'
+            : 'bg-emerald-500/10 text-emerald-200/90'
+          : b.type === 'heading'
+            ? 'text-emerald-400 font-semibold'
+            : b.type === 'image'
+              ? 'text-amber-400/80 italic'
+              : b.type === 'code'
+                ? 'text-blue-400/80'
+                : b.type === 'table'
+                  ? 'text-emerald-400/80'
+                  : 'text-white/80'
+      }`}
+    >
+      {b.edited ?? b.raw}
+    </div>
+  );
 
   return (
     <div className={`flex flex-1 min-h-0 gap-3 overflow-hidden ${className}`}>
@@ -124,52 +229,14 @@ export function NarrativeViewer({
             {structuralBlocks.length === 0 ? (
               <p className="text-xs text-white/30 p-1">No sections found</p>
             ) : (
-              structuralBlocks.map((b, idx) => (
-                <div
-                  key={`${prefix}index-${b.id}`}
-                  className="flex items-center gap-1 group/copy"
-                >
-                  <button
-                    type="button"
-                    onClick={() => scrollToBlock(b.id)}
-                    className={`flex-1 min-w-0 text-left rounded-md px-2 py-1 text-[11px] transition-colors ${
-                      activeBlockId === b.id
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'text-white/60 hover:bg-white/5 hover:text-white/90'
-                    }`}
-                    style={{ paddingLeft: `${0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75}rem` }}
-                  >
-                    {b.type === 'heading' ? (
-                      <span className="truncate block" title={b.title}>{b.title}</span>
-                    ) : b.type === 'image' ? (
-                      <span className="truncate block text-amber-400/70" title={`[IMAGE:${b.title}]`}>[IMAGE:{b.title}]</span>
-                    ) : b.type === 'code' ? (
-                      <span className="truncate block text-blue-400/70" title={b.title}>{b.title}</span>
-                    ) : b.type === 'table' ? (
-                      <span className="truncate block text-emerald-400/70" title="Table">Table</span>
-                    ) : null}
-                  </button>
-                  {onCopySection && b.type === 'heading' && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const ids = getSectionBlockIds(blocks, b.id);
-                        const markdown = blocks
-                          .filter((bb) => ids.includes(bb.id))
-                          .map((bb) => bb.raw)
-                          .join('');
-                        onCopySection(markdown, b.title);
-                      }}
-                      className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 flex-shrink-0 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
-                      title="Copy section to page editor"
-                      aria-label="Copy section"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              ))
+              structuralBlocks.map((b, idx) => {
+                const isActive = activeBlockId === b.id;
+                if (renderSidebarRow) {
+                  const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
+                  return <Fragment key={`${prefix}index-${b.id}`}>{renderSidebarRow(b, { isActive, index: idx, indent })}</Fragment>;
+                }
+                return defaultSidebarRow(b, idx, isActive);
+              })
             )}
           </div>
         </div>
@@ -182,34 +249,14 @@ export function NarrativeViewer({
         }`}
       >
         {viewMode === 'markdown' ? (
-          <Markdown className="text-[13px] leading-relaxed">{content}</Markdown>
+          <Markdown className="text-[13px] leading-relaxed">{content || ''}</Markdown>
         ) : (
           blocks.map(b => {
             const isActive = activeRangeIds.has(b.id);
-            return (
-              <div
-                key={`${prefix}block-${b.id}`}
-                ref={el => { blockRefs.current.set(b.id, el); }}
-                onClick={() => handleContentClick(b)}
-                className={`block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${
-                  isActive
-                    ? b.type === 'heading'
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : 'bg-emerald-500/10 text-emerald-200/90'
-                    : b.type === 'heading'
-                      ? 'text-emerald-400 font-semibold'
-                      : b.type === 'image'
-                        ? 'text-amber-400/80 italic'
-                        : b.type === 'code'
-                          ? 'text-blue-400/80'
-                          : b.type === 'table'
-                            ? 'text-emerald-400/80'
-                            : 'text-white/80'
-                }`}
-              >
-                {b.raw}
-              </div>
-            );
+            if (renderBlock) {
+              return <Fragment key={`${prefix}block-${b.id}`}>{renderBlock(b, { isActive })}</Fragment>;
+            }
+            return defaultBlock(b, isActive);
           })
         )}
         {diagrams && diagrams.length > 0 && (
@@ -224,4 +271,4 @@ export function NarrativeViewer({
       </div>
     </div>
   );
-}
+});
