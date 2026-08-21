@@ -19,6 +19,8 @@ import {
   listSessionsByServerBank,
   updateSession,
   deleteSessionWithSteps,
+  createSessionPage,
+  updateCuratedPage,
 } from '../db/crud/research.js';
 
 import { discoverMentalModelsByRoles } from '../services/research/mental-model-discovery.js';
@@ -152,6 +154,7 @@ const toApiSession = (dbRow) => ({
   server_id: dbRow.rs_server_id,
   bank_id: dbRow.rs_bank_id,
   viewpoint_ids: dbRow.rs_viewpoint_ids,
+  scope_entity_ids: dbRow.rs_scope_entity_ids,
   status: dbRow.rs_status,
   current_step_id: dbRow.rs_current_step_id,
   created_at: dbRow.rs_created_at,
@@ -1357,7 +1360,7 @@ router.post('/synthesize', async (req, res) => {
  */
 router.post('/sessions', async (req, res) => {
   const start = Date.now();
-  const { title, description, server_id, bank_id, viewpoint_ids } = req.body;
+  const { title, description, server_id, bank_id, viewpoint_ids, scope_entity_ids } = req.body;
 
   if (!server_id || typeof server_id !== 'number') {
     sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions', duration: Date.now() - start });
@@ -1378,6 +1381,7 @@ router.post('/sessions', async (req, res) => {
     rs_server_id: server_id,
     rs_bank_id: bank_id,
     rs_viewpoint_ids: viewpoint_ids,
+    rs_scope_entity_ids: scope_entity_ids ?? [],
     rs_status: 'active',
   });
 
@@ -1438,11 +1442,12 @@ router.put('/sessions/:id', async (req, res) => {
   const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id', start });
   if (!idCheck.valid) return;
 
-  const { title, description, status } = req.body;
+  const { title, description, status, scope_entity_ids } = req.body;
   const updateData = {};
   if (title !== undefined) updateData.rs_title = title;
   if (description !== undefined) updateData.rs_description = description;
   if (status !== undefined) updateData.rs_status = status;
+  if (scope_entity_ids !== undefined) updateData.rs_scope_entity_ids = scope_entity_ids;
 
   const result = await updateSession(db, idCheck.id, updateData);
   if (!result.success) {
@@ -1487,6 +1492,56 @@ router.get('/sessions/:id/steps', async (req, res) => {
 
 /**
  * @openapi
+ * /research/sessions/{id}/pages:
+ *   post:
+ *     summary: Create a new curated page inside a research session
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title]
+ *             properties:
+ *               title:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Curated page created
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: Session not found
+ */
+router.post('/sessions/:id/pages', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/pages', start });
+  if (!idCheck.valid) return;
+
+  const { title } = req.body;
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    sendResponse({ res, status: 400, error: 'title is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  const sessionResult = await getSession(db, idCheck.id);
+  if (!sessionResult.success || !sessionResult.data) {
+    sendResponse({ res, status: 404, error: 'Research session not found', code: 'NOT_FOUND', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  const result = await createSessionPage(db, idCheck.id, title.trim());
+  if (!result.success) {
+    sendResponse({ res, status: mapErrorToStatus(result.code) || 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  sendResponse({ res, status: 201, data: { step_id: result.data }, logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
  * /research/steps/{id}:
  *   get:
  *     summary: Get a single research step
@@ -1518,6 +1573,44 @@ router.get('/steps/:id', async (req, res) => {
     return;
   }
   sendResponse({ res, status: 200, data: toApiStep(result.data), logger, method: 'GET', path: '/research/steps/:id', duration: Date.now() - start });
+});
+
+router.put('/steps/:id', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/steps/:id', start });
+  if (!idCheck.valid) return;
+
+  const stepResult = await getStep(db, idCheck.id);
+  if (!stepResult.success || !stepResult.data) {
+    sendResponse({ res, status: 404, error: 'Research step not found', code: 'NOT_FOUND', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const step = stepResult.data;
+  if (step.rstep_action_type !== 'curated_page') {
+    sendResponse({ res, status: 400, error: 'Only curated_page steps can be updated via this route', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const { intent_text, canvas, synthesis } = req.body;
+  const updateData = {};
+  if (intent_text !== undefined) updateData.rstep_intent_text = intent_text;
+  if (canvas !== undefined) updateData.rstep_canvas_state = canvas;
+  if (synthesis !== undefined) updateData.rstep_synthesis = synthesis;
+
+  if (Object.keys(updateData).length === 0) {
+    sendResponse({ res, status: 400, error: 'No fields to update', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const result = await updateCuratedPage(db, idCheck.id, updateData);
+  if (!result.success) {
+    sendResponse({ res, status: mapErrorToStatus(result.code) || 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const updated = await getStep(db, idCheck.id);
+  sendResponse({ res, status: 200, data: toApiStep(updated.data), logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
 });
 
 router.delete('/steps/:id', async (req, res) => {

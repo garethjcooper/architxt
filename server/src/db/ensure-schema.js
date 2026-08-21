@@ -118,6 +118,7 @@ function ensureMissingTables(db) {
         rs_server_id INTEGER,
         rs_bank_id TEXT NOT NULL,
         rs_viewpoint_ids JSON NOT NULL,
+        rs_scope_entity_ids JSON,
         rs_status TEXT NOT NULL DEFAULT 'active',
         rs_current_step_id INTEGER,
         rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -983,6 +984,10 @@ function ensureMissingColumns(db) {
         {
           name: 'rs_server_id',
           ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_server_id INTEGER REFERENCES servers(svr_id) ON DELETE SET NULL'
+        },
+        {
+          name: 'rs_scope_entity_ids',
+          ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_scope_entity_ids JSON'
         }
       ]
     },
@@ -1201,6 +1206,7 @@ function ensureResearchSessionsServerFk(db) {
         rs_server_id INTEGER,
         rs_bank_id TEXT NOT NULL,
         rs_viewpoint_ids JSON NOT NULL,
+        rs_scope_entity_ids JSON,
         rs_status TEXT NOT NULL DEFAULT 'active',
         rs_current_step_id INTEGER,
         rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -1212,7 +1218,7 @@ function ensureResearchSessionsServerFk(db) {
 
     const columns = [
       'rs_id', 'rs_title', 'rs_description', 'rs_server_id', 'rs_bank_id',
-      'rs_viewpoint_ids', 'rs_status', 'rs_current_step_id', 'rs_created_at', 'rs_updated_at'
+      'rs_viewpoint_ids', 'rs_scope_entity_ids', 'rs_status', 'rs_current_step_id', 'rs_created_at', 'rs_updated_at'
     ];
     const colList = columns.join(', ');
     db.exec(`INSERT INTO _research_sessions_new (${colList}) SELECT ${colList} FROM research_sessions`);
