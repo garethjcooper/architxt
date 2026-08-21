@@ -16,6 +16,8 @@ interface WorkspaceResultPanelProps {
   error: string | null;
   sessionName?: string;
   onCopy?: (event: ResearchCopyEvent) => void;
+  /** Optional key namespace passed through to ResearchResultPanel/NarrativeViewer. */
+  keyPrefix?: string;
 }
 
 export function WorkspaceResultPanel({
@@ -24,6 +26,7 @@ export function WorkspaceResultPanel({
   error,
   sessionName,
   onCopy,
+  keyPrefix,
 }: WorkspaceResultPanelProps) {
   // Structured-output Reflect steps can carry their payload in canvas.graph while
   // leaving synthesis.narrative empty. Show the diagrams/canvas pane in that
@@ -46,6 +49,7 @@ export function WorkspaceResultPanel({
       sessionName={sessionName || 'reflect'}
       onCopy={onCopy}
       showCanvas={hasGraph}
+      keyPrefix={keyPrefix}
       {...panelState}
     />
   );

@@ -135,6 +135,8 @@ export interface ResearchResultPanelProps {
   onCopy?: (event: ResearchCopyEvent) => void;
   /** When false, only the narrative pane is rendered (no graph/diagrams panel). */
   showCanvas?: boolean;
+  /** Optional key namespace passed through to NarrativeViewer. */
+  keyPrefix?: string;
 }
 
 export function ResearchResultPanel({
@@ -170,6 +172,7 @@ export function ResearchResultPanel({
   onResizeNarrativeReset,
   onCopy,
   showCanvas = true,
+  keyPrefix,
 }: ResearchResultPanelProps) {
   const trail = trailProp ?? [];
   const selectedStepIds = selectedStepIdsProp ?? new Set<number>();
@@ -407,7 +410,14 @@ export function ResearchResultPanel({
                 </div>
               )}
               {resultView === 'narrative' && (
-                <NarrativeViewer content={narrative} title="Sections" viewMode={showNarrativePlain ? 'plain' : 'markdown'} showIndex={showNarrativeIndex} onCopySection={onCopy ? (markdown, title) => onCopy({ type: 'narrative', payload: markdown, label: title }) : undefined} />
+                <NarrativeViewer
+                  content={narrative}
+                  title="Sections"
+                  viewMode={showNarrativePlain ? 'plain' : 'markdown'}
+                  showIndex={showNarrativeIndex}
+                  onCopySection={onCopy ? (markdown, title) => onCopy({ type: 'narrative', payload: markdown, label: title }) : undefined}
+                  keyPrefix={keyPrefix}
+                />
               )}
             </div>
           )}

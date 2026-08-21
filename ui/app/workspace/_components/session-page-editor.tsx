@@ -40,6 +40,8 @@ interface CanvasShape {
 interface SessionPageEditorProps {
   step: ResearchStepSummary;
   onSaved?: (updated: ResearchStepSummary) => void;
+  /** Optional key namespace so multiple session editors on the same page don't share React keys. */
+  keyPrefix?: string;
 }
 
 function defaultCanvas(canvas: ResearchStepSummary['canvas']): CanvasShape {
@@ -51,9 +53,10 @@ function defaultCanvas(canvas: ResearchStepSummary['canvas']): CanvasShape {
 }
 
 export const SessionPageEditor = forwardRef(function SessionPageEditor(
-  { step, onSaved }: SessionPageEditorProps,
+  { step, onSaved, keyPrefix = '' }: SessionPageEditorProps,
   ref: React.Ref<SessionPageEditorRef>
 ) {
+  const prefix = keyPrefix ? `${keyPrefix}-` : '';
   const [title, setTitle] = useState(step.intent_text || '');
   const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => buildBlocks(step.synthesis?.narrative));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -313,7 +316,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
                     const isActive = activeBlockId === b.id;
                     return (
                       <div
-                        key={`sidebar-${b.id}`}
+                        key={`${prefix}sidebar-${b.id}`}
                         id={`sidebar-row-${b.id}`}
                         className={`group flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
                           isActive
@@ -377,7 +380,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
                   const isActive = activeRangeIds.has(b.id);
                   return (
                     <div
-                      key={`content-${b.id}`}
+                      key={`${prefix}content-${b.id}`}
                       ref={(el) => { blockRefs.current.set(b.id, el); }}
                       onClick={!isEditing ? () => scrollToBlock(b.id) : undefined}
                       className={`group/row block whitespace-pre-wrap transition-colors rounded px-2 py-0.5 ${
