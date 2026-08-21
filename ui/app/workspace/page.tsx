@@ -82,6 +82,14 @@ export default function WorkspacePage() {
     return Array.from(new Set([...manuallyAttachedIds, ...mentionedEntityIds]));
   }, [manuallyAttachedIds, mentionedEntityIds]);
 
+  const scopeEntityIds = useMemo(() => {
+    return activeSession?.scope_entity_ids ?? [];
+  }, [activeSession?.scope_entity_ids]);
+
+  const contextualEntityIds = useMemo(() => {
+    return Array.from(new Set([...scopeEntityIds, ...attachedEntityIds]));
+  }, [scopeEntityIds, attachedEntityIds]);
+
   const {
     selectedServerId,
     setSelectedServerId,
@@ -381,14 +389,14 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
-    if (!serverId || !bankId || attachedEntityIds.length === 0) {
+    if (!serverId || !bankId || contextualEntityIds.length === 0) {
       setEntityInfoMap(null);
       return;
     }
     let cancelled = false;
     setLoadingEntityInfo(true);
     entityInfoApi
-      .info(serverId, bankId, attachedEntityIds)
+      .info(serverId, bankId, contextualEntityIds)
       .then((result) => {
         if (cancelled) return;
         const contentMap = result.content || {};
@@ -400,7 +408,7 @@ export default function WorkspacePage() {
       })
       .catch((err: any) => {
         if (cancelled) return;
-        logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: attachedEntityIds });
+        logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: contextualEntityIds });
         toast.error(`Failed to load entity info: ${err.message || err}`);
         setEntityInfoMap(null);
       })
@@ -410,7 +418,7 @@ export default function WorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [serverId, bankId, attachedEntityIds]);
+  }, [serverId, bankId, contextualEntityIds]);
 
   return (
     <PageShell
@@ -481,7 +489,7 @@ export default function WorkspacePage() {
             )}
 
             <AttachedEntitiesPanel
-              entityIds={attachedEntityIds}
+              entityIds={contextualEntityIds}
               entityInfoMap={entityInfoMap}
               loading={loadingEntityInfo}
               expandedEntityIds={expandedEntityIds}
