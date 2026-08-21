@@ -152,16 +152,75 @@ export default function WorkspacePage() {
     document.body.style.userSelect = '';
   }, []);
 
+  // Layout sizing: three horizontal panes inside the left column.
+  const leftColumnRef = useRef<HTMLDivElement>(null);
+  const [leftPaneHeights, setLeftPaneHeights] = useState({ top: 0.33, middle: 0.34, bottom: 0.33 });
+  const [hResizing, setHResizing] = useState<null | 'row1' | 'row2'>(null);
+  const hResizeStartRef = useRef({
+    y: 0,
+    height: 0,
+    heights: { top: 0.33, middle: 0.34, bottom: 0.33 },
+  });
+
+  const handleHResizeStart = useCallback(
+    (pane: 'row1' | 'row2') => (e: React.MouseEvent) => {
+      setHResizing(pane);
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+      hResizeStartRef.current = {
+        y: e.clientY,
+        height: leftColumnRef.current?.getBoundingClientRect().height ?? 0,
+        heights: { ...leftPaneHeights },
+      };
+    },
+    [leftPaneHeights]
+  );
+
+  const handleHResizeMove = useCallback(
+    (e: MouseEvent) => {
+      if (!hResizing) return;
+      const { y, height, heights } = hResizeStartRef.current;
+      if (height <= 0) return;
+      const delta = (e.clientY - y) / height;
+      const MIN = 0.12;
+
+      if (hResizing === 'row1') {
+        const nextTop = Math.max(MIN, Math.min(heights.top + delta, heights.top + heights.middle - MIN));
+        const nextMiddle = Math.max(MIN, heights.middle - (nextTop - heights.top));
+        setLeftPaneHeights((prev) => ({ ...prev, top: nextTop, middle: nextMiddle }));
+      } else if (hResizing === 'row2') {
+        const nextMiddle = Math.max(MIN, Math.min(heights.middle + delta, heights.middle + heights.bottom - MIN));
+        const nextBottom = Math.max(MIN, heights.bottom - (nextMiddle - heights.middle));
+        setLeftPaneHeights((prev) => ({ ...prev, middle: nextMiddle, bottom: nextBottom }));
+      }
+    },
+    [hResizing]
+  );
+
+  const handleHResizeEnd = useCallback(() => {
+    setHResizing(null);
+    if (!resizing) {
+      document.body.style.cursor = '';
+    }
+    document.body.style.userSelect = '';
+  }, [resizing]);
+
   useEffect(() => {
-    const move = (e: MouseEvent) => handleResizeMove(e);
-    const up = () => handleResizeEnd();
+    const move = (e: MouseEvent) => {
+      handleResizeMove(e);
+      handleHResizeMove(e);
+    };
+    const up = () => {
+      handleResizeEnd();
+      handleHResizeEnd();
+    };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
     return () => {
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', up);
     };
-  }, [handleResizeMove, handleResizeEnd]);
+  }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd]);
 
   const handleSelectStep = useCallback((step: ResearchStepSummary) => {
     setSelectedStep(step);
@@ -455,49 +514,61 @@ export default function WorkspacePage() {
         {/* Main three-column workbench */}
         <div ref={mainRowRef} className="flex-1 min-h-0 flex">
           {/* Column 1: query + entities | session items | contextual data */}
-          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
-            <ReflectQueryPanel
-              query={reflectQuery}
-              onChange={setReflectQuery}
-              onSubmit={handleReflect}
-              attachedEntityIds={attachedEntityIds}
-              entityInfoMap={entityInfoMap}
-              aqlEntities={aqlEntities}
-              aqlEdges={aqlEdges}
-              onDetachEntity={handleDetachEntity}
-              disabled={!reflectQuery.trim() || !serverId || !bankId}
-            />
+          <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
+            <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
+              <ReflectQueryPanel
+                query={reflectQuery}
+                onChange={setReflectQuery}
+                onSubmit={handleReflect}
+                attachedEntityIds={attachedEntityIds}
+                entityInfoMap={entityInfoMap}
+                aqlEntities={aqlEntities}
+                aqlEdges={aqlEdges}
+                onDetachEntity={handleDetachEntity}
+                disabled={!reflectQuery.trim() || !serverId || !bankId}
+              />
+            </div>
+
+            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} title="Drag to resize query / session items" />
 
             {serverId && bankId ? (
-              <SessionItemsPanel
-                serverId={serverId}
-                bankId={bankId}
-                activeStepId={selectedStep?.id}
-                editingStepId={editingStep?.id}
-                refreshSignal={sessionRefreshSignal}
-                onSelectStep={handleSelectStep}
-                onEditPage={handleEditPage}
-                onActiveSessionChange={setActiveSession}
-              />
+              <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.middle, minHeight: 140 }}>
+                <SessionItemsPanel
+                  serverId={serverId}
+                  bankId={bankId}
+                  activeStepId={selectedStep?.id}
+                  editingStepId={editingStep?.id}
+                  refreshSignal={sessionRefreshSignal}
+                  onSelectStep={handleSelectStep}
+                  onEditPage={handleEditPage}
+                  onActiveSessionChange={setActiveSession}
+                />
+              </div>
             ) : (
-              <Panel className="flex-1 min-h-0">
-                <PanelHeader title="Session items" />
-                <PanelContent className="p-3">
-                  <div className="text-white/40 text-xs">Select a server and bank to load sessions.</div>
-                </PanelContent>
-              </Panel>
+              <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.middle, minHeight: 140 }}>
+                <Panel className="flex-1 min-h-0">
+                  <PanelHeader title="Session items" />
+                  <PanelContent className="p-3">
+                    <div className="text-white/40 text-xs">Select a server and bank to load sessions.</div>
+                  </PanelContent>
+                </Panel>
+              </div>
             )}
 
-            <AttachedEntitiesPanel
-              entityIds={contextualEntityIds}
-              entityInfoMap={entityInfoMap}
-              loading={loadingEntityInfo}
-              expandedEntityIds={expandedEntityIds}
-              selectedModelKeys={selectedModelKeys}
-              onDetach={handleDetachEntity}
-              onToggleExpand={toggleEntityExpanded}
-              onSelectModel={selectEntityModel}
-            />
+            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row2')} title="Drag to resize session items / contextual data" />
+
+            <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 120 }}>
+              <AttachedEntitiesPanel
+                entityIds={contextualEntityIds}
+                entityInfoMap={entityInfoMap}
+                loading={loadingEntityInfo}
+                expandedEntityIds={expandedEntityIds}
+                selectedModelKeys={selectedModelKeys}
+                onDetach={handleDetachEntity}
+                onToggleExpand={toggleEntityExpanded}
+                onSelectModel={selectEntityModel}
+              />
+            </div>
           </div>
 
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/middle columns" />
