@@ -1316,7 +1316,7 @@ export const researchApi = {
     }),
 
   updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string } }) =>
-    fetchApi<{ updated: true; step_id: number }>(`/research/steps/${stepId}`, {
+    fetchApi<ResearchStep>(`/research/steps/${stepId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
