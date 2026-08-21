@@ -176,6 +176,14 @@ export function QueryForm(props: QueryFormProps) {
     return map;
   }, [availableEntities]);
 
+  const handleEditorChange = useCallback(
+    (value: string, newCursor: number) => {
+      setQuery(value);
+      setCursor(newCursor);
+    },
+    [setQuery, setCursor],
+  );
+
   return (
     <form onSubmit={onSubmit} className="flex flex-col h-full p-2 gap-2 overflow-hidden">
       <div className="flex flex-1 min-h-0 gap-2">
@@ -183,10 +191,7 @@ export function QueryForm(props: QueryFormProps) {
           <div className="flex flex-col flex-1 min-h-0 min-w-0 relative">
             <AqlEditor
               value={query}
-              onChange={(value, newCursor) => {
-                setQuery(value);
-                setCursor(newCursor);
-              }}
+              onChange={handleEditorChange}
               disabled={isRunning}
               placeholder={QUERY_PLACEHOLDERS[queryMode]}
               availableEntities={availableEntities}

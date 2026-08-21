@@ -516,16 +516,31 @@ export function AqlEditor(props: AqlEditorProps) {
   }, [availableEntities, availableEdges, includeEdges]);
 
   const lastCursorRef = useRef(0);
+  const lastValueRef = useRef(value);
+  useEffect(() => {
+    lastValueRef.current = value;
+  }, [value]);
 
+  // Keep the change callback stable so CodeMirror doesn't rebind on every
+  // keystroke. We still suppress duplicate notifications with value/cursor refs.
   const handleChange = useCallback(
     (newValue: string, viewUpdate: ViewUpdate) => {
       const cursor = viewUpdate.state.selection.main.head;
-      if (newValue !== value || cursor !== lastCursorRef.current) {
-        lastCursorRef.current = cursor;
-        onChange(newValue, cursor);
+      const valueChanged = newValue !== lastValueRef.current;
+      const cursorChanged = cursor !== lastCursorRef.current;
+      if (valueChanged || cursorChanged) {
+        lastValueRef.current = newValue;
+        if (cursorChanged) {
+          lastCursorRef.current = cursor;
+        }
+        // Notify parent whenever the document value changes, but not for
+        // pure cursor/selection movements.
+        if (valueChanged) {
+          onChange(newValue, cursor);
+        }
       }
     },
-    [value, onChange],
+    [onChange],
   );
 
   // Keep the submit callback in a ref so the keymap extension never has to be
