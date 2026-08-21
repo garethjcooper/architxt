@@ -122,7 +122,7 @@ export function NarrativeViewer({
             ) : (
               structuralBlocks.map((b, idx) => (
                 <div
-                  key={b.id}
+                  key={`index-${b.id}`}
                   className="flex items-center gap-1 group/copy"
                 >
                   <button
@@ -184,7 +184,7 @@ export function NarrativeViewer({
             const isActive = activeRangeIds.has(b.id);
             return (
               <div
-                key={b.id}
+                key={`block-${b.id}`}
                 ref={el => { blockRefs.current.set(b.id, el); }}
                 onClick={() => handleContentClick(b)}
                 className={`block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${
