@@ -29,7 +29,6 @@ import { EntityScopePanel } from './_components/entity-scope-panel';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
-import type { SessionItemsPanelRef } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { pollForStepCompletion } from '@/lib/api/poll-step';
 import { type ResearchQueryOptions, buildDiscoverOptions } from '@/app/research/use-research-session';
@@ -39,6 +38,7 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 import { SessionPageEditor } from './_components/session-page-editor';
 import type { SessionPageEditorRef } from './_components/session-page-editor';
 import { type ResearchCopyEvent } from '@/app/research/research-result-panel';
+import { useWorkspaceSession } from './_components/use-workspace-session';
 
 const logger = createLogger('WorkspacePage');
 
@@ -75,13 +75,7 @@ export default function WorkspacePage() {
   const [reflectError, setReflectError] = useState<string | null>(null);
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
-  const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
-  const sessionItemsRef = useRef<SessionItemsPanelRef | null>(null);
   const editorRef = useRef<SessionPageEditorRef | null>(null);
-
-  const scopeEntityIds = useMemo(() => {
-    return activeSession?.scope_entity_ids ?? [];
-  }, [activeSession?.scope_entity_ids]);
 
   const {
     selectedServerId,
@@ -92,6 +86,17 @@ export default function WorkspacePage() {
 
   const serverId = selectedServerId ? Number(selectedServerId) : 0;
   const bankId = selectedBankId;
+
+  const workspaceSession = useWorkspaceSession({ serverId, bankId });
+  const [activeSession, setActiveSession] = useState<ResearchSession | null>(workspaceSession.activeSession);
+
+  useEffect(() => {
+    setActiveSession(workspaceSession.activeSession);
+  }, [workspaceSession.activeSession]);
+
+  const scopeEntityIds = useMemo(() => {
+    return activeSession?.scope_entity_ids ?? [];
+  }, [activeSession?.scope_entity_ids]);
 
   // Layout sizing: three vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
@@ -227,7 +232,6 @@ export default function WorkspacePage() {
   const handlePageSaved = useCallback((updated: ResearchStepSummary) => {
     setEditingStep(updated);
     setSelectedStep((prev) => (prev?.id === updated.id ? updated : prev));
-    void sessionItemsRef.current?.refresh();
     toast.success('Page updated');
   }, []);
 
@@ -378,7 +382,7 @@ export default function WorkspacePage() {
       // The discover route returns 202 immediately; poll the session steps until
       // the new step finishes, then select it like any other existing step.
       const completedStep = await pollForStepCompletion(response.session_id, response.step_id, {
-        onPoll: () => sessionItemsRef.current?.refresh(),
+        onPoll: () => workspaceSession.refresh(),
       });
       if (!completedStep) {
         throw new Error('Timed out waiting for Reflect step to complete');
@@ -390,7 +394,7 @@ export default function WorkspacePage() {
         toast.warning(`Reflect completed with warnings: ${completedStep.error_message}`);
       }
       setSelectedStep(completedStep);
-      void sessionItemsRef.current?.refresh();
+      void workspaceSession.refresh();
       toast.success('Reflect query completed');
     } catch (err: any) {
       setReflectError(err.message || String(err));
@@ -447,7 +451,7 @@ export default function WorkspacePage() {
         const nextStep: ResearchStepSummary = { ...page, intent_text: updated.intent_text ?? pageTitle, synthesis: updated.synthesis, canvas: updated.canvas };
         setSelectedStep(nextStep);
         setEditingStep(nextStep);
-        void sessionItemsRef.current?.refresh();
+        void workspaceSession.refresh();
         toast.success(`Created page "${pageTitle}" with copied ${event.type}`);
         return;
       } catch (err: any) {
@@ -489,11 +493,9 @@ export default function WorkspacePage() {
 
     try {
       await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
-      void sessionItemsRef.current?.refresh();
     } catch (err: any) {
       logger.error('Failed to update session scope', { error: err, sessionId: activeSession.id, entityId });
       toast.error(`Failed to update scope: ${err.message || err}`);
-      void sessionItemsRef.current?.refresh();
     }
   }, [activeSession]);
 
@@ -509,7 +511,7 @@ export default function WorkspacePage() {
     }
     try {
       await researchApi.rerunStep(stepId, { server_id: serverId });
-      void sessionItemsRef.current?.refresh();
+      void workspaceSession.refresh();
       toast.success('Re-running query');
     } catch (err: any) {
       logger.error('Failed to re-run step', { error: err, stepId });
@@ -635,17 +637,18 @@ export default function WorkspacePage() {
             {serverId && bankId ? (
               <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.middle, minHeight: 140 }}>
                 <SessionItemsPanel
-                  ref={sessionItemsRef}
-                  serverId={serverId}
-                  bankId={bankId}
+                  session={workspaceSession.activeSession}
+                  items={workspaceSession.workspaceItems}
+                  loading={workspaceSession.sessionsLoading || workspaceSession.trailLoading}
                   activeStepId={selectedStep?.id}
                   editingStepId={editingStep?.id}
+                  runningStepId={workspaceSession.runningStepId}
                   onSelectStep={handleSelectStep}
                   onEditPage={handleEditPage}
-                  onActiveSessionChange={setActiveSession}
                   onReuseStep={handleReuseStep}
                   onRerunStep={handleRerunStep}
                   onInspectStep={handleInspectStep}
+                  onRefresh={workspaceSession.refresh}
                 />
               </div>
             ) : (

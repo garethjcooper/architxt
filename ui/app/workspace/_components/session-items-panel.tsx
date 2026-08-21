@@ -1,6 +1,4 @@
-'use client';
-
-import { useState, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus } from 'lucide-react';
@@ -12,156 +10,37 @@ import { QueryTrail } from '@/app/research/query-trail';
 
 const logger = createLogger('SessionItemsPanel');
 
-const WORKSPACE_ITEM_TYPES = new Set(['reflect', 'curated_page']);
-
-export interface SessionItemsPanelRef {
-  refresh: () => Promise<void>;
-}
-
 export interface SessionItemsPanelProps {
-  serverId: number;
-  bankId: string;
+  session?: ResearchSession | null;
+  items: ResearchStepSummary[];
+  loading?: boolean;
   activeStepId?: number | null;
   editingStepId?: number | null;
+  runningStepId?: number | null;
   onSelectStep: (step: ResearchStepSummary) => void;
   onEditPage: (step: ResearchStepSummary) => void;
-  onActiveSessionChange?: (session: ResearchSession | null) => void;
   onReuseStep?: (step: ResearchStepSummary) => void;
   onRerunStep?: (stepId: number) => Promise<unknown>;
   onInspectStep?: (step: ResearchStepSummary) => void;
+  onRefresh?: () => void | Promise<void>;
 }
 
-function isWorkspaceItem(step: ResearchStepSummary): boolean {
-  return WORKSPACE_ITEM_TYPES.has(step.action_type || 'discover');
-}
-
-export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPanelProps>(function SessionItemsPanel({
-  serverId,
-  bankId,
+export function SessionItemsPanel({
+  session,
+  items,
+  loading = false,
   activeStepId,
   editingStepId,
+  runningStepId,
   onSelectStep,
   onEditPage,
-  onActiveSessionChange,
   onReuseStep,
   onRerunStep,
   onInspectStep,
-}, ref) {
-  const [sessions, setSessions] = useState<ResearchSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
-  const [items, setItems] = useState<ResearchStepSummary[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(false);
-  const [loadingItems, setLoadingItems] = useState(false);
+  onRefresh,
+}: SessionItemsPanelProps) {
   const [creatingPage, setCreatingPage] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState('');
-
-  const activeSession = useMemo(
-    () => sessions.find((s) => s.id === activeSessionId) || null,
-    [sessions, activeSessionId]
-  );
-
-  useEffect(() => {
-    onActiveSessionChange?.(activeSession);
-  }, [activeSession, onActiveSessionChange]);
-
-  const loadSessions = useCallback(async () => {
-    setLoadingSessions(true);
-    try {
-      const data = await researchApi.listSessions(serverId, bankId);
-      const list = Array.isArray(data) ? data : [];
-      setSessions(list);
-      return list;
-    } catch (err) {
-      logger.error('Failed to load sessions', err);
-      toast.error('Failed to load sessions');
-      return [];
-    } finally {
-      setLoadingSessions(false);
-    }
-  }, [serverId, bankId]);
-
-  const ensureActiveSession = useCallback(
-    async (list: ResearchSession[]) => {
-      if (list.length === 0) {
-        try {
-          const created = await researchApi.createSession({
-            server_id: serverId,
-            bank_id: bankId,
-            viewpoint_ids: [],
-            title: 'Workspace session',
-          });
-          const refreshed = await loadSessions();
-          const next = refreshed.find((s) => s.id === created.session_id) || refreshed[0] || null;
-          if (next) {
-            setActiveSessionId(next.id);
-          }
-          return next;
-        } catch (err) {
-          logger.error('Failed to create workspace session', err);
-          toast.error('Failed to create workspace session');
-          return null;
-        }
-      }
-      const latest = list[0];
-      setActiveSessionId(latest.id);
-      return latest;
-    },
-    [serverId, bankId, loadSessions]
-  );
-
-  const loadItems = useCallback(async (sessionId: number) => {
-    setLoadingItems(true);
-    try {
-      const steps = await researchApi.getSessionSteps(sessionId);
-      const normalized = Array.isArray(steps) ? steps : [];
-      setItems(normalized.filter(isWorkspaceItem));
-    } catch (err) {
-      logger.error('Failed to load session items', err);
-      toast.error('Failed to load session items');
-      setItems([]);
-    } finally {
-      setLoadingItems(false);
-    }
-  }, []);
-
-  const refresh = useCallback(async () => {
-    const list = await loadSessions();
-    const session = await ensureActiveSession(list);
-    if (session) {
-      await loadItems(session.id);
-    }
-  }, [loadSessions, ensureActiveSession, loadItems]);
-
-  useImperativeHandle(ref, () => ({
-    refresh,
-  }), [refresh]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setActiveSessionId(null);
-    setItems([]);
-    loadSessions().then((list) => {
-      if (cancelled) return;
-      ensureActiveSession(list).then((session) => {
-        if (cancelled || !session) return;
-        void loadItems(session.id);
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadSessions, ensureActiveSession, loadItems]);
-
-  // Poll for running items so Reflect outputs update as the agent completes.
-  useEffect(() => {
-    if (!activeSessionId) return;
-    const hasRunning = items.some((s) => s.status === 'running');
-    if (!hasRunning) return;
-    const interval = setInterval(() => {
-      void loadItems(activeSessionId);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [activeSessionId, items, loadItems]);
 
   const handleStartCreatePage = () => {
     setCreatingPage(true);
@@ -175,25 +54,24 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
 
   const handleConfirmCreatePage = async () => {
     const title = newPageTitle.trim();
-    if (!title || !activeSessionId) {
+    const sessionId = session?.id;
+    if (!title || !sessionId) {
       handleCancelCreatePage();
       return;
     }
     try {
-      const result = await researchApi.createSessionPage(activeSessionId, title);
+      const result = await researchApi.createSessionPage(sessionId, title);
       toast.success('Page created');
       setCreatingPage(false);
       setNewPageTitle('');
-      await loadItems(activeSessionId);
+      await onRefresh?.();
       const step = items.find((s) => s.id === result.id);
       if (step) {
         onEditPage(step);
       } else {
         try {
           const full = await researchApi.getStep(result.id);
-          if (isWorkspaceItem(full)) {
-            onEditPage(full);
-          }
+          onEditPage(full);
         } catch (err) {
           logger.error('Failed to fetch new page details', err);
         }
@@ -205,11 +83,10 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
   };
 
   const handleDeleteStep = async (stepId: number) => {
-    if (!activeSessionId) return;
     try {
       await researchApi.deleteStep(stepId);
       toast.success('Item deleted');
-      await loadItems(activeSessionId);
+      await onRefresh?.();
     } catch (err) {
       logger.error('Failed to delete step', err);
       toast.error('Failed to delete item');
@@ -229,19 +106,14 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
     [items, onEditPage, onSelectStep]
   );
 
-  const runningStepId = useMemo(() => {
-    const running = items.find((s) => s.status === 'running');
-    return running?.id ?? null;
-  }, [items]);
-
   return (
     <Panel className="flex-1 min-h-0">
       <PanelHeader title="Session items" count={items.length} />
       <PanelContent className="p-0">
         <div className="absolute inset-0 flex flex-col">
           <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between shrink-0">
-            <span className="text-xs text-white/60 truncate" title={activeSession?.title || ''}>
-              {activeSession?.title || (loadingSessions ? 'Loading…' : 'No session')}
+            <span className="text-xs text-white/60 truncate" title={session?.title || ''}>
+              {session?.title || (loading ? 'Loading…' : 'No session')}
             </span>
             {!creatingPage && (
               <Button
@@ -249,7 +121,7 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
                 size="sm"
                 className="gap-1 h-7 text-xs"
                 onClick={handleStartCreatePage}
-                disabled={!activeSessionId || loadingItems}
+                disabled={!session?.id || loading}
               >
                 <Plus className="w-3 h-3" />
                 New page
@@ -279,7 +151,7 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
               trail={items}
               selectedStepIds={new Set()}
               activeStepId={activeStepId ?? null}
-              runningStepId={runningStepId}
+              runningStepId={runningStepId ?? null}
               viewMode="step"
               onToggleStep={() => {}}
               onSelectAll={() => {}}
@@ -297,12 +169,12 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
               } : undefined}
             />
 
-            {!creatingPage && items.length === 0 && !loadingItems && (
+            {!creatingPage && items.length === 0 && !loading && (
               <div className="text-white/40 text-xs px-3 py-2">
                 No workspace items yet. Create a page or run Reflect.
               </div>
             )}
-            {loadingItems && items.length === 0 && (
+            {loading && items.length === 0 && (
               <div className="text-white/40 text-xs px-3 py-2">Loading session items…</div>
             )}
           </div>
@@ -310,4 +182,4 @@ export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPa
       </PanelContent>
     </Panel>
   );
-});
+}
