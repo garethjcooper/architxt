@@ -852,6 +852,8 @@ export function useResearchSession({
     error,
     setError,
     fetchSessions,
+    fetchTrail,
+    setActiveSessionId,
     handleCreateSession,
     handleRenameSession,
     handleDeleteSession,
