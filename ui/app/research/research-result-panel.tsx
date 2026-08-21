@@ -133,6 +133,8 @@ export interface ResearchResultPanelProps {
   onResizeNarrativeReset?: () => void;
   /** If provided, copy actions are delegated to this handler instead of the default clipboard/download behavior. */
   onCopy?: (event: ResearchCopyEvent) => void;
+  /** When false, only the narrative pane is rendered (no graph/diagrams panel). */
+  showCanvas?: boolean;
 }
 
 export function ResearchResultPanel({
@@ -167,6 +169,7 @@ export function ResearchResultPanel({
   onResizeNarrativeStart,
   onResizeNarrativeReset,
   onCopy,
+  showCanvas = true,
 }: ResearchResultPanelProps) {
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
@@ -283,7 +286,7 @@ export function ResearchResultPanel({
       {/* Narrative */}
       <div
         className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
-        style={{ width: `${narrativeWidth}%` }}
+        style={showCanvas ? { width: `${narrativeWidth}%` } : { flex: 1 }}
       >
         <div className="px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
           <span className="font-medium text-sm">Narrative</span>
@@ -409,16 +412,19 @@ export function ResearchResultPanel({
         </div>
       </div>
 
-      <div
-        className="w-3 shrink-0 cursor-col-resize flex items-center justify-center group"
-        onMouseDown={onResizeNarrativeStart}
-        onDoubleClick={onResizeNarrativeReset}
-        title="Drag to resize Narrative and Diagrams panels; double-click to reset"
-      >
-        <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
-      </div>
+      {showCanvas && (
+        <div
+          className="w-3 shrink-0 cursor-col-resize flex items-center justify-center group"
+          onMouseDown={onResizeNarrativeStart}
+          onDoubleClick={onResizeNarrativeReset}
+          title="Drag to resize Narrative and Diagrams panels; double-click to reset"
+        >
+          <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+        </div>
+      )}
 
-      <div className="flex-1 min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col">
+      {showCanvas && (
+        <div className="flex-1 min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col">
         <div className="px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">Diagrams</span>
@@ -727,6 +733,7 @@ export function ResearchResultPanel({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
