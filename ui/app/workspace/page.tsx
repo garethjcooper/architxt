@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
-import { serversApi, contextualGraphApi, entityInfoApi, hindsightApi, type Server } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, entityInfoApi, hindsightApi, researchApi, type Server } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
@@ -24,9 +24,9 @@ import {
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
-import { SpinePanel } from './_components/spine-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
-import { ReflectResultPanel } from './_components/reflect-result-panel';
+import { SessionItemsPanel } from './_components/session-items-panel';
+import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 
 const logger = createLogger('WorkspacePage');
 
@@ -50,6 +50,10 @@ export default function WorkspacePage() {
   const [reflectResult, setReflectResult] = useState<unknown | null>(null);
   const [reflectLoading, setReflectLoading] = useState(false);
   const [reflectError, setReflectError] = useState<string | null>(null);
+  const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
+  const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
+  const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
+  const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
 
   const mentionedEntityIds = useMemo(() => {
     const mentioned: string[] = [];
@@ -81,62 +85,50 @@ export default function WorkspacePage() {
   const serverId = selectedServerId ? Number(selectedServerId) : 0;
   const bankId = selectedBankId;
 
-  // Layout sizing.
-  const [topHeight, setTopHeight] = useState(360);
-  const topRowRef = useRef<HTMLDivElement>(null);
-  const [topFlex, setTopFlex] = useState({ query: 2, patches: 2, spine: 2, edges: 1 });
-  const totalTopFlex = topFlex.query + topFlex.patches + topFlex.spine + topFlex.edges;
+  // Layout sizing: three vertical columns.
+  const mainRowRef = useRef<HTMLDivElement>(null);
+  const [columnWidths, setColumnWidths] = useState({ left: 0.25, middle: 0.4, right: 0.35 });
 
-  const [resizing, setResizing] = useState<null | 'top' | 'query' | 'patches' | 'spine'>(null);
+  const [resizing, setResizing] = useState<null | 'col1' | 'col2'>(null);
   const resizeStartRef = useRef({
     x: 0,
     width: 0,
-    flex: { query: 2, patches: 2, spine: 2, edges: 1 },
+    widths: { left: 0.25, middle: 0.4, right: 0.35 },
   });
 
   const handleResizeStart = useCallback(
-    (pane: 'top' | 'query' | 'patches' | 'spine') => (e: React.MouseEvent) => {
+    (pane: 'col1' | 'col2') => (e: React.MouseEvent) => {
       setResizing(pane);
-      document.body.style.cursor = pane === 'top' ? 'row-resize' : 'col-resize';
+      document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
       resizeStartRef.current = {
         x: e.clientX,
-        width: topRowRef.current?.getBoundingClientRect().width ?? 0,
-        flex: { ...topFlex },
+        width: mainRowRef.current?.getBoundingClientRect().width ?? 0,
+        widths: { ...columnWidths },
       };
     },
-    [topFlex]
+    [columnWidths]
   );
 
   const handleResizeMove = useCallback(
     (e: MouseEvent) => {
       if (!resizing) return;
-      if (resizing === 'top') {
-        const next = Math.min(Math.max(e.clientY - 180, 160), 560);
-        setTopHeight(next);
-        return;
-      }
-      const { x, width, flex } = resizeStartRef.current;
+      const { x, width, widths } = resizeStartRef.current;
       if (width <= 0) return;
-      const deltaPx = e.clientX - x;
-      const deltaFlex = (deltaPx / width) * totalTopFlex;
-      const MIN_FLEX = 0.4;
+      const delta = (e.clientX - x) / width;
+      const MIN = 0.15;
 
-      if (resizing === 'query') {
-        const nextQuery = Math.max(MIN_FLEX, flex.query + deltaFlex);
-        const nextPatches = Math.max(MIN_FLEX, flex.patches - (nextQuery - flex.query));
-        setTopFlex((prev) => ({ ...prev, query: nextQuery, patches: nextPatches }));
-      } else if (resizing === 'patches') {
-        const nextPatches = Math.max(MIN_FLEX, flex.patches + deltaFlex);
-        const nextSpine = Math.max(MIN_FLEX, flex.spine - (nextPatches - flex.patches));
-        setTopFlex((prev) => ({ ...prev, patches: nextPatches, spine: nextSpine }));
-      } else if (resizing === 'spine') {
-        const nextSpine = Math.max(MIN_FLEX, flex.spine + deltaFlex);
-        const nextEdges = Math.max(MIN_FLEX, flex.edges - (nextSpine - flex.spine));
-        setTopFlex((prev) => ({ ...prev, spine: nextSpine, edges: nextEdges }));
+      if (resizing === 'col1') {
+        const nextLeft = Math.max(MIN, Math.min(widths.left + delta, widths.left + widths.middle - MIN));
+        const nextMiddle = Math.max(MIN, widths.middle - (nextLeft - widths.left));
+        setColumnWidths((prev) => ({ ...prev, left: nextLeft, middle: nextMiddle }));
+      } else if (resizing === 'col2') {
+        const nextMiddle = Math.max(MIN, Math.min(widths.middle + delta, widths.middle + widths.right - MIN));
+        const nextRight = Math.max(MIN, widths.right - (nextMiddle - widths.middle));
+        setColumnWidths((prev) => ({ ...prev, middle: nextMiddle, right: nextRight }));
       }
     },
-    [resizing, totalTopFlex]
+    [resizing]
   );
 
   const handleResizeEnd = useCallback(() => {
@@ -155,6 +147,15 @@ export default function WorkspacePage() {
       document.removeEventListener('mouseup', up);
     };
   }, [handleResizeMove, handleResizeEnd]);
+
+  const handleSelectStep = useCallback((step: ResearchStepSummary) => {
+    setSelectedStep(step);
+  }, []);
+
+  const handleEditPage = useCallback((step: ResearchStepSummary) => {
+    setSelectedStep(step);
+    setEditingStep(step);
+  }, []);
 
   const fetchServers = useCallback(async () => {
     try {
@@ -259,15 +260,27 @@ export default function WorkspacePage() {
       toast.error('Select a server and bank before running Reflect.');
       return;
     }
+    if (!activeSession) {
+      toast.error('Wait for a workspace session to load before running Reflect.');
+      return;
+    }
     try {
       setReflectLoading(true);
       setReflectError(null);
       setReflectResult(null);
-      // Phase 1: Reflect sends only the free-text query; corpus integration later.
       const cleanedQuery = query.replace(/\[\[[^\]]+\]\]/g, '').replace(/\s+/g, ' ').trim();
-      const result = await hindsightApi.reflect(serverId, bankId, { query: cleanedQuery || query });
+      const result = await researchApi.discover({
+        server_id: serverId,
+        bank_id: bankId,
+        session_id: activeSession.id,
+        viewpoint_ids: activeSession.viewpoint_ids || [],
+        intent_text: cleanedQuery || query,
+        query_depth: 'reflect',
+        budget: 'low',
+      });
       setReflectResult(result);
-      toast.success('Reflect response received');
+      setSessionRefreshSignal((n) => n + 1);
+      toast.success('Reflect query started');
     } catch (err: any) {
       setReflectError(err.message || String(err));
       logger.error('Reflect query failed', { error: err, serverId, bankId, query });
@@ -275,7 +288,7 @@ export default function WorkspacePage() {
     } finally {
       setReflectLoading(false);
     }
-  }, [reflectQuery, serverId, bankId]);
+  }, [reflectQuery, serverId, bankId, activeSession]);
 
   const handleAttachEntity = useCallback((entityId: string) => {
     setManuallyAttachedIds((prev) => {
@@ -388,75 +401,93 @@ export default function WorkspacePage() {
           </Button>
         </div>
 
-        {/* Top row: reflect query | patches | entity spine | edges */}
-        <div ref={topRowRef} className="flex min-h-0" style={{ height: topHeight }}>
-          <ReflectQueryPanel
-            query={reflectQuery}
-            onChange={setReflectQuery}
-            onSubmit={handleReflect}
-            attachedEntityIds={attachedEntityIds}
-            entityInfoMap={entityInfoMap}
-            aqlEntities={aqlEntities}
-            aqlEdges={aqlEdges}
-            onDetachEntity={handleDetachEntity}
-            disabled={!reflectQuery.trim() || !serverId || !bankId}
-          />
+        {/* Main three-column workbench */}
+        <div ref={mainRowRef} className="flex-1 min-h-0 flex">
+          {/* Column 1: query + entities | session items | contextual data */}
+          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
+            <ReflectQueryPanel
+              query={reflectQuery}
+              onChange={setReflectQuery}
+              onSubmit={handleReflect}
+              attachedEntityIds={attachedEntityIds}
+              entityInfoMap={entityInfoMap}
+              aqlEntities={aqlEntities}
+              aqlEdges={aqlEdges}
+              onDetachEntity={handleDetachEntity}
+              disabled={!reflectQuery.trim() || !serverId || !bankId}
+            />
 
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('query')} title="Drag to resize Reflect query pane" />
+            {serverId && bankId ? (
+              <SessionItemsPanel
+                serverId={serverId}
+                bankId={bankId}
+                activeStepId={selectedStep?.id}
+                editingStepId={editingStep?.id}
+                refreshSignal={sessionRefreshSignal}
+                onSelectStep={handleSelectStep}
+                onEditPage={handleEditPage}
+                onActiveSessionChange={setActiveSession}
+              />
+            ) : (
+              <Panel className="flex-1 min-h-0">
+                <PanelHeader title="Session items" />
+                <PanelContent className="p-3">
+                  <div className="text-white/40 text-xs">Select a server and bank to load sessions.</div>
+                </PanelContent>
+              </Panel>
+            )}
 
-          {/* Patches - disabled while Reflect query is the focus */}
-          <Panel style={{ flex: topFlex.patches, minWidth: 160 }}>
-            <PanelHeader title="Patches" />
-            <PanelContent>
-              <div className="absolute inset-0 flex items-center justify-center text-white/40 text-xs px-4 text-center">
-                Spine interactivity is disabled. Attach entities via [[...]] in the Reflect query to see their model content here.
-              </div>
-            </PanelContent>
-          </Panel>
+            <AttachedEntitiesPanel
+              entityIds={attachedEntityIds}
+              entityInfoMap={entityInfoMap}
+              loading={loadingEntityInfo}
+              expandedEntityIds={expandedEntityIds}
+              selectedModelKeys={selectedModelKeys}
+              onDetach={handleDetachEntity}
+              onToggleExpand={toggleEntityExpanded}
+              onSelectModel={selectEntityModel}
+            />
+          </div>
 
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('patches')} title="Drag to resize patches pane" />
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/middle columns" />
 
-          <SpinePanel
-            entities={spineEntities}
-            search={spineSearch}
-            onSearchChange={setSpineSearch}
-          />
+          {/* Column 2: read-only NarrativeViewer */}
+          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.middle, minWidth: 280 }}>
+            <Panel className="flex-1 min-h-0">
+              <PanelHeader title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'} />
+              <PanelContent className="p-4">
+                {selectedStep ? (
+                  <div className="text-white/60 text-sm">
+                    Selected: {selectedStep.intent_text || 'Untitled'} ({selectedStep.action_type})
+                  </div>
+                ) : (
+                  <div className="text-white/40 text-xs">
+                    Select a Reflect output or page from the session list to preview it here.
+                  </div>
+                )}
+              </PanelContent>
+            </Panel>
+          </div>
 
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('spine')} title="Drag to resize entity spine" />
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col2')} title="Drag to resize middle/right columns" />
 
-          {/* Edges - disabled while Reflect query is the focus */}
-          <Panel style={{ flex: topFlex.edges, minWidth: 140 }}>
-            <PanelHeader title="Edges" />
-            <PanelContent>
-              <div className="absolute inset-0 flex items-center justify-center text-white/40 text-xs px-4 text-center">
-                Spine interactivity is disabled. Use [[...]] references in the Reflect query.
-              </div>
-            </PanelContent>
-          </Panel>
-        </div>
-
-        <ResizeHandle direction="horizontal" onMouseDown={handleResizeStart('top')} title="Drag to resize top/bottom split" />
-
-        {/* Bottom row: attached entities | reflect result */}
-        <div className="flex-1 min-h-0 flex">
-          <AttachedEntitiesPanel
-            entityIds={attachedEntityIds}
-            entityInfoMap={entityInfoMap}
-            loading={loadingEntityInfo}
-            expandedEntityIds={expandedEntityIds}
-            selectedModelKeys={selectedModelKeys}
-            onDetach={handleDetachEntity}
-            onToggleExpand={toggleEntityExpanded}
-            onSelectModel={selectEntityModel}
-          />
-
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('query')} title="Drag to resize temporary/workspace split" />
-
-          <ReflectResultPanel
-            loading={reflectLoading}
-            error={reflectError}
-            result={reflectResult}
-          />
+          {/* Column 3: session page editor */}
+          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
+            <Panel className="flex-1 min-h-0">
+              <PanelHeader title={editingStep ? 'Edit page' : 'Page editor'} />
+              <PanelContent className="p-4">
+                {editingStep ? (
+                  <div className="text-white/60 text-sm">
+                    Editing: {editingStep.intent_text || 'Untitled'}
+                  </div>
+                ) : (
+                  <div className="text-white/40 text-xs">
+                    Open a page from the session list to edit it here.
+                  </div>
+                )}
+              </PanelContent>
+            </Panel>
+          </div>
         </div>
       </div>
     </PageShell>
