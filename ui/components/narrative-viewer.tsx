@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { parseBlocks, SmartBlock, getSectionBlockIds, getSidebarIndent, slugifyHeading } from './smart-document-editor';
+import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
+import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
 import { Copy } from 'lucide-react';
@@ -41,14 +42,14 @@ export function NarrativeViewer({
   showIndex = true,
   diagrams,
 }: NarrativeViewerProps) {
-  const [blocks, setBlocks] = useState<SmartBlock[]>([]);
+  const [blocks, setBlocks] = useState<NarrativeBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [activeRangeIds, setActiveRangeIds] = useState<Set<string>>(new Set());
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const markdownContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setBlocks(parseBlocks(content));
+    setBlocks(parseNarrativeBlocks(content));
     setActiveBlockId(null);
     setActiveRangeIds(new Set());
   }, [content]);
@@ -82,7 +83,7 @@ export function NarrativeViewer({
     onHeadingClick?.(id, blocks.find(b => b.id === id)?.title);
   }, [blocks, onHeadingClick, viewMode]);
 
-  const handleContentClick = useCallback((block: SmartBlock) => {
+  const handleContentClick = useCallback((block: NarrativeBlock) => {
     let sectionId = block.id;
     if (block.type !== 'heading') {
       const bIdx = blocks.findIndex(bb => bb.id === block.id);

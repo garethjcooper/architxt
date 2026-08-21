@@ -1,0 +1,147 @@
+'use client';
+
+/** Block-level parser for narrative / session-page content.
+ *
+ * This intentionally mirrors the shape of SmartBlock from
+ * ./smart-document-editor but adds structural recognition for fenced code
+ * blocks (```mermaid, etc.) and markdown tables. It is used by
+ * NarrativeViewer and SessionPageEditor so both stay aligned on how the
+ * standard envelope's narrative content is split and indexed.
+ */
+
+export interface NarrativeBlock {
+  id: string;
+  type: 'text' | 'heading' | 'image' | 'code' | 'table';
+  raw: string;
+  edited?: string;
+  deleted?: boolean;
+  level?: number;
+  title?: string;
+  language?: string;
+}
+
+function flushText(textBuffer: string[], blocks: NarrativeBlock[], blockId: { value: number }) {
+  if (textBuffer.length) {
+    blocks.push({
+      id: `b${blockId.value++}`,
+      type: 'text',
+      raw: textBuffer.join('\n') + '\n',
+    });
+    textBuffer.length = 0;
+  }
+}
+
+export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
+  const blocks: NarrativeBlock[] = [];
+  const lines = content.split(/\n/);
+  const textBuffer: string[] = [];
+  let blockId = 0;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    const imageOpenMatch = line.match(/^\[IMAGE:([^\]]+)\]$/);
+    const codeFenceMatch = line.match(/^```(\w*)\s*$/);
+    const tableMatch = (line.match(/\|/g) || []).length >= 2;
+
+    if (headingMatch) {
+      flushText(textBuffer, blocks, { value: blockId });
+      blocks.push({
+        id: `b${blockId++}`,
+        type: 'heading',
+        raw: line + '\n',
+        level: headingMatch[1].length,
+        title: headingMatch[2],
+      });
+      i++;
+    } else if (imageOpenMatch) {
+      flushText(textBuffer, blocks, { value: blockId });
+      const imageId = imageOpenMatch[1];
+      const imageLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length) {
+        const closeMatch = lines[j].match(
+          new RegExp(`^\\[/IMAGE:${imageId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]$`)
+        );
+        imageLines.push(lines[j]);
+        if (closeMatch) break;
+        j++;
+      }
+      blocks.push({
+        id: `b${blockId++}`,
+        type: 'image',
+        raw: imageLines.join('\n') + '\n',
+        title: imageId,
+      });
+      i = j + 1;
+    } else if (codeFenceMatch) {
+      flushText(textBuffer, blocks, { value: blockId });
+      const language = codeFenceMatch[1];
+      const codeLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length) {
+        codeLines.push(lines[j]);
+        if (lines[j].match(/^```\s*$/)) break;
+        j++;
+      }
+      blocks.push({
+        id: `b${blockId++}`,
+        type: 'code',
+        raw: codeLines.join('\n') + '\n',
+        title: language || 'code',
+        language,
+      });
+      i = j + 1;
+    } else if (tableMatch) {
+      flushText(textBuffer, blocks, { value: blockId });
+      const tableLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length && (lines[j].match(/\|/g) || []).length >= 2) {
+        tableLines.push(lines[j]);
+        j++;
+      }
+      blocks.push({
+        id: `b${blockId++}`,
+        type: 'table',
+        raw: tableLines.join('\n') + '\n',
+        title: tableLines[0]?.replace(/\|/g, ' ').trim() || 'table',
+      });
+      i = j;
+    } else {
+      textBuffer.push(line);
+      i++;
+    }
+  }
+  flushText(textBuffer, blocks, { value: blockId });
+  return blocks;
+}
+
+export function buildNarrativeContent(blocks: NarrativeBlock[]): string {
+  return blocks.filter((b) => !b.deleted).map((b) => b.edited ?? b.raw).join('');
+}
+
+export function getSectionBlockIds(blocks: NarrativeBlock[], targetId: string): string[] {
+  const idx = blocks.findIndex((b) => b.id === targetId);
+  if (idx === -1) return [];
+  const target = blocks[idx];
+  if (target.type !== 'heading') return [targetId];
+  const ids = [targetId];
+  for (let i = idx + 1; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (b.type === 'heading' && b.level! <= target.level!) break;
+    ids.push(b.id);
+  }
+  return ids;
+}
+
+export function getSidebarIndent(blocks: NarrativeBlock[], index: number): number {
+  const block = blocks[index];
+  if (block.type === 'heading') return block.level! - 1;
+  for (let i = index - 1; i >= 0; i--) {
+    if (blocks[i].type === 'heading') {
+      return blocks[i].level!;
+    }
+  }
+  return 0;
+}

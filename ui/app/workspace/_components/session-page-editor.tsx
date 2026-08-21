@@ -6,21 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
-  parseBlocks,
+  parseNarrativeBlocks,
+  buildNarrativeContent,
   getSectionBlockIds,
   getSidebarIndent,
-  type SmartBlock,
-} from '@/components/smart-document-editor';
+  type NarrativeBlock,
+} from '@/components/narrative-blocks';
 import { researchApi, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
 import { Panel, PanelHeader, PanelContent } from './panel-layout';
 
-function buildContent(blocks: SmartBlock[]): string {
-  return blocks.filter((b) => !b.deleted).map((b) => b.edited ?? b.raw).join('');
+function buildContent(blocks: NarrativeBlock[]): string {
+  return buildNarrativeContent(blocks);
 }
 
-function buildBlocks(content: string | null | undefined): SmartBlock[] {
+function buildBlocks(content: string | null | undefined): NarrativeBlock[] {
   if (!content) return [];
-  return parseBlocks(content);
+  return parseNarrativeBlocks(content);
 }
 
 export interface SessionPageEditorRef {
@@ -54,7 +55,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
   ref: React.Ref<SessionPageEditorRef>
 ) {
   const [title, setTitle] = useState(step.intent_text || '');
-  const [blocks, setBlocks] = useState<SmartBlock[]>(() => buildBlocks(step.synthesis?.narrative));
+  const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => buildBlocks(step.synthesis?.narrative));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [activeRangeIds, setActiveRangeIds] = useState<Set<string>>(new Set());
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
   useImperativeHandle(ref, () => ({
     appendBlocks: (markdown: string) => {
       if (!markdown) return;
-      const parsed = parseBlocks(markdown);
+      const parsed = parseNarrativeBlocks(markdown);
       setBlocks((prev) => {
         const maxId = prev.reduce((max, b) => {
           const n = Number(b.id.replace(/^b/, ''));
@@ -227,7 +228,7 @@ export const SessionPageEditor = forwardRef(function SessionPageEditor(
     }
   }, [blocks]);
 
-  const startEditingBlock = useCallback((b: SmartBlock) => {
+  const startEditingBlock = useCallback((b: NarrativeBlock) => {
     const initialValue =
       b.type === 'heading'
         ? (b.edited ?? b.raw).replace(/^#{1,6}\s+/, '').replace(/\n$/, '')
