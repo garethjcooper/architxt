@@ -147,24 +147,28 @@ export function QueryTrail(props: QueryTrailProps) {
                     </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-32 bg-[oklch(0.18_0_0)] border-white/10 text-white/90">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUseDetails?.(step.id);
-                      }}
-                      disabled={step.status === 'running'}
-                    >
-                      <ClipboardList className="h-3 w-3 mr-2" /> Re-use
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRerunStep?.(step.id);
-                      }}
-                      disabled={step.status === 'running' || anyRunning}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-2" /> Re-run
-                    </DropdownMenuItem>
+                    {step.action_type !== 'curated_page' && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUseDetails?.(step.id);
+                          }}
+                          disabled={step.status === 'running'}
+                        >
+                          <ClipboardList className="h-3 w-3 mr-2" /> Re-use
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRerunStep?.(step.id);
+                          }}
+                          disabled={step.status === 'running' || anyRunning}
+                        >
+                          <RefreshCw className="h-3 w-3 mr-2" /> Re-run
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();

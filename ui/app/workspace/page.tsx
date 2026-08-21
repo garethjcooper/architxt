@@ -29,6 +29,7 @@ import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
 
 import { SessionPageEditor } from './_components/session-page-editor';
 import type { SessionPageEditorRef } from './_components/session-page-editor';
@@ -58,6 +59,7 @@ export default function WorkspacePage() {
   const [reflectError, setReflectError] = useState<string | null>(null);
   const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
+  const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
   const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
   const editorRef = useRef<SessionPageEditorRef | null>(null);
@@ -455,6 +457,30 @@ export default function WorkspacePage() {
     }
   }, [activeSession]);
 
+  const handleReuseStep = useCallback((step: ResearchStepSummary) => {
+    setReflectQuery(step.intent_text || '');
+    toast.success('Query copied to Reflect input');
+  }, []);
+
+  const handleRerunStep = useCallback(async (stepId: number) => {
+    if (!serverId) {
+      toast.error('Select a server before re-running.');
+      return;
+    }
+    try {
+      await researchApi.rerunStep(stepId, { server_id: serverId });
+      setSessionRefreshSignal((n) => n + 1);
+      toast.success('Re-running query');
+    } catch (err: any) {
+      logger.error('Failed to re-run step', { error: err, stepId });
+      toast.error(`Failed to re-run: ${err.message || err}`);
+    }
+  }, [serverId]);
+
+  const handleInspectStep = useCallback((step: ResearchStepSummary) => {
+    setInspectingStep(step);
+  }, []);
+
   const toggleEntityExpanded = useCallback((entityId: string) => {
     setExpandedEntityIds((prev) => {
       const next = new Set(prev);
@@ -573,6 +599,9 @@ export default function WorkspacePage() {
                   onSelectStep={handleSelectStep}
                   onEditPage={handleEditPage}
                   onActiveSessionChange={setActiveSession}
+                  onReuseStep={handleReuseStep}
+                  onRerunStep={handleRerunStep}
+                  onInspectStep={handleInspectStep}
                 />
               </div>
             ) : (
@@ -639,6 +668,14 @@ export default function WorkspacePage() {
             )}
           </div>
         </div>
+
+        <QueryInspectDialog
+          open={inspectingStep !== null}
+          onOpenChange={(open) => {
+            if (!open) setInspectingStep(null);
+          }}
+          step={inspectingStep}
+        />
       </div>
     </PageShell>
   );
