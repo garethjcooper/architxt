@@ -165,10 +165,11 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     }
   }
 
-  // Defense in depth: if the caller did not ask for narrative, treat any
-  // returned narrative as a model mistake and discard it before it reaches
-  // downstream consumers.
-  if (!requestedNarrative) {
+  // Only discard a produced narrative when the caller explicitly requested
+  // something else (graph/table/diagram) and the model also produced that
+  // structured output. For plain Reflect queries with no explicit section
+  // directives, the narrative is the primary output and must be preserved.
+  if (!requestedNarrative && hasStructuredOutput) {
     extracted.narrative = '';
   }
 

@@ -528,6 +528,15 @@ export function AqlEditor(props: AqlEditorProps) {
     [value, onChange],
   );
 
+  // Keep the submit callback in a ref so the keymap extension never has to be
+  // recreated when the parent passes a new function reference (e.g. a closure
+  // that changes on every keystroke). This prevents expensive CodeMirror
+  // reconfiguration and keeps typing responsive.
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => {
+    onSubmitRef.current = onSubmit;
+  }, [onSubmit]);
+
   const extensions = useMemo(
     () => [
       aqlLanguage,
@@ -540,13 +549,13 @@ export function AqlEditor(props: AqlEditorProps) {
         {
           key: 'Mod-Enter',
           run: () => {
-            onSubmit?.();
+            onSubmitRef.current?.();
             return true;
           },
         },
       ]),
     ],
-    [onSubmit],
+    [],
   );
 
   return (
