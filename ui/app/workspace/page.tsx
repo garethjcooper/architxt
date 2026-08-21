@@ -29,7 +29,9 @@ import { EntityScopePanel } from './_components/entity-scope-panel';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
+import type { SessionItemsPanelRef } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
+import { pollForStepCompletion } from '@/lib/api/poll-step';
 import { type ResearchQueryOptions, buildDiscoverOptions } from '@/app/research/use-research-session';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
@@ -39,9 +41,6 @@ import type { SessionPageEditorRef } from './_components/session-page-editor';
 import { type ResearchCopyEvent } from '@/app/research/research-result-panel';
 
 const logger = createLogger('WorkspacePage');
-
-const MAX_POLL_MS = 5 * 60 * 1000;
-const POLL_INTERVAL_MS = 1500;
 
 export default function WorkspacePage() {
   const [servers, setServers] = useState<Server[]>([]);
@@ -77,7 +76,7 @@ export default function WorkspacePage() {
   const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(null);
-  const [sessionRefreshSignal, setSessionRefreshSignal] = useState(0);
+  const sessionItemsRef = useRef<SessionItemsPanelRef | null>(null);
   const editorRef = useRef<SessionPageEditorRef | null>(null);
 
   const scopeEntityIds = useMemo(() => {
@@ -228,7 +227,7 @@ export default function WorkspacePage() {
   const handlePageSaved = useCallback((updated: ResearchStepSummary) => {
     setEditingStep(updated);
     setSelectedStep((prev) => (prev?.id === updated.id ? updated : prev));
-    setSessionRefreshSignal((n) => n + 1);
+    void sessionItemsRef.current?.refresh();
     toast.success('Page updated');
   }, []);
 
@@ -378,31 +377,20 @@ export default function WorkspacePage() {
 
       // The discover route returns 202 immediately; poll the session steps until
       // the new step finishes, then select it like any other existing step.
-      const sessionId = response.session_id;
-      const stepId = response.step_id;
-      const start = Date.now();
-      let completedStep: ResearchStepSummary | null = null;
-      while (Date.now() - start < MAX_POLL_MS) {
-        const steps = await researchApi.getSessionSteps(sessionId);
-        const step = steps.find((s) => s.id === stepId);
-        if (step?.status === 'completed') {
-          completedStep = step;
-          break;
-        }
-        if (step?.status === 'failed') {
-          throw new Error(step.error_message || 'Reflect step failed');
-        }
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-        setSessionRefreshSignal((n) => n + 1);
-      }
+      const completedStep = await pollForStepCompletion(response.session_id, response.step_id, {
+        onPoll: () => sessionItemsRef.current?.refresh(),
+      });
       if (!completedStep) {
         throw new Error('Timed out waiting for Reflect step to complete');
+      }
+      if (completedStep.status === 'failed') {
+        throw new Error(completedStep.error_message || 'Reflect step failed');
       }
       if (completedStep.error_message) {
         toast.warning(`Reflect completed with warnings: ${completedStep.error_message}`);
       }
       setSelectedStep(completedStep);
-      setSessionRefreshSignal((n) => n + 1);
+      void sessionItemsRef.current?.refresh();
       toast.success('Reflect query completed');
     } catch (err: any) {
       setReflectError(err.message || String(err));
@@ -459,7 +447,7 @@ export default function WorkspacePage() {
         const nextStep: ResearchStepSummary = { ...page, intent_text: updated.intent_text ?? pageTitle, synthesis: updated.synthesis, canvas: updated.canvas };
         setSelectedStep(nextStep);
         setEditingStep(nextStep);
-        setSessionRefreshSignal((n) => n + 1);
+        void sessionItemsRef.current?.refresh();
         toast.success(`Created page "${pageTitle}" with copied ${event.type}`);
         return;
       } catch (err: any) {
@@ -501,11 +489,11 @@ export default function WorkspacePage() {
 
     try {
       await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
-      setSessionRefreshSignal((n) => n + 1);
+      void sessionItemsRef.current?.refresh();
     } catch (err: any) {
       logger.error('Failed to update session scope', { error: err, sessionId: activeSession.id, entityId });
       toast.error(`Failed to update scope: ${err.message || err}`);
-      setSessionRefreshSignal((n) => n + 1);
+      void sessionItemsRef.current?.refresh();
     }
   }, [activeSession]);
 
@@ -521,7 +509,7 @@ export default function WorkspacePage() {
     }
     try {
       await researchApi.rerunStep(stepId, { server_id: serverId });
-      setSessionRefreshSignal((n) => n + 1);
+      void sessionItemsRef.current?.refresh();
       toast.success('Re-running query');
     } catch (err: any) {
       logger.error('Failed to re-run step', { error: err, stepId });
@@ -647,11 +635,11 @@ export default function WorkspacePage() {
             {serverId && bankId ? (
               <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.middle, minHeight: 140 }}>
                 <SessionItemsPanel
+                  ref={sessionItemsRef}
                   serverId={serverId}
                   bankId={bankId}
                   activeStepId={selectedStep?.id}
                   editingStepId={editingStep?.id}
-                  refreshSignal={sessionRefreshSignal}
                   onSelectStep={handleSelectStep}
                   onEditPage={handleEditPage}
                   onActiveSessionChange={setActiveSession}

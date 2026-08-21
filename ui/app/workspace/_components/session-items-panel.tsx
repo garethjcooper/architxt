@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus } from 'lucide-react';
@@ -14,12 +14,15 @@ const logger = createLogger('SessionItemsPanel');
 
 const WORKSPACE_ITEM_TYPES = new Set(['reflect', 'curated_page']);
 
+export interface SessionItemsPanelRef {
+  refresh: () => Promise<void>;
+}
+
 export interface SessionItemsPanelProps {
   serverId: number;
   bankId: string;
   activeStepId?: number | null;
   editingStepId?: number | null;
-  refreshSignal?: number;
   onSelectStep: (step: ResearchStepSummary) => void;
   onEditPage: (step: ResearchStepSummary) => void;
   onActiveSessionChange?: (session: ResearchSession | null) => void;
@@ -32,19 +35,18 @@ function isWorkspaceItem(step: ResearchStepSummary): boolean {
   return WORKSPACE_ITEM_TYPES.has(step.action_type || 'discover');
 }
 
-export function SessionItemsPanel({
+export const SessionItemsPanel = forwardRef<SessionItemsPanelRef, SessionItemsPanelProps>(function SessionItemsPanel({
   serverId,
   bankId,
   activeStepId,
   editingStepId,
-  refreshSignal,
   onSelectStep,
   onEditPage,
   onActiveSessionChange,
   onReuseStep,
   onRerunStep,
   onInspectStep,
-}: SessionItemsPanelProps) {
+}, ref) {
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [items, setItems] = useState<ResearchStepSummary[]>([]);
@@ -122,6 +124,18 @@ export function SessionItemsPanel({
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    const list = await loadSessions();
+    const session = await ensureActiveSession(list);
+    if (session) {
+      await loadItems(session.id);
+    }
+  }, [loadSessions, ensureActiveSession, loadItems]);
+
+  useImperativeHandle(ref, () => ({
+    refresh,
+  }), [refresh]);
+
   useEffect(() => {
     let cancelled = false;
     setActiveSessionId(null);
@@ -136,7 +150,7 @@ export function SessionItemsPanel({
     return () => {
       cancelled = true;
     };
-  }, [loadSessions, ensureActiveSession, loadItems, refreshSignal]);
+  }, [loadSessions, ensureActiveSession, loadItems]);
 
   // Poll for running items so Reflect outputs update as the agent completes.
   useEffect(() => {
@@ -296,4 +310,4 @@ export function SessionItemsPanel({
       </PanelContent>
     </Panel>
   );
-}
+});

@@ -26,29 +26,6 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
 }
 
 
-function extractReflectNarrative(result: unknown): string {
-  if (result == null) return '';
-  if (typeof result === 'string') return result;
-  if (typeof result !== 'object') return String(result);
-  const obj = result as Record<string, unknown>;
-  const candidateKeys = ['response', 'narrative', 'content', 'answer', 'output', 'structured_output', 'text', 'markdown'];
-  for (const key of candidateKeys) {
-    const value = obj[key];
-    if (typeof value === 'string' && value.trim()) return value;
-  }
-  // Hindsight sometimes nests under data.
-  if (typeof obj.data === 'string' && obj.data.trim()) return obj.data;
-  if (typeof obj.data === 'object' && obj.data != null) {
-    const data = obj.data as Record<string, unknown>;
-    for (const key of candidateKeys) {
-      const value = data[key];
-      if (typeof value === 'string' && value.trim()) return value;
-    }
-  }
-  return JSON.stringify(result, null, 2);
-}
-
-
 function getModelContentText(content: MentalModelContent | undefined): string {
   if (!content) return '';
   if (typeof content.narrative === 'string' && content.narrative.trim()) return content.narrative;
@@ -104,7 +81,6 @@ export type { ModelContentEntry, EntityInfoWithContent };
 export {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,
-  extractReflectNarrative,
   getModelContentText,
   renderModelContent,
   MODEL_TAB_LABELS,
