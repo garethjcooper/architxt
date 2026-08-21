@@ -669,13 +669,15 @@ export default function WorkspacePage() {
                 count={selectedStep ? (selectedStep.synthesis?.narrative ? undefined : 0) : undefined}
               />
               <PanelContent className="p-0 overflow-hidden">
-                <WorkspaceResultPanel
-                  result={selectedStep || reflectResult}
-                  loading={reflectLoading}
-                  error={reflectError}
-                  sessionName={activeSession?.title}
-                  onCopy={handleCopySection}
-                />
+                <div className="h-full flex flex-col">
+                  <WorkspaceResultPanel
+                    result={selectedStep || reflectResult}
+                    loading={reflectLoading}
+                    error={reflectError}
+                    sessionName={activeSession?.title}
+                    onCopy={handleCopySection}
+                  />
+                </div>
               </PanelContent>
             </Panel>
           </div>
