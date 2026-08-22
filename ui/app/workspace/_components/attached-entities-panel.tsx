@@ -4,7 +4,8 @@ import { useMemo } from 'react';
 import { ChevronRight, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
-import { type EntityInfoWithContent, MODEL_TAB_LABELS } from './model-content-utils';
+import { MODEL_TAB_LABELS } from './model-content-utils';
+import { type EntityInfo } from '@/lib/api/client';
 
 export interface ModelItem {
   key: string;
@@ -15,7 +16,7 @@ export interface ModelItem {
 
 export interface AttachedEntitiesPanelProps {
   entityIds: string[];
-  entityInfoMap: Record<string, EntityInfoWithContent> | null;
+  entityInfoMap: Record<string, EntityInfo> | null;
   loading: boolean;
   expandedEntityIds: Set<string>;
   selectedModel: { entityId: string; extId: string } | null;
@@ -23,7 +24,7 @@ export interface AttachedEntitiesPanelProps {
   onSelectModel: (entityId: string, item: ModelItem) => void;
 }
 
-function getEntityModelItems(info: EntityInfoWithContent): ModelItem[] {
+function getEntityModelItems(info: EntityInfo): ModelItem[] {
   const items: ModelItem[] = [];
 
   info.contextual_refs.forEach((ref, i) => {
