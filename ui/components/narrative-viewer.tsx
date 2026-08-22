@@ -42,10 +42,14 @@ export interface NarrativeViewerProps {
   keyPrefix?: string;
   /** Optional header content rendered above the sidebar/content panes. */
   header?: React.ReactNode;
-  /** Optional render prop for a sidebar row. Receives the block, whether it's active, its index, and computed indent (rem). */
-  renderSidebarRow?: (block: NarrativeBlock, ctx: { isActive: boolean; index: number; indent: number }) => React.ReactNode;
-  /** Optional render prop for a content block. Receives the block and whether it's in the active range. */
-  renderBlock?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
+  /** Optional id of a block currently being edited. If provided, that block is rendered via renderEditingBlock. */
+  editingBlockId?: string;
+  /** Optional render prop replacing the block currently being edited. */
+  renderEditingBlock?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
+  /** Optional render prop for extra sidebar row actions, appended inside the default row. */
+  renderSidebarRowActions?: (block: NarrativeBlock, ctx: { isActive: boolean; index: number; indent: number }) => React.ReactNode;
+  /** Optional render prop for extra content-block actions, appended inside the default block row. */
+  renderBlockActions?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
 }
 
 export const NarrativeViewer = forwardRef(function NarrativeViewer({
@@ -63,8 +67,10 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   diagrams,
   keyPrefix = '',
   header,
-  renderSidebarRow,
-  renderBlock,
+  editingBlockId,
+  renderEditingBlock,
+  renderSidebarRowActions,
+  renderBlockActions,
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
   const prefix = keyPrefix ? `${keyPrefix}-` : '';
   const [internalBlocks, setInternalBlocks] = useState<NarrativeBlock[]>([]);
@@ -149,17 +155,19 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     return (
       <div
         key={`${prefix}index-${b.id}`}
-        className="flex items-center gap-1 group/copy"
+        className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+          isActive
+            ? 'bg-emerald-500/20 text-emerald-300'
+            : b.deleted
+              ? 'text-white/30 line-through'
+              : 'text-white/60 hover:bg-white/5 hover:text-white/90'
+        }`}
+        style={{ paddingLeft: `${indent}rem` }}
       >
         <button
           type="button"
           onClick={() => scrollToBlock(b.id)}
-          className={`flex-1 min-w-0 text-left rounded-md px-2 py-1 text-[11px] transition-colors ${
-            isActive
-              ? 'bg-emerald-500/20 text-emerald-300'
-              : 'text-white/60 hover:bg-white/5 hover:text-white/90'
-          }`}
-          style={{ paddingLeft: `${indent}rem` }}
+          className="flex-1 min-w-0 text-left"
         >
           {b.type === 'heading' ? (
             <span className="truncate block" title={b.title}>{b.title}</span>
@@ -171,53 +179,117 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
             <span className="truncate block text-emerald-400/70" title="Table">Table</span>
           ) : null}
         </button>
-        {onCopySection && b.type === 'heading' && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const ids = getSectionBlockIds(blocks, b.id);
-              const markdown = blocks
-                .filter((bb) => ids.includes(bb.id))
-                .map((bb) => bb.raw)
-                .join('');
-              onCopySection(markdown, b.title);
-            }}
-            className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 flex-shrink-0 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
-            title="Copy section to page editor"
-            aria-label="Copy section"
-          >
-            <Copy className="h-3 w-3" />
-          </button>
-        )}
+        <div className="flex items-center flex-shrink-0">
+          {onCopySection && b.type === 'heading' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const ids = getSectionBlockIds(blocks, b.id);
+                const markdown = blocks
+                  .filter((bb) => ids.includes(bb.id))
+                  .map((bb) => bb.raw)
+                  .join('');
+                onCopySection(markdown, b.title);
+              }}
+              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
+              title="Copy section to page editor"
+              aria-label="Copy section"
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+          )}
+          {renderSidebarRowActions && renderSidebarRowActions(b, { isActive, index: idx, indent })}
+        </div>
       </div>
     );
   };
 
-  const defaultBlock = (b: NarrativeBlock, isActive: boolean) => (
-    <div
-      key={`${prefix}block-${b.id}`}
-      ref={el => { blockRefs.current.set(b.id, el); }}
-      onClick={() => handleContentClick(b)}
-      className={`block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${
-        isActive
-          ? b.type === 'heading'
-            ? 'bg-emerald-500/15 text-emerald-300'
-            : 'bg-emerald-500/10 text-emerald-200/90'
-          : b.type === 'heading'
-            ? 'text-emerald-400 font-semibold'
-            : b.type === 'image'
-              ? 'text-amber-400/80 italic'
-              : b.type === 'code'
-                ? 'text-blue-400/80'
-                : b.type === 'table'
-                  ? 'text-emerald-400/80'
-                  : 'text-white/80'
-      }`}
-    >
-      {b.edited ?? b.raw}
-    </div>
-  );
+  const defaultBlock = (b: NarrativeBlock, isActive: boolean) => {
+    if (b.type === 'code' && b.language === 'mermaid') {
+      const content = (b.edited ?? b.raw).replace(/^```mermaid\n?/, '').replace(/\n?```\s*$/, '');
+      const name = b.title || 'diagram';
+      return (
+        <div
+          key={`${prefix}block-${b.id}`}
+          ref={el => { blockRefs.current.set(b.id, el); }}
+          onClick={() => handleContentClick(b)}
+          className={`rounded border border-white/10 p-2 cursor-pointer transition-colors ${
+            isActive ? 'bg-emerald-500/10' : 'hover:bg-white/5'
+          }`}
+        >
+          <MermaidDiagram name={name} type={name} content={content} />
+        </div>
+      );
+    }
+
+    if (b.type === 'table') {
+      const rows = b.raw
+        .trim()
+        .split('\n')
+        .filter((row) => !/^\s*\|?[-:]+\|?\s*$/.test(row) && row.trim());
+      if (rows.length < 1) return null;
+      const cells = rows.map((r) => r.split('|').map((c) => c.trim()).filter(Boolean));
+      const [headers, ...body] = cells;
+      return (
+        <div
+          key={`${prefix}block-${b.id}`}
+          ref={el => { blockRefs.current.set(b.id, el); }}
+          onClick={() => handleContentClick(b)}
+          className={`overflow-x-auto cursor-pointer transition-colors ${isActive ? 'bg-emerald-500/10 rounded' : ''}`}
+        >
+          <table className="w-full text-left text-[12px] border-collapse">
+            <thead>
+              <tr className="border-b border-white/20">
+                {headers?.map((h, i) => <th key={i} className="py-1 px-2 font-semibold text-white/80">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((row, r) => (
+                <tr key={r} className="border-b border-white/10">
+                  {row.map((cell, c) => <td key={c} className="py-1 px-2 text-white/70">{cell}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={`${prefix}block-${b.id}`}
+        ref={el => { blockRefs.current.set(b.id, el); }}
+        onClick={() => handleContentClick(b)}
+        className={`group/block block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${
+          isActive
+            ? b.deleted
+              ? 'bg-white/5 text-white/20 line-through'
+              : 'bg-emerald-500/15 text-emerald-300'
+            : b.deleted
+              ? 'opacity-25 line-through text-white/30'
+              : b.edited
+                ? 'text-white/90 border-l-2 border-blue-500/40 pl-1'
+                : b.type === 'heading'
+                  ? 'text-emerald-400 font-semibold'
+                  : b.type === 'image'
+                    ? 'text-amber-400/80 italic'
+                    : b.type === 'code'
+                      ? 'text-blue-400/80'
+                      : 'text-white/80'
+        }`}
+      >
+        <div className="flex items-start gap-1">
+          <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
+          {renderBlockActions && !b.deleted && (
+            <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
+              {renderBlockActions(b, { isActive })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${className}`}>
@@ -236,10 +308,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               ) : (
                 structuralBlocks.map((b, idx) => {
                   const isActive = activeBlockId === b.id;
-                  if (renderSidebarRow) {
-                    const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
-                    return <Fragment key={`${prefix}index-${b.id}`}>{renderSidebarRow(b, { isActive, index: idx, indent })}</Fragment>;
-                  }
+                  const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
                   return defaultSidebarRow(b, idx, isActive);
                 })
               )}
@@ -258,8 +327,8 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           ) : (
             blocks.map(b => {
               const isActive = activeRangeIds.has(b.id);
-              if (renderBlock) {
-                return <Fragment key={`${prefix}block-${b.id}`}>{renderBlock(b, { isActive })}</Fragment>;
+              if (editingBlockId === b.id && renderEditingBlock) {
+                return <Fragment key={`${prefix}block-${b.id}`}>{renderEditingBlock(b, { isActive })}</Fragment>;
               }
               return defaultBlock(b, isActive);
             })
