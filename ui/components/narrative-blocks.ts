@@ -35,7 +35,7 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
   const blocks: NarrativeBlock[] = [];
   const lines = content.split(/\n/);
   const textBuffer: string[] = [];
-  let blockId = 0;
+  const blockId = { value: 0 };
 
   let i = 0;
   while (i < lines.length) {
@@ -46,9 +46,9 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
     const tableMatch = (line.match(/\|/g) || []).length >= 2;
 
     if (headingMatch) {
-      flushText(textBuffer, blocks, { value: blockId });
+      flushText(textBuffer, blocks, blockId);
       blocks.push({
-        id: `b${blockId++}`,
+        id: `b${blockId.value++}`,
         type: 'heading',
         raw: line + '\n',
         level: headingMatch[1].length,
@@ -56,7 +56,7 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
       });
       i++;
     } else if (imageOpenMatch) {
-      flushText(textBuffer, blocks, { value: blockId });
+      flushText(textBuffer, blocks, blockId);
       const imageId = imageOpenMatch[1];
       const imageLines: string[] = [line];
       let j = i + 1;
@@ -69,14 +69,14 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
         j++;
       }
       blocks.push({
-        id: `b${blockId++}`,
+        id: `b${blockId.value++}`,
         type: 'image',
         raw: imageLines.join('\n') + '\n',
         title: imageId,
       });
       i = j + 1;
     } else if (codeFenceMatch) {
-      flushText(textBuffer, blocks, { value: blockId });
+      flushText(textBuffer, blocks, blockId);
       const language = codeFenceMatch[1];
       const codeLines: string[] = [line];
       let j = i + 1;
@@ -86,7 +86,7 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
         j++;
       }
       blocks.push({
-        id: `b${blockId++}`,
+        id: `b${blockId.value++}`,
         type: 'code',
         raw: codeLines.join('\n') + '\n',
         title: language || 'code',
@@ -94,7 +94,7 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
       });
       i = j + 1;
     } else if (tableMatch) {
-      flushText(textBuffer, blocks, { value: blockId });
+      flushText(textBuffer, blocks, blockId);
       const tableLines: string[] = [line];
       let j = i + 1;
       while (j < lines.length && (lines[j].match(/\|/g) || []).length >= 2) {
@@ -102,7 +102,7 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
         j++;
       }
       blocks.push({
-        id: `b${blockId++}`,
+        id: `b${blockId.value++}`,
         type: 'table',
         raw: tableLines.join('\n') + '\n',
         title: tableLines[0]?.replace(/\|/g, ' ').trim() || 'table',
@@ -113,7 +113,7 @@ export function parseNarrativeBlocks(content: string): NarrativeBlock[] {
       i++;
     }
   }
-  flushText(textBuffer, blocks, { value: blockId });
+  flushText(textBuffer, blocks, blockId);
   return blocks;
 }
 

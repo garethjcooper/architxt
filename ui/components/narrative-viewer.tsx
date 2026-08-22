@@ -207,6 +207,45 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   };
 
   const defaultBlock = (b: NarrativeBlock, isActive: boolean) => {
+    // In plain mode every block is raw text; do not render live Mermaid/HTML tables.
+    if (viewMode === 'plain') {
+      return (
+        <div
+          key={`${prefix}block-${b.id}`}
+          ref={el => { blockRefs.current.set(b.id, el); }}
+          onClick={() => handleContentClick(b)}
+          className={`group/block block whitespace-pre-wrap rounded px-2 py-0.5 cursor-pointer transition-colors ${
+            isActive
+              ? b.deleted
+                ? 'bg-white/5 text-white/20 line-through'
+                : 'bg-emerald-500/15 text-emerald-300'
+              : b.deleted
+                ? 'opacity-25 line-through text-white/30'
+                : b.edited
+                  ? 'text-white/90 border-l-2 border-blue-500/40 pl-1'
+                  : b.type === 'heading'
+                    ? 'text-emerald-400 font-semibold'
+                    : b.type === 'image'
+                      ? 'text-amber-400/80 italic'
+                      : b.type === 'code'
+                        ? 'text-blue-400/80'
+                        : b.type === 'table'
+                          ? 'text-emerald-400/80'
+                          : 'text-white/80'
+          }`}
+        >
+          <div className="flex items-start gap-1">
+            <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
+            {renderBlockActions && !b.deleted && (
+              <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
+                {renderBlockActions(b, { isActive })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     if (b.type === 'code' && b.language === 'mermaid') {
       const content = (b.edited ?? b.raw).replace(/^```mermaid\n?/, '').replace(/\n?```\s*$/, '');
       const name = b.title || 'diagram';
