@@ -21,12 +21,13 @@ import { canonicalNodeId, resolveNodeType } from '@/app/research/graph-utils';
 import {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,
+  mentalModelContentToStepSummary,
   type EntityInfoWithContent,
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
 import { EntityScopePanel } from './_components/entity-scope-panel';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
-import { AttachedEntitiesPanel } from './_components/attached-entities-panel';
+import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
@@ -52,8 +53,12 @@ export default function WorkspacePage() {
   const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfoWithContent> | null>(null);
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
-  const [selectedModelKeys, setSelectedModelKeys] = useState<Record<string, string | null>>({});
-  const [selectedStep, setSelectedStep] = useState<ResearchStepSummary | null>(null);
+  type SelectedView =
+    | { kind: 'step'; step: ResearchStepSummary }
+    | { kind: 'model'; entityId: string; extId: string; name: string };
+  const [selectedView, setSelectedView] = useState<SelectedView | null>(null);
+  const selectedStep = useMemo(() => (selectedView?.kind === 'step' ? selectedView.step : null), [selectedView]);
+  const selectedModel = useMemo(() => (selectedView?.kind === 'model' ? { entityId: selectedView.entityId, extId: selectedView.extId } : null), [selectedView]);
   const selectedStepHasGraph = useMemo(() => {
     if (!selectedStep?.canvas?.graph) return false;
     return selectedStep.canvas.graph.nodes?.length > 0;
@@ -92,6 +97,23 @@ export default function WorkspacePage() {
   const scopeEntityIds = useMemo(() => {
     return activeSession?.scope_entity_ids ?? [];
   }, [activeSession?.scope_entity_ids]);
+
+  const previewResult = useMemo(() => {
+    if (!selectedView) return null;
+    if (selectedView.kind === 'step') return selectedView.step;
+    const entry = entityInfoMap?.[selectedView.entityId]?.content?.[selectedView.extId];
+    if (!entry?.mental_model) return null;
+    return mentalModelContentToStepSummary(selectedView.name, entry.mental_model);
+  }, [selectedView, entityInfoMap]);
+
+  const previewError = useMemo(() => {
+    if (selectedView?.kind !== 'model') return reflectError;
+    const entry = entityInfoMap?.[selectedView.entityId]?.content?.[selectedView.extId];
+    if (!entry) return `Model ${selectedView.extId} is not loaded.`;
+    if (entry.error) return entry.error;
+    if (!entry.mental_model) return `Model ${selectedView.extId} has no content.`;
+    return null;
+  }, [selectedView, entityInfoMap, reflectError]);
 
   // Layout sizing: two vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
@@ -212,7 +234,7 @@ export default function WorkspacePage() {
   }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd]);
 
   const handleSelectStep = useCallback((step: ResearchStepSummary) => {
-    setSelectedStep(step);
+    setSelectedView({ kind: 'step', step });
   }, []);
 
   const fetchServers = useCallback(async () => {
@@ -340,12 +362,12 @@ export default function WorkspacePage() {
   );
 
   // When the research hook produces a completed result, mirror it into the
-  // workspace's selected-step state so the result panel renders.
+  // workspace's selected-view state so the result panel renders.
   useEffect(() => {
     if (!workspaceSession.result) return;
     const step = workspaceSession.trail.find((s) => s.id === workspaceSession.result?.step_id);
     if (step) {
-      setSelectedStep(step);
+      setSelectedView({ kind: 'step', step });
       void workspaceSession.refresh();
     }
   }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh]);
@@ -403,8 +425,8 @@ export default function WorkspacePage() {
     });
   }, []);
 
-  const selectEntityModel = useCallback((entityId: string, key: string) => {
-    setSelectedModelKeys((prev) => ({ ...prev, [entityId]: key }));
+  const selectEntityModel = useCallback((entityId: string, item: ModelItem) => {
+    setSelectedView({ kind: 'model', entityId, extId: item.extId, name: item.label });
   }, []);
 
   useEffect(() => {
@@ -536,7 +558,7 @@ export default function WorkspacePage() {
                 entityInfoMap={entityInfoMap}
                 loading={loadingEntityInfo}
                 expandedEntityIds={expandedEntityIds}
-                selectedModelKeys={selectedModelKeys}
+                selectedModel={selectedModel}
                 onToggleExpand={toggleEntityExpanded}
                 onSelectModel={selectEntityModel}
               />
@@ -549,15 +571,31 @@ export default function WorkspacePage() {
           <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
             <Panel className="flex-1 min-h-0">
               <PanelHeader
-                title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
-                count={selectedStep ? (selectedStep.synthesis?.narrative || selectedStepHasGraph ? undefined : 0) : undefined}
+                title={
+                  selectedView?.kind === 'model'
+                    ? 'Model preview'
+                    : selectedStep
+                      ? selectedStep.action_type === 'curated_page'
+                        ? 'Page preview'
+                        : 'Reflect output'
+                      : 'Read-only preview'
+                }
+                count={
+                  selectedView?.kind === 'model'
+                    ? undefined
+                    : selectedStep
+                      ? selectedStep.synthesis?.narrative || selectedStepHasGraph
+                        ? undefined
+                        : 0
+                      : undefined
+                }
               />
               <PanelContent className="p-0 overflow-hidden">
                 <div className="h-full flex flex-col">
                   <WorkspaceResultPanel
-                    result={selectedStep}
+                    result={previewResult}
                     loading={reflectLoading}
-                    error={reflectError}
+                    error={previewError}
                     sessionName={activeSession?.title}
                     keyPrefix="preview"
                   />
