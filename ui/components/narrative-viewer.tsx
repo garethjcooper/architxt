@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
@@ -72,7 +72,8 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   renderSidebarRowActions,
   renderBlockActions,
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
-  const prefix = keyPrefix ? `${keyPrefix}-` : '';
+  const instanceId = useId().replace(/:/g, '');
+  const prefix = keyPrefix ? `${keyPrefix}-` : `${instanceId}-`;
   const [internalBlocks, setInternalBlocks] = useState<NarrativeBlock[]>([]);
   const [internalActiveBlockId, setInternalActiveBlockId] = useState<string | null>(null);
   const [internalActiveRangeIds, setInternalActiveRangeIds] = useState<Set<string>>(new Set());
