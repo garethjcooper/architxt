@@ -12,10 +12,15 @@ import {
   renderValue,
 } from '@/lib/contextual-graph/display';
 
-type ModelContentEntry = { found: boolean; error?: string; mental_model?: MentalModelContent };
+// Raw shape returned by the standard `/research/mental-models/content` API.
+type HindsightContentResult = {
+  found?: boolean;
+  content?: string | object | null;
+  content_hash?: string | null;
+  updated_at?: string | null;
+};
 
-type EntityInfoWithContent = EntityInfo & { content?: Record<string, ModelContentEntry> };
-
+type EntityInfoWithContent = EntityInfo;
 
 function isGroundedNodeForWorkspace(node: DisplayNode): boolean {
   return isGroundedNode(node) && !isCandidateNode(node);
@@ -25,19 +30,46 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
   return isGroundedEdge(edge) && !isCandidateEdge(edge);
 }
 
+function parseMentalModelContent(raw: HindsightContentResult): MentalModelContent {
+  let parsed: any = null;
+  const rawContent = raw.content;
 
-function getModelContentText(content: MentalModelContent | undefined): string {
-  if (!content) return '';
-  if (typeof content.narrative === 'string' && content.narrative.trim()) return content.narrative;
-  if (typeof content.concatenation === 'string' && content.concatenation.trim()) return content.concatenation;
-  return '';
+  if (typeof rawContent === 'string' && rawContent.trim()) {
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch {
+      parsed = null;
+    }
+  } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
+    parsed = rawContent;
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {
+      ext_id: '',
+      narrative: typeof rawContent === 'string' ? rawContent : '',
+      concatenation: undefined,
+      graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
+    };
+  }
+
+  return {
+    ext_id: '',
+    narrative: typeof parsed.narrative === 'string' ? parsed.narrative : '',
+    concatenation: undefined,
+    graph: (parsed.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
+    tables: Array.isArray(parsed.tables) ? parsed.tables : [],
+    diagrams: Array.isArray(parsed.diagrams) ? parsed.diagrams : [],
+  };
 }
 
-
-/** Build a synthetic step summary from a mental model's content so it can be
- *  previewed with the same ResearchResultPanel/WorkspaceResultPanel path as a
+/** Build a synthetic step summary from a raw mental-model content result so it can
+ *  be previewed with the same ResearchResultPanel/WorkspaceResultPanel path as a
  *  session step. */
-export function mentalModelContentToStepSummary(name: string, content: MentalModelContent): ResearchStepSummary {
+export function mentalModelContentToStepSummary(name: string, raw: ModelContentCacheEntry): ResearchStepSummary {
+  const content = parseMentalModelContent(raw);
   const now = new Date().toISOString();
   return {
     id: -1,
@@ -55,7 +87,7 @@ export function mentalModelContentToStepSummary(name: string, content: MentalMod
     selections: [],
     calls: [],
     synthesis: {
-      narrative: content.narrative ?? content.concatenation ?? '',
+      narrative: content.narrative || '',
     },
     canvas: {
       graph: (content.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
@@ -66,8 +98,12 @@ export function mentalModelContentToStepSummary(name: string, content: MentalMod
   };
 }
 
+function getModelContentText(raw: HindsightContentResult | undefined): string {
+  if (!raw) return '';
+  return parseMentalModelContent(raw).narrative || '';
+}
 
-function renderModelContent(entry: ModelContentEntry | undefined): React.ReactNode {
+function renderModelContent(entry: HindsightContentResult | undefined): React.ReactNode {
   if (!entry) {
     return (
       <div className="h-24 flex items-center justify-center text-xs text-white/40">
@@ -75,32 +111,24 @@ function renderModelContent(entry: ModelContentEntry | undefined): React.ReactNo
       </div>
     );
   }
-  if (entry.error) {
-    return (
-      <div className="h-24 flex items-center justify-center text-xs text-red-400">
-        {entry.error}
-      </div>
-    );
-  }
-  if (!entry.found || !entry.mental_model) {
+  if (entry.found === false) {
     return (
       <div className="h-24 flex items-center justify-center text-xs text-white/40">
         Model content not found.
       </div>
     );
   }
-  const text = getModelContentText(entry.mental_model);
+  const text = getModelContentText(entry);
   if (text) {
     return <NarrativeViewer content={text} title="Content" viewMode="markdown" showIndex={false} className="h-48" />;
   }
-  // No narrative/concatenation: render the full structured content as JSON.
+  // No narrative: render the full raw content as JSON.
   return (
     <div className="h-48 overflow-auto rounded border border-white/10 bg-black/20 p-2">
-      {renderValue(entry.mental_model)}
+      {renderValue(entry.content)}
     </div>
   );
 }
-
 
 const MODEL_TAB_LABELS: Record<string, string> = {
   contextual_refs: 'Context',
@@ -109,8 +137,14 @@ const MODEL_TAB_LABELS: Record<string, string> = {
   edge_contexts: 'Edges',
 };
 
+export type ModelContentCacheEntry = {
+  content: string | object | null;
+  found: boolean;
+  loading?: boolean;
+  error?: string | null;
+};
 
-export type { ModelContentEntry, EntityInfoWithContent };
+export type { HindsightContentResult, EntityInfoWithContent };
 export {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,

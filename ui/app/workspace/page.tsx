@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
-import { serversApi, contextualGraphApi, entityInfoApi, entitiesApi, researchApi, type Server, type Entity } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, entityInfoApi, entitiesApi, researchApi, mentalModelsApi, type Server, type Entity, type EntityInfo } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
@@ -22,7 +22,7 @@ import {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,
   mentalModelContentToStepSummary,
-  type EntityInfoWithContent,
+  type ModelContentCacheEntry,
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
 import { EntityScopePanel } from './_components/entity-scope-panel';
@@ -50,7 +50,8 @@ export default function WorkspacePage() {
   const [architxtEntities, setArchitxtEntities] = useState<Entity[]>([]);
   const [loadingArchitxtEntities, setLoadingArchitxtEntities] = useState(false);
 
-  const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfoWithContent> | null>(null);
+  const [entityInfoMap, setEntityInfoMap] = useState<Record<string, EntityInfo> | null>(null);
+  const [modelContentCache, setModelContentCache] = useState<Record<string, ModelContentCacheEntry>>({});
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
   type SelectedView =
@@ -101,19 +102,20 @@ export default function WorkspacePage() {
   const previewResult = useMemo(() => {
     if (!selectedView) return null;
     if (selectedView.kind === 'step') return selectedView.step;
-    const entry = entityInfoMap?.[selectedView.entityId]?.content?.[selectedView.extId];
-    if (!entry?.mental_model) return null;
-    return mentalModelContentToStepSummary(selectedView.name, entry.mental_model);
-  }, [selectedView, entityInfoMap]);
+    const entry = modelContentCache[selectedView.extId];
+    if (!entry || entry.loading || entry.error || !entry.content) return null;
+    return mentalModelContentToStepSummary(selectedView.name, entry);
+  }, [selectedView, modelContentCache]);
 
   const previewError = useMemo(() => {
     if (selectedView?.kind !== 'model') return reflectError;
-    const entry = entityInfoMap?.[selectedView.entityId]?.content?.[selectedView.extId];
+    const entry = modelContentCache[selectedView.extId];
     if (!entry) return `Model ${selectedView.extId} is not loaded.`;
+    if (entry.loading) return null;
     if (entry.error) return entry.error;
-    if (!entry.mental_model) return `Model ${selectedView.extId} has no content.`;
+    if (!entry.content) return `Model ${selectedView.extId} has no content.`;
     return null;
-  }, [selectedView, entityInfoMap, reflectError]);
+  }, [selectedView, modelContentCache, reflectError]);
 
   // Layout sizing: two vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
@@ -425,9 +427,40 @@ export default function WorkspacePage() {
     });
   }, []);
 
+  const loadModelContent = useCallback(async (extId: string) => {
+    if (!serverId || !bankId) return;
+    setModelContentCache((prev) => {
+      if (prev[extId]?.loading || prev[extId]?.content !== undefined) return prev;
+      return { ...prev, [extId]: { ...prev[extId], loading: true, error: null } };
+    });
+    try {
+      const result = await mentalModelsApi.fetchContent(serverId, bankId, extId);
+      setModelContentCache((prev) => ({
+        ...prev,
+        [extId]: {
+          content: result.content ?? null,
+          found: result.found,
+          loading: false,
+          error: null,
+        },
+      }));
+    } catch (err: any) {
+      setModelContentCache((prev) => ({
+        ...prev,
+        [extId]: {
+          content: prev[extId]?.content ?? null,
+          found: prev[extId]?.found ?? false,
+          loading: false,
+          error: err.message || String(err) || 'Failed to load model content.',
+        },
+      }));
+    }
+  }, [serverId, bankId]);
+
   const selectEntityModel = useCallback((entityId: string, item: ModelItem) => {
     setSelectedView({ kind: 'model', entityId, extId: item.extId, name: item.label });
-  }, []);
+    void loadModelContent(item.extId);
+  }, [loadModelContent]);
 
   useEffect(() => {
     if (!serverId || !bankId || scopeEntityIds.length === 0) {
@@ -437,13 +470,12 @@ export default function WorkspacePage() {
     let cancelled = false;
     setLoadingEntityInfo(true);
     entityInfoApi
-      .info(serverId, bankId, scopeEntityIds)
+      .info(serverId, bankId, scopeEntityIds, false)
       .then((result) => {
         if (cancelled) return;
-        const contentMap = result.content || {};
-        const mergedEntities: Record<string, EntityInfoWithContent> = {};
+        const mergedEntities: Record<string, EntityInfo> = {};
         for (const [id, info] of Object.entries(result.entities)) {
-          mergedEntities[id] = { ...info, content: contentMap };
+          mergedEntities[id] = info;
         }
         setEntityInfoMap(mergedEntities);
       })

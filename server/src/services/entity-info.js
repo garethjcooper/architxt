@@ -487,6 +487,11 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       for (const m of plainModels) allExtIds.add(m.ext_id);
 
       const entityEdgeContexts = edgeContextsByEntityId.get(id) || [];
+      for (const ctx of entityEdgeContexts) {
+        for (const ref of ctx.refs || []) {
+          if (ref.ext_id) allExtIds.add(ref.ext_id);
+        }
+      }
 
       entities[id] = buildEntityInfo({
         graphNode,
