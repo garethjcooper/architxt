@@ -1,7 +1,7 @@
 'use client';
 
 import { NarrativeViewer } from '@/components/narrative-viewer';
-import { type EntityInfo, type MentalModelContent } from '@/lib/api/client';
+import { type EntityInfo, type MentalModelContent, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
 import {
   DisplayNode,
   DisplayEdge,
@@ -31,6 +31,39 @@ function getModelContentText(content: MentalModelContent | undefined): string {
   if (typeof content.narrative === 'string' && content.narrative.trim()) return content.narrative;
   if (typeof content.concatenation === 'string' && content.concatenation.trim()) return content.concatenation;
   return '';
+}
+
+
+/** Build a synthetic step summary from a mental model's content so it can be
+ *  previewed with the same ResearchResultPanel/WorkspaceResultPanel path as a
+ *  session step. */
+export function mentalModelContentToStepSummary(name: string, content: MentalModelContent): ResearchStepSummary {
+  const now = new Date().toISOString();
+  return {
+    id: -1,
+    session_id: -1,
+    parent_step_id: null,
+    intent_text: name,
+    raw_query: null,
+    action_type: 'curated_page',
+    parameters: null,
+    created_at: now,
+    status: 'completed',
+    error_message: null,
+    tool_calls_used: 0,
+    viewpoint_ids: [],
+    selections: [],
+    calls: [],
+    synthesis: {
+      narrative: content.narrative ?? content.concatenation ?? '',
+    },
+    canvas: {
+      graph: (content.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
+      tables: content.tables ?? [],
+      diagrams: content.diagrams ?? [],
+      meta: undefined,
+    },
+  };
 }
 
 
