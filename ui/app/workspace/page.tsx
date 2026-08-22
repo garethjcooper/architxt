@@ -32,9 +32,6 @@ import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
-import { SessionPageEditor } from './_components/session-page-editor';
-import type { SessionPageEditorRef } from './_components/session-page-editor';
-import { type ResearchCopyEvent } from '@/app/research/research-result-panel';
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
 const logger = createLogger('WorkspacePage');
@@ -61,9 +58,7 @@ export default function WorkspacePage() {
     if (!selectedStep?.canvas?.graph) return false;
     return selectedStep.canvas.graph.nodes?.length > 0;
   }, [selectedStep]);
-  const [editingStep, setEditingStep] = useState<ResearchStepSummary | null>(null);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
-  const editorRef = useRef<SessionPageEditorRef | null>(null);
 
   const {
     selectedServerId,
@@ -98,19 +93,19 @@ export default function WorkspacePage() {
     return activeSession?.scope_entity_ids ?? [];
   }, [activeSession?.scope_entity_ids]);
 
-  // Layout sizing: three vertical columns.
+  // Layout sizing: two vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
-  const [columnWidths, setColumnWidths] = useState({ left: 0.25, middle: 0.4, right: 0.35 });
+  const [columnWidths, setColumnWidths] = useState({ left: 0.3, right: 0.7 });
 
-  const [resizing, setResizing] = useState<null | 'col1' | 'col2'>(null);
+  const [resizing, setResizing] = useState<null | 'col1'>(null);
   const resizeStartRef = useRef({
     x: 0,
     width: 0,
-    widths: { left: 0.25, middle: 0.4, right: 0.35 },
+    widths: { left: 0.3, right: 0.7 },
   });
 
   const handleResizeStart = useCallback(
-    (pane: 'col1' | 'col2') => (e: React.MouseEvent) => {
+    (pane: 'col1') => (e: React.MouseEvent) => {
       setResizing(pane);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
@@ -132,13 +127,9 @@ export default function WorkspacePage() {
       const MIN = 0.15;
 
       if (resizing === 'col1') {
-        const nextLeft = Math.max(MIN, Math.min(widths.left + delta, widths.left + widths.middle - MIN));
-        const nextMiddle = Math.max(MIN, widths.middle - (nextLeft - widths.left));
-        setColumnWidths((prev) => ({ ...prev, left: nextLeft, middle: nextMiddle }));
-      } else if (resizing === 'col2') {
-        const nextMiddle = Math.max(MIN, Math.min(widths.middle + delta, widths.middle + widths.right - MIN));
-        const nextRight = Math.max(MIN, widths.right - (nextMiddle - widths.middle));
-        setColumnWidths((prev) => ({ ...prev, middle: nextMiddle, right: nextRight }));
+        const nextLeft = Math.max(MIN, Math.min(widths.left + delta, 1 - MIN));
+        const nextRight = Math.max(MIN, widths.right - (nextLeft - widths.left));
+        setColumnWidths((prev) => ({ ...prev, left: nextLeft, right: nextRight }));
       }
     },
     [resizing]
@@ -222,17 +213,6 @@ export default function WorkspacePage() {
 
   const handleSelectStep = useCallback((step: ResearchStepSummary) => {
     setSelectedStep(step);
-  }, []);
-
-  const handleEditPage = useCallback((step: ResearchStepSummary) => {
-    setSelectedStep(step);
-    setEditingStep(step);
-  }, []);
-
-  const handlePageSaved = useCallback((updated: ResearchStepSummary) => {
-    setEditingStep(updated);
-    setSelectedStep((prev) => (prev?.id === updated.id ? updated : prev));
-    toast.success('Page updated');
   }, []);
 
   const fetchServers = useCallback(async () => {
@@ -360,7 +340,7 @@ export default function WorkspacePage() {
   );
 
   // When the research hook produces a completed result, mirror it into the
-  // workspace's selected-step state so the page editor and result panel render.
+  // workspace's selected-step state so the result panel renders.
   useEffect(() => {
     if (!workspaceSession.result) return;
     const step = workspaceSession.trail.find((s) => s.id === workspaceSession.result?.step_id);
@@ -369,83 +349,6 @@ export default function WorkspacePage() {
       void workspaceSession.refresh();
     }
   }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh]);
-
-  const handleCopySection = useCallback(async (event: ResearchCopyEvent) => {
-    if (!activeSession) {
-      toast.error('No active session. Select a server and bank first.');
-      return;
-    }
-    if (!editingStep) {
-      const pageTitle = event.label || 'Copied section';
-      try {
-        const page = await researchApi.createSessionPage(activeSession.id, pageTitle);
-        let updateData: Parameters<typeof researchApi.updateCuratedPage>[1] = {
-          intent_text: pageTitle,
-          canvas: page.canvas || undefined,
-        };
-        switch (event.type) {
-          case 'narrative':
-            updateData.synthesis = { narrative: event.payload };
-            break;
-          case 'graph': {
-            const parsedGraph = JSON.parse(event.payload);
-            updateData.canvas = {
-              ...(page.canvas || { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
-              graph: parsedGraph,
-            };
-            break;
-          }
-          case 'tables': {
-            const parsedTables = JSON.parse(event.payload);
-            updateData.canvas = {
-              ...(page.canvas || { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
-              tables: parsedTables,
-            };
-            break;
-          }
-          case 'diagrams': {
-            const parsedDiagrams = JSON.parse(event.payload);
-            updateData.canvas = {
-              ...(page.canvas || { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
-              diagrams: parsedDiagrams,
-            };
-            break;
-          }
-        }
-        const updated = await researchApi.updateCuratedPage(page.id, updateData);
-        const nextStep: ResearchStepSummary = { ...page, intent_text: updated.intent_text ?? pageTitle, synthesis: updated.synthesis, canvas: updated.canvas };
-        setSelectedStep(nextStep);
-        setEditingStep(nextStep);
-        void workspaceSession.refresh();
-        toast.success(`Created page "${pageTitle}" with copied ${event.type}`);
-        return;
-      } catch (err: any) {
-        toast.error(err.message || `Failed to create page for copied ${event.type}`);
-        return;
-      }
-    }
-    switch (event.type) {
-      case 'narrative':
-        editorRef.current?.appendBlocks(event.payload);
-        break;
-      case 'graph': {
-        const parsedGraph = JSON.parse(event.payload);
-        editorRef.current?.appendGraph(parsedGraph.nodes || [], parsedGraph.edges || []);
-        break;
-      }
-      case 'tables': {
-        const parsedTables = JSON.parse(event.payload);
-        editorRef.current?.appendTables(parsedTables);
-        break;
-      }
-      case 'diagrams': {
-        const parsedDiagrams = JSON.parse(event.payload);
-        editorRef.current?.appendDiagrams(parsedDiagrams);
-        break;
-      }
-    }
-    toast.success(`Copied ${event.type}${event.label ? ` "${event.label}"` : ''} into the open page`);
-  }, [activeSession, editingStep, editorRef]);
 
   const handleToggleScopeEntity = useCallback(async (entityId: string, inScope: boolean) => {
     if (!activeSession) return;
@@ -568,7 +471,7 @@ export default function WorkspacePage() {
           </Button>
         </div>
 
-        {/* Main three-column workbench */}
+        {/* Main two-column workbench */}
         <div ref={mainRowRef} className="flex-1 min-h-0 flex">
           {/* Column 1: scope + query | session items | contextual data */}
           <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
@@ -606,10 +509,8 @@ export default function WorkspacePage() {
                   items={workspaceSession.workspaceItems}
                   loading={workspaceSession.sessionsLoading || workspaceSession.trailLoading}
                   activeStepId={selectedStep?.id}
-                  editingStepId={editingStep?.id}
                   runningStepId={workspaceSession.runningStepId}
                   onSelectStep={handleSelectStep}
-                  onEditPage={handleEditPage}
                   onReuseStep={handleReuseStep}
                   onRerunStep={handleRerunStep}
                   onInspectStep={handleInspectStep}
@@ -642,10 +543,10 @@ export default function WorkspacePage() {
             </div>
           </div>
 
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/middle columns" />
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/right columns" />
 
           {/* Column 2: result viewer */}
-          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.middle, minWidth: 280 }}>
+          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
             <Panel className="flex-1 min-h-0">
               <PanelHeader
                 title={selectedStep ? (selectedStep.action_type === 'curated_page' ? 'Page preview' : 'Reflect output') : 'Read-only preview'}
@@ -658,30 +559,11 @@ export default function WorkspacePage() {
                     loading={reflectLoading}
                     error={reflectError}
                     sessionName={activeSession?.title}
-                    onCopy={handleCopySection}
                     keyPrefix="preview"
                   />
                 </div>
               </PanelContent>
             </Panel>
-          </div>
-
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col2')} title="Drag to resize middle/right columns" />
-
-          {/* Column 3: session page editor */}
-          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
-            {editingStep ? (
-              <SessionPageEditor ref={editorRef} step={editingStep} onSaved={handlePageSaved} keyPrefix="editor" />
-            ) : (
-              <Panel className="flex-1 min-h-0">
-                <PanelHeader title="Page editor" />
-                <PanelContent className="p-4">
-                  <div className="text-white/40 text-xs">
-                    Open a page from the session list to edit it here.
-                  </div>
-                </PanelContent>
-              </Panel>
-            )}
           </div>
         </div>
 
