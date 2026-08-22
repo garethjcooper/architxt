@@ -531,7 +531,17 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'entity-capabilities-{id}',
     name: 'Entity capabilities: {entity-name}',
     role: 'sys_entity_capabilities',
-    sourceQuery: 'Entity: {id} ({entity-name}).\\n#table\\n#table-name Capabilities\\nReturn the major architectural capabilities of the entity in a table named "capabilities" with columns: name, responsibility, purpose, business_capability_mapping, evidence.\\n- name: the capability name.\\n- responsibility: what the entity does for this capability.\\n- purpose: why the capability matters.\\n- business_capability_mapping: the business domain this capability belongs to.\\n- evidence: array of Hindsight memory IDs supporting this capability.\\nList its major capabilities, each with its purpose, responsibility, business capability mapping, and evidence.\\n#end',
+    sourceQuery: `Entity: {id} ({entity-name}).
+#table
+#table-name Capabilities
+Return the major architectural capabilities of the entity in a table named "capabilities" with columns: name, responsibility, purpose, business_capability_mapping, evidence.
+- name: the capability name.
+- responsibility: what the entity does for this capability.
+- purpose: why the capability matters.
+- business_capability_mapping: the business domain this capability belongs to.
+- evidence: array of Hindsight memory IDs supporting this capability.
+List its major capabilities, each with its purpose, responsibility, business capability mapping, and evidence.
+#end`,
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
