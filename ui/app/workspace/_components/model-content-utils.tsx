@@ -30,9 +30,52 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
   return isGroundedEdge(edge) && !isCandidateEdge(edge);
 }
 
-function parseMentalModelContent(raw: HindsightContentResult): MentalModelContent {
+function isTableRow(line: string): boolean {
+  return (line.match(/\|/g) || []).length >= 2;
+}
+
+/** Remove accidental blank lines inside markdown table blocks. This fixes LLM outputs
+ *  that insert an empty line between table rows, which would otherwise break GFM table
+ *  rendering and show the remaining rows as plain text. */
+function normalizeTableBlankLines(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (isTableRow(line)) {
+      out.push(line);
+      i++;
+      let pendingBlanks = 0;
+      while (i < lines.length) {
+        const cur = lines[i];
+        if (cur.trim() === '') {
+          pendingBlanks++;
+          i++;
+          continue;
+        }
+        if (isTableRow(cur)) {
+          // Drop the blanks; the rows belong to the same table.
+          out.push(cur);
+          pendingBlanks = 0;
+          i++;
+          continue;
+        }
+        // Non-table line after blanks — preserve the blanks and exit the table.
+        for (let b = 0; b < pendingBlanks; b++) out.push('');
+        break;
+      }
+    } else {
+      out.push(line);
+      i++;
+    }
+  }
+  return out.join('\n');
+}
+
+function parseMentalModelContent(raw: HindsightContentResult | ModelContentCacheEntry): MentalModelContent {
   let parsed: any = null;
-  const rawContent = raw.content;
+  const rawContent = raw.content ?? null;
 
   if (typeof rawContent === 'string' && rawContent.trim()) {
     try {
@@ -47,7 +90,7 @@ function parseMentalModelContent(raw: HindsightContentResult): MentalModelConten
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return {
       ext_id: '',
-      narrative: typeof rawContent === 'string' ? rawContent : '',
+      narrative: normalizeTableBlankLines(typeof rawContent === 'string' ? rawContent : ''),
       concatenation: undefined,
       graph: { nodes: [], edges: [] },
       tables: [],
@@ -57,7 +100,7 @@ function parseMentalModelContent(raw: HindsightContentResult): MentalModelConten
 
   return {
     ext_id: '',
-    narrative: typeof parsed.narrative === 'string' ? parsed.narrative : '',
+    narrative: normalizeTableBlankLines(typeof parsed.narrative === 'string' ? parsed.narrative : ''),
     concatenation: undefined,
     graph: (parsed.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
     tables: Array.isArray(parsed.tables) ? parsed.tables : [],
@@ -68,7 +111,7 @@ function parseMentalModelContent(raw: HindsightContentResult): MentalModelConten
 /** Build a synthetic step summary from a raw mental-model content result so it can
  *  be previewed with the same ResearchResultPanel/WorkspaceResultPanel path as a
  *  session step. */
-export function mentalModelContentToStepSummary(name: string, raw: ModelContentCacheEntry): ResearchStepSummary {
+export function mentalModelContentToStepSummary(name: string, raw: HindsightContentResult | ModelContentCacheEntry): ResearchStepSummary {
   const content = parseMentalModelContent(raw);
   const now = new Date().toISOString();
   return {
