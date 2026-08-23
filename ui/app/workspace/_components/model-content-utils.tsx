@@ -98,65 +98,6 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
   };
 }
 
-/** Build a synthetic step summary from multiple raw mental-model content results
- *  by merging their graphs/tables/diagrams. Used for edge-context groups. */
-export function mergeMentalModelContents(name: string, raws: (HindsightContentResult | ModelContentCacheEntry)[]): ResearchStepSummary {
-  const contents = raws.map((raw) => parseMentalModelContent(raw));
-  const allNodes: GraphNode[] = [];
-  const nodeIds = new Set<string>();
-  const allEdges: GraphEdge[] = [];
-  const allTables: { name: string; columns: string[]; rows: Record<string, any>[] }[] = [];
-  const allDiagrams: { name: string; type: string; content: string }[] = [];
-  const narratives: string[] = [];
-
-  for (const content of contents) {
-    if (content.graph?.nodes) {
-      for (const node of content.graph.nodes) {
-        const nodeId = (node as { id?: string })?.id;
-        if (nodeId && !nodeIds.has(nodeId)) {
-          nodeIds.add(nodeId);
-          allNodes.push(node as GraphNode);
-        }
-      }
-    }
-    if (content.graph?.edges) {
-      for (const edge of content.graph.edges) {
-        if (edge) allEdges.push(edge as GraphEdge);
-      }
-    }
-    if (content.tables?.length) allTables.push(...(content.tables as { name: string; columns: string[]; rows: Record<string, any>[] }[]));
-    if (content.diagrams?.length) allDiagrams.push(...(content.diagrams as { name: string; type: string; content: string }[]));
-    if (content.narrative?.trim()) narratives.push(content.narrative.trim());
-  }
-
-  const now = new Date().toISOString();
-  return {
-    id: -1,
-    session_id: -1,
-    parent_step_id: null,
-    intent_text: name,
-    raw_query: null,
-    action_type: 'curated_page',
-    parameters: null,
-    created_at: now,
-    status: 'completed',
-    error_message: null,
-    tool_calls_used: 0,
-    viewpoint_ids: [],
-    selections: [],
-    calls: [],
-    synthesis: {
-      narrative: narratives.join('\n\n'),
-    },
-    canvas: {
-      graph: { nodes: allNodes, edges: allEdges },
-      tables: allTables,
-      diagrams: allDiagrams,
-      meta: undefined,
-    },
-  };
-}
-
 function getModelContentText(raw: HindsightContentResult | undefined): string {
   if (!raw) return '';
   return parseMentalModelContent(raw).narrative || '';
