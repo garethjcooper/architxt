@@ -121,13 +121,13 @@ export default function WorkspacePage() {
 
   // Layout sizing: two vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
-  const [columnWidths, setColumnWidths] = useState({ left: 0.3, right: 0.7 });
+  const [columnWidths, setColumnWidths] = useState({ left: 0.42, right: 0.58 });
 
   const [resizing, setResizing] = useState<null | 'col1'>(null);
   const resizeStartRef = useRef({
     x: 0,
     width: 0,
-    widths: { left: 0.3, right: 0.7 },
+    widths: { left: 0.42, right: 0.58 },
   });
 
   const handleResizeStart = useCallback(
@@ -167,18 +167,64 @@ export default function WorkspacePage() {
     document.body.style.userSelect = '';
   }, []);
 
-  // Layout sizing: three horizontal panes inside the left column.
+  // Layout sizing: scope/query top pane + combined bottom pane in the left column.
   const leftColumnRef = useRef<HTMLDivElement>(null);
-  const [leftPaneHeights, setLeftPaneHeights] = useState({ top: 0.33, middle: 0.34, bottom: 0.33 });
-  const [hResizing, setHResizing] = useState<null | 'row1' | 'row2'>(null);
+  const [leftPaneHeights, setLeftPaneHeights] = useState({ top: 0.4, bottom: 0.6 });
+  const [hResizing, setHResizing] = useState<null | 'row1'>(null);
   const hResizeStartRef = useRef({
     y: 0,
     height: 0,
-    heights: { top: 0.33, middle: 0.34, bottom: 0.33 },
+    heights: { top: 0.4, bottom: 0.6 },
   });
 
+  // Inner horizontal split within the left-column bottom pane.
+  const leftBottomRef = useRef<HTMLDivElement>(null);
+  const [innerWidths, setInnerWidths] = useState({ left: 0.5, right: 0.5 });
+  const [innerResizing, setInnerResizing] = useState<null | 'innerCol'>(null);
+  const innerResizeStartRef = useRef({
+    x: 0,
+    width: 0,
+    widths: { left: 0.5, right: 0.5 },
+  });
+
+  const handleInnerResizeStart = useCallback(
+    (pane: 'innerCol') => (e: React.MouseEvent) => {
+      setInnerResizing(pane);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      innerResizeStartRef.current = {
+        x: e.clientX,
+        width: leftBottomRef.current?.getBoundingClientRect().width ?? 0,
+        widths: { ...innerWidths },
+      };
+    },
+    [innerWidths]
+  );
+
+  const handleInnerResizeMove = useCallback(
+    (e: MouseEvent) => {
+      if (!innerResizing) return;
+      const { x, width, widths } = innerResizeStartRef.current;
+      if (width <= 0) return;
+      const delta = (e.clientX - x) / width;
+      const MIN = 0.15;
+      const nextLeft = Math.max(MIN, Math.min(widths.left + delta, 1 - MIN));
+      const nextRight = Math.max(MIN, widths.right - (nextLeft - widths.left));
+      setInnerWidths((prev) => ({ ...prev, left: nextLeft, right: nextRight }));
+    },
+    [innerResizing]
+  );
+
+  const handleInnerResizeEnd = useCallback(() => {
+    setInnerResizing(null);
+    if (!resizing) {
+      document.body.style.cursor = '';
+    }
+    document.body.style.userSelect = '';
+  }, [resizing]);
+
   const handleHResizeStart = useCallback(
-    (pane: 'row1' | 'row2') => (e: React.MouseEvent) => {
+    (pane: 'row1') => (e: React.MouseEvent) => {
       setHResizing(pane);
       document.body.style.cursor = 'row-resize';
       document.body.style.userSelect = 'none';
@@ -200,13 +246,9 @@ export default function WorkspacePage() {
       const MIN = 0.12;
 
       if (hResizing === 'row1') {
-        const nextTop = Math.max(MIN, Math.min(heights.top + delta, heights.top + heights.middle - MIN));
-        const nextMiddle = Math.max(MIN, heights.middle - (nextTop - heights.top));
-        setLeftPaneHeights((prev) => ({ ...prev, top: nextTop, middle: nextMiddle }));
-      } else if (hResizing === 'row2') {
-        const nextMiddle = Math.max(MIN, Math.min(heights.middle + delta, heights.middle + heights.bottom - MIN));
-        const nextBottom = Math.max(MIN, heights.bottom - (nextMiddle - heights.middle));
-        setLeftPaneHeights((prev) => ({ ...prev, middle: nextMiddle, bottom: nextBottom }));
+        const nextTop = Math.max(MIN, Math.min(heights.top + delta, 1 - MIN));
+        const nextBottom = Math.max(MIN, 1 - nextTop);
+        setLeftPaneHeights((prev) => ({ ...prev, top: nextTop, bottom: nextBottom }));
       }
     },
     [hResizing]
@@ -224,10 +266,12 @@ export default function WorkspacePage() {
     const move = (e: MouseEvent) => {
       handleResizeMove(e);
       handleHResizeMove(e);
+      handleInnerResizeMove(e);
     };
     const up = () => {
       handleResizeEnd();
       handleHResizeEnd();
+      handleInnerResizeEnd();
     };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
@@ -235,7 +279,7 @@ export default function WorkspacePage() {
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', up);
     };
-  }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd]);
+  }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd, handleInnerResizeMove, handleInnerResizeEnd]);
 
   const handleSelectStep = useCallback((step: ResearchStepSummary) => {
     setSelectedView({ kind: 'step', step });
@@ -558,46 +602,63 @@ export default function WorkspacePage() {
               </div>
             </div>
 
-            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} title="Drag to resize query / session items" />
+            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} title="Drag to resize query / lower panels" />
 
-            {serverId && bankId ? (
-              <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.middle, minHeight: 140 }}>
-                <SessionItemsPanel
-                  session={workspaceSession.activeSession}
-                  items={workspaceSession.workspaceItems}
-                  loading={workspaceSession.sessionsLoading || workspaceSession.trailLoading}
-                  activeStepId={selectedStep?.id}
-                  runningStepId={workspaceSession.runningStepId}
-                  onSelectStep={handleSelectStep}
-                  onReuseStep={handleReuseStep}
-                  onRerunStep={handleRerunStep}
-                  onInspectStep={handleInspectStep}
-                  onRefresh={workspaceSession.refresh}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.middle, minHeight: 140 }}>
-                <Panel className="flex-1 min-h-0">
-                  <PanelHeader title="Session items" />
-                  <PanelContent className="p-3">
-                    <div className="text-white/40 text-xs">Select a server and bank to load sessions.</div>
-                  </PanelContent>
-                </Panel>
-              </div>
-            )}
+            <div ref={leftBottomRef} className="flex min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 140 }}>
+              {serverId && bankId ? (
+                <>
+                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
+                    <AttachedEntitiesPanel
+                      entityIds={scopeEntityIds}
+                      entityInfoMap={entityInfoMap}
+                      loading={loadingEntityInfo}
+                      expandedEntityIds={expandedEntityIds}
+                      selectedModel={selectedModel}
+                      onToggleExpand={toggleEntityExpanded}
+                      onSelectModel={selectEntityModel}
+                    />
+                  </div>
 
-            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row2')} title="Drag to resize session items / contextual data" />
+                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} title="Drag to resize contextual data / session items" />
 
-            <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 120 }}>
-              <AttachedEntitiesPanel
-                entityIds={scopeEntityIds}
-                entityInfoMap={entityInfoMap}
-                loading={loadingEntityInfo}
-                expandedEntityIds={expandedEntityIds}
-                selectedModel={selectedModel}
-                onToggleExpand={toggleEntityExpanded}
-                onSelectModel={selectEntityModel}
-              />
+                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
+                    <SessionItemsPanel
+                      session={workspaceSession.activeSession}
+                      items={workspaceSession.workspaceItems}
+                      loading={workspaceSession.sessionsLoading || workspaceSession.trailLoading}
+                      activeStepId={selectedStep?.id}
+                      runningStepId={workspaceSession.runningStepId}
+                      onSelectStep={handleSelectStep}
+                      onReuseStep={handleReuseStep}
+                      onRerunStep={handleRerunStep}
+                      onInspectStep={handleInspectStep}
+                      onRefresh={workspaceSession.refresh}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
+                    <Panel className="flex-1 min-h-0">
+                      <PanelHeader title="Contextual data" />
+                      <PanelContent className="p-3">
+                        <div className="text-white/40 text-xs">Select a server and bank to load contextual data.</div>
+                      </PanelContent>
+                    </Panel>
+                  </div>
+
+                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} title="Drag to resize contextual data / session items" />
+
+                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
+                    <Panel className="flex-1 min-h-0">
+                      <PanelHeader title="Session items" />
+                      <PanelContent className="p-3">
+                        <div className="text-white/40 text-xs">Select a server and bank to load sessions.</div>
+                      </PanelContent>
+                    </Panel>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
