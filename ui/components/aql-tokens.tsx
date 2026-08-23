@@ -8,17 +8,17 @@ import {
 } from '@architxt/aql';
 
 const BLOCK_COLORS: Record<string, string> = {
-  diagram: '#a855f7',
-  table: '#06b6d4',
-  graph: '#f97316',
-  narrative: '#22c55e',
+  diagram: '#94a3b8',
+  table: '#94a3b8',
+  graph: '#94a3b8',
+  narrative: '#94a3b8',
 };
 
 const SUB_COLORS: Record<string, string> = {
-  'diagram-name': '#3b82f6',
-  'diagram-type': '#eab308',
-  'table-name': '#06b6d4',
-  end: '#ef4444',
+  'diagram-name': '#64748b',
+  'diagram-type': '#64748b',
+  'table-name': '#64748b',
+  end: '#94a3b8',
 };
 
 export function directiveColor(keyword: string): string {
@@ -88,7 +88,7 @@ function DirectiveToken({
   return (
     <span
       className="aql-token aql-directive whitespace-pre-wrap"
-      style={{ color }}
+      style={{ color, fontWeight: 500 }}
       data-token-raw={raw}
       title={raw}
     >
@@ -195,7 +195,7 @@ export function AqlTokenList({
             return <ReferenceToken key={i} reference={token.reference!} resolver={resolveReference} />;
           case 'text':
             return (
-              <span key={i} className="text-white/80 whitespace-pre-wrap">
+              <span key={i} className="text-[#e5e7eb] whitespace-pre-wrap">
                 {token.text}
               </span>
             );
