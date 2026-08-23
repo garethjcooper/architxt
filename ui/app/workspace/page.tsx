@@ -26,6 +26,7 @@ import {
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
 import { EntityScopePanel } from './_components/entity-scope-panel';
+import { EntityScopeManagerDialog } from './_components/entity-scope-manager-dialog';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
@@ -65,6 +66,7 @@ export default function WorkspacePage() {
     return selectedStep.canvas.graph.nodes?.length > 0;
   }, [selectedStep]);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
+  const [scopeManagerOpen, setScopeManagerOpen] = useState(false);
 
   const {
     selectedServerId,
@@ -374,12 +376,10 @@ export default function WorkspacePage() {
     }
   }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh]);
 
-  const handleToggleScopeEntity = useCallback(async (entityId: string, inScope: boolean) => {
+  const handleRemoveScopeEntity = useCallback(async (entityId: string) => {
     if (!activeSession) return;
     const currentIds = activeSession.scope_entity_ids ?? [];
-    const nextIds = inScope
-      ? Array.from(new Set([...currentIds, entityId]))
-      : currentIds.filter((id) => id !== entityId);
+    const nextIds = currentIds.filter((id) => id !== entityId);
 
     setActiveSession((prev) => (prev ? { ...prev, scope_entity_ids: nextIds } : prev));
 
@@ -389,6 +389,12 @@ export default function WorkspacePage() {
       logger.error('Failed to update session scope', { error: err, sessionId: activeSession.id, entityId });
       toast.error(`Failed to update scope: ${err.message || err}`);
     }
+  }, [activeSession]);
+
+  const handleUpdateScope = useCallback(async (nextIds: string[]) => {
+    if (!activeSession) return;
+    setActiveSession((prev) => (prev ? { ...prev, scope_entity_ids: nextIds } : prev));
+    await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
   }, [activeSession]);
 
   const handleReuseStep = useCallback((step: ResearchStepSummary) => {
@@ -529,15 +535,16 @@ export default function WorkspacePage() {
         <div ref={mainRowRef} className="flex-1 min-h-0 flex">
           {/* Column 1: scope + query | session items | contextual data */}
           <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
-            <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
+            <div className="flex flex-col min-h-0 gap-2" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
+              <EntityScopePanel
+                className="shrink-0"
+                entities={architxtEntities}
+                scopeEntityIds={scopeEntityIds}
+                onRemove={handleRemoveScopeEntity}
+                onManage={() => setScopeManagerOpen(true)}
+                loading={loadingArchitxtEntities}
+              />
               <div className="flex-1 min-h-0 flex">
-                <EntityScopePanel
-                  entities={architxtEntities}
-                  scopeEntityIds={scopeEntityIds}
-                  onToggle={handleToggleScopeEntity}
-                  loading={loadingArchitxtEntities}
-                  style={{ flex: 0.35, minWidth: 180 }}
-                />
                 <ReflectQueryPanel
                   query={reflectQuery}
                   cursor={reflectCursor}
@@ -549,7 +556,7 @@ export default function WorkspacePage() {
                   loading={reflectLoading}
                   queryOptions={queryOptions}
                   onQueryOptionsChange={setQueryOptions}
-                  style={{ flex: 0.65, minWidth: 220 }}
+                  style={{ flex: 1, minWidth: 220 }}
                 />
               </div>
             </div>
@@ -643,6 +650,13 @@ export default function WorkspacePage() {
             if (!open) setInspectingStep(null);
           }}
           step={inspectingStep}
+        />
+
+        <EntityScopeManagerDialog
+          isOpen={scopeManagerOpen}
+          onClose={() => setScopeManagerOpen(false)}
+          scopeEntityIds={scopeEntityIds}
+          onSave={handleUpdateScope}
         />
       </div>
     </PageShell>
