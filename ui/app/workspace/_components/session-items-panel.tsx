@@ -106,7 +106,7 @@ export function SessionItemsPanel({
       <PanelContent className="p-0">
         <div className="absolute inset-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1">
-            {items.map((step, idx) => {
+            {items.map((step) => {
               const isActive = activeStepId === step.id;
               const isExpanded = expandedIds.has(step.id);
               const isRunning = step.status === 'running' || runningStepId === step.id;
@@ -134,7 +134,6 @@ export function SessionItemsPanel({
                     >
                       <div className="flex items-center justify-between text-xs text-white/90">
                         <span className="truncate flex items-center gap-2 min-w-0">
-                          <span className="font-mono text-white/60">#{idx + 1}</span>
                           {createdAt && (
                             <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
                           )}
@@ -172,7 +171,7 @@ export function SessionItemsPanel({
                         <span
                           className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 cursor-pointer"
                           onClick={(e) => e.stopPropagation()}
-                          aria-label={`Query ${idx + 1} actions`}
+                          aria-label="Query actions"
                           role="button"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
