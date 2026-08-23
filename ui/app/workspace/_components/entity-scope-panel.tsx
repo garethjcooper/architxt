@@ -1,21 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Panel, PanelHeader, PanelContent } from './panel-layout';
-import { colorForType } from '@/components/research-canvas';
 import type { Entity } from '@/lib/types';
 
 interface EntityScopePanelProps {
   entities: Entity[];
   scopeEntityIds: string[];
-  onToggle: (entityId: string, inScope: boolean) => void;
+  onRemove: (entityId: string) => void;
+  onManage: () => void;
   loading?: boolean;
-  style?: React.CSSProperties;
   className?: string;
 }
 
@@ -26,92 +22,97 @@ function canonicalEntityId(entity: Entity): string {
 export function EntityScopePanel({
   entities,
   scopeEntityIds,
-  onToggle,
+  onRemove,
+  onManage,
   loading,
-  style,
   className,
 }: EntityScopePanelProps) {
-  const [search, setSearch] = useState('');
+  const [isExpanded, setIsExpanded] = useState(true);
+
   const scopeSet = useMemo(() => new Set(scopeEntityIds), [scopeEntityIds]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return entities;
-    return entities.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.entity_id.toLowerCase().includes(q) ||
-        e.type_name.toLowerCase().includes(q)
-    );
-  }, [entities, search]);
+  const inScope = useMemo(() => {
+    return entities
+      .filter((e) => scopeSet.has(canonicalEntityId(e)))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [entities, scopeSet]);
+
+  const isEmpty = inScope.length === 0;
+  const canExpand = inScope.length > 0;
 
   return (
-    <Panel className={cn('flex-1', className)} style={style}>
-      <PanelHeader title="Entity scope" count={scopeEntityIds.length} />
-      <PanelContent className="p-0">
-        <div className="absolute inset-0 flex flex-col">
-          <div className="px-2 py-2 border-b border-white/10 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
-              <Input
-                placeholder="Filter entities..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-7 text-xs bg-black/20 border-white/10 pl-7"
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
-            {loading ? (
-              <div className="text-white/40 text-xs px-2 py-2">Loading entities…</div>
-            ) : filtered.length === 0 ? (
-              <div className="text-white/40 text-xs px-2 py-2">
-                {entities.length === 0 ? 'No entities in the Architxt app list.' : 'No entities match your filter.'}
-              </div>
-            ) : (
-              filtered.map((entity) => {
-                const id = canonicalEntityId(entity);
-                const inScope = scopeSet.has(id);
-                const color = colorForType(entity.type_name);
-                return (
-                  <label
-                    key={id}
-                    className={cn(
-                      'flex items-center gap-2 rounded border px-2 py-1.5 text-xs cursor-pointer transition-colors',
-                      inScope
-                        ? 'bg-emerald-500/10 border-emerald-500/30'
-                        : 'bg-black/20 border-white/5 hover:bg-white/5'
-                    )}
-                    title={id}
-                  >
-                    <Checkbox
-                      checked={inScope}
-                      onCheckedChange={(checked) => onToggle(id, checked === true)}
-                      className="shrink-0"
-                    />
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="truncate font-medium text-white/90">{entity.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="truncate text-white/50">{entity.entity_id}</span>
-                        <Badge variant="outline" className="text-[9px] h-3 px-1 border-white/20 text-white/50 shrink-0">
-                          {entity.type_name}
-                        </Badge>
-                      </div>
-                    </div>
-                  </label>
-                );
-              })
-            )}
-          </div>
+    <div
+      className={cn(
+        'border border-white/10 bg-[oklch(0.23_0_0)] rounded-md flex flex-col overflow-hidden',
+        className
+      )}
+    >
+      <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-medium truncate">Entity scope</span>
+          {!loading && (
+            <span className="text-[10px] text-emerald-200/70 bg-emerald-900/30 border border-emerald-500/20 rounded px-1.5 py-0.5 shrink-0">
+              {inScope.length}
+            </span>
+          )}
         </div>
-      </PanelContent>
-    </Panel>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {canExpand && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="h-6 text-[10px] px-2 text-emerald-200/80 hover:text-emerald-100 hover:bg-emerald-900/20"
+            >
+              {isExpanded ? 'Hide' : 'Show'}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onManage}
+            className="h-6 text-[10px] px-2 text-emerald-200/80 hover:text-emerald-100 hover:bg-emerald-900/20"
+          >
+            Manage
+          </Button>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="flex-1 min-h-0 p-2">
+          {loading ? (
+            <div className="text-white/40 text-xs px-1 py-1">Loading scope...</div>
+          ) : isEmpty ? (
+            <div className="text-white/40 text-xs px-1 py-1">
+              No entities in scope. Click Manage to add some.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+              {inScope.map((entity) => {
+                const qid = canonicalEntityId(entity);
+                const label = `${entity.entity_id} — ${entity.name}`;
+
+                return (
+                  <div
+                    key={qid}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                  >
+                    <span>{label}</span>
+                    <span className="text-[10px] text-white/40">{entity.type_name}</span>
+                    <button
+                      onClick={() => onRemove(qid)}
+                      className="ml-1 hover:opacity-70 transition-opacity"
+                      title="Remove from scope"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
