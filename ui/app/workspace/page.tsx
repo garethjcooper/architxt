@@ -502,9 +502,6 @@ export default function WorkspacePage() {
   return (
     <PageShell
       title="Workspace"
-      subtitle="Discovery and collation workbench."
-      count={entities.length}
-      countLabel="entity"
       loading={loadingServers || loadingBanks || loadingData}
     >
       <div className="flex flex-col flex-1 min-h-0 gap-3">
