@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { colorForType } from '@/components/research-canvas';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
 import { type EntityInfo } from '@/lib/api/client';
@@ -138,30 +139,34 @@ export function AttachedEntitiesPanel({
               const expanded = expandedEntityIds.has(entityId);
               const hasItems = items.length > 0;
 
+              const typeName = info.catalog?.type_name || (entityId.includes(':') ? entityId.split(':')[0] : undefined);
+              const color = colorForType(typeName);
+
               return (
                 <div
                   key={entityId}
-                  className="rounded-md border border-white/10 bg-black/20 overflow-hidden"
+                  className="rounded border border-white/5 bg-black/20 overflow-hidden"
                 >
                   <button
                     type="button"
                     onClick={() => onToggleExpand(entityId)}
-                    className="w-full px-2.5 py-2 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
+                    className="w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
                     disabled={!hasItems}
                     title={hasItems ? (expanded ? 'Collapse' : 'Expand') : 'No attached models'}
+                    style={{ borderLeftColor: color, borderLeftWidth: 3 }}
                   >
                     <ChevronRight
                       className={cn(
-                        'w-4 h-4 text-emerald-400/70 shrink-0 transition-transform',
+                        'w-4 h-4 text-white/40 shrink-0 transition-transform',
                         expanded && 'rotate-90',
                         !hasItems && 'opacity-30'
                       )}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-emerald-200 truncate">
+                      <div className="text-xs text-white/90 truncate">
                         {info.catalog?.name || info.graph_node?.display_name || entityId}
                       </div>
-                      <div className="text-xs text-white/50 truncate">{entityId}</div>
+                      <div className="text-[10px] text-white/50 font-mono truncate">{entityId}</div>
                     </div>
                     {hasItems && (
                       <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded border border-white/10 bg-white/5">
