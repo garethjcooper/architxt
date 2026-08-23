@@ -22,6 +22,7 @@ import {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,
   mentalModelContentToStepSummary,
+  mergeMentalModelContents,
   type ModelContentCacheEntry,
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
@@ -54,6 +55,7 @@ export default function WorkspacePage() {
   const [modelContentCache, setModelContentCache] = useState<Record<string, ModelContentCacheEntry>>({});
   const [loadingEntityInfo, setLoadingEntityInfo] = useState(false);
   const [expandedEntityIds, setExpandedEntityIds] = useState<Set<string>>(new Set());
+  const [expandedEdgeGroupIds, setExpandedEdgeGroupIds] = useState<Set<string>>(new Set());
   type SelectedView =
     | { kind: 'step'; step: ResearchStepSummary }
     | { kind: 'model'; entityId: string; extId: string; name: string };
@@ -104,6 +106,9 @@ export default function WorkspacePage() {
     if (selectedView.kind === 'step') return selectedView.step;
     const entry = modelContentCache[selectedView.extId];
     if (!entry || entry.loading || entry.error || !entry.content) return null;
+    if (selectedView.extId.startsWith('edge-group:') && Array.isArray(entry.content)) {
+      return mergeMentalModelContents(selectedView.name, entry.content as ModelContentCacheEntry[]);
+    }
     return mentalModelContentToStepSummary(selectedView.name, entry);
   }, [selectedView, modelContentCache]);
 
@@ -427,6 +432,18 @@ export default function WorkspacePage() {
     });
   }, []);
 
+  const toggleEdgeGroupExpanded = useCallback((key: string) => {
+    setExpandedEdgeGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
   const loadModelContent = useCallback(async (extId: string) => {
     if (!serverId || !bankId) return;
     setModelContentCache((prev) => {
@@ -457,10 +474,54 @@ export default function WorkspacePage() {
     }
   }, [serverId, bankId]);
 
+  const loadEdgeGroupContent = useCallback(async (groupKey: string, extIds: string[]) => {
+    if (!serverId || !bankId) return;
+    setModelContentCache((prev) => {
+      if (prev[groupKey]?.loading || prev[groupKey]?.content !== undefined) return prev;
+      return { ...prev, [groupKey]: { ...prev[groupKey], loading: true, error: null } };
+    });
+    try {
+      const results = await Promise.all(
+        extIds.map((extId) => mentalModelsApi.fetchContent(serverId, bankId, extId))
+      );
+      setModelContentCache((prev) => ({
+        ...prev,
+        [groupKey]: {
+          content: results.map((r) => ({
+            content: r.content ?? null,
+            found: r.found,
+          })),
+          found: results.some((r) => r.found),
+          loading: false,
+          error: null,
+        },
+      }));
+    } catch (err: any) {
+      setModelContentCache((prev) => ({
+        ...prev,
+        [groupKey]: {
+          content: prev[groupKey]?.content ?? null,
+          found: prev[groupKey]?.found ?? false,
+          loading: false,
+          error: err.message || String(err) || 'Failed to load edge group content.',
+        },
+      }));
+    }
+  }, [serverId, bankId]);
+
   const selectEntityModel = useCallback((entityId: string, item: ModelItem) => {
+    if (item.edgeGroup && item.edgeContexts && item.edgeContexts.length > 0) {
+      const groupKey = `edge-group:${entityId}`;
+      setSelectedView({ kind: 'model', entityId, extId: groupKey, name: item.label });
+      void loadEdgeGroupContent(
+        groupKey,
+        item.edgeContexts.map((e) => e.extId)
+      );
+      return;
+    }
     setSelectedView({ kind: 'model', entityId, extId: item.extId, name: item.label });
     void loadModelContent(item.extId);
-  }, [loadModelContent]);
+  }, [loadModelContent, loadEdgeGroupContent]);
 
   useEffect(() => {
     if (!serverId || !bankId || scopeEntityIds.length === 0) {
@@ -590,8 +651,10 @@ export default function WorkspacePage() {
                 entityInfoMap={entityInfoMap}
                 loading={loadingEntityInfo}
                 expandedEntityIds={expandedEntityIds}
+                expandedEdgeGroupIds={expandedEdgeGroupIds}
                 selectedModel={selectedModel}
                 onToggleExpand={toggleEntityExpanded}
+                onToggleEdgeGroup={toggleEdgeGroupExpanded}
                 onSelectModel={selectEntityModel}
               />
             </div>
