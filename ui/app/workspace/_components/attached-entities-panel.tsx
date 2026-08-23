@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronRight, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
@@ -12,6 +12,7 @@ export interface ModelItem {
   label: string;
   extId: string;
   category: string;
+  children?: Array<{ key: string; label: string }>;
 }
 
 export interface AttachedEntitiesPanelProps {
@@ -57,14 +58,27 @@ function getEntityModelItems(info: EntityInfo): ModelItem[] {
     });
   });
 
-  info.edge_contexts.forEach((ctx) => {
+  // Group edge contexts by their backing mental-model ext_id so a single
+  // system edge-context model can surface the many physical graph edges it
+  // produced without collapsing into a merged global "Edges" group.
+  const edgeContextsByExtId = new Map<string, EntityInfo['edge_contexts']>();
+  for (const ctx of info.edge_contexts) {
     const extId = ctx.refs[0]?.ext_id;
-    if (!extId) return;
+    if (!extId) continue;
+    if (!edgeContextsByExtId.has(extId)) edgeContextsByExtId.set(extId, []);
+    edgeContextsByExtId.get(extId)!.push(ctx);
+  }
+
+  edgeContextsByExtId.forEach((contexts, extId) => {
     items.push({
-      key: `edge-${ctx.edge_id || `${ctx.source_id}-${ctx.target_id}`}`,
-      label: `${ctx.source_id}->${ctx.target_id}`,
+      key: `edge-${extId}`,
+      label: extId,
       extId,
       category: MODEL_TAB_LABELS.edge_contexts,
+      children: contexts.map((ctx) => ({
+        key: `edge-child-${ctx.edge_id || `${ctx.source_id}-${ctx.target_id}`}`,
+        label: `${ctx.source_id} → ${ctx.target_id}`,
+      })),
     });
   });
 
@@ -83,6 +97,18 @@ export function AttachedEntitiesPanel({
   const sortedIds = useMemo(() => {
     return [...entityIds].sort((a, b) => a.localeCompare(b));
   }, [entityIds]);
+
+  // Track which edge-context model rows are expanded to show child edges.
+  const [expandedEdgeModelKeys, setExpandedEdgeModelKeys] = useState<Set<string>>(new Set());
+
+  const toggleEdgeModelExpanded = (key: string) => {
+    setExpandedEdgeModelKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <Panel className="flex-1">
@@ -148,24 +174,53 @@ export function AttachedEntitiesPanel({
                     <div className="border-t border-white/10 px-1 py-1 space-y-0.5">
                       {items.map((item) => {
                         const isSelected = selectedModel?.entityId === entityId && selectedModel?.extId === item.extId;
+                        const hasChildren = item.children && item.children.length > 0;
+                        const edgeModelExpanded = hasChildren && expandedEdgeModelKeys.has(item.key);
                         return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => onSelectModel(entityId, item)}
-                            className={cn(
-                              'w-full text-left rounded px-2 py-1.5 text-[11px] transition-colors flex items-center gap-2',
-                              isSelected
-                                ? 'bg-emerald-500/15 text-emerald-200'
-                                : 'text-white/70 hover:bg-white/5'
+                          <div key={item.key} className="space-y-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (hasChildren) {
+                                  toggleEdgeModelExpanded(item.key);
+                                }
+                                onSelectModel(entityId, item);
+                              }}
+                              className={cn(
+                                'w-full text-left rounded px-2 py-1.5 text-[11px] transition-colors flex items-center gap-2',
+                                isSelected
+                                  ? 'bg-emerald-500/15 text-emerald-200'
+                                  : 'text-white/70 hover:bg-white/5'
+                              )}
+                              title={`${item.category}: ${item.label}`}
+                            >
+                              {hasChildren && (
+                                <ChevronRight
+                                  className={cn(
+                                    'w-3 h-3 text-emerald-400/70 shrink-0 transition-transform',
+                                    edgeModelExpanded && 'rotate-90'
+                                  )}
+                                />
+                              )}
+                              <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
+                                {item.category}
+                              </span>
+                              <span className="truncate min-w-0 flex-1">{item.label}</span>
+                            </button>
+                            {edgeModelExpanded && (
+                              <div className="pl-5 pr-1 space-y-0.5">
+                                {item.children!.map((child) => (
+                                  <div
+                                    key={child.key}
+                                    className="text-[10px] text-white/50 truncate py-0.5"
+                                    title={child.label}
+                                  >
+                                    {child.label}
+                                  </div>
+                                ))}
+                              </div>
                             )}
-                            title={`${item.category}: ${item.label}`}
-                          >
-                            <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
-                              {item.category}
-                            </span>
-                            <span className="truncate min-w-0 flex-1">{item.label}</span>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
