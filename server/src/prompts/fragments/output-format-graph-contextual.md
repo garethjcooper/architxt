@@ -11,7 +11,16 @@ Edge field rules:
 - `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied.
 - `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`.
 - `label`: short phrase, max 4 words.
-- `detail`: structured concise description of the flow. Cover as many of the following as are supported by the source material, in one or two sentences: what is transferred, how it is transferred (protocol / format / API), how often, any known intermediaries, and any known error-handling or retry behavior. Empty string if not justified.
+- `detail`: readable description of the flow, maximum 4 sentences. Summarize what moves between the endpoints and any important qualification. Empty string if not justified.
+- `properties`: optional object with flat, machine-curatable fields. Omit entirely when none are supported by the source material. All values are optional:
+  - `dataObjects`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
+  - `protocol`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
+  - `format`: data format / API style (e.g., JSON, XML, CSV, Avro, Parquet, FIX, protobuf, binary, REST, SOAP).
+  - `frequency`: cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, on startup).
+  - `intermediaries`: array of gateways, queues, ESBs, proxies, object stores, load balancers. Use the exact entity id from the catalog when a known intermediary is named; use a lowercase hyphenated slug only for genuinely unnamed or inferred intermediaries.
+  - `reliability`: retry, acknowledgement, idempotency, ordering, duplicate-handling, or delivery-semantics behavior.
+  - `auth`: authentication / authorization mechanism (e.g., OAuth 2.0, mTLS, API key, mutual Kerberos, JWT, IP allowlist).
+  - `encryption`: encryption in transit/rest, signing, or hashing (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed).
 - `evidence`: array of Hindsight memory IDs.
 - Do not include a `provenance` field on edges. The system derives edge provenance from the endpoint ids.
 - Multiple edges per node pair are allowed when the interactions differ by direction, type, or context. Do not collapse distinct interactions into a single combined edge.
@@ -19,7 +28,7 @@ Edge field rules:
 Example edge:
 
 ```json
-{ "from": "example-type:EXAMPLE-001", "to": "example-type:EXAMPLE-002", "type": "sends", "label": "usage data", "detail": "Example System A sends usage data to Example System B. The data is sent as billable usage events via a nightly batch file through an internal SFTP gateway.", "evidence": ["mem-abc123"] }
+{ "from": "example-type:EXAMPLE-001", "to": "example-type:EXAMPLE-002", "type": "sends", "label": "usage data", "detail": "Example System A sends usage data to Example System B every night. The batch file is pushed through an internal SFTP gateway and contains billable usage events.", "properties": { "dataObjects": ["billable usage events"], "protocol": "SFTP", "format": "CSV", "frequency": "nightly", "intermediaries": ["internal-sftp-gateway"], "reliability": "retries up to 3 times with exponential backoff" }, "evidence": ["mem-abc123"] }
 ```
 
 Connected-node rule:
