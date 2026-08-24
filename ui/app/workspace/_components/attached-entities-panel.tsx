@@ -106,7 +106,14 @@ function getEntityModelItems(
       const targetLabel = resolveName(hindsightCtx.target_id);
       label = `${sourceLabel} → ${targetLabel}`;
     } else {
-      label = extId;
+      // Edge-context ext_ids follow edge-ctx-{source_id}|{target_id}. Resolve
+      // both endpoints to human-readable names so the parent row matches the
+      // child rows and the context manager edge list.
+      const scopePart = extId.startsWith('edge-ctx-') ? extId.slice('edge-ctx-'.length) : extId;
+      const [sourceId, targetId] = scopePart.split('|');
+      const sourceLabel = sourceId ? resolveName(sourceId) : extId;
+      const targetLabel = targetId ? resolveName(targetId) : '';
+      label = targetLabel ? `${sourceLabel} → ${targetLabel}` : sourceLabel;
     }
 
     items.push({
