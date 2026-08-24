@@ -198,7 +198,7 @@ export function ResearchResultPanel({
   onResizeNarrativeStart,
   onResizeNarrativeReset,
   onCopy,
-  showCanvas = true,
+  showCanvas = false,
   keyPrefix,
 }: ResearchResultPanelProps) {
   const trail = trailProp ?? [];
