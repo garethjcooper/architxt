@@ -122,23 +122,23 @@ export function EntityScopeManagerDialog({
     const label = `${entity.entityId} — ${entity.name}`;
 
     return (
-      <div
+      <span
         key={entity.id}
         onClick={() => {
           if (!inScope) {
             handleToggle(`${entity.typeName}:${entity.entityId}`);
           }
         }}
-        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs transition-all ${
+        title={label}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] border truncate max-w-[200px] transition-all ${
           inScope ? '' : 'cursor-pointer'
         } ${
           inScope
-            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-            : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
+            ? 'bg-purple-800/15 text-purple-400 border-purple-700/20'
+            : 'bg-purple-800/15 text-purple-400 border-purple-700/20 hover:bg-purple-800/25 hover:border-purple-700/40'
         }`}
       >
-        <span>{label}</span>
-        <span className="text-[10px] text-white/40">{entity.typeName}</span>
+        <span className="truncate">{label}</span>
 
         {inScope && (
           <button
@@ -146,12 +146,12 @@ export function EntityScopeManagerDialog({
               e.stopPropagation();
               handleRemove(`${entity.typeName}:${entity.entityId}`);
             }}
-            className="ml-1 hover:opacity-70 transition-opacity"
+            className="ml-1 hover:opacity-70 transition-opacity shrink-0"
           >
             <X className="w-3 h-3" />
           </button>
         )}
-      </div>
+      </span>
     );
   };
 
