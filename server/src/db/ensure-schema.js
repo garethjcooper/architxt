@@ -520,7 +520,10 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'entity-summary-{id}',
     name: 'Entity summary: {entity-name}',
     role: 'sys_entity_summary',
-    sourceQuery: 'Entity: {id} ({entity-name}).\n#narrative\nDescribe its core architectural role, responsibilities, and relationships to other components.\n#end',
+    sourceQuery: `[[{entity-name} ({id})]].
+#narrative
+Describe its core architectural role, responsibilities, and relationships to other components.
+#end`,
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
@@ -531,7 +534,7 @@ const CONTEXTUAL_GRAPH_TEMPLATES = [
     extId: 'entity-capabilities-{id}',
     name: 'Entity capabilities: {entity-name}',
     role: 'sys_entity_capabilities',
-    sourceQuery: `Entity: {id} ({entity-name}).
+    sourceQuery: `[[{entity-name} ({id})]].
 #table
 #table-name Capabilities
 Return the major architectural capabilities of the entity in a table named "capabilities" with columns: name, responsibility, purpose, business_capability_mapping, evidence.
@@ -552,7 +555,20 @@ List its major capabilities, each with its purpose, responsibility, business cap
     extId: 'edge-ctx-{source-id}|{target-id}',
     name: 'Edge context: {source-name} ↔ {target-name}',
     role: 'sys_edge_context',
-    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?\n#graph\nFor each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.\n#end',
+    sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
+#graph
+For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
+#end
+#table
+#table-name Edges
+Return the edges in a table named "Edges" with columns: from, to, edge type, description, evidence.
+- from: source of the edge, exact ids only.
+- to: destination of the edge, exact ids only.
+- type: edge type based on standard list, sends etc.
+- description: describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. Explicitly call out any known files or protocols that are used.
+- evidence: array of Hindsight memory IDs supporting this edge.
+The edge list must be based on the generated graph list.
+#end`,
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
