@@ -95,13 +95,13 @@ export function EntityScopePanel({
                 return (
                   <div
                     key={qid}
-                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] border truncate max-w-[200px] bg-purple-800/15 text-purple-400 border-purple-700/20"
+                    title={label}
                   >
-                    <span>{label}</span>
-                    <span className="text-[10px] text-white/40">{entity.type_name}</span>
+                    <span className="truncate">{label}</span>
                     <button
                       onClick={() => onRemove(qid)}
-                      className="ml-1 hover:opacity-70 transition-opacity"
+                      className="ml-1 hover:opacity-70 transition-opacity shrink-0"
                       title="Remove from scope"
                     >
                       <X className="w-3 h-3" />
