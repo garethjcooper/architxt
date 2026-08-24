@@ -311,6 +311,9 @@ function normalizeEdge(e) {
     label: typeof e.label === 'string' ? e.label : undefined,
     detail: typeof e.detail === 'string' ? e.detail : undefined,
     evidence: Array.isArray(e.evidence) ? e.evidence : undefined,
+    properties: e.properties && typeof e.properties === 'object' && !Array.isArray(e.properties)
+      ? e.properties
+      : undefined,
   };
 }
 
