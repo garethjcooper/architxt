@@ -84,6 +84,9 @@ export function normalizeEdge(e) {
   if (!from || !to || !type) return null;
   const label = typeof e.label === 'string' && e.label.length > 0 ? e.label : undefined;
   const detail = typeof e.detail === 'string' && e.detail.length > 0 ? e.detail : undefined;
+  const properties = e.properties && typeof e.properties === 'object' && !Array.isArray(e.properties)
+    ? e.properties
+    : undefined;
   const source_fact_ids = Array.isArray(e.source_fact_ids) ? e.source_fact_ids : undefined;
   const edge = {
     from,
@@ -91,6 +94,7 @@ export function normalizeEdge(e) {
     type,
     label,
     detail,
+    properties,
     source_fact_ids,
   };
   edge.id = `${from}|${to}|${type}|${label || ''}|${edgeHash(edge)}`;

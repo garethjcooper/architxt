@@ -150,6 +150,9 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
 
     const label = typeof e.label === 'string' ? e.label.trim() : '';
     const detail = typeof e.detail === 'string' ? e.detail.trim() : '';
+    const properties = e.properties && typeof e.properties === 'object' && !Array.isArray(e.properties)
+      ? e.properties
+      : undefined;
 
     const key = `${from}|${to}|${type}`;
     const provenance = deriveProvenance(from, to, activity, nodeById);
@@ -158,9 +161,10 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       const existing = edgeByKey.get(key);
       existing.label = mergeField(existing.label, label);
       existing.detail = mergeField(existing.detail, detail);
+      existing.properties = mergeProperties(existing.properties, properties);
       existing.provenance = mergeProvenance(existing.provenance, provenance);
     } else {
-      edgeByKey.set(key, { from, to, type, provenance, label, detail });
+      edgeByKey.set(key, { from, to, type, provenance, label, detail, properties });
     }
   }
 
@@ -191,6 +195,33 @@ function mergeField(existing, incoming) {
   if (!existing) return incoming;
   if (existing === incoming) return existing;
   return [existing, incoming].join('; ');
+}
+
+function mergeProperties(existing, incoming) {
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (value === undefined || value === null || value === '') continue;
+    const existingValue = merged[key];
+    if (Array.isArray(value)) {
+      const existingArray = Array.isArray(existingValue) ? existingValue : (existingValue != null ? [existingValue] : []);
+      const seen = new Set(existingArray.map((v) => String(v)));
+      for (const item of value) {
+        const s = String(item);
+        if (!seen.has(s)) {
+          existingArray.push(item);
+          seen.add(s);
+        }
+      }
+      merged[key] = existingArray;
+    } else if (existingValue === undefined || existingValue === null || existingValue === '') {
+      merged[key] = value;
+    } else if (String(existingValue) !== String(value)) {
+      merged[key] = [String(existingValue), String(value)].join('; ');
+    }
+  }
+  return merged;
 }
 
 function mergeProvenance(a, b) {
