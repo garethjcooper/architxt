@@ -195,27 +195,27 @@ export function ManageModelEntitiesDialog({
     }
 
     return (
-      <div
+      <span
         key={entity.id}
         onClick={() => {
           if (entity.currentState === 'none' || entity.currentState === 'partial') {
             handleEntityToggle(entity.id);
           }
         }}
-        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs transition-all ${
+        title={label}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] border truncate max-w-[200px] transition-all ${
           entity.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-slate-800/20 border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
+            ? 'bg-purple-800/5 text-purple-400/40 border-purple-700/10 line-through hover:bg-purple-800/10'
             : entity.currentState === 'common'
-              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+              ? 'bg-purple-800/15 text-purple-400 border-purple-700/20'
               : entity.currentState === 'partial'
-                ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
-                : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
+                ? 'bg-purple-800/10 text-purple-400/90 border-purple-700/15 border-dashed hover:bg-purple-800/20'
+                : 'bg-purple-800/10 text-purple-400/80 border-purple-700/15 hover:bg-purple-800/25 hover:border-purple-700/30'
         }`}
       >
-        <span className={isRemoved ? 'line-through' : ''}>{label}</span>
-        <span className="text-[10px] text-white/40">{entity.typeName}</span>
+        <span className={isRemoved ? 'line-through' : 'truncate'}>{label}</span>
 
         {entity.currentState !== 'none' && !isRemoved && (
           <button
@@ -223,12 +223,12 @@ export function ManageModelEntitiesDialog({
               e.stopPropagation();
               handleRemoveEntity(entity.id);
             }}
-            className="ml-1 hover:opacity-70 transition-opacity"
+            className="ml-1 hover:opacity-70 transition-opacity shrink-0"
           >
             <X className="w-3 h-3" />
           </button>
         )}
-      </div>
+      </span>
     );
   };
 
