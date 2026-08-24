@@ -356,8 +356,8 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    fragments: '["contextual-patch.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
   {
