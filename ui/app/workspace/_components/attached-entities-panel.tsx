@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronRight, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
@@ -183,35 +183,42 @@ export function AttachedEntitiesPanel({
                         const edgeModelExpanded = hasChildren && expandedEdgeModelKeys.has(item.key);
                         return (
                           <div key={item.key} className="space-y-0.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (hasChildren) {
-                                  toggleEdgeModelExpanded(item.key);
-                                }
-                                onSelectModel(entityId, item);
-                              }}
+                            <div
                               className={cn(
-                                'w-full text-left rounded px-2 py-1.5 text-[11px] transition-colors flex items-center gap-2',
-                                isSelected
-                                  ? 'bg-emerald-500/15 text-emerald-200'
-                                  : 'text-white/70 hover:bg-white/5'
+                                'flex items-center gap-1 rounded px-2 py-1.5 text-[11px] transition-colors group',
+                                isSelected ? 'bg-emerald-500/15' : 'hover:bg-white/5'
                               )}
-                              title={`${item.category}: ${item.label}`}
                             >
+                              <button
+                                type="button"
+                                onClick={() => onSelectModel(entityId, item)}
+                                className={cn(
+                                  'flex-1 text-left flex items-center gap-2 min-w-0',
+                                  isSelected ? 'text-emerald-200' : 'text-white/70'
+                                )}
+                                title={`${item.category}: ${item.label}`}
+                              >
+                                <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
+                                  {item.category}
+                                </span>
+                                <span className="truncate min-w-0 flex-1">{item.label}</span>
+                              </button>
+
                               {hasChildren && (
-                                <ChevronRight
-                                  className={cn(
-                                    'w-3 h-3 text-emerald-400/70 shrink-0 transition-transform',
-                                    edgeModelExpanded && 'rotate-90'
+                                <button
+                                  type="button"
+                                  onClick={() => toggleEdgeModelExpanded(item.key)}
+                                  className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                                  title={edgeModelExpanded ? 'Collapse edges' : 'Expand edges'}
+                                >
+                                  {edgeModelExpanded ? (
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <ChevronDown className="w-3.5 h-3.5" />
                                   )}
-                                />
+                                </button>
                               )}
-                              <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
-                                {item.category}
-                              </span>
-                              <span className="truncate min-w-0 flex-1">{item.label}</span>
-                            </button>
+                            </div>
                             {edgeModelExpanded && (
                               <div className="pl-5 pr-1 space-y-0.5">
                                 {item.children!.map((child) => (
