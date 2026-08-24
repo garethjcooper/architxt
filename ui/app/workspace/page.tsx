@@ -187,6 +187,12 @@ export default function WorkspacePage() {
     widths: { left: 0.5, right: 0.5 },
   });
 
+  // Narrative / graph resize within the right-hand result panel.
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const [narrativeWidth, setNarrativeWidth] = useState(40);
+  const [isDraggingNarrativeWidth, setIsDraggingNarrativeWidth] = useState(false);
+  const narrativeResizeStartRef = useRef({ x: 0, containerWidth: 0, startWidth: 40 });
+
   const handleInnerResizeStart = useCallback(
     (pane: 'innerCol') => (e: React.MouseEvent) => {
       setInnerResizing(pane);
@@ -222,6 +228,38 @@ export default function WorkspacePage() {
     }
     document.body.style.userSelect = '';
   }, [resizing]);
+
+  const handleNarrativeResizeStart = useCallback((e: React.MouseEvent) => {
+    setIsDraggingNarrativeWidth(true);
+    narrativeResizeStartRef.current = {
+      x: e.clientX,
+      containerWidth: rightPanelRef.current?.getBoundingClientRect().width ?? 0,
+      startWidth: narrativeWidth,
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [narrativeWidth]);
+
+  const handleNarrativeResizeMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingNarrativeWidth) return;
+    const { x, containerWidth, startWidth } = narrativeResizeStartRef.current;
+    if (containerWidth <= 0) return;
+    const deltaPct = ((e.clientX - x) / containerWidth) * 100;
+    const nextWidth = Math.min(Math.max(startWidth + deltaPct, 20), 70);
+    setNarrativeWidth(nextWidth);
+  }, [isDraggingNarrativeWidth]);
+
+  const handleNarrativeResizeEnd = useCallback(() => {
+    setIsDraggingNarrativeWidth(false);
+    if (!resizing && !innerResizing && !hResizing) {
+      document.body.style.cursor = '';
+    }
+    document.body.style.userSelect = '';
+  }, [resizing, innerResizing, hResizing]);
+
+  const handleNarrativeResizeReset = useCallback(() => {
+    setNarrativeWidth(40);
+  }, []);
 
   const handleHResizeStart = useCallback(
     (pane: 'row1') => (e: React.MouseEvent) => {
@@ -267,11 +305,13 @@ export default function WorkspacePage() {
       handleResizeMove(e);
       handleHResizeMove(e);
       handleInnerResizeMove(e);
+      handleNarrativeResizeMove(e);
     };
     const up = () => {
       handleResizeEnd();
       handleHResizeEnd();
       handleInnerResizeEnd();
+      handleNarrativeResizeEnd();
     };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
@@ -279,7 +319,7 @@ export default function WorkspacePage() {
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', up);
     };
-  }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd, handleInnerResizeMove, handleInnerResizeEnd]);
+  }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd, handleInnerResizeMove, handleInnerResizeEnd, handleNarrativeResizeMove, handleNarrativeResizeEnd]);
 
   const handleSelectStep = useCallback((step: ResearchStepSummary) => {
     setSelectedView({ kind: 'step', step });
@@ -668,7 +708,7 @@ export default function WorkspacePage() {
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/right columns" />
 
           {/* Column 2: result viewer */}
-          <div className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
+          <div ref={rightPanelRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
             <Panel className="flex-1 min-h-0">
               <PanelHeader
                 title={
@@ -698,6 +738,9 @@ export default function WorkspacePage() {
                     error={previewError}
                     sessionName={activeSession?.title}
                     keyPrefix="preview"
+                    narrativeWidth={narrativeWidth}
+                    onResizeNarrativeStart={handleNarrativeResizeStart}
+                    onResizeNarrativeReset={handleNarrativeResizeReset}
                   />
                 </div>
               </PanelContent>
