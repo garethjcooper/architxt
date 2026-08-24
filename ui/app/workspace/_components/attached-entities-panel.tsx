@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronUp, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
+import { EdgeListRow } from '@/lib/contextual-graph/display';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
 import { type EntityInfo } from '@/lib/api/client';
@@ -13,7 +14,7 @@ export interface ModelItem {
   label: string;
   extId: string;
   category: string;
-  children?: Array<{ key: string; label: string }>;
+  children?: Array<{ key: string; label: string; edgeContext?: EntityInfo['edge_contexts'][number] }>;
 }
 
 export interface AttachedEntitiesPanelProps {
@@ -79,6 +80,7 @@ function getEntityModelItems(info: EntityInfo): ModelItem[] {
       children: contexts.map((ctx) => ({
         key: `edge-child-${ctx.edge_id || `${ctx.source_id}-${ctx.target_id}`}`,
         label: `${ctx.source_id} → ${ctx.target_id}`,
+        edgeContext: ctx,
       })),
     });
   });
@@ -220,16 +222,46 @@ export function AttachedEntitiesPanel({
                               )}
                             </div>
                             {edgeModelExpanded && (
-                              <div className="pl-5 pr-1 space-y-0.5">
-                                {item.children!.map((child) => (
-                                  <div
-                                    key={child.key}
-                                    className="text-[10px] text-white/50 truncate py-0.5"
-                                    title={child.label}
-                                  >
-                                    {child.label}
-                                  </div>
-                                ))}
+                              <div className="pl-5 pr-1 space-y-1 py-1">
+                                {item.children!.map((child) => {
+                                  const ctx = child.edgeContext;
+                                  if (!ctx) return (
+                                    <div
+                                      key={child.key}
+                                      className="text-[10px] text-white/50 truncate py-0.5"
+                                      title={child.label}
+                                    >
+                                      {child.label}
+                                    </div>
+                                  );
+
+                                  const edge: import('@/lib/contextual-graph/display').DisplayEdge = {
+                                    id: ctx.edge_id,
+                                    source_id: ctx.source_id,
+                                    target_id: ctx.target_id,
+                                    type: ctx.edge_type,
+                                    labels: [],
+                                    label: child.label,
+                                    detail: ctx.edge_id,
+                                    properties: {},
+                                    modelRefs: [],
+                                  };
+
+                                  const sourceInfo = entityInfoMap?.[ctx.source_id];
+                                  const targetInfo = entityInfoMap?.[ctx.target_id];
+                                  const sourceLabel = sourceInfo?.catalog?.name || sourceInfo?.graph_node?.display_name;
+                                  const targetLabel = targetInfo?.catalog?.name || targetInfo?.graph_node?.display_name;
+
+                                  return (
+                                    <EdgeListRow
+                                      key={child.key}
+                                      edge={edge}
+                                      sourceLabel={sourceLabel}
+                                      targetLabel={targetLabel}
+                                      onClick={() => onSelectModel(entityId, item)}
+                                    />
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
