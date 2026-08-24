@@ -68,6 +68,12 @@ export function EdgeTable({
                     {e.detail}
                   </div>
                 )}
+                {e.properties && Object.keys(e.properties).length > 0 && !e.detail && (
+                  <div className="text-[10px] text-white/50 font-mono truncate" title={Object.entries(e.properties).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ')}>
+                    {Object.entries(e.properties).slice(0, 2).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ')}
+                    {Object.keys(e.properties).length > 2 && ' ...'}
+                  </div>
+                )}
                 <div className="text-[10px] text-white/40 font-mono truncate ml-auto" title={`${qualifiedFor(e.from)} → ${qualifiedFor(e.to)}`}>
                   {qualifiedFor(e.from)} → {qualifiedFor(e.to)}
                 </div>
