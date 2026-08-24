@@ -189,6 +189,17 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
 
   const modelRef = buildModelRef(model, output.raw, timestamp);
 
+  // Remove any edges previously produced by this edge-context model so that
+  // each refresh yields a clean replacement rather than accumulating stale
+  // or partially-overlapping edges.
+  const edgesToRemove = allEdges.filter((edge) => {
+    const refs = edge.cge_properties?.provenance?.model_refs || [];
+    return refs.some((ref) => ref?.ext_id === model.mm_ext_id);
+  });
+  for (const edge of edgesToRemove) {
+    deleteEdge(db, serverId, bankId, edge.cge_id);
+  }
+
   // Ensure endpoint nodes emitted by the model exist in the working graph.
   // If a node is missing, create it from the model output so asserted edges have endpoints.
   // We always normalize model-emitted ids through buildNodeId so a bare

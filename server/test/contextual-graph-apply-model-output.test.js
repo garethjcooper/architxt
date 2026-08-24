@@ -333,6 +333,49 @@ describe('applyModelOutput', () => {
     assert.ok(output.narrative.includes('File: DBnnnn00'));
   });
 
+  it('replaces prior edges when the same edge-context model is applied again', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+
+    const firstOutput = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'Singleview sends postpaid usage, mobile data, Fibre Voice usage, and Fibre 0900 call records to ICMS via a BLINCL file feed for rating and billing. Typically transmitted in nightly batch files.', evidence: ['m1'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const m = model('edge-ctx-a-com:COM-002|a-com:COM-001', 'sys_edge_context');
+    let result = await applyModelOutput(db, serverId, bankId, m, firstOutput);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const secondOutput = normalizeModelOutput(JSON.stringify({
+      narrative: '',
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'Singleview sends various usage data (postpaid usage, mobile data, Fibre Voice Usage, Fibre 0900 call data) to ICMS via a BLINCL feed for rating and billing.', evidence: ['m2'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    result = await applyModelOutput(db, serverId, bankId, m, secondOutput);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 1);
+    assert.equal(allEdges[0].cge_type, 'sends');
+    assert.ok(allEdges[0].cge_properties.detail.includes('various usage data'));
+  });
+
   it('does not overwrite an existing edge of a different type between the same endpoints', async () => {
     upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
     upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
