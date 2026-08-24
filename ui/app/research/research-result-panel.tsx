@@ -283,6 +283,13 @@ export function ResearchResultPanel({
       text = `${text}${mdDiagrams}`;
     }
 
+    // Prototype: render the step's graph inline as a Mermaid diagram inside the narrative.
+    if (viewMode === 'step' && showCanvas && graphNodes.length > 0) {
+      const mermaid = generateMermaid(graphNodes, graphEdges, canvasView);
+      const diagramName = canvasView === 'components' ? 'Component diagram' : 'Graph diagram';
+      text = `${text}\n\n## ${diagramName}\n\n\`\`\`mermaid\n${mermaid}\n\`\`\``;
+    }
+
     return text;
   }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams]);
 
