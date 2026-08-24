@@ -552,7 +552,7 @@ List its major capabilities, each with its purpose, responsibility, business cap
     extId: 'edge-ctx-{source-id}|{target-id}',
     name: 'Edge context: {source-name} ↔ {target-name}',
     role: 'sys_edge_context',
-    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between {source-id} ({source-name}) and {target-id} ({target-name})?\n#graph\nFor each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.\n#end',
+    sourceQuery: 'What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?\n#graph\nFor each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.\n#end',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
