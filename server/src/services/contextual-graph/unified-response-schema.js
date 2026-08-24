@@ -15,7 +15,34 @@ export const UNIFIED_RESPONSE_SCHEMA = {
       type: 'object',
       properties: {
         nodes: { type: 'array' },
-        edges: { type: 'array' },
+        edges: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              from: { type: 'string' },
+              to: { type: 'string' },
+              type: { type: 'string' },
+              label: { type: 'string' },
+              detail: { type: 'string' },
+              properties: {
+                type: 'object',
+                properties: {
+                  dataObjects: { type: 'array', items: { type: 'string' } },
+                  protocol: { type: 'string' },
+                  format: { type: 'string' },
+                  frequency: { type: 'string' },
+                  intermediaries: { type: 'array', items: { type: 'string' } },
+                  reliability: { type: 'string' },
+                  auth: { type: 'string' },
+                  encryption: { type: 'string' },
+                },
+              },
+              evidence: { type: 'array', items: { type: 'string' } },
+            },
+            required: ['from', 'to', 'type', 'label', 'detail'],
+          },
+        },
       },
       required: ['nodes', 'edges'],
     },
