@@ -334,16 +334,39 @@ const BUILTIN_TEMPLATES = [
     name: 'sys_edge_context',
     mode: 'sys_edge_context',
     description: 'System template: directed interactions between two specific contextual-graph nodes.',
-    body: `Answer the topic below.
+    body: `You are describing the directed interaction between two known entities in an architecture graph.
 
-## Topic
+## Relationship
 
 {{ARCHITXT_TOPIC}}
+
+## Instructions
+
+Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`.
+
+For each flow, write a concise but informative \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification.
+
+Also populate the edge \`properties\` object with any supported machine-curatable facts. All properties are optional; omit the entire \`properties\` object if none are supported:
+- \`dataObjects\`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
+- \`protocol\`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
+- \`format\`: data format / API style (e.g., JSON, XML, CSV, Avro, Parquet, FIX, protobuf, binary, REST, SOAP).
+- \`frequency\`: cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, on startup).
+- \`intermediaries\`: array of gateways, queues, ESBs, proxies, object stores, load balancers. Use the exact entity id from the catalog when a known intermediary is named; use a lowercase hyphenated slug only for genuinely unnamed or inferred intermediaries.
+- \`reliability\`: retry, acknowledgement, idempotency, ordering, duplicate-handling, or delivery-semantics behavior.
+- \`auth\`: authentication / authorization mechanism (e.g., OAuth 2.0, mTLS, API key, mutual Kerberos, JWT, IP allowlist).
+- \`encryption\`: encryption in transit/rest, signing, or hashing (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed).
+
+Rules:
+- Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
+- If the interaction is bidirectional, emit two edges with \`from\`/\`to\` swapped.
+- Do not include edges to nodes that are not one of the two endpoints.
+- Emit one edge per distinct flow; do not collapse multiple kinds of exchange into a single edge.
+- If a flow is described but no evidence IDs are available, still emit the edge with an empty evidence array.
 
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    fragments: '["contextual-patch.md","output-format-graph-contextual.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -557,7 +580,16 @@ List its major capabilities, each with its purpose, responsibility, business cap
     role: 'sys_edge_context',
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
-For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
+For each flow, write a concise \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification. Populate the edge \`properties\` object with any supported machine-curatable facts:
+- \`dataObjects\`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
+- \`protocol\`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
+- \`format\`: data format / API style (e.g., JSON, XML, CSV, Avro, Parquet, FIX, protobuf, binary, REST, SOAP).
+- \`frequency\`: cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, on startup).
+- \`intermediaries\`: array of gateways, queues, ESBs, proxies, object stores, load balancers. Use the exact entity id from the catalog when a known intermediary is named; use a lowercase hyphenated slug only for genuinely unnamed or inferred intermediaries.
+- \`reliability\`: retry, acknowledgement, idempotency, ordering, duplicate-handling, or delivery-semantics behavior.
+- \`auth\`: authentication / authorization mechanism (e.g., OAuth 2.0, mTLS, API key, mutual Kerberos, JWT, IP allowlist).
+- \`encryption\`: encryption in transit/rest, signing, or hashing (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed).
+The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
 #end
 #table
 #table-name Edges
@@ -565,7 +597,7 @@ Return the edges in a table named "Edges" with columns: from, to, edge type, des
 - from: source of the edge, exact ids only.
 - to: destination of the edge, exact ids only.
 - type: edge type based on standard list, sends etc.
-- description: describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. Explicitly call out any known files or protocols that are used.
+- description: readable description of the flow, maximum 4 sentences. Explicitly call out any known files, protocols, formats, intermediaries, reliability, auth, or encryption.
 - evidence: array of Hindsight memory IDs supporting this edge.
 The edge list must be based on the generated graph list.
 #end`,
