@@ -90,7 +90,7 @@ export function EntityScopePanel({
             <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
               {inScope.map((entity) => {
                 const qid = canonicalEntityId(entity);
-                const label = `${entity.entity_id} — ${entity.name}`;
+                const label = `${qid} ${entity.name}`;
 
                 return (
                   <div

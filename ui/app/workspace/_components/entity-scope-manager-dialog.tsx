@@ -119,7 +119,8 @@ export function EntityScopeManagerDialog({
   const availableItems = allFiltered.filter(({ qid }) => !draftSet.has(qid));
 
   const renderPill = (entity: EntityItem, inScope: boolean) => {
-    const label = `${entity.entityId} — ${entity.name}`;
+    const qid = `${entity.typeName}:${entity.entityId}`;
+    const label = `${qid} ${entity.name}`;
 
     return (
       <span
