@@ -7,7 +7,8 @@ import { colorForType } from '@/components/research-canvas';
 import { EdgeListRow } from '@/lib/contextual-graph/display';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
-import { type EntityInfo } from '@/lib/api/client';
+import { type EntityInfo, type EntityInfoContextualRef, type Entity } from '@/lib/api/client';
+import { type DisplayEdge, type DisplayNode, MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 
 export interface ModelItem {
   key: string;
@@ -20,6 +21,9 @@ export interface ModelItem {
 export interface AttachedEntitiesPanelProps {
   entityIds: string[];
   entityInfoMap: Record<string, EntityInfo> | null;
+  edges?: DisplayEdge[];
+  entities?: Entity[];
+  contextualNodes?: DisplayNode[];
   loading: boolean;
   expandedEntityIds: Set<string>;
   selectedModel: { entityId: string; extId: string } | null;
@@ -27,16 +31,35 @@ export interface AttachedEntitiesPanelProps {
   onSelectModel: (entityId: string, item: ModelItem) => void;
 }
 
-function getEntityModelItems(info: EntityInfo): ModelItem[] {
+function getEntityModelItems(
+  info: EntityInfo,
+  entityInfoMap?: Record<string, EntityInfo> | null,
+  entityNameById?: Map<string, string>,
+  contextualNodeNameById?: Map<string, string>
+): ModelItem[] {
+  const resolveName = (entityId: string): string => {
+    const infoName = entityInfoMap?.[entityId]?.catalog?.name || entityInfoMap?.[entityId]?.graph_node?.display_name;
+    if (infoName) return infoName;
+    const masterName = entityNameById?.get(entityId);
+    if (masterName) return masterName;
+    const nodeName = contextualNodeNameById?.get(entityId);
+    if (nodeName) return nodeName;
+    return entityId;
+  };
+
   const items: ModelItem[] = [];
 
   info.contextual_refs.forEach((ref, i) => {
     if (!ref.ext_id) return;
+    const roleLabel = MODEL_ROLE_LABELS[ref.role] || ref.role;
+    const rolePrefix = ref.role.replace(/^sys_/, '').replace(/_/g, '-') + '-';
+    const entityId = ref.ext_id.startsWith(rolePrefix) ? ref.ext_id.slice(rolePrefix.length) : ref.ext_id;
+    const label = resolveName(entityId);
     items.push({
       key: `ctx-${ref.role}-${ref.ext_id || i}`,
-      label: ref.ext_id,
+      label,
       extId: ref.ext_id,
-      category: MODEL_TAB_LABELS.contextual_refs,
+      category: roleLabel,
     });
   });
 
@@ -63,6 +86,8 @@ function getEntityModelItems(info: EntityInfo): ModelItem[] {
   // Group edge contexts by their backing mental-model ext_id so a single
   // system edge-context model can surface the many physical graph edges it
   // produced without collapsing into a merged global "Edges" group.
+  // Keep hindsight contexts in the group so they can supply the parent row's
+  // source → target label; only derived contexts are shown as child rows.
   const edgeContextsByExtId = new Map<string, EntityInfo['edge_contexts']>();
   for (const ctx of info.edge_contexts) {
     const extId = ctx.refs[0]?.ext_id;
@@ -72,12 +97,24 @@ function getEntityModelItems(info: EntityInfo): ModelItem[] {
   }
 
   edgeContextsByExtId.forEach((contexts, extId) => {
+    const hindsightCtx = contexts.find((c) => c.origin === 'hindsight');
+    const derivedContexts = contexts.filter((c) => c.origin !== 'hindsight');
+
+    let label: string;
+    if (hindsightCtx) {
+      const sourceLabel = resolveName(hindsightCtx.source_id);
+      const targetLabel = resolveName(hindsightCtx.target_id);
+      label = `${sourceLabel} → ${targetLabel}`;
+    } else {
+      label = extId;
+    }
+
     items.push({
       key: `edge-${extId}`,
-      label: extId,
+      label,
       extId,
       category: MODEL_TAB_LABELS.edge_contexts,
-      children: contexts.map((ctx) => ({
+      children: derivedContexts.map((ctx) => ({
         key: `edge-child-${ctx.edge_id || `${ctx.source_id}-${ctx.target_id}`}`,
         label: `${ctx.source_id} → ${ctx.target_id}`,
         edgeContext: ctx,
@@ -91,6 +128,9 @@ function getEntityModelItems(info: EntityInfo): ModelItem[] {
 export function AttachedEntitiesPanel({
   entityIds,
   entityInfoMap,
+  edges = [],
+  entities = [],
+  contextualNodes = [],
   loading,
   expandedEntityIds,
   selectedModel,
@@ -100,6 +140,28 @@ export function AttachedEntitiesPanel({
   const sortedIds = useMemo(() => {
     return [...entityIds].sort((a, b) => a.localeCompare(b));
   }, [entityIds]);
+
+  const edgeById = useMemo(() => {
+    const map = new Map<string, DisplayEdge>();
+    for (const edge of edges) map.set(edge.id, edge);
+    return map;
+  }, [edges]);
+
+  const entityNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entity of entities) {
+      if (entity.entity_id && entity.name) map.set(entity.entity_id, entity.name);
+    }
+    return map;
+  }, [entities]);
+
+  const contextualNodeNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const node of contextualNodes) {
+      if (node.id && node.label) map.set(node.id, node.label);
+    }
+    return map;
+  }, [contextualNodes]);
 
   // Track which edge-context model rows are expanded to show child edges.
   const [expandedEdgeModelKeys, setExpandedEdgeModelKeys] = useState<Set<string>>(new Set());
@@ -137,7 +199,7 @@ export function AttachedEntitiesPanel({
             sortedIds.map((entityId) => {
               const info = entityInfoMap[entityId];
               if (!info) return null;
-              const items = getEntityModelItems(info);
+              const items = getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById);
               const expanded = expandedEntityIds.has(entityId);
               const hasItems = items.length > 0;
 
@@ -235,6 +297,8 @@ export function AttachedEntitiesPanel({
                                     </div>
                                   );
 
+                                  const backingEdge = edgeById.get(ctx.edge_id);
+
                                   const edge: import('@/lib/contextual-graph/display').DisplayEdge = {
                                     id: ctx.edge_id,
                                     source_id: ctx.source_id,
@@ -242,15 +306,25 @@ export function AttachedEntitiesPanel({
                                     type: ctx.edge_type,
                                     labels: [],
                                     label: child.label,
-                                    detail: ctx.edge_id,
+                                    detail: backingEdge?.detail || backingEdge?.label || ctx.edge_id,
                                     properties: {},
                                     modelRefs: [],
                                   };
 
                                   const sourceInfo = entityInfoMap?.[ctx.source_id];
                                   const targetInfo = entityInfoMap?.[ctx.target_id];
-                                  const sourceLabel = sourceInfo?.catalog?.name || sourceInfo?.graph_node?.display_name;
-                                  const targetLabel = targetInfo?.catalog?.name || targetInfo?.graph_node?.display_name;
+                                  const sourceLabel =
+                                    sourceInfo?.catalog?.name ||
+                                    sourceInfo?.graph_node?.display_name ||
+                                    entityNameById.get(ctx.source_id) ||
+                                    contextualNodeNameById.get(ctx.source_id) ||
+                                    ctx.source_id;
+                                  const targetLabel =
+                                    targetInfo?.catalog?.name ||
+                                    targetInfo?.graph_node?.display_name ||
+                                    entityNameById.get(ctx.target_id) ||
+                                    contextualNodeNameById.get(ctx.target_id) ||
+                                    ctx.target_id;
 
                                   return (
                                     <EdgeListRow
