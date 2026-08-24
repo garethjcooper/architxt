@@ -72,7 +72,7 @@ export function Markdown({ children, className = '' }: MarkdownProps) {
           em: ({ ...props }) => <em className="italic text-white/80" {...props} />,
           blockquote: ({ ...props }) =>
             <blockquote className="border-l-2 border-white/20 pl-3 italic text-white/60 mb-3" {...props} />,
-          table: ({ ...props }) => <table className="w-full text-sm border-collapse mb-3" {...props} />,
+          table: ({ ...props }) => <table className="w-full text-[12px] border-collapse mb-3" {...props} />,
           thead: ({ ...props }) => <thead className="border-b border-white/20" {...props} />,
           th: ({ ...props }) => <th className="text-left py-1.5 px-2 font-medium text-white/80" {...props} />,
           td: ({ ...props }) => <td className="py-1.5 px-2 border-b border-white/10 text-white/70" {...props} />,

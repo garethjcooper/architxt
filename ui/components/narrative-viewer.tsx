@@ -363,7 +363,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           }`}
         >
           {viewMode === 'markdown' ? (
-            <Markdown className="text-[13px] leading-relaxed">{content || ''}</Markdown>
+            <Markdown className="text-[12px] leading-relaxed">{content || ''}</Markdown>
           ) : (
             blocks.map(b => {
               const isActive = activeRangeIds.has(b.id);
