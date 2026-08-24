@@ -41,6 +41,33 @@ function escapeMermaidId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
+function escapeMarkdownCell(val: unknown): string {
+  if (val === undefined || val === null) return '';
+  const str = typeof val === 'string' ? val : JSON.stringify(val);
+  return str.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+function rowsToMarkdownTable(columns: string[], rows: Record<string, unknown>[]): string {
+  if (!rows.length) return '';
+  const header = `| ${columns.join(' | ')} |`;
+  const sep = `| ${columns.map(() => '---').join(' | ')} |`;
+  const body = rows.map((row) => {
+    const cells = columns.map((c) => escapeMarkdownCell(row[c]));
+    return `| ${cells.join(' | ')} |`;
+  }).join('\n');
+  return `${header}\n${sep}\n${body}`;
+}
+
+function formatPropertiesCompact(properties: Record<string, any>): string {
+  return Object.entries(properties)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => {
+      const value = Array.isArray(v) ? v.join(', ') : typeof v === 'string' ? v : JSON.stringify(v);
+      return `${k}: ${value}`;
+    })
+    .join(' | ');
+}
+
 function generateMermaid(
   nodes: GraphNode[],
   edges: GraphEdge[],
@@ -234,6 +261,35 @@ export function ResearchResultPanel({
     return diagrams.length > 0 ? diagrams : null;
   }, [trail, selectedStepIds, viewMode]);
 
+  const mergedGraph = useMemo(() => {
+    if (viewMode !== 'session') return null;
+    const selected = trail.filter((s) => selectedStepIds.has(s.id));
+    if (selected.length === 0) return null;
+    const nodes: GraphNode[] = [];
+    const nodeIds = new Set<string>();
+    const edges: GraphEdge[] = [];
+    const edgeKeys = new Set<string>();
+    for (const s of selected) {
+      const stepGraph = s.canvas?.graph;
+      if (!stepGraph) continue;
+      for (const n of stepGraph.nodes ?? []) {
+        if (n?.id && !nodeIds.has(n.id)) {
+          nodeIds.add(n.id);
+          nodes.push(n);
+        }
+      }
+      for (const e of stepGraph.edges ?? []) {
+        if (!e?.from || !e?.to) continue;
+        const key = e.id || `${e.from}|${e.to}|${e.label || e.type || ''}`;
+        if (!edgeKeys.has(key)) {
+          edgeKeys.add(key);
+          edges.push(e);
+        }
+      }
+    }
+    return nodes.length > 0 || edges.length > 0 ? { nodes, edges } : null;
+  }, [trail, selectedStepIds, viewMode]);
+
   const sourceSteps = useMemo(() => {
     if (result?.action_type !== 'synthesize' || !Array.isArray(result?.parameters?.source_steps)) return [];
     return result.parameters.source_steps
@@ -283,8 +339,34 @@ export function ResearchResultPanel({
       text = `${text}${mdDiagrams}`;
     }
 
+    const graph = viewMode === 'session' ? mergedGraph : result?.canvas?.graph;
+    if (graph && (graph.nodes?.length || graph.edges?.length)) {
+      const nodeRows = graph.nodes?.map((n) => ({
+        ID: n.id || '',
+        Name: n.name || n.label || '',
+        Type: n.type || '',
+      })) ?? [];
+      const nodeTable = rowsToMarkdownTable(['ID', 'Name', 'Type'], nodeRows);
+
+      const edgeRows = graph.edges?.map((e) => {
+        const props = e.properties ? formatPropertiesCompact(e.properties) : '';
+        return {
+          From: e.from || '',
+          To: e.to || '',
+          Type: e.type || '',
+          Label: e.label || '',
+          Detail: e.detail || '',
+          Properties: props,
+        };
+      }) ?? [];
+      const edgeTable = rowsToMarkdownTable(['From', 'To', 'Type', 'Label', 'Detail', 'Properties'], edgeRows);
+
+      const rawGraphJson = JSON.stringify(graph, null, 2);
+      text = `${text}\n\n## Graph: Nodes\n\n${nodeTable}\n\n## Graph: Edges\n\n${edgeTable}\n\n## Graph: Raw JSON\n\n\`\`\`json\n${rawGraphJson}\n\`\`\``;
+    }
+
     return text;
-  }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams]);
+  }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams, result?.canvas?.graph, mergedGraph]);
 
   return (
     <div className="min-h-0 flex-1 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
