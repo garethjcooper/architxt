@@ -689,6 +689,16 @@ export function ResearchResultPanel({
                   <div className="font-mono truncate" title={hoveredInfo.data.id}>id: {hoveredInfo.data.id}</div>
                   <div className="whitespace-normal break-words">label: {hoveredInfo.data.fullLabel || hoveredInfo.data.name || hoveredInfo.data.label}</div>
                   {hoveredInfo.data.detail && <div className="whitespace-normal break-words text-white/50">{hoveredInfo.data.detail}</div>}
+                  {hoveredInfo.data.properties && Object.keys(hoveredInfo.data.properties).length > 0 && (
+                    <div className="flex flex-col gap-0.5 text-white/50">
+                      {Object.entries(hoveredInfo.data.properties).map(([k, v]) => (
+                        <div key={k} className="whitespace-normal break-words">
+                          <span className="text-white/40">{k}:</span>{' '}
+                          {Array.isArray(v) ? v.join(', ') : String(v)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="truncate">type: {hoveredInfo.data.type}</div>
                   {hoveredInfo.data.source && <div className="truncate">source: {hoveredInfo.data.source}</div>}
                   {hoveredInfo.data.mental_model_applied && <div className="text-emerald-300/80">mental model applied</div>}
@@ -703,6 +713,16 @@ export function ResearchResultPanel({
                   <div className="truncate">type: {hoveredInfo.data.type}</div>
                   {hoveredInfo.data.source && <div className="truncate">source: {hoveredInfo.data.source}</div>}
                   {hoveredInfo.data.detail && <div className="whitespace-normal break-words text-white/50">{hoveredInfo.data.detail}</div>}
+                  {hoveredInfo.data.properties && Object.keys(hoveredInfo.data.properties).length > 0 && (
+                    <div className="flex flex-col gap-0.5 text-white/50">
+                      {Object.entries(hoveredInfo.data.properties).map(([k, v]) => (
+                        <div key={k} className="whitespace-normal break-words">
+                          <span className="text-white/40">{k}:</span>{' '}
+                          {Array.isArray(v) ? v.join(', ') : String(v)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
