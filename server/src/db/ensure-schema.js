@@ -570,8 +570,7 @@ List its major capabilities, each with its purpose, responsibility, business cap
     role: 'sys_edge_context',
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
-For each flow, write a concise \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification. Populate the edge \`properties\` object with any supported machine-curatable facts described in the graph format rules.
-The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
+For each flow, write a concise \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
 #end
 #table
 #table-name Edges
