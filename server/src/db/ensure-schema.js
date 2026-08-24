@@ -344,17 +344,7 @@ const BUILTIN_TEMPLATES = [
 
 Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`.
 
-For each flow, write a concise but informative \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification.
-
-Also populate the edge \`properties\` object with any supported machine-curatable facts. All properties are optional; omit the entire \`properties\` object if none are supported:
-- \`dataObjects\`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
-- \`protocol\`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
-- \`format\`: data format / API style (e.g., JSON, XML, CSV, Avro, Parquet, FIX, protobuf, binary, REST, SOAP).
-- \`frequency\`: cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, on startup).
-- \`intermediaries\`: array of gateways, queues, ESBs, proxies, object stores, load balancers. Use the exact entity id from the catalog when a known intermediary is named; use a lowercase hyphenated slug only for genuinely unnamed or inferred intermediaries.
-- \`reliability\`: retry, acknowledgement, idempotency, ordering, duplicate-handling, or delivery-semantics behavior.
-- \`auth\`: authentication / authorization mechanism (e.g., OAuth 2.0, mTLS, API key, mutual Kerberos, JWT, IP allowlist).
-- \`encryption\`: encryption in transit/rest, signing, or hashing (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed).
+For each flow, write a concise but informative \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification. Also populate the edge \`properties\` object with any supported machine-curatable facts; all properties are optional, and the full set is defined in the graph format rules.
 
 Rules:
 - Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
@@ -580,15 +570,7 @@ List its major capabilities, each with its purpose, responsibility, business cap
     role: 'sys_edge_context',
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
-For each flow, write a concise \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification. Populate the edge \`properties\` object with any supported machine-curatable facts:
-- \`dataObjects\`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
-- \`protocol\`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
-- \`format\`: data format / API style (e.g., JSON, XML, CSV, Avro, Parquet, FIX, protobuf, binary, REST, SOAP).
-- \`frequency\`: cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, on startup).
-- \`intermediaries\`: array of gateways, queues, ESBs, proxies, object stores, load balancers. Use the exact entity id from the catalog when a known intermediary is named; use a lowercase hyphenated slug only for genuinely unnamed or inferred intermediaries.
-- \`reliability\`: retry, acknowledgement, idempotency, ordering, duplicate-handling, or delivery-semantics behavior.
-- \`auth\`: authentication / authorization mechanism (e.g., OAuth 2.0, mTLS, API key, mutual Kerberos, JWT, IP allowlist).
-- \`encryption\`: encryption in transit/rest, signing, or hashing (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed).
+For each flow, write a concise \`detail\` (maximum 4 sentences) that summarizes what moves between the endpoints and any important qualification. Populate the edge \`properties\` object with any supported machine-curatable facts described in the graph format rules.
 The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
 #end
 #table
