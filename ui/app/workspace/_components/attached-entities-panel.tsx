@@ -1,27 +1,25 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ChevronUp, FileText } from 'lucide-react';
+import { useMemo } from 'react';
+import { ChevronRight, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
-import { EdgeListRow } from '@/lib/contextual-graph/display';
+
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
-import { type EntityInfo, type EntityInfoContextualRef, type Entity } from '@/lib/api/client';
-import { type DisplayEdge, type DisplayNode, MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
+import { type EntityInfo, type Entity } from '@/lib/api/client';
+import { type DisplayNode, MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 
 export interface ModelItem {
   key: string;
   label: string;
   extId: string;
   category: string;
-  children?: Array<{ key: string; label: string; edgeContext?: EntityInfo['edge_contexts'][number] }>;
 }
 
 export interface AttachedEntitiesPanelProps {
   entityIds: string[];
   entityInfoMap: Record<string, EntityInfo> | null;
-  edges?: DisplayEdge[];
   entities?: Entity[];
   contextualNodes?: DisplayNode[];
   loading: boolean;
@@ -83,11 +81,9 @@ function getEntityModelItems(
     });
   });
 
-  // Group edge contexts by their backing mental-model ext_id so a single
-  // system edge-context model can surface the many physical graph edges it
-  // produced without collapsing into a merged global "Edges" group.
-  // Keep hindsight contexts in the group so they can supply the parent row's
-  // source → target label; only derived contexts are shown as child rows.
+  // Surface each edge-context mental model as a single simple row showing the
+  // source → target scope. The individual physical edges are now rendered in
+  // the narrative markdown, so they no longer need a child group here.
   const edgeContextsByExtId = new Map<string, EntityInfo['edge_contexts']>();
   for (const ctx of info.edge_contexts) {
     const extId = ctx.refs[0]?.ext_id;
@@ -98,7 +94,6 @@ function getEntityModelItems(
 
   edgeContextsByExtId.forEach((contexts, extId) => {
     const hindsightCtx = contexts.find((c) => c.origin === 'hindsight');
-    const derivedContexts = contexts.filter((c) => c.origin !== 'hindsight');
 
     let label: string;
     if (hindsightCtx) {
@@ -106,9 +101,6 @@ function getEntityModelItems(
       const targetLabel = resolveName(hindsightCtx.target_id);
       label = `${sourceLabel} → ${targetLabel}`;
     } else {
-      // Edge-context ext_ids follow edge-ctx-{source_id}|{target_id}. Resolve
-      // both endpoints to human-readable names so the parent row matches the
-      // child rows and the context manager edge list.
       const scopePart = extId.startsWith('edge-ctx-') ? extId.slice('edge-ctx-'.length) : extId;
       const [sourceId, targetId] = scopePart.split('|');
       const sourceLabel = sourceId ? resolveName(sourceId) : extId;
@@ -121,11 +113,6 @@ function getEntityModelItems(
       label,
       extId,
       category: MODEL_TAB_LABELS.edge_contexts,
-      children: derivedContexts.map((ctx) => ({
-        key: `edge-child-${ctx.edge_id || `${ctx.source_id}-${ctx.target_id}`}`,
-        label: `${ctx.source_id} → ${ctx.target_id}`,
-        edgeContext: ctx,
-      })),
     });
   });
 
@@ -135,7 +122,6 @@ function getEntityModelItems(
 export function AttachedEntitiesPanel({
   entityIds,
   entityInfoMap,
-  edges = [],
   entities = [],
   contextualNodes = [],
   loading,
@@ -147,12 +133,6 @@ export function AttachedEntitiesPanel({
   const sortedIds = useMemo(() => {
     return [...entityIds].sort((a, b) => a.localeCompare(b));
   }, [entityIds]);
-
-  const edgeById = useMemo(() => {
-    const map = new Map<string, DisplayEdge>();
-    for (const edge of edges) map.set(edge.id, edge);
-    return map;
-  }, [edges]);
 
   const entityNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -169,18 +149,6 @@ export function AttachedEntitiesPanel({
     }
     return map;
   }, [contextualNodes]);
-
-  // Track which edge-context model rows are expanded to show child edges.
-  const [expandedEdgeModelKeys, setExpandedEdgeModelKeys] = useState<Set<string>>(new Set());
-
-  const toggleEdgeModelExpanded = (key: string) => {
-    setExpandedEdgeModelKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
 
   return (
     <Panel className="flex-1">
@@ -250,102 +218,22 @@ export function AttachedEntitiesPanel({
                     <div className="border-t border-white/10 px-1 py-1 space-y-0.5">
                       {items.map((item) => {
                         const isSelected = selectedModel?.entityId === entityId && selectedModel?.extId === item.extId;
-                        const hasChildren = item.children && item.children.length > 0;
-                        const edgeModelExpanded = hasChildren && expandedEdgeModelKeys.has(item.key);
                         return (
-                          <div key={item.key} className="space-y-0.5">
-                            <div
-                              className={cn(
-                                'flex items-center gap-1 rounded px-2 py-1.5 text-[11px] transition-colors group',
-                                isSelected ? 'bg-emerald-500/15' : 'hover:bg-white/5'
-                              )}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => onSelectModel(entityId, item)}
-                                className={cn(
-                                  'flex-1 text-left flex items-center gap-2 min-w-0',
-                                  isSelected ? 'text-emerald-200' : 'text-white/70'
-                                )}
-                                title={`${item.category}: ${item.label}`}
-                              >
-                                <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
-                                  {item.category}
-                                </span>
-                                <span className="truncate min-w-0 flex-1">{item.label}</span>
-                              </button>
-
-                              {hasChildren && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleEdgeModelExpanded(item.key)}
-                                  className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-                                  title={edgeModelExpanded ? 'Collapse edges' : 'Expand edges'}
-                                >
-                                  {edgeModelExpanded ? (
-                                    <ChevronUp className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <ChevronDown className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                            {edgeModelExpanded && (
-                              <div className="pl-5 pr-1 space-y-1 py-1">
-                                {item.children!.map((child) => {
-                                  const ctx = child.edgeContext;
-                                  if (!ctx) return (
-                                    <div
-                                      key={child.key}
-                                      className="text-[10px] text-white/50 truncate py-0.5"
-                                      title={child.label}
-                                    >
-                                      {child.label}
-                                    </div>
-                                  );
-
-                                  const backingEdge = edgeById.get(ctx.edge_id);
-
-                                  const edge: import('@/lib/contextual-graph/display').DisplayEdge = {
-                                    id: ctx.edge_id,
-                                    source_id: ctx.source_id,
-                                    target_id: ctx.target_id,
-                                    type: ctx.edge_type,
-                                    labels: [],
-                                    label: child.label,
-                                    detail: backingEdge?.detail || backingEdge?.label || ctx.edge_id,
-                                    properties: {},
-                                    modelRefs: [],
-                                  };
-
-                                  const sourceInfo = entityInfoMap?.[ctx.source_id];
-                                  const targetInfo = entityInfoMap?.[ctx.target_id];
-                                  const sourceLabel =
-                                    sourceInfo?.catalog?.name ||
-                                    sourceInfo?.graph_node?.display_name ||
-                                    entityNameById.get(ctx.source_id) ||
-                                    contextualNodeNameById.get(ctx.source_id) ||
-                                    ctx.source_id;
-                                  const targetLabel =
-                                    targetInfo?.catalog?.name ||
-                                    targetInfo?.graph_node?.display_name ||
-                                    entityNameById.get(ctx.target_id) ||
-                                    contextualNodeNameById.get(ctx.target_id) ||
-                                    ctx.target_id;
-
-                                  return (
-                                    <EdgeListRow
-                                      key={child.key}
-                                      edge={edge}
-                                      sourceLabel={sourceLabel}
-                                      targetLabel={targetLabel}
-                                      onClick={() => onSelectModel(entityId, item)}
-                                    />
-                                  );
-                                })}
-                              </div>
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => onSelectModel(entityId, item)}
+                            className={cn(
+                              'w-full text-left flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
+                              isSelected ? 'bg-emerald-500/15 text-emerald-200' : 'text-white/70 hover:bg-white/5'
                             )}
-                          </div>
+                            title={`${item.category}: ${item.label}`}
+                          >
+                            <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
+                              {item.category}
+                            </span>
+                            <span className="truncate min-w-0 flex-1">{item.label}</span>
+                          </button>
                         );
                       })}
                     </div>

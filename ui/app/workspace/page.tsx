@@ -651,7 +651,6 @@ export default function WorkspacePage() {
                     <AttachedEntitiesPanel
                       entityIds={scopeEntityIds}
                       entityInfoMap={entityInfoMap}
-                      edges={edges}
                       entities={architxtEntities}
                       contextualNodes={entities}
                       loading={loadingEntityInfo}
