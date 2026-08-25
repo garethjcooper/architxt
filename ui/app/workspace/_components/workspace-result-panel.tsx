@@ -5,7 +5,7 @@ import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client
 
 interface WorkspaceResultPanelProps {
   result: DiscoverStepResponse | ResearchStepSummary | null;
-  loading?: boolean;
+  isRunning?: boolean;
   error?: string | null;
   title?: string;
   count?: number;
@@ -15,7 +15,7 @@ interface WorkspaceResultPanelProps {
 
 export function WorkspaceResultPanel({
   result,
-  loading,
+  isRunning,
   error,
   title = 'Workspace',
   count,
@@ -30,15 +30,14 @@ export function WorkspaceResultPanel({
     );
   }
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center text-xs text-white/50">
-        Loading...
-      </div>
-    );
-  }
-
   if (!result) {
+    if (isRunning) {
+      return (
+        <div className="h-full flex items-center justify-center text-xs text-white/50">
+          Running query…
+        </div>
+      );
+    }
     return (
       <div className="h-full flex items-center justify-center text-xs text-white/40">
         Select a step or model to view its content.
@@ -47,15 +46,23 @@ export function WorkspaceResultPanel({
   }
 
   return (
-    <EnvelopeViewer
-      envelope={result}
-      title={title}
-      count={count}
-      keyPrefix={keyPrefix}
-      className="h-full"
-      showIndex
-      showControls
-      sessionName={sessionName}
-    />
+    <div className="relative h-full">
+      {isRunning && (
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-emerald-900/40 backdrop-blur-sm px-2.5 py-1 text-[10px] text-emerald-200/80 shadow-sm">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Running query…
+        </div>
+      )}
+      <EnvelopeViewer
+        envelope={result}
+        title={title}
+        count={count}
+        keyPrefix={keyPrefix}
+        className="h-full"
+        showIndex
+        showControls
+        sessionName={sessionName}
+      />
+    </div>
   );
 }
