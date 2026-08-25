@@ -218,30 +218,23 @@ export default function ContextManagerPage() {
     });
   }, [sortedEdges, graphSearch, nodeById]);
 
-  const edgeContextGroupCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const edge of edges) {
-      const key = getEdgeContextPairKey(edge);
-      if (!key) continue;
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-    return counts;
-  }, [edges]);
-
   const groupedEdgeRows = useMemo(() => {
-    // Build groups keyed by edge-context mental-model scope.
+    // Group all filtered edges by their canonical relationship.
     const groups = new Map<string, DisplayEdge[]>();
     for (const edge of filteredSortedEdges) {
-      const ctxKey = getEdgeContextPairKey(edge);
-      if (ctxKey) {
-        let list = groups.get(ctxKey);
-        if (!list) {
-          list = [];
-          groups.set(ctxKey, list);
-        }
-        list.push(edge);
+      const key = getEdgeSortGroup(edge);
+      let list = groups.get(key);
+      if (!list) {
+        list = [];
+        groups.set(key, list);
       }
+      list.push(edge);
     }
+
+    const isMentalModelEdge = (e: DisplayEdge) =>
+      e.id.startsWith('hindsight-') ||
+      e.properties.provenance?.source === 'hindsight' ||
+      e.modelRefs.some((r) => r.role === 'sys_edge_context');
 
     const rows: Array<{
       edge: DisplayEdge;
@@ -249,30 +242,30 @@ export default function ContextManagerPage() {
       key: string;
       isGroup: boolean;
     }> = [];
-    const seen = new Set<string>();
-    for (const edge of filteredSortedEdges) {
-      const ctxKey = getEdgeContextPairKey(edge);
-      if (ctxKey) {
-        if (seen.has(ctxKey)) continue;
-        seen.add(ctxKey);
-        const members = groups.get(ctxKey) || [edge];
-        // Prefer the hindsight mental-model edge as the representative.
-        const representative =
-          members.find((e) => e.id.startsWith('hindsight-')) ||
-          members.find((e) => e.modelRefs.some((r) => r.role === 'sys_edge_context')) ||
-          members[0];
+
+    for (const [key, members] of groups) {
+      const mental = members.find(isMentalModelEdge);
+      if (mental) {
+        const childCount = members.length - 1; // exclude the mental-model edge itself
         rows.push({
-          edge: representative,
-          count: edgeContextGroupCounts.get(ctxKey) || members.length,
-          key: ctxKey,
+          edge: mental,
+          count: Math.max(0, childCount),
+          key,
           isGroup: true,
         });
       } else {
-        rows.push({ edge, count: 1, key: edge.id, isGroup: false });
+        for (const edge of members) {
+          rows.push({ edge, count: 1, key: edge.id, isGroup: false });
+        }
       }
     }
-    return rows;
-  }, [filteredSortedEdges, edgeContextGroupCounts]);
+
+    return rows.sort((a, b) => {
+      const aKey = `${a.edge.source_id}|${a.edge.target_id}`;
+      const bKey = `${b.edge.source_id}|${b.edge.target_id}`;
+      return aKey.localeCompare(bKey);
+    });
+  }, [filteredSortedEdges]);
 
   const allModelRefs = useMemo(() => {
     const refs: ModelRef[] = [];
