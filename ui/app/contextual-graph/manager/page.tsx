@@ -229,6 +229,20 @@ export default function ContextManagerPage() {
   }, [edges]);
 
   const groupedEdgeRows = useMemo(() => {
+    // Build groups keyed by edge-context mental-model scope.
+    const groups = new Map<string, DisplayEdge[]>();
+    for (const edge of filteredSortedEdges) {
+      const ctxKey = getEdgeContextPairKey(edge);
+      if (ctxKey) {
+        let list = groups.get(ctxKey);
+        if (!list) {
+          list = [];
+          groups.set(ctxKey, list);
+        }
+        list.push(edge);
+      }
+    }
+
     const rows: Array<{
       edge: DisplayEdge;
       count: number;
@@ -241,7 +255,18 @@ export default function ContextManagerPage() {
       if (ctxKey) {
         if (seen.has(ctxKey)) continue;
         seen.add(ctxKey);
-        rows.push({ edge, count: edgeContextGroupCounts.get(ctxKey) || 1, key: ctxKey, isGroup: true });
+        const members = groups.get(ctxKey) || [edge];
+        // Prefer the hindsight mental-model edge as the representative.
+        const representative =
+          members.find((e) => e.id.startsWith('hindsight-')) ||
+          members.find((e) => e.modelRefs.some((r) => r.role === 'sys_edge_context')) ||
+          members[0];
+        rows.push({
+          edge: representative,
+          count: edgeContextGroupCounts.get(ctxKey) || members.length,
+          key: ctxKey,
+          isGroup: true,
+        });
       } else {
         rows.push({ edge, count: 1, key: edge.id, isGroup: false });
       }
