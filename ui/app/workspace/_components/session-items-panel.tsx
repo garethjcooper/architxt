@@ -137,6 +137,15 @@ export function SessionItemsPanel({
                           {createdAt && (
                             <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
                           )}
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                              step.action_type === 'curated_page'
+                                ? 'bg-purple-900/30 border-purple-500/30 text-purple-300'
+                                : 'bg-emerald-900/30 border-emerald-500/30 text-emerald-300'
+                            }`}
+                          >
+                            {step.action_type === 'curated_page' ? 'curated' : 'reflect'}
+                          </span>
                           {step.status === 'running' && (
                             <span className="text-amber-300 animate-pulse">● running</span>
                           )}
