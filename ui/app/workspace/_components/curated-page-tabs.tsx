@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Plus, X, Trash2, Edit3, FileText, ChevronDown } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ResearchStepSummary } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -38,17 +37,6 @@ interface CuratedPageTabsProps {
   onAddViewTab?: (label: string, sourceId?: string) => void;
 }
 
-function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () => void) {
-  useEffect(() => {
-    const listener = (e: MouseEvent) => {
-      if (!ref.current || ref.current.contains(e.target as Node)) return;
-      handler();
-    };
-    document.addEventListener('mousedown', listener);
-    return () => document.removeEventListener('mousedown', listener);
-  }, [ref, handler]);
-}
-
 export function CuratedPageTabs({
   tabs,
   activeTabId,
@@ -59,50 +47,8 @@ export function CuratedPageTabs({
   onDeleteCuratedPage,
   onCloseTab,
 }: CuratedPageTabsProps) {
-  const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState('');
-  const editInputRef = useRef<HTMLInputElement>(null);
   const [pagesOpen, setPagesOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
-
-  useEffect(() => {
-    if (editingTabId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
-    }
-  }, [editingTabId]);
-
-  const startRename = useCallback((tab: WorkspaceTab) => {
-    if (tab.kind !== 'curated' || tab.stepId == null) return;
-    setEditingTabId(tab.id);
-    setEditingValue(tab.label);
-  }, []);
-
-  const commitRename = useCallback(async () => {
-    if (!editingTabId) return;
-    const tab = tabs.find((t) => t.id === editingTabId);
-    if (!tab || tab.kind !== 'curated' || tab.stepId == null) {
-      setEditingTabId(null);
-      return;
-    }
-    const trimmed = editingValue.trim();
-    if (trimmed && trimmed !== tab.label) {
-      await onRenameCuratedPage(tab.stepId, trimmed);
-    }
-    setEditingTabId(null);
-  }, [editingTabId, editingValue, tabs, onRenameCuratedPage]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        void commitRename();
-      } else if (e.key === 'Escape') {
-        setEditingTabId(null);
-      }
-    },
-    [commitRename]
-  );
 
   const curatedTabIds = new Set(
     tabs.filter((t) => t.kind === 'curated' && t.stepId != null).map((t) => t.stepId!)
@@ -236,30 +182,9 @@ export function CuratedPageTabs({
                   isCurated ? 'bg-purple-400' : 'bg-emerald-400'
                 )}
               />
-              {editingTabId === tab.id && isCurated ? (
-                <Input
-                  ref={editInputRef}
-                  value={editingValue}
-                  onChange={(e) => setEditingValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onBlur={() => void commitRename()}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-5 min-w-[6rem] max-w-[12rem] px-1 py-0 text-[11px] bg-black/30 border-white/10"
-                />
-              ) : (
-                <span
-                  className="truncate max-w-[10rem]"
-                  onClick={(e) => {
-                    if (isCurated) {
-                      e.stopPropagation();
-                      startRename(tab);
-                    }
-                  }}
-                  title={tab.label}
-                >
-                  {tab.label}
-                </span>
-              )}
+              <span className="truncate max-w-[10rem]" title={tab.label}>
+                {tab.label}
+              </span>
               <button
                 type="button"
                 onClick={(e) => {
