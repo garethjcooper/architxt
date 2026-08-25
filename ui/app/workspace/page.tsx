@@ -884,7 +884,7 @@ export default function WorkspacePage() {
               result={previewResult}
               title={previewTitle}
               count={previewResult?.synthesis?.narrative ? undefined : 0}
-              loading={reflectLoading}
+              isRunning={reflectLoading && activeTabId === ANCHOR_TAB_ID}
               error={previewError}
               sessionName={activeSession?.title}
               keyPrefix="preview"
