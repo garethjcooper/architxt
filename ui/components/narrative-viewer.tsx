@@ -96,21 +96,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     setInternalActiveRangeIds(new Set());
   }, [content, blocksProp]);
 
-  const structuralBlocks = useMemo(() => blocks.filter(b => {
-    if (b.type === 'text') return false;
-    if (b.type === 'heading') {
-      const title = b.title || '';
-      // Hide synthetic envelope headings generated for canvas tables/graphs —
-      // they are not meaningful navigation targets and their children are already
-      // visible in the rendered content.
-      return !/^Table:/i.test(title) && !/^Graph:/i.test(title);
-    }
-    // Hide inline table and raw JSON code blocks from the index; they are
-    // not navigable sections and just add noise.
-    if (b.type === 'table') return false;
-    if (b.type === 'code' && b.language === 'json') return false;
-    return true;
-  }), [blocks]);
+  const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading'), [blocks]);
 
   const scrollToBlock = useCallback((id: string) => {
     const container = markdownContainerRef.current;
