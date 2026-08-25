@@ -277,12 +277,14 @@ export function EdgeListRow({
   onClick,
   sourceLabel,
   targetLabel,
+  edgeContextCount,
 }: {
   edge: DisplayEdge;
   active?: boolean;
   onClick?: () => void;
   sourceLabel?: string;
   targetLabel?: string;
+  edgeContextCount?: number;
 }) {
   const sourceDisplay = sourceLabel || edge.source_id;
   const targetDisplay = targetLabel || edge.target_id;
@@ -308,6 +310,14 @@ export function EdgeListRow({
           {description || secondary}
         </div>
       </div>
+      {edgeContextCount !== undefined && edgeContextCount > 0 && (
+        <span
+          className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
+          title={`${edgeContextCount} physical edge${edgeContextCount === 1 ? '' : 's'} in this edge context`}
+        >
+          {edgeContextCount} edge{edgeContextCount === 1 ? '' : 's'}
+        </span>
+      )}
     </button>
   );
 }
