@@ -218,6 +218,16 @@ export default function ContextManagerPage() {
     });
   }, [sortedEdges, graphSearch, nodeById]);
 
+  const edgeContextGroupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const edge of edges) {
+      const key = getEdgeContextPairKey(edge);
+      if (!key) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [edges]);
+
   const allModelRefs = useMemo(() => {
     const refs: ModelRef[] = [];
     for (const node of nodes) refs.push(...node.modelRefs);
@@ -617,6 +627,7 @@ export default function ContextManagerPage() {
                       active={selectedEdgeId === edge.id}
                       sourceLabel={nodeById.get(edge.source_id)?.label}
                       targetLabel={nodeById.get(edge.target_id)?.label}
+                      edgeContextCount={edgeContextGroupCounts.get(getEdgeContextPairKey(edge) || '')}
                       onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
                     />
                   ))}
