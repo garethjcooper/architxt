@@ -1,6 +1,7 @@
 'use client';
 
 import { NarrativeViewer } from '@/components/narrative-viewer';
+import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { type EntityInfo, type MentalModelContent, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
 import {
   DisplayNode,
@@ -103,6 +104,17 @@ function getModelContentText(raw: HindsightContentResult | undefined): string {
   return parseMentalModelContent(raw).narrative || '';
 }
 
+function hasStructuredEnvelope(entry: HindsightContentResult | undefined): boolean {
+  if (!entry) return false;
+  const content = parseMentalModelContent(entry);
+  return Boolean(
+    (content.graph?.nodes?.length ?? 0) > 0 ||
+    (content.graph?.edges?.length ?? 0) > 0 ||
+    content.tables?.length ||
+    content.diagrams?.length
+  );
+}
+
 function renderModelContent(entry: HindsightContentResult | undefined): React.ReactNode {
   if (!entry) {
     return (
@@ -118,11 +130,22 @@ function renderModelContent(entry: HindsightContentResult | undefined): React.Re
       </div>
     );
   }
+  // Standard contextual-graph envelope: render with the same viewer used for
+  // research steps, so graph/tables/diagrams are displayed instead of raw JSON.
+  if (hasStructuredEnvelope(entry)) {
+    return (
+      <EnvelopeViewer
+        envelope={mentalModelContentToStepSummary('Content', entry)}
+        title="Content"
+        className="h-48"
+      />
+    );
+  }
   const text = getModelContentText(entry);
   if (text) {
     return <NarrativeViewer content={text} title="Content" viewMode="markdown" showIndex={false} className="h-48" />;
   }
-  // No narrative: render the full raw content as JSON.
+  // Not a recognized envelope and no narrative: render the full raw content as JSON.
   return (
     <div className="h-48 overflow-auto rounded border border-white/10 bg-black/20 p-2">
       {renderValue(entry.content)}
@@ -150,5 +173,6 @@ export {
   isGroundedEdgeForWorkspace,
   getModelContentText,
   renderModelContent,
+  hasStructuredEnvelope,
   MODEL_TAB_LABELS,
 };

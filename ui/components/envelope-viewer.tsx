@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { NarrativeViewer } from './narrative-viewer';
 import { InteractiveGraph, type GraphLayout } from './research-canvas';
 import { MermaidDiagram } from './mermaid-diagram';
@@ -74,6 +74,15 @@ export function EnvelopeViewer({ envelope, title = 'Preview', onCopy, className 
     const all: EnvelopeTab[] = ['narrative', 'graph', 'tables', 'diagrams'];
     return all.filter((t) => hasData(normalized, t));
   }, [normalized]);
+
+  // If the current tab has no data but another tab does, switch to the first
+  // available tab. This handles graph/tables/diagrams-only envelopes without
+  // requiring every caller to pick a different default.
+  useEffect(() => {
+    if (!hasData(normalized, activeTab) && tabs.length > 0 && tabs[0] !== activeTab) {
+      setActiveTab(tabs[0]);
+    }
+  }, [normalized, activeTab, tabs]);
 
   const activeHasData = hasData(normalized, activeTab);
 
