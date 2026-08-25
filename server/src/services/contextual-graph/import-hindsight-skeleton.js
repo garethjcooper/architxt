@@ -70,7 +70,9 @@ export async function importHindsightSkeleton(
     return typeof label === 'string' && label.trim() !== '';
   });
 
-  // Apply label filters before ranking.
+  // Apply exclude filter first. include_patterns act as guaranteed seeds, not
+  // an exclusive whitelist; top_k_nodes only caps the additional non-included
+  // nodes so a narrowly included node still imports its neighbors.
   let skippedByFilter = 0;
   candidateNodes = candidateNodes.filter((n) => {
     const label = n.data.label;
@@ -78,20 +80,30 @@ export async function importHindsightSkeleton(
       skippedByFilter += 1;
       return false;
     }
-    if (includePatterns.length > 0 && !includePatterns.some((p) => p.test(label))) {
-      skippedByFilter += 1;
-      return false;
-    }
     return true;
   });
 
-  // Apply top-k by degree if configured.
+  const includedNodes = [];
+  const otherNodes = [];
+  for (const n of candidateNodes) {
+    const label = n.data.label;
+    if (includePatterns.length > 0 && includePatterns.some((p) => p.test(label))) {
+      includedNodes.push(n);
+    } else {
+      otherNodes.push(n);
+    }
+  }
+
   if (typeof options.top_k_nodes === 'number' && options.top_k_nodes > 0) {
-    candidateNodes = candidateNodes
+    const remainingSlots = Math.max(0, options.top_k_nodes - includedNodes.length);
+    const rankedOtherNodes = otherNodes
       .map((n) => ({ n, degree: rawDegrees.get(n.data.id) || 0 }))
       .sort((a, b) => b.degree - a.degree || a.n.data.label.localeCompare(b.n.data.label))
-      .slice(0, options.top_k_nodes)
+      .slice(0, remainingSlots)
       .map(({ n }) => n);
+    candidateNodes = [...includedNodes, ...rankedOtherNodes];
+  } else {
+    candidateNodes = [...includedNodes, ...otherNodes];
   }
 
   const allowedRawIds = new Set(candidateNodes.map((n) => n.data.id));

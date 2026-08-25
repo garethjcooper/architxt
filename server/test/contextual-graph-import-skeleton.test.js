@@ -202,4 +202,46 @@ describe('importHindsightSkeleton', () => {
     const existing = getNode(db, serverId, 'Mozart-API', 'existing-node').data;
     assert.notEqual(existing, null);
   });
+
+  it('guarantees include_patterns as seeds and caps only the remaining top_k_nodes', async () => {
+    // COM-019 is low-degree but explicitly included; top_k_nodes:4 should keep
+    // it plus the 3 highest-degree other nodes so its edges are imported.
+    const fetchGraph = makeFetchGraph({
+      nodes: [
+        { data: { id: 'h1', label: 'a-com:COM-001' } },
+        { data: { id: 'h2', label: 'a-com:COM-002' } },
+        { data: { id: 'h3', label: 'a-com:COM-003' } },
+        { data: { id: 'h4', label: 'a-com:COM-004' } },
+        { data: { id: 'h5', label: 'a-com:COM-019' } },
+      ],
+      edges: [
+        { data: { source: 'h1', target: 'h2', weight: 10 } },
+        { data: { source: 'h1', target: 'h3', weight: 8 } },
+        { data: { source: 'h1', target: 'h4', weight: 6 } },
+        { data: { source: 'h1', target: 'h5', weight: 3 } },
+      ],
+    });
+
+    const result = await importHindsightSkeleton(db, serverId, 'Mozart-API', {
+      top_k_nodes: 4,
+      include_patterns: ['COM-019'],
+    }, fetchGraph);
+
+    assert.equal(result.success, true);
+    // Included node (COM-019) plus the top 3 others (COM-001 hub + COM-002 + COM-003).
+    assert.equal(result.imported.nodes, 4);
+    // COM-019 connects to COM-001, so that edge survives instead of isolating it.
+    assert.equal(result.imported.edges, 3);
+
+    const com019 = getNode(db, serverId, 'Mozart-API', 'a-com:com-019').data;
+    assert.ok(com019);
+
+    const edges = listEdges(db, serverId, 'Mozart-API', { undirected: true }).data;
+    const edgeIds = edges.map((e) => e.cge_id).sort();
+    assert.deepEqual(edgeIds, [
+      'hindsight-a-com:com-001-a-com:com-002',
+      'hindsight-a-com:com-001-a-com:com-003',
+      'hindsight-a-com:com-001-a-com:com-019',
+    ]);
+  });
 });
