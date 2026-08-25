@@ -11,7 +11,12 @@ Edge field rules:
 - `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied.
 - `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`.
 - `label`: short phrase, max 4 words.
-- `detail`: readable description of the flow, 2–4 complete sentences when the source material supports it. Describe what moves between the endpoints and any important qualification. The `properties` object is for machine-curatable facts and does not replace this human-readable description. Empty string if not justified.
+- `detail`: readable description of the flow, 2–4 complete sentences when the source material supports it. Write the `detail` so a reader can understand the flow without looking at `properties`:
+  1. Sentence 1: what moves between the endpoints (data object, event, file, API call).
+  2. Sentence 2: direction and mechanism (e.g., calls over HTTPS REST, writes to a shared database, drops files on SFTP).
+  3. Sentence 3: cadence or trigger (e.g., real-time, nightly batch, on-demand, on startup, on error).
+  4. Sentence 4: any important qualification: reliability, auth, encryption, intermediaries, or error handling.
+  Omit a sentence if the source material does not support it. Do not repeat the `label` or restate the endpoint names. The `properties` object is for machine-curatable facts and does not replace this human-readable description. Empty string if not justified.
 - `properties`: optional object with flat, machine-curatable fields. Omit entirely when none are supported by the source material. All values are optional:
   - `dataObjects`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
   - `protocol`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
