@@ -13,7 +13,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
 import { MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
-import { hasStructuredEnvelope, mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
+import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import type { ModelRef } from './page';
 
 const ROLE_LABELS = MODEL_ROLE_LABELS;
@@ -277,20 +277,18 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
   const formatPreview = (result: ContentResult | null, error: string | null): React.ReactNode => {
     if (error) return <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
-    if (hasStructuredEnvelope(result)) {
-      return (
-        <EnvelopeViewer
-          envelope={mentalModelContentToStepSummary(result.ext_id || 'Content', result)}
-          title="Content"
-          className="h-full"
-        />
-      );
+    if (result.content == null) {
+      return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
     }
-    if (result.content != null) {
-      const text = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-      return <pre className="text-xs text-white/80 whitespace-pre-wrap font-mono bg-black/20 rounded border border-white/10 p-3 h-full">{text}</pre>;
-    }
-    return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
+    // Always render through the standard envelope viewer. Plain text/non-envelope
+    // content is wrapped as a narrative-only envelope by the helper below.
+    return (
+      <EnvelopeViewer
+        envelope={mentalModelContentToStepSummary(result.ext_id || 'Content', result)}
+        title="Content"
+        className="h-full"
+      />
+    );
   };
 
   const formatPreviewText = (result: ContentResult | null, error: string | null): string => {

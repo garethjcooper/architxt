@@ -10,7 +10,6 @@ import {
   isCandidateNode,
   isGroundedEdge,
   isCandidateEdge,
-  renderValue,
 } from '@/lib/contextual-graph/display';
 
 // Raw shape returned by the standard `/research/mental-models/content` API.
@@ -130,26 +129,15 @@ function renderModelContent(entry: HindsightContentResult | undefined): React.Re
       </div>
     );
   }
-  // Standard contextual-graph envelope: render with the same viewer used for
-  // research steps, so graph/tables/diagrams are displayed instead of raw JSON.
-  if (hasStructuredEnvelope(entry)) {
-    return (
-      <EnvelopeViewer
-        envelope={mentalModelContentToStepSummary('Content', entry)}
-        title="Content"
-        className="h-48"
-      />
-    );
-  }
-  const text = getModelContentText(entry);
-  if (text) {
-    return <NarrativeViewer content={text} title="Content" viewMode="markdown" showIndex={false} className="h-48" />;
-  }
-  // Not a recognized envelope and no narrative: render the full raw content as JSON.
+  // Mental-model content is always a standard contextual-graph envelope (possibly
+  // with only a narrative). Render it with the same viewer used for research
+  // steps so graph/tables/diagrams are displayed consistently.
   return (
-    <div className="h-48 overflow-auto rounded border border-white/10 bg-black/20 p-2">
-      {renderValue(entry.content)}
-    </div>
+    <EnvelopeViewer
+      envelope={mentalModelContentToStepSummary('Content', entry)}
+      title="Content"
+      className="h-48"
+    />
   );
 }
 
