@@ -344,12 +344,7 @@ const BUILTIN_TEMPLATES = [
 
 Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`.
 
-For each flow, write a \`detail\` of 2–4 complete sentences that a reader can understand without looking at \`properties\`:
-1. Sentence 1: what moves between the endpoints (data object, event, file, API call).
-2. Sentence 2: direction and mechanism (e.g., calls over HTTPS REST, writes to a shared database, drops files on SFTP).
-3. Sentence 3: cadence or trigger (e.g., real-time, nightly batch, on-demand, on startup, on error).
-4. Sentence 4: any important qualification: reliability, auth, encryption, intermediaries, or error handling.
-Omit a sentence if the source material does not support it. Do not repeat the \`label\` or restate the endpoint names. Also populate the edge \`properties\` object with any supported machine-curatable facts; all properties are optional, and the full set is defined in the graph format rules.
+For each flow, write a \`detail\` of 2–4 complete sentences as described in the graph format rules. Also populate the edge \`properties\` object with any supported machine-curatable facts; all properties are optional, and the full set is defined in the graph format rules.
 
 Rules:
 - Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
@@ -361,7 +356,7 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    fragments: '["contextual-patch.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","output-format-graph-contextual.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -575,12 +570,7 @@ List its major capabilities, each with its purpose, responsibility, business cap
     role: 'sys_edge_context',
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
-For each flow, write a \`detail\` of 2–4 complete sentences that a reader can understand without looking at \`properties\`:
-1. Sentence 1: what moves between the endpoints (data object, event, file, API call).
-2. Sentence 2: direction and mechanism (e.g., calls over HTTPS REST, writes to a shared database, drops files on SFTP).
-3. Sentence 3: cadence or trigger (e.g., real-time, nightly batch, on-demand, on startup, on error).
-4. Sentence 4: any important qualification: reliability, auth, encryption, intermediaries, or error handling.
-Omit a sentence if the source material does not support it. Do not repeat the \`label\` or restate the endpoint names. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
+For each flow, write a \`detail\` of 2–4 complete sentences as described in the graph format rules. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
 #end
 #table
 #table-name Edges
