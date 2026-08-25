@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
+import { Copy, Plus } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
-import { Copy } from 'lucide-react';
 
 export interface NarrativeDiagram {
   name: string;
@@ -50,6 +50,10 @@ export interface NarrativeViewerProps {
   renderSidebarRowActions?: (block: NarrativeBlock, ctx: { isActive: boolean; index: number; indent: number }) => React.ReactNode;
   /** Optional render prop for extra content-block actions, appended inside the default block row. */
   renderBlockActions?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
+  /** Optional callback to add a section/block to a curated page. When provided, a + icon appears on each structural block. */
+  onAddToPage?: (markdown: string, title?: string) => void;
+  /** Optional label for the add-to-page action. */
+  addToPageLabel?: string;
 }
 
 export const NarrativeViewer = forwardRef(function NarrativeViewer({
@@ -71,6 +75,8 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   renderEditingBlock,
   renderSidebarRowActions,
   renderBlockActions,
+  onAddToPage,
+  addToPageLabel = 'Add to page',
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
   const instanceId = useId().replace(/:/g, '');
   const prefix = keyPrefix ? `${keyPrefix}-` : `${instanceId}-`;
@@ -200,6 +206,25 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               <Copy className="h-3 w-3" />
             </button>
           )}
+          {onAddToPage && b.type === 'heading' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const ids = getSectionBlockIds(blocks, b.id);
+                const markdown = blocks
+                  .filter((bb) => ids.includes(bb.id))
+                  .map((bb) => bb.raw)
+                  .join('');
+                onAddToPage(markdown, b.title);
+              }}
+              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
+              title={addToPageLabel}
+              aria-label={addToPageLabel}
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          )}
           {renderSidebarRowActions && renderSidebarRowActions(b, { isActive, index: idx, indent })}
         </div>
       </div>
@@ -238,7 +263,37 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
             <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
             {renderBlockActions && !b.deleted && (
               <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
+                {onAddToPage && b.type !== 'text' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddToPage(b.raw, b.title);
+                    }}
+                    className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
+                    title={addToPageLabel}
+                    aria-label={addToPageLabel}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                )}
                 {renderBlockActions(b, { isActive })}
+              </div>
+            )}
+            {!renderBlockActions && onAddToPage && !b.deleted && b.type !== 'text' && (
+              <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToPage(b.raw, b.title);
+                  }}
+                  className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
+                  title={addToPageLabel}
+                  aria-label={addToPageLabel}
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
               </div>
             )}
           </div>
@@ -323,7 +378,37 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
           {renderBlockActions && !b.deleted && (
             <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
+              {onAddToPage && b.type !== 'text' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToPage(b.raw, b.title);
+                  }}
+                  className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
+                  title={addToPageLabel}
+                  aria-label={addToPageLabel}
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              )}
               {renderBlockActions(b, { isActive })}
+            </div>
+          )}
+          {!renderBlockActions && onAddToPage && !b.deleted && b.type !== 'text' && (
+            <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToPage(b.raw, b.title);
+                }}
+                className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
+                title={addToPageLabel}
+                aria-label={addToPageLabel}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
             </div>
           )}
         </div>
@@ -346,11 +431,12 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               {structuralBlocks.length === 0 ? (
                 <p className="text-xs text-white/30 p-1">No sections found</p>
               ) : (
-                structuralBlocks.map((b, idx) => {
-                  const isActive = activeBlockId === b.id;
-                  const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
-                  return defaultSidebarRow(b, idx, isActive);
-                })
+                <>
+                  {structuralBlocks.map((b, idx) => {
+                    const isActive = activeBlockId === b.id;
+                    return defaultSidebarRow(b, idx, isActive);
+                  })}
+                </>
               )}
             </div>
           </div>

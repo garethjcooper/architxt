@@ -1,9 +1,9 @@
 'use client';
-
-import { EnvelopeViewer } from '@/components/envelope-viewer';
+import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { CuratedPageEditor, type CuratedPageEnvelope } from './curated-page-editor';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 
-interface WorkspaceResultPanelProps {
+export interface WorkspaceResultPanelProps {
   result: DiscoverStepResponse | ResearchStepSummary | null;
   isRunning?: boolean;
   error?: string | null;
@@ -11,6 +11,11 @@ interface WorkspaceResultPanelProps {
   count?: number;
   sessionName?: string;
   keyPrefix?: string;
+  /** When a curated page tab is active, editing happens here. */
+  activeCuratedPage?: ResearchStepSummary | null;
+  curatedPages?: ResearchStepSummary[];
+  onSaveCuratedPage?: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
+  onCopyToCuratedPage?: (sectionMarkdown: string, sectionTitle?: string) => void;
 }
 
 export function WorkspaceResultPanel({
@@ -21,6 +26,10 @@ export function WorkspaceResultPanel({
   count,
   sessionName,
   keyPrefix,
+  activeCuratedPage,
+  curatedPages = [],
+  onSaveCuratedPage,
+  onCopyToCuratedPage,
 }: WorkspaceResultPanelProps) {
   if (error) {
     return (
@@ -45,6 +54,17 @@ export function WorkspaceResultPanel({
     );
   }
 
+  // When a curated page is active, show the editor instead of the read-only envelope.
+  if (activeCuratedPage && onSaveCuratedPage) {
+    return (
+      <CuratedPageEditor
+        page={activeCuratedPage}
+        pages={curatedPages}
+        onSave={onSaveCuratedPage}
+      />
+    );
+  }
+
   return (
     <div className="relative h-full">
       {isRunning && (
@@ -62,6 +82,13 @@ export function WorkspaceResultPanel({
         showIndex
         showControls
         sessionName={sessionName}
+        onCopy={onCopyToCuratedPage ? (event: EnvelopeCopyEvent) => {
+          if (event.type !== 'narrative') {
+            // Structured sections are not yet supported for copy-to-page.
+            return;
+          }
+          onCopyToCuratedPage(event.payload, event.label);
+        } : undefined}
       />
     </div>
   );
