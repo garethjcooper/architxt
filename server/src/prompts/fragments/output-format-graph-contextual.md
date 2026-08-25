@@ -11,7 +11,7 @@ Edge field rules:
 - `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied.
 - `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`.
 - `label`: short phrase, max 4 words.
-- `detail`: readable description of the flow, maximum 4 sentences. Summarize what moves between the endpoints and any important qualification. Empty string if not justified.
+- `detail`: readable description of the flow, 2–4 complete sentences when the source material supports it. Describe what moves between the endpoints and any important qualification. The `properties` object is for machine-curatable facts and does not replace this human-readable description. Empty string if not justified.
 - `properties`: optional object with flat, machine-curatable fields. Omit entirely when none are supported by the source material. All values are optional:
   - `dataObjects`: array of atomic bounded data units (file spec, customer data, event type, document type, record set).
   - `protocol`: transfer mechanism (e.g., HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop, shared database, in-process call).
