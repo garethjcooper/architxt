@@ -35,7 +35,7 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
-import { CuratedPageTabs, type WorkspaceTab } from './_components/curated-page-tabs';
+import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
 
 const logger = createLogger('WorkspacePage');
 
@@ -69,8 +69,8 @@ export default function WorkspacePage() {
   const [scopeManagerOpen, setScopeManagerOpen] = useState(false);
 
   // Tab state for curated pages and read-only views.
-  const [tabs, setTabs] = useState<WorkspaceTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>([makeAnchorTab()]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(ANCHOR_TAB_ID);
 
   const {
     selectedServerId,
@@ -126,6 +126,22 @@ export default function WorkspacePage() {
     if (selectedStep) return 'Reflect output';
     return 'Read-only preview';
   }, [tabs, activeTabId, selectedView, selectedStep]);
+
+  const activeViewLabel = useMemo(() => {
+    if (selectedView?.kind === 'model') return selectedView.name || 'Model';
+    if (selectedStep) return selectedStep.intent_text || selectedStep.raw_query || `Reflect ${selectedStep.id}`;
+    return 'Preview';
+  }, [selectedView, selectedStep]);
+
+  const updateAnchorTab = useCallback((label: string) => {
+    setTabs((prev) => {
+      const anchorIndex = prev.findIndex((t) => t.id === ANCHOR_TAB_ID);
+      if (anchorIndex === -1) return prev;
+      const next = [...prev];
+      next[anchorIndex] = { ...next[anchorIndex], label: label.slice(0, 40) };
+      return next;
+    });
+  }, []);
 
   const previewError = useMemo(() => {
     if (selectedView?.kind !== 'model') return reflectError;
@@ -339,19 +355,25 @@ export default function WorkspacePage() {
     };
   }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd, handleInnerResizeMove, handleInnerResizeEnd, handleNarrativeResizeMove, handleNarrativeResizeEnd]);
 
-  const handleSelectStep = useCallback((step: ResearchStepSummary) => {
+  const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
     setSelectedView({ kind: 'step', step });
-    // Open a read-only view tab for non-curated steps; curated pages are handled
-    // via the dedicated Pages list and tab state.
+    // Curated pages are handled via the dedicated Pages list and tab state.
     if (step.action_type === 'curated_page') return;
+
     const label = step.intent_text || step.raw_query || `Reflect ${step.id}`;
-    const id = `view-step-${step.id}`;
-    setTabs((prev) => {
-      if (prev.some((t) => t.id === id)) return prev;
-      return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: String(step.id) }];
-    });
-    setActiveTabId(id);
-  }, []);
+
+    if (openInNewTab) {
+      const id = `view-step-${step.id}`;
+      setTabs((prev) => {
+        if (prev.some((t) => t.id === id)) return prev;
+        return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: String(step.id) }];
+      });
+      setActiveTabId(id);
+    } else {
+      updateAnchorTab(label);
+      setActiveTabId(ANCHOR_TAB_ID);
+    }
+  }, [updateAnchorTab]);
 
   const fetchServers = useCallback(async () => {
     try {
@@ -481,9 +503,10 @@ export default function WorkspacePage() {
     const step = workspaceSession.trail.find((s) => s.id === workspaceSession.result?.step_id);
     if (step) {
       setSelectedView({ kind: 'step', step });
+      updateAnchorTab(step.intent_text || step.raw_query || `Reflect ${step.id}`);
       void workspaceSession.refresh();
     }
-  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh]);
+  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh, updateAnchorTab]);
 
   const handleRemoveScopeEntity = useCallback(async (entityId: string) => {
     if (!activeSession) return;
@@ -563,17 +586,23 @@ export default function WorkspacePage() {
     }
   }, [serverId, bankId]);
 
-  const selectEntityModel = useCallback((entityId: string, item: ModelItem) => {
+  const selectEntityModel = useCallback((entityId: string, item: ModelItem, openInNewTab = false) => {
     setSelectedView({ kind: 'model', entityId, extId: item.extId, name: item.label });
     void loadModelContent(item.extId);
-    const id = `view-model-${item.extId}`;
-    const label = item.label || item.extId;
-    setTabs((prev) => {
-      if (prev.some((t) => t.id === id)) return prev;
-      return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: item.extId }];
-    });
-    setActiveTabId(id);
-  }, [loadModelContent]);
+
+    if (openInNewTab) {
+      const id = `view-model-${item.extId}`;
+      const label = item.label || item.extId;
+      setTabs((prev) => {
+        if (prev.some((t) => t.id === id)) return prev;
+        return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: item.extId }];
+      });
+      setActiveTabId(id);
+    } else {
+      updateAnchorTab(item.label || item.extId);
+      setActiveTabId(ANCHOR_TAB_ID);
+    }
+  }, [loadModelContent, updateAnchorTab]);
 
   useEffect(() => {
     if (!serverId || !bankId || scopeEntityIds.length === 0) {
@@ -606,16 +635,19 @@ export default function WorkspacePage() {
     };
   }, [serverId, bankId, scopeEntityIds]);
 
-  // Keep curated tabs in sync with the session's curated pages.
+  // Keep curated tabs in sync with the session's curated pages. Preserve the anchor tab.
   useEffect(() => {
     setTabs((prev) => {
+      const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
       const existingCuratedIds = new Set(
         prev.filter((t) => t.kind === 'curated' && t.stepId != null).map((t) => t.stepId!)
       );
       const currentPageIds = new Set(workspaceSession.curatedPages.map((p) => p.id));
 
-      // Remove tabs whose pages were deleted.
-      const cleaned = prev.filter((t) => t.kind !== 'curated' || (t.stepId != null && currentPageIds.has(t.stepId)));
+      // Remove tabs whose pages were deleted, keep all view tabs including anchor.
+      const cleaned = prev.filter(
+        (t) => t.id === ANCHOR_TAB_ID || t.kind !== 'curated' || (t.stepId != null && currentPageIds.has(t.stepId))
+      );
 
       // Add tabs for new pages.
       const added = workspaceSession.curatedPages
@@ -627,7 +659,7 @@ export default function WorkspacePage() {
           stepId: p.id,
         }));
 
-      const next = [...cleaned, ...added];
+      const next = [anchor, ...cleaned.filter((t) => t.id !== ANCHOR_TAB_ID), ...added];
 
       // Ensure an active tab exists if we have tabs and the current one is stale.
       setActiveTabId((current) => {
@@ -796,7 +828,7 @@ export default function WorkspacePage() {
               }}
               onCloseTab={(tabId, kind, isEmpty) => {
                 const tab = tabs.find((t) => t.id === tabId);
-                if (!tab) return;
+                if (!tab || tab.pinned) return;
                 if (kind === 'curated') {
                   // Closing a curated tab only deletes the page if it is empty.
                   if (isEmpty) {
@@ -808,8 +840,15 @@ export default function WorkspacePage() {
                 setTabs((prev) => prev.filter((t) => t.id !== tabId));
                 if (activeTabId === tabId) {
                   const remaining = tabs.filter((t) => t.id !== tabId);
-                  setActiveTabId(remaining[0]?.id ?? null);
+                  setActiveTabId(remaining[0]?.id ?? ANCHOR_TAB_ID);
                 }
+              }}
+              onCloseAllViews={() => {
+                setTabs((prev) => {
+                  const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
+                  return [anchor, ...prev.filter((t) => t.kind === 'curated')];
+                });
+                setActiveTabId(ANCHOR_TAB_ID);
               }}
             />
             <WorkspaceResultPanel

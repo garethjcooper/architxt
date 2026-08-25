@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronRight, FileText } from 'lucide-react';
+import { ChevronRight, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
 
@@ -27,7 +27,7 @@ export interface AttachedEntitiesPanelProps {
   expandedEntityIds: Set<string>;
   selectedModel: { entityId: string; extId: string } | null;
   onToggleExpand: (entityId: string) => void;
-  onSelectModel: (entityId: string, item: ModelItem) => void;
+  onSelectModel: (entityId: string, item: ModelItem, openInNewTab?: boolean) => void;
 }
 
 function getEntityModelItems(
@@ -221,20 +221,35 @@ export function AttachedEntitiesPanel({
                       {items.map((item) => {
                         const isSelected = selectedModel?.entityId === entityId && selectedModel?.extId === item.extId;
                         return (
-                          <button
+                          <div
                             key={item.key}
-                            type="button"
-                            onClick={() => onSelectModel(entityId, item)}
                             className={cn(
-                              'w-full text-left flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
+                              'flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
                               isSelected ? 'bg-emerald-500/15 text-emerald-200' : 'text-white/70 hover:bg-white/5'
                             )}
-                            title={`${item.category}: ${item.label}`}
                           >
-                            <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
-                              {item.category}
-                            </span>
-                            <span className="truncate min-w-0 flex-1">{item.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => onSelectModel(entityId, item)}
+                              className="flex-1 text-left flex items-center gap-2 min-w-0"
+                              title={`${item.category}: ${item.label}`}
+                            >
+                              <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
+                                {item.category}
+                              </span>
+                              <span className="truncate min-w-0 flex-1">{item.label}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectModel(entityId, item, true);
+                              }}
+                              className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10"
+                              title="Open in new tab"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
                             {item.edgeCount !== undefined && item.edgeCount > 0 && (
                               <span
                                 className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
@@ -243,7 +258,7 @@ export function AttachedEntitiesPanel({
                                 {item.edgeCount} edge{item.edgeCount === 1 ? '' : 's'}
                               </span>
                             )}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

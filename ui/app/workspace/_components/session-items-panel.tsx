@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MoreHorizontal, ChevronDown, ChevronUp, Trash2, Info, ClipboardList, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, ChevronDown, ChevronUp, Trash2, Info, ClipboardList, RefreshCw, ExternalLink } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ export interface SessionItemsPanelProps {
   loading?: boolean;
   activeStepId?: number | null;
   runningStepId?: number | null;
-  onSelectStep: (step: ResearchStepSummary) => void;
+  onSelectStep: (step: ResearchStepSummary, openInNewTab?: boolean) => void;
   onReuseStep?: (step: ResearchStepSummary) => void;
   onRerunStep?: (stepId: number) => Promise<unknown>;
   onInspectStep?: (step: ResearchStepSummary) => void;
@@ -157,6 +157,15 @@ export function SessionItemsPanel({
 
                     <button
                       type="button"
+                      onClick={() => onSelectStep(step, true)}
+                      className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => toggleExpanded(step.id)}
                       className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 ${
                         !canExpand ? 'invisible' : ''
@@ -184,8 +193,16 @@ export function SessionItemsPanel({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-32 bg-[oklch(0.18_0_0)] border-white/10 text-white/90"
+                        className="w-36 bg-[oklch(0.18_0_0)] border-white/10 text-white/90"
                       >
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectStep(step, true);
+                          }}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-2" /> Open in new tab
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
