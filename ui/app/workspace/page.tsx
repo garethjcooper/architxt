@@ -683,40 +683,32 @@ export default function WorkspacePage() {
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/right columns" />
 
           {/* Column 2: result viewer */}
-          <div ref={rightPanelRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.right, minWidth: 280 }}>
-            <Panel className="flex-1 min-h-0">
-              <PanelHeader
-                title={
-                  selectedView?.kind === 'model'
-                    ? 'Model preview'
-                    : selectedStep
-                      ? selectedStep.action_type === 'curated_page'
-                        ? 'Page preview'
-                        : 'Reflect output'
-                      : 'Read-only preview'
-                }
-                count={
-                  selectedView?.kind === 'model'
-                    ? undefined
-                    : selectedStep
-                      ? selectedStep.synthesis?.narrative
-                        ? undefined
-                        : 0
-                      : undefined
-                }
-              />
-              <PanelContent className="p-0 overflow-hidden">
-                <div className="h-full flex flex-col">
-                  <WorkspaceResultPanel
-                    result={previewResult}
-                    loading={reflectLoading}
-                    error={previewError}
-                    sessionName={activeSession?.title}
-                    keyPrefix="preview"
-                  />
-                </div>
-              </PanelContent>
-            </Panel>
+          <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
+            <WorkspaceResultPanel
+              result={previewResult}
+              title={
+                selectedView?.kind === 'model'
+                  ? 'Model preview'
+                  : selectedStep
+                    ? selectedStep.action_type === 'curated_page'
+                      ? 'Page preview'
+                      : 'Reflect output'
+                    : 'Read-only preview'
+              }
+              count={
+                selectedView?.kind === 'model'
+                  ? undefined
+                  : selectedStep
+                    ? selectedStep.synthesis?.narrative
+                      ? undefined
+                      : 0
+                    : undefined
+              }
+              loading={reflectLoading}
+              error={previewError}
+              sessionName={activeSession?.title}
+              keyPrefix="preview"
+            />
           </div>
         </div>
 

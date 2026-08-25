@@ -7,6 +7,8 @@ interface WorkspaceResultPanelProps {
   result: DiscoverStepResponse | ResearchStepSummary | null;
   loading?: boolean;
   error?: string | null;
+  title?: string;
+  count?: number;
   sessionName?: string;
   keyPrefix?: string;
 }
@@ -15,6 +17,8 @@ export function WorkspaceResultPanel({
   result,
   loading,
   error,
+  title = 'Workspace',
+  count,
   sessionName,
   keyPrefix,
 }: WorkspaceResultPanelProps) {
@@ -45,9 +49,13 @@ export function WorkspaceResultPanel({
   return (
     <EnvelopeViewer
       envelope={result}
-      title={sessionName || 'Workspace'}
+      title={title}
+      count={count}
       keyPrefix={keyPrefix}
       className="h-full"
+      showIndex
+      showControls
+      sessionName={sessionName}
     />
   );
 }
