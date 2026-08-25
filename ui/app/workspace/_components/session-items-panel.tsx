@@ -134,9 +134,6 @@ export function SessionItemsPanel({
                     >
                       <div className="flex items-center justify-between text-xs text-white/90">
                         <span className="truncate flex items-center gap-2 min-w-0">
-                          {createdAt && (
-                            <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
-                          )}
                           <span
                             className={`text-[10px] px-1.5 py-0.5 rounded border ${
                               step.action_type === 'curated_page'
@@ -146,6 +143,9 @@ export function SessionItemsPanel({
                           >
                             {step.action_type === 'curated_page' ? 'curated' : 'reflect'}
                           </span>
+                          {createdAt && (
+                            <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
+                          )}
                           {step.status === 'running' && (
                             <span className="text-amber-300 animate-pulse">● running</span>
                           )}
