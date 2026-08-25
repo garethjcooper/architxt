@@ -9,7 +9,7 @@ import { researchApi, type ResearchSession, type ResearchStepSummary } from '@/l
 
 const logger = createLogger('useWorkspaceSession');
 
-const WORKSPACE_ITEM_TYPES = new Set(['reflect', 'curated_page']);
+const WORKSPACE_ITEM_TYPES = new Set(['reflect']);
 
 export interface UseWorkspaceSessionOptions {
   serverId: number | null;
@@ -62,6 +62,11 @@ export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOpt
     [trail]
   );
 
+  const curatedPages = useMemo(
+    () => trail.filter((step) => step.action_type === 'curated_page'),
+    [trail]
+  );
+
   const runningStepId = useMemo(() => {
     const running = workspaceItems.find((s) => s.status === 'running');
     return running?.id ?? researchRunningStepId ?? null;
@@ -110,6 +115,7 @@ export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOpt
     ...research,
     activeSession,
     workspaceItems,
+    curatedPages,
     runningStepId,
     refresh,
     autoCreating,
