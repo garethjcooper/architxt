@@ -253,7 +253,7 @@ export default function ContextManagerPage() {
           key,
           isGroup: true,
         });
-        // Render remaining physical child edges (without their own count badge).
+        // Render remaining physical child edges immediately after the mental-model row.
         for (const edge of members) {
           if (edge.id === mental.id) continue;
           rows.push({ edge, count: 1, key: edge.id, isGroup: false });
@@ -265,11 +265,7 @@ export default function ContextManagerPage() {
       }
     }
 
-    return rows.sort((a, b) => {
-      const aKey = `${a.edge.source_id}|${a.edge.target_id}`;
-      const bKey = `${b.edge.source_id}|${b.edge.target_id}`;
-      return aKey.localeCompare(bKey);
-    });
+    return rows;
   }, [filteredSortedEdges]);
 
   const allModelRefs = useMemo(() => {
