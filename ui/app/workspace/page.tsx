@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { MoreHorizontal, ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
@@ -16,7 +16,6 @@ import {
   backendNodeToDisplayNode,
   backendEdgeToDisplayEdge,
 } from '@/lib/contextual-graph/display';
-import { RefreshCw } from 'lucide-react';
 import { canonicalNodeId, resolveNodeType } from '@/app/research/graph-utils';
 import {
   isGroundedNodeForWorkspace,
@@ -43,7 +42,6 @@ export default function WorkspacePage() {
   const [banks, setBanks] = useState<SelectorBank[]>([]);
   const [loadingServers, setLoadingServers] = useState(false);
   const [loadingBanks, setLoadingBanks] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
 
   const [entities, setEntities] = useState<DisplayNode[]>([]);
   const [edges, setEdges] = useState<DisplayEdge[]>([]);
@@ -359,7 +357,6 @@ export default function WorkspacePage() {
       return;
     }
     try {
-      setLoadingData(true);
       const [nodesData, edgesData] = await Promise.all([
         contextualGraphApi.listNodes(serverId, bankId, { limit: 2000 }),
         contextualGraphApi.listEdges(serverId, bankId, { limit: 2000 }),
@@ -373,8 +370,6 @@ export default function WorkspacePage() {
     } catch (err: any) {
       logger.error('Failed to load workspace data', { error: err, serverId, bankId });
       toast.error(`Failed to load workspace data: ${err.message || err}`);
-    } finally {
-      setLoadingData(false);
     }
   }, [serverId, bankId]);
 
@@ -577,7 +572,7 @@ export default function WorkspacePage() {
   return (
     <PageShell
       title="Workspace"
-      loading={loadingServers || loadingBanks || loadingData}
+      loading={loadingServers || loadingBanks}
     >
       <div className="flex flex-col flex-1 min-h-0 gap-3">
         {/* Controls */}
@@ -591,16 +586,6 @@ export default function WorkspacePage() {
             setSelectedBankId={setSelectedBankId}
             loadingBanks={loadingBanks}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadData}
-            disabled={!serverId || !bankId || loadingData}
-            className="gap-1.5"
-          >
-            <RefreshCw className={cn('w-4 h-4', loadingData && 'animate-spin')} />
-            Refresh
-          </Button>
         </div>
 
         {/* Main two-column workbench */}
