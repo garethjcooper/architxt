@@ -394,13 +394,12 @@ export default function WorkspacePage() {
   );
 
   const handleAppendSection = useCallback(
-    async (stepId: number, sectionMarkdown: string, sectionTitle?: string) => {
+    async (stepId: number, sectionMarkdown: string, _sectionTitle?: string) => {
       const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
       if (!page) return;
       const currentNarrative = page.synthesis?.narrative ?? '';
       const prefix = currentNarrative.trim() ? '\n\n' : '';
-      const heading = sectionTitle?.trim() ? `## ${sectionTitle.trim()}\n\n` : '';
-      const nextNarrative = `${currentNarrative}${prefix}${heading}${sectionMarkdown}`;
+      const nextNarrative = `${currentNarrative}${prefix}${sectionMarkdown}`;
       const canvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
       try {
         await researchApi.updateCuratedPage(stepId, {
@@ -413,7 +412,7 @@ export default function WorkspacePage() {
           const targetId = `curated-${stepId}`;
           return current === targetId ? current : targetId;
         });
-        toast.success(`Added ${sectionTitle || 'section'} to ${page.intent_text || `Page ${page.id}`}`);
+        toast.success(`Added ${_sectionTitle || 'section'} to ${page.intent_text || `Page ${page.id}`}`);
       } catch (err: unknown) {
         logger.error('Failed to add section to curated page', err);
         toast.error(`Failed to add section: ${String(err instanceof Error ? err.message : String(err))}`);
