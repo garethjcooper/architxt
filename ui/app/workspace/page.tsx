@@ -699,7 +699,7 @@ export default function WorkspacePage() {
                   selectedView?.kind === 'model'
                     ? undefined
                     : selectedStep
-                      ? selectedStep.synthesis?.narrative || selectedStepHasGraph
+                      ? selectedStep.synthesis?.narrative
                         ? undefined
                         : 0
                       : undefined
@@ -713,9 +713,6 @@ export default function WorkspacePage() {
                     error={previewError}
                     sessionName={activeSession?.title}
                     keyPrefix="preview"
-                    narrativeWidth={narrativeWidth}
-                    onResizeNarrativeStart={handleNarrativeResizeStart}
-                    onResizeNarrativeReset={handleNarrativeResizeReset}
                   />
                 </div>
               </PanelContent>
