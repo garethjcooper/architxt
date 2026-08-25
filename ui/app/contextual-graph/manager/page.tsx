@@ -228,6 +228,27 @@ export default function ContextManagerPage() {
     return counts;
   }, [edges]);
 
+  const groupedEdgeRows = useMemo(() => {
+    const rows: Array<{
+      edge: DisplayEdge;
+      count: number;
+      key: string;
+      isGroup: boolean;
+    }> = [];
+    const seen = new Set<string>();
+    for (const edge of filteredSortedEdges) {
+      const ctxKey = getEdgeContextPairKey(edge);
+      if (ctxKey) {
+        if (seen.has(ctxKey)) continue;
+        seen.add(ctxKey);
+        rows.push({ edge, count: edgeContextGroupCounts.get(ctxKey) || 1, key: ctxKey, isGroup: true });
+      } else {
+        rows.push({ edge, count: 1, key: edge.id, isGroup: false });
+      }
+    }
+    return rows;
+  }, [filteredSortedEdges, edgeContextGroupCounts]);
+
   const allModelRefs = useMemo(() => {
     const refs: ModelRef[] = [];
     for (const node of nodes) refs.push(...node.modelRefs);
@@ -617,17 +638,17 @@ export default function ContextManagerPage() {
                   </span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-                  {filteredSortedEdges.length === 0 && (
+                  {groupedEdgeRows.length === 0 && (
                     <div className="text-[11px] text-white/40 px-2 py-3">No grounded edges loaded.</div>
                   )}
-                  {filteredSortedEdges.map((edge) => (
+                  {groupedEdgeRows.map(({ edge, count, key }) => (
                     <EdgeListRow
-                      key={edge.id}
+                      key={key}
                       edge={edge}
                       active={selectedEdgeId === edge.id}
                       sourceLabel={nodeById.get(edge.source_id)?.label}
                       targetLabel={nodeById.get(edge.target_id)?.label}
-                      edgeContextCount={edgeContextGroupCounts.get(getEdgeContextPairKey(edge) || '')}
+                      edgeContextCount={count > 1 ? count : undefined}
                       onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
                     />
                   ))}
