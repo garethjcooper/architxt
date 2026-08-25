@@ -99,15 +99,24 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   const structuralBlocks = useMemo(() => blocks.filter(b => b.type !== 'text'), [blocks]);
 
   const scrollToBlock = useCallback((id: string) => {
+    const container = markdownContainerRef.current;
+    const scrollContainerTo = (el: HTMLElement) => {
+      if (!container) return;
+      const top =
+        el.getBoundingClientRect().top -
+        container.getBoundingClientRect().top +
+        container.scrollTop;
+      container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    };
+
     if (viewMode === 'markdown') {
       const block = blocks.find(b => b.id === id);
       if (!block || block.type !== 'heading' || !block.title) return;
       const slug = slugifyHeading(block.title);
-      const container = markdownContainerRef.current;
       const el = container?.querySelector(`#${CSS.escape(slug)}`) as HTMLElement | null;
       if (el) {
         if (!blocksProp) setInternalActiveBlockId(id);
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollContainerTo(el);
       }
       onHeadingClick?.(id, block.title);
       return;
@@ -121,7 +130,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     if (rangeIds.length > 0) {
       const firstEl = blockRefs.current.get(rangeIds[0]);
       if (firstEl) {
-        firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollContainerTo(firstEl);
       }
     }
     onHeadingClick?.(id, blocks.find(b => b.id === id)?.title);
@@ -162,7 +171,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     return (
       <div
         key={`${prefix}index-${b.id}`}
-        className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+        className={`group/copy flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
           isActive
             ? 'bg-emerald-500/20 text-emerald-300'
             : b.deleted
