@@ -36,6 +36,7 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
+import { type CuratedPageEnvelope } from './_components/curated-page-editor';
 
 const logger = createLogger('WorkspacePage');
 
@@ -72,6 +73,8 @@ export default function WorkspacePage() {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([makeAnchorTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(ANCHOR_TAB_ID);
 
+  const [pendingSection, setPendingSection] = useState<{ markdown: string; title?: string } | null>(null);
+
   const {
     selectedServerId,
     setSelectedServerId,
@@ -104,6 +107,14 @@ export default function WorkspacePage() {
   const scopeEntityIds = useMemo(() => {
     return activeSession?.scope_entity_ids ?? [];
   }, [activeSession?.scope_entity_ids]);
+
+  const activeCuratedPage = useMemo(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab?.kind === 'curated' && activeTab.stepId != null) {
+      return workspaceSession.curatedPages.find((p) => p.id === activeTab.stepId) ?? null;
+    }
+    return null;
+  }, [tabs, activeTabId, workspaceSession.curatedPages]);
 
   const previewResult = useMemo(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -355,6 +366,62 @@ export default function WorkspacePage() {
     };
   }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd, handleInnerResizeMove, handleInnerResizeEnd, handleNarrativeResizeMove, handleNarrativeResizeEnd]);
 
+  const handleSaveCuratedPage = useCallback(
+    async (stepId: number, envelope: CuratedPageEnvelope) => {
+      try {
+        await researchApi.updateCuratedPage(stepId, { canvas: envelope.canvas, synthesis: envelope.synthesis });
+        await workspaceSession.refresh();
+        toast.success('Page saved');
+      } catch (err: unknown) {
+        logger.error('Failed to save curated page', err);
+        toast.error(`Failed to save page: ${String(err instanceof Error ? err.message : String(err))}`);
+      }
+    },
+    [workspaceSession.refresh]
+  );
+
+  const handleCopyToCuratedPage = useCallback(
+    (sectionMarkdown: string, sectionTitle?: string) => {
+      if (activeCuratedPage) {
+        // Append to the currently active curated page immediately.
+        handleAppendSection(activeCuratedPage.id, sectionMarkdown, sectionTitle);
+        return;
+      }
+      // No active curated page: show target picker.
+      setPendingSection({ markdown: sectionMarkdown, title: sectionTitle });
+    },
+    [activeCuratedPage]
+  );
+
+  const handleAppendSection = useCallback(
+    async (stepId: number, sectionMarkdown: string, sectionTitle?: string) => {
+      const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
+      if (!page) return;
+      const currentNarrative = page.synthesis?.narrative ?? '';
+      const prefix = currentNarrative.trim() ? '\n\n' : '';
+      const heading = sectionTitle?.trim() ? `## ${sectionTitle.trim()}\n\n` : '';
+      const nextNarrative = `${currentNarrative}${prefix}${heading}${sectionMarkdown}`;
+      const canvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+      try {
+        await researchApi.updateCuratedPage(stepId, {
+          canvas,
+          synthesis: { narrative: nextNarrative },
+        });
+        await workspaceSession.refresh();
+        // Open the target page tab if not already active.
+        setActiveTabId((current) => {
+          const targetId = `curated-${stepId}`;
+          return current === targetId ? current : targetId;
+        });
+        toast.success(`Added ${sectionTitle || 'section'} to ${page.intent_text || `Page ${page.id}`}`);
+      } catch (err: unknown) {
+        logger.error('Failed to add section to curated page', err);
+        toast.error(`Failed to add section: ${String(err instanceof Error ? err.message : String(err))}`);
+      }
+    },
+    [workspaceSession.curatedPages, workspaceSession.refresh]
+  );
+
   const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
     setSelectedView({ kind: 'step', step });
     // Curated pages are handled via the dedicated Pages list and tab state.
@@ -419,9 +486,9 @@ export default function WorkspacePage() {
 
       setEntities(displayNodes);
       setEdges(displayEdges);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('Failed to load workspace data', { error: err, serverId, bankId });
-      toast.error(`Failed to load workspace data: ${err.message || err}`);
+      toast.error(`Failed to load workspace data: ${String(err instanceof Error ? err.message : String(err))}`);
     }
   }, [serverId, bankId]);
 
@@ -450,7 +517,7 @@ export default function WorkspacePage() {
         if (cancelled) return;
         setArchitxtEntities(Array.isArray(data) ? data : []);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (cancelled) return;
         logger.error('Failed to load Architxt entities', err);
         toast.error('Failed to load entities for scope');
@@ -517,9 +584,9 @@ export default function WorkspacePage() {
 
     try {
       await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('Failed to update session scope', { error: err, sessionId: activeSession.id, entityId });
-      toast.error(`Failed to update scope: ${err.message || err}`);
+      toast.error(`Failed to update scope: ${String(err instanceof Error ? err.message : String(err))}`);
     }
   }, [activeSession]);
 
@@ -554,9 +621,9 @@ export default function WorkspacePage() {
         await researchApi.updateCuratedPage(stepId, { intent_text: title });
         await workspaceSession.refresh();
         toast.success('Page renamed');
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('Failed to rename curated page', err);
-        toast.error(`Failed to rename page: ${err.message || err}`);
+        toast.error(`Failed to rename page: ${String(err instanceof Error ? err.message : String(err))}`);
       }
     },
     [workspaceSession.refresh]
@@ -610,14 +677,14 @@ export default function WorkspacePage() {
           error: null,
         },
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       setModelContentCache((prev) => ({
         ...prev,
         [extId]: {
           content: prev[extId]?.content ?? null,
           found: prev[extId]?.found ?? false,
           loading: false,
-          error: err.message || String(err) || 'Failed to load model content.',
+          error: String(err instanceof Error ? err.message : String(err)) || 'Failed to load model content.',
         },
       }));
     }
@@ -658,10 +725,10 @@ export default function WorkspacePage() {
         }
         setEntityInfoMap(mergedEntities);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (cancelled) return;
         logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: scopeEntityIds });
-        toast.error(`Failed to load entity info: ${err.message || err}`);
+        toast.error(`Failed to load entity info: ${String(err instanceof Error ? err.message : String(err))}`);
         setEntityInfoMap(null);
       })
       .finally(() => {
@@ -839,9 +906,9 @@ export default function WorkspacePage() {
                   await researchApi.createSessionPage(activeSession.id, title);
                   await workspaceSession.refresh();
                   toast.success(`Created ${title}`);
-                } catch (err: any) {
+                } catch (err: unknown) {
                   logger.error('Failed to create curated page', err);
-                  toast.error(`Failed to create page: ${err.message || err}`);
+                  toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
                 }
               }}
               onRenameCuratedPage={handleRenameCuratedPage}
@@ -850,9 +917,9 @@ export default function WorkspacePage() {
                   await researchApi.deleteStep(stepId);
                   await workspaceSession.refresh();
                   toast.success('Page deleted');
-                } catch (err: any) {
+                } catch (err: unknown) {
                   logger.error('Failed to delete curated page', err);
-                  toast.error(`Failed to delete page: ${err.message || err}`);
+                  toast.error(`Failed to delete page: ${String(err instanceof Error ? err.message : String(err))}`);
                 }
               }}
               onCloseTab={(tabId, kind, isEmpty) => {
@@ -888,6 +955,10 @@ export default function WorkspacePage() {
               error={previewError}
               sessionName={activeSession?.title}
               keyPrefix="preview"
+              activeCuratedPage={activeCuratedPage}
+              curatedPages={workspaceSession.curatedPages}
+              onSaveCuratedPage={handleSaveCuratedPage}
+              onCopyToCuratedPage={handleCopyToCuratedPage}
             />
           </div>
         </div>
@@ -899,6 +970,40 @@ export default function WorkspacePage() {
           }}
           step={inspectingStep}
         />
+
+        {pendingSection && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] p-4 w-80 shadow-lg">
+              <div className="text-sm font-medium text-white/90 mb-2">Add section to page</div>
+              <p className="text-xs text-white/60 mb-4">
+                “{pendingSection.title || 'Untitled section'}”
+              </p>
+              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto mb-4">
+                {workspaceSession.curatedPages.length === 0 && (
+                  <div className="text-xs text-white/40">No curated pages yet. Create one from the Pages menu.</div>
+                )}
+                {workspaceSession.curatedPages.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    onClick={() => {
+                      void handleAppendSection(page.id, pendingSection.markdown, pendingSection.title);
+                      setPendingSection(null);
+                    }}
+                    className="text-left text-xs px-2 py-1.5 rounded border border-white/10 bg-black/20 text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                  >
+                    {page.intent_text || `Page ${page.id}`}
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setPendingSection(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <EntityScopeManagerDialog
           isOpen={scopeManagerOpen}

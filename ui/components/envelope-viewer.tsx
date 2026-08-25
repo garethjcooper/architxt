@@ -26,6 +26,10 @@ export interface EnvelopeViewerProps {
   count?: number;
   /** Called when a copy action is requested. When omitted, the viewer copies/downloads directly. */
   onCopy?: (event: EnvelopeCopyEvent) => void;
+  /** Optional callback to add a section to a curated page. Receives the section markdown. */
+  onAddToPage?: (sectionMarkdown: string, sectionTitle?: string) => void;
+  /** Optional label for the add-to-page action. */
+  addToPageLabel?: string;
   /** Optional key namespace passed through to NarrativeViewer. */
   keyPrefix?: string;
   /** Optional extra className for the outer container. */
@@ -71,6 +75,8 @@ export function EnvelopeViewer({
   showControls = false,
   defaultViewMode = 'markdown',
   sessionName,
+  onAddToPage,
+  addToPageLabel,
 }: EnvelopeViewerProps) {
   const markdown = useMemo(() => buildEnvelopeMarkdown(envelope ?? null), [envelope]);
   const [showIndexState, setShowIndexState] = useState(showIndex);
@@ -171,6 +177,8 @@ export function EnvelopeViewer({
           viewMode={viewMode}
           showIndex={showIndexState}
           onCopySection={handleCopySection}
+          onAddToPage={onAddToPage ? (sectionMarkdown, sectionTitle) => onAddToPage(sectionMarkdown, sectionTitle) : undefined}
+          addToPageLabel={addToPageLabel}
           keyPrefix={keyPrefix}
           className="h-full"
         />
