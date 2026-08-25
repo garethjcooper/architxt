@@ -544,6 +544,24 @@ export default function WorkspacePage() {
     setInspectingStep(step);
   }, []);
 
+  const handleRenameCuratedPage = useCallback(
+    async (stepId: number, title: string) => {
+      // Optimistically update any open curated tab labels.
+      setTabs((prev) =>
+        prev.map((t) => (t.kind === 'curated' && t.stepId === stepId ? { ...t, label: title } : t))
+      );
+      try {
+        await researchApi.updateCuratedPage(stepId, { intent_text: title });
+        await workspaceSession.refresh();
+        toast.success('Page renamed');
+      } catch (err: any) {
+        logger.error('Failed to rename curated page', err);
+        toast.error(`Failed to rename page: ${err.message || err}`);
+      }
+    },
+    [workspaceSession.refresh]
+  );
+
   const selectCuratedPage = useCallback((stepId: number) => {
     const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
     if (!page) return;
@@ -826,16 +844,7 @@ export default function WorkspacePage() {
                   toast.error(`Failed to create page: ${err.message || err}`);
                 }
               }}
-              onRenameCuratedPage={async (stepId, title) => {
-                try {
-                  await researchApi.updateCuratedPage(stepId, { intent_text: title });
-                  await workspaceSession.refresh();
-                  toast.success('Page renamed');
-                } catch (err: any) {
-                  logger.error('Failed to rename curated page', err);
-                  toast.error(`Failed to rename page: ${err.message || err}`);
-                }
-              }}
+              onRenameCuratedPage={handleRenameCuratedPage}
               onDeleteCuratedPage={async (stepId) => {
                 try {
                   await researchApi.deleteStep(stepId);
