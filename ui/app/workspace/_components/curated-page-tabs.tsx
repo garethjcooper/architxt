@@ -23,6 +23,14 @@ export interface WorkspaceTab {
   stepId?: number;
   /** For view tabs: optional source identifier for restoring selection. */
   sourceId?: string;
+  /** Pinned tabs cannot be closed by the user. */
+  pinned?: boolean;
+}
+
+export const ANCHOR_TAB_ID = 'view-anchor';
+
+export function makeAnchorTab(label = 'Preview'): WorkspaceTab {
+  return { id: ANCHOR_TAB_ID, kind: 'view', label, pinned: true };
 }
 
 interface CuratedPageTabsProps {
@@ -34,7 +42,7 @@ interface CuratedPageTabsProps {
   onRenameCuratedPage: (stepId: number, title: string) => Promise<void>;
   onDeleteCuratedPage: (stepId: number) => Promise<void>;
   onCloseTab: (tabId: string, kind: TabKind, isEmpty: boolean) => void;
-  onAddViewTab?: (label: string, sourceId?: string) => void;
+  onCloseAllViews?: () => void;
 }
 
 export function CuratedPageTabs({
@@ -46,6 +54,7 @@ export function CuratedPageTabs({
   onRenameCuratedPage,
   onDeleteCuratedPage,
   onCloseTab,
+  onCloseAllViews,
 }: CuratedPageTabsProps) {
   const [pagesOpen, setPagesOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
@@ -101,9 +110,20 @@ export function CuratedPageTabs({
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
             <span className="text-[11px] font-medium text-white/80">Curated pages</span>
-            <Button variant="ghost" size="sm" onClick={handleCreate} className="h-6 px-2 text-[10px]">
-              <Plus className="h-3 w-3 mr-1" /> New
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onCloseAllViews?.()}
+                className="h-6 px-2 text-[10px] text-white/50 hover:text-white"
+                title="Close all view tabs"
+              >
+                <X className="h-3 w-3 mr-1" /> Close views
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleCreate} className="h-6 px-2 text-[10px]">
+                <Plus className="h-3 w-3 mr-1" /> New
+              </Button>
+            </div>
           </div>
           <div className="max-h-64 overflow-y-auto py-1">
             {curatedPages.length === 0 && (
@@ -189,12 +209,17 @@ export function CuratedPageTabs({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (tab.pinned) return;
                   onCloseTab(tab.id, tab.kind, false);
                 }}
-                className="opacity-0 group-hover/tab:opacity-100 p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10 transition-opacity"
-                title={isCurated ? 'Close tab' : 'Close view'}
+                className={cn(
+                  'p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10 transition-opacity',
+                  tab.pinned ? 'opacity-0 cursor-default' : 'opacity-0 group-hover/tab:opacity-100'
+                )}
+                title={tab.pinned ? 'Pinned' : isCurated ? 'Close tab' : 'Close view'}
+                disabled={tab.pinned}
               >
-                <X className="h-3 w-3" />
+                {tab.pinned ? null : <X className="h-3 w-3" />}
               </button>
             </div>
           );
