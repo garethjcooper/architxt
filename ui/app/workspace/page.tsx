@@ -487,19 +487,10 @@ export default function WorkspacePage() {
   }, []);
 
   const handleRerunStep = useCallback(async (stepId: number) => {
-    if (!serverId) {
-      toast.error('Select a server before re-running.');
-      return;
-    }
-    try {
-      await researchApi.rerunStep(stepId, { server_id: serverId });
-      void workspaceSession.refresh();
-      toast.success('Re-running query');
-    } catch (err: any) {
-      logger.error('Failed to re-run step', { error: err, stepId });
-      toast.error(`Failed to re-run: ${err.message || err}`);
-    }
-  }, [serverId]);
+    // Delegate to the research hook's rerun path so runningStepId is set and
+    // pollForStepCompletion keeps the trail/status live until completion.
+    await workspaceSession.handleRerunStep(stepId);
+  }, [workspaceSession.handleRerunStep]);
 
   const handleInspectStep = useCallback((step: ResearchStepSummary) => {
     setInspectingStep(step);
