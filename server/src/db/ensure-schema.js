@@ -558,16 +558,6 @@ List its major capabilities, each with its purpose, responsibility, business cap
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
 For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
-#end
-#table
-#table-name Edges
-Return the edges in a table named "Edges" with columns: from, to, edge type, description, evidence.
-- from: source of the edge, exact ids only.
-- to: destination of the edge, exact ids only.
-- type: edge type based on standard list, sends etc.
-- description: describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. Explicitly call out any known files or protocols that are used.
-- evidence: array of Hindsight memory IDs supporting this edge.
-The edge list must be based on the generated graph list.
 #end`,
     maxTokens: 8192,
     refreshMode: 'full',
