@@ -98,6 +98,15 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
 
   const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading'), [blocks]);
 
+  const hasContentBlocks = blocks.some(
+    b => b.type === 'text' || b.type === 'code' || b.type === 'table' || b.type === 'image'
+  );
+  const showWholeDocumentFallback = structuralBlocks.length === 0 && hasContentBlocks;
+
+  const wholeDocumentMarkdown = useMemo(() => {
+    return blocks.filter((b) => !b.deleted).map((b) => b.edited ?? b.raw).join('');
+  }, [blocks]);
+
   const scrollToBlock = useCallback((id: string) => {
     const container = markdownContainerRef.current;
     const scrollContainerTo = (el: HTMLElement) => {
@@ -166,6 +175,65 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     );
   }
 
+  const WholeDocumentFallbackRow = () => {
+    const isActive = activeBlockId === '__whole-document';
+    return (
+      <div
+        className={`group/copy flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+          isActive
+            ? 'bg-emerald-500/20 text-emerald-300'
+            : 'text-white/60 hover:bg-white/5 hover:text-white/90'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (!blocksProp) {
+              setInternalActiveBlockId('__whole-document');
+              setInternalActiveRangeIds(new Set(blocks.map((b) => b.id)));
+            }
+            const container = markdownContainerRef.current;
+            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+            onHeadingClick?.('__whole-document', title);
+          }}
+          className="flex-1 min-w-0 text-left"
+        >
+          <span className="truncate block" title={title}>All content</span>
+        </button>
+        <div className="flex items-center flex-shrink-0">
+          {onCopySection && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopySection(wholeDocumentMarkdown, title);
+              }}
+              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
+              title="Copy all to page editor"
+              aria-label="Copy all"
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+          )}
+          {onAddToPage && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToPage(wholeDocumentMarkdown, title);
+              }}
+              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
+              title={addToPageLabel}
+              aria-label={addToPageLabel}
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const defaultSidebarRow = (b: NarrativeBlock, idx: number, isActive: boolean) => {
     const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
     return (
@@ -185,15 +253,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           onClick={() => scrollToBlock(b.id)}
           className="flex-1 min-w-0 text-left"
         >
-          {b.type === 'heading' ? (
-            <span className="truncate block" title={b.title}>{b.title}</span>
-          ) : b.type === 'image' ? (
-            <span className="truncate block text-amber-400/70" title={`[IMAGE:${b.title}]`}>[IMAGE:{b.title}]</span>
-          ) : b.type === 'code' ? (
-            <span className="truncate block text-blue-400/70" title={b.title}>{b.title}</span>
-          ) : b.type === 'table' ? (
-            <span className="truncate block text-emerald-400/70" title="Table">Table</span>
-          ) : null}
+          <span className="truncate block" title={b.title}>{b.title}</span>
         </button>
         <div className="flex items-center flex-shrink-0">
           {onCopySection && b.type === 'heading' && (
@@ -434,19 +494,19 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           <div className="w-[13rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
             <div className="px-2 py-1.5 border-b border-white/10">
               <span className="text-[11px] font-medium text-white/70">{title}</span>
-              <span className="text-[10px] text-white/40 ml-1">({structuralBlocks.length})</span>
+              <span className="text-[10px] text-white/40 ml-1">({structuralBlocks.length || (showWholeDocumentFallback ? 1 : 0)})</span>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-1.5 space-y-0.5">
-              {structuralBlocks.length === 0 ? (
+              {structuralBlocks.length === 0 && !showWholeDocumentFallback && (
                 <p className="text-xs text-white/30 p-1">No sections found</p>
-              ) : (
-                <>
-                  {structuralBlocks.map((b, idx) => {
-                    const isActive = activeBlockId === b.id;
-                    return defaultSidebarRow(b, idx, isActive);
-                  })}
-                </>
               )}
+              {showWholeDocumentFallback && (
+                <WholeDocumentFallbackRow />
+              )}
+              {structuralBlocks.map((b, idx) => {
+                const isActive = activeBlockId === b.id;
+                return defaultSidebarRow(b, idx, isActive);
+              })}
             </div>
           </div>
         )}
