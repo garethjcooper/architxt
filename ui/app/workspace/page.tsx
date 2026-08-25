@@ -35,6 +35,8 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
+import { CuratedPageTabs, type WorkspaceTab } from './_components/curated-page-tabs';
+
 const logger = createLogger('WorkspacePage');
 
 export default function WorkspacePage() {
@@ -65,6 +67,10 @@ export default function WorkspacePage() {
   }, [selectedStep]);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
   const [scopeManagerOpen, setScopeManagerOpen] = useState(false);
+
+  // Tab state for curated pages and read-only views.
+  const [tabs, setTabs] = useState<WorkspaceTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   const {
     selectedServerId,
@@ -100,12 +106,26 @@ export default function WorkspacePage() {
   }, [activeSession?.scope_entity_ids]);
 
   const previewResult = useMemo(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab?.kind === 'curated' && activeTab.stepId != null) {
+      const page = workspaceSession.curatedPages.find((p) => p.id === activeTab.stepId);
+      return page ?? null;
+    }
     if (!selectedView) return null;
     if (selectedView.kind === 'step') return selectedView.step;
     const entry = modelContentCache[selectedView.extId];
     if (!entry || entry.loading || entry.error || !entry.content) return null;
     return mentalModelContentToStepSummary(selectedView.name, entry);
-  }, [selectedView, modelContentCache]);
+  }, [tabs, activeTabId, selectedView, modelContentCache, workspaceSession.curatedPages]);
+
+  const previewTitle = useMemo(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab) return activeTab.label;
+    if (selectedView?.kind === 'model') return 'Model preview';
+    if (selectedStep?.action_type === 'curated_page') return 'Page preview';
+    if (selectedStep) return 'Reflect output';
+    return 'Read-only preview';
+  }, [tabs, activeTabId, selectedView, selectedStep]);
 
   const previewError = useMemo(() => {
     if (selectedView?.kind !== 'model') return reflectError;
@@ -321,6 +341,16 @@ export default function WorkspacePage() {
 
   const handleSelectStep = useCallback((step: ResearchStepSummary) => {
     setSelectedView({ kind: 'step', step });
+    // Open a read-only view tab for non-curated steps; curated pages are handled
+    // via the dedicated Pages list and tab state.
+    if (step.action_type === 'curated_page') return;
+    const label = step.intent_text || step.raw_query || `Reflect ${step.id}`;
+    const id = `view-step-${step.id}`;
+    setTabs((prev) => {
+      if (prev.some((t) => t.id === id)) return prev;
+      return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: String(step.id) }];
+    });
+    setActiveTabId(id);
   }, []);
 
   const fetchServers = useCallback(async () => {
@@ -536,6 +566,13 @@ export default function WorkspacePage() {
   const selectEntityModel = useCallback((entityId: string, item: ModelItem) => {
     setSelectedView({ kind: 'model', entityId, extId: item.extId, name: item.label });
     void loadModelContent(item.extId);
+    const id = `view-model-${item.extId}`;
+    const label = item.label || item.extId;
+    setTabs((prev) => {
+      if (prev.some((t) => t.id === id)) return prev;
+      return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: item.extId }];
+    });
+    setActiveTabId(id);
   }, [loadModelContent]);
 
   useEffect(() => {
@@ -568,6 +605,43 @@ export default function WorkspacePage() {
       cancelled = true;
     };
   }, [serverId, bankId, scopeEntityIds]);
+
+  // Keep curated tabs in sync with the session's curated pages.
+  useEffect(() => {
+    setTabs((prev) => {
+      const existingCuratedIds = new Set(
+        prev.filter((t) => t.kind === 'curated' && t.stepId != null).map((t) => t.stepId!)
+      );
+      const currentPageIds = new Set(workspaceSession.curatedPages.map((p) => p.id));
+
+      // Remove tabs whose pages were deleted.
+      const cleaned = prev.filter((t) => t.kind !== 'curated' || (t.stepId != null && currentPageIds.has(t.stepId)));
+
+      // Add tabs for new pages.
+      const added = workspaceSession.curatedPages
+        .filter((p) => !existingCuratedIds.has(p.id))
+        .map((p) => ({
+          id: `curated-${p.id}`,
+          kind: 'curated' as const,
+          label: p.intent_text || `Page ${p.id}`,
+          stepId: p.id,
+        }));
+
+      const next = [...cleaned, ...added];
+
+      // Ensure an active tab exists if we have tabs and the current one is stale.
+      setActiveTabId((current) => {
+        const stillActive = next.some((t) => t.id === current);
+        if (!stillActive && next.length > 0) {
+          return added[0]?.id || next[0].id;
+        }
+        if (next.length === 0) return null;
+        return current;
+      });
+
+      return next;
+    });
+  }, [workspaceSession.curatedPages]);
 
   return (
     <PageShell
@@ -684,26 +758,64 @@ export default function WorkspacePage() {
 
           {/* Column 2: result viewer */}
           <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
+            <CuratedPageTabs
+              tabs={tabs}
+              activeTabId={activeTabId}
+              curatedPages={workspaceSession.curatedPages}
+              onSelect={setActiveTabId}
+              onCreateCuratedPage={async (title) => {
+                if (!activeSession) return;
+                try {
+                  await researchApi.createSessionPage(activeSession.id, title);
+                  await workspaceSession.refresh();
+                  toast.success(`Created ${title}`);
+                } catch (err: any) {
+                  logger.error('Failed to create curated page', err);
+                  toast.error(`Failed to create page: ${err.message || err}`);
+                }
+              }}
+              onRenameCuratedPage={async (stepId, title) => {
+                try {
+                  await researchApi.updateCuratedPage(stepId, { intent_text: title });
+                  await workspaceSession.refresh();
+                  toast.success('Page renamed');
+                } catch (err: any) {
+                  logger.error('Failed to rename curated page', err);
+                  toast.error(`Failed to rename page: ${err.message || err}`);
+                }
+              }}
+              onDeleteCuratedPage={async (stepId) => {
+                try {
+                  await researchApi.deleteStep(stepId);
+                  await workspaceSession.refresh();
+                  toast.success('Page deleted');
+                } catch (err: any) {
+                  logger.error('Failed to delete curated page', err);
+                  toast.error(`Failed to delete page: ${err.message || err}`);
+                }
+              }}
+              onCloseTab={(tabId, kind, isEmpty) => {
+                const tab = tabs.find((t) => t.id === tabId);
+                if (!tab) return;
+                if (kind === 'curated') {
+                  // Closing a curated tab only deletes the page if it is empty.
+                  if (isEmpty) {
+                    if (tab.stepId != null) {
+                      void researchApi.deleteStep(tab.stepId).then(() => workspaceSession.refresh());
+                    }
+                  }
+                }
+                setTabs((prev) => prev.filter((t) => t.id !== tabId));
+                if (activeTabId === tabId) {
+                  const remaining = tabs.filter((t) => t.id !== tabId);
+                  setActiveTabId(remaining[0]?.id ?? null);
+                }
+              }}
+            />
             <WorkspaceResultPanel
               result={previewResult}
-              title={
-                selectedView?.kind === 'model'
-                  ? 'Model preview'
-                  : selectedStep
-                    ? selectedStep.action_type === 'curated_page'
-                      ? 'Page preview'
-                      : 'Reflect output'
-                    : 'Read-only preview'
-              }
-              count={
-                selectedView?.kind === 'model'
-                  ? undefined
-                  : selectedStep
-                    ? selectedStep.synthesis?.narrative
-                      ? undefined
-                      : 0
-                    : undefined
-              }
+              title={previewTitle}
+              count={previewResult?.synthesis?.narrative ? undefined : 0}
               loading={reflectLoading}
               error={previewError}
               sessionName={activeSession?.title}

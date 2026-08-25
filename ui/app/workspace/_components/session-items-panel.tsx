@@ -135,14 +135,10 @@ export function SessionItemsPanel({
                       <div className="flex items-center justify-between text-xs text-white/90">
                         <span className="truncate flex items-center gap-2 min-w-0">
                           <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                              step.action_type === 'curated_page'
-                                ? 'bg-purple-900/30 border-purple-500/30 text-purple-300'
-                                : 'bg-emerald-900/30 border-emerald-500/30 text-emerald-300'
-                            }`}
-                          >
-                            {step.action_type === 'curated_page' ? 'curated' : 'reflect'}
-                          </span>
+                            className={`text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/30 border-emerald-500/30 text-emerald-300`}
+                            >
+                            reflect
+                            </span>
                           {createdAt && (
                             <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
                           )}
@@ -190,28 +186,24 @@ export function SessionItemsPanel({
                         align="end"
                         className="w-32 bg-[oklch(0.18_0_0)] border-white/10 text-white/90"
                       >
-                        {step.action_type !== 'curated_page' && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onReuseStep?.(step);
-                              }}
-                              disabled={isRunning}
-                            >
-                              <ClipboardList className="h-3 w-3 mr-2" /> Re-use
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRerunStep?.(step.id);
-                              }}
-                              disabled={isRunning || anyRunning}
-                            >
-                              <RefreshCw className="h-3 w-3 mr-2" /> Re-run
-                            </DropdownMenuItem>
-                          </>
-                        )}
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onReuseStep?.(step);
+                          }}
+                          disabled={isRunning}
+                        >
+                          <ClipboardList className="h-3 w-3 mr-2" /> Re-use
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRerunStep?.(step.id);
+                          }}
+                          disabled={isRunning || anyRunning}
+                        >
+                          <RefreshCw className="h-3 w-3 mr-2" /> Re-run
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
