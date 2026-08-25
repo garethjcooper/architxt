@@ -15,6 +15,7 @@ export interface ModelItem {
   label: string;
   extId: string;
   category: string;
+  edgeCount?: number;
 }
 
 export interface AttachedEntitiesPanelProps {
@@ -113,6 +114,7 @@ function getEntityModelItems(
       label,
       extId,
       category: MODEL_TAB_LABELS.edge_contexts,
+      edgeCount: contexts.length,
     });
   });
 
@@ -233,6 +235,14 @@ export function AttachedEntitiesPanel({
                               {item.category}
                             </span>
                             <span className="truncate min-w-0 flex-1">{item.label}</span>
+                            {item.edgeCount !== undefined && item.edgeCount > 0 && (
+                              <span
+                                className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
+                                title={`${item.edgeCount} physical edge${item.edgeCount === 1 ? '' : 's'} in this edge context`}
+                              >
+                                {item.edgeCount} edge{item.edgeCount === 1 ? '' : 's'}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
