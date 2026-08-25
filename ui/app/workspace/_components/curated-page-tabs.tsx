@@ -141,14 +141,13 @@ export function CuratedPageTabs({
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/10 bg-[oklch(0.18_0_0)] min-h-10">
       <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
         <PopoverTrigger>
-          <button
-            type="button"
-            className="flex items-center gap-1 text-[10px] text-white/70 hover:text-white px-2 py-1 rounded hover:bg-white/5 shrink-0"
+          <span
+            className="flex items-center gap-1 text-[10px] text-white/70 hover:text-white px-2 py-1 rounded hover:bg-white/5 shrink-0 cursor-pointer"
           >
             <FileText className="h-3 w-3" />
             Pages
             <ChevronDown className="h-3 w-3" />
-          </button>
+          </span>
         </PopoverTrigger>
         <PopoverContent
           align="start"
