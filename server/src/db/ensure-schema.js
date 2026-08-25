@@ -342,9 +342,7 @@ const BUILTIN_TEMPLATES = [
 
 ## Instructions
 
-Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`.
-
-For each flow, write a \`detail\` of 2–4 complete sentences as described in the graph format rules. Also populate the edge \`properties\` object with any supported machine-curatable facts; all properties are optional, and the full set is defined in the graph format rules.
+Both endpoints already exist in the graph. Do not introduce new nodes. Return every distinct directed flow between them as a separate edge in \`graph.edges\`. For each flow, describe what moves between the endpoints and any important qualification in the edge \`detail\`, and populate the edge \`properties\` object with any supported machine-curatable facts. All properties are optional, and the full set is defined in the graph format rules.
 
 Rules:
 - Do not include a \`type\` field on the endpoint nodes; both endpoints are already known to the graph.
@@ -356,7 +354,7 @@ Rules:
 ## Source material
 
 {{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md","output-format-graph-contextual.md"]',
+    fragments: '["contextual-patch.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
     variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS"]',
     examplesHeuristic: null,
   },
@@ -570,7 +568,6 @@ List its major capabilities, each with its purpose, responsibility, business cap
     role: 'sys_edge_context',
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
-For each flow, write a \`detail\` of 2–4 complete sentences as described in the graph format rules. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
 #end
 #table
 #table-name Edges
