@@ -253,6 +253,11 @@ export default function ContextManagerPage() {
           key,
           isGroup: true,
         });
+        // Render remaining physical child edges (without their own count badge).
+        for (const edge of members) {
+          if (edge.id === mental.id) continue;
+          rows.push({ edge, count: 1, key: edge.id, isGroup: false });
+        }
       } else {
         for (const edge of members) {
           rows.push({ edge, count: 1, key: edge.id, isGroup: false });
