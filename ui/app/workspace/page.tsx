@@ -544,6 +544,25 @@ export default function WorkspacePage() {
     setInspectingStep(step);
   }, []);
 
+  const selectCuratedPage = useCallback((stepId: number) => {
+    const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
+    if (!page) return;
+    const id = `curated-${stepId}`;
+    setTabs((prev) => {
+      if (prev.some((t) => t.id === id)) return prev;
+      return [
+        ...prev,
+        {
+          id,
+          kind: 'curated',
+          label: page.intent_text || `Page ${page.id}`,
+          stepId,
+        },
+      ];
+    });
+    setActiveTabId(id);
+  }, [workspaceSession.curatedPages]);
+
   const toggleEntityExpanded = useCallback((entityId: string) => {
     setExpandedEntityIds((prev) => {
       const next = new Set(prev);
@@ -795,6 +814,7 @@ export default function WorkspacePage() {
               activeTabId={activeTabId}
               curatedPages={workspaceSession.curatedPages}
               onSelect={setActiveTabId}
+              onSelectCuratedPage={selectCuratedPage}
               onCreateCuratedPage={async (title) => {
                 if (!activeSession) return;
                 try {

@@ -38,6 +38,7 @@ interface CuratedPageTabsProps {
   activeTabId: string | null;
   curatedPages: ResearchStepSummary[];
   onSelect: (tabId: string) => void;
+  onSelectCuratedPage: (stepId: number) => void;
   onCreateCuratedPage: (title: string) => Promise<void>;
   onRenameCuratedPage: (stepId: number, title: string) => Promise<void>;
   onDeleteCuratedPage: (stepId: number) => Promise<void>;
@@ -50,6 +51,7 @@ export function CuratedPageTabs({
   activeTabId,
   curatedPages,
   onSelect,
+  onSelectCuratedPage,
   onCreateCuratedPage,
   onRenameCuratedPage,
   onDeleteCuratedPage,
@@ -139,7 +141,7 @@ export function CuratedPageTabs({
                   <button
                     type="button"
                     onClick={() => {
-                      onSelect(`curated-${page.id}`);
+                      onSelectCuratedPage(page.id);
                       setPagesOpen(false);
                     }}
                     className={cn(
