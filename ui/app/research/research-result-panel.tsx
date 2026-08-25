@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
+import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import cytoscape from 'cytoscape';
 
@@ -39,33 +40,6 @@ function sanitizeFilenameBase(sessionName: string): string {
 
 function escapeMermaidId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_]/g, '_');
-}
-
-function escapeMarkdownCell(val: unknown): string {
-  if (val === undefined || val === null) return '';
-  const str = typeof val === 'string' ? val : JSON.stringify(val);
-  return str.replace(/\|/g, '\\|').replace(/\n/g, ' ');
-}
-
-function rowsToMarkdownTable(columns: string[], rows: Record<string, unknown>[]): string {
-  if (!rows.length) return '';
-  const header = `| ${columns.join(' | ')} |`;
-  const sep = `| ${columns.map(() => '---').join(' | ')} |`;
-  const body = rows.map((row) => {
-    const cells = columns.map((c) => escapeMarkdownCell(row[c]));
-    return `| ${cells.join(' | ')} |`;
-  }).join('\n');
-  return `${header}\n${sep}\n${body}`;
-}
-
-function formatPropertiesCompact(properties: Record<string, any>): string {
-  return Object.entries(properties)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => {
-      const value = Array.isArray(v) ? v.join(', ') : typeof v === 'string' ? v : JSON.stringify(v);
-      return `${k}: ${value}`;
-    })
-    .join(' | ');
 }
 
 function generateMermaid(
@@ -301,72 +275,19 @@ export function ResearchResultPanel({
   }, [result?.action_type, result?.parameters?.source_steps]);
 
   const narrative = useMemo(() => {
-    let text = '';
-    if (viewMode === 'session' && mergedNarrative) {
-      text = mergedNarrative;
-    } else {
-      const rawNarrative = result?.synthesis?.narrative;
-      text = typeof rawNarrative === 'string' ? rawNarrative : JSON.stringify(rawNarrative ?? null, null, 2);
+    if (viewMode === 'session') {
+      const mergedEnvelope = {
+        synthesis: { narrative: mergedNarrative || '' },
+        canvas: {
+          tables: mergedTables ?? undefined,
+          diagrams: mergedDiagrams ?? undefined,
+          graph: mergedGraph ?? undefined,
+        },
+      };
+      return buildEnvelopeMarkdown(mergedEnvelope);
     }
-
-    const tables = viewMode === 'session' ? mergedTables : result?.canvas?.tables;
-    if (tables && tables.length > 0) {
-      const mdTables = tables.map((t) => {
-        if (!t.rows || t.rows.length === 0) return '';
-        const cols = t.columns?.length ? t.columns : Object.keys(t.rows[0]);
-        const header = `| ${cols.join(' | ')} |`;
-        const sep = `| ${cols.map(() => '---').join(' | ')} |`;
-        const body = t.rows.map((row) => {
-          const cells = cols.map((c) => {
-            const val = row[c];
-            if (val === undefined || val === null) return '';
-            const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-            return str.replace(/\|/g, '\\|').replace(/\n/g, ' ');
-          });
-          return `| ${cells.join(' | ')} |`;
-        }).join('\n');
-        return `\n\n## Table: ${t.name}\n\n${header}\n${sep}\n${body}`;
-      }).join('\n');
-      text = `${text}${mdTables}`;
-    }
-
-    const diagrams = viewMode === 'session' ? mergedDiagrams : result?.canvas?.diagrams;
-    if (diagrams && diagrams.length > 0) {
-      const mdDiagrams = diagrams.map((d) => {
-        const diagramContent = typeof d.content === 'string' ? d.content : JSON.stringify(d.content ?? null, null, 2);
-        return `\n\n## Diagram: ${d.name || d.type || 'Untitled'}\n\n\`\`\`mermaid\n${diagramContent}\n\`\`\``;
-      }).join('\n');
-      text = `${text}${mdDiagrams}`;
-    }
-
-    const graph = viewMode === 'session' ? mergedGraph : result?.canvas?.graph;
-    if (graph && (graph.nodes?.length || graph.edges?.length)) {
-      const nodeRows = graph.nodes?.map((n) => ({
-        ID: n.id || '',
-        Name: n.name || n.label || '',
-        Type: n.type || '',
-      })) ?? [];
-      const nodeTable = rowsToMarkdownTable(['ID', 'Name', 'Type'], nodeRows);
-
-      const edgeRows = graph.edges?.map((e) => {
-        const props = e.properties ? formatPropertiesCompact(e.properties) : '';
-        return {
-          From: e.from || '',
-          To: e.to || '',
-          Type: e.type || '',
-          Label: e.label || '',
-          Detail: e.detail || '',
-          Properties: props,
-        };
-      }) ?? [];
-      const edgeTable = rowsToMarkdownTable(['From', 'To', 'Type', 'Label', 'Detail', 'Properties'], edgeRows);
-
-      const rawGraphJson = JSON.stringify(graph, null, 2);
-      text = `${text}\n\n## Graph: Nodes\n\n${nodeTable}\n\n## Graph: Edges\n\n${edgeTable}\n\n## Graph: Raw JSON\n\n\`\`\`json\n${rawGraphJson}\n\`\`\``;
-    }
-
-    return text;
-  }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, result?.synthesis?.narrative, result?.canvas?.tables, result?.canvas?.diagrams, result?.canvas?.graph, mergedGraph]);
+    return buildEnvelopeMarkdown(result ?? null);
+  }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, mergedGraph, result]);
 
   return (
     <div className="min-h-0 flex-1 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
