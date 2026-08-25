@@ -17,10 +17,11 @@ export interface EnvelopeViewerProps {
   envelope: ResearchStepSummary | DiscoverStepResponse | null;
   title?: string;
   onCopy?: (event: EnvelopeCopyEvent) => void;
+  keyPrefix?: string;
   className?: string;
 }
 
-export function EnvelopeViewer({ envelope, title = 'Preview', onCopy, className = '' }: EnvelopeViewerProps) {
+export function EnvelopeViewer({ envelope, title = 'Preview', onCopy, keyPrefix, className = '' }: EnvelopeViewerProps) {
   const markdown = useMemo(() => buildEnvelopeMarkdown(envelope ?? null), [envelope]);
 
   const handleCopy = (md: string, sectionTitle?: string) => {
@@ -39,6 +40,7 @@ export function EnvelopeViewer({ envelope, title = 'Preview', onCopy, className 
       viewMode="markdown"
       showIndex={false}
       onCopySection={onCopy ? handleCopy : undefined}
+      keyPrefix={keyPrefix}
       className={className}
     />
   );

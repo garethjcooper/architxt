@@ -1,26 +1,14 @@
 'use client';
 
-import {
-  ResearchResultPanel,
-  type ResearchCopyEvent,
-} from '@/app/research/research-result-panel';
-import { useResearchResultPanel } from '@/app/research/use-research-result-panel';
-import type {
-  DiscoverStepResponse,
-  ResearchStepSummary,
-} from '@/lib/api/client';
+import { EnvelopeViewer } from '@/components/envelope-viewer';
+import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 
 interface WorkspaceResultPanelProps {
   result: DiscoverStepResponse | ResearchStepSummary | null;
-  loading: boolean;
-  error: string | null;
+  loading?: boolean;
+  error?: string | null;
   sessionName?: string;
-  onCopy?: (event: ResearchCopyEvent) => void;
-  /** Optional key namespace passed through to ResearchResultPanel/NarrativeViewer. */
   keyPrefix?: string;
-  narrativeWidth?: number;
-  onResizeNarrativeStart?: (e: React.MouseEvent) => void;
-  onResizeNarrativeReset?: () => void;
 }
 
 export function WorkspaceResultPanel({
@@ -28,35 +16,38 @@ export function WorkspaceResultPanel({
   loading,
   error,
   sessionName,
-  onCopy,
   keyPrefix,
-  narrativeWidth,
-  onResizeNarrativeStart,
-  onResizeNarrativeReset,
 }: WorkspaceResultPanelProps) {
-  // Graph data is now rendered as markdown tables inside the narrative, so the
-  // dedicated canvas panel stays hidden by default. It can still be opted-in by
-  // passing showCanvas={true} if needed.
-  const panelState = useResearchResultPanel({
-    nodes: result?.canvas?.graph?.nodes,
-    edges: result?.canvas?.graph?.edges,
-  });
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-red-300/90 whitespace-pre-wrap p-4">
+        {error}
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-white/50">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!result) {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-white/40">
+        Select a step or model to view its content.
+      </div>
+    );
+  }
 
   return (
-    <ResearchResultPanel
-      loading={loading}
-      error={error}
-      result={result}
-      viewMode="step"
-      resultView="narrative"
-      sessionName={sessionName || 'reflect'}
-      onCopy={onCopy}
-      showCanvas={false}
+    <EnvelopeViewer
+      envelope={result}
+      title={sessionName || 'Workspace'}
       keyPrefix={keyPrefix}
-      narrativeWidth={narrativeWidth}
-      onResizeNarrativeStart={onResizeNarrativeStart}
-      onResizeNarrativeReset={onResizeNarrativeReset}
-      {...panelState}
+      className="h-full"
     />
   );
 }
