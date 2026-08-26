@@ -96,7 +96,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     setInternalActiveRangeIds(new Set());
   }, [content, blocksProp]);
 
-  const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading'), [blocks]);
+  const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading' && !b.synthetic), [blocks]);
 
   const hasContentBlocks = blocks.some(
     b => b.type === 'text' || b.type === 'code' || b.type === 'table' || b.type === 'image'

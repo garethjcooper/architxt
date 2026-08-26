@@ -68,7 +68,7 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => parseNarrativeBlocks(envelope.synthesis.narrative));
   const [showIndex, setShowIndex] = useState(true);
-  const [plain, setPlain] = useState(true);
+  const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
