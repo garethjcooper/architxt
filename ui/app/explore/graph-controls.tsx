@@ -4,6 +4,7 @@ import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import type { GraphNode, GraphEdge } from '@/components/research-canvas';
+import { sanitizeFilenameBase } from '@/lib/utils';
 import cytoscape from 'cytoscape';
 
 function downloadBlob(content: string | Blob, filename: string, type: string) {
@@ -27,10 +28,6 @@ function dataUrlToBlob(dataUrl: string): Blob {
     array[i] = binary.charCodeAt(i);
   }
   return new Blob([array], { type: mime });
-}
-
-function sanitizeFilenameBase(name: string): string {
-  return name.replace(/[^a-zA-Z0-9\-_]/g, '_').slice(0, 50);
 }
 
 function escapeMermaidId(id: string): string {
