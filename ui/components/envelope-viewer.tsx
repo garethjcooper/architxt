@@ -7,14 +7,9 @@ import { EnvelopeControls } from './envelope-controls';
 import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
+import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
-export interface EnvelopeCopyEvent {
-  type: 'narrative' | 'graph' | 'tables' | 'diagrams';
-  /** Markdown for narrative sections; JSON stringified payloads for structured types. */
-  payload: string;
-  /** Human-readable label for the copied chunk. */
-  label?: string;
-}
+export type { EnvelopeCopyEvent };
 
 export interface EnvelopeViewerProps {
   /** Envelope to render. */
@@ -25,8 +20,8 @@ export interface EnvelopeViewerProps {
   count?: number;
   /** Called when a copy action is requested. When omitted, the viewer copies/downloads directly. */
   onCopy?: (event: EnvelopeCopyEvent) => void;
-  /** Optional callback to add structured or narrative content to a curated page. */
-  onAddToPage?: (event: EnvelopeCopyEvent) => void;
+  /** Optional callback to add structured or narrative content to a curated page. May receive a single event or an array of events for whole-document decomposition. */
+  onAddToPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Optional label for the add-to-page action. */
   addToPageLabel?: string;
   /** Optional key namespace passed through to NarrativeViewer. */
@@ -136,14 +131,54 @@ export function EnvelopeViewer({
   };
 
   const handleCopySection = onCopy
-    ? (sectionMarkdown: string, sectionTitle?: string) =>
-        onCopy({ type: 'narrative', payload: sectionMarkdown, label: sectionTitle || effectiveSessionName })
+    ? (event: EnvelopeCopyEvent) => onCopy(event)
     : undefined;
 
   const handleAddSection = onAddToPage
-    ? (sectionMarkdown: string, sectionTitle?: string) =>
-        onAddToPage({ type: 'narrative', payload: sectionMarkdown, label: sectionTitle || effectiveSessionName })
+    ? (event: EnvelopeCopyEvent) => onAddToPage(event)
     : undefined;
+
+  const resolveSectionCopy = useCallback(
+    (heading: string, _level: number, _markdown: string): EnvelopeCopyEvent | null => {
+      const trimmed = heading.trim();
+      if (trimmed === 'Graph' || trimmed === 'Source: Raw JSON') {
+        const graph = normalized?.canvas?.graph;
+        if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
+          return {
+            type: 'graph',
+            payload: JSON.stringify(graph, null, 2),
+            label: normalized?.intent_text || 'Graph',
+          };
+        }
+      }
+      const tables = normalized?.canvas?.tables ?? [];
+      const table = tables.find((t) => t.name === trimmed);
+      if (table) {
+        return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
+      }
+      const diagrams = normalized?.canvas?.diagrams ?? [];
+      const diagram = diagrams.find((d) => d.name === trimmed);
+      if (diagram) {
+        return { type: 'diagrams', payload: JSON.stringify([diagram], null, 2), label: diagram.name };
+      }
+      return null;
+    },
+    [normalized]
+  );
+
+  const handleCopyWholeDocument = useCallback(
+    (events: EnvelopeCopyEvent[]) => {
+      if (onCopy) {
+        events.forEach((event) => onCopy(event));
+        return;
+      }
+      if (onAddToPage) {
+        onAddToPage(events);
+        return;
+      }
+    },
+    [onCopy, onAddToPage]
+  );
 
   return (
     <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${className}`}>
@@ -170,6 +205,8 @@ export function EnvelopeViewer({
           showIndex={showIndexState}
           onCopySection={handleCopySection}
           onAddToPage={handleAddSection}
+          resolveSectionCopy={resolveSectionCopy}
+          onCopyWholeDocument={handleCopyWholeDocument}
           addToPageLabel={addToPageLabel}
           keyPrefix={keyPrefix}
           className="h-full"

@@ -37,7 +37,7 @@ import { useWorkspaceSession } from './_components/use-workspace-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
 import { type CuratedPageEnvelope } from './_components/curated-page-editor';
-import { type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { type EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { mergeGraphs } from '@/lib/envelope-merge';
 
 const logger = createLogger('WorkspacePage');
@@ -75,7 +75,7 @@ export default function WorkspacePage() {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([makeAnchorTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(ANCHOR_TAB_ID);
 
-  const [pendingSection, setPendingSection] = useState<{ event: EnvelopeCopyEvent; title?: string } | null>(null);
+  const [pendingSection, setPendingSection] = useState<{ events: EnvelopeCopyEvent[]; title?: string } | null>(null);
 
   const {
     selectedServerId,
@@ -382,20 +382,22 @@ export default function WorkspacePage() {
   );
 
   const handleCopyToCuratedPage = useCallback(
-    (event: EnvelopeCopyEvent) => {
+    (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
+      const events = Array.isArray(event) ? event : [event];
+      const firstLabel = events[0]?.label;
       if (activeCuratedPage) {
         // Apply to the currently active curated page immediately.
-        void handleApplyCopyEvent(activeCuratedPage.id, event);
+        void handleApplyCopyEvent(activeCuratedPage.id, events);
         return;
       }
       // No active curated page: show target picker.
-      setPendingSection({ event, title: event.label });
+      setPendingSection({ events, title: firstLabel });
     },
     [activeCuratedPage]
   );
 
   const handleApplyCopyEvent = useCallback(
-    async (stepId: number, event: EnvelopeCopyEvent) => {
+    async (stepId: number, event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
       const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
       if (!page) return;
 
@@ -405,52 +407,51 @@ export default function WorkspacePage() {
         canvas,
         synthesis,
       };
+      const events = Array.isArray(event) ? event : [event];
       let toastMessage = '';
+      let narrativeAccumulator = synthesis.narrative ?? '';
 
-      switch (event.type) {
-        case 'narrative': {
-          const currentNarrative = synthesis.narrative ?? '';
-          const prefix = currentNarrative.trim() ? '\n\n' : '';
-          updateData.synthesis = { narrative: `${currentNarrative}${prefix}${event.payload}` };
-          toastMessage = `Added ${event.label || 'section'} to ${page.intent_text || `Page ${page.id}`}`;
-          break;
-        }
-        case 'graph': {
-          const parsedGraph = JSON.parse(event.payload);
-          const mergeResult = mergeGraphs(
-            canvas.graph ?? { nodes: [], edges: [] },
-            { nodes: parsedGraph.nodes || [], edges: parsedGraph.edges || [] }
-          );
-          updateData.canvas = {
-            ...canvas,
-            graph: { nodes: mergeResult.nodes, edges: mergeResult.edges },
-          };
-          toastMessage = `Merged graph into ${page.intent_text || `Page ${page.id}`}: +${mergeResult.addedNodes} nodes, +${mergeResult.addedEdges} edges`;
-          break;
-        }
-        case 'tables': {
-          const parsedTables = JSON.parse(event.payload);
-          const existingNames = new Set((canvas.tables ?? []).map((t) => t.name));
-          const newTables = (parsedTables ?? []).filter((t: { name: string }) => !existingNames.has(t.name));
-          updateData.canvas = {
-            ...canvas,
-            tables: [...(canvas.tables ?? []), ...newTables],
-          };
-          toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
-          break;
-        }
-        case 'diagrams': {
-          const parsedDiagrams = JSON.parse(event.payload);
-          const existingNames = new Set((canvas.diagrams ?? []).map((d) => d.name));
-          const newDiagrams = (parsedDiagrams ?? []).filter((d: { name: string }) => !existingNames.has(d.name));
-          updateData.canvas = {
-            ...canvas,
-            diagrams: [...(canvas.diagrams ?? []), ...newDiagrams],
-          };
-          toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
-          break;
+      for (const ev of events) {
+        switch (ev.type) {
+          case 'narrative': {
+            const prefix = narrativeAccumulator.trim() ? '\n\n' : '';
+            narrativeAccumulator = `${narrativeAccumulator}${prefix}${ev.payload}`;
+            toastMessage = `Added ${ev.label || 'section'} to ${page.intent_text || `Page ${page.id}`}`;
+            break;
+          }
+          case 'graph': {
+            const parsedGraph = JSON.parse(ev.payload);
+            const mergeResult = mergeGraphs(
+              canvas.graph ?? { nodes: [], edges: [] },
+              { nodes: parsedGraph.nodes || [], edges: parsedGraph.edges || [] }
+            );
+            canvas.graph = { nodes: mergeResult.nodes, edges: mergeResult.edges };
+            updateData.canvas = canvas;
+            toastMessage = `Merged graph into ${page.intent_text || `Page ${page.id}`}: +${mergeResult.addedNodes} nodes, +${mergeResult.addedEdges} edges`;
+            break;
+          }
+          case 'tables': {
+            const parsedTables = JSON.parse(ev.payload);
+            const existingNames = new Set((canvas.tables ?? []).map((t) => t.name));
+            const newTables = (parsedTables ?? []).filter((t: { name: string }) => !existingNames.has(t.name));
+            canvas.tables = [...(canvas.tables ?? []), ...newTables];
+            updateData.canvas = canvas;
+            toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
+            break;
+          }
+          case 'diagrams': {
+            const parsedDiagrams = JSON.parse(ev.payload);
+            const existingNames = new Set((canvas.diagrams ?? []).map((d) => d.name));
+            const newDiagrams = (parsedDiagrams ?? []).filter((d: { name: string }) => !existingNames.has(d.name));
+            canvas.diagrams = [...(canvas.diagrams ?? []), ...newDiagrams];
+            updateData.canvas = canvas;
+            toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
+            break;
+          }
         }
       }
+
+      updateData.synthesis = { narrative: narrativeAccumulator };
 
       try {
         await researchApi.updateCuratedPage(stepId, updateData);
@@ -463,7 +464,7 @@ export default function WorkspacePage() {
         toast.success(toastMessage);
       } catch (err: unknown) {
         logger.error('Failed to apply copy event to curated page', err);
-        toast.error(`Failed to add ${event.type}: ${String(err instanceof Error ? err.message : String(err))}`);
+        toast.error(`Failed to apply copy: ${String(err instanceof Error ? err.message : String(err))}`);
       }
     },
     [workspaceSession.curatedPages, workspaceSession.refresh]
@@ -1034,7 +1035,7 @@ export default function WorkspacePage() {
                     key={page.id}
                     type="button"
                     onClick={() => {
-                      void handleApplyCopyEvent(page.id, pendingSection.event);
+                      void handleApplyCopyEvent(page.id, pendingSection.events);
                       setPendingSection(null);
                     }}
                     className="text-left text-xs px-2 py-1.5 rounded border border-white/10 bg-black/20 text-white/70 hover:bg-white/5 hover:text-white transition-colors"
