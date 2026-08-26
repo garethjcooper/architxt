@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { parseNarrativeBlocks, buildNarrativeContent, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
+import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
 import { cn, downloadMarkdown } from '@/lib/utils';
@@ -62,7 +62,6 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   // Use the full envelope markdown for display so canvas tables/diagrams/graph
   // are visible in the editor. The editable/savable narrative is still the
   // non-synthetic blocks only.
-  const currentMarkdown = useMemo(() => buildNarrativeContent(blocks), [blocks]);
   const userMarkdown = useMemo(() => buildUserNarrativeContent(blocks), [blocks]);
   const isDirty = userMarkdown !== envelope.synthesis.narrative;
   const viewMode = plain ? 'plain' : 'markdown';
@@ -83,14 +82,14 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   }, [page, userMarkdown, envelope.canvas, onSave]);
 
   const handleCopy = useCallback(() => {
-    if (!currentMarkdown) return;
-    navigator.clipboard.writeText(currentMarkdown).then(() => toast.success('Copied to clipboard'));
-  }, [currentMarkdown]);
+    if (!displayMarkdown) return;
+    navigator.clipboard.writeText(displayMarkdown).then(() => toast.success('Copied to clipboard'));
+  }, [displayMarkdown]);
 
   const handleDownload = useCallback(() => {
-    if (!currentMarkdown) return;
-    downloadMarkdown(currentMarkdown, pageTitle);
-  }, [currentMarkdown, pageTitle]);
+    if (!displayMarkdown) return;
+    downloadMarkdown(displayMarkdown, pageTitle);
+  }, [displayMarkdown, pageTitle]);
 
   const toggleDelete = useCallback((id: string) => {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, deleted: !b.deleted } : b)));
