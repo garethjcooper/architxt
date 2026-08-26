@@ -107,6 +107,8 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     return blocks.filter((b) => !b.deleted).map((b) => b.edited ?? b.raw).join('');
   }, [blocks]);
 
+  const renderedMarkdown = content || wholeDocumentMarkdown;
+
   const scrollToBlock = useCallback((id: string) => {
     const container = markdownContainerRef.current;
     const scrollContainerTo = (el: HTMLElement) => {
@@ -518,7 +520,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           }`}
         >
           {viewMode === 'markdown' ? (
-            <Markdown className="text-[12px] leading-relaxed">{content || ''}</Markdown>
+            <Markdown className="text-[12px] leading-relaxed">{renderedMarkdown}</Markdown>
           ) : (
             blocks.map(b => {
               const isActive = activeRangeIds.has(b.id);
