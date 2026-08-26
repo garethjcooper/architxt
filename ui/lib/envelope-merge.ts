@@ -105,3 +105,51 @@ export function mergeGraphs(
     skippedEdges: skippedEdges + removedOrphans,
   };
 }
+
+/**
+ * Attempt to extract a synthetic graph section from markdown rendered by
+ * `buildEnvelopeMarkdown`. If found, returns the parsed graph and the markdown
+ * with the entire `## Graph` section removed. This lets a narrative-level
+ * "Add" path still merge graph data into `canvas.graph` instead of polluting
+ * `synthesis.narrative`.
+ */
+export function extractGraphFromMarkdown(markdown: string): {
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] } | null;
+  cleanedMarkdown: string;
+} {
+  // Match a level-2 heading that begins a Graph section, up to the next level-2 heading or EOF.
+  const graphSectionRegex = /^## Graph\b[\s\S]*?(?=^## [^#]|\Z)/m;
+  const match = graphSectionRegex.exec(markdown);
+  if (!match) {
+    return { graph: null, cleanedMarkdown: markdown };
+  }
+
+  const section = match[0];
+  const jsonBlockMatch = section.match(/```json\s*([\s\S]*?)\s*```/);
+  if (!jsonBlockMatch) {
+    return { graph: null, cleanedMarkdown: markdown };
+  }
+
+  try {
+    const graph = JSON.parse(jsonBlockMatch[1]);
+    if (!graph || typeof graph !== 'object') {
+      return { graph: null, cleanedMarkdown: markdown };
+    }
+    const cleanedMarkdown = normalizeSpacing(markdown.replace(graphSectionRegex, ''));
+    return {
+      graph: {
+        nodes: Array.isArray(graph.nodes) ? graph.nodes : [],
+        edges: Array.isArray(graph.edges) ? graph.edges : [],
+      },
+      cleanedMarkdown,
+    };
+  } catch {
+    return { graph: null, cleanedMarkdown: markdown };
+  }
+}
+
+function normalizeSpacing(text: string): string {
+  return text
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
