@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
+import { parseMarkdownTable, extractTablesFromMarkdown } from '@/lib/envelope-merge';
 
 export type { EnvelopeCopyEvent };
 
@@ -81,8 +82,10 @@ export function EnvelopeViewer({
         label: normalized.intent_text || 'Graph',
       };
     }
-    const tables = normalized.canvas?.tables;
-    if (tables && tables.length > 0) {
+    const canvasTables = normalized.canvas?.tables ?? [];
+    const narrativeTables = extractTablesFromMarkdown(normalized.synthesis?.narrative ?? '');
+    const tables = [...canvasTables, ...narrativeTables];
+    if (tables.length > 0) {
       items.tables = {
         payload: JSON.stringify(tables, null, 2),
         label: normalized.intent_text || 'Tables',
@@ -139,7 +142,7 @@ export function EnvelopeViewer({
     : undefined;
 
   const resolveSectionCopy = useCallback(
-    (heading: string, _level: number, _markdown: string): EnvelopeCopyEvent | null => {
+    (heading: string, _level: number, contentMarkdown: string): EnvelopeCopyEvent | null => {
       const trimmed = heading.trim();
       if (trimmed === 'Graph' || trimmed === 'Source: Raw JSON') {
         const graph = normalized?.canvas?.graph;
@@ -151,10 +154,20 @@ export function EnvelopeViewer({
           };
         }
       }
-      const tables = normalized?.canvas?.tables ?? [];
-      const table = tables.find((t) => t.name === trimmed);
+      const canvasTables = normalized?.canvas?.tables ?? [];
+      const table = canvasTables.find((t) => t.name === trimmed);
       if (table) {
         return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
+      }
+      // Fallback: headings like "Table: capabilities" whose data lives in the
+      // narrative markdown rather than canvas.tables can still be copied as
+      // structured table events by parsing the rendered table back to JSON.
+      const tableHeadingMatch = trimmed.match(/^Table:\s*(.+)$/i);
+      if (tableHeadingMatch) {
+        const parsed = parseMarkdownTable(tableHeadingMatch[1], contentMarkdown);
+        if (parsed) {
+          return { type: 'tables', payload: JSON.stringify([parsed], null, 2), label: parsed.name };
+        }
       }
       const diagrams = normalized?.canvas?.diagrams ?? [];
       const diagram = diagrams.find((d) => d.name === trimmed);
