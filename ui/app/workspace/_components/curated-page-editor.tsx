@@ -21,7 +21,6 @@ export type CuratedPageEnvelope = {
 
 export interface CuratedPageEditorProps {
   page: ResearchStepSummary | DiscoverStepResponse;
-  pages?: ResearchStepSummary[];
   onSave: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
   /** When true, the editor renders a compact read-only preview without editing controls. */
   readOnly?: boolean;
@@ -198,8 +197,4 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
       </div>
     </div>
   );
-}
-
-export function buildCuratedPagePreview(page: ResearchStepSummary): string {
-  return buildEnvelopeMarkdown(page);
 }

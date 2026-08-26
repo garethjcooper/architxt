@@ -59,7 +59,6 @@ export function WorkspaceResultPanel({
     return (
       <CuratedPageEditor
         page={activeCuratedPage}
-        pages={curatedPages}
         onSave={onSaveCuratedPage}
       />
     );
