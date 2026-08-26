@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { NarrativeViewer } from './narrative-viewer';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
 import { EnvelopeControls } from './envelope-controls';
@@ -25,8 +25,8 @@ export interface EnvelopeViewerProps {
   count?: number;
   /** Called when a copy action is requested. When omitted, the viewer copies/downloads directly. */
   onCopy?: (event: EnvelopeCopyEvent) => void;
-  /** Optional callback to add a section to a curated page. Receives the section markdown. */
-  onAddToPage?: (sectionMarkdown: string, sectionTitle?: string) => void;
+  /** Optional callback to add structured or narrative content to a curated page. */
+  onAddToPage?: (event: EnvelopeCopyEvent) => void;
   /** Optional label for the add-to-page action. */
   addToPageLabel?: string;
   /** Optional key namespace passed through to NarrativeViewer. */
@@ -64,6 +64,59 @@ export function EnvelopeViewer({
   const viewMode = plain ? 'plain' : 'markdown';
   const effectiveSessionName = sessionName ?? title;
 
+  const normalized = useMemo(() => {
+    if (!envelope) return null;
+    if ('intent_text' in envelope) {
+      return envelope as ResearchStepSummary;
+    }
+    return {
+      intent_text: undefined,
+      synthesis: envelope.synthesis,
+      canvas: envelope.canvas,
+    };
+  }, [envelope]);
+
+  const structuredItems = useMemo(() => {
+    if (!normalized) return undefined;
+    const items: NonNullable<React.ComponentPropsWithoutRef<typeof EnvelopeControls>['structuredItems']> = {};
+    const graph = normalized.canvas?.graph;
+    if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
+      items.graph = {
+        payload: JSON.stringify(graph, null, 2),
+        label: normalized.intent_text || 'Graph',
+      };
+    }
+    const tables = normalized.canvas?.tables;
+    if (tables && tables.length > 0) {
+      items.tables = {
+        payload: JSON.stringify(tables, null, 2),
+        label: normalized.intent_text || 'Tables',
+      };
+    }
+    const diagrams = normalized.canvas?.diagrams;
+    if (diagrams && diagrams.length > 0) {
+      items.diagrams = {
+        payload: JSON.stringify(diagrams, null, 2),
+        label: normalized.intent_text || 'Diagrams',
+      };
+    }
+    return Object.keys(items).length > 0 ? items : undefined;
+  }, [normalized]);
+
+  const handleCopyStructured = useCallback(
+    (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => {
+      onCopy?.({ type, payload, label });
+    },
+    [onCopy]
+  );
+
+  const handleAddStructured = useCallback(
+    (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => {
+      onAddToPage?.({ type, payload, label });
+    },
+    [onAddToPage]
+  );
+
   const handleCopy = () => {
     if (!markdown) return;
     if (onCopy) {
@@ -87,6 +140,11 @@ export function EnvelopeViewer({
         onCopy({ type: 'narrative', payload: sectionMarkdown, label: sectionTitle || effectiveSessionName })
     : undefined;
 
+  const handleAddSection = onAddToPage
+    ? (sectionMarkdown: string, sectionTitle?: string) =>
+        onAddToPage({ type: 'narrative', payload: sectionMarkdown, label: sectionTitle || effectiveSessionName })
+    : undefined;
+
   return (
     <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${className}`}>
       {showControls && (
@@ -99,6 +157,9 @@ export function EnvelopeViewer({
           onPlainChange={setPlain}
           onCopyText={handleCopy}
           onSaveMd={handleSave}
+          structuredItems={structuredItems}
+          onCopyStructured={onCopy ? handleCopyStructured : undefined}
+          onAddStructured={onAddToPage ? handleAddStructured : undefined}
         />
       )}
       <div className="flex-1 min-h-0 overflow-hidden p-2 relative">
@@ -108,7 +169,7 @@ export function EnvelopeViewer({
           viewMode={viewMode}
           showIndex={showIndexState}
           onCopySection={handleCopySection}
-          onAddToPage={onAddToPage ? (sectionMarkdown, sectionTitle) => onAddToPage(sectionMarkdown, sectionTitle) : undefined}
+          onAddToPage={handleAddSection}
           addToPageLabel={addToPageLabel}
           keyPrefix={keyPrefix}
           className="h-full"

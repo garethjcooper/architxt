@@ -15,7 +15,7 @@ export interface WorkspaceResultPanelProps {
   activeCuratedPage?: ResearchStepSummary | null;
   curatedPages?: ResearchStepSummary[];
   onSaveCuratedPage?: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
-  onCopyToCuratedPage?: (sectionMarkdown: string, sectionTitle?: string) => void;
+  onCopyToCuratedPage?: (event: EnvelopeCopyEvent) => void;
 }
 
 export function WorkspaceResultPanel({
@@ -81,13 +81,8 @@ export function WorkspaceResultPanel({
         showIndex
         showControls
         sessionName={sessionName}
-        onCopy={onCopyToCuratedPage ? (event: EnvelopeCopyEvent) => {
-          if (event.type !== 'narrative') {
-            // Structured sections are not yet supported for copy-to-page.
-            return;
-          }
-          onCopyToCuratedPage(event.payload, event.label);
-        } : undefined}
+        onAddToPage={onCopyToCuratedPage}
+        addToPageLabel="Add to page"
       />
     </div>
   );
