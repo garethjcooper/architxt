@@ -8,6 +8,7 @@ import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/r
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
+import { sanitizeFilenameBase } from '@/lib/utils';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import cytoscape from 'cytoscape';
 
@@ -32,10 +33,6 @@ function dataUrlToBlob(dataUrl: string): Blob {
     array[i] = binary.charCodeAt(i);
   }
   return new Blob([array], { type: mime });
-}
-
-function sanitizeFilenameBase(sessionName: string): string {
-  return sessionName.replace(/[^a-zA-Z0-9\-_]/g, '_').slice(0, 50);
 }
 
 function escapeMermaidId(id: string): string {
