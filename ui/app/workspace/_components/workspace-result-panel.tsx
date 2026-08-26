@@ -14,6 +14,8 @@ export interface WorkspaceResultPanelProps {
   keyPrefix?: string;
   /** When a curated page tab is active, editing happens here. */
   activeCuratedPage?: ResearchStepSummary | null;
+  /** Server baseline for the active curated page, used to compute dirty state. */
+  activeCuratedPageBaseline?: CuratedPageEnvelope;
   curatedPages?: ResearchStepSummary[];
   onSaveCuratedPage?: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
@@ -28,6 +30,7 @@ export function WorkspaceResultPanel({
   sessionName,
   keyPrefix,
   activeCuratedPage,
+  activeCuratedPageBaseline,
   curatedPages = [],
   onSaveCuratedPage,
   onCopyToCuratedPage,
@@ -61,6 +64,7 @@ export function WorkspaceResultPanel({
       <CuratedPageEditor
         key={activeCuratedPage.id}
         page={activeCuratedPage}
+        baseline={activeCuratedPageBaseline}
         onSave={onSaveCuratedPage}
       />
     );

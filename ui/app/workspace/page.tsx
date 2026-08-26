@@ -36,7 +36,7 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
-import { type CuratedPageEnvelope } from './_components/curated-page-editor';
+import { CuratedPageEnvelope, normalizeEnvelope } from './_components/curated-page-editor';
 import { type EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { mergeGraphs } from '@/lib/envelope-merge';
 
@@ -77,6 +77,10 @@ export default function WorkspacePage() {
 
   const [pendingSection, setPendingSection] = useState<{ events: EnvelopeCopyEvent[]; title?: string } | null>(null);
 
+  // Local envelope overrides per curated-page id. These represent edits that
+  // have been applied in the UI (copy/add from a view) but not yet persisted.
+  const [pendingCuratedEdits, setPendingCuratedEdits] = useState<Record<number, CuratedPageEnvelope>>({});
+
   const {
     selectedServerId,
     setSelectedServerId,
@@ -95,6 +99,17 @@ export default function WorkspacePage() {
     if (!tab || tab.kind !== 'curated' || tab.stepId == null) return null;
     return workspaceSession.curatedPages.find((p) => p.id === tab.stepId) ?? null;
   }, [tabs, activeTabId, workspaceSession.curatedPages]);
+
+  const activeCuratedPageWithEdits = useMemo(() => {
+    if (!activeCuratedPage) return null;
+    const edits = pendingCuratedEdits[activeCuratedPage.id];
+    if (!edits) return activeCuratedPage;
+    return {
+      ...activeCuratedPage,
+      synthesis: edits.synthesis,
+      canvas: edits.canvas,
+    };
+  }, [activeCuratedPage, pendingCuratedEdits]);
 
   useEffect(() => {
     setActiveSession(workspaceSession.activeSession);
@@ -369,9 +384,17 @@ export default function WorkspacePage() {
   const handleSaveCuratedPage = useCallback(
     async (stepId: number, envelope: CuratedPageEnvelope) => {
       try {
-        const payload: Parameters<typeof researchApi.updateCuratedPage>[1] = { synthesis: envelope.synthesis };
-        if (envelope.canvas) payload.canvas = envelope.canvas;
+        const payload: Parameters<typeof researchApi.updateCuratedPage>[1] = {
+          synthesis: envelope.synthesis,
+          canvas: envelope.canvas,
+        };
         await researchApi.updateCuratedPage(stepId, payload);
+        // Clear local pending edits for this page once the server confirms the save.
+        setPendingCuratedEdits((prev) => {
+          const next = { ...prev };
+          delete next[stepId];
+          return next;
+        });
         await workspaceSession.refresh();
         toast.success('Page saved');
       } catch (err: unknown) {
@@ -403,17 +426,18 @@ export default function WorkspacePage() {
       const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
       if (!page) return;
 
-      // Work on shallow copies so we never mutate the cached page object that
-      // React is memoizing in the editor / workspace session.
-      const pageCanvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+      // Merge into a fresh local envelope instead of persisting immediately.
+      // The editor renders the updated envelope, compares it to the server
+      // baseline, and enables Save so the user can persist the change.
+      const sourceEnvelope = pendingCuratedEdits[stepId] ?? normalizeEnvelope(page);
       const canvas = {
-        graph: { ...(pageCanvas.graph ?? { nodes: [], edges: [] }) },
-        tables: [...(pageCanvas.tables ?? [])],
-        diagrams: [...(pageCanvas.diagrams ?? [])],
+        graph: { ...(sourceEnvelope.canvas?.graph ?? { nodes: [], edges: [] }) },
+        tables: [...(sourceEnvelope.canvas?.tables ?? [])],
+        diagrams: [...(sourceEnvelope.canvas?.diagrams ?? [])],
       };
-      canvas.graph.nodes = [...(pageCanvas.graph?.nodes ?? [])];
-      canvas.graph.edges = [...(pageCanvas.graph?.edges ?? [])];
-      const synthesis = { ...(page.synthesis ?? { narrative: '' }) };
+      canvas.graph.nodes = [...(sourceEnvelope.canvas?.graph?.nodes ?? [])];
+      canvas.graph.edges = [...(sourceEnvelope.canvas?.graph?.edges ?? [])];
+      const synthesis = { ...sourceEnvelope.synthesis };
       let toastMessage = '';
       const events = Array.isArray(event) ? event : [event];
       let narrativeAccumulator = synthesis.narrative ?? '';
@@ -457,23 +481,21 @@ export default function WorkspacePage() {
 
       synthesis.narrative = narrativeAccumulator;
 
-      try {
-        await researchApi.updateCuratedPage(stepId, { canvas, synthesis });
-        await workspaceSession.refresh();
-        // Make the target page visible so the user sees the applied change and
-        // the Save button reflect the updated envelope.
-        setActiveTabId((current) => {
-          const targetId = `curated-${stepId}`;
-          return current === targetId ? current : targetId;
-        });
-        if (toastMessage) toast.success(toastMessage);
-      } catch (err) {
-        logger.error('Failed to apply copy event', err);
-        toast.error('Failed to add to page');
-        throw err;
-      }
+      // Update the local pending edit so the editor sees the new envelope and
+      // becomes dirty against the server baseline.
+      setPendingCuratedEdits((prev) => ({
+        ...prev,
+        [stepId]: { synthesis, canvas },
+      }));
+      // Make the target page visible so the user sees the applied change and
+      // the Save button reflect the updated envelope.
+      setActiveTabId((current) => {
+        const targetId = `curated-${stepId}`;
+        return current === targetId ? current : targetId;
+      });
+      if (toastMessage) toast.success(toastMessage);
     },
-    [workspaceSession.curatedPages, workspaceSession.refresh]
+    [workspaceSession.curatedPages, pendingCuratedEdits]
   );
 
   const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
@@ -1009,7 +1031,8 @@ export default function WorkspacePage() {
               error={previewError}
               sessionName={activeSession?.title}
               keyPrefix="preview"
-              activeCuratedPage={activeCuratedPage}
+              activeCuratedPage={activeCuratedPageWithEdits}
+              activeCuratedPageBaseline={activeCuratedPage ? normalizeEnvelope(activeCuratedPage) : undefined}
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
               onCopyToCuratedPage={handleCopyToCuratedPage}
