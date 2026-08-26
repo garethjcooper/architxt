@@ -86,7 +86,7 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike | null | undefined)
 
     const rawGraphJson = JSON.stringify(graph, null, 2);
     parts.push(
-      `\n\n## Graph\n\n### Raw JSON\n\n\`\`\`json\n${rawGraphJson}\n\`\`\`\n\n### Nodes\n\n${nodeTable}\n\n### Edges\n\n${edgeTable}`,
+      `\n\n## Graph\n\n### Source: Raw JSON\n\n\`\`\`json\n${rawGraphJson}\n\`\`\`\n\n### Generated: Nodes\n\n${nodeTable}\n\n### Generated: Edges\n\n${edgeTable}`,
     );
   }
 
