@@ -89,6 +89,8 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   }
 
   const mergedGraph = { nodes: [], edges: [] };
+  const mergedTables = [];
+  const mergedDiagrams = [];
   const narratives = [];
   for (const roleResult of result.roles || []) {
     const found = (roleResult.entities || [])
@@ -123,13 +125,19 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
         }
       }
     }
+    if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
+      mergedTables.push(...roleResult.result.tables);
+    }
+    if (roleResult.result?.diagrams && roleResult.result.diagrams.length > 0) {
+      mergedDiagrams.push(...roleResult.result.diagrams);
+    }
   }
 
   const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
   const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
   await updateStep(db, step.rstep_id, {
-    rstep_canvas_state: { graph: mergedGraph, tables: [], diagrams: [] },
+    rstep_canvas_state: { graph: mergedGraph, tables: mergedTables, diagrams: mergedDiagrams },
     rstep_synthesis: { narrative: narratives.join('\n\n') },
     rstep_status: 'completed',
     rstep_error_message: null,
