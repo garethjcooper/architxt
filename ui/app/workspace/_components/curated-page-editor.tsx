@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
@@ -44,12 +44,6 @@ function getPageTitle(page: ResearchStepSummary | DiscoverStepResponse): string 
   return 'Curated page';
 }
 
-function getPageId(page: ResearchStepSummary | DiscoverStepResponse): number | null {
-  if ('id' in page && typeof page.id === 'number') return page.id;
-  if ('step_id' in page && typeof page.step_id === 'number') return page.step_id;
-  return null;
-}
-
 export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(page), [page]);
@@ -60,24 +54,18 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   const [saving, setSaving] = useState(false);
 
   // Track the envelope we last loaded/saved against so that externally applied
-  // changes (copy/add table, graph, narrative) also make the page dirty.
-  const baselineRef = useRef<CuratedPageEnvelope | null>(null);
-  const blocksRef = useRef<NarrativeBlock[]>([]);
+  // changes (copy/add table, graph, narrative) also make the page dirty. Keeping
+  // it in React state (rather than a ref) means the dirty comparison re-computes
+  // after saves without relying on mutable reads during render. The parent remounts
+  // this editor per page via a stable key, so the initial baseline is always the
+  // envelope of the newly selected page.
+  const [baseline, setBaseline] = useState<CuratedPageEnvelope>(() => envelope);
   const displayedBlocks = useMemo(() => {
     return baseBlocks.map((b) => (deletedBlockIds.has(b.id) ? { ...b, deleted: true } : { ...b, deleted: false }));
   }, [baseBlocks, deletedBlockIds]);
-  blocksRef.current = displayedBlocks;
-
-  const pageId = getPageId(page);
-  useEffect(() => {
-    baselineRef.current = envelope;
-    setDeletedBlockIds(new Set());
-  }, [pageId]);
 
   const userMarkdown = useMemo(() => buildUserNarrativeContent(displayedBlocks), [displayedBlocks]);
   const baselineDirty = useMemo(() => {
-    const baseline = baselineRef.current;
-    if (!baseline) return false;
     const canvas = envelope.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
     const baseCanvas = baseline.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
     const narrativeChanged = userMarkdown !== (baseline.synthesis.narrative ?? '');
@@ -85,7 +73,7 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
     const tablesChanged = JSON.stringify(canvas.tables) !== JSON.stringify(baseCanvas.tables);
     const diagramsChanged = JSON.stringify(canvas.diagrams) !== JSON.stringify(baseCanvas.diagrams);
     return narrativeChanged || graphChanged || tablesChanged || diagramsChanged;
-  }, [envelope, userMarkdown]);
+  }, [envelope, baseline, userMarkdown]);
   const isDirty = userMarkdown !== envelope.synthesis.narrative || baselineDirty;
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
@@ -99,7 +87,7 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
       // the editor from accidentally overwriting freshly-added structured data with the
       // canvas snapshot it loaded with.
       await onSave(page.id, { synthesis: { narrative: userMarkdown } });
-      baselineRef.current = { synthesis: { narrative: userMarkdown }, canvas: envelope.canvas };
+      setBaseline({ synthesis: { narrative: userMarkdown }, canvas: envelope.canvas });
       setDeletedBlockIds(new Set());
       toast.success('Saved curated page');
     } finally {
@@ -127,16 +115,16 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   }, []);
 
   const removeSection = useCallback((id: string) => {
-    const ids = getSectionBlockIds(blocksRef.current, id);
+    const ids = getSectionBlockIds(displayedBlocks, id);
     setDeletedBlockIds((prev) => {
       const next = new Set(prev);
       for (const blockId of ids) {
-        const b = blocksRef.current.find((bb) => bb.id === blockId);
+        const b = displayedBlocks.find((bb: NarrativeBlock) => bb.id === blockId);
         if (b && !b.synthetic) next.add(blockId);
       }
       return next;
     });
-  }, []);
+  }, [displayedBlocks]);
 
   const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
     if (b.synthetic) return;
@@ -148,13 +136,13 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   }, [removeSection, toggleDelete]);
 
   const restoreSection = useCallback((id: string) => {
-    const ids = getSectionBlockIds(blocksRef.current, id);
+    const ids = getSectionBlockIds(displayedBlocks, id);
     setDeletedBlockIds((prev) => {
       const next = new Set(prev);
       for (const blockId of ids) next.delete(blockId);
       return next;
     });
-  }, []);
+  }, [displayedBlocks]);
 
   const restoreSectionOrBlock = useCallback((b: NarrativeBlock) => {
     if (b.synthetic) return;
