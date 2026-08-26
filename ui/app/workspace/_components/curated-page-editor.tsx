@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
@@ -44,26 +44,49 @@ function getPageTitle(page: ResearchStepSummary | DiscoverStepResponse): string 
   return 'Curated page';
 }
 
+function getPageId(page: ResearchStepSummary | DiscoverStepResponse): number | null {
+  if ('id' in page && typeof page.id === 'number') return page.id;
+  if ('step_id' in page && typeof page.step_id === 'number') return page.step_id;
+  return null;
+}
+
 export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(page), [page]);
-  const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => parseNarrativeBlocks(displayMarkdown));
+  const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
+  const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set());
   const [showIndex, setShowIndex] = useState(true);
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      setBlocks(parseNarrativeBlocks(displayMarkdown));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [displayMarkdown]);
+  // Track the envelope we last loaded/saved against so that externally applied
+  // changes (copy/add table, graph, narrative) also make the page dirty.
+  const baselineRef = useRef<CuratedPageEnvelope | null>(null);
+  const blocksRef = useRef<NarrativeBlock[]>([]);
+  const displayedBlocks = useMemo(() => {
+    return baseBlocks.map((b) => (deletedBlockIds.has(b.id) ? { ...b, deleted: true } : { ...b, deleted: false }));
+  }, [baseBlocks, deletedBlockIds]);
+  blocksRef.current = displayedBlocks;
 
-  // Use the full envelope markdown for display so canvas tables/diagrams/graph
-  // are visible in the editor. The editable/savable narrative is still the
-  // non-synthetic blocks only.
-  const userMarkdown = useMemo(() => buildUserNarrativeContent(blocks), [blocks]);
-  const isDirty = userMarkdown !== envelope.synthesis.narrative;
+  const pageId = getPageId(page);
+  useEffect(() => {
+    baselineRef.current = envelope;
+    setDeletedBlockIds(new Set());
+  }, [pageId]);
+
+  const userMarkdown = useMemo(() => buildUserNarrativeContent(displayedBlocks), [displayedBlocks]);
+  const baselineDirty = useMemo(() => {
+    const baseline = baselineRef.current;
+    if (!baseline) return false;
+    const canvas = envelope.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+    const baseCanvas = baseline.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+    const narrativeChanged = userMarkdown !== (baseline.synthesis.narrative ?? '');
+    const graphChanged = JSON.stringify(canvas.graph) !== JSON.stringify(baseCanvas.graph);
+    const tablesChanged = JSON.stringify(canvas.tables) !== JSON.stringify(baseCanvas.tables);
+    const diagramsChanged = JSON.stringify(canvas.diagrams) !== JSON.stringify(baseCanvas.diagrams);
+    return narrativeChanged || graphChanged || tablesChanged || diagramsChanged;
+  }, [envelope, userMarkdown]);
+  const isDirty = userMarkdown !== envelope.synthesis.narrative || baselineDirty;
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
 
@@ -76,11 +99,13 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
       // the editor from accidentally overwriting freshly-added structured data with the
       // canvas snapshot it loaded with.
       await onSave(page.id, { synthesis: { narrative: userMarkdown } });
+      baselineRef.current = { synthesis: { narrative: userMarkdown }, canvas: envelope.canvas };
+      setDeletedBlockIds(new Set());
       toast.success('Saved curated page');
     } finally {
       setSaving(false);
     }
-  }, [page, userMarkdown, onSave]);
+  }, [page, userMarkdown, onSave, envelope.canvas]);
 
   const handleCopy = useCallback(() => {
     if (!displayMarkdown) return;
@@ -93,13 +118,25 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   }, [displayMarkdown, pageTitle]);
 
   const toggleDelete = useCallback((id: string) => {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, deleted: !b.deleted } : b)));
+    setDeletedBlockIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }, []);
 
   const removeSection = useCallback((id: string) => {
-    const ids = getSectionBlockIds(blocks, id);
-    setBlocks((prev) => prev.map((b) => (ids.includes(b.id) && !b.synthetic ? { ...b, deleted: true } : b)));
-  }, [blocks]);
+    const ids = getSectionBlockIds(blocksRef.current, id);
+    setDeletedBlockIds((prev) => {
+      const next = new Set(prev);
+      for (const blockId of ids) {
+        const b = blocksRef.current.find((bb) => bb.id === blockId);
+        if (b && !b.synthetic) next.add(blockId);
+      }
+      return next;
+    });
+  }, []);
 
   const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
     if (b.synthetic) return;
@@ -111,9 +148,13 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
   }, [removeSection, toggleDelete]);
 
   const restoreSection = useCallback((id: string) => {
-    const ids = getSectionBlockIds(blocks, id);
-    setBlocks((prev) => prev.map((b) => (ids.includes(b.id) && !b.synthetic ? { ...b, deleted: false } : b)));
-  }, [blocks]);
+    const ids = getSectionBlockIds(blocksRef.current, id);
+    setDeletedBlockIds((prev) => {
+      const next = new Set(prev);
+      for (const blockId of ids) next.delete(blockId);
+      return next;
+    });
+  }, []);
 
   const restoreSectionOrBlock = useCallback((b: NarrativeBlock) => {
     if (b.synthetic) return;
@@ -161,7 +202,7 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
       />
       <div className="flex-1 min-h-0 overflow-hidden p-2">
         <NarrativeViewer
-          blocks={blocks}
+          blocks={displayedBlocks}
           title="Sections"
           viewMode={viewMode}
           showIndex={showIndex}
