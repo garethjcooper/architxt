@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
-import { parseMarkdownTable, extractTablesFromMarkdown } from '@/lib/envelope-merge';
 
 export type { EnvelopeCopyEvent };
 
@@ -82,10 +81,8 @@ export function EnvelopeViewer({
         label: normalized.intent_text || 'Graph',
       };
     }
-    const canvasTables = normalized.canvas?.tables ?? [];
-    const narrativeTables = extractTablesFromMarkdown(normalized.synthesis?.narrative ?? '');
-    const tables = [...canvasTables, ...narrativeTables];
-    if (tables.length > 0) {
+    const tables = normalized.canvas?.tables;
+    if (tables && tables.length > 0) {
       items.tables = {
         payload: JSON.stringify(tables, null, 2),
         label: normalized.intent_text || 'Tables',
@@ -142,8 +139,10 @@ export function EnvelopeViewer({
     : undefined;
 
   const resolveSectionCopy = useCallback(
-    (heading: string, _level: number, contentMarkdown: string): EnvelopeCopyEvent | null => {
+    (heading: string, _level: number, _contentMarkdown: string): EnvelopeCopyEvent | null => {
       const trimmed = heading.trim();
+
+      // Graph is rendered as a synthetic section; use the canonical canvas.graph.
       if (trimmed === 'Graph' || trimmed === 'Source: Raw JSON') {
         const graph = normalized?.canvas?.graph;
         if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
@@ -154,26 +153,27 @@ export function EnvelopeViewer({
           };
         }
       }
-      const canvasTables = normalized?.canvas?.tables ?? [];
-      const table = canvasTables.find((t) => t.name === trimmed);
-      if (table) {
-        return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
-      }
-      // Fallback: headings like "Table: capabilities" whose data lives in the
-      // narrative markdown rather than canvas.tables can still be copied as
-      // structured table events by parsing the rendered table back to JSON.
+
+      // Tables are rendered as "Table: <name>" headings; map back to canvas.tables by name.
       const tableHeadingMatch = trimmed.match(/^Table:\s*(.+)$/i);
       if (tableHeadingMatch) {
-        const parsed = parseMarkdownTable(tableHeadingMatch[1], contentMarkdown);
-        if (parsed) {
-          return { type: 'tables', payload: JSON.stringify([parsed], null, 2), label: parsed.name };
+        const tableName = tableHeadingMatch[1].trim();
+        const table = normalized?.canvas?.tables?.find((t) => t.name === tableName);
+        if (table) {
+          return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
         }
       }
-      const diagrams = normalized?.canvas?.diagrams ?? [];
-      const diagram = diagrams.find((d) => d.name === trimmed);
-      if (diagram) {
-        return { type: 'diagrams', payload: JSON.stringify([diagram], null, 2), label: diagram.name };
+
+      // Diagrams are rendered as "Diagram: <name>" headings; map back to canvas.diagrams by name.
+      const diagramHeadingMatch = trimmed.match(/^Diagram:\s*(.+)$/i);
+      if (diagramHeadingMatch) {
+        const diagramName = diagramHeadingMatch[1].trim();
+        const diagram = normalized?.canvas?.diagrams?.find((d) => d.name === diagramName);
+        if (diagram) {
+          return { type: 'diagrams', payload: JSON.stringify([diagram], null, 2), label: diagram.name };
+        }
       }
+
       return null;
     },
     [normalized]
