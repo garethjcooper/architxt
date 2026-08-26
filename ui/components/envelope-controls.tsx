@@ -32,9 +32,9 @@ export function EnvelopeControls({
   const [controlsOpen, setControlsOpen] = useState(false);
 
   return (
-    <div className="relative h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
-      <div className="text-xs font-medium truncate">{title}</div>
-      <div className="flex items-center gap-2">
+    <div className="relative h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+      <div className="min-w-0 flex-1 text-xs font-medium truncate pr-3">{title}</div>
+      <div className="flex items-center gap-2 shrink-0">
         {count !== undefined && (
           <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-white/20 text-emerald-200/80">
             {count}
@@ -51,7 +51,7 @@ export function EnvelopeControls({
         </label>
       </div>
       {controlsOpen && (
-        <div className="absolute top-10 right-3 z-10 flex flex-col gap-2 rounded-md border border-white/10 bg-[oklch(0.18_0_0)]/75 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[220px]">
+        <div className="absolute top-full right-3 mt-1 z-30 flex flex-col gap-2 rounded-md border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[220px]">
           <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
             <Switch
               checked={showIndex}
