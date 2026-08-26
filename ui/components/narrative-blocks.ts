@@ -28,13 +28,18 @@ const SYNTHETIC_HEADING_PREFIXES = [
   'Table:',
   'Graph:',
   'Diagram:',
+  'Source:',
+  'Generated:',
   'Raw JSON',
   'mermaid',
 ];
 
+const SYNTHETIC_HEADING_EXACTS = ['Graph'];
+
 export function isSyntheticHeading(title?: string): boolean {
   if (!title) return false;
   const trimmed = title.trim();
+  if (SYNTHETIC_HEADING_EXACTS.includes(trimmed)) return true;
   return SYNTHETIC_HEADING_PREFIXES.some((prefix) =>
     trimmed === prefix || trimmed.startsWith(`${prefix} `)
   );
@@ -144,8 +149,19 @@ export function buildNarrativeContent(blocks: NarrativeBlock[]): string {
 }
 
 export function buildUserNarrativeContent(blocks: NarrativeBlock[]): string {
+  // Drop synthetic headings and every block that lives under a synthetic heading,
+  // even if the blocks themselves are not marked synthetic (e.g. legacy graph JSON
+  // that was previously stored inside synthesis.narrative).
+  const syntheticSubtreeIds = new Set<string>();
+  for (const b of blocks) {
+    if (b.type === 'heading' && b.synthetic) {
+      for (const id of getSectionBlockIds(blocks, b.id)) {
+        syntheticSubtreeIds.add(id);
+      }
+    }
+  }
   return blocks
-    .filter((b) => !b.deleted && !b.synthetic)
+    .filter((b) => !b.deleted && !b.synthetic && !syntheticSubtreeIds.has(b.id))
     .map((b) => b.edited ?? b.raw)
     .join('');
 }
