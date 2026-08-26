@@ -7,7 +7,7 @@ import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildNarrativeContent, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
-import { cn } from '@/lib/utils';
+import { cn, downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export type CuratedPageEnvelope = {
@@ -43,25 +43,6 @@ function getPageTitle(page: ResearchStepSummary | DiscoverStepResponse): string 
   if ('intent_text' in page && page.intent_text) return page.intent_text;
   if ('id' in page && typeof page.id === 'number') return `Page ${page.id}`;
   return 'Curated page';
-}
-
-function sanitizeFilenameBase(name: string): string {
-  return name.replace(/[^a-zA-Z0-9\\-_]/g, '_').slice(0, 50);
-}
-
-function downloadMarkdown(markdown: string, title: string) {
-  const date = new Date().toISOString().split('T')[0];
-  const filename = `${sanitizeFilenameBase(title)}-${date}.md`;
-  const blob = new Blob([markdown], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast.success(`Downloaded as ${filename}`);
 }
 
 export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPageEditorProps) {
