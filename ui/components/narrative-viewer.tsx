@@ -96,7 +96,15 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     setInternalActiveRangeIds(new Set());
   }, [content, blocksProp]);
 
-  const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading' && !b.synthetic), [blocks]);
+  const structuralBlocks = useMemo(() => blocks.filter(b => {
+    if (b.type === 'text') return false;
+    if (b.type === 'heading') return !b.synthetic;
+    // Hide inline table blocks and raw JSON code blocks from the index;
+    // they are not navigable sections and just add noise.
+    if (b.type === 'table') return false;
+    if (b.type === 'code' && b.language === 'json') return false;
+    return true;
+  }), [blocks]);
 
   const hasContentBlocks = blocks.some(
     b => b.type === 'text' || b.type === 'code' || b.type === 'table' || b.type === 'image'
