@@ -60,6 +60,7 @@ export function CuratedPageTabs({
 }: CuratedPageTabsProps) {
   const [pagesOpen, setPagesOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
+  const [renamingPage, setRenamingPage] = useState<{ stepId: number; title: string } | null>(null);
 
   const curatedTabIds = new Set(
     tabs.filter((t) => t.kind === 'curated' && t.stepId != null).map((t) => t.stepId!)
@@ -78,14 +79,16 @@ export function CuratedPageTabs({
     setPagesOpen(false);
   }, [tabs, curatedPages, onCreateCuratedPage]);
 
-  const handlePageListRename = useCallback(
-    async (stepId: number, current: string) => {
-      const next = window.prompt('Rename curated page', current);
-      if (!next || next.trim() === current) return;
-      await onRenameCuratedPage(stepId, next.trim());
-    },
-    [onRenameCuratedPage]
-  );
+  const handleConfirmRename = useCallback(async () => {
+    if (!renamingPage) return;
+    const next = renamingPage.title.trim();
+    if (!next) {
+      setRenamingPage(null);
+      return;
+    }
+    await onRenameCuratedPage(renamingPage.stepId, next);
+    setRenamingPage(null);
+  }, [renamingPage, onRenameCuratedPage]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!confirmDelete) return;
@@ -156,7 +159,7 @@ export function CuratedPageTabs({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handlePageListRename(page.id, page.intent_text || `Page ${page.id}`);
+                        setRenamingPage({ stepId: page.id, title: page.intent_text || `Page ${page.id}` });
                       }}
                       className="p-1 rounded text-white/40 hover:text-white hover:bg-white/10"
                       title="Rename"
@@ -241,6 +244,37 @@ export function CuratedPageTabs({
               </Button>
               <Button variant="destructive" size="sm" onClick={() => void handleConfirmDelete()}>
                 Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {renamingPage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] p-4 w-80 shadow-lg">
+            <div className="text-sm font-medium text-white/90 mb-2">Rename curated page</div>
+            <input
+              type="text"
+              value={renamingPage.title}
+              onChange={(e) => setRenamingPage({ ...renamingPage, title: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handleConfirmRename();
+                } else if (e.key === 'Escape') {
+                  setRenamingPage(null);
+                }
+              }}
+              className="w-full px-2 py-1.5 mb-4 rounded bg-black/30 border border-white/10 text-xs text-white/90 placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setRenamingPage(null)}>
+                Cancel
+              </Button>
+              <Button variant="default" size="sm" onClick={() => void handleConfirmRename()}>
+                Save
               </Button>
             </div>
           </div>
