@@ -1,5 +1,6 @@
 'use client';
-import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { EnvelopeViewer } from '@/components/envelope-viewer';
+import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { CuratedPageEditor, type CuratedPageEnvelope } from './curated-page-editor';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 
@@ -15,7 +16,7 @@ export interface WorkspaceResultPanelProps {
   activeCuratedPage?: ResearchStepSummary | null;
   curatedPages?: ResearchStepSummary[];
   onSaveCuratedPage?: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
-  onCopyToCuratedPage?: (event: EnvelopeCopyEvent) => void;
+  onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
 }
 
 export function WorkspaceResultPanel({

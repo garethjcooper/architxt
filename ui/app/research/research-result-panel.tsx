@@ -11,6 +11,7 @@ import { EnvelopeControls } from '@/components/envelope-controls';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
 import { sanitizeFilenameBase, downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
+import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import cytoscape from 'cytoscape';
 
 function downloadBlob(content: string | Blob, filename: string, type: string) {
@@ -97,6 +98,11 @@ export interface ResearchCopyEvent {
   payload: string;
   /** Human-readable label for the copied chunk. */
   label?: string;
+}
+
+/** Convert internal EnvelopeCopyEvent to the ResearchCopyEvent shape (they are structurally identical). */
+function toResearchCopyEvent(event: EnvelopeCopyEvent): ResearchCopyEvent {
+  return event;
 }
 
 export interface ResearchResultPanelProps {
@@ -363,7 +369,8 @@ export function ResearchResultPanel({
                   title="Sections"
                   viewMode={showNarrativePlain ? 'plain' : 'markdown'}
                   showIndex={showNarrativeIndex}
-                  onCopySection={onCopy ? (markdown, title) => onCopy({ type: 'narrative', payload: markdown, label: title }) : undefined}
+                  onCopySection={onCopy ? (event) => onCopy(event) : undefined}
+                  onCopyWholeDocument={onCopy ? (events) => events.forEach((event) => onCopy(event)) : undefined}
                   keyPrefix={keyPrefix}
                 />
               )}

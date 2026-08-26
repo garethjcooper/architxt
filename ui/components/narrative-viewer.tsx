@@ -6,6 +6,7 @@ import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type Narrat
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
+import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
 export interface NarrativeViewerProps {
   /** Markdown narrative content to display/index. Either this or `blocks` must be provided. */
@@ -22,8 +23,8 @@ export interface NarrativeViewerProps {
   onBlockClick?: (block: NarrativeBlock) => void;
   /** Called when the user clicks a heading in the index. */
   onHeadingClick?: (id: string, title?: string) => void;
-  /** Called when the user chooses to copy a section (heading + its content). Receives the raw markdown. */
-  onCopySection?: (markdown: string, title?: string) => void;
+  /** Called when the user chooses to copy a section (heading + its content). Receives an envelope event. */
+  onCopySection?: (event: EnvelopeCopyEvent) => void;
   /** Optional extra className for the outer container. */
   className?: string;
   /** Display mode: 'plain' keeps the raw block view; 'markdown' renders formatted Markdown. */
@@ -43,11 +44,18 @@ export interface NarrativeViewerProps {
   /** Optional render prop for extra content-block actions, appended inside the default block row. */
   renderBlockActions?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
   /** Optional callback to add a section/block to a curated page. When provided, a + icon appears on each structural block. */
-  onAddToPage?: (markdown: string, title?: string) => void;
+  onAddToPage?: (event: EnvelopeCopyEvent) => void;
   /** Optional label for the add-to-page action. */
   addToPageLabel?: string;
   /** When true, show copy/add actions in the section index header. Defaults to true when onCopySection/onAddToPage are provided. */
   showHeaderActions?: boolean;
+  /**
+   * Optional resolver that turns a section (heading + content) into a structured envelope event.
+   * If it returns null, the section is treated as narrative.
+   */
+  resolveSectionCopy?: (heading: string, level: number, contentMarkdown: string) => EnvelopeCopyEvent | null;
+  /** Called when the user copies/adds the whole document. Decomposes into one or more envelope events. */
+  onCopyWholeDocument?: (events: EnvelopeCopyEvent[]) => void;
 }
 
 export const NarrativeViewer = forwardRef(function NarrativeViewer({
@@ -71,6 +79,8 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   onAddToPage,
   addToPageLabel = 'Add to page',
   showHeaderActions,
+  resolveSectionCopy,
+  onCopyWholeDocument,
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
   const instanceId = useId().replace(/:/g, '');
   const prefix = keyPrefix ? `${keyPrefix}-` : `${instanceId}-`;
@@ -92,13 +102,55 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
 
   const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading' || b.type === 'image'), [blocks]);
 
-  const effectiveShowHeaderActions = showHeaderActions ?? (Boolean(onCopySection) || Boolean(onAddToPage));
+  const effectiveShowHeaderActions = showHeaderActions ?? (Boolean(onCopySection) || Boolean(onAddToPage) || Boolean(onCopyWholeDocument));
 
   const wholeDocumentMarkdown = useMemo(() => {
     return blocks.filter((b) => !b.deleted).map((b) => b.edited ?? b.raw).join('');
   }, [blocks]);
 
   const renderedMarkdown = content || wholeDocumentMarkdown;
+
+  const makeSectionEvent = useCallback((b: NarrativeBlock): EnvelopeCopyEvent => {
+    const ids = getSectionBlockIds(blocks, b.id);
+    const markdown = blocks
+      .filter((bb) => ids.includes(bb.id))
+      .map((bb) => bb.edited ?? bb.raw)
+      .join('');
+    if (resolveSectionCopy) {
+      const resolved = resolveSectionCopy(b.title ?? '', b.level ?? 0, markdown);
+      if (resolved) return resolved;
+    }
+    if (b.synthetic) {
+      return { type: 'narrative', payload: markdown, label: b.title };
+    }
+    return { type: 'narrative', payload: markdown, label: b.title };
+  }, [blocks, resolveSectionCopy]);
+
+  const makeBlockEvent = (raw: string, title?: string): EnvelopeCopyEvent => {
+    if (resolveSectionCopy) {
+      const resolved = resolveSectionCopy(title ?? '', 0, raw);
+      if (resolved) return resolved;
+    }
+    return { type: 'narrative', payload: raw, label: title };
+  };
+
+  const copyWholeDocument = useCallback(() => {
+    if (!onCopyWholeDocument) return;
+    const events: EnvelopeCopyEvent[] = [];
+    const covered = new Set<string>();
+    for (const b of structuralBlocks) {
+      if (covered.has(b.id)) continue;
+      const event = makeSectionEvent(b);
+      events.push(event);
+      const ids = getSectionBlockIds(blocks, b.id);
+      ids.forEach((id) => covered.add(id));
+    }
+    const proseBlocks = blocks.filter((bb) => !bb.deleted && !covered.has(bb.id));
+    if (proseBlocks.length > 0) {
+      events.push({ type: 'narrative', payload: proseBlocks.map((bb) => bb.edited ?? bb.raw).join(''), label: title });
+    }
+    onCopyWholeDocument(events);
+  }, [blocks, structuralBlocks, makeSectionEvent, onCopyWholeDocument, title]);
 
   const scrollToBlock = useCallback((id: string) => {
     const container = markdownContainerRef.current;
@@ -195,12 +247,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                const ids = getSectionBlockIds(blocks, b.id);
-                const markdown = blocks
-                  .filter((bb) => ids.includes(bb.id))
-                  .map((bb) => bb.raw)
-                  .join('');
-                onCopySection(markdown, b.title);
+                onCopySection(makeSectionEvent(b));
               }}
               className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
               title="Copy section to page editor"
@@ -214,12 +261,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                const ids = getSectionBlockIds(blocks, b.id);
-                const markdown = blocks
-                  .filter((bb) => ids.includes(bb.id))
-                  .map((bb) => bb.raw)
-                  .join('');
-                onAddToPage(markdown, b.title);
+                onAddToPage(makeSectionEvent(b));
               }}
               className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
               title={addToPageLabel}
@@ -271,7 +313,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAddToPage(b.raw, b.title);
+                      onAddToPage(makeBlockEvent(b.raw, b.title));
                     }}
                     className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
                     title={addToPageLabel}
@@ -289,7 +331,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddToPage(b.raw, b.title);
+                    onAddToPage(makeBlockEvent(b.raw, b.title));
                   }}
                   className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
                   title={addToPageLabel}
@@ -386,7 +428,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddToPage(b.raw, b.title);
+                    onAddToPage(makeBlockEvent(b.raw, b.title));
                   }}
                   className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
                   title={addToPageLabel}
@@ -404,7 +446,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAddToPage(b.raw, b.title);
+                  onAddToPage(makeBlockEvent(b.raw, b.title));
                 }}
                 className="p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-colors"
                 title={addToPageLabel}
@@ -433,12 +475,12 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               </div>
               {effectiveShowHeaderActions && (
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {onCopySection && (
+                  {onCopyWholeDocument && (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onCopySection(wholeDocumentMarkdown, title);
+                        copyWholeDocument();
                       }}
                       className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
                       title="Copy all to page editor"
@@ -447,12 +489,12 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                       <Copy className="h-3 w-3" />
                     </button>
                   )}
-                  {onAddToPage && (
+                  {onCopyWholeDocument && (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onAddToPage(wholeDocumentMarkdown, title);
+                        copyWholeDocument();
                       }}
                       className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
                       title={addToPageLabel}
