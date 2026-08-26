@@ -5,6 +5,7 @@ import { NarrativeViewer } from './narrative-viewer';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
 import { EnvelopeControls } from './envelope-controls';
 import { toast } from 'sonner';
+import { downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 
 export interface EnvelopeCopyEvent {
@@ -40,26 +41,6 @@ export interface EnvelopeViewerProps {
   defaultViewMode?: 'plain' | 'markdown';
   /** Name used for downloaded file names. */
   sessionName?: string;
-}
-
-function sanitizeFilenameBase(name: string): string {
-  return name.replace(/[^a-zA-Z0-9\\-_]/g, '_').slice(0, 50);
-}
-
-function downloadMarkdown(markdown: string, sessionName: string) {
-  const date = new Date().toISOString().split('T')[0];
-  const sanitized = sanitizeFilenameBase(sessionName);
-  const filename = `${sanitized}-${date}.md`;
-  const blob = new Blob([markdown], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast.success(`Downloaded as ${filename}`);
 }
 
 export function EnvelopeViewer({
