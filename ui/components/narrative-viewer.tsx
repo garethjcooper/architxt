@@ -7,12 +7,6 @@ import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
 
-export interface NarrativeDiagram {
-  name: string;
-  type: string;
-  content: string;
-}
-
 export interface NarrativeViewerProps {
   /** Markdown narrative content to display/index. Either this or `blocks` must be provided. */
   content?: string;
@@ -36,8 +30,6 @@ export interface NarrativeViewerProps {
   viewMode?: 'plain' | 'markdown';
   /** Whether to show the left-hand index sidebar. */
   showIndex?: boolean;
-  /** Optional Mermaid diagrams to render inline after the narrative content. @deprecated Diagrams should now be included in the Markdown content itself as fenced mermaid blocks. */
-  diagrams?: NarrativeDiagram[];
   /** Optional key namespace so multiple NarrativeViewers on the same page don't share React keys. */
   keyPrefix?: string;
   /** Optional header content rendered above the sidebar/content panes. */
@@ -68,7 +60,6 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   className = '',
   viewMode = 'plain',
   showIndex = true,
-  diagrams,
   keyPrefix = '',
   header,
   editingBlockId,
@@ -529,15 +520,6 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               }
               return defaultBlock(b, isActive);
             })
-          )}
-          {diagrams && diagrams.length > 0 && (
-            <div className="mt-6 flex flex-col gap-4">
-              <hr className="border-white/10" />
-              <div className="text-[10px] uppercase text-white/40 font-medium">Legacy diagram pane (deprecated)</div>
-              {diagrams.map((d, idx) => (
-                <MermaidDiagram key={idx} name={d.name} type={d.type} content={d.content} />
-              ))}
-            </div>
           )}
         </div>
       </div>
