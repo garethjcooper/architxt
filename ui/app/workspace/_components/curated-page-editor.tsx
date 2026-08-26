@@ -1,11 +1,14 @@
 'use client';
 
-import { forwardRef, useImperativeHandle, useState, useEffect, useMemo, useCallback } from 'react';
-import { Trash2, Undo2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
+import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export type CuratedPageEnvelope = {
   synthesis: { narrative: string };
@@ -20,21 +23,8 @@ export interface CuratedPageEditorProps {
   page: ResearchStepSummary | DiscoverStepResponse;
   pages?: ResearchStepSummary[];
   onSave: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
-  /** Optional callback invoked when the user requests to add a section to another page. */
-  onAddRequest?: (sectionMarkdown: string, sectionTitle?: string) => void;
   /** When true, the editor renders a compact read-only preview without editing controls. */
   readOnly?: boolean;
-  /** Controls whether the NarrativeViewer index sidebar is shown. */
-  showIndex?: boolean;
-  /** Controls whether the NarrativeViewer uses plain or markdown mode. */
-  viewMode?: 'plain' | 'markdown';
-  /** Called whenever the dirty state changes so the parent can render a save affordance. */
-  onDirtyChange?: (dirty: boolean) => void;
-}
-
-export interface CuratedPageEditorRef {
-  save: () => Promise<void>;
-  isDirty: () => boolean;
 }
 
 function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): CuratedPageEnvelope {
@@ -49,19 +39,39 @@ function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): Cu
   };
 }
 
-export const CuratedPageEditor = forwardRef<CuratedPageEditorRef, CuratedPageEditorProps>(function CuratedPageEditor({
-  page,
-  onSave,
-  readOnly = false,
-  showIndex = true,
-  viewMode = 'plain',
-  onDirtyChange,
-}: CuratedPageEditorProps, ref) {
+function getPageTitle(page: ResearchStepSummary | DiscoverStepResponse): string {
+  if ('intent_text' in page && page.intent_text) return page.intent_text;
+  if ('id' in page && typeof page.id === 'number') return `Page ${page.id}`;
+  return 'Curated page';
+}
+
+function sanitizeFilenameBase(name: string): string {
+  return name.replace(/[^a-zA-Z0-9\\-_]/g, '_').slice(0, 50);
+}
+
+function downloadMarkdown(markdown: string, title: string) {
+  const date = new Date().toISOString().split('T')[0];
+  const filename = `${sanitizeFilenameBase(title)}-${date}.md`;
+  const blob = new Blob([markdown], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast.success(`Downloaded as ${filename}`);
+}
+
+export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => parseNarrativeBlocks(envelope.synthesis.narrative));
+  const [showIndex, setShowIndex] = useState(true);
+  const [plain, setPlain] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Defer parsing to avoid cascading renders caused by synchronous setState.
     const id = requestAnimationFrame(() => {
       setBlocks(parseNarrativeBlocks(envelope.synthesis.narrative));
     });
@@ -69,28 +79,33 @@ export const CuratedPageEditor = forwardRef<CuratedPageEditorRef, CuratedPageEdi
   }, [envelope.synthesis.narrative]);
 
   const currentMarkdown = useMemo(() => buildNarrativeContent(blocks), [blocks]);
-  const isDirty = useMemo(() => currentMarkdown !== envelope.synthesis.narrative, [currentMarkdown, envelope.synthesis.narrative]);
-
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+  const isDirty = currentMarkdown !== envelope.synthesis.narrative;
+  const viewMode = plain ? 'plain' : 'markdown';
+  const pageTitle = useMemo(() => getPageTitle(page), [page]);
 
   const handleSave = useCallback(async () => {
-    if (!page || !('id' in page)) return;
+    if (!page || !('id' in page) || typeof page.id !== 'number') return;
+    setSaving(true);
     try {
       await onSave(page.id, {
         synthesis: { narrative: currentMarkdown },
         canvas: envelope.canvas,
       });
+      toast.success('Saved curated page');
     } finally {
-      // saving state is managed by the parent chrome
+      setSaving(false);
     }
   }, [page, currentMarkdown, envelope.canvas, onSave]);
 
-  useImperativeHandle(ref, () => ({
-    save: handleSave,
-    isDirty: () => isDirty,
-  }), [handleSave, isDirty]);
+  const handleCopy = useCallback(() => {
+    if (!currentMarkdown) return;
+    navigator.clipboard.writeText(currentMarkdown).then(() => toast.success('Copied to clipboard'));
+  }, [currentMarkdown]);
+
+  const handleDownload = useCallback(() => {
+    if (!currentMarkdown) return;
+    downloadMarkdown(currentMarkdown, pageTitle);
+  }, [currentMarkdown, pageTitle]);
 
   const toggleDelete = useCallback((id: string) => {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, deleted: !b.deleted } : b)));
@@ -124,6 +139,39 @@ export const CuratedPageEditor = forwardRef<CuratedPageEditorRef, CuratedPageEdi
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <EnvelopeControls
+        title={pageTitle}
+        showIndex={showIndex}
+        onShowIndexChange={setShowIndex}
+        plain={plain}
+        onPlainChange={setPlain}
+        onCopyText={handleCopy}
+        onSaveMd={handleDownload}
+        extraHeaderItems={
+          readOnly ? undefined : (
+            <>
+              {isDirty && (
+                <span className="text-[10px] text-white/50 hidden sm:inline">Unsaved changes</span>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!isDirty || saving}
+                className={cn(
+                  'h-6 px-2 rounded text-[11px] flex items-center gap-1 transition-colors',
+                  isDirty
+                    ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                )}
+              >
+                {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+                <Save className="h-3 w-3" />
+                Save
+              </button>
+            </>
+          )
+        }
+      />
       <div className="flex-1 min-h-0 overflow-hidden p-2">
         <NarrativeViewer
           blocks={blocks}
@@ -161,7 +209,7 @@ export const CuratedPageEditor = forwardRef<CuratedPageEditorRef, CuratedPageEdi
       </div>
     </div>
   );
-});
+}
 
 export function buildCuratedPagePreview(page: ResearchStepSummary): string {
   return buildEnvelopeMarkdown(page);

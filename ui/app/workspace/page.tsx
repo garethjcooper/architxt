@@ -36,7 +36,7 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
-import { type CuratedPageEnvelope, type CuratedPageEditorRef } from './_components/curated-page-editor';
+import { type CuratedPageEnvelope } from './_components/curated-page-editor';
 
 const logger = createLogger('WorkspacePage');
 
@@ -75,14 +75,6 @@ export default function WorkspacePage() {
 
   const [pendingSection, setPendingSection] = useState<{ markdown: string; title?: string } | null>(null);
 
-  // Curated page viewer chrome state (lifted so it can live in the tab bar).
-  const [curatedShowIndex, setCuratedShowIndex] = useState(true);
-  const [curatedPlain, setCuratedPlain] = useState(true);
-  const [curatedControlsOpen, setCuratedControlsOpen] = useState(false);
-  const [curatedDirty, setCuratedDirty] = useState(false);
-  const [curatedSaving, setCuratedSaving] = useState(false);
-  const curatedEditorRef = useRef<CuratedPageEditorRef | null>(null);
-
   const {
     selectedServerId,
     setSelectedServerId,
@@ -101,8 +93,6 @@ export default function WorkspacePage() {
     if (!tab || tab.kind !== 'curated' || tab.stepId == null) return null;
     return workspaceSession.curatedPages.find((p) => p.id === tab.stepId) ?? null;
   }, [tabs, activeTabId, workspaceSession.curatedPages]);
-
-  const isCuratedActive = Boolean(activeCuratedPage);
 
   useEffect(() => {
     setActiveSession(workspaceSession.activeSession);
@@ -388,15 +378,6 @@ export default function WorkspacePage() {
     },
     [workspaceSession.refresh]
   );
-
-  const handleSaveActivePage = useCallback(async () => {
-    setCuratedSaving(true);
-    try {
-      await curatedEditorRef.current?.save();
-    } finally {
-      setCuratedSaving(false);
-    }
-  }, []);
 
   const handleCopyToCuratedPage = useCallback(
     (sectionMarkdown: string, sectionTitle?: string) => {
@@ -963,16 +944,6 @@ export default function WorkspacePage() {
                 });
                 setActiveTabId(ANCHOR_TAB_ID);
               }}
-              isCuratedActive={isCuratedActive}
-              onSaveActivePage={handleSaveActivePage}
-              isDirty={curatedDirty}
-              controlsOpen={curatedControlsOpen}
-              onControlsOpenChange={setCuratedControlsOpen}
-              showIndex={curatedShowIndex}
-              onShowIndexChange={setCuratedShowIndex}
-              plain={curatedPlain}
-              onPlainChange={setCuratedPlain}
-              saving={curatedSaving}
             />
             <WorkspaceResultPanel
               result={previewResult}
@@ -986,10 +957,6 @@ export default function WorkspacePage() {
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
               onCopyToCuratedPage={handleCopyToCuratedPage}
-              curatedEditorRef={curatedEditorRef}
-              curatedShowIndex={curatedShowIndex}
-              curatedViewMode={curatedPlain ? 'plain' : 'markdown'}
-              onCuratedDirtyChange={setCuratedDirty}
             />
           </div>
         </div>

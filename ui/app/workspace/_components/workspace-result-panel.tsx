@@ -1,6 +1,6 @@
 'use client';
 import { EnvelopeViewer, type EnvelopeCopyEvent } from '@/components/envelope-viewer';
-import { CuratedPageEditor, type CuratedPageEnvelope, type CuratedPageEditorRef } from './curated-page-editor';
+import { CuratedPageEditor, type CuratedPageEnvelope } from './curated-page-editor';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 
 export interface WorkspaceResultPanelProps {
@@ -16,14 +16,6 @@ export interface WorkspaceResultPanelProps {
   curatedPages?: ResearchStepSummary[];
   onSaveCuratedPage?: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
   onCopyToCuratedPage?: (sectionMarkdown: string, sectionTitle?: string) => void;
-  /** Ref forwarded to the CuratedPageEditor so the parent can trigger save. */
-  curatedEditorRef?: React.RefObject<CuratedPageEditorRef | null>;
-  /** Controls whether the curated editor shows the index sidebar. */
-  curatedShowIndex?: boolean;
-  /** Controls whether the curated editor uses plain or markdown mode. */
-  curatedViewMode?: 'plain' | 'markdown';
-  /** Called when the curated editor's dirty state changes. */
-  onCuratedDirtyChange?: (dirty: boolean) => void;
 }
 
 export function WorkspaceResultPanel({
@@ -38,10 +30,6 @@ export function WorkspaceResultPanel({
   curatedPages = [],
   onSaveCuratedPage,
   onCopyToCuratedPage,
-  curatedEditorRef,
-  curatedShowIndex,
-  curatedViewMode,
-  onCuratedDirtyChange,
 }: WorkspaceResultPanelProps) {
   if (error) {
     return (
@@ -70,13 +58,9 @@ export function WorkspaceResultPanel({
   if (activeCuratedPage && onSaveCuratedPage) {
     return (
       <CuratedPageEditor
-        ref={curatedEditorRef}
         page={activeCuratedPage}
         pages={curatedPages}
         onSave={onSaveCuratedPage}
-        showIndex={curatedShowIndex}
-        viewMode={curatedViewMode}
-        onDirtyChange={onCuratedDirtyChange}
       />
     );
   }
