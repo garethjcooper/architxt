@@ -59,6 +59,7 @@ export function WorkspaceResultPanel({
   if (activeCuratedPage && onSaveCuratedPage) {
     return (
       <CuratedPageEditor
+        key={activeCuratedPage.id}
         page={activeCuratedPage}
         onSave={onSaveCuratedPage}
       />

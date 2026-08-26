@@ -460,6 +460,12 @@ export default function WorkspacePage() {
       try {
         await researchApi.updateCuratedPage(stepId, { canvas, synthesis });
         await workspaceSession.refresh();
+        // Make the target page visible so the user sees the applied change and
+        // the Save button reflect the updated envelope.
+        setActiveTabId((current) => {
+          const targetId = `curated-${stepId}`;
+          return current === targetId ? current : targetId;
+        });
         if (toastMessage) toast.success(toastMessage);
       } catch (err) {
         logger.error('Failed to apply copy event', err);
