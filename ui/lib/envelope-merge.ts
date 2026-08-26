@@ -1,4 +1,25 @@
-import type { GraphNode, GraphEdge } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge } from '@/lib/api/client';
+
+export interface TableItem {
+  name: string;
+  columns?: string[];
+  rows: Record<string, unknown>[];
+}
+
+export interface DiagramItem {
+  name: string;
+  type: string;
+  content: string;
+}
+
+type EnvelopeLike = {
+  synthesis?: { narrative?: string | null } | null;
+  canvas?: {
+    graph?: { nodes?: GraphNode[]; edges?: GraphEdge[] } | null;
+    tables?: TableItem[] | null;
+    diagrams?: DiagramItem[] | null;
+  } | null;
+};
 
 export interface GraphMergeResult {
   nodes: GraphNode[];
@@ -110,4 +131,89 @@ function normalizeSpacing(text: string): string {
   return text
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/** Parse a markdown table section back into structured table JSON. */
+export function parseMarkdownTable(name: string, markdown: string): TableItem | null {
+  const lines = markdown
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && l.includes('|'));
+
+  // Drop separator lines (| --- | --- |).
+  const nonSeparator = lines.filter((l) => !/^\s*\|?\s*[-:]+\s*\|?\s*$/.test(l));
+  if (nonSeparator.length < 2) return null;
+
+  const parseRow = (line: string): string[] =>
+    line
+      .split('|')
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
+
+  const headers = parseRow(nonSeparator[0]);
+  if (headers.length === 0) return null;
+
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 1; i < nonSeparator.length; i++) {
+    const cells = parseRow(nonSeparator[i]);
+    if (cells.length === 0) continue;
+    const row: Record<string, unknown> = {};
+    headers.forEach((h, idx) => {
+      const cell = cells[idx];
+      row[h] = cell !== undefined ? tryParseJsonCell(cell) : '';
+    });
+    rows.push(row);
+  }
+
+  if (rows.length === 0) return null;
+  return { name, columns: headers, rows };
+}
+
+function tryParseJsonCell(value: string): unknown {
+  if (value === '') return '';
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'null') return null;
+  if (/^-?\d+(\.\d+)?$/.test(value)) {
+    const num = Number(value);
+    if (Number.isFinite(num)) return num;
+  }
+  // Markdown table cells may contain stringified JSON arrays/objects.
+  if ((value.startsWith('[') && value.endsWith(']')) || (value.startsWith('{') && value.endsWith('}'))) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+/**
+ * Parse an envelope's rendered markdown back into structured table items.
+ * Useful when the source page only stored tables inside `synthesis.narrative`
+ * rather than in `canvas.tables`.
+ */
+export function extractTablesFromMarkdown(markdown: string): TableItem[] {
+  const tables: TableItem[] = [];
+  const lines = markdown.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const headingMatch = lines[i].match(/^#{1,6}\s+Table:\s*(.+)$/i);
+    if (headingMatch) {
+      const name = headingMatch[1].trim();
+      const tableLines: string[] = [];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim().includes('|')) {
+        tableLines.push(lines[j]);
+        j++;
+      }
+      const parsed = parseMarkdownTable(name, tableLines.join('\n'));
+      if (parsed) tables.push(parsed);
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  return tables;
 }
