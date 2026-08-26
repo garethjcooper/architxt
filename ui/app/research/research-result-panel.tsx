@@ -7,8 +7,9 @@ import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
+import { EnvelopeControls } from '@/components/envelope-controls';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
-import { sanitizeFilenameBase } from '@/lib/utils';
+import { sanitizeFilenameBase, downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import cytoscape from 'cytoscape';
 
@@ -177,7 +178,6 @@ export function ResearchResultPanel({
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [hoveredInfo, setHoveredInfo] = useState<{ kind: 'node' | 'edge'; data: any } | null>(null);
-  const [showNarrativeControls, setShowNarrativeControls] = useState(false);
   const [showNarrativeIndex, setShowNarrativeIndex] = useState(true);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
@@ -293,89 +293,37 @@ export function ResearchResultPanel({
         className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
         style={showCanvas ? { width: `${narrativeWidth}%` } : { flex: 1 }}
       >
-        <div className="px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
-          <span className="font-medium text-sm">Narrative</span>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-              <Switch
-                checked={showNarrativeControls}
-                onCheckedChange={(checked) => setShowNarrativeControls(Boolean(checked))}
-              />
-              Controls
-            </label>
-            {resultQueryDepth && (
+        <EnvelopeControls
+          title="Narrative"
+          showIndex={showNarrativeIndex}
+          onShowIndexChange={setShowNarrativeIndex}
+          plain={showNarrativePlain}
+          onPlainChange={(v) => setShowNarrativePlain?.(v)}
+          onCopyText={() => {
+            if (!narrative) return;
+            if (onCopy) {
+              onCopy({ type: 'narrative', payload: narrative, label: sessionName });
+              return;
+            }
+            navigator.clipboard.writeText(narrative).then(() => toast.success('Narrative copied to clipboard'));
+          }}
+          onSaveMd={() => {
+            if (!narrative) return;
+            if (onCopy) {
+              onCopy({ type: 'narrative', payload: narrative, label: sessionName });
+              return;
+            }
+            downloadMarkdown(narrative, sessionName);
+          }}
+          extraHeaderItems={
+            resultQueryDepth ? (
               <span className="text-[10px] text-white/50 px-2 py-0.5 rounded border border-white/10 bg-black/20">
                 {resultQueryDepth.replace('_', ' ')}
               </span>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
         <div className="flex-1 min-h-0 overflow-hidden p-2 relative">
-          {showNarrativeControls && setShowNarrativePlain && (
-            <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 rounded-md border border-white/10 bg-[oklch(0.18_0_0)]/75 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[220px]">
-              <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                <Switch
-                  checked={showNarrativeIndex}
-                  onCheckedChange={(checked) => setShowNarrativeIndex(Boolean(checked))}
-                  size="sm"
-                />
-                Show index
-              </label>
-              <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                <Switch
-                  checked={showNarrativePlain}
-                  onCheckedChange={(checked) => setShowNarrativePlain(Boolean(checked))}
-                  size="sm"
-                />
-                Plain text
-              </label>
-              <div className="h-px bg-white/10" />
-              <button
-                type="button"
-                onClick={() => {
-                  if (!narrative) return;
-                  if (onCopy) {
-                    onCopy({ type: 'narrative', payload: narrative, label: sessionName });
-                    return;
-                  }
-                  navigator.clipboard.writeText(narrative).then(() => toast.success('Narrative copied to clipboard'));
-                }}
-                className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-emerald-300 transition-colors"
-                disabled={!narrative}
-              >
-                <Copy className="h-3 w-3" />
-                Copy text
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!narrative) return;
-                  if (onCopy) {
-                    onCopy({ type: 'narrative', payload: narrative, label: sessionName });
-                    return;
-                  }
-                  const date = new Date().toISOString().split('T')[0];
-                  const sanitized = sessionName.replace(/[^a-zA-Z0-9\\-_]/g, '_').slice(0, 50);
-                  const filename = `${sanitized}-${date}.md`;
-                  const blob = new Blob([narrative], { type: 'text/markdown' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = filename;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                  toast.success(`Narrative downloaded as ${filename}`);
-                }}
-                className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-emerald-300 transition-colors"
-                disabled={!narrative}
-              >
-                <Download className="h-3 w-3" />
-                Save .md
-              </button>
-            </div>
-          )}
           {loading && (
             <div className="space-y-3">
               <Skeleton className="h-4 w-3/4" />
