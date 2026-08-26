@@ -369,7 +369,9 @@ export default function WorkspacePage() {
   const handleSaveCuratedPage = useCallback(
     async (stepId: number, envelope: CuratedPageEnvelope) => {
       try {
-        await researchApi.updateCuratedPage(stepId, { canvas: envelope.canvas, synthesis: envelope.synthesis });
+        const payload: Parameters<typeof researchApi.updateCuratedPage>[1] = { synthesis: envelope.synthesis };
+        if (envelope.canvas) payload.canvas = envelope.canvas;
+        await researchApi.updateCuratedPage(stepId, payload);
         await workspaceSession.refresh();
         toast.success('Page saved');
       } catch (err: unknown) {

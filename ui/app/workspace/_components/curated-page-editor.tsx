@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 
 export type CuratedPageEnvelope = {
   synthesis: { narrative: string };
-  canvas: {
+  canvas?: {
     graph: { nodes: unknown[]; edges: unknown[] };
     tables?: Array<{ name: string; columns?: string[]; rows: Record<string, unknown>[] }>;
     diagrams?: Array<{ name: string; type: string; content: string }>;
@@ -71,15 +71,16 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
     if (!page || !('id' in page) || typeof page.id !== 'number') return;
     setSaving(true);
     try {
-      await onSave(page.id, {
-        synthesis: { narrative: userMarkdown },
-        canvas: envelope.canvas,
-      });
+      // The editor only mutates narrative; structured canvas data (graph/tables/diagrams)
+      // is owned by the envelope-aware copy/add handlers. Saving only synthesis prevents
+      // the editor from accidentally overwriting freshly-added structured data with the
+      // canvas snapshot it loaded with.
+      await onSave(page.id, { synthesis: { narrative: userMarkdown } });
       toast.success('Saved curated page');
     } finally {
       setSaving(false);
     }
-  }, [page, userMarkdown, envelope.canvas, onSave]);
+  }, [page, userMarkdown, onSave]);
 
   const handleCopy = useCallback(() => {
     if (!displayMarkdown) return;
