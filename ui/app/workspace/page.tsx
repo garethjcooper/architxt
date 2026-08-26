@@ -37,6 +37,8 @@ import { useWorkspaceSession } from './_components/use-workspace-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
 import { type CuratedPageEnvelope } from './_components/curated-page-editor';
+import { type EnvelopeCopyEvent } from '@/components/envelope-viewer';
+import { mergeGraphs } from '@/lib/envelope-merge';
 
 const logger = createLogger('WorkspacePage');
 
@@ -73,7 +75,7 @@ export default function WorkspacePage() {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([makeAnchorTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(ANCHOR_TAB_ID);
 
-  const [pendingSection, setPendingSection] = useState<{ markdown: string; title?: string } | null>(null);
+  const [pendingSection, setPendingSection] = useState<{ event: EnvelopeCopyEvent; title?: string } | null>(null);
 
   const {
     selectedServerId,
@@ -380,41 +382,88 @@ export default function WorkspacePage() {
   );
 
   const handleCopyToCuratedPage = useCallback(
-    (sectionMarkdown: string, sectionTitle?: string) => {
+    (event: EnvelopeCopyEvent) => {
       if (activeCuratedPage) {
-        // Append to the currently active curated page immediately.
-        handleAppendSection(activeCuratedPage.id, sectionMarkdown, sectionTitle);
+        // Apply to the currently active curated page immediately.
+        void handleApplyCopyEvent(activeCuratedPage.id, event);
         return;
       }
       // No active curated page: show target picker.
-      setPendingSection({ markdown: sectionMarkdown, title: sectionTitle });
+      setPendingSection({ event, title: event.label });
     },
     [activeCuratedPage]
   );
 
-  const handleAppendSection = useCallback(
-    async (stepId: number, sectionMarkdown: string, _sectionTitle?: string) => {
+  const handleApplyCopyEvent = useCallback(
+    async (stepId: number, event: EnvelopeCopyEvent) => {
       const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
       if (!page) return;
-      const currentNarrative = page.synthesis?.narrative ?? '';
-      const prefix = currentNarrative.trim() ? '\n\n' : '';
-      const nextNarrative = `${currentNarrative}${prefix}${sectionMarkdown}`;
+
       const canvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+      const synthesis = page.synthesis ?? { narrative: '' };
+      let updateData: Parameters<typeof researchApi.updateCuratedPage>[1] = {
+        canvas,
+        synthesis,
+      };
+      let toastMessage = '';
+
+      switch (event.type) {
+        case 'narrative': {
+          const currentNarrative = synthesis.narrative ?? '';
+          const prefix = currentNarrative.trim() ? '\n\n' : '';
+          updateData.synthesis = { narrative: `${currentNarrative}${prefix}${event.payload}` };
+          toastMessage = `Added ${event.label || 'section'} to ${page.intent_text || `Page ${page.id}`}`;
+          break;
+        }
+        case 'graph': {
+          const parsedGraph = JSON.parse(event.payload);
+          const mergeResult = mergeGraphs(
+            canvas.graph ?? { nodes: [], edges: [] },
+            { nodes: parsedGraph.nodes || [], edges: parsedGraph.edges || [] }
+          );
+          updateData.canvas = {
+            ...canvas,
+            graph: { nodes: mergeResult.nodes, edges: mergeResult.edges },
+          };
+          toastMessage = `Merged graph into ${page.intent_text || `Page ${page.id}`}: +${mergeResult.addedNodes} nodes, +${mergeResult.addedEdges} edges`;
+          break;
+        }
+        case 'tables': {
+          const parsedTables = JSON.parse(event.payload);
+          const existingNames = new Set((canvas.tables ?? []).map((t) => t.name));
+          const newTables = (parsedTables ?? []).filter((t: { name: string }) => !existingNames.has(t.name));
+          updateData.canvas = {
+            ...canvas,
+            tables: [...(canvas.tables ?? []), ...newTables],
+          };
+          toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
+          break;
+        }
+        case 'diagrams': {
+          const parsedDiagrams = JSON.parse(event.payload);
+          const existingNames = new Set((canvas.diagrams ?? []).map((d) => d.name));
+          const newDiagrams = (parsedDiagrams ?? []).filter((d: { name: string }) => !existingNames.has(d.name));
+          updateData.canvas = {
+            ...canvas,
+            diagrams: [...(canvas.diagrams ?? []), ...newDiagrams],
+          };
+          toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
+          break;
+        }
+      }
+
       try {
-        await researchApi.updateCuratedPage(stepId, {
-          canvas,
-          synthesis: { narrative: nextNarrative },
-        });
+        await researchApi.updateCuratedPage(stepId, updateData);
         await workspaceSession.refresh();
         // Open the target page tab if not already active.
         setActiveTabId((current) => {
           const targetId = `curated-${stepId}`;
           return current === targetId ? current : targetId;
         });
-        toast.success(`Added ${_sectionTitle || 'section'} to ${page.intent_text || `Page ${page.id}`}`);
+        toast.success(toastMessage);
       } catch (err: unknown) {
-        logger.error('Failed to add section to curated page', err);
-        toast.error(`Failed to add section: ${String(err instanceof Error ? err.message : String(err))}`);
+        logger.error('Failed to apply copy event to curated page', err);
+        toast.error(`Failed to add ${event.type}: ${String(err instanceof Error ? err.message : String(err))}`);
       }
     },
     [workspaceSession.curatedPages, workspaceSession.refresh]
@@ -985,7 +1034,7 @@ export default function WorkspacePage() {
                     key={page.id}
                     type="button"
                     onClick={() => {
-                      void handleAppendSection(page.id, pendingSection.markdown, pendingSection.title);
+                      void handleApplyCopyEvent(page.id, pendingSection.event);
                       setPendingSection(null);
                     }}
                     className="text-left text-xs px-2 py-1.5 rounded border border-white/10 bg-black/20 text-white/70 hover:bg-white/5 hover:text-white transition-colors"
