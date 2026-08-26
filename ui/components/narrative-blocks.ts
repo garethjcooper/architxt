@@ -143,6 +143,13 @@ export function buildNarrativeContent(blocks: NarrativeBlock[]): string {
   return blocks.filter((b) => !b.deleted).map((b) => b.edited ?? b.raw).join('');
 }
 
+export function buildUserNarrativeContent(blocks: NarrativeBlock[]): string {
+  return blocks
+    .filter((b) => !b.deleted && !b.synthetic)
+    .map((b) => b.edited ?? b.raw)
+    .join('');
+}
+
 export function getSectionBlockIds(blocks: NarrativeBlock[], targetId: string): string[] {
   const idx = blocks.findIndex((b) => b.id === targetId);
   if (idx === -1) return [];
