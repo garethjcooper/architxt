@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { parseNarrativeBlocks, buildNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
+import { parseNarrativeBlocks, buildNarrativeContent, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
 import { cn } from '@/lib/utils';
@@ -66,20 +66,25 @@ function downloadMarkdown(markdown: string, title: string) {
 
 export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
-  const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => parseNarrativeBlocks(envelope.synthesis.narrative));
+  const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(page), [page]);
+  const [blocks, setBlocks] = useState<NarrativeBlock[]>(() => parseNarrativeBlocks(displayMarkdown));
   const [showIndex, setShowIndex] = useState(true);
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
-      setBlocks(parseNarrativeBlocks(envelope.synthesis.narrative));
+      setBlocks(parseNarrativeBlocks(displayMarkdown));
     });
     return () => cancelAnimationFrame(id);
-  }, [envelope.synthesis.narrative]);
+  }, [displayMarkdown]);
 
+  // Use the full envelope markdown for display so canvas tables/diagrams/graph
+  // are visible in the editor. The editable/savable narrative is still the
+  // non-synthetic blocks only.
   const currentMarkdown = useMemo(() => buildNarrativeContent(blocks), [blocks]);
-  const isDirty = currentMarkdown !== envelope.synthesis.narrative;
+  const userMarkdown = useMemo(() => buildUserNarrativeContent(blocks), [blocks]);
+  const isDirty = userMarkdown !== envelope.synthesis.narrative;
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
 
@@ -88,14 +93,14 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
     setSaving(true);
     try {
       await onSave(page.id, {
-        synthesis: { narrative: currentMarkdown },
+        synthesis: { narrative: userMarkdown },
         canvas: envelope.canvas,
       });
       toast.success('Saved curated page');
     } finally {
       setSaving(false);
     }
-  }, [page, currentMarkdown, envelope.canvas, onSave]);
+  }, [page, userMarkdown, envelope.canvas, onSave]);
 
   const handleCopy = useCallback(() => {
     if (!currentMarkdown) return;
@@ -113,10 +118,11 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
 
   const removeSection = useCallback((id: string) => {
     const ids = getSectionBlockIds(blocks, id);
-    setBlocks((prev) => prev.map((b) => (ids.includes(b.id) ? { ...b, deleted: true } : b)));
+    setBlocks((prev) => prev.map((b) => (ids.includes(b.id) && !b.synthetic ? { ...b, deleted: true } : b)));
   }, [blocks]);
 
   const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
+    if (b.synthetic) return;
     if (b.type === 'heading') {
       removeSection(b.id);
     } else {
@@ -126,10 +132,11 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
 
   const restoreSection = useCallback((id: string) => {
     const ids = getSectionBlockIds(blocks, id);
-    setBlocks((prev) => prev.map((b) => (ids.includes(b.id) ? { ...b, deleted: false } : b)));
+    setBlocks((prev) => prev.map((b) => (ids.includes(b.id) && !b.synthetic ? { ...b, deleted: false } : b)));
   }, [blocks]);
 
   const restoreSectionOrBlock = useCallback((b: NarrativeBlock) => {
+    if (b.synthetic) return;
     if (b.type === 'heading') {
       restoreSection(b.id);
     } else {
@@ -182,6 +189,7 @@ export function CuratedPageEditor({ page, onSave, readOnly = false }: CuratedPag
           className="h-full"
           renderSidebarRowActions={(b) => {
             if (readOnly) return null;
+            if (b.synthetic) return null;
             if (b.type === 'text') return null;
             return (
               <button

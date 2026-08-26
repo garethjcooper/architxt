@@ -96,15 +96,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     setInternalActiveRangeIds(new Set());
   }, [content, blocksProp]);
 
-  const structuralBlocks = useMemo(() => blocks.filter(b => {
-    if (b.type === 'text') return false;
-    if (b.type === 'heading') return !b.synthetic;
-    // Hide inline table blocks and raw JSON code blocks from the index;
-    // they are not navigable sections and just add noise.
-    if (b.type === 'table') return false;
-    if (b.type === 'code' && b.language === 'json') return false;
-    return true;
-  }), [blocks]);
+  const structuralBlocks = useMemo(() => blocks.filter(b => b.type === 'heading' || b.type === 'image'), [blocks]);
 
   const hasContentBlocks = blocks.some(
     b => b.type === 'text' || b.type === 'code' || b.type === 'table' || b.type === 'image'
@@ -342,7 +334,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
             <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
             {renderBlockActions && !b.deleted && (
               <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
-                {onAddToPage && b.type !== 'text' && (
+                {onAddToPage && b.type !== 'text' && !b.synthetic && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -359,7 +351,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 {renderBlockActions(b, { isActive })}
               </div>
             )}
-            {!renderBlockActions && onAddToPage && !b.deleted && b.type !== 'text' && (
+            {!renderBlockActions && onAddToPage && !b.deleted && b.type !== 'text' && !b.synthetic && (
               <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
                 <button
                   type="button"
@@ -457,7 +449,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
           {renderBlockActions && !b.deleted && (
             <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
-              {onAddToPage && b.type !== 'text' && (
+              {onAddToPage && b.type !== 'text' && !b.synthetic && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -474,7 +466,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               {renderBlockActions(b, { isActive })}
             </div>
           )}
-          {!renderBlockActions && onAddToPage && !b.deleted && b.type !== 'text' && (
+          {!renderBlockActions && onAddToPage && !b.deleted && b.type !== 'text' && !b.synthetic && (
             <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
               <button
                 type="button"
