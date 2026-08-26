@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, X, Trash2, Edit3, FileText, ChevronDown, Save, Loader2 } from 'lucide-react';
+import { Plus, X, Trash2, Edit3, FileText, ChevronDown } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import type { ResearchStepSummary } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 
@@ -45,22 +44,6 @@ interface CuratedPageTabsProps {
   onDeleteCuratedPage: (stepId: number) => Promise<void>;
   onCloseTab: (tabId: string, kind: TabKind, isEmpty: boolean) => void;
   onCloseAllViews?: () => void;
-  /** True when a curated tab is active. */
-  isCuratedActive?: boolean;
-  /** Called when the user clicks Save on a curated tab. */
-  onSaveActivePage?: () => void;
-  /** Whether the active curated page has unsaved changes. */
-  isDirty?: boolean;
-  /** Whether the curated editor controls popover is open. */
-  controlsOpen?: boolean;
-  onControlsOpenChange?: (open: boolean) => void;
-  /** Current curated viewer settings. */
-  showIndex?: boolean;
-  onShowIndexChange?: (checked: boolean) => void;
-  plain?: boolean;
-  onPlainChange?: (checked: boolean) => void;
-  /** Whether the active page is currently saving. */
-  saving?: boolean;
 }
 
 export function CuratedPageTabs({
@@ -74,16 +57,6 @@ export function CuratedPageTabs({
   onDeleteCuratedPage,
   onCloseTab,
   onCloseAllViews,
-  isCuratedActive,
-  onSaveActivePage,
-  isDirty,
-  controlsOpen,
-  onControlsOpenChange,
-  showIndex,
-  onShowIndexChange,
-  plain,
-  onPlainChange,
-  saving,
 }: CuratedPageTabsProps) {
   const [pagesOpen, setPagesOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
@@ -254,56 +227,6 @@ export function CuratedPageTabs({
           );
         })}
       </div>
-
-      {isCuratedActive && (
-        <div className="flex items-center gap-2 shrink-0">
-          {isDirty && <span className="text-[10px] text-white/50 hidden sm:inline">Unsaved changes</span>}
-          <Button
-            size="sm"
-            onClick={() => onSaveActivePage?.()}
-            disabled={!isDirty || saving}
-            className="h-6 px-2 text-[11px] bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-          >
-            {saving && <Loader2 className="h-3 w-3 animate-spin" />}
-            <Save className="h-3 w-3" />
-            Save
-          </Button>
-          <Popover open={controlsOpen} onOpenChange={onControlsOpenChange}>
-            <PopoverTrigger>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[10px] text-white/70 hover:text-white hover:bg-white/10"
-              >
-                Controls
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="w-48 p-0 bg-[oklch(0.18_0_0)] border-white/10 text-white/90"
-            >
-              <div className="flex flex-col gap-2 px-3 py-2">
-                <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                  <Switch
-                    checked={showIndex}
-                    onCheckedChange={onShowIndexChange}
-                    size="sm"
-                  />
-                  Show index
-                </label>
-                <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-                  <Switch
-                    checked={plain}
-                    onCheckedChange={onPlainChange}
-                    size="sm"
-                  />
-                  Plain text
-                </label>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
