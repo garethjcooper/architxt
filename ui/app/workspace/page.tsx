@@ -403,14 +403,19 @@ export default function WorkspacePage() {
       const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
       if (!page) return;
 
-      const canvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
-      const synthesis = page.synthesis ?? { narrative: '' };
-      let updateData: Parameters<typeof researchApi.updateCuratedPage>[1] = {
-        canvas,
-        synthesis,
+      // Work on shallow copies so we never mutate the cached page object that
+      // React is memoizing in the editor / workspace session.
+      const pageCanvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+      const canvas = {
+        graph: { ...(pageCanvas.graph ?? { nodes: [], edges: [] }) },
+        tables: [...(pageCanvas.tables ?? [])],
+        diagrams: [...(pageCanvas.diagrams ?? [])],
       };
-      const events = Array.isArray(event) ? event : [event];
+      canvas.graph.nodes = [...(pageCanvas.graph?.nodes ?? [])];
+      canvas.graph.edges = [...(pageCanvas.graph?.edges ?? [])];
+      const synthesis = { ...(page.synthesis ?? { narrative: '' }) };
       let toastMessage = '';
+      const events = Array.isArray(event) ? event : [event];
       let narrativeAccumulator = synthesis.narrative ?? '';
 
       for (const ev of events) {
@@ -428,7 +433,6 @@ export default function WorkspacePage() {
               { nodes: parsedGraph.nodes || [], edges: parsedGraph.edges || [] }
             );
             canvas.graph = { nodes: mergeResult.nodes, edges: mergeResult.edges };
-            updateData.canvas = canvas;
             toastMessage = `Merged graph into ${page.intent_text || `Page ${page.id}`}: +${mergeResult.addedNodes} nodes, +${mergeResult.addedEdges} edges`;
             break;
           }
@@ -437,7 +441,6 @@ export default function WorkspacePage() {
             const existingNames = new Set((canvas.tables ?? []).map((t) => t.name));
             const newTables = (parsedTables ?? []).filter((t: { name: string }) => !existingNames.has(t.name));
             canvas.tables = [...(canvas.tables ?? []), ...newTables];
-            updateData.canvas = canvas;
             toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
@@ -446,27 +449,22 @@ export default function WorkspacePage() {
             const existingNames = new Set((canvas.diagrams ?? []).map((d) => d.name));
             const newDiagrams = (parsedDiagrams ?? []).filter((d: { name: string }) => !existingNames.has(d.name));
             canvas.diagrams = [...(canvas.diagrams ?? []), ...newDiagrams];
-            updateData.canvas = canvas;
             toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
         }
       }
 
-      updateData.synthesis = { narrative: narrativeAccumulator };
+      synthesis.narrative = narrativeAccumulator;
 
       try {
-        await researchApi.updateCuratedPage(stepId, updateData);
+        await researchApi.updateCuratedPage(stepId, { canvas, synthesis });
         await workspaceSession.refresh();
-        // Open the target page tab if not already active.
-        setActiveTabId((current) => {
-          const targetId = `curated-${stepId}`;
-          return current === targetId ? current : targetId;
-        });
-        toast.success(toastMessage);
-      } catch (err: unknown) {
-        logger.error('Failed to apply copy event to curated page', err);
-        toast.error(`Failed to apply copy: ${String(err instanceof Error ? err.message : String(err))}`);
+        if (toastMessage) toast.success(toastMessage);
+      } catch (err) {
+        logger.error('Failed to apply copy event', err);
+        toast.error('Failed to add to page');
+        throw err;
       }
     },
     [workspaceSession.curatedPages, workspaceSession.refresh]
