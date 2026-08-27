@@ -966,8 +966,9 @@ export interface EntityInfoEdgeContext {
 export interface MentalModelContent {
   ext_id: string;
   narrative?: string;
+  narrative_name?: string;
   concatenation?: string;
-  graph?: { nodes: unknown[]; edges: unknown[] };
+  graph?: { name?: string | null; nodes: unknown[]; edges: unknown[] };
   diagrams?: Array<{ name: string; type: string; content: string }>;
   tables?: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
   findings?: Array<{ summary: string; confidence?: number; evidence?: string }>;
@@ -1079,6 +1080,7 @@ export interface DiscoverStepResponse {
   parameters?: Record<string, any> | null;
   synthesis?: {
     narrative: string;
+    narrative_name?: string;
   };
   canvas?: {
     graph: {
