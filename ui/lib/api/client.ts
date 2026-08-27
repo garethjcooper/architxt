@@ -1227,7 +1227,7 @@ export const researchApi = {
     include_source_facts?: boolean;
     tags?: string[];
     tags_match?: string;
-    section_focus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
+    section_focus?: Record<string, string | { name?: string; content: string } | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/discover', {
       method: 'POST',
@@ -1290,7 +1290,7 @@ export const researchApi = {
     intent_text: string;
     raw_query?: string;
     max_tokens?: number;
-    section_focus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
+    section_focus?: Record<string, string | { name?: string; content: string } | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/synthesize', {
       method: 'POST',

@@ -1,6 +1,8 @@
 ### Graph generation rules
 
-The `graph` envelope section must contain a `nodes` array and an `edges` array.
+The `graph` envelope section must contain a `name`, `nodes` array and `edges` array.
+
+- `name`: a short human-readable identifier for the graph (used as its title/label when rendered). **This MUST be the exact title provided via `#graph-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If no name is provided, generate a short descriptive name (4–6 words) based on the graph's content.
 
 Node field rules:
 - `id`: stable working-graph id. Reuse the exact id from the topic or catalog. For genuinely new candidates not in the topic/catalog, use a lowercase hyphenated slug with no prefix.

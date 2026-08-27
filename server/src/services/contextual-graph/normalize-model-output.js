@@ -425,7 +425,7 @@ export function normalizeModelOutput(raw) {
 
   const graphInput = parsed.graph && typeof parsed.graph === 'object' && !Array.isArray(parsed.graph)
     ? parsed.graph
-    : { nodes: [], edges: [] };
+    : { name: '', nodes: [], edges: [] };
   if (!Object.prototype.hasOwnProperty.call(parsed, 'graph')) {
     errors.push('Missing required top-level key: graph');
   }
@@ -468,7 +468,12 @@ export function normalizeModelOutput(raw) {
 
   return {
     narrative,
-    graph: { nodes: connectedNodes, edges },
+    narrative_name: typeof parsed.narrative_name === 'string' ? parsed.narrative_name : '',
+    graph: {
+      name: typeof graphInput.name === 'string' ? graphInput.name : '',
+      nodes: connectedNodes,
+      edges,
+    },
     tables,
     diagrams,
     errors,

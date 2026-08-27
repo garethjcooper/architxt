@@ -24,7 +24,8 @@ describe('normalizeModelOutput', () => {
     });
     const out = normalizeModelOutput(raw);
     assert.equal(out.narrative, 'A system that bills customers.');
-    assert.deepEqual(out.graph, { nodes: [], edges: [] });
+    assert.equal(out.narrative_name, '');
+    assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.equal(out.errors.length, 0);
   });
@@ -41,7 +42,7 @@ describe('normalizeModelOutput', () => {
   it('fills missing sections with defaults and records errors', () => {
     const out = normalizeModelOutput(JSON.stringify({ narrative: 'only narrative' }));
     assert.equal(out.narrative, 'only narrative');
-    assert.deepEqual(out.graph, { nodes: [], edges: [] });
+    assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.ok(out.errors.length >= 2);
   });
@@ -86,7 +87,7 @@ describe('normalizeModelOutput', () => {
   it('validates tables require name and columns/rows', () => {
     const raw = JSON.stringify({
       narrative: '',
-      graph: { nodes: [], edges: [] },
+      graph: { name: '', nodes: [], edges: [] },
       tables: [
         { name: 'capabilities', columns: ['name'], rows: [{ name: 'billing' }] },
         { columns: ['name'], rows: [] },
@@ -130,7 +131,7 @@ describe('normalizeModelOutput', () => {
   it('parses and validates diagrams', () => {
     const raw = JSON.stringify({
       narrative: '',
-      graph: { nodes: [], edges: [] },
+      graph: { name: '', nodes: [], edges: [] },
       tables: [],
       diagrams: [
         { name: 'Order sequence', type: 'sequenceDiagram', content: 'Alice->>Bob: Hello' },

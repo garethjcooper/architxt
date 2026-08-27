@@ -120,7 +120,7 @@ export function loadAndCompose(db, name, variables) {
 /**
  * Compose a full prompt for a derived mental model.
  *
- * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} sectionFocus
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} sectionFocus
  * @returns {{active: string[], empty: string[]}}
  */
 function computeSectionState(sectionFocus) {
@@ -175,7 +175,7 @@ const DIAGRAM_TYPE_TO_FRAGMENT = {
  * keeping prompt size minimal and preventing the LLM from hallucinating
  * unrequested sections.
  *
- * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} sectionFocus
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} sectionFocus
  * @returns {string[]}
  */
 export function buildConditionalFragments(sectionFocus) {
@@ -326,16 +326,32 @@ function stripEntityTags(str) {
  *   - description               (if name is omitted; LLM should generate one)
  *
  * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
- *   - #graph, #narrative → single string (one bullet)
- *   - #table             → TableDirective[] (one per table, with optional #table-name)
- *   - #diagram           → DiagramDirective[] with #diagram-name, #diagram-type, and content
+ *   - #graph, #narrative -> { name?, content }
+ *   - #table             -> TableDirective[] (one per table, with optional #table-name)
+ *   - #diagram           -> DiagramDirective[] with #diagram-name, #diagram-type, and content
  *
- * @param {string|string[]|{name?:string,content:string}[]|{name:string,type:string,content:string}[]} [raw]
+ * @param {string|{name?:string,content:string}|string[]|{name?:string,content:string}[]|{name:string,type:string,content:string}[]} [raw]
  * @returns {string}
  */
 export function formatFocusVariable(raw) {
+  // Single named content entry (graph/narrative) or legacy plain string.
+  if (!Array.isArray(raw) && typeof raw === 'object' && raw !== null && 'content' in raw) {
+    const { name, content } = /** @type {{name?:string,content:string}} */ (raw);
+    const cleanedContent = stripEntityTags(content?.trim() || '');
+    const cleanedName = name?.trim() ? stripEntityTags(name.trim()) : '';
+    if (!cleanedContent) return '';
+    if (cleanedName) return `- **${cleanedName}** — ${cleanedContent}`;
+    return `- ${cleanedContent}`;
+  }
+
+  // Legacy plain string.
+  if (!Array.isArray(raw)) {
+    if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
+    return `- ${stripEntityTags(raw.trim())}`;
+  }
+
   // Diagram directives
-  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'type' in raw[0]) {
+  if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'type' in raw[0]) {
     const directives = /** @type {{name:string,type:string,content:string}[]} */ (raw);
     const lines = directives
       .filter((d) => d.type?.trim() !== '' && d.content?.trim() !== '')
@@ -350,7 +366,7 @@ export function formatFocusVariable(raw) {
   }
 
   // Table directives
-  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'content' in raw[0]) {
+  if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'content' in raw[0]) {
     const directives = /** @type {{name?:string,content:string}[]} */ (raw);
     const lines = directives
       .filter((d) => d.content?.trim() !== '')
@@ -363,16 +379,11 @@ export function formatFocusVariable(raw) {
     return lines.join('\n');
   }
 
-  // String array (graph/narrative multiple scopes, or legacy table array)
-  if (Array.isArray(raw)) {
-    const lines = raw
-      .filter((s) => typeof s === 'string' && s.trim() !== '')
-      .map((s) => `- ${stripEntityTags(s.trim())}`);
-    return lines.join('\n');
-  }
-
-  if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
-  return `- ${stripEntityTags(raw.trim())}`;
+  // String array (legacy graph/narrative multiple scopes, or legacy table array)
+  const lines = raw
+    .filter((s) => typeof s === 'string' && s.trim() !== '')
+    .map((s) => `- ${stripEntityTags(s.trim())}`);
+  return lines.join('\n');
 }
 
 /**
@@ -382,16 +393,22 @@ export function formatFocusVariable(raw) {
  * focus variables (synthesize handler). We take the union of both so that
  * callers who supply section_focus as variables still get the right fragments.
  *
- * @param {{graph?:string, table?:Array, diagram?:Array, narrative?:string}} parsedSectionFocus
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} parsedSectionFocus
  * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_DIAGRAM_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} merged
- * @returns {{graph?:string, table?:Array, diagram?:Array, narrative?:string}}
+ * @returns {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}}
  */
 function computeEffectiveFocus(parsedSectionFocus, merged) {
   const effectiveFocus = {
     ...parsedSectionFocus,
   };
   if (merged.ARCHITXT_GRAPH_FOCUS?.trim()) {
-    effectiveFocus.graph = merged.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
+    const graphLine = merged.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
+    const namedMatch = graphLine.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+    if (namedMatch) {
+      effectiveFocus.graph = { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
+    } else {
+      effectiveFocus.graph = { content: graphLine };
+    }
   }
   if (merged.ARCHITXT_TABLE_FOCUS?.trim()) {
     const lines = merged.ARCHITXT_TABLE_FOCUS.trim().split('\n').filter((l) => l.trim());
@@ -412,7 +429,13 @@ function computeEffectiveFocus(parsedSectionFocus, merged) {
     });
   }
   if (merged.ARCHITXT_NARRATIVE_FOCUS?.trim()) {
-    effectiveFocus.narrative = merged.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
+    const narrativeLine = merged.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
+    const namedMatch = narrativeLine.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+    if (namedMatch) {
+      effectiveFocus.narrative = { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
+    } else {
+      effectiveFocus.narrative = { content: narrativeLine };
+    }
   }
   return effectiveFocus;
 }

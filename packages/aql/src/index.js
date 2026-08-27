@@ -19,6 +19,8 @@ export const SUB_DIRECTIVE_KEYS = Object.freeze([
   'diagram-name',
   'diagram-type',
   'table-name',
+  'graph-name',
+  'narrative-name',
   'end',
 ]);
 
@@ -39,8 +41,8 @@ export const MERMAID_DIAGRAM_TYPES = Object.freeze([
 ]);
 
 export const ALLOWED_KEYS_BY_BLOCK = Object.freeze({
-  graph: new Set(),
-  narrative: new Set(),
+  graph: new Set(['graph-name']),
+  narrative: new Set(['narrative-name']),
   table: new Set(['table-name']),
   diagram: new Set(['diagram-name', 'diagram-type']),
 });
@@ -84,8 +86,8 @@ export const ALLOWED_KEYS_BY_BLOCK = Object.freeze({
  * Convert parsed AQL blocks into the legacy section-focus shape used by the server
  * prompt templates and the UI API callers.
  *
- *   graph     -> string (concatenated bodies)
- *   narrative -> string (concatenated bodies)
+ *   graph     -> { name?, content }
+ *   narrative -> { name?, content }
  *   table     -> Array<{name?, content}>
  *   diagram   -> Array<{name?, type, content}>
  *
@@ -107,10 +109,12 @@ export function toSectionFocus(aqlQuery) {
   for (const block of blocks) {
     const { kind, name, type, body } = block;
     if (kind === 'graph' || kind === 'narrative') {
+      const entry = { name: name || undefined, content: body };
       if (sectionFocus[kind]) {
-        sectionFocus[kind] = sectionFocus[kind] + (body ? '\n' + body : '');
+        sectionFocus[kind].content = sectionFocus[kind].content + (body ? '\n' + body : '');
+        if (name && !sectionFocus[kind].name) sectionFocus[kind].name = name;
       } else {
-        sectionFocus[kind] = body;
+        sectionFocus[kind] = entry;
       }
       if (body) topicCandidates.push(body);
       continue;
@@ -348,7 +352,7 @@ export function parseAql(rawQuery) {
 
       if (keyword === 'diagram-type') {
         current.type = parsedValue;
-      } else if (keyword === 'diagram-name' || keyword === 'table-name') {
+      } else if (['diagram-name', 'table-name', 'graph-name', 'narrative-name'].includes(keyword)) {
         current.name = parsedValue;
       }
       continue;
