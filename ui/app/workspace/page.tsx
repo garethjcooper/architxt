@@ -170,14 +170,19 @@ export default function WorkspacePage() {
   }, []);
 
   const previewError = useMemo(() => {
-    if (selectedView?.kind !== 'model') return reflectError;
-    const entry = modelContentCache[selectedView.extId];
-    if (!entry) return `Model ${selectedView.extId} is not loaded.`;
-    if (entry.loading) return null;
-    if (entry.error) return entry.error;
-    if (!entry.content) return `Model ${selectedView.extId} has no content.`;
-    return null;
-  }, [selectedView, modelContentCache, reflectError]);
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab?.kind === 'curated') return null;
+    if (selectedView?.kind === 'step') return selectedView.step.error_message || null;
+    if (selectedView?.kind === 'model') {
+      const entry = modelContentCache[selectedView.extId];
+      if (!entry) return `Model ${selectedView.extId} is not loaded.`;
+      if (entry.loading) return null;
+      if (entry.error) return entry.error;
+      if (!entry.content) return `Model ${selectedView.extId} has no content.`;
+      return null;
+    }
+    return reflectError;
+  }, [tabs, activeTabId, selectedView, modelContentCache, reflectError]);
 
   // Layout sizing: two vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
