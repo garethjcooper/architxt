@@ -14,6 +14,7 @@ import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
 import { MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
+import type { MentalModelEnvelope } from '@/lib/api/client';
 import type { ModelRef } from './page';
 
 const ROLE_LABELS = MODEL_ROLE_LABELS;
@@ -36,6 +37,7 @@ type ContentResult = {
   content: string | object | null;
   content_hash: string | null;
   updated_at: string | null;
+  envelope?: MentalModelEnvelope | null;
 };
 
 export interface MentalModelsTabProps {

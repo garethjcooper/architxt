@@ -742,6 +742,7 @@ export default function WorkspacePage() {
         ...prev,
         [extId]: {
           content: result.content ?? null,
+          envelope: result.envelope ?? undefined,
           found: result.found,
           loading: false,
           error: null,
@@ -752,6 +753,7 @@ export default function WorkspacePage() {
         ...prev,
         [extId]: {
           content: prev[extId]?.content ?? null,
+          envelope: prev[extId]?.envelope ?? undefined,
           found: prev[extId]?.found ?? false,
           loading: false,
           error: String(err instanceof Error ? err.message : String(err)) || 'Failed to load model content.',
