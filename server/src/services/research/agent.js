@@ -93,10 +93,18 @@ export async function runDiscoverStep(params) {
       tables: handlerResult.tables || [],
       diagrams: handlerResult.diagrams || [],
     };
+    const envelope = {
+      narrative,
+      narrative_name: handlerResult.narrative_name || '',
+      graph: canvas.graph,
+      tables: canvas.tables,
+      diagrams: canvas.diagrams,
+    };
 
     await updateStep(db, rstepId, {
       rstep_canvas_state: canvas,
-      rstep_synthesis: { narrative },
+      rstep_synthesis: { narrative, narrative_name: handlerResult.narrative_name || '' },
+      rstep_envelope: envelope,
       rstep_tool_calls_used: calls.length,
       rstep_calls: calls,
       rstep_status: 'completed',
