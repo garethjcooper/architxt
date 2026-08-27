@@ -127,7 +127,7 @@ describe('reflect handler', () => {
     assert.ok(capturedQuery);
     assert.ok(capturedQuery.includes('## Topic'));
     assert.equal(result.success, true);
-    assert.ok(result.narrative.length > 0);
+    assert.equal(result.narrative, 'Here is the analysis.');
     assert.equal(result.graph.nodes.length, 2);
   });
 
@@ -154,7 +154,7 @@ describe('reflect handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.ok(result.narrative.includes('# Results - test1 (erDiagram)'));
+    assert.equal(result.narrative, '');
     assert.equal(result.diagrams.length, 1);
     assert.equal(result.diagrams[0].type, 'erDiagram');
   });
