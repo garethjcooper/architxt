@@ -140,7 +140,11 @@ export default function WorkspacePage() {
     if (!selectedView) return null;
     if (selectedView.kind === 'step') return selectedView.step;
     const entry = modelContentCache[selectedView.extId];
-    if (!entry || entry.loading || entry.error || !entry.content) return null;
+    if (!entry || entry.loading || entry.error) return null;
+    // Render from the normalized server envelope when present, even if raw content
+    // is empty or not yet populated. This prevents edge-context rows from appearing
+    // blank when Hindsight returns a structured envelope but no raw content string.
+    if (!entry.content && !entry.envelope) return null;
     return mentalModelContentToStepSummary(selectedView.name, entry);
   }, [tabs, activeTabId, selectedView, modelContentCache, workspaceSession.curatedPages]);
 
@@ -178,7 +182,7 @@ export default function WorkspacePage() {
       if (!entry) return `Model ${selectedView.extId} is not loaded.`;
       if (entry.loading) return null;
       if (entry.error) return entry.error;
-      if (!entry.content) return `Model ${selectedView.extId} has no content.`;
+      if (!entry.content && !entry.envelope) return `Model ${selectedView.extId} has no content.`;
       return null;
     }
     return reflectError;
@@ -738,7 +742,7 @@ export default function WorkspacePage() {
   const loadModelContent = useCallback(async (extId: string) => {
     if (!serverId || !bankId) return;
     setModelContentCache((prev) => {
-      if (prev[extId]?.loading || prev[extId]?.content !== undefined) return prev;
+      if (prev[extId]?.loading || (prev[extId]?.content !== undefined && prev[extId]?.envelope !== undefined)) return prev;
       return { ...prev, [extId]: { ...prev[extId], loading: true, error: null } };
     });
     try {

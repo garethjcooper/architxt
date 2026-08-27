@@ -131,6 +131,49 @@ describe('normalizeGraph', () => {
     assert.strictEqual(result.edges[0].to, 'a-com:COM-001');
     assert.strictEqual(result.edges[1].to, 'delta');
   });
+
+
+  it('preserves mental-model edges when both endpoints are present in nodes', () => {
+    const result = normalizeGraph({
+      name: 'Intermediate to Fuse flows',
+      nodes: [
+        { id: 'a-com:COM-019', name: 'Intermediate' },
+        { id: 'a-com:COM-049', name: 'Fuse' },
+      ],
+      edges: [
+        {
+          from: 'a-com:COM-019',
+          to: 'a-com:COM-049',
+          type: 'sends',
+          label: 'usage events',
+          detail: 'Intermediate distributes usage event data to Fuse.',
+          properties: { dataObjects: ['usage events'] },
+        },
+      ],
+    }, { activity: 'mental-model', knownCatalog: new Map() });
+    assert.strictEqual(result.nodes.length, 2);
+    assert.strictEqual(result.edges.length, 1);
+    assert.strictEqual(result.edges[0].from, 'a-com:COM-019');
+    assert.strictEqual(result.edges[0].to, 'a-com:COM-049');
+    assert.strictEqual(result.edges[0].provenance, 'known');
+  });
+
+  it('completes missing mental-model endpoint from known catalog', () => {
+    const knownCatalog = new Map([
+      ['a-com:COM-049', { id: 'a-com:COM-049', type: 'a-com', name: 'Fuse' }],
+    ]);
+    const result = normalizeGraph({
+      name: 'Intermediate to Fuse flows',
+      nodes: [{ id: 'a-com:COM-019', name: 'Intermediate' }],
+      edges: [{ from: 'a-com:COM-019', to: 'a-com:COM-049', type: 'sends', label: 'usage events' }],
+    }, { activity: 'mental-model', knownCatalog });
+    assert.strictEqual(result.nodes.length, 2);
+    assert.strictEqual(result.edges.length, 1);
+    const fuse = result.nodes.find((n) => n.id === 'a-com:COM-049');
+    assert.ok(fuse);
+    assert.strictEqual(fuse.name, 'Fuse');
+    assert.strictEqual(fuse.provenance, 'known');
+  });
 });
 
 describe('normalizeSlug', () => {
