@@ -169,7 +169,6 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
           className="h-full"
           renderSidebarRowActions={(b) => {
             if (readOnly) return null;
-            if (b.synthetic) return null;
             if (b.type === 'text') return null;
             return (
               <button
