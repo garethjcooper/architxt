@@ -57,6 +57,14 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   logger.info('Reflect research query', { serverId, bankId, queryLength: query.length });
 
   const focus = options.section_focus || {};
+  const requestedGraph = Boolean(focus.graph && (typeof focus.graph === 'string' ? focus.graph.trim() : focus.graph.content?.trim()));
+  const requestedTables = Array.isArray(focus.table) && focus.table.length > 0;
+  const requestedDiagrams = Array.isArray(focus.diagram) && focus.diagram.length > 0;
+  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
+    ? focus.narrative.trim().length > 0
+    : focus.narrative.content?.trim().length > 0);
+  const requestedStructured = requestedGraph || requestedTables || requestedDiagrams;
+  const hasAnyDirective = requestedNarrative || requestedStructured;
   let composedQuery;
   try {
     composedQuery = await composeMentalModelPrompt(db, 'generic', query, {
@@ -139,9 +147,6 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const hasGraph = envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0;
   const hasTables = Array.isArray(envelope.tables) && envelope.tables.length > 0;
   const hasDiagrams = Array.isArray(envelope.diagrams) && envelope.diagrams.length > 0;
-  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
-    ? focus.narrative.trim().length > 0
-    : focus.narrative.content?.trim().length > 0);
   const hasStructuredOutput = hasGraph || hasTables || hasDiagrams;
 
   // Require a non-empty narrative only when narrative was explicitly requested
@@ -164,12 +169,12 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   }
 
   // Only discard a produced narrative when the caller explicitly requested
-  // something else (graph/table/diagram) and the model also produced that
+  // structured sections (graph/table/diagram) and the model also produced that
   // structured output. For plain Reflect queries with no explicit section
   // directives, the narrative is the primary output and must be preserved.
   let finalNarrative = envelope.narrative;
   let finalNarrativeName = envelope.narrative_name;
-  if (!requestedNarrative && hasStructuredOutput) {
+  if (requestedStructured && !requestedNarrative && hasStructuredOutput) {
     finalNarrative = '';
     finalNarrativeName = '';
   }
@@ -177,8 +182,8 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   // If narrative is empty but structured output exists, synthesize a header so
   // downstream consumers still have a Markdown section to render.
   const narrative = finalNarrative && finalNarrative.length > 0
-    ? `# Results - ${query}\n\n${finalNarrative}` + basedOnToMarkdown(result.data, query)
-    : `# Results - ${query}` + basedOnToMarkdown(result.data, query);
+    ? finalNarrative + basedOnToMarkdown(result.data, query)
+    : basedOnToMarkdown(result.data, query);
 
   return {
     success: true,
