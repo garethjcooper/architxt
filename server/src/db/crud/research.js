@@ -19,6 +19,7 @@ const STEP_JSON_FIELDS = [
   'rstep_viewpoint_ids',
   'rstep_canvas_state',
   'rstep_synthesis',
+  'rstep_envelope',
   'rstep_calls',
 ];
 
@@ -214,10 +215,11 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
   const sql = `INSERT INTO ${STEP_TABLE} (
     rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
     rstep_action_type, rstep_parameters, rstep_viewpoint_ids, rstep_canvas_state,
-    rstep_synthesis, rstep_status, rstep_error_message,
+    rstep_synthesis, rstep_envelope, rstep_status, rstep_error_message,
     rstep_tool_calls_used, rstep_calls
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
+  const blankEnvelope = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
   const result = stmt(db, sql).run(
     rsId,
     null,
@@ -229,6 +231,7 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
     null,
     JSON.stringify({ graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
     JSON.stringify({ narrative: '' }),
+    blankEnvelope,
     'completed',
     null,
     0,
@@ -248,9 +251,26 @@ export const updateCuratedPage = (db, stepId, data) => dbExec(() => {
   if (entries.length === 0) {
     throw new Error('No allowed fields to update');
   }
-  const prepared = toJson(Object.fromEntries(entries), STEP_JSON_FIELDS);
-  const columns = entries.map(([key]) => `${key} = ?`).join(', ');
-  const values = entries.map(([key]) => prepared[key] ?? data[key]);
+
+  // For curated pages, an rstep_envelope update is the canonical write. Keep the
+  // legacy split fields in sync so older consumers continue to work until the
+  // full migration is complete.
+  const updateData = Object.fromEntries(entries);
+  if (updateData.rstep_envelope) {
+    const envelope = typeof updateData.rstep_envelope === 'string'
+      ? JSON.parse(updateData.rstep_envelope)
+      : updateData.rstep_envelope;
+    updateData.rstep_synthesis = { narrative: typeof envelope.narrative === 'string' ? envelope.narrative : '' };
+    updateData.rstep_canvas_state = {
+      graph: envelope.graph ?? { nodes: [], edges: [] },
+      tables: envelope.tables ?? [],
+      diagrams: envelope.diagrams ?? [],
+    };
+  }
+
+  const prepared = toJson(updateData, STEP_JSON_FIELDS);
+  const columns = Object.keys(updateData).map((key) => `${key} = ?`).join(', ');
+  const values = Object.keys(updateData).map((key) => prepared[key] ?? updateData[key]);
   const sql = `UPDATE ${STEP_TABLE} SET ${columns} WHERE ${STEP_PK} = ? AND rstep_action_type = 'curated_page'`;
   const result = stmt(db, sql).run(...values, id);
   if (result.changes === 0) {

@@ -169,43 +169,67 @@ const toApiSession = (dbRow) => ({
   updated_at: dbRow.rs_updated_at,
 });
 
-const toApiStepSummary = (dbRow) => ({
-  id: dbRow.rstep_id,
-  session_id: dbRow.rs_id,
-  parent_step_id: dbRow.rstep_parent_step_id,
-  intent_text: dbRow.rstep_intent_text,
-  raw_query: dbRow.rstep_raw_query || null,
-  action_type: dbRow.rstep_action_type,
-  parameters: dbRow.rstep_parameters,
-  created_at: dbRow.rstep_created_at,
-  selections: dbRow.rstep_selections,
-  viewpoint_ids: dbRow.rstep_viewpoint_ids,
-  canvas: dbRow.rstep_canvas_state,
-  synthesis: dbRow.rstep_synthesis,
-  tool_calls_used: dbRow.rstep_tool_calls_used,
-  calls: dbRow.rstep_calls,
-  status: dbRow.rstep_status || 'completed',
-  error_message: dbRow.rstep_error_message || null,
-});
+const toApiStepSummary = (dbRow) => {
+  const isCurated = dbRow.rstep_action_type === 'curated_page';
+  const envelope = isCurated
+    ? (dbRow.rstep_envelope ?? {
+        narrative: dbRow.rstep_synthesis?.narrative ?? '',
+        graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
+        tables: dbRow.rstep_canvas_state?.tables ?? [],
+        diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
+      })
+    : undefined;
+  return {
+    id: dbRow.rstep_id,
+    session_id: dbRow.rs_id,
+    parent_step_id: dbRow.rstep_parent_step_id,
+    intent_text: dbRow.rstep_intent_text,
+    raw_query: dbRow.rstep_raw_query || null,
+    action_type: dbRow.rstep_action_type,
+    parameters: dbRow.rstep_parameters,
+    created_at: dbRow.rstep_created_at,
+    selections: dbRow.rstep_selections,
+    viewpoint_ids: dbRow.rstep_viewpoint_ids,
+    canvas: dbRow.rstep_canvas_state,
+    synthesis: dbRow.rstep_synthesis,
+    envelope,
+    tool_calls_used: dbRow.rstep_tool_calls_used,
+    calls: dbRow.rstep_calls,
+    status: dbRow.rstep_status || 'completed',
+    error_message: dbRow.rstep_error_message || null,
+  };
+};
 
-const toApiStep = (dbRow) => ({
-  id: dbRow.rstep_id,
-  session_id: dbRow.rs_id,
-  parent_step_id: dbRow.rstep_parent_step_id,
-  intent_text: dbRow.rstep_intent_text,
-  raw_query: dbRow.rstep_raw_query || null,
-  action_type: dbRow.rstep_action_type,
-  parameters: dbRow.rstep_parameters,
-  selections: dbRow.rstep_selections,
-  viewpoint_ids: dbRow.rstep_viewpoint_ids,
-  canvas: dbRow.rstep_canvas_state,
-  synthesis: dbRow.rstep_synthesis,
-  tool_calls_used: dbRow.rstep_tool_calls_used,
-  calls: dbRow.rstep_calls,
-  status: dbRow.rstep_status || 'completed',
-  error_message: dbRow.rstep_error_message || null,
-  created_at: dbRow.rstep_created_at,
-});
+const toApiStep = (dbRow) => {
+  const isCurated = dbRow.rstep_action_type === 'curated_page';
+  const envelope = isCurated
+    ? (dbRow.rstep_envelope ?? {
+        narrative: dbRow.rstep_synthesis?.narrative ?? '',
+        graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
+        tables: dbRow.rstep_canvas_state?.tables ?? [],
+        diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
+      })
+    : undefined;
+  return {
+    id: dbRow.rstep_id,
+    session_id: dbRow.rs_id,
+    parent_step_id: dbRow.rstep_parent_step_id,
+    intent_text: dbRow.rstep_intent_text,
+    raw_query: dbRow.rstep_raw_query || null,
+    action_type: dbRow.rstep_action_type,
+    parameters: dbRow.rstep_parameters,
+    selections: dbRow.rstep_selections,
+    viewpoint_ids: dbRow.rstep_viewpoint_ids,
+    canvas: dbRow.rstep_canvas_state,
+    synthesis: dbRow.rstep_synthesis,
+    envelope,
+    tool_calls_used: dbRow.rstep_tool_calls_used,
+    calls: dbRow.rstep_calls,
+    status: dbRow.rstep_status || 'completed',
+    error_message: dbRow.rstep_error_message || null,
+    created_at: dbRow.rstep_created_at,
+  };
+};
 
 /**
  * @openapi
@@ -1606,11 +1630,12 @@ router.put('/steps/:id', async (req, res) => {
     return;
   }
 
-  const { intent_text, canvas, synthesis } = req.body;
+  const { intent_text, canvas, synthesis, envelope } = req.body;
   const updateData = {};
   if (intent_text !== undefined) updateData.rstep_intent_text = intent_text;
   if (canvas !== undefined) updateData.rstep_canvas_state = canvas;
   if (synthesis !== undefined) updateData.rstep_synthesis = synthesis;
+  if (envelope !== undefined) updateData.rstep_envelope = envelope;
 
   if (Object.keys(updateData).length === 0) {
     sendResponse({ res, status: 400, error: 'No fields to update', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });

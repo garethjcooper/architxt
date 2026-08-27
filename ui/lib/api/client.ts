@@ -1030,12 +1030,12 @@ export interface PrebuiltRoleResult {
           nodes: GraphNode[];
           edges: GraphEdge[];
         }>;
-    tables?: Array<{
+    tables: Array<{
       name: string;
       columns: string[];
       rows: Record<string, any>[];
     }>;
-    diagrams?: Array<{
+    diagrams: Array<{
       name: string;
       type: string;
       content: string;
@@ -1097,6 +1097,24 @@ export interface DiscoverStepResponse {
     }>;
     meta?: GraphMeta;
   };
+  /** Unified envelope shape (used by curated_page steps). */
+  envelope?: {
+    narrative: string;
+    graph: {
+      nodes: GraphNode[];
+      edges: GraphEdge[];
+    };
+    tables: Array<{
+      name: string;
+      columns: string[];
+      rows: Record<string, any>[];
+    }>;
+    diagrams: Array<{
+      name: string;
+      type: string;
+      content: string;
+    }>;
+  };
   calls?: Array<{
     tool: string;
     mode: string;
@@ -1156,6 +1174,24 @@ export interface ResearchStep {
   viewpoint_ids: number[] | null;
   canvas: DiscoverStepResponse['canvas'] | null;
   synthesis: DiscoverStepResponse['synthesis'] | null;
+  /** Unified envelope for curated_page steps. Undefined for non-curated steps. */
+  envelope?: {
+    narrative: string;
+    graph: {
+      nodes: GraphNode[];
+      edges: GraphEdge[];
+    };
+    tables: Array<{
+      name: string;
+      columns: string[];
+      rows: Record<string, any>[];
+    }>;
+    diagrams: Array<{
+      name: string;
+      type: string;
+      content: string;
+    }>;
+  };
   calls: ResearchStepCall[] | null;
   tool_calls_used: number;
   status: 'running' | 'completed' | 'failed';
@@ -1174,6 +1210,24 @@ export interface ResearchStepSummary {
   created_at: string;
   canvas: DiscoverStepResponse['canvas'] | null;
   synthesis: DiscoverStepResponse['synthesis'] | null;
+  /** Unified envelope for curated_page steps. Undefined for non-curated steps. */
+  envelope?: {
+    narrative: string;
+    graph: {
+      nodes: GraphNode[];
+      edges: GraphEdge[];
+    };
+    tables: Array<{
+      name: string;
+      columns: string[];
+      rows: Record<string, any>[];
+    }>;
+    diagrams: Array<{
+      name: string;
+      type: string;
+      content: string;
+    }>;
+  };
   selections: any[] | null;
   viewpoint_ids: number[] | null;
   calls: ResearchStepCall[] | null;
@@ -1315,7 +1369,7 @@ export const researchApi = {
       body: JSON.stringify({ title }),
     }),
 
-  updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string } }) =>
+  updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string }; envelope?: { narrative: string; graph: { nodes: any[]; edges: any[] }; tables: any[]; diagrams: any[] } }) =>
     fetchApi<ResearchStep>(`/research/steps/${stepId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
