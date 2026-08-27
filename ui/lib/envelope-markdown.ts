@@ -1,9 +1,9 @@
 import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedEnvelope } from '@/lib/api/client';
 
 type LegacyEnvelope = {
-  synthesis?: { narrative?: string | null } | null;
+  synthesis?: { narrative?: string | null; narrative_name?: string | null } | null;
   canvas?: {
-    graph?: { nodes?: GraphNode[]; edges?: GraphEdge[] } | null;
+    graph?: { name?: string | null; nodes?: GraphNode[]; edges?: GraphEdge[] } | null;
     tables?: Array<{ name: string; columns?: string[]; rows: Record<string, any>[] }> | null;
     diagrams?: Array<{ name: string; type: string; content: string }> | null;
   } | null;
@@ -23,9 +23,9 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   if (!isUnifiedEnvelope(envelope)) {
     return {
       narrative: envelope.synthesis?.narrative ?? '',
-      narrative_name: '',
+      narrative_name: envelope.synthesis?.narrative_name ?? '',
       graph: {
-        name: '',
+        name: envelope.canvas?.graph?.name ?? '',
         nodes: envelope.canvas?.graph?.nodes ?? [],
         edges: envelope.canvas?.graph?.edges ?? [],
       },

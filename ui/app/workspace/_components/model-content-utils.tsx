@@ -58,8 +58,9 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
   return {
     ext_id: '',
     narrative: typeof parsed.narrative === 'string' ? parsed.narrative : '',
+    narrative_name: typeof parsed.narrative_name === 'string' ? parsed.narrative_name : undefined,
     concatenation: undefined,
-    graph: (parsed.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
+    graph: (parsed.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
     tables: Array.isArray(parsed.tables) ? parsed.tables : [],
     diagrams: Array.isArray(parsed.diagrams) ? parsed.diagrams : [],
   };
@@ -88,16 +89,18 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
     calls: [],
     synthesis: {
       narrative: content.narrative || '',
+      narrative_name: content.narrative_name,
     },
     canvas: {
-      graph: (content.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
+      graph: (content.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
       tables: content.tables ?? [],
       diagrams: content.diagrams ?? [],
       meta: undefined,
     },
     envelope: {
       narrative: content.narrative || '',
-      graph: (content.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
+      narrative_name: content.narrative_name,
+      graph: (content.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
       tables: content.tables ?? [],
       diagrams: content.diagrams ?? [],
     },
