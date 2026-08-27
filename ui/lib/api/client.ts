@@ -554,7 +554,7 @@ export const mentalModelsApi = {
       body: JSON.stringify(payload),
     }),
 
-  // Fetch raw Hindsight mental-model content without graph validation
+  // Fetch normalized Hindsight mental-model envelope (plus raw content for inspection)
   fetchContent: (serverId: number, bankId: string, extId: string) =>
     fetchApi<{
       ext_id: string;
@@ -562,6 +562,7 @@ export const mentalModelsApi = {
       content: string | object | null;
       content_hash: string | null;
       updated_at: string | null;
+      envelope: MentalModelEnvelope | null;
     }>(`/research/mental-models/content?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&ext_id=${encodeURIComponent(extId)}`),
   // Tags
   getTags: (id: number) => fetchApi<Tag[]>(`/mentalmodels/${id}/tags`),
@@ -963,8 +964,22 @@ export interface EntityInfoEdgeContext {
   refs: EntityInfoContextualRef[];
 }
 
+// Normalized envelope returned by `/research/mental-models/content` in addition to raw content.
+export interface MentalModelEnvelope {
+  narrative: string;
+  narrative_name: string;
+  graph: { name: string; nodes: GraphNode[]; edges: GraphEdge[] };
+  tables: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
+  diagrams: Array<{ name: string; type: string; content: string }>;
+}
+
 export interface MentalModelContent {
   ext_id: string;
+  found?: boolean;
+  content?: string | object | null;
+  content_hash?: string | null;
+  updated_at?: string | null;
+  envelope?: MentalModelEnvelope;
   narrative?: string;
   narrative_name?: string;
   concatenation?: string;

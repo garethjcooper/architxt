@@ -2,7 +2,7 @@
 
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
-import { type EntityInfo, type MentalModelContent, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
+import { type EntityInfo, type MentalModelContent, type MentalModelEnvelope, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
 import {
   DisplayNode,
   DisplayEdge,
@@ -18,6 +18,7 @@ type HindsightContentResult = {
   content?: string | object | null;
   content_hash?: string | null;
   updated_at?: string | null;
+  envelope?: MentalModelEnvelope;
 };
 
 type EntityInfoWithContent = EntityInfo;
@@ -31,6 +32,21 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
 }
 
 function parseMentalModelContent(raw: HindsightContentResult | ModelContentCacheEntry): MentalModelContent {
+  // Prefer the server-normalized envelope when available.
+  const serverEnvelope = raw.envelope ?? undefined;
+  if (serverEnvelope) {
+    return {
+      ext_id: '',
+      narrative: serverEnvelope.narrative,
+      narrative_name: serverEnvelope.narrative_name,
+      concatenation: undefined,
+      graph: serverEnvelope.graph,
+      tables: serverEnvelope.tables,
+      diagrams: serverEnvelope.diagrams,
+      envelope: serverEnvelope,
+    };
+  }
+
   let parsed: any = null;
   const rawContent = raw.content ?? null;
 
@@ -92,15 +108,15 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
       narrative_name: content.narrative_name,
     },
     canvas: {
-      graph: (content.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
+      graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
       tables: content.tables ?? [],
       diagrams: content.diagrams ?? [],
       meta: undefined,
     },
-    envelope: {
+    envelope: content.envelope ?? {
       narrative: content.narrative || '',
       narrative_name: content.narrative_name,
-      graph: (content.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
+      graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
       tables: content.tables ?? [],
       diagrams: content.diagrams ?? [],
     },
@@ -159,6 +175,7 @@ const MODEL_TAB_LABELS: Record<string, string> = {
 
 export type ModelContentCacheEntry = {
   content: string | object | null;
+  envelope?: MentalModelEnvelope | null;
   found: boolean;
   loading?: boolean;
   error?: string | null;

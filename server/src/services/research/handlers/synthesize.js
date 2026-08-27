@@ -14,7 +14,7 @@ import { config } from '../../../config.js';
 import { createLogger } from '../../../utils/logger.js';
 import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
 import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
-import { normalizeGraph } from '../../../prompts/normalize-graph.js';
+import { toEnvelope } from '../../contextual-graph/to-envelope.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 
 const logger = createLogger('research-synthesize');
@@ -258,12 +258,14 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   const catalogEntities = await loadEntityCatalog(db);
   const knownCatalog = new Map(catalogEntities.map((e) => [e.id, e]));
 
+  const parsed = normalizeModelOutput(llmResult.data.content);
   const corpusNodeIds = new Set(corpusNodes.map((n) => n.id));
 
-  const parsed = normalizeModelOutput(llmResult.data.content);
-  const normalized = normalizeGraph(parsed.graph, {
-    activity: 'synthesize',
+  // Normalize the raw envelope through the shared helper. Discovery filtering is
+  // applied afterwards because Synthesize has stricter allowDiscovery rules.
+  const envelope = toEnvelope(parsed, {
     knownCatalog,
+    activity: 'synthesize',
     mode: 'generic',
   });
 
@@ -272,15 +274,15 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   let filteredEdges;
 
   if (allowDiscovery) {
-    filteredNodes = normalized.nodes;
+    filteredNodes = envelope.graph.nodes;
     const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = normalized.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
+    filteredEdges = envelope.graph.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
   } else {
-    filteredNodes = normalized.nodes.filter(
+    filteredNodes = envelope.graph.nodes.filter(
       (n) => corpusNodeIds.has(n.id) || knownCatalog.has(n.id)
     );
     const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = normalized.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
+    filteredEdges = envelope.graph.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
   }
 
   logger.info('Synthesize graph filtered', {
@@ -297,18 +299,19 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
 
   // Defense in depth: if narrative was not requested, scrub any model-generated
   // narrative so downstream consumers only see structured output.
+  let finalNarrative = envelope.narrative;
   if (hasAnyDirective && !requestedNarrative) {
-    parsed.narrative = '';
+    finalNarrative = '';
   }
 
   const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
-  graph.name = normalized.name || parsed.graph?.name || '';
+  graph.name = envelope.graph.name;
 
   logger.info('Synthesize handler completed', {
     intentText,
     templateName: 'generic',
-    narrativeLength: parsed.narrative.length,
-    narrativeNameLength: (parsed.narrative_name || '').length,
+    narrativeLength: finalNarrative.length,
+    narrativeNameLength: (envelope.narrative_name || '').length,
     graphNameLength: (graph.name || '').length,
     graphNodeCount: graph.nodes.length,
     graphEdgeCount: graph.edges.length,
@@ -316,11 +319,11 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
 
   return {
     success: true,
-    narrative: parsed.narrative,
-    narrative_name: parsed.narrative_name || '',
+    narrative: finalNarrative,
+    narrative_name: envelope.narrative_name,
     graph,
-    tables: parsed.tables || [],
-    diagrams: parsed.diagrams || [],
+    tables: envelope.tables,
+    diagrams: envelope.diagrams,
     calls: [
       {
         mode: 'synthesize',

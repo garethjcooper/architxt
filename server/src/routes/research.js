@@ -27,6 +27,8 @@ import { discoverMentalModelsByRoles } from '../services/research/mental-model-d
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
+import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
+import { loadEntityCatalog } from '../prompts/entity-catalog.js';
 import { parseSectionDirectives } from '../prompts/section-directives.js';
 
 const logger = createLogger('research-route');
@@ -1089,8 +1091,9 @@ router.post('/mental-models/refresh', async (req, res) => {
  *   get:
  *     summary: Fetch raw Hindsight mental-model content
  *     description: |
- *       Returns the latest content for a Hindsight mental model ext_id without
- *       any graph parsing or validation. Useful for inspecting model output.
+ *       Returns the latest content for a Hindsight mental model ext_id. The raw
+ *       content is returned for inspection, along with a normalized envelope
+ *       suitable for rendering with the contextual-graph viewer.
  *     tags: [Research]
  *     parameters:
  *       - in: query
@@ -1133,6 +1136,31 @@ router.get('/mental-models/content', async (req, res) => {
     }
 
     const model = result.mentalModel || {};
+    let rawContent = model.content ?? null;
+    let parsedContent = null;
+
+    if (typeof rawContent === 'string' && rawContent.trim()) {
+      try {
+        parsedContent = JSON.parse(rawContent);
+      } catch {
+        parsedContent = null;
+      }
+    } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
+      parsedContent = rawContent;
+    }
+
+    const catalogEntities = await loadEntityCatalog(db);
+    const knownCatalog = new Map(catalogEntities.map((e) => [e.id, e]));
+
+    const envelope = parsedContent
+      ? toEnvelope(parsedContent, { knownCatalog, activity: 'mental-model', mode: 'generic' })
+      : {
+          narrative: '',
+          narrative_name: '',
+          graph: { name: '', nodes: [], edges: [] },
+          tables: [],
+          diagrams: [],
+        };
 
     sendResponse({
       res,
@@ -1140,9 +1168,10 @@ router.get('/mental-models/content', async (req, res) => {
       data: {
         ext_id: extId,
         found: true,
-        content: model.content ?? null,
+        content: rawContent,
         content_hash: model.content_hash ?? null,
         updated_at: model.updated_at ?? null,
+        envelope,
       },
       logger,
       method: 'GET',

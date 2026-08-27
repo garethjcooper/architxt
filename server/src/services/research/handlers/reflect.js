@@ -6,11 +6,11 @@
  */
 
 import { reflect } from '../../hindsight/index.js';
-import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';
 import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
 import { UNIFIED_RESPONSE_SCHEMA } from '../../contextual-graph/unified-response-schema.js';
+import { toEnvelope } from '../../contextual-graph/to-envelope.js';
 
 const logger = createLogger('research-handler-reflect');
 
@@ -130,26 +130,21 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   }
   const extracted = structuredOutput;
   const knownCatalog = await knownCatalogPromise;
-  const normalizedGraph = normalizeGraph(extracted.graph, {
-    activity: 'reflect',
+  const envelope = toEnvelope(extracted, {
     knownCatalog,
+    activity: 'reflect',
     mode: 'generic',
   });
 
-  const graph = {
-    name: normalizedGraph.name || extracted.graph?.name || '',
-    nodes: normalizedGraph.nodes,
-    edges: normalizedGraph.edges,
-  };
-  const hasGraph = graph.nodes.length > 0 || graph.edges.length > 0;
-  const hasTables = Array.isArray(extracted.tables) && extracted.tables.length > 0;
-  const hasDiagrams = Array.isArray(extracted.diagrams) && extracted.diagrams.length > 0;
+  const hasGraph = envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0;
+  const hasTables = Array.isArray(envelope.tables) && envelope.tables.length > 0;
+  const hasDiagrams = Array.isArray(envelope.diagrams) && envelope.diagrams.length > 0;
   const requestedNarrative = focus.narrative && focus.narrative.trim().length > 0;
   const hasStructuredOutput = hasGraph || hasTables || hasDiagrams;
 
   // Require a non-empty narrative only when narrative was explicitly requested
   // or when no structured output sections were produced.
-  if (!extracted.narrative || extracted.narrative.length === 0) {
+  if (!envelope.narrative || envelope.narrative.length === 0) {
     if (requestedNarrative || !hasStructuredOutput) {
       logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
       return {
@@ -170,25 +165,26 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   // something else (graph/table/diagram) and the model also produced that
   // structured output. For plain Reflect queries with no explicit section
   // directives, the narrative is the primary output and must be preserved.
+  let finalNarrative = envelope.narrative;
+  let finalNarrativeName = envelope.narrative_name;
   if (!requestedNarrative && hasStructuredOutput) {
-    extracted.narrative = '';
-    extracted.narrative_name = '';
+    finalNarrative = '';
+    finalNarrativeName = '';
   }
 
-  const narrativeName = extracted.narrative_name || '';
   // If narrative is empty but structured output exists, synthesize a header so
   // downstream consumers still have a Markdown section to render.
-  const narrative = extracted.narrative && extracted.narrative.length > 0
-    ? `# Results - ${query}\n\n${extracted.narrative}` + basedOnToMarkdown(result.data, query)
+  const narrative = finalNarrative && finalNarrative.length > 0
+    ? `# Results - ${query}\n\n${finalNarrative}` + basedOnToMarkdown(result.data, query)
     : `# Results - ${query}` + basedOnToMarkdown(result.data, query);
 
   return {
     success: true,
     narrative,
-    narrative_name: narrativeName,
-    graph,
-    tables: extracted.tables || [],
-    diagrams: extracted.diagrams || [],
+    narrative_name: finalNarrativeName,
+    graph: envelope.graph,
+    tables: envelope.tables,
+    diagrams: envelope.diagrams,
     calls_used: ['reflect'],
     calls: [baseCall],
   };
