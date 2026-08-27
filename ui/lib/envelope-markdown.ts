@@ -75,6 +75,37 @@ export function rowsToMarkdownTable(columns: string[], rows: Record<string, unkn
   return `${header}\n${sep}\n${body}`;
 }
 
+export function parseMarkdownTable(markdown: string): { columns: string[]; rows: Record<string, unknown>[] } | null {
+  const lines = markdown.split(/\n/).filter((l) => l.trim());
+  if (lines.length < 2) return null;
+  const separatorIdx = lines.findIndex((l) => /^\|?\s*[-:]+\s*(\|\s*[-:]+\s*)*\|?\s*$/.test(l));
+  if (separatorIdx <= 0 || separatorIdx >= lines.length - 1) return null;
+
+  const parseRow = (line: string): string[] => {
+    const trimmed = line.trim();
+    const inner = trimmed.startsWith('|') && trimmed.endsWith('|')
+      ? trimmed.slice(1, -1)
+      : trimmed;
+    return inner.split('|').map((c) => c.trim());
+  };
+
+  const columns = parseRow(lines[separatorIdx - 1]);
+  if (columns.length === 0) return null;
+
+  const rows: Record<string, unknown>[] = [];
+  for (let i = separatorIdx + 1; i < lines.length; i++) {
+    const cells = parseRow(lines[i]);
+    if (cells.length === 0) continue;
+    const row: Record<string, unknown> = {};
+    for (let j = 0; j < columns.length; j++) {
+      row[columns[j]] = cells[j] ?? '';
+    }
+    rows.push(row);
+  }
+
+  return rows.length > 0 ? { columns, rows } : null;
+}
+
 export function formatPropertiesCompact(properties: Record<string, any>): string {
   return Object.entries(properties)
     .filter(([, v]) => v !== undefined && v !== null)
@@ -110,30 +141,8 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
   }
 
   if (graph && (graph.nodes?.length || graph.edges?.length)) {
-    const nodeRows = graph.nodes?.map((n) => ({
-      ID: n.id || '',
-      Name: n.name || n.label || '',
-      Type: n.type || '',
-    })) ?? [];
-    const nodeTable = rowsToMarkdownTable(['ID', 'Name', 'Type'], nodeRows);
-
-    const edgeRows = graph.edges?.map((e) => {
-      const props = e.properties ? formatPropertiesCompact(e.properties) : '';
-      return {
-        From: e.from || '',
-        To: e.to || '',
-        Type: e.type || '',
-        Label: e.label || '',
-        Detail: e.detail || '',
-        Properties: props,
-      };
-    }) ?? [];
-    const edgeTable = rowsToMarkdownTable(['From', 'To', 'Type', 'Label', 'Detail', 'Properties'], edgeRows);
-
     const rawGraphJson = JSON.stringify(graph, null, 2);
-    parts.push(
-      `\n\n## Graph\n\n### Source: Raw JSON\n\n\`\`\`json\n${rawGraphJson}\n\`\`\`\n\n### Generated: Nodes\n\n${nodeTable}\n\n### Generated: Edges\n\n${edgeTable}`,
-    );
+    parts.push(`\n\n## Graph\n\n\`\`\`json\n${rawGraphJson}\n\`\`\``);
   }
 
   return parts.join('').trim();

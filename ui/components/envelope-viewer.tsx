@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { NarrativeViewer } from './narrative-viewer';
-import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
+import { buildEnvelopeMarkdown, formatPropertiesCompact, parseMarkdownTable } from '@/lib/envelope-markdown';
 import { EnvelopeControls } from './envelope-controls';
 import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
@@ -139,7 +139,7 @@ export function EnvelopeViewer({
     : undefined;
 
   const resolveSectionCopy = useCallback(
-    (heading: string, _level: number, _contentMarkdown: string): EnvelopeCopyEvent | null => {
+    (heading: string, _level: number, contentMarkdown: string): EnvelopeCopyEvent | null => {
       const trimmed = heading.trim();
 
       // Graph is rendered as a synthetic section; use the canonical canvas.graph.
@@ -162,6 +162,17 @@ export function EnvelopeViewer({
         if (table) {
           return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
         }
+      }
+
+      // Markdown tables inside narrative that do not correspond to an envelope
+      // table are promoted to JSON table data when copied.
+      const parsed = parseMarkdownTable(contentMarkdown);
+      if (parsed) {
+        return {
+          type: 'tables',
+          payload: JSON.stringify([{ name: trimmed || 'Table', columns: parsed.columns, rows: parsed.rows }], null, 2),
+          label: trimmed || 'Table',
+        };
       }
 
       // Diagrams are rendered as "Diagram: <name>" headings; map back to canvas.diagrams by name.
