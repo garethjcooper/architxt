@@ -82,6 +82,8 @@ const aqlLanguage = new LanguageSupport(
           case 'diagram-name':
           case 'diagram-type':
           case 'table-name':
+          case 'graph-name':
+          case 'narrative-name':
             return 'directive-sub';
           default:
             return 'directive';
@@ -251,6 +253,26 @@ const aqlLinter = linter((view) => {
         message: 'Table is missing a #table-name',
       });
     }
+    if (block.kind === 'graph' && !block.name) {
+      const lineIdx = (block.startLine ?? 1) - 1;
+      const from = view.state.doc.line(lineIdx + 1).from;
+      diagnostics.push({
+        from,
+        to: from + (lines[lineIdx]?.length ?? 0),
+        severity: 'warning',
+        message: 'Graph is missing a #graph-name',
+      });
+    }
+    if (block.kind === 'narrative' && !block.name) {
+      const lineIdx = (block.startLine ?? 1) - 1;
+      const from = view.state.doc.line(lineIdx + 1).from;
+      diagnostics.push({
+        from,
+        to: from + (lines[lineIdx]?.length ?? 0),
+        severity: 'warning',
+        message: 'Narrative is missing a #narrative-name',
+      });
+    }
   }
 
   return diagnostics;
@@ -275,7 +297,18 @@ function getCurrentBlockKind(state: EditorState): string | null {
   return currentBlock;
 }
 
-const DIRECTIVE_KEYWORDS = ['diagram', 'table', 'graph', 'narrative', 'diagram-name', 'diagram-type', 'table-name', 'end'];
+const DIRECTIVE_KEYWORDS = [
+  'diagram',
+  'table',
+  'graph',
+  'narrative',
+  'diagram-name',
+  'diagram-type',
+  'table-name',
+  'graph-name',
+  'narrative-name',
+  'end',
+];
 
 function buildDirectiveCompletions(filter: string, state: EditorState): Completion[] {
   const term = filter.toLowerCase();
@@ -326,8 +359,8 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
       boost = 99;
     } else if (kw === 'graph') {
       apply = (view, _completion, from, to) => {
-        const text = '#graph\n#end';
-        const cursor = from + '#graph\n'.length;
+        const text = '#graph\n#graph-name \n#end';
+        const cursor = from + '#graph\n#graph-name '.length;
         view.dispatch({
           changes: { from, to, insert: text },
           selection: { anchor: cursor, head: cursor },
@@ -336,8 +369,8 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
       boost = 99;
     } else if (kw === 'narrative') {
       apply = (view, _completion, from, to) => {
-        const text = '#narrative\n#end';
-        const cursor = from + '#narrative\n'.length;
+        const text = '#narrative\n#narrative-name \n#end';
+        const cursor = from + '#narrative\n#narrative-name '.length;
         view.dispatch({
           changes: { from, to, insert: text },
           selection: { anchor: cursor, head: cursor },
@@ -346,7 +379,7 @@ function buildDirectiveCompletions(filter: string, state: EditorState): Completi
       boost = 99;
     } else if (kw === 'end') {
       apply = '#end';
-    } else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name') {
+    } else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name' || kw === 'graph-name' || kw === 'narrative-name') {
       apply = `#${kw} `;
     } else {
       apply = `#${kw}`;
