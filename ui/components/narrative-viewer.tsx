@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
-import { Copy, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
@@ -459,36 +459,20 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 <span className="text-[11px] font-medium text-white/70 truncate" title={title}>{title}</span>
                 <span className="text-[10px] text-white/40 ml-1 flex-shrink-0">({structuralBlocks.length})</span>
               </div>
-              {effectiveShowHeaderActions && (
+              {effectiveShowHeaderActions && onCopyWholeDocument && (
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {onCopyWholeDocument && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyWholeDocument();
-                      }}
-                      className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
-                      title="Copy all to page editor"
-                      aria-label="Copy all"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                  )}
-                  {onCopyWholeDocument && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyWholeDocument();
-                      }}
-                      className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
-                      title={addToPageLabel}
-                      aria-label={addToPageLabel}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyWholeDocument();
+                    }}
+                    className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
+                    title={addToPageLabel}
+                    aria-label={addToPageLabel}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
                 </div>
               )}
             </div>
