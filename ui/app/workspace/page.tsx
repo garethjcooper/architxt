@@ -1027,7 +1027,6 @@ export default function WorkspacePage() {
             <WorkspaceResultPanel
               result={previewResult}
               title={previewTitle}
-              count={previewResult?.synthesis?.narrative ? undefined : 0}
               isRunning={reflectLoading && activeTabId === ANCHOR_TAB_ID}
               error={previewError}
               sessionName={activeSession?.title}
