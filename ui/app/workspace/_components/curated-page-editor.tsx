@@ -5,31 +5,12 @@ import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
-import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge } from '@/lib/api/client';
-import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
+import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
+import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { cn, downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
 
-export type CuratedPageEnvelope = {
-  synthesis: { narrative: string };
-  canvas?: {
-    graph: { nodes: GraphNode[]; edges: GraphEdge[] };
-    tables?: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
-    diagrams?: Array<{ name: string; type: string; content: string }>;
-  };
-};
-
-export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): CuratedPageEnvelope {
-  const canvas = page.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
-  return {
-    synthesis: { narrative: page.synthesis?.narrative ?? '' },
-    canvas: {
-      graph: canvas.graph ?? { nodes: [], edges: [] },
-      tables: canvas.tables ?? [],
-      diagrams: canvas.diagrams ?? [],
-    },
-  };
-}
+export type CuratedPageEnvelope = ReturnType<typeof normalizeEnvelope>;
 
 function getPageTitle(page: ResearchStepSummary | DiscoverStepResponse): string {
   if ('intent_text' in page && page.intent_text) return page.intent_text;
@@ -48,7 +29,7 @@ export interface CuratedPageEditorProps {
 
 export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
-  const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(page), [page]);
+  const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
   const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set());
   const [showIndex, setShowIndex] = useState(true);
@@ -68,16 +49,8 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
   }, [baseBlocks, deletedBlockIds]);
 
   const userMarkdown = useMemo(() => buildUserNarrativeContent(displayedBlocks), [displayedBlocks]);
-  const baselineDirty = useMemo(() => {
-    const canvas = envelope.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
-    const baseCanvas = effectiveBaseline.canvas ?? { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
-    const narrativeChanged = userMarkdown !== (effectiveBaseline.synthesis.narrative ?? '');
-    const graphChanged = JSON.stringify(canvas.graph) !== JSON.stringify(baseCanvas.graph);
-    const tablesChanged = JSON.stringify(canvas.tables) !== JSON.stringify(baseCanvas.tables);
-    const diagramsChanged = JSON.stringify(canvas.diagrams) !== JSON.stringify(baseCanvas.diagrams);
-    return narrativeChanged || graphChanged || tablesChanged || diagramsChanged;
-  }, [envelope, effectiveBaseline, userMarkdown]);
-  const isDirty = userMarkdown !== envelope.synthesis.narrative || baselineDirty;
+  const workingEnvelope = useMemo(() => ({ ...envelope, narrative: userMarkdown }), [envelope, userMarkdown]);
+  const isDirty = useMemo(() => JSON.stringify(workingEnvelope) !== JSON.stringify(effectiveBaseline), [workingEnvelope, effectiveBaseline]);
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
 
@@ -85,15 +58,13 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
     if (!page || !('id' in page) || typeof page.id !== 'number') return;
     setSaving(true);
     try {
-      // Save the full envelope: narrative edits plus any structured canvas data
-      // (graph/tables/diagrams) that was applied via envelope-aware copy/add.
-      await onSave(page.id, { synthesis: { narrative: userMarkdown }, canvas: envelope.canvas });
+      await onSave(page.id, workingEnvelope);
       setDeletedBlockIds(new Set());
       toast.success('Saved curated page');
     } finally {
       setSaving(false);
     }
-  }, [page, userMarkdown, onSave, envelope.canvas]);
+  }, [page, workingEnvelope, onSave]);
 
   const handleCopy = useCallback(() => {
     if (!displayMarkdown) return;

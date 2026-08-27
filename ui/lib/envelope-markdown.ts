@@ -1,6 +1,6 @@
 import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge } from '@/lib/api/client';
 
-type EnvelopeLike = {
+type LegacyEnvelope = {
   synthesis?: { narrative?: string | null } | null;
   canvas?: {
     graph?: { nodes?: GraphNode[]; edges?: GraphEdge[] } | null;
@@ -8,6 +8,55 @@ type EnvelopeLike = {
     diagrams?: Array<{ name: string; type: string; content: string }> | null;
   } | null;
 };
+
+type UnifiedEnvelope = {
+  narrative: string;
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] };
+  tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }>;
+  diagrams: Array<{ name: string; type: string; content: string }>;
+};
+
+export type EnvelopeLike = LegacyEnvelope | UnifiedEnvelope | null | undefined;
+
+function isUnifiedEnvelope(envelope: EnvelopeLike): envelope is UnifiedEnvelope {
+  if (!envelope || typeof envelope !== 'object') return false;
+  return 'narrative' in envelope && !('synthesis' in envelope);
+}
+
+function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
+  if (!envelope) {
+    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+  }
+  if (!isUnifiedEnvelope(envelope)) {
+    return {
+      narrative: envelope.synthesis?.narrative ?? '',
+      graph: {
+        nodes: envelope.canvas?.graph?.nodes ?? [],
+        edges: envelope.canvas?.graph?.edges ?? [],
+      },
+      tables: (envelope.canvas?.tables ?? []).map((t) => ({
+        name: t.name,
+        columns: t.columns ?? [],
+        rows: t.rows,
+      })),
+      diagrams: envelope.canvas?.diagrams ?? [],
+    };
+  }
+
+  return {
+    narrative: envelope.narrative ?? '',
+    graph: {
+      nodes: envelope.graph?.nodes ?? [],
+      edges: envelope.graph?.edges ?? [],
+    },
+    tables: (envelope.tables ?? []).map((t) => ({
+      name: t.name,
+      columns: t.columns ?? [],
+      rows: t.rows,
+    })),
+    diagrams: envelope.diagrams ?? [],
+  };
+}
 
 export function escapeMarkdownCell(val: unknown): string {
   if (val === undefined || val === null) return '';
@@ -36,15 +85,14 @@ export function formatPropertiesCompact(properties: Record<string, any>): string
     .join(' | ');
 }
 
-export function buildEnvelopeMarkdown(envelope: EnvelopeLike | null | undefined): string {
-  if (!envelope) return '';
+export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
+  const { narrative, graph, tables, diagrams } = toUnified(envelope);
   const parts: string[] = [];
 
-  if (envelope.synthesis?.narrative?.trim()) {
-    parts.push(envelope.synthesis.narrative.trim());
+  if (narrative.trim()) {
+    parts.push(narrative.trim());
   }
 
-  const tables = envelope.canvas?.tables;
   if (tables && tables.length > 0) {
     for (const t of tables) {
       if (!t.rows || t.rows.length === 0) continue;
@@ -54,7 +102,6 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike | null | undefined)
     }
   }
 
-  const diagrams = envelope.canvas?.diagrams;
   if (diagrams && diagrams.length > 0) {
     for (const d of diagrams) {
       const content = typeof d.content === 'string' ? d.content : JSON.stringify(d.content ?? null, null, 2);
@@ -62,7 +109,6 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike | null | undefined)
     }
   }
 
-  const graph = envelope.canvas?.graph;
   if (graph && (graph.nodes?.length || graph.edges?.length)) {
     const nodeRows = graph.nodes?.map((n) => ({
       ID: n.id || '',
@@ -91,4 +137,8 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike | null | undefined)
   }
 
   return parts.join('').trim();
+}
+
+export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): Required<UnifiedEnvelope> {
+  return toUnified(page);
 }

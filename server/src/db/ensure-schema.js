@@ -100,6 +100,7 @@ function ensureMissingTables(db) {
         rstep_viewpoint_ids JSON,
         rstep_canvas_state JSON,
         rstep_synthesis JSON,
+        rstep_envelope JSON,
         rstep_tool_calls_used INTEGER DEFAULT 0,
         rstep_status TEXT,
         rstep_error_message TEXT,
@@ -1025,6 +1026,10 @@ function ensureMissingColumns(db) {
         {
           name: 'rstep_raw_query',
           ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_raw_query TEXT'
+        },
+        {
+          name: 'rstep_envelope',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_envelope JSON'
         }
       ]
     },
@@ -1251,6 +1256,50 @@ function ensureResearchSessionsServerFk(db) {
 }
 
 /**
+ * Migrate curated_page steps so they store their entire content as a single
+ * rstep_envelope object. Non-curated steps keep legacy rstep_synthesis and
+ * rstep_canvas_state untouched.
+ */
+function migrateCuratedPagesToEnvelope(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='research_steps'").get();
+  if (!tableExists) return 0;
+  const colExists = db.prepare("PRAGMA table_info(research_steps)").all().some((c) => c.name === 'rstep_envelope');
+  if (!colExists) return 0;
+
+  const pending = db.prepare(`
+    SELECT rstep_id, rstep_synthesis, rstep_canvas_state
+    FROM research_steps
+    WHERE rstep_action_type = 'curated_page' AND rstep_envelope IS NULL
+  `).all();
+
+  if (!pending || pending.length === 0) return 0;
+
+  const update = db.prepare(`
+    UPDATE research_steps
+    SET rstep_envelope = ?
+    WHERE rstep_id = ?
+  `);
+
+  let migrated = 0;
+  for (const row of pending) {
+    const synthesis = row.rstep_synthesis ? JSON.parse(row.rstep_synthesis) : { narrative: '' };
+    const canvas = row.rstep_canvas_state ? JSON.parse(row.rstep_canvas_state) : { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+    const envelope = {
+      narrative: typeof synthesis.narrative === 'string' ? synthesis.narrative : '',
+      graph: canvas.graph ?? { nodes: [], edges: [] },
+      tables: canvas.tables ?? [],
+      diagrams: canvas.diagrams ?? [],
+    };
+    update.run(JSON.stringify(envelope), row.rstep_id);
+    migrated++;
+  }
+  if (migrated > 0) {
+    logger.info(`Migrated ${migrated} curated_page step(s) to rstep_envelope`);
+  }
+  return migrated;
+}
+
+/**
  * Ensure pending_operations.pop_doc_id is nullable. Older schemas created it
  * as NOT NULL, but document-less async operations (e.g. mental-model refresh)
  * need to leave it null. Recreate the table preserving existing rows only when
@@ -1406,6 +1455,7 @@ export function ensureSchema(db) {
     const removed = removeMentalModelCheckConstraints(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
     const mmReturnsMigrated = migrateMentalModelReturnsToGeneric(db);
+    const curatedPagesMigrated = migrateCuratedPagesToEnvelope(db);
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
     const researchFkFixed = ensureResearchSessionsServerFk(db);
@@ -1413,12 +1463,12 @@ export function ensureSchema(db) {
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
     const cgTemplates = ensureContextualGraphTemplates(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}`);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

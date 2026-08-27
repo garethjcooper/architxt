@@ -36,7 +36,8 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
-import { CuratedPageEnvelope, normalizeEnvelope } from './_components/curated-page-editor';
+import { CuratedPageEnvelope } from './_components/curated-page-editor';
+import { normalizeEnvelope } from '@/lib/envelope-markdown';
 import { type EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { mergeGraphs } from '@/lib/envelope-merge';
 
@@ -106,8 +107,7 @@ export default function WorkspacePage() {
     if (!edits) return activeCuratedPage;
     return {
       ...activeCuratedPage,
-      synthesis: edits.synthesis,
-      canvas: edits.canvas,
+      envelope: edits,
     };
   }, [activeCuratedPage, pendingCuratedEdits]);
 
@@ -384,11 +384,7 @@ export default function WorkspacePage() {
   const handleSaveCuratedPage = useCallback(
     async (stepId: number, envelope: CuratedPageEnvelope) => {
       try {
-        const payload: Parameters<typeof researchApi.updateCuratedPage>[1] = {
-          synthesis: envelope.synthesis,
-          canvas: envelope.canvas,
-        };
-        await researchApi.updateCuratedPage(stepId, payload);
+        await researchApi.updateCuratedPage(stepId, { envelope });
         // Clear local pending edits for this page once the server confirms the save.
         setPendingCuratedEdits((prev) => {
           const next = { ...prev };
@@ -406,23 +402,8 @@ export default function WorkspacePage() {
     [workspaceSession.refresh]
   );
 
-  const handleCopyToCuratedPage = useCallback(
-    (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
-      const events = Array.isArray(event) ? event : [event];
-      const firstLabel = events[0]?.label;
-      if (activeCuratedPage) {
-        // Apply to the currently active curated page immediately.
-        void handleApplyCopyEvent(activeCuratedPage.id, events);
-        return;
-      }
-      // No active curated page: show target picker.
-      setPendingSection({ events, title: firstLabel });
-    },
-    [activeCuratedPage]
-  );
-
   const handleApplyCopyEvent = useCallback(
-    async (stepId: number, event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
+    (stepId: number, event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
       const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
       if (!page) return;
 
@@ -430,62 +411,60 @@ export default function WorkspacePage() {
       // The editor renders the updated envelope, compares it to the server
       // baseline, and enables Save so the user can persist the change.
       const sourceEnvelope = pendingCuratedEdits[stepId] ?? normalizeEnvelope(page);
-      const canvas = {
-        graph: { ...(sourceEnvelope.canvas?.graph ?? { nodes: [], edges: [] }) },
-        tables: [...(sourceEnvelope.canvas?.tables ?? [])],
-        diagrams: [...(sourceEnvelope.canvas?.diagrams ?? [])],
+      const nextEnvelope: CuratedPageEnvelope = {
+        narrative: sourceEnvelope.narrative,
+        graph: {
+          nodes: [...(sourceEnvelope.graph?.nodes ?? [])],
+          edges: [...(sourceEnvelope.graph?.edges ?? [])],
+        },
+        tables: [...(sourceEnvelope.tables ?? [])],
+        diagrams: [...(sourceEnvelope.diagrams ?? [])],
       };
-      canvas.graph.nodes = [...(sourceEnvelope.canvas?.graph?.nodes ?? [])];
-      canvas.graph.edges = [...(sourceEnvelope.canvas?.graph?.edges ?? [])];
-      const synthesis = { ...sourceEnvelope.synthesis };
       let toastMessage = '';
       const events = Array.isArray(event) ? event : [event];
-      let narrativeAccumulator = synthesis.narrative ?? '';
 
       for (const ev of events) {
         switch (ev.type) {
           case 'narrative': {
-            const prefix = narrativeAccumulator.trim() ? '\n\n' : '';
-            narrativeAccumulator = `${narrativeAccumulator}${prefix}${ev.payload}`;
+            const prefix = nextEnvelope.narrative.trim() ? '\n\n' : '';
+            nextEnvelope.narrative = `${nextEnvelope.narrative}${prefix}${ev.payload}`;
             toastMessage = `Added ${ev.label || 'section'} to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
           case 'graph': {
             const parsedGraph = JSON.parse(ev.payload);
             const mergeResult = mergeGraphs(
-              canvas.graph ?? { nodes: [], edges: [] },
+              nextEnvelope.graph,
               { nodes: parsedGraph.nodes || [], edges: parsedGraph.edges || [] }
             );
-            canvas.graph = { nodes: mergeResult.nodes, edges: mergeResult.edges };
+            nextEnvelope.graph = { nodes: mergeResult.nodes, edges: mergeResult.edges };
             toastMessage = `Merged graph into ${page.intent_text || `Page ${page.id}`}: +${mergeResult.addedNodes} nodes, +${mergeResult.addedEdges} edges`;
             break;
           }
           case 'tables': {
             const parsedTables = JSON.parse(ev.payload);
-            const existingNames = new Set((canvas.tables ?? []).map((t) => t.name));
+            const existingNames = new Set(nextEnvelope.tables.map((t) => t.name));
             const newTables = (parsedTables ?? []).filter((t: { name: string }) => !existingNames.has(t.name));
-            canvas.tables = [...(canvas.tables ?? []), ...newTables];
+            nextEnvelope.tables = [...nextEnvelope.tables, ...newTables];
             toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
           case 'diagrams': {
             const parsedDiagrams = JSON.parse(ev.payload);
-            const existingNames = new Set((canvas.diagrams ?? []).map((d) => d.name));
+            const existingNames = new Set(nextEnvelope.diagrams.map((d) => d.name));
             const newDiagrams = (parsedDiagrams ?? []).filter((d: { name: string }) => !existingNames.has(d.name));
-            canvas.diagrams = [...(canvas.diagrams ?? []), ...newDiagrams];
+            nextEnvelope.diagrams = [...nextEnvelope.diagrams, ...newDiagrams];
             toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
         }
       }
 
-      synthesis.narrative = narrativeAccumulator;
-
       // Update the local pending edit so the editor sees the new envelope and
       // becomes dirty against the server baseline.
       setPendingCuratedEdits((prev) => ({
         ...prev,
-        [stepId]: { synthesis, canvas },
+        [stepId]: nextEnvelope,
       }));
       // Make the target page visible so the user sees the applied change and
       // the Save button reflect the updated envelope.
@@ -496,6 +475,21 @@ export default function WorkspacePage() {
       if (toastMessage) toast.success(toastMessage);
     },
     [workspaceSession.curatedPages, pendingCuratedEdits]
+  );
+
+  const handleCopyToCuratedPage = useCallback(
+    (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
+      const events = Array.isArray(event) ? event : [event];
+      const firstLabel = events[0]?.label;
+      if (activeCuratedPage) {
+        // Apply to the currently active curated page immediately.
+        handleApplyCopyEvent(activeCuratedPage.id, events);
+        return;
+      }
+      // No active curated page: show target picker.
+      setPendingSection({ events, title: firstLabel });
+    },
+    [activeCuratedPage, handleApplyCopyEvent]
   );
 
   const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
