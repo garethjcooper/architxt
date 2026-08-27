@@ -139,7 +139,9 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const hasGraph = envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0;
   const hasTables = Array.isArray(envelope.tables) && envelope.tables.length > 0;
   const hasDiagrams = Array.isArray(envelope.diagrams) && envelope.diagrams.length > 0;
-  const requestedNarrative = focus.narrative && focus.narrative.trim().length > 0;
+  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
+    ? focus.narrative.trim().length > 0
+    : focus.narrative.content?.trim().length > 0);
   const hasStructuredOutput = hasGraph || hasTables || hasDiagrams;
 
   // Require a non-empty narrative only when narrative was explicitly requested
