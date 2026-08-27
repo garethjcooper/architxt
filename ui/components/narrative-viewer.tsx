@@ -242,20 +242,6 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           <span className="truncate block" title={b.title}>{b.title}</span>
         </button>
         <div className="flex items-center flex-shrink-0">
-          {onCopySection && b.type === 'heading' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCopySection(makeSectionEvent(b));
-              }}
-              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
-              title="Copy section to page editor"
-              aria-label="Copy section"
-            >
-              <Copy className="h-3 w-3" />
-            </button>
-          )}
           {onAddToPage && b.type === 'heading' && (
             <button
               type="button"
