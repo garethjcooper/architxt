@@ -11,9 +11,11 @@ export const UNIFIED_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
     narrative: { type: 'string' },
+    narrative_name: { type: 'string' },
     graph: {
       type: 'object',
       properties: {
+        name: { type: 'string' },
         nodes: { type: 'array' },
         edges: {
           type: 'array',

@@ -137,6 +137,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   });
 
   const graph = {
+    name: normalizedGraph.name || extracted.graph?.name || '',
     nodes: normalizedGraph.nodes,
     edges: normalizedGraph.edges,
   };
@@ -171,8 +172,10 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   // directives, the narrative is the primary output and must be preserved.
   if (!requestedNarrative && hasStructuredOutput) {
     extracted.narrative = '';
+    extracted.narrative_name = '';
   }
 
+  const narrativeName = extracted.narrative_name || '';
   // If narrative is empty but structured output exists, synthesize a header so
   // downstream consumers still have a Markdown section to render.
   const narrative = extracted.narrative && extracted.narrative.length > 0
@@ -182,6 +185,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   return {
     success: true,
     narrative,
+    narrative_name: narrativeName,
     graph,
     tables: extracted.tables || [],
     diagrams: extracted.diagrams || [],
