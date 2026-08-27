@@ -26,11 +26,33 @@ describe('parseAql', () => {
     assert.equal(q.intentText, '');
     const focus = toSectionFocus(q);
     assert.equal(focus.intentText, 'CRM, Billing');
-    assert.equal(focus.sectionFocus.graph, 'CRM, Billing');
+    assert.equal(focus.sectionFocus.graph.content, 'CRM, Billing');
     assert.equal(q.blocks.length, 1);
     assert.equal(q.blocks[0].kind, 'graph');
     assert.equal(q.blocks[0].body, 'CRM, Billing');
     assert.equal(q.errors, undefined);
+  });
+
+  it('parses a graph block with name', () => {
+    const q = parseAql('#graph\n#graph-name "Integration flows"\nCRM, Billing\n#end');
+    assert.equal(q.blocks.length, 1);
+    assert.equal(q.blocks[0].kind, 'graph');
+    assert.equal(q.blocks[0].name, 'Integration flows');
+    assert.equal(q.blocks[0].body, 'CRM, Billing');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.sectionFocus.graph.name, 'Integration flows');
+    assert.equal(focus.sectionFocus.graph.content, 'CRM, Billing');
+  });
+
+  it('parses a narrative block with name', () => {
+    const q = parseAql('#narrative\n#narrative-name Summary\nDescribe the impact.\n#end');
+    assert.equal(q.blocks.length, 1);
+    assert.equal(q.blocks[0].kind, 'narrative');
+    assert.equal(q.blocks[0].name, 'Summary');
+    assert.equal(q.blocks[0].body, 'Describe the impact.');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.sectionFocus.narrative.name, 'Summary');
+    assert.equal(focus.sectionFocus.narrative.content, 'Describe the impact.');
   });
 
   it('parses a table block with name', () => {
@@ -60,7 +82,7 @@ describe('parseAql', () => {
     assert.equal(q.intentText, 'compare current and desired state');
     const focus = toSectionFocus(q);
     assert.equal(focus.intentText, 'compare current and desired state');
-    assert.equal(focus.sectionFocus.graph, 'CRM');
+    assert.equal(focus.sectionFocus.graph.content, 'CRM');
   });
 
   it('returns errors for unclosed blocks', () => {
@@ -76,7 +98,7 @@ describe('parseAql', () => {
   });
 
   it('returns errors for disallowed sub-directive keys', () => {
-    const q = parseAql('#table\n#diagram-type flowchart\n#table-name T\n#end');
+    const q = parseAql('#graph\n#table-name T\n#end');
     assert.ok(q.errors);
     assert.ok(q.errors.some((e) => /not allowed/.test(e.message)));
   });

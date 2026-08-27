@@ -68,7 +68,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
       diagrams: [] });
     const { graph, errors } = normalizeModelOutput(content);
     assert.ok(graph, 'expected graph to be returned');
-    assert.deepEqual(graph, { nodes: [], edges: [] });
+    assert.deepEqual(graph, { name: '', nodes: [], edges: [] });
     assert.equal(errors.length, 0);
   });
 
