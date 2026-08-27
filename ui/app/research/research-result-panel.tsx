@@ -8,7 +8,7 @@ import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/r
 import { ComponentDiagram } from '@/components/component-diagram';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { buildEnvelopeMarkdown } from '@/lib/envelope-markdown';
+import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { sanitizeFilenameBase, downloadMarkdown } from '@/lib/utils';
 import type { DiscoverStepResponse, GraphNode, GraphEdge, ResearchStepSummary } from '@/lib/api/client';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
@@ -206,7 +206,8 @@ export function ResearchResultPanel({
     if (selected.length === 0) return null;
     return selected
       .map((s) => {
-        const narrative = s.synthesis?.narrative;
+        const envelope = normalizeEnvelope(s);
+        const narrative = envelope.narrative;
         if (!narrative) return null;
         return narrative;
       })
@@ -220,7 +221,7 @@ export function ResearchResultPanel({
     if (selected.length === 0) return null;
     const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
     for (const s of selected) {
-      const stepTables = s.canvas?.tables;
+      const stepTables = normalizeEnvelope(s).tables;
       if (stepTables?.length) tables.push(...stepTables);
     }
     return tables.length > 0 ? tables : null;
@@ -232,7 +233,7 @@ export function ResearchResultPanel({
     if (selected.length === 0) return null;
     const diagrams: Array<{ name: string; type: string; content: string }> = [];
     for (const s of selected) {
-      const stepDiagrams = s.canvas?.diagrams;
+      const stepDiagrams = normalizeEnvelope(s).diagrams;
       if (stepDiagrams?.length) diagrams.push(...stepDiagrams);
     }
     return diagrams.length > 0 ? diagrams : null;
@@ -247,7 +248,7 @@ export function ResearchResultPanel({
     const edges: GraphEdge[] = [];
     const edgeKeys = new Set<string>();
     for (const s of selected) {
-      const stepGraph = s.canvas?.graph;
+      const stepGraph = normalizeEnvelope(s).graph;
       if (!stepGraph) continue;
       for (const n of stepGraph.nodes ?? []) {
         if (n?.id && !nodeIds.has(n.id)) {
@@ -280,12 +281,10 @@ export function ResearchResultPanel({
   const narrative = useMemo(() => {
     if (viewMode === 'session') {
       const mergedEnvelope = {
-        synthesis: { narrative: mergedNarrative || '' },
-        canvas: {
-          tables: mergedTables ?? undefined,
-          diagrams: mergedDiagrams ?? undefined,
-          graph: mergedGraph ?? undefined,
-        },
+        narrative: mergedNarrative || '',
+        graph: mergedGraph ?? { nodes: [], edges: [] },
+        tables: mergedTables ?? [],
+        diagrams: mergedDiagrams ?? [],
       };
       return buildEnvelopeMarkdown(mergedEnvelope);
     }

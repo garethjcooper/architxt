@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { NarrativeViewer } from './narrative-viewer';
-import { buildEnvelopeMarkdown, formatPropertiesCompact, parseMarkdownTable } from '@/lib/envelope-markdown';
+import { buildEnvelopeMarkdown, formatPropertiesCompact, normalizeEnvelopeFromNullable, parseMarkdownTable } from '@/lib/envelope-markdown';
 import { EnvelopeControls } from './envelope-controls';
 import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
@@ -59,44 +59,40 @@ export function EnvelopeViewer({
   const viewMode = plain ? 'plain' : 'markdown';
   const effectiveSessionName = sessionName ?? title;
 
-  const normalized = useMemo(() => {
-    if (!envelope) return null;
-    if ('intent_text' in envelope) {
-      return envelope as ResearchStepSummary;
-    }
-    return {
-      intent_text: undefined,
-      synthesis: envelope.synthesis,
-      canvas: envelope.canvas,
-    };
-  }, [envelope]);
+  const titleLabel = useMemo(() => {
+    if (!envelope) return title;
+    if ('intent_text' in envelope && typeof (envelope as any).intent_text === 'string') return (envelope as any).intent_text;
+    return title;
+  }, [envelope, title]);
+
+  const normalized = useMemo(() => normalizeEnvelopeFromNullable(envelope), [envelope]);
 
   const structuredItems = useMemo(() => {
     if (!normalized) return undefined;
     const items: NonNullable<React.ComponentPropsWithoutRef<typeof EnvelopeControls>['structuredItems']> = {};
-    const graph = normalized.canvas?.graph;
+    const graph = normalized.graph;
     if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
       items.graph = {
         payload: JSON.stringify(graph, null, 2),
-        label: normalized.intent_text || 'Graph',
+        label: titleLabel,
       };
     }
-    const tables = normalized.canvas?.tables;
+    const tables = normalized.tables;
     if (tables && tables.length > 0) {
       items.tables = {
         payload: JSON.stringify(tables, null, 2),
-        label: normalized.intent_text || 'Tables',
+        label: titleLabel,
       };
     }
-    const diagrams = normalized.canvas?.diagrams;
+    const diagrams = normalized.diagrams;
     if (diagrams && diagrams.length > 0) {
       items.diagrams = {
         payload: JSON.stringify(diagrams, null, 2),
-        label: normalized.intent_text || 'Diagrams',
+        label: titleLabel,
       };
     }
     return Object.keys(items).length > 0 ? items : undefined;
-  }, [normalized]);
+  }, [normalized, titleLabel]);
 
   const handleCopyStructured = useCallback(
     (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => {
@@ -142,23 +138,23 @@ export function EnvelopeViewer({
     (heading: string, _level: number, contentMarkdown: string): EnvelopeCopyEvent | null => {
       const trimmed = heading.trim();
 
-      // Graph is rendered as a synthetic section; use the canonical canvas.graph.
+      // Graph is rendered as a synthetic section; use the canonical envelope.graph.
       if (trimmed === 'Graph' || trimmed === 'Source: Raw JSON') {
-        const graph = normalized?.canvas?.graph;
+        const graph = normalized?.graph;
         if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
           return {
             type: 'graph',
             payload: JSON.stringify(graph, null, 2),
-            label: normalized?.intent_text || 'Graph',
+            label: titleLabel,
           };
         }
       }
 
-      // Tables are rendered as "Table: <name>" headings; map back to canvas.tables by name.
+      // Tables are rendered as "Table: <name>" headings; map back to envelope.tables by name.
       const tableHeadingMatch = trimmed.match(/^Table:\s*(.+)$/i);
       if (tableHeadingMatch) {
         const tableName = tableHeadingMatch[1].trim();
-        const table = normalized?.canvas?.tables?.find((t) => t.name === tableName);
+        const table = normalized?.tables?.find((t) => t.name === tableName);
         if (table) {
           return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
         }
@@ -175,11 +171,11 @@ export function EnvelopeViewer({
         };
       }
 
-      // Diagrams are rendered as "Diagram: <name>" headings; map back to canvas.diagrams by name.
+      // Diagrams are rendered as "Diagram: <name>" headings; map back to envelope.diagrams by name.
       const diagramHeadingMatch = trimmed.match(/^Diagram:\s*(.+)$/i);
       if (diagramHeadingMatch) {
         const diagramName = diagramHeadingMatch[1].trim();
-        const diagram = normalized?.canvas?.diagrams?.find((d) => d.name === diagramName);
+        const diagram = normalized?.diagrams?.find((d) => d.name === diagramName);
         if (diagram) {
           return { type: 'diagrams', payload: JSON.stringify([diagram], null, 2), label: diagram.name };
         }

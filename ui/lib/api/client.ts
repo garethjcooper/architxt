@@ -1098,23 +1098,7 @@ export interface DiscoverStepResponse {
     meta?: GraphMeta;
   };
   /** Unified envelope shape (used by curated_page steps). */
-  envelope?: {
-    narrative: string;
-    graph: {
-      nodes: GraphNode[];
-      edges: GraphEdge[];
-    };
-    tables: Array<{
-      name: string;
-      columns: string[];
-      rows: Record<string, any>[];
-    }>;
-    diagrams: Array<{
-      name: string;
-      type: string;
-      content: string;
-    }>;
-  };
+  envelope?: UnifiedEnvelope;
   calls?: Array<{
     tool: string;
     mode: string;
@@ -1129,6 +1113,24 @@ export interface DiscoverStepResponse {
   }>;
   tool_calls_used?: number;
   error_message?: string | null;
+}
+
+export interface UnifiedEnvelope {
+  narrative: string;
+  graph: {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  };
+  tables: Array<{
+    name: string;
+    columns: string[];
+    rows: Record<string, any>[];
+  }>;
+  diagrams: Array<{
+    name: string;
+    type: string;
+    content: string;
+  }>;
 }
 
 export interface ResearchStepCall {
@@ -1175,27 +1177,11 @@ export interface ResearchStep {
   canvas: DiscoverStepResponse['canvas'] | null;
   synthesis: DiscoverStepResponse['synthesis'] | null;
   /** Unified envelope for curated_page steps. Undefined for non-curated steps. */
-  envelope?: {
-    narrative: string;
-    graph: {
-      nodes: GraphNode[];
-      edges: GraphEdge[];
-    };
-    tables: Array<{
-      name: string;
-      columns: string[];
-      rows: Record<string, any>[];
-    }>;
-    diagrams: Array<{
-      name: string;
-      type: string;
-      content: string;
-    }>;
-  };
+  envelope?: UnifiedEnvelope;
   calls: ResearchStepCall[] | null;
-  tool_calls_used: number;
   status: 'running' | 'completed' | 'failed';
   error_message: string | null;
+  tool_calls_used: number;
   created_at: string;
 }
 
@@ -1211,23 +1197,7 @@ export interface ResearchStepSummary {
   canvas: DiscoverStepResponse['canvas'] | null;
   synthesis: DiscoverStepResponse['synthesis'] | null;
   /** Unified envelope for curated_page steps. Undefined for non-curated steps. */
-  envelope?: {
-    narrative: string;
-    graph: {
-      nodes: GraphNode[];
-      edges: GraphEdge[];
-    };
-    tables: Array<{
-      name: string;
-      columns: string[];
-      rows: Record<string, any>[];
-    }>;
-    diagrams: Array<{
-      name: string;
-      type: string;
-      content: string;
-    }>;
-  };
+  envelope?: UnifiedEnvelope;
   selections: any[] | null;
   viewpoint_ids: number[] | null;
   calls: ResearchStepCall[] | null;

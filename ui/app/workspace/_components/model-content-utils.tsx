@@ -95,6 +95,12 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
       diagrams: content.diagrams ?? [],
       meta: undefined,
     },
+    envelope: {
+      narrative: content.narrative || '',
+      graph: (content.graph ?? { nodes: [], edges: [] }) as { nodes: GraphNode[]; edges: GraphEdge[] },
+      tables: content.tables ?? [],
+      diagrams: content.diagrams ?? [],
+    },
   };
 }
 
