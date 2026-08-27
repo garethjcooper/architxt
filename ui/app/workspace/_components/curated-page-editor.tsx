@@ -10,6 +10,23 @@ import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdow
 import { cn, downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
 
+function parseSyntheticHeading(title?: string): { kind: 'graph' | 'table' | 'diagram'; name?: string } | null {
+  if (!title) return null;
+  const trimmed = title.trim();
+  const graphMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
+  if (graphMatch) return { kind: 'graph', name: graphMatch[1]?.trim() };
+  const tableMatch = trimmed.match(/^Table:\s*(.+)$/i);
+  if (tableMatch) return { kind: 'table', name: tableMatch[1].trim() };
+  const diagramMatch = trimmed.match(/^Diagram:\s*(.+)$/i);
+  if (diagramMatch) return { kind: 'diagram', name: diagramMatch[1].trim() };
+  return null;
+}
+
+function structuredKey(parsed: NonNullable<ReturnType<typeof parseSyntheticHeading>>): string {
+  if (parsed.kind === 'graph') return 'graph';
+  return `${parsed.kind}:${parsed.name || 'untitled'}`;
+}
+
 export type CuratedPageEnvelope = ReturnType<typeof normalizeEnvelope>;
 
 function getPageTitle(page: ResearchStepSummary | DiscoverStepResponse): string {
@@ -32,6 +49,7 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
   const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set());
+  const [deletedStructuredKeys, setDeletedStructuredKeys] = useState<Set<string>>(new Set());
   const [showIndex, setShowIndex] = useState(true);
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,17 +57,41 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
   // Reset transient edit state when the page itself changes.
   useEffect(() => {
     setDeletedBlockIds(new Set());
+    setDeletedStructuredKeys(new Set());
   }, [page]);
 
   // Compare against the server baseline so that local envelope mutations
   // (copy/add graph, tables, diagrams, narrative) make the page dirty.
   const effectiveBaseline = baseline ?? envelope;
-  const displayedBlocks = useMemo(() => {
-    return baseBlocks.map((b) => (deletedBlockIds.has(b.id) ? { ...b, deleted: true } : { ...b, deleted: false }));
-  }, [baseBlocks, deletedBlockIds]);
 
-  const userMarkdown = useMemo(() => buildUserNarrativeContent(displayedBlocks), [displayedBlocks]);
-  const workingEnvelope = useMemo(() => ({ ...envelope, narrative: userMarkdown }), [envelope, userMarkdown]);
+  const displayedBlocks = useMemo(() => {
+    const deletedSubtreeIds = new Set<string>();
+    for (let i = 0; i < baseBlocks.length; i++) {
+      const b = baseBlocks[i];
+      if (b.type !== 'heading' || !b.synthetic) continue;
+      const parsed = parseSyntheticHeading(b.title);
+      if (!parsed || !deletedStructuredKeys.has(structuredKey(parsed))) continue;
+      for (const id of getSectionBlockIds(baseBlocks, b.id)) {
+        deletedSubtreeIds.add(id);
+      }
+    }
+    return baseBlocks.map((b) => {
+      if (deletedBlockIds.has(b.id) || deletedSubtreeIds.has(b.id)) return { ...b, deleted: true };
+      return { ...b, deleted: false };
+    });
+  }, [baseBlocks, deletedBlockIds, deletedStructuredKeys]);
+
+  const workingEnvelope = useMemo(() => {
+    const userMarkdown = buildUserNarrativeContent(displayedBlocks);
+    return {
+      ...envelope,
+      narrative: userMarkdown,
+      tables: envelope.tables.filter((t) => !deletedStructuredKeys.has(`table:${t.name}`)),
+      diagrams: envelope.diagrams.filter((d) => !deletedStructuredKeys.has(`diagram:${d.name}`)),
+      graph: deletedStructuredKeys.has('graph') ? { name: envelope.graph.name, nodes: [], edges: [] } : envelope.graph,
+    };
+  }, [envelope, displayedBlocks, deletedStructuredKeys]);
+
   const isDirty = useMemo(() => JSON.stringify(workingEnvelope) !== JSON.stringify(effectiveBaseline), [workingEnvelope, effectiveBaseline]);
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
@@ -60,6 +102,7 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
     try {
       await onSave(page.id, workingEnvelope);
       setDeletedBlockIds(new Set());
+      setDeletedStructuredKeys(new Set());
       toast.success('Saved curated page');
     } finally {
       setSaving(false);
@@ -97,14 +140,39 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
     });
   }, [displayedBlocks]);
 
+  const addStructuredKey = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeading(b.title);
+    if (!parsed) return;
+    const key = structuredKey(parsed);
+    setDeletedStructuredKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  const removeStructuredKey = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeading(b.title);
+    if (!parsed) return;
+    const key = structuredKey(parsed);
+    setDeletedStructuredKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
   const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
-    if (b.synthetic) return;
+    if (b.synthetic) {
+      addStructuredKey(b);
+      return;
+    }
     if (b.type === 'heading') {
       removeSection(b.id);
     } else {
       toggleDelete(b.id);
     }
-  }, [removeSection, toggleDelete]);
+  }, [removeSection, toggleDelete, addStructuredKey]);
 
   const restoreSection = useCallback((id: string) => {
     const ids = getSectionBlockIds(displayedBlocks, id);
@@ -116,13 +184,16 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
   }, [displayedBlocks]);
 
   const restoreSectionOrBlock = useCallback((b: NarrativeBlock) => {
-    if (b.synthetic) return;
+    if (b.synthetic) {
+      removeStructuredKey(b);
+      return;
+    }
     if (b.type === 'heading') {
       restoreSection(b.id);
     } else {
       toggleDelete(b.id);
     }
-  }, [restoreSection, toggleDelete]);
+  }, [restoreSection, toggleDelete, removeStructuredKey]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -170,25 +241,26 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
           renderSidebarRowActions={(b) => {
             if (readOnly) return null;
             if (b.type === 'text') return null;
+            const isDeleted = b.deleted;
             return (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (b.deleted) {
+                  if (isDeleted) {
                     restoreSectionOrBlock(b);
                   } else {
                     removeSectionOrBlock(b);
                   }
                 }}
                 className={`p-1 rounded transition-colors ${
-                  b.deleted
+                  isDeleted
                     ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
                     : 'text-white/40 hover:text-rose-400 hover:bg-rose-500/10'
                 }`}
-                title={b.deleted ? 'Restore' : 'Remove'}
+                title={isDeleted ? 'Restore' : 'Remove'}
               >
-                {b.deleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
+                {isDeleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
               </button>
             );
           }}
