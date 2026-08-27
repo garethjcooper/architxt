@@ -1117,7 +1117,9 @@ export interface DiscoverStepResponse {
 
 export interface UnifiedEnvelope {
   narrative: string;
+  narrative_name?: string | null;
   graph: {
+    name?: string | null;
     nodes: GraphNode[];
     edges: GraphEdge[];
   };

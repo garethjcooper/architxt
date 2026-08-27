@@ -169,6 +169,7 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
   }
 
   return {
+    name: typeof graph.name === 'string' ? graph.name : undefined,
     nodes: Array.from(nodeById.values()),
     edges: Array.from(edgeByKey.values()),
   };

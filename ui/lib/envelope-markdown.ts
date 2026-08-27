@@ -18,12 +18,14 @@ function isUnifiedEnvelope(envelope: EnvelopeLike): envelope is UnifiedEnvelope 
 
 function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   if (!envelope) {
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+    return { narrative: '', narrative_name: '', graph: { name: '', nodes: [], edges: [] }, tables: [], diagrams: [] };
   }
   if (!isUnifiedEnvelope(envelope)) {
     return {
       narrative: envelope.synthesis?.narrative ?? '',
+      narrative_name: '',
       graph: {
+        name: '',
         nodes: envelope.canvas?.graph?.nodes ?? [],
         edges: envelope.canvas?.graph?.edges ?? [],
       },
@@ -38,7 +40,9 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
 
   return {
     narrative: envelope.narrative ?? '',
+    narrative_name: envelope.narrative_name ?? '',
     graph: {
+      name: envelope.graph?.name ?? '',
       nodes: envelope.graph?.nodes ?? [],
       edges: envelope.graph?.edges ?? [],
     },
@@ -111,11 +115,12 @@ export function formatPropertiesCompact(properties: Record<string, any>): string
 
 export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
   const unified = toUnified(envelope);
-  const { narrative, graph, tables, diagrams } = unified;
+  const { narrative, narrative_name, graph, tables, diagrams } = unified;
   const parts: string[] = [];
 
   if (narrative.trim()) {
-    parts.push(narrative.trim());
+    const heading = narrative_name?.trim() ? `## ${narrative_name.trim()}` : '';
+    parts.push(heading ? `${heading}\n\n${narrative.trim()}` : narrative.trim());
   }
 
   if (tables && tables.length > 0) {
@@ -136,7 +141,8 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
 
   if (graph && (graph.nodes?.length || graph.edges?.length)) {
     const rawGraphJson = JSON.stringify(graph, null, 2);
-    parts.push(`\n\n## Graph\n\n\`\`\`json\n${rawGraphJson}\n\`\`\``);
+    const heading = graph.name?.trim() ? `## Graph: ${graph.name.trim()}` : '## Graph';
+    parts.push(`\n\n${heading}\n\n\`\`\`json\n${rawGraphJson}\n\`\`\``);
   }
 
   return parts.join('').trim();

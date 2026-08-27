@@ -260,7 +260,10 @@ export const updateCuratedPage = (db, stepId, data) => dbExec(() => {
     const envelope = typeof updateData.rstep_envelope === 'string'
       ? JSON.parse(updateData.rstep_envelope)
       : updateData.rstep_envelope;
-    updateData.rstep_synthesis = { narrative: typeof envelope.narrative === 'string' ? envelope.narrative : '' };
+    updateData.rstep_synthesis = {
+      narrative: typeof envelope.narrative === 'string' ? envelope.narrative : '',
+      narrative_name: typeof envelope.narrative_name === 'string' ? envelope.narrative_name : undefined,
+    };
     updateData.rstep_canvas_state = {
       graph: envelope.graph ?? { nodes: [], edges: [] },
       tables: envelope.tables ?? [],

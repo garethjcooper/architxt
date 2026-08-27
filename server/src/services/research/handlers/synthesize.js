@@ -302,11 +302,14 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   }
 
   const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
+  graph.name = normalized.name || parsed.graph?.name || '';
 
   logger.info('Synthesize handler completed', {
     intentText,
     templateName: 'generic',
     narrativeLength: parsed.narrative.length,
+    narrativeNameLength: (parsed.narrative_name || '').length,
+    graphNameLength: (graph.name || '').length,
     graphNodeCount: graph.nodes.length,
     graphEdgeCount: graph.edges.length,
   });
@@ -314,6 +317,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   return {
     success: true,
     narrative: parsed.narrative,
+    narrative_name: parsed.narrative_name || '',
     graph,
     tables: parsed.tables || [],
     diagrams: parsed.diagrams || [],

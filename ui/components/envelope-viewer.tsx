@@ -139,13 +139,14 @@ export function EnvelopeViewer({
       const trimmed = heading.trim();
 
       // Graph is rendered as a synthetic section; use the canonical envelope.graph.
-      if (trimmed === 'Graph' || trimmed === 'Source: Raw JSON') {
+      const graphHeadingMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
+      if (graphHeadingMatch) {
         const graph = normalized?.graph;
         if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
           return {
             type: 'graph',
             payload: JSON.stringify(graph, null, 2),
-            label: titleLabel,
+            label: graphHeadingMatch[1]?.trim() || titleLabel,
           };
         }
       }
