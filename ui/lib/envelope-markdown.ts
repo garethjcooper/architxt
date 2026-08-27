@@ -140,5 +140,8 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
 }
 
 export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): Required<UnifiedEnvelope> {
-  return toUnified(page);
+  // Prefer the unified envelope field when present; fall back to the legacy
+  // split synthesis/canvas shape for non-curated or older responses.
+  const envelopeLike = page.envelope ?? { synthesis: page.synthesis, canvas: page.canvas };
+  return toUnified(envelopeLike);
 }
