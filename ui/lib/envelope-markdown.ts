@@ -1,4 +1,4 @@
-import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedEnvelope } from '@/lib/api/client';
 
 type LegacyEnvelope = {
   synthesis?: { narrative?: string | null } | null;
@@ -7,13 +7,6 @@ type LegacyEnvelope = {
     tables?: Array<{ name: string; columns?: string[]; rows: Record<string, any>[] }> | null;
     diagrams?: Array<{ name: string; type: string; content: string }> | null;
   } | null;
-};
-
-type UnifiedEnvelope = {
-  narrative: string;
-  graph: { nodes: GraphNode[]; edges: GraphEdge[] };
-  tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }>;
-  diagrams: Array<{ name: string; type: string; content: string }>;
 };
 
 export type EnvelopeLike = LegacyEnvelope | UnifiedEnvelope | null | undefined;
@@ -117,7 +110,8 @@ export function formatPropertiesCompact(properties: Record<string, any>): string
 }
 
 export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
-  const { narrative, graph, tables, diagrams } = toUnified(envelope);
+  const unified = toUnified(envelope);
+  const { narrative, graph, tables, diagrams } = unified;
   const parts: string[] = [];
 
   if (narrative.trim()) {
@@ -148,9 +142,16 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
   return parts.join('').trim();
 }
 
-export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): Required<UnifiedEnvelope> {
+export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): UnifiedEnvelope {
   // Prefer the unified envelope field when present; fall back to the legacy
   // split synthesis/canvas shape for non-curated or older responses.
   const envelopeLike = page.envelope ?? { synthesis: page.synthesis, canvas: page.canvas };
   return toUnified(envelopeLike);
+}
+
+export function normalizeEnvelopeFromNullable(
+  page: ResearchStepSummary | DiscoverStepResponse | null | undefined
+): UnifiedEnvelope {
+  if (!page) return toUnified(null);
+  return normalizeEnvelope(page);
 }
