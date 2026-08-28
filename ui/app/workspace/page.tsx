@@ -963,7 +963,17 @@ export default function WorkspacePage() {
               activeSessionId={workspaceSession.activeSessionId}
               loading={workspaceSession.sessionsLoading}
               disabled={!serverId || !bankId}
-              onSelect={(id) => workspaceSession.setActiveSessionId(id)}
+              onSelect={(id) => {
+                const session = workspaceSession.sessions.find((s) => s.id === id);
+                if (!session) return;
+                void (async () => {
+                  await workspaceSession.handleSelectSession(session);
+                  const latest = workspaceSession.workspaceItems[0] ?? workspaceSession.curatedPages[0] ?? null;
+                  if (latest) {
+                    setSelectedView({ kind: 'step', step: latest });
+                  }
+                })();
+              }}
             />
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
