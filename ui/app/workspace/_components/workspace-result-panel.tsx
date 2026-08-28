@@ -22,8 +22,15 @@ export interface WorkspaceResultPanelProps {
   onCuratedPageDirtyChange?: (dirty: boolean) => void;
   /** Increment to trigger saving the active curated page. */
   saveCuratedPageTrigger?: number;
-  /** Called with the working envelope for the active curated page on every change. */
-  onCuratedPageChange?: (envelope: CuratedPageEnvelope, dirty: boolean) => void;
+  /** Called with the working envelope and deletion state for the active curated page on every change. */
+  onCuratedPageChange?: (payload: {
+    envelope: CuratedPageEnvelope;
+    dirty: boolean;
+    deletedBlockIds: string[];
+    deletedStructuredKeys: string[];
+  }) => void;
+  /** Deletion sets to restore when the active curated page editor is remounted. */
+  activeCuratedPageDeletions?: { deletedBlockIds: string[]; deletedStructuredKeys: string[] };
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
@@ -46,6 +53,7 @@ export function WorkspaceResultPanel({
   onCuratedPageDirtyChange,
   saveCuratedPageTrigger,
   onCuratedPageChange,
+  activeCuratedPageDeletions,
   onCopyToCuratedPage,
   tabs,
   headerTitle,
@@ -79,6 +87,8 @@ export function WorkspaceResultPanel({
         onDirtyChange={onCuratedPageDirtyChange}
         saveTrigger={saveCuratedPageTrigger}
         onChange={onCuratedPageChange}
+        initialDeletedBlockIds={activeCuratedPageDeletions?.deletedBlockIds}
+        initialDeletedStructuredKeys={activeCuratedPageDeletions?.deletedStructuredKeys}
       />
     );
   }
