@@ -1,10 +1,17 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trash2, Undo2, Loader2 } from 'lucide-react';
+import { Trash2, Undo2, Loader2, Eye } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
+import { MermaidDiagram } from '@/components/mermaid-diagram';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { downloadMarkdown } from '@/lib/utils';
@@ -84,6 +91,7 @@ export function CuratedPageEditor({
   const [showIndex, setShowIndex] = useState(true);
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [focusedDiagram, setFocusedDiagram] = useState<{ name: string; content: string } | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -277,6 +285,25 @@ export function CuratedPageEditor({
     }
   }, [restoreSection, toggleDelete, removeStructuredKey]);
 
+  const openDiagramFocus = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeading(b.title);
+    if (!parsed || parsed.kind !== 'diagram') return;
+    const diagram = envelope.diagrams.find((d) => d.name === parsed.name);
+    if (diagram && typeof diagram.content === 'string') {
+      setFocusedDiagram({ name: diagram.name || parsed.name || 'Diagram', content: diagram.content });
+      return;
+    }
+    // Fallback: extract the mermaid source from the block following the heading.
+    const idx = displayedBlocks.findIndex((bb) => bb.id === b.id);
+    const next = displayedBlocks[idx + 1];
+    if (next && next.type === 'code' && next.language === 'mermaid') {
+      const source = (next.edited ?? next.raw)
+        .replace(/^```mermaid\n?/, '')
+        .replace(/\n?```\s*$/, '');
+      setFocusedDiagram({ name: parsed.name || 'Diagram', content: source });
+    }
+  }, [envelope.diagrams, displayedBlocks]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       <EnvelopeControls
@@ -311,30 +338,64 @@ export function CuratedPageEditor({
             if (readOnly) return null;
             if (b.type === 'text') return null;
             const isDeleted = b.deleted;
+            const parsed = parseSyntheticHeading(b.title);
+            const isDiagram = parsed?.kind === 'diagram';
             return (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isDeleted) {
-                    restoreSectionOrBlock(b);
-                  } else {
-                    removeSectionOrBlock(b);
-                  }
-                }}
-                className={`p-1 rounded transition-colors ${
-                  isDeleted
-                    ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-                    : 'text-white/40 hover:text-rose-400 hover:bg-rose-500/10'
-                }`}
-                title={isDeleted ? 'Restore' : 'Remove'}
-              >
-                {isDeleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
-              </button>
+              <div className="flex items-center gap-0.5">
+                {isDiagram && !isDeleted && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDiagramFocus(b);
+                    }}
+                    className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                    title="Focus diagram"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isDeleted) {
+                      restoreSectionOrBlock(b);
+                    } else {
+                      removeSectionOrBlock(b);
+                    }
+                  }}
+                  className={`p-1 rounded transition-colors ${
+                    isDeleted
+                      ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                      : 'text-white/40 hover:text-rose-400 hover:bg-rose-500/10'
+                  }`}
+                  title={isDeleted ? 'Restore' : 'Remove'}
+                >
+                  {isDeleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
+                </button>
+              </div>
             );
           }}
         />
       </div>
+      <Dialog open={focusedDiagram != null} onOpenChange={(open) => { if (!open) setFocusedDiagram(null); }}>
+        <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] flex flex-col" showCloseButton>
+          <DialogHeader>
+            <DialogTitle>{focusedDiagram?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto p-1">
+            {focusedDiagram && (
+              <MermaidDiagram
+                name={focusedDiagram.name}
+                type="diagram"
+                content={focusedDiagram.content}
+                className="h-full"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
