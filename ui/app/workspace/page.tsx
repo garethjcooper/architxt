@@ -28,6 +28,7 @@ import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-en
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
+import { SessionSelector } from './_components/session-selector';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
 import { useWorkspaceSession } from './_components/use-workspace-session';
@@ -878,6 +879,39 @@ export default function WorkspacePage() {
             setSelectedServerId={setSelectedServerId}
             setSelectedBankId={setSelectedBankId}
             loadingBanks={loadingBanks}
+          />
+          <SessionSelector
+            sessions={workspaceSession.sessions}
+            activeSessionId={workspaceSession.activeSessionId}
+            loading={workspaceSession.sessionsLoading}
+            disabled={!serverId || !bankId}
+            onSelect={(id) => workspaceSession.setActiveSessionId(id)}
+            onCreate={async () => {
+              if (!serverId || !bankId) return;
+              try {
+                await researchApi.createSession({
+                  server_id: serverId,
+                  bank_id: bankId,
+                  viewpoint_ids: [],
+                  title: 'Workspace session',
+                });
+                await workspaceSession.refresh();
+                toast.success('Session created');
+              } catch (err: unknown) {
+                logger.error('Failed to create session', err);
+                toast.error(`Failed to create session: ${String(err instanceof Error ? err.message : String(err))}`);
+              }
+            }}
+            onDelete={async (id) => {
+              try {
+                await researchApi.deleteSession(id);
+                await workspaceSession.refresh();
+                toast.success('Session deleted');
+              } catch (err: unknown) {
+                logger.error('Failed to delete session', err);
+                toast.error(`Failed to delete session: ${String(err instanceof Error ? err.message : String(err))}`);
+              }
+            }}
           />
         </div>
 
