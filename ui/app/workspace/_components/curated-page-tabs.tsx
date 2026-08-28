@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, X, Trash2, Pencil, FileText, ChevronDown } from 'lucide-react';
+import { Plus, X, Trash2, Pencil, Save, FileText, ChevronDown } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -45,6 +45,10 @@ interface CuratedPageTabsProps {
   onDeleteCuratedPage: (stepId: number) => Promise<void>;
   onCloseTab: (tabId: string, kind: TabKind, isEmpty: boolean) => void;
   onCloseAllViews?: () => void;
+  /** Whether the active curated page has pending changes. */
+  activePageDirty?: boolean;
+  /** Called when the user clicks the Save button for the active curated page. */
+  onSaveActivePage?: () => void;
 }
 
 export function CuratedPageTabs({
@@ -58,6 +62,8 @@ export function CuratedPageTabs({
   onDeleteCuratedPage,
   onCloseTab,
   onCloseAllViews,
+  activePageDirty = false,
+  onSaveActivePage,
 }: CuratedPageTabsProps) {
   const [pagesOpen, setPagesOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
@@ -210,6 +216,15 @@ export function CuratedPageTabs({
       </div>
 
       <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-white/10">
+        <button
+          type="button"
+          onClick={() => onSaveActivePage?.()}
+          disabled={!activeCuratedTab || !activePageDirty}
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-emerald-400 hover:bg-emerald-950/30 hover:border-emerald-500/30 disabled:opacity-30 transition-colors"
+          title="Save active page"
+        >
+          <Save className="h-3.5 w-3.5" />
+        </button>
         <button
           type="button"
           onClick={() => {
