@@ -21,6 +21,8 @@ export interface WorkspaceResultPanelProps {
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
+  /** Optional override for the header bar title. Defaults to title. */
+  headerTitle?: string;
 }
 
 export function WorkspaceResultPanel({
@@ -37,6 +39,7 @@ export function WorkspaceResultPanel({
   onSaveCuratedPage,
   onCopyToCuratedPage,
   tabs,
+  headerTitle,
 }: WorkspaceResultPanelProps) {
   if (error) {
     return (
@@ -70,6 +73,7 @@ export function WorkspaceResultPanel({
         baseline={activeCuratedPageBaseline}
         onSave={onSaveCuratedPage}
         tabs={tabs}
+        headerTitle={headerTitle}
       />
     );
   }
@@ -85,6 +89,7 @@ export function WorkspaceResultPanel({
       <EnvelopeViewer
         envelope={result}
         title={title}
+        headerTitle={headerTitle}
         count={count}
         keyPrefix={keyPrefix}
         className="h-full"

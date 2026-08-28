@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 
 interface EnvelopeControlsProps {
   title?: string;
+  headerTitle?: string;
   count?: number;
   showIndex: boolean;
   onShowIndexChange: (checked: boolean) => void;
@@ -30,6 +31,7 @@ interface EnvelopeControlsProps {
 
 export function EnvelopeControls({
   title = 'Preview',
+  headerTitle,
   count,
   showIndex,
   onShowIndexChange,
@@ -46,7 +48,7 @@ export function EnvelopeControls({
 
   return (
     <div className="relative h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
-      <div className="min-w-0 flex-1 text-xs font-medium truncate pr-3">{title}</div>
+      <div className="min-w-0 flex-1 text-xs font-medium truncate pr-3">{headerTitle ?? title}</div>
       <div className="flex items-center gap-2 shrink-0">
         {count !== undefined && (
           <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-white/20 text-emerald-200/80">

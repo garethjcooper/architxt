@@ -44,9 +44,11 @@ export interface CuratedPageEditorProps {
   readOnly?: boolean;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
+  /** Optional override for the header bar title. Defaults to the page title. */
+  headerTitle?: string;
 }
 
-export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs }: CuratedPageEditorProps) {
+export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
@@ -201,6 +203,7 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       <EnvelopeControls
         title={pageTitle}
+        headerTitle={headerTitle}
         showIndex={showIndex}
         onShowIndexChange={setShowIndex}
         plain={plain}
