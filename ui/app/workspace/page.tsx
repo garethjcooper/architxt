@@ -90,6 +90,11 @@ export default function WorkspacePage() {
   // Local envelope overrides per curated-page id. These represent edits that
   // have been applied in the UI (copy/add from a view) but not yet persisted.
   const [pendingCuratedEdits, setPendingCuratedEdits] = useState<Record<number, CuratedPageEnvelope>>({});
+  // Local deletion sets per curated-page id. These represent blocks/structured
+  // sections marked deleted in the editor so the revert option survives tab switches.
+  const [pendingCuratedDeletions, setPendingCuratedDeletions] = useState<
+    Record<number, { deletedBlockIds: string[]; deletedStructuredKeys: string[] }>
+  >({});
 
   const {
     selectedServerId,
@@ -196,21 +201,21 @@ export default function WorkspacePage() {
     setActiveSession(workspaceSession.activeSession);
   }, [workspaceSession.activeSession?.id, workspaceSession.activeSession?.title]);
 
-  // Mark curated tabs as dirty whenever they have pending edits.
+  // Mark curated tabs as dirty whenever they have pending edits or deletions.
   useEffect(() => {
     setTabs((prev) => {
       const changed = prev.some((t) => {
         if (t.kind !== 'curated' || t.stepId == null) return false;
-        const hasEdits = !!pendingCuratedEdits[t.stepId];
+        const hasEdits = !!pendingCuratedEdits[t.stepId] || !!pendingCuratedDeletions[t.stepId];
         return t.dirty !== hasEdits;
       });
       if (!changed) return prev;
       return prev.map((t) => {
         if (t.kind !== 'curated' || t.stepId == null) return t;
-        return { ...t, dirty: !!pendingCuratedEdits[t.stepId] };
+        return { ...t, dirty: !!pendingCuratedEdits[t.stepId] || !!pendingCuratedDeletions[t.stepId] };
       });
     });
-  }, [pendingCuratedEdits]);
+  }, [pendingCuratedEdits, pendingCuratedDeletions]);
 
   useEffect(() => {
     const id = workspaceSession.activeSession?.id;
@@ -500,8 +505,13 @@ export default function WorkspacePage() {
     async (stepId: number, envelope: CuratedPageEnvelope) => {
       try {
         await researchApi.updateCuratedPage(stepId, { envelope });
-        // Clear local pending edits for this page once the server confirms the save.
+        // Clear local pending edits and deletions for this page once the server confirms the save.
         setPendingCuratedEdits((prev) => {
+          const next = { ...prev };
+          delete next[stepId];
+          return next;
+        });
+        setPendingCuratedDeletions((prev) => {
           const next = { ...prev };
           delete next[stepId];
           return next;
@@ -1021,6 +1031,7 @@ export default function WorkspacePage() {
                 setSelectedView(null);
                 setTabViews({});
                 setPendingCuratedEdits({});
+                setPendingCuratedDeletions({});
                 const trail = await workspaceSession.handleSelectSession(session);
                 const latest = trail[0] ?? null;
                 if (latest) {
@@ -1160,19 +1171,31 @@ export default function WorkspacePage() {
               onSaveCuratedPage={handleSaveCuratedPage}
               onCuratedPageDirtyChange={setActiveCuratedPageDirty}
               saveCuratedPageTrigger={saveCuratedPageTrigger}
-              onCuratedPageChange={(envelope, dirty) => {
+              onCuratedPageChange={({ deletedBlockIds, deletedStructuredKeys, dirty }) => {
                 if (!activeCuratedPage) return;
-                setPendingCuratedEdits((prev) => {
-                  if (dirty) {
-                    if (prev[activeCuratedPage.id] === envelope) return prev;
-                    return { ...prev, [activeCuratedPage.id]: envelope };
+                setPendingCuratedDeletions((prev) => {
+                  const hasAny = deletedBlockIds.length > 0 || deletedStructuredKeys.length > 0;
+                  if (!hasAny) {
+                    if (!prev[activeCuratedPage.id]) return prev;
+                    const next = { ...prev };
+                    delete next[activeCuratedPage.id];
+                    return next;
                   }
-                  if (!prev[activeCuratedPage.id]) return prev;
-                  const next = { ...prev };
-                  delete next[activeCuratedPage.id];
+                  const next = { ...prev, [activeCuratedPage.id]: { deletedBlockIds, deletedStructuredKeys } };
                   return next;
                 });
+                // onDirtyChange is already reported separately, but keep this guard in case
+                // the editor ever emits dirty without deletions.
+                if (!dirty) {
+                  setPendingCuratedEdits((prev) => {
+                    if (!prev[activeCuratedPage.id]) return prev;
+                    const next = { ...prev };
+                    delete next[activeCuratedPage.id];
+                    return next;
+                  });
+                }
               }}
+              activeCuratedPageDeletions={activeCuratedPage ? pendingCuratedDeletions[activeCuratedPage.id] : undefined}
               onCopyToCuratedPage={handleCopyToCuratedPage}
               tabs={
                 <CuratedPageTabs

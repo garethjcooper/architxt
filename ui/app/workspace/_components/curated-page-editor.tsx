@@ -50,16 +50,37 @@ export interface CuratedPageEditorProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** Increment to trigger a save from the parent. */
   saveTrigger?: number;
-  /** Called with the current working envelope on every meaningful change so the parent can persist it across tab switches. */
-  onChange?: (envelope: CuratedPageEnvelope, dirty: boolean) => void;
+  /** Initial deletion sets restored from a previous edit session (e.g. after switching tabs). */
+  initialDeletedBlockIds?: string[];
+  initialDeletedStructuredKeys?: string[];
+  /** Called with the current working envelope and deletion state on every meaningful change.
+   *  The parent can persist the deletion sets so revert remains available across tab switches. */
+  onChange?: (payload: {
+    envelope: CuratedPageEnvelope;
+    dirty: boolean;
+    deletedBlockIds: string[];
+    deletedStructuredKeys: string[];
+  }) => void;
 }
 
-export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle, onDirtyChange, saveTrigger, onChange }: CuratedPageEditorProps) {
+export function CuratedPageEditor({
+  page,
+  baseline,
+  onSave,
+  readOnly = false,
+  tabs,
+  headerTitle,
+  onDirtyChange,
+  saveTrigger,
+  initialDeletedBlockIds,
+  initialDeletedStructuredKeys,
+  onChange,
+}: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
-  const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set());
-  const [deletedStructuredKeys, setDeletedStructuredKeys] = useState<Set<string>>(new Set());
+  const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set(initialDeletedBlockIds ?? []));
+  const [deletedStructuredKeys, setDeletedStructuredKeys] = useState<Set<string>>(new Set(initialDeletedStructuredKeys ?? []));
   const [showIndex, setShowIndex] = useState(true);
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,6 +94,25 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
     setDeletedBlockIds(new Set());
     setDeletedStructuredKeys(new Set());
   }, [page]);
+
+  // Restore deletion sets from the parent when they change (e.g. returning to an
+  // already-mounted editor after switching tabs). Keep local state as source of
+  // truth otherwise so revert/restore interactions stay responsive.
+  const initialDeletionsRef = useRef({ blockIds: initialDeletedBlockIds ?? [], structuredKeys: initialDeletedStructuredKeys ?? [] });
+  useEffect(() => {
+    const nextBlockIds = initialDeletedBlockIds ?? [];
+    const nextStructuredKeys = initialDeletedStructuredKeys ?? [];
+    const prev = initialDeletionsRef.current;
+    const same =
+      nextBlockIds.length === prev.blockIds.length &&
+      nextBlockIds.every((id, i) => id === prev.blockIds[i]) &&
+      nextStructuredKeys.length === prev.structuredKeys.length &&
+      nextStructuredKeys.every((k, i) => k === prev.structuredKeys[i]);
+    if (same) return;
+    initialDeletionsRef.current = { blockIds: nextBlockIds, structuredKeys: nextStructuredKeys };
+    setDeletedBlockIds(new Set(nextBlockIds));
+    setDeletedStructuredKeys(new Set(nextStructuredKeys));
+  }, [initialDeletedBlockIds, initialDeletedStructuredKeys]);
 
   // Compare against the server baseline so that local envelope mutations
   // (copy/add graph, tables, diagrams, narrative) make the page dirty.
@@ -112,14 +152,20 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
 
-  // Report the working envelope to the parent so edits survive tab switches.
+  // Report the working envelope and deletion sets to the parent so edits survive tab switches
+  // while the revert/restore option remains available.
   const lastEmittedRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const serialized = JSON.stringify(workingEnvelope);
     if (serialized === lastEmittedRef.current) return;
     lastEmittedRef.current = serialized;
-    onChange?.(workingEnvelope, isDirty);
-  }, [workingEnvelope, isDirty, onChange]);
+    onChange?.({
+      envelope: workingEnvelope,
+      dirty: isDirty,
+      deletedBlockIds: Array.from(deletedBlockIds),
+      deletedStructuredKeys: Array.from(deletedStructuredKeys),
+    });
+  }, [workingEnvelope, isDirty, deletedBlockIds, deletedStructuredKeys, onChange]);
 
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
