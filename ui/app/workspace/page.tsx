@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
@@ -135,26 +136,15 @@ export default function WorkspacePage() {
   const sessionHeaderActions = useMemo(
     () => (
       <div className="flex items-center gap-1">
-        {confirmSessionDelete ? (
-          <button
-            type="button"
-            onClick={() => void handleDeleteSession()}
-            disabled={sessionActionLoading || activeSession?.id == null}
-            className="h-6 px-2 rounded text-[11px] font-medium bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50"
-          >
-            {sessionActionLoading ? '...' : 'Confirm'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmSessionDelete(true)}
-            disabled={activeSession?.id == null}
-            className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
-            title="Delete selected session"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setConfirmSessionDelete(true)}
+          disabled={activeSession?.id == null}
+          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+          title="Delete selected session"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
         <button
           type="button"
           onClick={() => void handleCreateSession()}
@@ -166,7 +156,7 @@ export default function WorkspacePage() {
         </button>
       </div>
     ),
-    [confirmSessionDelete, sessionActionLoading, activeSession, serverId, bankId, handleCreateSession, handleDeleteSession]
+    [sessionActionLoading, activeSession, serverId, bankId, handleCreateSession]
   );
 
   const activeCuratedPage = useMemo(() => {
@@ -980,26 +970,15 @@ export default function WorkspacePage() {
             />
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {confirmSessionDelete ? (
-              <button
-                type="button"
-                onClick={() => void handleDeleteSession()}
-                disabled={sessionActionLoading || activeSession?.id == null}
-                className="h-7 px-2 rounded text-[11px] font-medium bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50"
-              >
-                {sessionActionLoading ? '...' : 'Confirm'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmSessionDelete(true)}
-                disabled={activeSession?.id == null}
-                className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
-                title="Delete selected session"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setConfirmSessionDelete(true)}
+              disabled={activeSession?.id == null}
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+              title="Delete selected session"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={() => void handleCreateSession()}
@@ -1176,6 +1155,16 @@ export default function WorkspacePage() {
             if (!open) setInspectingStep(null);
           }}
           step={inspectingStep}
+        />
+
+        <ConfirmDialog
+          open={confirmSessionDelete}
+          onOpenChange={setConfirmSessionDelete}
+          title="Delete Selected Session"
+          description={`Are you sure you want to delete the session "${activeSession?.title || 'Untitled'}"? This action cannot be undone.`}
+          onConfirm={() => void handleDeleteSession()}
+          variant="destructive"
+          confirmLabel="Delete"
         />
 
         {pendingSection && (
