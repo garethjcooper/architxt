@@ -109,16 +109,16 @@ export function CuratedPageTabs({
               key={tab.id}
               onClick={() => onSelect(tab.id)}
               className={cn(
-                'group/tab flex items-center gap-1.5 px-2 py-1 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors',
+                'group/tab relative flex items-center gap-1.5 pr-2 py-1 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors',
                 isActive
                   ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                   : 'bg-black/20 border-white/5 text-white/60 hover:bg-white/5 hover:text-white/80',
-                isCurated ? 'pl-2.5' : 'pl-2'
+                isCurated ? 'pl-2' : 'pl-2'
               )}
             >
               <span
                 className={cn(
-                  'w-1.5 h-1.5 rounded-full shrink-0',
+                  'absolute left-0 top-1 bottom-1 w-[3px] rounded-r shrink-0',
                   isCurated ? 'bg-purple-400' : 'bg-emerald-400'
                 )}
               />
