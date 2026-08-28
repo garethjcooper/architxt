@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
@@ -50,9 +50,11 @@ export interface CuratedPageEditorProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** Increment to trigger a save from the parent. */
   saveTrigger?: number;
+  /** Called with the current working envelope on every meaningful change so the parent can persist it across tab switches. */
+  onChange?: (envelope: CuratedPageEnvelope, dirty: boolean) => void;
 }
 
-export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle, onDirtyChange, saveTrigger }: CuratedPageEditorProps) {
+export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle, onDirtyChange, saveTrigger, onChange }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
@@ -62,8 +64,12 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Reset transient edit state when the page itself changes.
+  // Reset transient edit state only when the page identity changes, not on every envelope update.
+  const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
   useEffect(() => {
+    const nextId = 'id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page);
+    if (nextId === pageIdRef.current) return;
+    pageIdRef.current = nextId;
     setDeletedBlockIds(new Set());
     setDeletedStructuredKeys(new Set());
   }, [page]);
@@ -105,6 +111,15 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
+
+  // Report the working envelope to the parent so edits survive tab switches.
+  const lastEmittedRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const serialized = JSON.stringify(workingEnvelope);
+    if (serialized === lastEmittedRef.current) return;
+    lastEmittedRef.current = serialized;
+    onChange?.(workingEnvelope, isDirty);
+  }, [workingEnvelope, isDirty, onChange]);
 
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);

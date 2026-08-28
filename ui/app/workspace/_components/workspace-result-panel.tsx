@@ -22,6 +22,8 @@ export interface WorkspaceResultPanelProps {
   onCuratedPageDirtyChange?: (dirty: boolean) => void;
   /** Increment to trigger saving the active curated page. */
   saveCuratedPageTrigger?: number;
+  /** Called with the working envelope for the active curated page on every change. */
+  onCuratedPageChange?: (envelope: CuratedPageEnvelope, dirty: boolean) => void;
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
@@ -43,6 +45,7 @@ export function WorkspaceResultPanel({
   onSaveCuratedPage,
   onCuratedPageDirtyChange,
   saveCuratedPageTrigger,
+  onCuratedPageChange,
   onCopyToCuratedPage,
   tabs,
   headerTitle,
@@ -75,6 +78,7 @@ export function WorkspaceResultPanel({
         headerTitle={headerTitle}
         onDirtyChange={onCuratedPageDirtyChange}
         saveTrigger={saveCuratedPageTrigger}
+        onChange={onCuratedPageChange}
       />
     );
   }
