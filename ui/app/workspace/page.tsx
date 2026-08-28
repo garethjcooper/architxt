@@ -94,12 +94,14 @@ export default function WorkspacePage() {
     setSelectedServerId,
     selectedBankId,
     setSelectedBankId,
+    saveSessionId,
+    lastSessionId,
   } = usePersistentServerBank(servers, banks);
 
   const serverId = selectedServerId ? Number(selectedServerId) : 0;
   const bankId = selectedBankId;
 
-  const workspaceSession = useWorkspaceSession({ serverId, bankId });
+  const workspaceSession = useWorkspaceSession({ serverId, bankId, lastSessionId });
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(workspaceSession.activeSession);
   const [sessionActionLoading, setSessionActionLoading] = useState(false);
   const [confirmSessionDelete, setConfirmSessionDelete] = useState(false);
@@ -223,7 +225,10 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     setActiveSession(workspaceSession.activeSession);
-  }, [workspaceSession.activeSession]);
+    if (workspaceSession.activeSession?.id != null) {
+      saveSessionId(workspaceSession.activeSession.id);
+    }
+  }, [workspaceSession.activeSession, saveSessionId]);
 
   // Sync workspace query state into the underlying research hook so submissions
   // use the existing working discover/poll path instead of a parallel one.

@@ -7,6 +7,7 @@ const STORAGE_KEY = 'architxt:lastHindsightSelection';
 interface StoredSelection {
   serverId: string;
   bankId: string;
+  sessionId?: number;
 }
 
 function readStored(): StoredSelection | null {
@@ -16,7 +17,11 @@ function readStored(): StoredSelection | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (typeof parsed.serverId === 'string' && typeof parsed.bankId === 'string') {
-      return parsed;
+      return {
+        serverId: parsed.serverId,
+        bankId: parsed.bankId,
+        ...(typeof parsed.sessionId === 'number' && { sessionId: parsed.sessionId }),
+      };
     }
   } catch {
     // ignore corrupt storage
@@ -24,10 +29,10 @@ function readStored(): StoredSelection | null {
   return null;
 }
 
-function writeStored(serverId: string, bankId: string) {
+function writeStored(serverId: string, bankId: string, sessionId?: number) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ serverId, bankId }));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ serverId, bankId, sessionId }));
   } catch {
     // ignore storage errors
   }
@@ -44,9 +49,9 @@ export function useLastHindsightSelection() {
     setStored(readStored());
   }, []);
 
-  const save = useCallback((serverId: string, bankId: string) => {
-    writeStored(serverId, bankId);
-    setStored({ serverId, bankId });
+  const save = useCallback((serverId: string, bankId: string, sessionId?: number) => {
+    writeStored(serverId, bankId, sessionId);
+    setStored({ serverId, bankId, sessionId });
   }, []);
 
   return { stored, save };
