@@ -970,6 +970,7 @@ export default function WorkspacePage() {
             <WorkspaceResultPanel
               result={previewResult}
               title={previewTitle}
+              headerTitle="Pages"
               isRunning={reflectLoading && activeTabId === ANCHOR_TAB_ID}
               error={previewError}
               sessionName={activeSession?.title}

@@ -16,6 +16,8 @@ export interface EnvelopeViewerProps {
   envelope: ResearchStepSummary | DiscoverStepResponse | null;
   /** Human-readable title used for the section index and downloads. */
   title?: string;
+  /** Optional override for the header bar title. Defaults to title. */
+  headerTitle?: string;
   /** Optional count badge shown in the header. */
   count?: number;
   /** Called when a copy action is requested. When omitted, the viewer copies/downloads directly. */
@@ -54,6 +56,7 @@ export function EnvelopeViewer({
   onAddToPage,
   addToPageLabel,
   tabs,
+  headerTitle,
 }: EnvelopeViewerProps) {
   const markdown = useMemo(() => buildEnvelopeMarkdown(envelope ?? null), [envelope]);
   const [showIndexState, setShowIndexState] = useState(showIndex);
@@ -209,6 +212,7 @@ export function EnvelopeViewer({
       {showControls && (
         <EnvelopeControls
           title={title}
+          headerTitle={headerTitle}
           count={count}
           showIndex={showIndexState}
           onShowIndexChange={setShowIndexState}
