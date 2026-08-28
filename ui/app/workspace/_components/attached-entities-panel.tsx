@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { ChevronRight, FileText, ExternalLink } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronRight, FileText, ExternalLink, Search, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
 
@@ -132,6 +132,9 @@ export function AttachedEntitiesPanel({
   onToggleExpand,
   onSelectModel,
 }: AttachedEntitiesPanelProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showEmpty, setShowEmpty] = useState(false);
+
   const sortedIds = useMemo(() => {
     return [...entityIds].sort((a, b) => a.localeCompare(b));
   }, [entityIds]);
@@ -152,121 +155,179 @@ export function AttachedEntitiesPanel({
     return map;
   }, [contextualNodes]);
 
+  const q = searchQuery.trim().toLowerCase();
+
+  const visibleRows = useMemo(() => {
+    return sortedIds
+      .map((entityId) => {
+        const info = entityInfoMap?.[entityId];
+        const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById) : [];
+        const node = contextualNodes.find((n) => n.id === entityId);
+        const displayName = info?.catalog?.name || info?.graph_node?.display_name || node?.label || entityId;
+        return { entityId, info, items, displayName, hasItems: items.length > 0 };
+      })
+      .filter((row) => {
+        if (!showEmpty && !row.hasItems) return false;
+        if (!q) return true;
+        const text = `${row.entityId} ${row.displayName}`.toLowerCase();
+        return text.includes(q);
+      });
+  }, [sortedIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, showEmpty, q]);
+
   return (
     <Panel className="flex-1">
       <PanelHeader
         title="Contextual data"
-        count={entityIds.length > 0 ? entityIds.length : undefined}
+        count={entityIds.length > 0 ? visibleRows.length : undefined}
       />
       <PanelContent className="p-0">
-        <div className="absolute inset-0 overflow-y-auto p-2 space-y-1">
-          {entityIds.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-white/40 text-sm px-6 text-center gap-3">
-              <div className="flex items-center gap-2 text-white/50">
-                <FileText className="w-5 h-5" />
-                <span>Contextual data</span>
-              </div>
-              <p className="text-xs max-w-md">
-                Check entities in the Entity scope panel to load their contextual graph data here.
-              </p>
+        <div className="absolute inset-0 flex flex-col">
+          <div className="shrink-0 border-b border-white/10 bg-black/20 p-2 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter entities…"
+                className="w-full pl-7 pr-2 py-1 rounded border border-white/10 bg-slate-800/50 text-[11px] text-white placeholder:text-white/40 focus:outline-none focus:border-emerald-500/50"
+              />
             </div>
-          ) : loading ? (
-            <div className="h-full flex items-center justify-center text-white/40 text-xs">Loading entity info…</div>
-          ) : entityInfoMap ? (
-            sortedIds.map((entityId) => {
-              const info = entityInfoMap[entityId];
-              if (!info) return null;
-              const items = getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById);
-              const expanded = expandedEntityIds.has(entityId);
-              const hasItems = items.length > 0;
+            <button
+              type="button"
+              onClick={() => setShowEmpty((prev) => !prev)}
+              className={cn(
+                'w-full flex items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] border transition-colors',
+                showEmpty
+                  ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-300'
+                  : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5 hover:text-white/70'
+              )}
+              title={showEmpty ? 'Hide entities with no attached models' : 'Show all entities'}
+            >
+              <Filter className="w-3 h-3" />
+              {showEmpty ? `Showing all ${entityIds.length}` : `Showing ${visibleRows.length} with data`}
+            </button>
+          </div>
 
-              const typeName = info.catalog?.type_name || (entityId.includes(':') ? entityId.split(':')[0] : undefined);
-              const color = colorForType(typeName);
-
-              return (
-                <div
-                  key={entityId}
-                  className="rounded border border-white/5 bg-black/20 overflow-hidden"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onToggleExpand(entityId)}
-                    className="w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
-                    disabled={!hasItems}
-                    title={hasItems ? (expanded ? 'Collapse' : 'Expand') : 'No attached models'}
-                    style={{ borderLeftColor: color, borderLeftWidth: 3 }}
-                  >
-                    <ChevronRight
-                      className={cn(
-                        'w-4 h-4 text-white/40 shrink-0 transition-transform',
-                        expanded && 'rotate-90',
-                        !hasItems && 'opacity-30'
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-white/90 truncate">
-                        {info.catalog?.name || info.graph_node?.display_name || entityId}
-                      </div>
-                      <div className="text-[10px] text-white/50 font-mono truncate">{entityId}</div>
-                    </div>
-                    {hasItems && (
-                      <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded border border-white/10 bg-white/5">
-                        {items.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {expanded && hasItems && (
-                    <div className="border-t border-white/10 px-1 py-1 space-y-0.5">
-                      {items.map((item) => {
-                        const isSelected = selectedModel?.entityId === entityId && selectedModel?.extId === item.extId;
-                        return (
-                          <div
-                            key={item.key}
-                            className={cn(
-                              'flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
-                              isSelected ? 'bg-emerald-500/15 text-emerald-200' : 'text-white/70 hover:bg-white/5'
-                            )}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => onSelectModel(entityId, item)}
-                              className="flex-1 text-left flex items-center gap-2 min-w-0"
-                              title={`${item.category}: ${item.label}`}
-                            >
-                              <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
-                                {item.category}
-                              </span>
-                              <span className="truncate min-w-0 flex-1">{item.label}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectModel(entityId, item, true);
-                              }}
-                              className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10"
-                              title="Open in new tab"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </button>
-                            {item.edgeCount !== undefined && item.edgeCount > 0 && (
-                              <span
-                                className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
-                                title={`${item.edgeCount} physical edge${item.edgeCount === 1 ? '' : 's'} in this edge context`}
-                              >
-                                {item.edgeCount} edge{item.edgeCount === 1 ? '' : 's'}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
+            {entityIds.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-white/40 text-sm px-6 text-center gap-3">
+                <div className="flex items-center gap-2 text-white/50">
+                  <FileText className="w-5 h-5" />
+                  <span>Contextual data</span>
+                </div>
+                <p className="text-xs max-w-md">
+                  Select a server and bank to load contextual graph data.
+                </p>
+              </div>
+            ) : loading ? (
+              <div className="h-full flex items-center justify-center text-white/40 text-xs">Loading entity info…</div>
+            ) : entityInfoMap ? (
+              visibleRows.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-white/40 text-xs px-6 text-center gap-2">
+                  <p>No matching entities.</p>
+                  {!showEmpty && (
+                    <button
+                      type="button"
+                      onClick={() => setShowEmpty(true)}
+                      className="text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
+                    >
+                      Show all entities
+                    </button>
                   )}
                 </div>
-              );
-            })
-          ) : null}
+              ) : (
+                visibleRows.map(({ entityId, info, items, displayName, hasItems }) => {
+                  const expanded = expandedEntityIds.has(entityId);
+                  const typeName = info?.catalog?.type_name || (entityId.includes(':') ? entityId.split(':')[0] : undefined);
+                  const color = colorForType(typeName);
+
+                  return (
+                    <div
+                      key={entityId}
+                      className="rounded border border-white/5 bg-black/20 overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onToggleExpand(entityId)}
+                        className="w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
+                        disabled={!hasItems}
+                        title={hasItems ? (expanded ? 'Collapse' : 'Expand') : 'No attached models'}
+                        style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+                      >
+                        <ChevronRight
+                          className={cn(
+                            'w-4 h-4 text-white/40 shrink-0 transition-transform',
+                            expanded && 'rotate-90',
+                            !hasItems && 'opacity-30'
+                          )}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-white/90 truncate">
+                            {displayName}
+                          </div>
+                          <div className="text-[10px] text-white/50 font-mono truncate">{entityId}</div>
+                        </div>
+                        {hasItems && (
+                          <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded border border-white/10 bg-white/5">
+                            {items.length}
+                          </span>
+                        )}
+                      </button>
+
+                      {expanded && hasItems && (
+                        <div className="border-t border-white/10 px-1 py-1 space-y-0.5">
+                          {items.map((item) => {
+                            const isSelected = selectedModel?.entityId === entityId && selectedModel?.extId === item.extId;
+                            return (
+                              <div
+                                key={item.key}
+                                className={cn(
+                                  'flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
+                                  isSelected ? 'bg-emerald-500/15 text-emerald-200' : 'text-white/70 hover:bg-white/5'
+                                )}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectModel(entityId, item)}
+                                  className="flex-1 text-left flex items-center gap-2 min-w-0"
+                                  title={`${item.category}: ${item.label}`}
+                                >
+                                  <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
+                                    {item.category}
+                                  </span>
+                                  <span className="truncate min-w-0 flex-1">{item.label}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectModel(entityId, item, true);
+                                  }}
+                                  className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10"
+                                  title="Open in new tab"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </button>
+                                {item.edgeCount !== undefined && item.edgeCount > 0 && (
+                                  <span
+                                    className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
+                                    title={`${item.edgeCount} physical edge${item.edgeCount === 1 ? '' : 's'} in this edge context`}
+                                  >
+                                    {item.edgeCount} edge{item.edgeCount === 1 ? '' : 's'}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )
+            ) : null}
+          </div>
         </div>
       </PanelContent>
     </Panel>

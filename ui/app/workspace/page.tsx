@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { MoreHorizontal, ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
-import { toast } from 'sonner';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import { serversApi, contextualGraphApi, entityInfoApi, entitiesApi, researchApi, mentalModelsApi, type Server, type Entity, type EntityInfo } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
@@ -24,8 +23,6 @@ import {
   type ModelContentCacheEntry,
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
-import { EntityScopePanel } from './_components/entity-scope-panel';
-import { EntityScopeManagerDialog } from './_components/entity-scope-manager-dialog';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
@@ -70,7 +67,6 @@ export default function WorkspacePage() {
     return selectedStep.canvas.graph.nodes?.length > 0;
   }, [selectedStep]);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
-  const [scopeManagerOpen, setScopeManagerOpen] = useState(false);
 
   // Tab state for curated pages and read-only views.
   const [tabs, setTabs] = useState<WorkspaceTab[]>([makeAnchorTab()]);
@@ -127,9 +123,9 @@ export default function WorkspacePage() {
   // Local cursor is managed by the AQL editor component.
   const [reflectCursor, setReflectCursor] = useState(0);
 
-  const scopeEntityIds = useMemo(() => {
-    return activeSession?.scope_entity_ids ?? [];
-  }, [activeSession?.scope_entity_ids]);
+  const groundedNodeIds = useMemo(() => {
+    return entities.map((n) => n.id);
+  }, [entities]);
 
   const previewResult = useMemo(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -601,7 +597,7 @@ export default function WorkspacePage() {
       .catch((err: unknown) => {
         if (cancelled) return;
         logger.error('Failed to load Architxt entities', err);
-        toast.error('Failed to load entities for scope');
+        toast.error('Failed to load entities for contextual data');
       })
       .finally(() => {
         if (!cancelled) setLoadingArchitxtEntities(false);
@@ -656,37 +652,16 @@ export default function WorkspacePage() {
     }
   }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh, updateAnchorTab]);
 
-  const handleRemoveScopeEntity = useCallback(async (entityId: string) => {
-    if (!activeSession) return;
-    const currentIds = activeSession.scope_entity_ids ?? [];
-    const nextIds = currentIds.filter((id) => id !== entityId);
-
-    setActiveSession((prev) => (prev ? { ...prev, scope_entity_ids: nextIds } : prev));
-
-    try {
-      await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
-    } catch (err: unknown) {
-      logger.error('Failed to update session scope', { error: err, sessionId: activeSession.id, entityId });
-      toast.error(`Failed to update scope: ${String(err instanceof Error ? err.message : String(err))}`);
-    }
-  }, [activeSession]);
-
-  const handleUpdateScope = useCallback(async (nextIds: string[]) => {
-    if (!activeSession) return;
-    setActiveSession((prev) => (prev ? { ...prev, scope_entity_ids: nextIds } : prev));
-    await researchApi.updateSession(activeSession.id, { scope_entity_ids: nextIds });
-  }, [activeSession]);
-
-  const handleReuseStep = useCallback((step: ResearchStepSummary) => {
-    setReflectQuery(step.raw_query || step.intent_text || '');
-    toast.success('Query copied to Reflect input');
-  }, []);
-
   const handleRerunStep = useCallback(async (stepId: number) => {
     // Delegate to the research hook's rerun path so runningStepId is set and
     // pollForStepCompletion keeps the trail/status live until completion.
     await workspaceSession.handleRerunStep(stepId);
   }, [workspaceSession.handleRerunStep]);
+
+  const handleReuseStep = useCallback((step: ResearchStepSummary) => {
+    setReflectQuery(step.raw_query || step.intent_text || '');
+    toast.success('Query copied to Reflect input');
+  }, []);
 
   const handleInspectStep = useCallback((step: ResearchStepSummary) => {
     setInspectingStep(step);
@@ -809,35 +784,43 @@ export default function WorkspacePage() {
   }, [loadModelContent, updateAnchorTab]);
 
   useEffect(() => {
-    if (!serverId || !bankId || scopeEntityIds.length === 0) {
+    if (!serverId || !bankId || groundedNodeIds.length === 0) {
       setEntityInfoMap(null);
       return;
     }
     let cancelled = false;
     setLoadingEntityInfo(true);
-    entityInfoApi
-      .info(serverId, bankId, scopeEntityIds, false)
-      .then((result) => {
+
+    // The /entities/info route caps requests at 100 ids, so batch large graphs.
+    async function loadAllEntityInfo() {
+      const mergedEntities: Record<string, EntityInfo> = {};
+      const BATCH = 100;
+      for (let i = 0; i < groundedNodeIds.length; i += BATCH) {
         if (cancelled) return;
-        const mergedEntities: Record<string, EntityInfo> = {};
-        for (const [id, info] of Object.entries(result.entities)) {
-          mergedEntities[id] = info;
+        const batch = groundedNodeIds.slice(i, i + BATCH);
+        try {
+          const result = await entityInfoApi.info(serverId, bankId, batch, false);
+          if (cancelled) return;
+          for (const [id, info] of Object.entries(result.entities)) {
+            mergedEntities[id] = info;
+          }
+        } catch (err: unknown) {
+          if (cancelled) return;
+          logger.error('Failed to load entity info batch', { error: err, serverId, bankId, batchIndex: i / BATCH });
+          toast.error(`Failed to load entity info: ${String(err instanceof Error ? err.message : String(err))}`);
         }
+      }
+      if (!cancelled) {
         setEntityInfoMap(mergedEntities);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        logger.error('Failed to load entity info', { error: err, serverId, bankId, entityIds: scopeEntityIds });
-        toast.error(`Failed to load entity info: ${String(err instanceof Error ? err.message : String(err))}`);
-        setEntityInfoMap(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingEntityInfo(false);
-      });
+        setLoadingEntityInfo(false);
+      }
+    }
+
+    loadAllEntityInfo();
     return () => {
       cancelled = true;
     };
-  }, [serverId, bankId, scopeEntityIds]);
+  }, [serverId, bankId, groundedNodeIds]);
 
   // Keep curated tabs in sync with the session's curated pages. Preserve the anchor tab.
   useEffect(() => {
@@ -903,29 +886,19 @@ export default function WorkspacePage() {
           {/* Column 1: scope + query | session items | contextual data */}
           <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
             <div className="flex flex-col min-h-0 gap-2" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
-              <EntityScopePanel
-                className="shrink-0"
-                entities={architxtEntities}
-                scopeEntityIds={scopeEntityIds}
-                onRemove={handleRemoveScopeEntity}
-                onManage={() => setScopeManagerOpen(true)}
-                loading={loadingArchitxtEntities}
+              <ReflectQueryPanel
+                query={reflectQuery}
+                cursor={reflectCursor}
+                setQuery={setReflectQuery}
+                setCursor={setReflectCursor}
+                onSubmit={handleReflect}
+                aqlEntities={aqlEntities}
+                aqlEdges={aqlEdges}
+                loading={reflectLoading}
+                queryOptions={queryOptions}
+                onQueryOptionsChange={setQueryOptions}
+                className="flex-1 min-h-0"
               />
-              <div className="flex-1 min-h-0 flex">
-                <ReflectQueryPanel
-                  query={reflectQuery}
-                  cursor={reflectCursor}
-                  setQuery={setReflectQuery}
-                  setCursor={setReflectCursor}
-                  onSubmit={handleReflect}
-                  aqlEntities={aqlEntities}
-                  aqlEdges={aqlEdges}
-                  loading={reflectLoading}
-                  queryOptions={queryOptions}
-                  onQueryOptionsChange={setQueryOptions}
-                  style={{ flex: 1, minWidth: 220 }}
-                />
-              </div>
             </div>
 
             <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} title="Drag to resize query / lower panels" />
@@ -935,7 +908,7 @@ export default function WorkspacePage() {
                 <>
                   <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
                     <AttachedEntitiesPanel
-                      entityIds={scopeEntityIds}
+                      entityIds={groundedNodeIds}
                       entityInfoMap={entityInfoMap}
                       entities={architxtEntities}
                       contextualNodes={entities}
@@ -1105,12 +1078,6 @@ export default function WorkspacePage() {
           </div>
         )}
 
-        <EntityScopeManagerDialog
-          isOpen={scopeManagerOpen}
-          onClose={() => setScopeManagerOpen(false)}
-          scopeEntityIds={scopeEntityIds}
-          onSave={handleUpdateScope}
-        />
       </div>
     </PageShell>
   );
