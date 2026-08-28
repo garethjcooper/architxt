@@ -380,7 +380,7 @@ export function CuratedPageEditor({
         />
       </div>
       <Dialog open={focusedDiagram != null} onOpenChange={(open) => { if (!open) setFocusedDiagram(null); }}>
-        <DialogContent className="w-[95vw] h-[90vh] max-w-none flex flex-col" showCloseButton>
+        <DialogContent className="w-[95vw] h-[90vh] max-w-none sm:max-w-none flex flex-col" showCloseButton>
           <DialogHeader className="shrink-0">
             <DialogTitle>{focusedDiagram?.name}</DialogTitle>
           </DialogHeader>
