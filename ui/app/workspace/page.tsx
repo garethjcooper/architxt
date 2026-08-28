@@ -115,13 +115,17 @@ export default function WorkspacePage() {
     if (!serverId || !bankId) return;
     setSessionActionLoading(true);
     try {
-      await researchApi.createSession({
+      const { session_id: newSessionId } = await researchApi.createSession({
         server_id: serverId,
         bank_id: bankId,
         viewpoint_ids: [],
         title: newSessionTitle.trim() || 'Workspace session',
       });
       await workspaceSession.refresh();
+      const created = workspaceSession.sessions.find((s) => s.id === newSessionId);
+      if (created) {
+        await workspaceSession.handleSelectSession(created);
+      }
       toast.success('Session created');
       setNewSessionTitle('');
       setCreateSessionOpen(false);
