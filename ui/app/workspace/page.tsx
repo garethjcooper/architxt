@@ -82,6 +82,8 @@ export default function WorkspacePage() {
   // Tab state for curated pages and read-only views.
   const [tabs, setTabs] = useState<WorkspaceTab[]>([makeAnchorTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(ANCHOR_TAB_ID);
+  // Remember the SelectedView associated with each view tab so switching tabs restores the right preview.
+  const [tabViews, setTabViews] = useState<Record<string, SelectedView>>({});
 
   const [pendingSection, setPendingSection] = useState<{ events: EnvelopeCopyEvent[]; title?: string } | null>(null);
 
@@ -590,7 +592,8 @@ export default function WorkspacePage() {
   );
 
   const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
-    setSelectedView({ kind: 'step', step });
+    const view: SelectedView = { kind: 'step', step };
+    setSelectedView(view);
     // Curated pages are handled via the dedicated Pages list and tab state.
     if (step.action_type === 'curated_page') return;
 
@@ -602,9 +605,11 @@ export default function WorkspacePage() {
         if (prev.some((t) => t.id === id)) return prev;
         return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: String(step.id) }];
       });
+      setTabViews((prev) => ({ ...prev, [id]: view }));
       setActiveTabId(id);
     } else {
       updateAnchorTab(label);
+      setTabViews((prev) => ({ ...prev, [ANCHOR_TAB_ID]: view }));
       setActiveTabId(ANCHOR_TAB_ID);
     }
   }, [updateAnchorTab]);
@@ -855,8 +860,22 @@ export default function WorkspacePage() {
     }
   }, [serverId, bankId]);
 
+  // Restore the SelectedView that belongs to the active view tab so preview content switches correctly.
+  useEffect(() => {
+    if (!activeTabId || activeTabId === ANCHOR_TAB_ID) return;
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (!tab || tab.kind !== 'view') return;
+    const view = tabViews[activeTabId];
+    if (!view) return;
+    setSelectedView(view);
+    if (view.kind === 'model') {
+      void loadModelContent(view.extId);
+    }
+  }, [activeTabId, tabs, tabViews, loadModelContent]);
+
   const selectEntityModel = useCallback((entityId: string, item: ModelItem, openInNewTab = false) => {
-    setSelectedView({ kind: 'model', entityId, extId: item.extId, name: item.label });
+    const view: SelectedView = { kind: 'model', entityId, extId: item.extId, name: item.label };
+    setSelectedView(view);
     void loadModelContent(item.extId);
 
     if (openInNewTab) {
@@ -866,9 +885,11 @@ export default function WorkspacePage() {
         if (prev.some((t) => t.id === id)) return prev;
         return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: item.extId }];
       });
+      setTabViews((prev) => ({ ...prev, [id]: view }));
       setActiveTabId(id);
     } else {
       updateAnchorTab(item.label || item.extId);
+      setTabViews((prev) => ({ ...prev, [ANCHOR_TAB_ID]: view }));
       setActiveTabId(ANCHOR_TAB_ID);
     }
   }, [loadModelContent, updateAnchorTab]);
@@ -982,6 +1003,7 @@ export default function WorkspacePage() {
                 setTabs([makeAnchorTab()]);
                 setActiveTabId(ANCHOR_TAB_ID);
                 setSelectedView(null);
+                setTabViews({});
                 setPendingCuratedEdits({});
                 const trail = await workspaceSession.handleSelectSession(session);
                 const latest = trail[0] ?? null;
@@ -1164,6 +1186,11 @@ export default function WorkspacePage() {
                       }
                     }
                     setTabs((prev) => prev.filter((t) => t.id !== tabId));
+                    setTabViews((prev) => {
+                      const next = { ...prev };
+                      delete next[tabId];
+                      return next;
+                    });
                     if (activeTabId === tabId) {
                       const remaining = tabs.filter((t) => t.id !== tabId);
                       setActiveTabId(remaining[0]?.id ?? ANCHOR_TAB_ID);
@@ -1173,6 +1200,12 @@ export default function WorkspacePage() {
                     setTabs((prev) => {
                       const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
                       return [anchor, ...prev.filter((t) => t.kind === 'curated')];
+                    });
+                    setTabViews((prev) => {
+                      const next: Record<string, SelectedView> = {};
+                      const anchor = prev[ANCHOR_TAB_ID];
+                      if (anchor) next[ANCHOR_TAB_ID] = anchor;
+                      return next;
                     });
                     setActiveTabId(ANCHOR_TAB_ID);
                   }}
