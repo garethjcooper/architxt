@@ -225,10 +225,14 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     setActiveSession(workspaceSession.activeSession);
-    if (workspaceSession.activeSession?.id != null) {
-      saveSessionId(workspaceSession.activeSession.id);
+  }, [workspaceSession.activeSession?.id, workspaceSession.activeSession?.title]);
+
+  useEffect(() => {
+    const id = workspaceSession.activeSession?.id;
+    if (id != null) {
+      saveSessionId(id);
     }
-  }, [workspaceSession.activeSession, saveSessionId]);
+  }, [workspaceSession.activeSession?.id, saveSessionId]);
 
   // Sync workspace query state into the underlying research hook so submissions
   // use the existing working discover/poll path instead of a parallel one.

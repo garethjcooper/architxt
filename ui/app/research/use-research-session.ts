@@ -48,6 +48,7 @@ export interface UseResearchSessionOptions {
   viewMode: 'step' | 'session';
   onViewModeChange?: (mode: 'step' | 'session') => void;
   availableTemplateRoles?: Array<{ value: string; label: string }>;
+  initialSessionId?: number | null;
 }
 
 export interface ResearchQueryOptions {
@@ -216,6 +217,7 @@ export function useResearchSession({
   viewMode,
   onViewModeChange,
   availableTemplateRoles = [],
+  initialSessionId,
 }: UseResearchSessionOptions) {
   const [query, setQuery] = useState('');
   const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>('prebuilt');
@@ -241,6 +243,8 @@ export function useResearchSession({
   const [result, setResult] = useState<DiscoverStepResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasSeededSelectionRef = useRef(false);
+  const initialSessionIdRef = useRef(initialSessionId);
+  initialSessionIdRef.current = initialSessionId;
 
   // Focus entities are derived from selected step canvases so the hook can
   // compute them internally without a circular dependency on useResearchGraph.
@@ -314,7 +318,9 @@ export function useResearchSession({
 
     void fetchSessions(parseInt(serverId, 10), bankId).then((loaded) => {
       if (loaded.length === 0) return;
-      const latest = loaded[0];
+      const targetId = initialSessionIdRef.current;
+      const target = targetId != null ? loaded.find((s) => s.id === targetId) : undefined;
+      const latest = target ?? loaded[0];
       setActiveSessionId(latest.id);
       void fetchTrail(latest.id);
     });

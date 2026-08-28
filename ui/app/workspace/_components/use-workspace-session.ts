@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import {
@@ -23,6 +23,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
     serverId: serverId?.toString() ?? '',
     bankId: bankId ?? '',
     viewMode: 'step',
+    initialSessionId: lastSessionId,
   });
 
   const {
@@ -73,6 +74,9 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
     return running?.id ?? researchRunningStepId ?? null;
   }, [workspaceItems, researchRunningStepId]);
 
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+
   const refresh = useCallback(async () => {
     if (!serverId || !bankId) return;
     const loaded = await fetchSessions(serverId, bankId);
@@ -99,13 +103,14 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
       }
       return;
     }
-    const next = loaded.find((s) => s.id === lastSessionId) ?? loaded.find((s) => s.id === activeSessionId) ?? loaded[0] ?? null;
+    const currentId = activeSessionIdRef.current;
+    const next = loaded.find((s) => s.id === currentId) ?? loaded[0] ?? null;
     if (next == null) return;
     if (next.id !== activeSessionId) {
       setActiveSessionId(next.id);
     }
     await fetchTrail(next.id);
-  }, [serverId, bankId, fetchSessions, fetchTrail, activeSessionId, setActiveSessionId, lastSessionId]);
+  }, [serverId, bankId, fetchSessions, fetchTrail, activeSessionId, setActiveSessionId]);
 
   // Load/refresh when server/bank changes.
   useEffect(() => {
