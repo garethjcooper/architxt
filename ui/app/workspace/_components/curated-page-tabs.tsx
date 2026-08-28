@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { ResearchStepSummary } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 
@@ -62,6 +63,8 @@ export function CuratedPageTabs({
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
   const [renamingPage, setRenamingPage] = useState<{ stepId: number; title: string } | null>(null);
 
+  const activeCuratedTab = tabs.find((t) => t.id === activeTabId && t.kind === 'curated' && t.stepId != null);
+
   const curatedTabIds = new Set(
     tabs.filter((t) => t.kind === 'curated' && t.stepId != null).map((t) => t.stepId!)
   );
@@ -115,20 +118,6 @@ export function CuratedPageTabs({
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
             <span className="text-[11px] font-medium text-white/80">Curated pages</span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onCloseAllViews?.()}
-                className="h-6 px-2 text-[10px] text-white/50 hover:text-white"
-                title="Close all view tabs"
-              >
-                <X className="h-3 w-3 mr-1" /> Close views
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleCreate} className="h-6 px-2 text-[10px]">
-                <Plus className="h-3 w-3 mr-1" /> New
-              </Button>
-            </div>
           </div>
           <div className="max-h-64 overflow-y-auto py-1">
             {curatedPages.length === 0 && (
@@ -165,17 +154,6 @@ export function CuratedPageTabs({
                       title="Rename"
                     >
                       <Edit3 className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmDelete({ stepId: page.id, title: page.intent_text || `Page ${page.id}` });
-                      }}
-                      className="p-1 rounded text-white/40 hover:text-rose-400 hover:bg-rose-950/30"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
@@ -231,24 +209,40 @@ export function CuratedPageTabs({
         })}
       </div>
 
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] p-4 w-80 shadow-lg">
-            <div className="text-sm font-medium text-white/90 mb-2">Delete curated page?</div>
-            <p className="text-xs text-white/60 mb-4">
-              “{confirmDelete.title}” will be removed from the session.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => void handleConfirmDelete()}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-white/10">
+        <button
+          type="button"
+          onClick={() => void handleCreate()}
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          title="Add page"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!activeCuratedTab?.stepId) return;
+            setConfirmDelete({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
+          }}
+          disabled={!activeCuratedTab}
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+          title="Delete active page"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(null);
+        }}
+        title="Delete curated page?"
+        description={confirmDelete ? `“${confirmDelete.title}” will be removed from the session.` : ''}
+        confirmLabel="Delete"
+        onConfirm={() => void handleConfirmDelete()}
+        variant="destructive"
+      />
 
       {renamingPage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
