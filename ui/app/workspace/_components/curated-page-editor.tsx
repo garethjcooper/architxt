@@ -46,11 +46,9 @@ export interface CuratedPageEditorProps {
   tabs?: React.ReactNode;
   /** Optional override for the header bar title. Defaults to the page title. */
   headerTitle?: string;
-  /** Optional extra items rendered in the header row before the Controls toggle. */
-  extraHeaderItems?: React.ReactNode;
 }
 
-export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle, extraHeaderItems }: CuratedPageEditorProps) {
+export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
@@ -215,7 +213,6 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
         extraHeaderItems={
           readOnly ? undefined : (
             <>
-              {extraHeaderItems}
               {isDirty && (
                 <span className="text-[10px] text-white/50 hidden sm:inline">Unsaved changes</span>
               )}
