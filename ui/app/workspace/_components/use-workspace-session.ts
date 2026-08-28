@@ -14,9 +14,10 @@ const WORKSPACE_ITEM_TYPES = new Set(['reflect']);
 export interface UseWorkspaceSessionOptions {
   serverId: number | null;
   bankId: string | null;
+  lastSessionId?: number | null;
 }
 
-export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOptions) {
+export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWorkspaceSessionOptions) {
   const [autoCreating, setAutoCreating] = useState(false);
   const research = useResearchSession({
     serverId: serverId?.toString() ?? '',
@@ -98,13 +99,13 @@ export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOpt
       }
       return;
     }
-    const latest = loaded.find((s) => s.id === activeSessionId) ?? loaded[0] ?? null;
-    if (latest == null) return;
-    if (latest.id !== activeSessionId) {
-      setActiveSessionId(latest.id);
+    const next = loaded.find((s) => s.id === lastSessionId) ?? loaded.find((s) => s.id === activeSessionId) ?? loaded[0] ?? null;
+    if (next == null) return;
+    if (next.id !== activeSessionId) {
+      setActiveSessionId(next.id);
     }
-    await fetchTrail(latest.id);
-  }, [serverId, bankId, fetchSessions, fetchTrail, activeSessionId, setActiveSessionId]);
+    await fetchTrail(next.id);
+  }, [serverId, bankId, fetchSessions, fetchTrail, activeSessionId, setActiveSessionId, lastSessionId]);
 
   // Load/refresh when server/bank changes.
   useEffect(() => {

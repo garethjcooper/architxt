@@ -319,9 +319,6 @@ export function useResearchSession({
       void fetchTrail(latest.id);
     });
   }, [bankId, fetchSessions, fetchTrail]);
-
-
-
   // In session/merge mode, seed the selection with all steps when a trail first
   // loads and nothing is selected, so the merged narrative appears immediately.
   useEffect(() => {
