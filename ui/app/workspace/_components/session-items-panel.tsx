@@ -134,11 +134,6 @@ export function SessionItemsPanel({
                     >
                       <div className="flex items-center justify-between text-xs text-white/90">
                         <span className="truncate flex items-center gap-2 min-w-0">
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/30 border-emerald-500/30 text-emerald-300`}
-                            >
-                            reflect
-                            </span>
                           {createdAt && (
                             <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
                           )}
