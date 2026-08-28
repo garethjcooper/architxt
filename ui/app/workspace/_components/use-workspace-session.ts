@@ -98,7 +98,8 @@ export function useWorkspaceSession({ serverId, bankId }: UseWorkspaceSessionOpt
       }
       return;
     }
-    const latest = loaded[0];
+    const latest = loaded.find((s) => s.id === activeSessionId) ?? loaded[0] ?? null;
+    if (latest == null) return;
     if (latest.id !== activeSessionId) {
       setActiveSessionId(latest.id);
     }
