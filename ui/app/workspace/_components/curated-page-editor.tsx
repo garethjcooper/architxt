@@ -42,9 +42,11 @@ export interface CuratedPageEditorProps {
   onSave: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
   /** When true, the editor renders a compact read-only preview without editing controls. */
   readOnly?: boolean;
+  /** Optional tabs or navigation rendered between the header and the content. */
+  tabs?: React.ReactNode;
 }
 
-export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: CuratedPageEditorProps) {
+export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
@@ -230,6 +232,7 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false }: 
           )
         }
       />
+      {tabs}
       <div className="flex-1 min-h-0 overflow-hidden p-2">
         <NarrativeViewer
           blocks={displayedBlocks}

@@ -28,6 +28,8 @@ export interface EnvelopeViewerProps {
   keyPrefix?: string;
   /** Optional extra className for the outer container. */
   className?: string;
+  /** Optional tabs or navigation rendered between the header and the content. */
+  tabs?: React.ReactNode;
   /** Whether the left-hand section index sidebar is shown. */
   showIndex?: boolean;
   /** Whether the floating data-controls panel is available. */
@@ -51,6 +53,7 @@ export function EnvelopeViewer({
   sessionName,
   onAddToPage,
   addToPageLabel,
+  tabs,
 }: EnvelopeViewerProps) {
   const markdown = useMemo(() => buildEnvelopeMarkdown(envelope ?? null), [envelope]);
   const [showIndexState, setShowIndexState] = useState(showIndex);
@@ -218,6 +221,7 @@ export function EnvelopeViewer({
           onAddStructured={onAddToPage ? handleAddStructured : undefined}
         />
       )}
+      {tabs}
       <div className="flex-1 min-h-0 overflow-hidden p-2 relative">
         <NarrativeViewer
           content={markdown}
