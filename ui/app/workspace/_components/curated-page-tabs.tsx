@@ -111,7 +111,7 @@ export function CuratedPageTabs({
               key={tab.id}
               onClick={() => onSelect(tab.id)}
               className={cn(
-                'group/tab relative flex items-center gap-1.5 pr-6 pl-2 py-1 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors max-w-[16rem]',
+                'group/tab relative flex items-center gap-1.5 pr-7 pl-2 py-1 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors max-w-[18rem]',
                 isActive
                   ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                   : 'bg-black/20 border-white/5 text-white/60 hover:bg-white/5 hover:text-white/80'
@@ -123,7 +123,7 @@ export function CuratedPageTabs({
                   isCurated ? 'bg-emerald-400' : 'bg-white/30'
                 )}
               />
-              <span className={cn('truncate min-w-0', tab.kind === 'curated' && tab.dirty && 'italic')} title={tab.label}>
+              <span className={cn('truncate min-w-0', tab.kind === 'curated' && tab.dirty && 'italic pr-1')} title={tab.label}>
                 {tab.label}
               </span>
               <button
