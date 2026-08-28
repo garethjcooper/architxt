@@ -1137,13 +1137,6 @@ router.get('/mental-models/content', async (req, res) => {
     }
 
     const model = result.mentalModel || {};
-    logger.info('Research mental-models content Hindsight response', {
-      extId,
-      modelKeys: Object.keys(model),
-      contentType: typeof model.content,
-      hasEnvelopeField: 'envelope' in model,
-      envelopeType: model.envelope != null ? typeof model.envelope : null,
-    });
     let rawContent = model.content ?? null;
     let parsedContent = null;
 
@@ -1183,6 +1176,22 @@ router.get('/mental-models/content', async (req, res) => {
       || (envelope.tables?.length ?? 0) > 0
       || (envelope.diagrams?.length ?? 0) > 0
       || envelope.narrative?.trim().length > 0;
+
+    logger.info('Research mental-models content Hindsight response', {
+      extId,
+      modelKeys: Object.keys(model),
+      contentType: typeof model.content,
+      hasEnvelopeField: 'envelope' in model,
+      envelopeType: model.envelope != null ? typeof model.envelope : null,
+      parsedContentType: parsedContent != null ? typeof parsedContent : null,
+      parsedContentKeys: parsedContent != null ? Object.keys(parsedContent) : null,
+      rawGraphNodes: Array.isArray(parsedContent?.graph?.nodes) ? parsedContent.graph.nodes.length : 0,
+      rawGraphEdges: Array.isArray(parsedContent?.graph?.edges) ? parsedContent.graph.edges.length : 0,
+      finalEnvelopeNodes: envelope.graph?.nodes?.length ?? 0,
+      finalEnvelopeEdges: envelope.graph?.edges?.length ?? 0,
+      hasRawData,
+      hasEnvelopeData,
+    });
 
     if (hasRawData && !hasEnvelopeData) {
       logger.warn('Mental-model content normalization produced an empty envelope despite raw structured content', {
