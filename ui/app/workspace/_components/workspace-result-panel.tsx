@@ -19,6 +19,8 @@ export interface WorkspaceResultPanelProps {
   curatedPages?: ResearchStepSummary[];
   onSaveCuratedPage?: (stepId: number, envelope: CuratedPageEnvelope) => Promise<void>;
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
+  /** Optional tabs or navigation rendered between the header and the content. */
+  tabs?: React.ReactNode;
 }
 
 export function WorkspaceResultPanel({
@@ -34,6 +36,7 @@ export function WorkspaceResultPanel({
   curatedPages = [],
   onSaveCuratedPage,
   onCopyToCuratedPage,
+  tabs,
 }: WorkspaceResultPanelProps) {
   if (error) {
     return (
@@ -66,6 +69,7 @@ export function WorkspaceResultPanel({
         page={activeCuratedPage}
         baseline={activeCuratedPageBaseline}
         onSave={onSaveCuratedPage}
+        tabs={tabs}
       />
     );
   }
@@ -89,6 +93,7 @@ export function WorkspaceResultPanel({
         sessionName={sessionName}
         onAddToPage={onCopyToCuratedPage}
         addToPageLabel="Add to page"
+        tabs={tabs}
       />
     </div>
   );

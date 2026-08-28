@@ -967,59 +967,6 @@ export default function WorkspacePage() {
 
           {/* Column 2: result viewer */}
           <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
-            <CuratedPageTabs
-              tabs={tabs}
-              activeTabId={activeTabId}
-              curatedPages={workspaceSession.curatedPages}
-              onSelect={setActiveTabId}
-              onSelectCuratedPage={selectCuratedPage}
-              onCreateCuratedPage={async (title) => {
-                if (!activeSession) return;
-                try {
-                  await researchApi.createSessionPage(activeSession.id, title);
-                  await workspaceSession.refresh();
-                  toast.success(`Created ${title}`);
-                } catch (err: unknown) {
-                  logger.error('Failed to create curated page', err);
-                  toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
-                }
-              }}
-              onRenameCuratedPage={handleRenameCuratedPage}
-              onDeleteCuratedPage={async (stepId) => {
-                try {
-                  await researchApi.deleteStep(stepId);
-                  await workspaceSession.refresh();
-                  toast.success('Page deleted');
-                } catch (err: unknown) {
-                  logger.error('Failed to delete curated page', err);
-                  toast.error(`Failed to delete page: ${String(err instanceof Error ? err.message : String(err))}`);
-                }
-              }}
-              onCloseTab={(tabId, kind, isEmpty) => {
-                const tab = tabs.find((t) => t.id === tabId);
-                if (!tab || tab.pinned) return;
-                if (kind === 'curated') {
-                  // Closing a curated tab only deletes the page if it is empty.
-                  if (isEmpty) {
-                    if (tab.stepId != null) {
-                      void researchApi.deleteStep(tab.stepId).then(() => workspaceSession.refresh());
-                    }
-                  }
-                }
-                setTabs((prev) => prev.filter((t) => t.id !== tabId));
-                if (activeTabId === tabId) {
-                  const remaining = tabs.filter((t) => t.id !== tabId);
-                  setActiveTabId(remaining[0]?.id ?? ANCHOR_TAB_ID);
-                }
-              }}
-              onCloseAllViews={() => {
-                setTabs((prev) => {
-                  const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
-                  return [anchor, ...prev.filter((t) => t.kind === 'curated')];
-                });
-                setActiveTabId(ANCHOR_TAB_ID);
-              }}
-            />
             <WorkspaceResultPanel
               result={previewResult}
               title={previewTitle}
@@ -1032,6 +979,61 @@ export default function WorkspacePage() {
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
               onCopyToCuratedPage={handleCopyToCuratedPage}
+              tabs={
+                <CuratedPageTabs
+                  tabs={tabs}
+                  activeTabId={activeTabId}
+                  curatedPages={workspaceSession.curatedPages}
+                  onSelect={setActiveTabId}
+                  onSelectCuratedPage={selectCuratedPage}
+                  onCreateCuratedPage={async (title) => {
+                    if (!activeSession) return;
+                    try {
+                      await researchApi.createSessionPage(activeSession.id, title);
+                      await workspaceSession.refresh();
+                      toast.success(`Created ${title}`);
+                    } catch (err: unknown) {
+                      logger.error('Failed to create curated page', err);
+                      toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
+                    }
+                  }}
+                  onRenameCuratedPage={handleRenameCuratedPage}
+                  onDeleteCuratedPage={async (stepId) => {
+                    try {
+                      await researchApi.deleteStep(stepId);
+                      await workspaceSession.refresh();
+                      toast.success('Page deleted');
+                    } catch (err: unknown) {
+                      logger.error('Failed to delete curated page', err);
+                      toast.error(`Failed to delete page: ${String(err instanceof Error ? err.message : String(err))}`);
+                    }
+                  }}
+                  onCloseTab={(tabId, kind, isEmpty) => {
+                    const tab = tabs.find((t) => t.id === tabId);
+                    if (!tab || tab.pinned) return;
+                    if (kind === 'curated') {
+                      // Closing a curated tab only deletes the page if it is empty.
+                      if (isEmpty) {
+                        if (tab.stepId != null) {
+                          void researchApi.deleteStep(tab.stepId).then(() => workspaceSession.refresh());
+                        }
+                      }
+                    }
+                    setTabs((prev) => prev.filter((t) => t.id !== tabId));
+                    if (activeTabId === tabId) {
+                      const remaining = tabs.filter((t) => t.id !== tabId);
+                      setActiveTabId(remaining[0]?.id ?? ANCHOR_TAB_ID);
+                    }
+                  }}
+                  onCloseAllViews={() => {
+                    setTabs((prev) => {
+                      const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
+                      return [anchor, ...prev.filter((t) => t.kind === 'curated')];
+                    });
+                    setActiveTabId(ANCHOR_TAB_ID);
+                  }}
+                />
+              }
             />
           </div>
         </div>
