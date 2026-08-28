@@ -963,16 +963,19 @@ export default function WorkspacePage() {
               activeSessionId={workspaceSession.activeSessionId}
               loading={workspaceSession.sessionsLoading}
               disabled={!serverId || !bankId}
-              onSelect={(id) => {
+              onSelect={async (id) => {
                 const session = workspaceSession.sessions.find((s) => s.id === id);
                 if (!session) return;
-                void (async () => {
-                  await workspaceSession.handleSelectSession(session);
-                  const latest = workspaceSession.workspaceItems[0] ?? workspaceSession.curatedPages[0] ?? null;
-                  if (latest) {
-                    setSelectedView({ kind: 'step', step: latest });
-                  }
-                })();
+                // Reset the page panel for the new session, then load its latest item.
+                setTabs([makeAnchorTab()]);
+                setActiveTabId(ANCHOR_TAB_ID);
+                setSelectedView(null);
+                setPendingCuratedEdits({});
+                const trail = await workspaceSession.handleSelectSession(session);
+                const latest = trail[0] ?? null;
+                if (latest) {
+                  setSelectedView({ kind: 'step', step: latest });
+                }
               }}
             />
           </div>
