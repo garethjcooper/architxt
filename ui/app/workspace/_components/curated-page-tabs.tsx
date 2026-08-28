@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, X, Trash2, Edit3, FileText, ChevronDown } from 'lucide-react';
+import { Plus, X, Trash2, Pencil, FileText, ChevronDown } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -153,7 +153,7 @@ export function CuratedPageTabs({
                       className="p-1 rounded text-white/40 hover:text-white hover:bg-white/10"
                       title="Rename"
                     >
-                      <Edit3 className="h-3 w-3" />
+                      <Pencil className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export function CuratedPageTabs({
           className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
           title="Rename active page"
         >
-          <Edit3 className="h-3.5 w-3.5" />
+          <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
