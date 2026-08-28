@@ -196,6 +196,22 @@ export default function WorkspacePage() {
     setActiveSession(workspaceSession.activeSession);
   }, [workspaceSession.activeSession?.id, workspaceSession.activeSession?.title]);
 
+  // Mark curated tabs as dirty whenever they have pending edits.
+  useEffect(() => {
+    setTabs((prev) => {
+      const changed = prev.some((t) => {
+        if (t.kind !== 'curated' || t.stepId == null) return false;
+        const hasEdits = !!pendingCuratedEdits[t.stepId];
+        return t.dirty !== hasEdits;
+      });
+      if (!changed) return prev;
+      return prev.map((t) => {
+        if (t.kind !== 'curated' || t.stepId == null) return t;
+        return { ...t, dirty: !!pendingCuratedEdits[t.stepId] };
+      });
+    });
+  }, [pendingCuratedEdits]);
+
   useEffect(() => {
     const id = workspaceSession.activeSession?.id;
     if (id != null) {
