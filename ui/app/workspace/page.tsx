@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -105,34 +105,53 @@ export default function WorkspacePage() {
   const [confirmSessionDelete, setConfirmSessionDelete] = useState(false);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [editingSession, setEditingSession] = useState(false);
 
   const handleCreateSession = useCallback(async () => {
     if (!serverId || !bankId) return;
+    setNewSessionTitle('');
+    setEditingSession(false);
     setCreateSessionOpen(true);
   }, [serverId, bankId]);
+
+  const handleEditSession = useCallback(async () => {
+    if (!serverId || !bankId || !activeSession) return;
+    setNewSessionTitle(activeSession.title || '');
+    setEditingSession(true);
+    setCreateSessionOpen(true);
+  }, [serverId, bankId, activeSession]);
 
   const handleCreateSessionConfirm = useCallback(async () => {
     if (!serverId || !bankId) return;
     setSessionActionLoading(true);
     try {
-      const { session_id: newSessionId } = await researchApi.createSession({
-        server_id: serverId,
-        bank_id: bankId,
-        viewpoint_ids: [],
-        title: newSessionTitle.trim() || 'Workspace session',
-      });
-      await workspaceSession.refresh();
-      await workspaceSession.selectSessionById(newSessionId);
-      toast.success('Session created');
+      if (editingSession && activeSession) {
+        await researchApi.updateSession(activeSession.id, {
+          title: newSessionTitle.trim() || 'Workspace session',
+        });
+        await workspaceSession.refresh();
+        toast.success('Session updated');
+      } else {
+        const { session_id: newSessionId } = await researchApi.createSession({
+          server_id: serverId,
+          bank_id: bankId,
+          viewpoint_ids: [],
+          title: newSessionTitle.trim() || 'Workspace session',
+        });
+        await workspaceSession.refresh();
+        await workspaceSession.selectSessionById(newSessionId);
+        toast.success('Session created');
+      }
       setNewSessionTitle('');
       setCreateSessionOpen(false);
+      setEditingSession(false);
     } catch (err: unknown) {
-      logger.error('Failed to create session', err);
-      toast.error(`Failed to create session: ${String(err instanceof Error ? err.message : String(err))}`);
+      logger.error('Failed to save session', err);
+      toast.error(`Failed to save session: ${String(err instanceof Error ? err.message : String(err))}`);
     } finally {
       setSessionActionLoading(false);
     }
-  }, [serverId, bankId, newSessionTitle, workspaceSession]);
+  }, [serverId, bankId, newSessionTitle, editingSession, activeSession, workspaceSession]);
 
   const handleDeleteSession = useCallback(async () => {
     const id = activeSession?.id;
@@ -165,6 +184,15 @@ export default function WorkspacePage() {
         </button>
         <button
           type="button"
+          onClick={() => void handleEditSession()}
+          disabled={activeSession?.id == null}
+          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-amber-400 hover:bg-amber-950/30 hover:border-amber-500/30 disabled:opacity-30 transition-colors"
+          title="Edit selected session"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
           onClick={() => void handleCreateSession()}
           disabled={sessionActionLoading || !serverId || !bankId}
           className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
@@ -174,7 +202,7 @@ export default function WorkspacePage() {
         </button>
       </div>
     ),
-    [sessionActionLoading, activeSession, serverId, bankId, handleCreateSession]
+    [sessionActionLoading, activeSession, serverId, bankId, handleCreateSession, handleEditSession]
   );
 
   const activeCuratedPage = useMemo(() => {
@@ -1185,10 +1213,13 @@ export default function WorkspacePage() {
           confirmLabel="Delete"
         />
 
-        <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
+        <Dialog open={createSessionOpen} onOpenChange={(open) => {
+          setCreateSessionOpen(open);
+          if (!open) setEditingSession(false);
+        }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold text-white">Create Session</DialogTitle>
+              <DialogTitle className="text-xl font-semibold text-white">{editingSession ? 'Edit Session' : 'Create Session'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-6 py-4">
               <div className="space-y-2">
@@ -1216,7 +1247,10 @@ export default function WorkspacePage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                 <Button
                   variant="ghost"
-                  onClick={() => setCreateSessionOpen(false)}
+                  onClick={() => {
+                    setCreateSessionOpen(false);
+                    setEditingSession(false);
+                  }}
                   className="text-white/70 hover:text-white hover:bg-white/5"
                 >
                   Cancel
@@ -1227,7 +1261,7 @@ export default function WorkspacePage() {
                   className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {sessionActionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Create
+                  {editingSession ? 'Save' : 'Create'}
                 </Button>
               </div>
             </div>
