@@ -23,6 +23,8 @@ export interface WorkspaceResultPanelProps {
   tabs?: React.ReactNode;
   /** Optional override for the header bar title. Defaults to title. */
   headerTitle?: string;
+  /** Optional extra items rendered in the header row before the Controls toggle. */
+  extraHeaderItems?: React.ReactNode;
 }
 
 export function WorkspaceResultPanel({
@@ -40,6 +42,7 @@ export function WorkspaceResultPanel({
   onCopyToCuratedPage,
   tabs,
   headerTitle,
+  extraHeaderItems,
 }: WorkspaceResultPanelProps) {
   if (error) {
     return (
@@ -74,6 +77,7 @@ export function WorkspaceResultPanel({
         onSave={onSaveCuratedPage}
         tabs={tabs}
         headerTitle={headerTitle}
+        extraHeaderItems={extraHeaderItems}
       />
     );
   }
@@ -97,8 +101,8 @@ export function WorkspaceResultPanel({
         showControls
         sessionName={sessionName}
         onAddToPage={onCopyToCuratedPage}
-        addToPageLabel="Add to page"
         tabs={tabs}
+        extraHeaderItems={extraHeaderItems}
       />
     </div>
   );
