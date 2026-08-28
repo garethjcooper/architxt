@@ -27,6 +27,8 @@ interface EnvelopeControlsProps {
   onCopyStructured?: (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => void;
   /** Called for structured add-to-page; when absent, add buttons are hidden. */
   onAddStructured?: (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => void;
+  /** Render the Controls switch/dropdown. Defaults to true. */
+  showControlsToggle?: boolean;
 }
 
 export function EnvelopeControls({
@@ -43,6 +45,7 @@ export function EnvelopeControls({
   structuredItems,
   onCopyStructured,
   onAddStructured,
+  showControlsToggle = true,
 }: EnvelopeControlsProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
 
@@ -56,16 +59,18 @@ export function EnvelopeControls({
           </Badge>
         )}
         {extraHeaderItems}
-        <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
-          <Switch
-            checked={controlsOpen}
-            onCheckedChange={(checked) => setControlsOpen(Boolean(checked))}
-            size="sm"
-          />
-          Controls
-        </label>
+        {showControlsToggle && (
+          <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+            <Switch
+              checked={controlsOpen}
+              onCheckedChange={(checked) => setControlsOpen(Boolean(checked))}
+              size="sm"
+            />
+            Controls
+          </label>
+        )}
       </div>
-      {controlsOpen && (
+      {showControlsToggle && controlsOpen && (
         <div className="absolute top-full right-3 mt-1 z-30 flex flex-col gap-2 rounded-md border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[260px]">
           <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
             <Switch
