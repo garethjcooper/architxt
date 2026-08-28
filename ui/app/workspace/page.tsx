@@ -172,41 +172,6 @@ export default function WorkspacePage() {
     }
   }, [activeSession, workspaceSession]);
 
-  const sessionHeaderActions = useMemo(
-    () => (
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setConfirmSessionDelete(true)}
-          disabled={activeSession?.id == null}
-          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
-          title="Delete selected session"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleEditSession()}
-          disabled={activeSession?.id == null}
-          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
-          title="Edit selected session"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleCreateSession()}
-          disabled={sessionActionLoading || !serverId || !bankId}
-          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
-          title="Add session"
-        >
-          {sessionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        </button>
-      </div>
-    ),
-    [sessionActionLoading, activeSession, serverId, bankId, handleCreateSession, handleEditSession]
-  );
-
   const activeCuratedPage = useMemo(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab || tab.kind !== 'curated' || tab.stepId == null) return null;
@@ -1038,7 +1003,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => void handleEditSession()}
               disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-amber-400 hover:bg-amber-950/30 hover:border-amber-500/30 disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
               title="Edit selected session"
             >
               <Pencil className="h-4 w-4" />
