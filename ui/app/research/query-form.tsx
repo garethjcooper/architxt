@@ -41,6 +41,7 @@ export interface QueryFormProps {
   availableMentalModels?: Array<{ id: number; ext_id: string; name?: string }>;
   serverId?: string;
   bankId?: string;
+  showOptions?: boolean;
   /** Trail for synthesize-mode source step preview. */
   trail?: ResearchStepSummary[];
   /** Current step selection state for synthesize-mode preview. */
@@ -95,6 +96,7 @@ export function QueryForm(props: QueryFormProps) {
     availableMentalModels = [],
     serverId,
     bankId,
+    showOptions = true,
     trail = [],
     selectedStepIds = new Set(),
     activeStepId,
@@ -287,7 +289,7 @@ export function QueryForm(props: QueryFormProps) {
           </div>
         )}
 
-        {(queryMode === 'recall' || queryMode === 'reflect' || queryMode === 'synthesize') && (
+        {(queryMode === 'recall' || queryMode === 'reflect' || queryMode === 'synthesize') && showOptions && (
           <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
             <div className="text-[10px] text-white/70 font-medium mb-1">Options</div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2">

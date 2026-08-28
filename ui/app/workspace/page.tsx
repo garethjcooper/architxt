@@ -885,7 +885,7 @@ export default function WorkspacePage() {
         <div ref={mainRowRef} className="flex-1 min-h-0 flex">
           {/* Column 1: scope + query | session items | contextual data */}
           <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
-            <div className="flex flex-col min-h-0 gap-2" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
+            <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
               <ReflectQueryPanel
                 query={reflectQuery}
                 cursor={reflectCursor}
