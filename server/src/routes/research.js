@@ -1139,11 +1139,13 @@ router.get('/mental-models/content', async (req, res) => {
     const model = result.mentalModel || {};
     let rawContent = model.content ?? null;
     let parsedContent = null;
+    let parseError = null;
 
     if (typeof rawContent === 'string' && rawContent.trim()) {
       try {
         parsedContent = JSON.parse(rawContent);
-      } catch {
+      } catch (err) {
+        parseError = err.message;
         parsedContent = null;
       }
     } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
@@ -1191,6 +1193,10 @@ router.get('/mental-models/content', async (req, res) => {
       finalEnvelopeEdges: envelope.graph?.edges?.length ?? 0,
       hasRawData,
       hasEnvelopeData,
+      parseError,
+      rawContentPreview: typeof rawContent === 'string'
+        ? JSON.stringify(rawContent.slice(0, 400))
+        : null,
     });
 
     if (hasRawData && !hasEnvelopeData) {
