@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, X, Trash2, Pencil, Save, FileText, ChevronDown } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Plus, X, Trash2, Pencil, Save, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { ResearchStepSummary } from '@/lib/api/client';
@@ -65,7 +60,6 @@ export function CuratedPageTabs({
   activePageDirty = false,
   onSaveActivePage,
 }: CuratedPageTabsProps) {
-  const [pagesOpen, setPagesOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
   const [renamingPage, setRenamingPage] = useState<{ stepId: number; title: string } | null>(null);
 
@@ -85,7 +79,6 @@ export function CuratedPageTabs({
       index++;
     }
     await onCreateCuratedPage(`${base} ${index}`);
-    setPagesOpen(false);
   }, [tabs, curatedPages, onCreateCuratedPage]);
 
   const handleConfirmRename = useCallback(async () => {
@@ -103,72 +96,10 @@ export function CuratedPageTabs({
     if (!confirmDelete) return;
     await onDeleteCuratedPage(confirmDelete.stepId);
     setConfirmDelete(null);
-    setPagesOpen(false);
   }, [confirmDelete, onDeleteCuratedPage]);
 
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/10 bg-[oklch(0.18_0_0)] min-h-10">
-      <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
-        <PopoverTrigger>
-          <span
-            className="flex items-center gap-1 text-[10px] text-white/70 hover:text-white px-2 py-1 rounded hover:bg-white/5 shrink-0 cursor-pointer"
-          >
-            <FileText className="h-3 w-3" />
-            Pages
-            <ChevronDown className="h-3 w-3" />
-          </span>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="w-64 p-0 bg-[oklch(0.18_0_0)] border-white/10 text-white/90"
-        >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-            <span className="text-[11px] font-medium text-white/80">Curated pages</span>
-          </div>
-          <div className="max-h-64 overflow-y-auto py-1">
-            {curatedPages.length === 0 && (
-              <div className="px-3 py-2 text-[11px] text-white/40">No curated pages yet.</div>
-            )}
-            {curatedPages.map((page) => {
-              const isOpen = page.id != null && curatedTabIds.has(page.id);
-              return (
-                <div
-                  key={page.id}
-                  className="flex items-center gap-1 px-2 py-1.5 hover:bg-white/5 group"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSelectCuratedPage(page.id);
-                      setPagesOpen(false);
-                    }}
-                    className={cn(
-                      'flex-1 text-left text-[11px] truncate',
-                      isOpen ? 'text-emerald-300' : 'text-white/70'
-                    )}
-                  >
-                    {page.intent_text || `Page ${page.id}`}
-                  </button>
-                  <div className="flex items-center opacity-0 group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRenamingPage({ stepId: page.id, title: page.intent_text || `Page ${page.id}` });
-                      }}
-                      className="p-1 rounded text-white/40 hover:text-white hover:bg-white/10"
-                      title="Rename"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </PopoverContent>
-      </Popover>
-
       <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto custom-scrollbar">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
@@ -216,6 +147,39 @@ export function CuratedPageTabs({
       </div>
 
       <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-white/10">
+        <div className="flex items-center gap-1">
+          <FileText className="h-3.5 w-3.5 text-white/40" />
+          <select
+            value={activeTabId ?? ''}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!value) return;
+              if (tabs.some((t) => t.id === value)) {
+                onSelect(value);
+              } else if (value.startsWith('page-')) {
+                const pageId = Number(value.slice('page-'.length));
+                if (!Number.isNaN(pageId)) {
+                  onSelectCuratedPage(pageId);
+                }
+              }
+            }}
+            className="h-6 rounded-md border border-white/10 bg-[oklch(0.21_0_0)] px-1.5 text-[11px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none min-w-[6rem] max-w-[10rem]"
+          >
+            <option value="">Pages...</option>
+            {tabs.map((tab) => (
+              <option key={tab.id} value={tab.id}>
+                {tab.label}
+              </option>
+            ))}
+            {curatedPages
+              .filter((p) => p.id != null && !curatedTabIds.has(p.id))
+              .map((p) => (
+                <option key={`page-${p.id}`} value={`page-${p.id}`}>
+                  {p.intent_text || `Page ${p.id}`}
+                </option>
+              ))}
+          </select>
+        </div>
         <button
           type="button"
           onClick={() => onSaveActivePage?.()}
@@ -257,6 +221,16 @@ export function CuratedPageTabs({
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
+        {onCloseAllViews && (
+          <button
+            type="button"
+            onClick={() => onCloseAllViews()}
+            className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+            title="Close all view tabs"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       <ConfirmDialog
