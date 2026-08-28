@@ -386,13 +386,13 @@ export function CuratedPageEditor({
           </DialogHeader>
           {focusedDiagram && (
             <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-auto rounded-md border border-white/10 bg-[oklch(0.18_0_0)] p-2">
+              <div className="flex-1 min-w-0 min-h-0 overflow-auto rounded-md border border-white/10 bg-[oklch(0.18_0_0)] p-2">
                 <MermaidDiagram
                   content={focusedDiagram.content}
                   className="h-full border-0 bg-transparent"
                 />
               </div>
-              <div className="w-[28rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+              <div className="basis-[45%] min-w-[20rem] max-w-[50%] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70">
                   Diagram source
                 </div>
