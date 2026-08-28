@@ -63,19 +63,13 @@ export function SessionSelector({
       <div className="flex items-center gap-2">
         <MessageSquare className="h-4 w-4 text-white/40" />
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger>
-            <button
-              type="button"
-              disabled={disabled || sessions.length === 0}
-              className="h-8 min-w-[10rem] rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50 flex items-center justify-between gap-2"
-            >
-              <span className="truncate">{loading ? 'Loading...' : activeLabel}</span>
-              {loading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5 text-white/40" />
-              )}
-            </button>
+          <PopoverTrigger className="h-8 min-w-[10rem] rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50 flex items-center justify-between gap-2">
+            <span className="truncate">{loading ? 'Loading...' : activeLabel}</span>
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-white/40" />
+            )}
           </PopoverTrigger>
           <PopoverContent
             align="start"
