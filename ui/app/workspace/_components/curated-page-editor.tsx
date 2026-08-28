@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Trash2, Undo2, Save, Loader2 } from 'lucide-react';
+import { Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
-import { cn, downloadMarkdown } from '@/lib/utils';
+import { downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
 
 function parseSyntheticHeading(title?: string): { kind: 'graph' | 'table' | 'diagram'; name?: string } | null {
@@ -46,9 +46,13 @@ export interface CuratedPageEditorProps {
   tabs?: React.ReactNode;
   /** Optional override for the header bar title. Defaults to the page title. */
   headerTitle?: string;
+  /** Called when the dirty state changes so the parent can enable/disable a global Save control. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Increment to trigger a save from the parent. */
+  saveTrigger?: number;
 }
 
-export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle }: CuratedPageEditorProps) {
+export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, tabs, headerTitle, onDirtyChange, saveTrigger }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
   const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
@@ -97,6 +101,11 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
   }, [envelope, displayedBlocks, deletedStructuredKeys]);
 
   const isDirty = useMemo(() => JSON.stringify(workingEnvelope) !== JSON.stringify(effectiveBaseline), [workingEnvelope, effectiveBaseline]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
   const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
 
@@ -112,6 +121,12 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
       setSaving(false);
     }
   }, [page, workingEnvelope, onSave]);
+
+  useEffect(() => {
+    if (saveTrigger != null && saveTrigger > 0) {
+      void handleSave();
+    }
+  }, [saveTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopy = useCallback(() => {
     if (!displayMarkdown) return;
@@ -213,24 +228,9 @@ export function CuratedPageEditor({ page, baseline, onSave, readOnly = false, ta
         extraHeaderItems={
           readOnly ? undefined : (
             <>
-              {isDirty && (
-                <span className="text-[10px] text-white/50 hidden sm:inline">Unsaved changes</span>
+              {saving && (
+                <Loader2 className="h-3 w-3 animate-spin text-white/50" />
               )}
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!isDirty || saving}
-                className={cn(
-                  'h-6 px-2 rounded text-[11px] flex items-center gap-1 transition-colors',
-                  isDirty
-                    ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                    : 'bg-white/10 text-white/50 cursor-not-allowed'
-                )}
-              >
-                {saving && <Loader2 className="h-3 w-3 animate-spin" />}
-                <Save className="h-3 w-3" />
-                Save
-              </button>
             </>
           )
         }

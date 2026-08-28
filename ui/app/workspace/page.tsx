@@ -108,6 +108,8 @@ export default function WorkspacePage() {
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState('');
   const [editingSession, setEditingSession] = useState(false);
+  const [activeCuratedPageDirty, setActiveCuratedPageDirty] = useState(false);
+  const [saveCuratedPageTrigger, setSaveCuratedPageTrigger] = useState(0);
 
   const handleCreateSession = useCallback(async () => {
     if (!serverId || !bankId) return;
@@ -1118,6 +1120,8 @@ export default function WorkspacePage() {
               activeCuratedPageBaseline={activeCuratedPage ? normalizeEnvelope(activeCuratedPage) : undefined}
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
+              onCuratedPageDirtyChange={setActiveCuratedPageDirty}
+              saveCuratedPageTrigger={saveCuratedPageTrigger}
               onCopyToCuratedPage={handleCopyToCuratedPage}
               tabs={
                 <CuratedPageTabs
@@ -1172,6 +1176,8 @@ export default function WorkspacePage() {
                     });
                     setActiveTabId(ANCHOR_TAB_ID);
                   }}
+                  activePageDirty={activeCuratedPageDirty}
+                  onSaveActivePage={() => setSaveCuratedPageTrigger((n) => n + 1)}
                 />
               }
             />
