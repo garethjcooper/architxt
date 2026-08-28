@@ -452,12 +452,16 @@ export function useResearchSession({
     }
   }, [activeSessionId]);
 
-  const handleSelectSession = useCallback(async (session: ResearchSession) => {
-    setActiveSessionId(session.id);
+  const selectSessionById = useCallback(async (sessionId: number) => {
+    setActiveSessionId(sessionId);
     setResult(null);
     setTrail([]);
-    return await fetchTrail(session.id);
+    return await fetchTrail(sessionId);
   }, [fetchTrail]);
+
+  const handleSelectSession = useCallback(async (session: ResearchSession) => {
+    return await selectSessionById(session.id);
+  }, [selectSessionById]);
 
   const toggleStepSelection = useCallback((stepId: number) => {
     setSelectedStepIds((prev) => {
@@ -859,6 +863,7 @@ export function useResearchSession({
     handleRenameSession,
     handleDeleteSession,
     handleSelectSession,
+    selectSessionById,
     toggleStepSelection,
     selectAllSteps,
     clearStepSelection,

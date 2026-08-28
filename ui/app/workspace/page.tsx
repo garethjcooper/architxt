@@ -122,10 +122,7 @@ export default function WorkspacePage() {
         title: newSessionTitle.trim() || 'Workspace session',
       });
       await workspaceSession.refresh();
-      const created = workspaceSession.sessions.find((s) => s.id === newSessionId);
-      if (created) {
-        await workspaceSession.handleSelectSession(created);
-      }
+      await workspaceSession.selectSessionById(newSessionId);
       toast.success('Session created');
       setNewSessionTitle('');
       setCreateSessionOpen(false);
