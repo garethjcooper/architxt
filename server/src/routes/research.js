@@ -1129,6 +1129,7 @@ router.get('/mental-models/content', async (req, res) => {
   }
 
   try {
+    logger.info('Research mental-models content request', { serverId, bankId, extId });
     const result = await getHindsightMentalModel(serverId, bankId, extId, { detail: 'content' });
     if (!result.success) {
       const status = result.code === 'NOT_FOUND' ? 404 : 502;
@@ -1136,6 +1137,13 @@ router.get('/mental-models/content', async (req, res) => {
     }
 
     const model = result.mentalModel || {};
+    logger.info('Research mental-models content Hindsight response', {
+      extId,
+      modelKeys: Object.keys(model),
+      contentType: typeof model.content,
+      hasEnvelopeField: 'envelope' in model,
+      envelopeType: model.envelope != null ? typeof model.envelope : null,
+    });
     let rawContent = model.content ?? null;
     let parsedContent = null;
 
@@ -1161,6 +1169,36 @@ router.get('/mental-models/content', async (req, res) => {
           tables: [],
           diagrams: [],
         };
+
+    // Diagnostic log for empty envelopes when raw content looks structured.
+    // This helps identify normalization failures without falling back to raw content.
+    const hasRawGraph = parsedContent?.graph
+      && (Array.isArray(parsedContent.graph.nodes) || Array.isArray(parsedContent.graph.edges));
+    const hasRawTables = Array.isArray(parsedContent?.tables) && parsedContent.tables.length > 0;
+    const hasRawDiagrams = Array.isArray(parsedContent?.diagrams) && parsedContent.diagrams.length > 0;
+    const hasRawNarrative = typeof parsedContent?.narrative === 'string' && parsedContent.narrative.trim().length > 0;
+    const hasRawData = hasRawGraph || hasRawTables || hasRawDiagrams || hasRawNarrative;
+    const hasEnvelopeGraph = (envelope.graph?.nodes?.length ?? 0) > 0 || (envelope.graph?.edges?.length ?? 0) > 0;
+    const hasEnvelopeData = hasEnvelopeGraph
+      || (envelope.tables?.length ?? 0) > 0
+      || (envelope.diagrams?.length ?? 0) > 0
+      || envelope.narrative?.trim().length > 0;
+
+    if (hasRawData && !hasEnvelopeData) {
+      logger.warn('Mental-model content normalization produced an empty envelope despite raw structured content', {
+        extId,
+        rawContentType: typeof rawContent,
+        rawContentLength: typeof rawContent === 'string' ? rawContent.length : null,
+        parsedContentKeys: parsedContent ? Object.keys(parsedContent) : null,
+        rawGraphNodeCount: Array.isArray(parsedContent?.graph?.nodes) ? parsedContent.graph.nodes.length : null,
+        rawGraphEdgeCount: Array.isArray(parsedContent?.graph?.edges) ? parsedContent.graph.edges.length : null,
+        rawTableCount: Array.isArray(parsedContent?.tables) ? parsedContent.tables.length : null,
+        rawDiagramCount: Array.isArray(parsedContent?.diagrams) ? parsedContent.diagrams.length : null,
+        knownCatalogSize: knownCatalog.size,
+        envelopeNodeCount: envelope.graph?.nodes?.length ?? 0,
+        envelopeEdgeCount: envelope.graph?.edges?.length ?? 0,
+      });
+    }
 
     sendResponse({
       res,
