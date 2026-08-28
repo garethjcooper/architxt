@@ -3,6 +3,18 @@
 import { MessageSquare, Loader2 } from 'lucide-react';
 import type { ResearchSession } from '@/lib/api/client';
 
+function formatSessionDate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export interface SessionSelectorProps {
   sessions: ResearchSession[];
   activeSessionId?: number | null;
@@ -33,7 +45,7 @@ export function SessionSelector({
         <option value="">{loading ? 'Loading...' : sessions.length === 0 ? 'No sessions' : 'Select session...'}</option>
         {sessions.map((session, idx) => (
           <option key={session.id ?? `session-${idx}`} value={session.id}>
-            {session.title || `Session ${session.id}`}
+            {formatSessionDate(session.created_at)}{session.title ? ` - ${session.title}` : ` - Session ${session.id}`}
           </option>
         ))}
       </select>
