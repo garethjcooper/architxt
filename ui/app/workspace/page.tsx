@@ -1199,7 +1199,8 @@ export default function WorkspacePage() {
                   onCloseAllViews={() => {
                     setTabs((prev) => {
                       const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
-                      return [anchor, ...prev.filter((t) => t.kind === 'curated')];
+                      const curated = prev.filter((t) => t.kind === 'curated');
+                      return [anchor, ...curated];
                     });
                     setTabViews((prev) => {
                       const next: Record<string, SelectedView> = {};
@@ -1207,7 +1208,10 @@ export default function WorkspacePage() {
                       if (anchor) next[ANCHOR_TAB_ID] = anchor;
                       return next;
                     });
-                    setActiveTabId(ANCHOR_TAB_ID);
+                    setActiveTabId((current) => {
+                      const keepCurated = tabs.some((t) => t.id === current && t.kind === 'curated');
+                      return keepCurated ? current! : ANCHOR_TAB_ID;
+                    });
                   }}
                   activePageDirty={activeCuratedPageDirty}
                   onSaveActivePage={() => setSaveCuratedPageTrigger((n) => n + 1)}
