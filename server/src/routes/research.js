@@ -1212,55 +1212,44 @@ router.get('/mental-models/content', async (req, res) => {
           diagrams: [],
         };
 
-    // Diagnostic log for empty envelopes when raw content looks structured.
-    // This helps identify normalization failures without falling back to raw content.
-    const hasRawGraph = parsedContent?.graph
-      && (Array.isArray(parsedContent.graph.nodes) || Array.isArray(parsedContent.graph.edges));
-    const hasRawTables = Array.isArray(parsedContent?.tables) && parsedContent.tables.length > 0;
-    const hasRawDiagrams = Array.isArray(parsedContent?.diagrams) && parsedContent.diagrams.length > 0;
-    const hasRawNarrative = typeof parsedContent?.narrative === 'string' && parsedContent.narrative.trim().length > 0;
-    const hasRawData = hasRawGraph || hasRawTables || hasRawDiagrams || hasRawNarrative;
-    const hasEnvelopeGraph = (envelope.graph?.nodes?.length ?? 0) > 0 || (envelope.graph?.edges?.length ?? 0) > 0;
-    const hasEnvelopeData = hasEnvelopeGraph
+    const hasRawData = parsedContent
+      && ((Array.isArray(parsedContent.graph?.nodes) && parsedContent.graph.nodes.length > 0)
+        || (Array.isArray(parsedContent.graph?.edges) && parsedContent.graph.edges.length > 0)
+        || (Array.isArray(parsedContent.tables) && parsedContent.tables.length > 0)
+        || (Array.isArray(parsedContent.diagrams) && parsedContent.diagrams.length > 0)
+        || (typeof parsedContent.narrative === 'string' && parsedContent.narrative.trim().length > 0));
+
+    const hasEnvelopeData = (envelope.graph?.nodes?.length ?? 0) > 0
+      || (envelope.graph?.edges?.length ?? 0) > 0
       || (envelope.tables?.length ?? 0) > 0
       || (envelope.diagrams?.length ?? 0) > 0
       || envelope.narrative?.trim().length > 0;
 
-    logger.info('Research mental-models content Hindsight response', {
-      extId,
-      modelKeys: Object.keys(model),
-      contentType: typeof model.content,
-      hasEnvelopeField: 'envelope' in model,
-      envelopeType: model.envelope != null ? typeof model.envelope : null,
-      parsedContentType: parsedContent != null ? typeof parsedContent : null,
-      parsedContentKeys: parsedContent != null ? Object.keys(parsedContent) : null,
-      rawGraphNodes: Array.isArray(parsedContent?.graph?.nodes) ? parsedContent.graph.nodes.length : 0,
-      rawGraphEdges: Array.isArray(parsedContent?.graph?.edges) ? parsedContent.graph.edges.length : 0,
-      finalEnvelopeNodes: envelope.graph?.nodes?.length ?? 0,
-      finalEnvelopeEdges: envelope.graph?.edges?.length ?? 0,
-      hasRawData,
-      hasEnvelopeData,
-      parseError,
-      rawContentPreview: typeof rawContent === 'string'
-        ? JSON.stringify(rawContent.slice(0, 400))
-        : null,
-    });
+    if (parseError && hasRawData) {
+      logger.warn('Mental-model content required loose JSON extraction', {
+        extId,
+        parseError,
+        rawContentLength: typeof rawContent === 'string' ? rawContent.length : null,
+      });
+    }
 
     if (hasRawData && !hasEnvelopeData) {
       logger.warn('Mental-model content normalization produced an empty envelope despite raw structured content', {
         extId,
-        rawContentType: typeof rawContent,
-        rawContentLength: typeof rawContent === 'string' ? rawContent.length : null,
-        parsedContentKeys: parsedContent ? Object.keys(parsedContent) : null,
         rawGraphNodeCount: Array.isArray(parsedContent?.graph?.nodes) ? parsedContent.graph.nodes.length : null,
         rawGraphEdgeCount: Array.isArray(parsedContent?.graph?.edges) ? parsedContent.graph.edges.length : null,
-        rawTableCount: Array.isArray(parsedContent?.tables) ? parsedContent.tables.length : null,
-        rawDiagramCount: Array.isArray(parsedContent?.diagrams) ? parsedContent.diagrams.length : null,
         knownCatalogSize: knownCatalog.size,
-        envelopeNodeCount: envelope.graph?.nodes?.length ?? 0,
-        envelopeEdgeCount: envelope.graph?.edges?.length ?? 0,
       });
     }
+
+    logger.info('Research mental-models content response', {
+      extId,
+      rawContentType: typeof rawContent,
+      parsedContentType: parsedContent != null ? typeof parsedContent : null,
+      envelopeNodes: envelope.graph?.nodes?.length ?? 0,
+      envelopeEdges: envelope.graph?.edges?.length ?? 0,
+      usedLooseExtraction: parseError != null && parsedContent != null,
+    });
 
     sendResponse({
       res,
