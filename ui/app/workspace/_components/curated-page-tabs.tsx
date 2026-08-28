@@ -212,14 +212,6 @@ export function CuratedPageTabs({
       <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-white/10">
         <button
           type="button"
-          onClick={() => void handleCreate()}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-          title="Add page"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
           onClick={() => {
             if (!activeCuratedTab?.stepId) return;
             setConfirmDelete({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
@@ -229,6 +221,26 @@ export function CuratedPageTabs({
           title="Delete active page"
         >
           <Trash2 className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!activeCuratedTab?.stepId) return;
+            setRenamingPage({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
+          }}
+          disabled={!activeCuratedTab}
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+          title="Rename active page"
+        >
+          <Edit3 className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleCreate()}
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          title="Add page"
+        >
+          <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
 
