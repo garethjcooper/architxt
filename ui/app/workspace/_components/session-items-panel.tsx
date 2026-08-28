@@ -128,6 +128,22 @@ export function SessionItemsPanel({
                   <div className="flex items-center gap-2 px-2 py-1.5 min-h-[2.8125rem]">
                     <button
                       type="button"
+                      onClick={() => toggleExpanded(step.id)}
+                      className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 ${
+                        !canExpand ? 'invisible' : ''
+                      }`}
+                      title={isExpanded ? 'Collapse query' : 'Expand query'}
+                      disabled={!canExpand}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => onSelectStep(step)}
                       className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
                       title={query || 'Untitled query'}
@@ -157,22 +173,6 @@ export function SessionItemsPanel({
                       title="Open in new tab"
                     >
                       <ExternalLink className="h-3 w-3" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(step.id)}
-                      className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 ${
-                        !canExpand ? 'invisible' : ''
-                      }`}
-                      title={isExpanded ? 'Collapse query' : 'Expand query'}
-                      disabled={!canExpand}
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      )}
                     </button>
 
                     <DropdownMenu>
