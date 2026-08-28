@@ -32,7 +32,7 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
 }
 
 function parseMentalModelContent(raw: HindsightContentResult | ModelContentCacheEntry): MentalModelContent {
-  // Prefer the server-normalized envelope when available.
+  // Prefer the server-normalized envelope when present.
   const serverEnvelope = raw.envelope ?? undefined;
   if (serverEnvelope) {
     return {

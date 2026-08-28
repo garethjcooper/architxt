@@ -142,9 +142,11 @@ export default function WorkspacePage() {
     const entry = modelContentCache[selectedView.extId];
     if (!entry || entry.loading || entry.error) return null;
     // Render from the normalized server envelope when present, even if raw content
-    // is empty or not yet populated. This prevents edge-context rows from appearing
-    // blank when Hindsight returns a structured envelope but no raw content string.
+    // is empty or not yet populated. This prevents edge-context models with valid
+    // structured envelopes from appearing blank because the raw content field is
+    // a JSON string rather than rendered Markdown.
     if (!entry.content && !entry.envelope) return null;
+
     return mentalModelContentToStepSummary(selectedView.name, entry);
   }, [tabs, activeTabId, selectedView, modelContentCache, workspaceSession.curatedPages]);
 
@@ -742,7 +744,24 @@ export default function WorkspacePage() {
   const loadModelContent = useCallback(async (extId: string) => {
     if (!serverId || !bankId) return;
     setModelContentCache((prev) => {
-      if (prev[extId]?.loading || (prev[extId]?.content !== undefined && prev[extId]?.envelope !== undefined)) return prev;
+      const cached = prev[extId];
+      const cachedEnvelope = cached?.envelope;
+      const cachedEnvelopeEmpty =
+        cachedEnvelope != null &&
+        (cachedEnvelope.graph?.nodes?.length ?? 0) === 0 &&
+        (cachedEnvelope.graph?.edges?.length ?? 0) === 0 &&
+        (cachedEnvelope.tables?.length ?? 0) === 0 &&
+        (cachedEnvelope.diagrams?.length ?? 0) === 0 &&
+        !cachedEnvelope.narrative?.trim();
+      // Re-fetch if loading, never fetched, or the cached envelope is empty while
+      // raw content exists (server may now normalize the same content correctly).
+      const needsFetch =
+        !cached ||
+        cached.loading ||
+        cached.content === undefined ||
+        cached.envelope === undefined ||
+        cachedEnvelopeEmpty;
+      if (!needsFetch) return prev;
       return { ...prev, [extId]: { ...prev[extId], loading: true, error: null } };
     });
     try {
