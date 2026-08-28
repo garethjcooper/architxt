@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ChevronRight, FileText, ExternalLink, Search, Filter } from 'lucide-react';
+import { useMemo } from 'react';
+import { ChevronRight, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
 
@@ -132,13 +132,6 @@ export function AttachedEntitiesPanel({
   onToggleExpand,
   onSelectModel,
 }: AttachedEntitiesPanelProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showEmpty, setShowEmpty] = useState(false);
-
-  const sortedIds = useMemo(() => {
-    return [...entityIds].sort((a, b) => a.localeCompare(b));
-  }, [entityIds]);
-
   const entityNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const entity of entities) {
@@ -155,10 +148,8 @@ export function AttachedEntitiesPanel({
     return map;
   }, [contextualNodes]);
 
-  const q = searchQuery.trim().toLowerCase();
-
   const visibleRows = useMemo(() => {
-    return sortedIds
+    return entityIds
       .map((entityId) => {
         const info = entityInfoMap?.[entityId];
         const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById) : [];
@@ -166,13 +157,9 @@ export function AttachedEntitiesPanel({
         const displayName = info?.catalog?.name || info?.graph_node?.display_name || node?.label || entityId;
         return { entityId, info, items, displayName, hasItems: items.length > 0 };
       })
-      .filter((row) => {
-        if (!showEmpty && !row.hasItems) return false;
-        if (!q) return true;
-        const text = `${row.entityId} ${row.displayName}`.toLowerCase();
-        return text.includes(q);
-      });
-  }, [sortedIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, showEmpty, q]);
+      .filter((row) => row.hasItems)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes]);
 
   return (
     <Panel className="flex-1">
@@ -182,33 +169,6 @@ export function AttachedEntitiesPanel({
       />
       <PanelContent className="p-0">
         <div className="absolute inset-0 flex flex-col">
-          <div className="shrink-0 border-b border-white/10 bg-black/20 p-2 space-y-2">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter entities…"
-                className="w-full pl-7 pr-2 py-1 rounded border border-white/10 bg-slate-800/50 text-[11px] text-white placeholder:text-white/40 focus:outline-none focus:border-emerald-500/50"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowEmpty((prev) => !prev)}
-              className={cn(
-                'w-full flex items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] border transition-colors',
-                showEmpty
-                  ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-300'
-                  : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5 hover:text-white/70'
-              )}
-              title={showEmpty ? 'Hide entities with no attached models' : 'Show all entities'}
-            >
-              <Filter className="w-3 h-3" />
-              {showEmpty ? `Showing all ${entityIds.length}` : `Showing ${visibleRows.length} with data`}
-            </button>
-          </div>
-
           <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
             {entityIds.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-white/40 text-sm px-6 text-center gap-3">
@@ -225,16 +185,7 @@ export function AttachedEntitiesPanel({
             ) : entityInfoMap ? (
               visibleRows.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-white/40 text-xs px-6 text-center gap-2">
-                  <p>No matching entities.</p>
-                  {!showEmpty && (
-                    <button
-                      type="button"
-                      onClick={() => setShowEmpty(true)}
-                      className="text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
-                    >
-                      Show all entities
-                    </button>
-                  )}
+                  <p>No contextual models attached yet.</p>
                 </div>
               ) : (
                 visibleRows.map(({ entityId, info, items, displayName, hasItems }) => {
@@ -251,15 +202,13 @@ export function AttachedEntitiesPanel({
                         type="button"
                         onClick={() => onToggleExpand(entityId)}
                         className="w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
-                        disabled={!hasItems}
-                        title={hasItems ? (expanded ? 'Collapse' : 'Expand') : 'No attached models'}
+                        title={expanded ? 'Collapse' : 'Expand'}
                         style={{ borderLeftColor: color, borderLeftWidth: 3 }}
                       >
                         <ChevronRight
                           className={cn(
                             'w-4 h-4 text-white/40 shrink-0 transition-transform',
-                            expanded && 'rotate-90',
-                            !hasItems && 'opacity-30'
+                            expanded && 'rotate-90'
                           )}
                         />
                         <div className="min-w-0 flex-1">
@@ -268,11 +217,9 @@ export function AttachedEntitiesPanel({
                           </div>
                           <div className="text-[10px] text-white/50 font-mono truncate">{entityId}</div>
                         </div>
-                        {hasItems && (
-                          <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded border border-white/10 bg-white/5">
-                            {items.length}
-                          </span>
-                        )}
+                        <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded border border-white/10 bg-white/5">
+                          {items.length}
+                        </span>
                       </button>
 
                       {expanded && hasItems && (
