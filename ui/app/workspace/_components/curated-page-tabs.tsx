@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, X, Trash2, Pencil, Save, FileText } from 'lucide-react';
+import { Plus, X, Trash2, Pencil, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { ResearchStepSummary } from '@/lib/api/client';
@@ -147,39 +147,47 @@ export function CuratedPageTabs({
       </div>
 
       <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-white/10">
-        <div className="flex items-center gap-1">
-          <FileText className="h-3.5 w-3.5 text-white/40" />
-          <select
-            value={activeTabId ?? ''}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (!value) return;
-              if (tabs.some((t) => t.id === value)) {
-                onSelect(value);
-              } else if (value.startsWith('page-')) {
-                const pageId = Number(value.slice('page-'.length));
-                if (!Number.isNaN(pageId)) {
-                  onSelectCuratedPage(pageId);
-                }
-              }
-            }}
-            className="h-6 rounded-md border border-white/10 bg-[oklch(0.21_0_0)] px-1.5 text-[11px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none min-w-[6rem] max-w-[10rem]"
+        {onCloseAllViews && (
+          <button
+            type="button"
+            onClick={() => onCloseAllViews()}
+            disabled={tabs.filter((t) => t.kind === 'view' && !t.pinned).length === 0}
+            className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+            title="Close all view tabs"
           >
-            <option value="">Pages...</option>
-            {tabs.map((tab) => (
-              <option key={tab.id} value={tab.id}>
-                {tab.label}
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <select
+          value={activeTabId ?? ''}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (!value) return;
+            if (tabs.some((t) => t.id === value)) {
+              onSelect(value);
+            } else if (value.startsWith('page-')) {
+              const pageId = Number(value.slice('page-'.length));
+              if (!Number.isNaN(pageId)) {
+                onSelectCuratedPage(pageId);
+              }
+            }
+          }}
+          className="h-6 rounded-md border border-white/10 bg-[oklch(0.21_0_0)] px-1.5 text-[11px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none min-w-[6rem] max-w-[10rem]"
+        >
+          <option value="">Pages...</option>
+          {tabs.map((tab) => (
+            <option key={tab.id} value={tab.id}>
+              {tab.label}
+            </option>
+          ))}
+          {curatedPages
+            .filter((p) => p.id != null && !curatedTabIds.has(p.id))
+            .map((p) => (
+              <option key={`page-${p.id}`} value={`page-${p.id}`}>
+                {p.intent_text || `Page ${p.id}`}
               </option>
             ))}
-            {curatedPages
-              .filter((p) => p.id != null && !curatedTabIds.has(p.id))
-              .map((p) => (
-                <option key={`page-${p.id}`} value={`page-${p.id}`}>
-                  {p.intent_text || `Page ${p.id}`}
-                </option>
-              ))}
-          </select>
-        </div>
+        </select>
         <button
           type="button"
           onClick={() => onSaveActivePage?.()}
@@ -221,16 +229,6 @@ export function CuratedPageTabs({
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
-        {onCloseAllViews && (
-          <button
-            type="button"
-            onClick={() => onCloseAllViews()}
-            className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-            title="Close all view tabs"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
 
       <ConfirmDialog
