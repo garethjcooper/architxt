@@ -29,6 +29,48 @@ import { findEligibleTemplateModels } from '../services/research/template-eligib
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
 import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
 import { parseJsonString } from '../prompts/graph-parser.js';
+
+/**
+ * Extract the first balanced JSON object/array from a string that may contain
+ * trailing garbage after the JSON. This is stricter than the regex-based loose
+ * extractor and avoids over-matching when trailing text also contains braces.
+ */
+function extractBalancedJson(text) {
+  if (typeof text !== 'string' || !text.trim()) return null;
+  const start = text.search(/[\{\[]/);
+  if (start === -1) return null;
+  const opener = text[start];
+  const closer = opener === '{' ? '}' : ']';
+  let depth = 1;
+  let inString = false;
+  let escapeNext = false;
+  for (let i = start + 1; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+      } else if (ch === '\\') {
+        escapeNext = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === opener) {
+      depth += 1;
+    } else if (ch === closer) {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(start, i + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
 import { loadEntityCatalog } from '../prompts/entity-catalog.js';
 import { parseSectionDirectives } from '../prompts/section-directives.js';
 
@@ -1149,9 +1191,9 @@ router.get('/mental-models/content', async (req, res) => {
         parseError = err.message;
         // Some stored mental-model content is the valid JSON envelope followed
         // by extra LLM text (e.g. trailing prose after the closing brace). Fall
-        // back to the loose JSON extractor that pulls the first {...} or [...]
-        // payload and ignores surrounding/markdown content.
-        parsedContent = parseJsonString(rawContent);
+        // back to the loose JSON extractors that pull the first balanced {...}
+        // or [...] payload and ignore surrounding/markdown content.
+        parsedContent = parseJsonString(rawContent) || extractBalancedJson(rawContent);
       }
     } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
       parsedContent = rawContent;
