@@ -392,7 +392,7 @@ export function CuratedPageEditor({
                   className="h-full border-0 bg-transparent"
                 />
               </div>
-              <div className="basis-[45%] min-w-[20rem] max-w-[50%] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+              <div className="basis-[25%] min-w-[16rem] max-w-[35%] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70">
                   Diagram source
                 </div>
