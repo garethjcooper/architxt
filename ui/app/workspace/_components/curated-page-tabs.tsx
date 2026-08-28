@@ -111,11 +111,10 @@ export function CuratedPageTabs({
               key={tab.id}
               onClick={() => onSelect(tab.id)}
               className={cn(
-                'group/tab relative flex items-center gap-1.5 pr-3 py-1.5 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors max-w-[14rem]',
+                'group/tab relative flex items-center gap-1.5 pr-6 pl-2 py-1 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors max-w-[16rem]',
                 isActive
                   ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                  : 'bg-black/20 border-white/5 text-white/60 hover:bg-white/5 hover:text-white/80',
-                isCurated ? 'pl-2' : 'pl-2'
+                  : 'bg-black/20 border-white/5 text-white/60 hover:bg-white/5 hover:text-white/80'
               )}
             >
               <span
@@ -135,8 +134,8 @@ export function CuratedPageTabs({
                   onCloseTab(tab.id, tab.kind, false);
                 }}
                 className={cn(
-                  'p-1 rounded text-white/40 hover:text-white hover:bg-white/10 transition-opacity',
-                  tab.pinned ? 'opacity-0 cursor-default' : 'opacity-0 group-hover/tab:opacity-100'
+                  'absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-white/40 hover:text-white hover:bg-white/10 transition-opacity',
+                  tab.pinned ? 'opacity-0 cursor-default pointer-events-none' : 'opacity-0 group-hover/tab:opacity-100'
                 )}
                 title={tab.pinned ? 'Pinned' : isCurated ? 'Close tab' : 'Close view'}
                 disabled={tab.pinned}
