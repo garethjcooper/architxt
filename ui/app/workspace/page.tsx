@@ -1160,6 +1160,19 @@ export default function WorkspacePage() {
               onSaveCuratedPage={handleSaveCuratedPage}
               onCuratedPageDirtyChange={setActiveCuratedPageDirty}
               saveCuratedPageTrigger={saveCuratedPageTrigger}
+              onCuratedPageChange={(envelope, dirty) => {
+                if (!activeCuratedPage) return;
+                setPendingCuratedEdits((prev) => {
+                  if (dirty) {
+                    if (prev[activeCuratedPage.id] === envelope) return prev;
+                    return { ...prev, [activeCuratedPage.id]: envelope };
+                  }
+                  if (!prev[activeCuratedPage.id]) return prev;
+                  const next = { ...prev };
+                  delete next[activeCuratedPage.id];
+                  return next;
+                });
+              }}
               onCopyToCuratedPage={handleCopyToCuratedPage}
               tabs={
                 <CuratedPageTabs
