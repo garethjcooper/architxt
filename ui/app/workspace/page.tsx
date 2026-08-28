@@ -188,7 +188,7 @@ export default function WorkspacePage() {
           type="button"
           onClick={() => void handleEditSession()}
           disabled={activeSession?.id == null}
-          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-amber-400 hover:bg-amber-950/30 hover:border-amber-500/30 disabled:opacity-30 transition-colors"
+          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
           title="Edit selected session"
         >
           <Pencil className="h-4 w-4" />
