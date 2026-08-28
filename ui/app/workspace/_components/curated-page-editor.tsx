@@ -380,20 +380,28 @@ export function CuratedPageEditor({
         />
       </div>
       <Dialog open={focusedDiagram != null} onOpenChange={(open) => { if (!open) setFocusedDiagram(null); }}>
-        <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] flex flex-col" showCloseButton>
-          <DialogHeader>
+        <DialogContent className="w-[95vw] h-[90vh] max-w-none flex flex-col" showCloseButton>
+          <DialogHeader className="shrink-0">
             <DialogTitle>{focusedDiagram?.name}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-auto p-1">
-            {focusedDiagram && (
-              <MermaidDiagram
-                name={focusedDiagram.name}
-                type="diagram"
-                content={focusedDiagram.content}
-                className="h-full"
-              />
-            )}
-          </div>
+          {focusedDiagram && (
+            <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-auto rounded-md border border-white/10 bg-[oklch(0.18_0_0)] p-2">
+                <MermaidDiagram
+                  content={focusedDiagram.content}
+                  className="h-full border-0 bg-transparent"
+                />
+              </div>
+              <div className="w-[28rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70">
+                  Diagram source
+                </div>
+                <pre className="flex-1 min-h-0 overflow-auto p-3 text-[12px] leading-relaxed font-mono text-white/80 whitespace-pre">
+                  {focusedDiagram.content}
+                </pre>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
