@@ -119,7 +119,7 @@ export function CuratedPageTabs({
               <span
                 className={cn(
                   'absolute left-0 top-1 bottom-1 w-[3px] rounded-r shrink-0',
-                  isCurated ? 'bg-purple-400' : 'bg-emerald-400'
+                  isCurated ? 'bg-emerald-400' : 'bg-white/30'
                 )}
               />
               <span className="truncate max-w-[10rem]" title={tab.label}>
