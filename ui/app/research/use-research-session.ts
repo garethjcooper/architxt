@@ -455,7 +455,8 @@ export function useResearchSession({
   const handleSelectSession = useCallback(async (session: ResearchSession) => {
     setActiveSessionId(session.id);
     setResult(null);
-    await fetchTrail(session.id);
+    setTrail([]);
+    return await fetchTrail(session.id);
   }, [fetchTrail]);
 
   const toggleStepSelection = useCallback((stepId: number) => {
