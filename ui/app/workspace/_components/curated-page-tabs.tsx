@@ -21,6 +21,8 @@ export interface WorkspaceTab {
   sourceId?: string;
   /** Pinned tabs cannot be closed by the user. */
   pinned?: boolean;
+  /** For curated tabs: true when the page has unsaved edits. */
+  dirty?: boolean;
 }
 
 export const ANCHOR_TAB_ID = 'view-anchor';
@@ -118,11 +120,11 @@ export function CuratedPageTabs({
             >
               <span
                 className={cn(
-                  'absolute left-0 top-1 bottom-1 w-[3px] rounded-r shrink-0',
+                  'absolute left-0 top-1 bottom-1 w-[3px] rounded-l shrink-0',
                   isCurated ? 'bg-emerald-400' : 'bg-white/30'
                 )}
               />
-              <span className="truncate max-w-[10rem]" title={tab.label}>
+              <span className={cn('truncate max-w-[10rem]', tab.kind === 'curated' && tab.dirty && 'italic')} title={tab.label}>
                 {tab.label}
               </span>
               <button
