@@ -183,8 +183,10 @@ export function CuratedPageEditor({
     }
   }, [page, workingEnvelope, onSave]);
 
+  const lastSaveTriggerRef = useRef(saveTrigger);
   useEffect(() => {
-    if (saveTrigger != null && saveTrigger > 0) {
+    if (saveTrigger != null && saveTrigger > 0 && saveTrigger !== lastSaveTriggerRef.current) {
+      lastSaveTriggerRef.current = saveTrigger;
       void handleSave();
     }
   }, [saveTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
