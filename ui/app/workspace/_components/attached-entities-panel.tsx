@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronRight, FileText, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
 
@@ -205,12 +205,11 @@ export function AttachedEntitiesPanel({
                         title={expanded ? 'Collapse' : 'Expand'}
                         style={{ borderLeftColor: color, borderLeftWidth: 3 }}
                       >
-                        <ChevronRight
-                          className={cn(
-                            'w-4 h-4 text-white/40 shrink-0 transition-transform',
-                            expanded && 'rotate-90'
-                          )}
-                        />
+                        {expanded ? (
+                          <ChevronUp className={cn('w-4 h-4 text-white/40 shrink-0')} />
+                        ) : (
+                          <ChevronDown className={cn('w-4 h-4 text-white/40 shrink-0')} />
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="text-xs text-white/90 truncate">
                             {displayName}
