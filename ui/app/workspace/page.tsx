@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
@@ -95,8 +103,15 @@ export default function WorkspacePage() {
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(workspaceSession.activeSession);
   const [sessionActionLoading, setSessionActionLoading] = useState(false);
   const [confirmSessionDelete, setConfirmSessionDelete] = useState(false);
+  const [createSessionOpen, setCreateSessionOpen] = useState(false);
+  const [newSessionTitle, setNewSessionTitle] = useState('');
 
   const handleCreateSession = useCallback(async () => {
+    if (!serverId || !bankId) return;
+    setCreateSessionOpen(true);
+  }, [serverId, bankId]);
+
+  const handleCreateSessionConfirm = useCallback(async () => {
     if (!serverId || !bankId) return;
     setSessionActionLoading(true);
     try {
@@ -104,17 +119,19 @@ export default function WorkspacePage() {
         server_id: serverId,
         bank_id: bankId,
         viewpoint_ids: [],
-        title: 'Workspace session',
+        title: newSessionTitle.trim() || 'Workspace session',
       });
       await workspaceSession.refresh();
       toast.success('Session created');
+      setNewSessionTitle('');
+      setCreateSessionOpen(false);
     } catch (err: unknown) {
       logger.error('Failed to create session', err);
       toast.error(`Failed to create session: ${String(err instanceof Error ? err.message : String(err))}`);
     } finally {
       setSessionActionLoading(false);
     }
-  }, [serverId, bankId, workspaceSession]);
+  }, [serverId, bankId, newSessionTitle, workspaceSession]);
 
   const handleDeleteSession = useCallback(async () => {
     const id = activeSession?.id;
@@ -1166,6 +1183,55 @@ export default function WorkspacePage() {
           variant="destructive"
           confirmLabel="Delete"
         />
+
+        <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold text-white">Create Session</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="session-title" className="text-xs uppercase text-white/50 font-medium">
+                  Session name
+                </Label>
+                <Input
+                  id="session-title"
+                  value={newSessionTitle}
+                  onChange={(e) => setNewSessionTitle(e.target.value)}
+                  placeholder="Workspace session"
+                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                  style={{
+                    '--tw-ring-color': 'rgb(52, 211, 153)',
+                    '--tw-ring-opacity': '0.4',
+                  } as React.CSSProperties}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleCreateSessionConfirm();
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                <Button
+                  variant="ghost"
+                  onClick={() => setCreateSessionOpen(false)}
+                  className="text-white/70 hover:text-white hover:bg-white/5"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleCreateSessionConfirm()}
+                  disabled={sessionActionLoading}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {sessionActionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Create
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {pendingSection && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
