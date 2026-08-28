@@ -1,5 +1,4 @@
 'use client';
-import { EnvelopeControls } from '@/components/envelope-controls';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { CuratedPageEditor, type CuratedPageEnvelope } from './curated-page-editor';
@@ -24,8 +23,6 @@ export interface WorkspaceResultPanelProps {
   tabs?: React.ReactNode;
   /** Optional override for the header bar title. Defaults to title. */
   headerTitle?: string;
-  /** Optional extra items rendered in the header row before the Controls toggle. */
-  extraHeaderItems?: React.ReactNode;
 }
 
 export function WorkspaceResultPanel({
@@ -43,50 +40,19 @@ export function WorkspaceResultPanel({
   onCopyToCuratedPage,
   tabs,
   headerTitle,
-  extraHeaderItems,
 }: WorkspaceResultPanelProps) {
   if (error) {
     return (
-      <div className="flex flex-col h-full">
-        <EnvelopeControls
-          title={title}
-          headerTitle={headerTitle}
-          showIndex={false}
-          onShowIndexChange={() => {}}
-          plain={false}
-          onPlainChange={() => {}}
-          onCopyText={() => {}}
-          onSaveMd={() => {}}
-          extraHeaderItems={extraHeaderItems}
-          showControlsToggle={false}
-        />
-        {tabs}
-        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-red-300/90 whitespace-pre-wrap p-4">
-          {error}
-        </div>
+      <div className="h-full flex items-center justify-center text-xs text-red-300/90 whitespace-pre-wrap p-4">
+        {error}
       </div>
     );
   }
 
   if (!result) {
     return (
-      <div className="flex flex-col h-full">
-        <EnvelopeControls
-          title={title}
-          headerTitle={headerTitle}
-          showIndex={false}
-          onShowIndexChange={() => {}}
-          plain={false}
-          onPlainChange={() => {}}
-          onCopyText={() => {}}
-          onSaveMd={() => {}}
-          extraHeaderItems={extraHeaderItems}
-          showControlsToggle={false}
-        />
-        {tabs}
-        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-white/40">
-          {isRunning ? 'Running query…' : 'Select a step or model to view its content.'}
-        </div>
+      <div className="h-full flex items-center justify-center text-xs text-white/40">
+        {isRunning ? 'Running query…' : 'Select a step or model to view its content.'}
       </div>
     );
   }
@@ -101,7 +67,6 @@ export function WorkspaceResultPanel({
         onSave={onSaveCuratedPage}
         tabs={tabs}
         headerTitle={headerTitle}
-        extraHeaderItems={extraHeaderItems}
       />
     );
   }
@@ -126,7 +91,6 @@ export function WorkspaceResultPanel({
         sessionName={sessionName}
         onAddToPage={onCopyToCuratedPage}
         tabs={tabs}
-        extraHeaderItems={extraHeaderItems}
       />
     </div>
   );

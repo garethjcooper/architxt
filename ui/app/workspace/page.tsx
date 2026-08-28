@@ -947,23 +947,56 @@ export default function WorkspacePage() {
     >
       <div className="flex flex-col flex-1 min-h-0 gap-3">
         {/* Controls */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <ServerBankSelectors
-            servers={servers}
-            banks={banks}
-            selectedServerId={selectedServerId}
-            selectedBankId={selectedBankId}
-            setSelectedServerId={setSelectedServerId}
-            setSelectedBankId={setSelectedBankId}
-            loadingBanks={loadingBanks}
-          />
-          <SessionSelector
-            sessions={workspaceSession.sessions}
-            activeSessionId={workspaceSession.activeSessionId}
-            loading={workspaceSession.sessionsLoading}
-            disabled={!serverId || !bankId}
-            onSelect={(id) => workspaceSession.setActiveSessionId(id)}
-          />
+        <div className="flex items-center gap-3 flex-wrap justify-between">
+          <div className="flex items-center gap-3 flex-wrap">
+            <ServerBankSelectors
+              servers={servers}
+              banks={banks}
+              selectedServerId={selectedServerId}
+              selectedBankId={selectedBankId}
+              setSelectedServerId={setSelectedServerId}
+              setSelectedBankId={setSelectedBankId}
+              loadingBanks={loadingBanks}
+            />
+            <SessionSelector
+              sessions={workspaceSession.sessions}
+              activeSessionId={workspaceSession.activeSessionId}
+              loading={workspaceSession.sessionsLoading}
+              disabled={!serverId || !bankId}
+              onSelect={(id) => workspaceSession.setActiveSessionId(id)}
+            />
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {confirmSessionDelete ? (
+              <button
+                type="button"
+                onClick={() => void handleDeleteSession()}
+                disabled={sessionActionLoading || activeSession?.id == null}
+                className="h-7 px-2 rounded text-[11px] font-medium bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                {sessionActionLoading ? '...' : 'Confirm'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmSessionDelete(true)}
+                disabled={activeSession?.id == null}
+                className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+                title="Delete selected session"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleCreateSession()}
+              disabled={sessionActionLoading || !serverId || !bankId}
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+              title="Add session"
+            >
+              {sessionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
         {/* Main two-column workbench */}
@@ -1065,7 +1098,6 @@ export default function WorkspacePage() {
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
               onCopyToCuratedPage={handleCopyToCuratedPage}
-              extraHeaderItems={sessionHeaderActions}
               tabs={
                 <CuratedPageTabs
                   tabs={tabs}
