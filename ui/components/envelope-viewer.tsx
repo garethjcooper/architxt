@@ -32,6 +32,8 @@ export interface EnvelopeViewerProps {
   className?: string;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
+  /** Optional extra items rendered in the header row before the Controls toggle. */
+  extraHeaderItems?: React.ReactNode;
   /** Whether the left-hand section index sidebar is shown. */
   showIndex?: boolean;
   /** Whether the floating data-controls panel is available. */
@@ -57,6 +59,7 @@ export function EnvelopeViewer({
   addToPageLabel,
   tabs,
   headerTitle,
+  extraHeaderItems,
 }: EnvelopeViewerProps) {
   const markdown = useMemo(() => buildEnvelopeMarkdown(envelope ?? null), [envelope]);
   const [showIndexState, setShowIndexState] = useState(showIndex);
@@ -220,9 +223,7 @@ export function EnvelopeViewer({
           onPlainChange={setPlain}
           onCopyText={handleCopy}
           onSaveMd={handleSave}
-          structuredItems={structuredItems}
-          onCopyStructured={onCopy ? handleCopyStructured : undefined}
-          onAddStructured={onAddToPage ? handleAddStructured : undefined}
+          extraHeaderItems={extraHeaderItems}
         />
       )}
       {tabs}

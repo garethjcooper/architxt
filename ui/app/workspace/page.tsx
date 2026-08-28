@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
@@ -91,6 +92,82 @@ export default function WorkspacePage() {
 
   const workspaceSession = useWorkspaceSession({ serverId, bankId });
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(workspaceSession.activeSession);
+  const [sessionActionLoading, setSessionActionLoading] = useState(false);
+  const [confirmSessionDelete, setConfirmSessionDelete] = useState(false);
+
+  const handleCreateSession = useCallback(async () => {
+    if (!serverId || !bankId) return;
+    setSessionActionLoading(true);
+    try {
+      await researchApi.createSession({
+        server_id: serverId,
+        bank_id: bankId,
+        viewpoint_ids: [],
+        title: 'Workspace session',
+      });
+      await workspaceSession.refresh();
+      toast.success('Session created');
+    } catch (err: unknown) {
+      logger.error('Failed to create session', err);
+      toast.error(`Failed to create session: ${String(err instanceof Error ? err.message : String(err))}`);
+    } finally {
+      setSessionActionLoading(false);
+    }
+  }, [serverId, bankId, workspaceSession]);
+
+  const handleDeleteSession = useCallback(async () => {
+    const id = activeSession?.id;
+    if (id == null) return;
+    setSessionActionLoading(true);
+    try {
+      await researchApi.deleteSession(id);
+      await workspaceSession.refresh();
+      toast.success('Session deleted');
+    } catch (err: unknown) {
+      logger.error('Failed to delete session', err);
+      toast.error(`Failed to delete session: ${String(err instanceof Error ? err.message : String(err))}`);
+    } finally {
+      setSessionActionLoading(false);
+      setConfirmSessionDelete(false);
+    }
+  }, [activeSession, workspaceSession]);
+
+  const sessionHeaderActions = useMemo(
+    () => (
+      <div className="flex items-center gap-1">
+        {confirmSessionDelete ? (
+          <button
+            type="button"
+            onClick={() => void handleDeleteSession()}
+            disabled={sessionActionLoading || activeSession?.id == null}
+            className="h-6 px-2 rounded text-[11px] font-medium bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50"
+          >
+            {sessionActionLoading ? '...' : 'Confirm'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmSessionDelete(true)}
+            disabled={activeSession?.id == null}
+            className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+            title="Delete selected session"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => void handleCreateSession()}
+          disabled={sessionActionLoading || !serverId || !bankId}
+          className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+          title="Add session"
+        >
+          {sessionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+        </button>
+      </div>
+    ),
+    [confirmSessionDelete, sessionActionLoading, activeSession, serverId, bankId, handleCreateSession, handleDeleteSession]
+  );
 
   const activeCuratedPage = useMemo(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
@@ -886,32 +963,6 @@ export default function WorkspacePage() {
             loading={workspaceSession.sessionsLoading}
             disabled={!serverId || !bankId}
             onSelect={(id) => workspaceSession.setActiveSessionId(id)}
-            onCreate={async () => {
-              if (!serverId || !bankId) return;
-              try {
-                await researchApi.createSession({
-                  server_id: serverId,
-                  bank_id: bankId,
-                  viewpoint_ids: [],
-                  title: 'Workspace session',
-                });
-                await workspaceSession.refresh();
-                toast.success('Session created');
-              } catch (err: unknown) {
-                logger.error('Failed to create session', err);
-                toast.error(`Failed to create session: ${String(err instanceof Error ? err.message : String(err))}`);
-              }
-            }}
-            onDelete={async (id) => {
-              try {
-                await researchApi.deleteSession(id);
-                await workspaceSession.refresh();
-                toast.success('Session deleted');
-              } catch (err: unknown) {
-                logger.error('Failed to delete session', err);
-                toast.error(`Failed to delete session: ${String(err instanceof Error ? err.message : String(err))}`);
-              }
-            }}
           />
         </div>
 
@@ -1014,6 +1065,7 @@ export default function WorkspacePage() {
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
               onCopyToCuratedPage={handleCopyToCuratedPage}
+              extraHeaderItems={sessionHeaderActions}
               tabs={
                 <CuratedPageTabs
                   tabs={tabs}
