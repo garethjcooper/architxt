@@ -28,6 +28,7 @@ import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
 import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
+import { parseJsonString } from '../prompts/graph-parser.js';
 import { loadEntityCatalog } from '../prompts/entity-catalog.js';
 import { parseSectionDirectives } from '../prompts/section-directives.js';
 
@@ -1146,7 +1147,11 @@ router.get('/mental-models/content', async (req, res) => {
         parsedContent = JSON.parse(rawContent);
       } catch (err) {
         parseError = err.message;
-        parsedContent = null;
+        // Some stored mental-model content is the valid JSON envelope followed
+        // by extra LLM text (e.g. trailing prose after the closing brace). Fall
+        // back to the loose JSON extractor that pulls the first {...} or [...]
+        // payload and ignores surrounding/markdown content.
+        parsedContent = parseJsonString(rawContent);
       }
     } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
       parsedContent = rawContent;
