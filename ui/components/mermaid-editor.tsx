@@ -220,7 +220,9 @@ function PreviewPane({
 export function MermaidEditor({ content, onChange, onErrorChange, className, name, type }: MermaidEditorProps) {
   const [fitToPage, setFitToPage] = useState(true);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [sourceWidth, setSourceWidth] = useState(35);
   const lastValueRef = useRef(content);
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     lastValueRef.current = content;
@@ -239,9 +241,32 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
     [],
   );
 
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const container = (e.currentTarget as HTMLElement).parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((rect.right - moveEvent.clientX) / rect.width) * 100));
+      setSourceWidth(pct);
+    };
+
+    const onUp = () => {
+      draggingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
   return (
     <div className={cn('flex flex-col h-full gap-3', className)}>
-      <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
         <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>Preview</span>
@@ -259,7 +284,17 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
             />
           </div>
         </div>
-        <div className="basis-[35%] min-w-[16rem] max-w-[45%] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+        <div
+          onMouseDown={startResize}
+          className="w-4 shrink-0 cursor-col-resize flex items-center justify-center group"
+          title="Drag to resize panels"
+        >
+          <div className="w-px h-16 bg-white/10 group-hover:bg-white/30 group-active:bg-emerald-400/60 rounded-full" />
+        </div>
+        <div
+          className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+          style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
+        >
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>Diagram source</span>
           </div>
