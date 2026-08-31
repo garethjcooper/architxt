@@ -149,12 +149,22 @@ function PreviewPane({
       }
       try {
         const id = `mermaid-editor-${Math.random().toString(36).slice(2, 11)}`;
-        const errorContainer = document.createElement('div');
-        const { svg: rendered } = await mermaid.render(id, source, errorContainer);
+        const { svg: rendered } = await mermaid.render(id, source);
         if (!cancelled) {
-          setSvg(rendered);
-          setError(null);
-          onRender?.(null);
+          // Mermaid returns an error diagram SVG for some malformed input; detect
+          // by its common error title element and treat as a parse error instead.
+          const isErrorSvg = rendered.includes('id="error-') || rendered.includes('Syntax error') || rendered.includes('mermaid version');
+          if (isErrorSvg) {
+            const messageMatch = rendered.match(/error-text[^>]*>([^<]+)</);
+            const message = messageMatch ? messageMatch[1].trim() : 'Diagram syntax error';
+            setSvg(null);
+            setError(message);
+            onRender?.(message);
+          } else {
+            setSvg(rendered);
+            setError(null);
+            onRender?.(null);
+          }
         }
       } catch (err) {
         if (!cancelled) {
