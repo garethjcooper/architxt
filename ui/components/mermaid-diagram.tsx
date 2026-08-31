@@ -24,6 +24,7 @@ function initializeMermaid() {
     theme: 'dark',
     securityLevel: 'strict',
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    suppressErrorRendering: true,
   });
 }
 
@@ -52,16 +53,8 @@ export function MermaidDiagram({ content, className = '', name, type }: MermaidD
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`;
         const { svg: rendered } = await mermaid.render(id, source);
         if (!cancelled) {
-          const isErrorSvg = rendered.includes('id="error-') || rendered.includes('Syntax error') || rendered.includes('mermaid version');
-          if (isErrorSvg) {
-            const messageMatch = rendered.match(/error-text[^\u003e]*\u003e([^\u003c]+)\u003c/);
-            const message = messageMatch ? messageMatch[1].trim() : 'Diagram syntax error';
-            setSvg(null);
-            setError(message);
-          } else {
-            setSvg(rendered);
-            setError(null);
-          }
+          setSvg(rendered);
+          setError(null);
         }
       } catch (err) {
         if (!cancelled) {
