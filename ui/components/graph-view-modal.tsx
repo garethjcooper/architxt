@@ -25,7 +25,6 @@ export interface GraphViewModalProps {
   title?: string;
 }
 
-type Direction = 'TB' | 'LR' | 'BT' | 'RL';
 type Renderer = 'dagre' | 'elk';
 
 const tKeyword = Tag.define();
@@ -127,15 +126,20 @@ const mermaidTheme = EditorView.theme({
 
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
+  const [jsonHeight, setJsonHeight] = useState(30);
   const [fitToPage, setFitToPage] = useState(true);
   const [manualSource, setManualSource] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const draggingRef = useRef(false);
+  const rightColumnRef = useRef<HTMLDivElement | null>(null);
+  const colDraggingRef = useRef(false);
+  const jsonDraggingRef = useRef(false);
 
   const generatedSource = useMemo(() => {
     if (!graph.nodes.length && !graph.edges.length) return '';
     return graphToMermaid(graph, { showEdgeLabels: true });
   }, [graph]);
+
+  const graphJson = useMemo(() => JSON.stringify(graph, null, 2), [graph]);
 
   // Reset manual edits whenever the graph changes so we don't drift.
   useEffect(() => {
@@ -150,21 +154,44 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     [],
   );
 
-  const startResize = useCallback((e: React.MouseEvent) => {
-    const container = (e.currentTarget as HTMLElement).parentElement;
+  const startColResize = useCallback((e: React.MouseEvent) => {
+    const container = rightColumnRef.current?.parentElement;
     if (!container) return;
     e.preventDefault();
-    draggingRef.current = true;
+    colDraggingRef.current = true;
 
     const onMove = (moveEvent: MouseEvent) => {
-      if (!draggingRef.current) return;
+      if (!colDraggingRef.current) return;
       const rect = container.getBoundingClientRect();
       const pct = Math.min(80, Math.max(20, ((rect.right - moveEvent.clientX) / rect.width) * 100));
       setSourceWidth(pct);
     };
 
     const onUp = () => {
-      draggingRef.current = false;
+      colDraggingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
+  const startJsonResize = useCallback((e: React.MouseEvent) => {
+    const container = rightColumnRef.current;
+    if (!container) return;
+    e.preventDefault();
+    jsonDraggingRef.current = true;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      if (!jsonDraggingRef.current) return;
+      const rect = container.getBoundingClientRect();
+      const pct = Math.min(70, Math.max(10, ((rect.bottom - moveEvent.clientY) / rect.height) * 100));
+      setJsonHeight(pct);
+    };
+
+    const onUp = () => {
+      jsonDraggingRef.current = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -217,30 +244,45 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
                 />
               </div>
             </div>
-            <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />
+            <ResizeHandle direction="vertical" onMouseDown={startColResize} title="Drag to resize panels" />
             <div
+              ref={rightColumnRef}
               className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
               style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
-              <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
-                <span>Mermaid source</span>
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                  <span>Mermaid source</span>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <CodeMirror
+                    value={source}
+                    onChange={(v) => setManualSource(v)}
+                    extensions={extensions}
+                    theme="none"
+                    height="100%"
+                    className="h-full"
+                    basicSetup={{
+                      lineNumbers: false,
+                      foldGutter: false,
+                      highlightActiveLineGutter: false,
+                      highlightActiveLine: false,
+                      closeBrackets: false,
+                    }}
+                  />
+                </div>
               </div>
-              <div className="flex-1 min-h-0">
-                <CodeMirror
-                  value={source}
-                  onChange={(v) => setManualSource(v)}
-                  extensions={extensions}
-                  theme="none"
-                  height="100%"
-                  className="h-full"
-                  basicSetup={{
-                    lineNumbers: false,
-                    foldGutter: false,
-                    highlightActiveLineGutter: false,
-                    highlightActiveLine: false,
-                    closeBrackets: false,
-                  }}
-                />
+              <ResizeHandle direction="horizontal" onMouseDown={startJsonResize} title="Drag to resize JSON panel" />
+              <div
+                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+                style={{ flexBasis: `${jsonHeight}%`, minWidth: '16rem', maxWidth: '80%' }}
+              >
+                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                  <span>Graph JSON</span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
+                  <pre className="text-[11px] leading-relaxed font-mono text-white/80 whitespace-pre-wrap">{graphJson}</pre>
+                </div>
               </div>
             </div>
           </div>
