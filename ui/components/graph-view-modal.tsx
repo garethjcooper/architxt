@@ -224,22 +224,19 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     e.preventDefault();
     tablesDraggingRef.current = true;
     const startY = e.clientY;
-    const totalFlex = sourceFlex + tablesFlex + jsonFlex;
-    const startTablesRatio = tablesFlex / totalFlex;
+    const totalFlex = sourceFlex + tablesFlex;
 
     const onMove = (moveEvent: MouseEvent) => {
       if (!tablesDraggingRef.current) return;
       const rect = container.getBoundingClientRect();
+      // Mouse down = bigger tables panel, mouse up = smaller tables panel.
       const deltaY = moveEvent.clientY - startY;
       const deltaRatio = deltaY / rect.height;
-      const newTablesRatio = Math.min(0.6, Math.max(0.08, startTablesRatio + deltaRatio));
-      const newTablesFlex = Math.round(newTablesRatio * totalFlex);
-      const deltaFlex = newTablesFlex - tablesFlex;
-      const newSourceFlex = Math.max(1, sourceFlex - deltaFlex);
-      const actualDelta = sourceFlex - newSourceFlex;
+      const clamped = Math.min(0.75, Math.max(0.05, tablesFlex / totalFlex + deltaRatio));
+      const newTablesFlex = Math.round(clamped * totalFlex);
+      const newSourceFlex = Math.max(1, totalFlex - newTablesFlex);
       setTablesFlex(newTablesFlex);
       setSourceFlex(newSourceFlex);
-      setJsonFlex(Math.max(1, jsonFlex + (deltaFlex - actualDelta)));
     };
 
     const onUp = () => {
@@ -250,7 +247,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [sourceFlex, tablesFlex, jsonFlex]);
+  }, [sourceFlex, tablesFlex]);
 
   const startJsonResize = useCallback((e: React.MouseEvent) => {
     const container = rightColumnRef.current;
@@ -258,22 +255,19 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     e.preventDefault();
     jsonDraggingRef.current = true;
     const startY = e.clientY;
-    const totalFlex = sourceFlex + tablesFlex + jsonFlex;
-    const startJsonRatio = jsonFlex / totalFlex;
+    const totalFlex = tablesFlex + jsonFlex;
 
     const onMove = (moveEvent: MouseEvent) => {
       if (!jsonDraggingRef.current) return;
       const rect = container.getBoundingClientRect();
+      // Mouse down = bigger JSON panel, mouse up = smaller JSON panel.
       const deltaY = moveEvent.clientY - startY;
       const deltaRatio = deltaY / rect.height;
-      const newJsonRatio = Math.min(0.6, Math.max(0.08, startJsonRatio + deltaRatio));
-      const newJsonFlex = Math.round(newJsonRatio * totalFlex);
-      const deltaFlex = newJsonFlex - jsonFlex;
-      const newSourceFlex = Math.max(1, sourceFlex - deltaFlex);
-      const actualDelta = sourceFlex - newSourceFlex;
+      const clamped = Math.min(0.85, Math.max(0.05, jsonFlex / totalFlex + deltaRatio));
+      const newJsonFlex = Math.round(clamped * totalFlex);
+      const newTablesFlex = Math.max(1, totalFlex - newJsonFlex);
       setJsonFlex(newJsonFlex);
-      setSourceFlex(newSourceFlex);
-      setTablesFlex(Math.max(1, tablesFlex + (deltaFlex - actualDelta)));
+      setTablesFlex(newTablesFlex);
     };
 
     const onUp = () => {
@@ -284,7 +278,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [sourceFlex, tablesFlex, jsonFlex]);
+  }, [tablesFlex, jsonFlex]);
 
   const effectiveRenderer = useMemo(() => {
     const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
