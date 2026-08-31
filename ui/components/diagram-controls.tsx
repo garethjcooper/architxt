@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 export interface DiagramControlsProps {
-  /** The container whose first SVG child will be panned/zoomed. */
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  /** The element that contains the SVG and will be panned/zoomed. */
+  targetRef: React.RefObject<HTMLElement | null>;
   /** When true, CSS auto-fits the SVG and Panzoom is disabled. */
   fitToPage?: boolean;
   /** Called when the user toggles fit-to-page from the control box. */
@@ -18,51 +18,60 @@ export interface DiagramControlsProps {
   className?: string;
 }
 
-export function DiagramControls({ containerRef, fitToPage = true, onFitToPageChange, className }: DiagramControlsProps) {
+export function DiagramControls({
+  targetRef,
+  fitToPage = true,
+  onFitToPageChange,
+  className,
+}: DiagramControlsProps) {
   const panzoomRef = useRef<PanzoomObject | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
   const [panning, setPanning] = useState(false);
   const [scale, setScale] = useState(1);
   const [isReady, setIsReady] = useState(false);
 
+  const resetTargetStyles = useCallback((target: HTMLElement) => {
+    target.style.transform = '';
+    target.style.transformOrigin = '';
+    target.style.cursor = '';
+  }, []);
+
   const init = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const svg = container.querySelector('svg');
+    const target = targetRef.current;
+    if (!target) return;
+
+    const svg = target.querySelector('svg');
     if (!svg) {
       setIsReady(false);
       return;
     }
+
+    // Clean up previous instance and listeners before creating a new one.
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     if (panzoomRef.current?.destroy) {
       panzoomRef.current.destroy();
+      panzoomRef.current = null;
     }
-    // Ensure the SVG can be transformed by Panzoom; it expects display:block
-    // and a wrapper that reports dimensions.
-    const svgEl = svg as unknown as HTMLElement;
-    svgEl.style.display = 'block';
-    svgEl.style.width = '100%';
-    svgEl.style.height = '100%';
+    resetTargetStyles(target);
 
     if (fitToPage) {
-      // Fit-to-page mode: CSS handles sizing. Clear any prior Panzoom transform.
-      svgEl.style.transform = 'none';
-      panzoomRef.current = null;
+      // Fit-to-page: CSS handles sizing, no Panzoom transforms.
       setIsReady(true);
       setScale(1);
-      return () => {
-        svgEl.style.transform = '';
-      };
+      return;
     }
 
-    const panzoom = Panzoom(svgEl, {
+    const panzoom = Panzoom(target, {
       maxScale: 5,
       minScale: 0.2,
-      contain: undefined,
       cursor: 'grab',
       startScale: 1,
       startX: 0,
       startY: 0,
       step: 0.1,
       panOnlyWhenZoomed: false,
+      disablePan: !panning,
     });
 
     panzoomRef.current = panzoom;
@@ -73,38 +82,48 @@ export function DiagramControls({ containerRef, fitToPage = true, onFitToPageCha
       const detail = (event as CustomEvent).detail;
       if (detail?.scale != null) setScale(detail.scale);
     };
-    svg.parentElement?.addEventListener('panzoomzoom', updateScale);
-    svg.parentElement?.addEventListener('panzoompan', updateScale);
+    target.addEventListener('panzoomzoom', updateScale);
+    target.addEventListener('panzoompan', updateScale);
 
-    return () => {
-      svg.parentElement?.removeEventListener('panzoomzoom', updateScale);
-      svg.parentElement?.removeEventListener('panzoompan', updateScale);
+    const cleanup = () => {
+      target.removeEventListener('panzoomzoom', updateScale);
+      target.removeEventListener('panzoompan', updateScale);
       panzoom.destroy();
     };
-  }, [containerRef]);
+    cleanupRef.current = cleanup;
+    return cleanup;
+  }, [fitToPage, panning, resetTargetStyles, targetRef]);
 
-  // Re-init whenever the container gains/loses an SVG (e.g. after render)
-  // or when fit-to-page changes so Panzoom bounds/cursor update cleanly.
+  // Initialize Panzoom when the target or mode changes, and re-initialize
+  // whenever Mermaid replaces the SVG inside the target.
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const target = targetRef.current;
+    if (!target) return;
 
     init();
 
     const observer = new MutationObserver(() => {
-      const svg = container.querySelector('svg');
-      if (svg && !panzoomRef.current) {
+      const svg = target.querySelector('svg');
+      if (svg) {
         init();
-      } else if (!svg && panzoomRef.current) {
+      } else if (panzoomRef.current) {
         panzoomRef.current.destroy();
         panzoomRef.current = null;
         setIsReady(false);
       }
     });
 
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [containerRef, init, fitToPage]);
+    observer.observe(target, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      if (panzoomRef.current?.destroy) {
+        panzoomRef.current.destroy();
+        panzoomRef.current = null;
+      }
+    };
+  }, [fitToPage, init, targetRef]);
 
   const handleZoomIn = useCallback(() => {
     if (fitToPage) return;
@@ -143,7 +162,7 @@ export function DiagramControls({ containerRef, fitToPage = true, onFitToPageCha
         variant="ghost"
         size="icon-xs"
         onClick={handleZoomIn}
-        disabled={!isReady}
+        disabled={!isReady || fitToPage}
         title="Zoom in"
       >
         <ZoomIn className="h-3 w-3" />
@@ -153,7 +172,7 @@ export function DiagramControls({ containerRef, fitToPage = true, onFitToPageCha
         variant="ghost"
         size="icon-xs"
         onClick={handleZoomOut}
-        disabled={!isReady}
+        disabled={!isReady || fitToPage}
         title="Zoom out"
       >
         <ZoomOut className="h-3 w-3" />
@@ -163,8 +182,6 @@ export function DiagramControls({ containerRef, fitToPage = true, onFitToPageCha
         variant={fitToPage ? 'secondary' : 'ghost'}
         size="icon-xs"
         onClick={() => {
-          // When leaving fit-to-page, reset scale display and panning state so the
-          // next Panzoom instance starts from a clean identity transform.
           if (fitToPage) {
             setScale(1);
             setPanning(false);
@@ -172,7 +189,7 @@ export function DiagramControls({ containerRef, fitToPage = true, onFitToPageCha
           onFitToPageChange?.(!fitToPage);
         }}
         disabled={!isReady}
-        title={fitToPage ? 'Fit to page (CSS)' : 'Actual size'}
+        title={fitToPage ? 'Fit to page' : 'Actual size'}
       >
         <Maximize className="h-3 w-3" />
       </Button>
@@ -191,7 +208,7 @@ export function DiagramControls({ containerRef, fitToPage = true, onFitToPageCha
         variant="ghost"
         size="icon-xs"
         onClick={handleReset}
-        disabled={!isReady}
+        disabled={!isReady || fitToPage}
         title="Reset zoom"
       >
         <GripHorizontal className="h-3 w-3" />
