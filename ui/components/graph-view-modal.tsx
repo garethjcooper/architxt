@@ -126,12 +126,14 @@ const mermaidTheme = EditorView.theme({
 
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
-  const [jsonHeight, setJsonHeight] = useState(30);
+  const [tablesHeight, setTablesHeight] = useState(35);
+  const [jsonHeight, setJsonHeight] = useState(35);
   const [fitToPage, setFitToPage] = useState(false);
   const [manualSource, setManualSource] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const colDraggingRef = useRef(false);
+  const tablesDraggingRef = useRef(false);
   const jsonDraggingRef = useRef(false);
 
   const generatedSource = useMemo(() => {
@@ -140,6 +142,43 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
   }, [graph]);
 
   const graphJson = useMemo(() => JSON.stringify(graph, null, 2), [graph]);
+
+  const markdownTables = useMemo(() => {
+    const escapeCell = (v: unknown) => {
+      const str = v === null || v === undefined ? '' : String(v);
+      return str.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+    };
+
+    const nodeHeader = ['id', 'type', 'label', 'name'];
+    const nodeRows = graph.nodes.map((n) =>
+      nodeHeader.map((key) => escapeCell(n[key as keyof GraphNode])).join(' | ')
+    );
+    const nodeTable = [
+      `| ${nodeHeader.join(' | ')} |`,
+      `| ${nodeHeader.map(() => '---').join(' | ')} |`,
+      ...nodeRows.map((row) => `| ${row} |`),
+    ].join('\n');
+
+    const edgeHeader = ['from', 'to', 'type', 'label'];
+    const edgeRows = graph.edges.map((e) => {
+      const src = graph.nodes.find((n) => n.id === e.from);
+      const tgt = graph.nodes.find((n) => n.id === e.to);
+      return edgeHeader
+        .map((key) => {
+          if (key === 'from') return escapeCell(src?.id ?? e.from);
+          if (key === 'to') return escapeCell(tgt?.id ?? e.to);
+          return escapeCell(e[key as keyof GraphEdge]);
+        })
+        .join(' | ');
+    });
+    const edgeTable = [
+      `| ${edgeHeader.join(' | ')} |`,
+      `| ${edgeHeader.map(() => '---').join(' | ')} |`,
+      ...edgeRows.map((row) => `| ${row} |`),
+    ].join('\n');
+
+    return `### Nodes (${graph.nodes.length})\n\n${nodeTable}\n\n### Edges (${graph.edges.length})\n\n${edgeTable}`;
+  }, [graph]);
 
   // Reset manual edits whenever the graph changes so we don't drift.
   useEffect(() => {
@@ -169,6 +208,32 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
     const onUp = () => {
       colDraggingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
+  const startTablesResize = useCallback((e: React.MouseEvent) => {
+    const container = rightColumnRef.current;
+    if (!container) return;
+    e.preventDefault();
+    tablesDraggingRef.current = true;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      if (!tablesDraggingRef.current) return;
+      const rect = container.getBoundingClientRect();
+      const mermaidBox = container.firstElementChild?.getBoundingClientRect();
+      const mermaidBottom = mermaidBox?.bottom ?? rect.top;
+      const available = rect.height - (mermaidBottom - rect.top);
+      const pct = Math.min(70, Math.max(10, ((mermaidBottom - moveEvent.clientY) / available) * 100));
+      setTablesHeight(pct);
+    };
+
+    const onUp = () => {
+      tablesDraggingRef.current = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -270,6 +335,18 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
                       closeBrackets: false,
                     }}
                   />
+                </div>
+              </div>
+              <ResizeHandle direction="horizontal" onMouseDown={startTablesResize} title="Drag to resize tables panel" />
+              <div
+                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+                style={{ flexBasis: `${tablesHeight}%` }}
+              >
+                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                  <span>Node/edge tables</span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
+                  <pre className="text-[11px] leading-relaxed font-mono text-white/80 whitespace-pre-wrap">{markdownTables}</pre>
                 </div>
               </div>
               <ResizeHandle direction="horizontal" onMouseDown={startJsonResize} title="Drag to resize JSON panel" />
