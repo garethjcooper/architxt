@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 import { graphToMermaid } from '@/lib/graph/mermaid-flowchart';
+import { escapeMarkdownCell } from '@/lib/envelope-markdown';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
@@ -156,14 +157,9 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
   const graphJson = useMemo(() => JSON.stringify(graph, null, 2), [graph]);
 
   const markdownTables = useMemo(() => {
-    const escapeCell = (v: unknown) => {
-      const str = v === null || v === undefined ? '' : String(v);
-      return str.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
-    };
-
     const nodeHeader = ['id', 'type', 'label', 'name'];
     const nodeRows = graph.nodes.map((n) =>
-      nodeHeader.map((key) => escapeCell(n[key as keyof GraphNode])).join(' | ')
+      nodeHeader.map((key) => escapeMarkdownCell(n[key as keyof GraphNode])).join(' | ')
     );
     const nodeTable = [
       `| ${nodeHeader.join(' | ')} |`,
@@ -171,15 +167,16 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
       ...nodeRows.map((row) => `| ${row} |`),
     ].join('\n');
 
-    const edgeHeader = ['from', 'to', 'type', 'label'];
+    const edgeHeader = ['from', 'to', 'type', 'label', 'detail', 'properties'];
     const edgeRows = graph.edges.map((e) => {
       const src = graph.nodes.find((n) => n.id === e.from);
       const tgt = graph.nodes.find((n) => n.id === e.to);
       return edgeHeader
         .map((key) => {
-          if (key === 'from') return escapeCell(src?.id ?? e.from);
-          if (key === 'to') return escapeCell(tgt?.id ?? e.to);
-          return escapeCell(e[key as keyof GraphEdge]);
+          if (key === 'from') return escapeMarkdownCell(src?.id ?? e.from);
+          if (key === 'to') return escapeMarkdownCell(tgt?.id ?? e.to);
+          if (key === 'properties') return escapeMarkdownCell(e.properties ? JSON.stringify(e.properties) : '');
+          return escapeMarkdownCell(e[key as keyof GraphEdge]);
         })
         .join(' | ');
     });
@@ -309,10 +306,9 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
     const events: EnvelopeCopyEvent[] = [];
     if (includeDiagram && source.trim()) {
       const diagramName = title || graph.name || 'Graph diagram';
-      // Preserve any renderer directive from the source; diagram type is always mermaid/flowchart.
-      const type = source.trim().match(/^\s*classDiagram/i)
+      const type = source.trim().match(/^\s*classDiagram\b/i)
         ? 'classDiagram'
-        : source.trim().match(/^\s*stateDiagram/i)
+        : source.trim().match(/^\s*stateDiagram\b/i)
         ? 'stateDiagram'
         : 'flowchart';
       events.push({
@@ -322,7 +318,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
       });
     }
     if (includeTables && (graph.nodes.length > 0 || graph.edges.length > 0)) {
-      const tableRows = graph.nodes.map((n) => ({
+      const nodeRows = graph.nodes.map((n) => ({
         id: n.id,
         type: n.type || '',
         label: n.label || '',
@@ -336,14 +332,16 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
           to: tgt?.id ?? e.to,
           type: e.type || '',
           label: e.label || '',
+          detail: e.detail || '',
+          properties: e.properties || null,
         };
       });
       const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
-      if (tableRows.length > 0) {
-        tables.push({ name: `${title || graph.name || 'Graph'} nodes`, columns: ['id', 'type', 'label', 'name'], rows: tableRows });
+      if (nodeRows.length > 0) {
+        tables.push({ name: `${title || graph.name || 'Graph'} nodes`, columns: ['id', 'type', 'label', 'name'], rows: nodeRows });
       }
       if (edgeRows.length > 0) {
-        tables.push({ name: `${title || graph.name || 'Graph'} edges`, columns: ['from', 'to', 'type', 'label'], rows: edgeRows });
+        tables.push({ name: `${title || graph.name || 'Graph'} edges`, columns: ['from', 'to', 'type', 'label', 'detail', 'properties'], rows: edgeRows });
       }
       if (tables.length > 0) {
         events.push({
