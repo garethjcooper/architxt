@@ -15,6 +15,8 @@ export interface MermaidEditorProps {
   content: string;
   /** Called whenever the user edits the source. */
   onChange: (content: string) => void;
+  /** Called when the rendered diagram enters or leaves an error state. */
+  onErrorChange?: (error: string | null) => void;
   /** Optional CSS class for the outer container. */
   className?: string;
   /** Optional diagram name shown as a heading above the render. */
@@ -127,6 +129,7 @@ function PreviewPane({
   fitToPage,
   onFitToPageChange,
   onRender,
+  onErrorChange,
 }: {
   content: string;
   name?: string;
@@ -134,10 +137,19 @@ function PreviewPane({
   fitToPage: boolean;
   onFitToPageChange: (fit: boolean) => void;
   onRender?: (error: string | null) => void;
+  onErrorChange?: (error: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleRender = useCallback(
+    (error: string | null) => {
+      onRender?.(error);
+      onErrorChange?.(error);
+    },
+    [onErrorChange, onRender],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +158,7 @@ function PreviewPane({
       if (!source) {
         setSvg(null);
         setError('No diagram source provided.');
-        onRender?.('No diagram source provided.');
+        handleRender('No diagram source provided.');
         return;
       }
       try {
@@ -155,20 +167,20 @@ function PreviewPane({
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
-          onRender?.(null);
+          handleRender(null);
         }
       } catch (err) {
         if (!cancelled) {
           setSvg(null);
           const message = err instanceof Error ? err.message : String(err);
           setError(message);
-          onRender?.(message);
+          handleRender(message);
         }
       }
     };
     render();
     return () => { cancelled = true; };
-  }, [content, onRender]);
+  }, [content, handleRender]);
 
   return (
     <div className="flex flex-col h-full rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
@@ -205,7 +217,7 @@ function PreviewPane({
   );
 }
 
-export function MermaidEditor({ content, onChange, className, name, type }: MermaidEditorProps) {
+export function MermaidEditor({ content, onChange, onErrorChange, className, name, type }: MermaidEditorProps) {
   const [fitToPage, setFitToPage] = useState(true);
   const [lastError, setLastError] = useState<string | null>(null);
   const lastValueRef = useRef(content);
@@ -243,6 +255,7 @@ export function MermaidEditor({ content, onChange, className, name, type }: Merm
               fitToPage={fitToPage}
               onFitToPageChange={setFitToPage}
               onRender={setLastError}
+              onErrorChange={onErrorChange}
             />
           </div>
         </div>
