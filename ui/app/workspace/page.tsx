@@ -1171,7 +1171,7 @@ export default function WorkspacePage() {
               onSaveCuratedPage={handleSaveCuratedPage}
               onCuratedPageDirtyChange={setActiveCuratedPageDirty}
               saveCuratedPageTrigger={saveCuratedPageTrigger}
-              onCuratedPageChange={({ deletedBlockIds, deletedStructuredKeys, dirty }) => {
+              onCuratedPageChange={({ envelope, deletedBlockIds, deletedStructuredKeys, dirty }) => {
                 if (!activeCuratedPage) return;
                 setPendingCuratedDeletions((prev) => {
                   const hasAny = deletedBlockIds.length > 0 || deletedStructuredKeys.length > 0;
@@ -1184,9 +1184,12 @@ export default function WorkspacePage() {
                   const next = { ...prev, [activeCuratedPage.id]: { deletedBlockIds, deletedStructuredKeys } };
                   return next;
                 });
-                // onDirtyChange is already reported separately, but keep this guard in case
-                // the editor ever emits dirty without deletions.
-                if (!dirty) {
+                if (dirty) {
+                  setPendingCuratedEdits((prev) => ({
+                    ...prev,
+                    [activeCuratedPage.id]: envelope,
+                  }));
+                } else {
                   setPendingCuratedEdits((prev) => {
                     if (!prev[activeCuratedPage.id]) return prev;
                     const next = { ...prev };
