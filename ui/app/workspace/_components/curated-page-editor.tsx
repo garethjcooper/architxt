@@ -413,7 +413,8 @@ export function CuratedPageEditor({
             const isDiagram = parsed?.kind === 'diagram';
             const isGraph = parsed?.kind === 'graph';
             const isTable = parsed?.kind === 'table';
-            const canFocus = isText || isDiagram || isGraph || isTable;
+            const isNarrative = b.type === 'heading' && !b.synthetic;
+            const canFocus = isText || isNarrative || isDiagram || isGraph || isTable;
             return (
               <div className="flex items-center gap-0.5">
                 {canFocus && !isDeleted && (
@@ -425,14 +426,14 @@ export function CuratedPageEditor({
                         openGraphFocus(b);
                       } else if (isTable) {
                         openTableFocus(b);
-                      } else if (isText) {
+                      } else if (isNarrative || isText) {
                         openNarrativeFocus(b);
                       } else {
                         openDiagramFocus(b);
                       }
                     }}
                     className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                    title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : isText ? 'Focus narrative' : 'Focus diagram'}
+                    title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : isNarrative || isText ? 'Focus narrative' : 'Focus diagram'}
                   >
                     <Eye className="h-3 w-3" />
                   </button>
