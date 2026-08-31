@@ -148,6 +148,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const hResizeStartRef = useRef({ y: 0, ratios: ratios, height: 0 });
 
+  const defaultDiagramName = title || graph.name || 'Graph diagram';
+  const defaultNodeTableName = `${title || graph.name || 'Graph'} nodes`;
+  const defaultEdgeTableName = `${title || graph.name || 'Graph'} edges`;
+
+  const [diagramName, setDiagramName] = useState(defaultDiagramName);
+  const [nodeTableName, setNodeTableName] = useState(defaultNodeTableName);
+  const [edgeTableName, setEdgeTableName] = useState(defaultEdgeTableName);
+
   const generatedSource = useMemo(() => {
     if (!graph.nodes.length && !graph.edges.length) return '';
     return graphToMermaid(graph, { showEdgeLabels: true });
@@ -191,11 +199,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
     return `### Nodes (${graph.nodes.length})\n\n${nodeTable}\n\n### Edges (${graph.edges.length})\n\n${edgeTable}`;
   }, [graph]);
 
-  // Reset selections whenever the graph changes so we don't drift.
+  // Reset selections and default names whenever the graph changes so we don't drift.
   useEffect(() => {
     setIncludeDiagram(false);
     setIncludeTables(false);
-  }, [graph]);
+    setDiagramName(defaultDiagramName);
+    setNodeTableName(defaultNodeTableName);
+    setEdgeTableName(defaultEdgeTableName);
+  }, [graph, defaultDiagramName, defaultNodeTableName, defaultEdgeTableName]);
 
   const source = generatedSource;
   const isEmpty = !graph.nodes.length && !graph.edges.length;
@@ -306,7 +317,6 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
   const handleApply = useCallback(() => {
     const events: EnvelopeCopyEvent[] = [];
     if (includeDiagram && source.trim()) {
-      const diagramName = title || graph.name || 'Graph diagram';
       const type = source.trim().match(/^\s*classDiagram\b/i)
         ? 'classDiagram'
         : source.trim().match(/^\s*stateDiagram\b/i)
@@ -342,10 +352,10 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
       });
       const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
       if (nodeRows.length > 0) {
-        tables.push({ name: `${title || graph.name || 'Graph'} nodes`, columns: ['id', 'type', 'label', 'name'], rows: nodeRows });
+        tables.push({ name: nodeTableName, columns: ['id', 'type', 'label', 'name'], rows: nodeRows });
       }
       if (edgeRows.length > 0) {
-        tables.push({ name: `${title || graph.name || 'Graph'} edges`, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows });
+        tables.push({ name: edgeTableName, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows });
       }
       if (tables.length > 0) {
         events.push({
@@ -357,7 +367,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
     }
     onApply?.(events);
     onOpenChange(false);
-  }, [includeDiagram, includeTables, source, graph, title, onApply, onOpenChange]);
+  }, [includeDiagram, includeTables, source, graph, diagramName, nodeTableName, edgeTableName, onApply, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -407,13 +417,24 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
               <div className="flex flex-col overflow-hidden" style={{ flex: ratios.source }}>
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Mermaid source</span>
-                  <button
-                    type="button"
-                    onClick={() => setIncludeDiagram((v) => !v)}
-                    className={toggleButtonClass(includeDiagram)}
-                  >
-                    {includeDiagram ? 'Add diagram' : 'Add to page'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {includeDiagram && (
+                      <input
+                        type="text"
+                        value={diagramName}
+                        onChange={(e) => setDiagramName(e.target.value)}
+                        className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-48"
+                        placeholder="Diagram name"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIncludeDiagram((v) => !v)}
+                      className={toggleButtonClass(includeDiagram)}
+                    >
+                      {includeDiagram ? 'Add diagram' : 'Add to page'}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-0">
                   <CodeMirror
@@ -440,13 +461,33 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Node/edge tables</span>
-                  <button
-                    type="button"
-                    onClick={() => setIncludeTables((v) => !v)}
-                    className={toggleButtonClass(includeTables)}
-                  >
-                    {includeTables ? 'Add tables' : 'Add to page'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {includeTables && (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={nodeTableName}
+                          onChange={(e) => setNodeTableName(e.target.value)}
+                          className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
+                          placeholder="Nodes name"
+                        />
+                        <input
+                          type="text"
+                          value={edgeTableName}
+                          onChange={(e) => setEdgeTableName(e.target.value)}
+                          className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
+                          placeholder="Edges name"
+                        />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIncludeTables((v) => !v)}
+                      className={toggleButtonClass(includeTables)}
+                    >
+                      {includeTables ? 'Add tables' : 'Add to page'}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
                   <Markdown className="text-[12px]">{markdownTables}</Markdown>
