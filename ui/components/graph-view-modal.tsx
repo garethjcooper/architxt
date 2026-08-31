@@ -255,13 +255,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
     if (hResizing === 'upper') {
       // Moving down grows the tables pane and shrinks the source pane.
-      const nextTables = Math.max(MIN, Math.min(1 - MIN, startRatios.tables + delta));
+      const nextTables = Math.max(MIN, Math.min(1 - MIN, startRatios.tables - delta));
       const nextSource = Math.max(MIN, 1 - nextTables - startRatios.json);
       const nextJson = Math.max(MIN, 1 - nextSource - nextTables);
       setRatios({ source: nextSource, tables: nextTables, json: nextJson });
     } else {
       // Moving down grows the JSON pane and shrinks the tables pane.
-      const nextJson = Math.max(MIN, Math.min(1 - MIN, startRatios.json + delta));
+      const nextJson = Math.max(MIN, Math.min(1 - MIN, startRatios.json - delta));
       const nextTables = Math.max(MIN, 1 - startRatios.source - nextJson);
       const nextSource = Math.max(MIN, 1 - nextTables - nextJson);
       setRatios({ source: nextSource, tables: nextTables, json: nextJson });
