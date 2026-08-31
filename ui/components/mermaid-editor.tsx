@@ -5,7 +5,6 @@ import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import { Tag, tagHighlighter } from '@lezer/highlight';
-import { Maximize2, Minimize2 } from 'lucide-react';
 import mermaid from 'mermaid';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -173,16 +172,6 @@ function PreviewPane({
 
   return (
     <div className="flex flex-col h-full rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
-      {(name || type) && (
-        <div className="px-3 py-2 border-b border-white/10 bg-emerald-900/10 flex items-center justify-between gap-2 shrink-0">
-          {name && <span className="text-sm font-medium text-emerald-300 truncate">{name}</span>}
-          {type && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/30 text-white/60 whitespace-nowrap">
-              {type}
-            </span>
-          )}
-        </div>
-      )}
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div
           ref={containerRef}
