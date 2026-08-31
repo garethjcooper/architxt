@@ -10,11 +10,15 @@ import { Button } from '@/components/ui/button';
 export interface DiagramControlsProps {
   /** The container whose first SVG child will be panned/zoomed. */
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** When true, CSS auto-fits the SVG and Panzoom is disabled. */
+  fitToPage?: boolean;
+  /** Called when the user toggles fit-to-page from the control box. */
+  onFitToPageChange?: (fit: boolean) => void;
   /** Optional className for the floating panel. */
   className?: string;
 }
 
-export function DiagramControls({ containerRef, className }: DiagramControlsProps) {
+export function DiagramControls({ containerRef, fitToPage = true, onFitToPageChange, className }: DiagramControlsProps) {
   const panzoomRef = useRef<PanzoomObject | null>(null);
   const [panning, setPanning] = useState(false);
   const [scale, setScale] = useState(1);
@@ -38,10 +42,21 @@ export function DiagramControls({ containerRef, className }: DiagramControlsProp
     svgEl.style.width = '100%';
     svgEl.style.height = '100%';
 
+    if (fitToPage) {
+      // Fit-to-page mode: CSS handles sizing. Clear any prior Panzoom transform.
+      svgEl.style.transform = 'none';
+      panzoomRef.current = null;
+      setIsReady(true);
+      setScale(1);
+      return () => {
+        svgEl.style.transform = '';
+      };
+    }
+
     const panzoom = Panzoom(svgEl, {
       maxScale: 5,
       minScale: 0.2,
-      contain: 'outside',
+      contain: undefined,
       cursor: 'grab',
       startScale: 1,
       startX: 0,
@@ -68,7 +83,8 @@ export function DiagramControls({ containerRef, className }: DiagramControlsProp
     };
   }, [containerRef]);
 
-  // Re-init whenever the container gains/loses an SVG (e.g. after render).
+  // Re-init whenever the container gains/loses an SVG (e.g. after render)
+  // or when fit-to-page changes so Panzoom bounds/cursor update cleanly.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -88,28 +104,32 @@ export function DiagramControls({ containerRef, className }: DiagramControlsProp
 
     observer.observe(container, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [containerRef, init]);
+  }, [containerRef, init, fitToPage]);
 
   const handleZoomIn = useCallback(() => {
+    if (fitToPage) return;
     panzoomRef.current?.zoomIn();
-  }, []);
+  }, [fitToPage]);
 
   const handleZoomOut = useCallback(() => {
+    if (fitToPage) return;
     panzoomRef.current?.zoomOut();
-  }, []);
+  }, [fitToPage]);
 
   const handleReset = useCallback(() => {
+    if (fitToPage) return;
     panzoomRef.current?.reset();
     setScale(1);
-  }, []);
+  }, [fitToPage]);
 
   const togglePanning = useCallback(() => {
+    if (fitToPage) return;
     const next = !panning;
     setPanning(next);
     if (panzoomRef.current?.setOptions) {
       panzoomRef.current.setOptions({ disablePan: !next });
     }
-  }, [panning]);
+  }, [fitToPage, panning]);
 
   return (
     <div
@@ -140,11 +160,29 @@ export function DiagramControls({ containerRef, className }: DiagramControlsProp
       </Button>
       <Button
         type="button"
+        variant={fitToPage ? 'secondary' : 'ghost'}
+        size="icon-xs"
+        onClick={() => {
+          // When leaving fit-to-page, reset scale display and panning state so the
+          // next Panzoom instance starts from a clean identity transform.
+          if (fitToPage) {
+            setScale(1);
+            setPanning(false);
+          }
+          onFitToPageChange?.(!fitToPage);
+        }}
+        disabled={!isReady}
+        title={fitToPage ? 'Fit to page (CSS)' : 'Actual size'}
+      >
+        <Maximize className="h-3 w-3" />
+      </Button>
+      <Button
+        type="button"
         variant={panning ? 'secondary' : 'ghost'}
         size="icon-xs"
         onClick={togglePanning}
-        disabled={!isReady}
-        title={panning ? 'Panning enabled' : 'Enable pan'}
+        disabled={!isReady || fitToPage}
+        title={panning ? 'Panning enabled' : fitToPage ? 'Pan disabled in fit mode' : 'Enable pan'}
       >
         <Move className="h-3 w-3" />
       </Button>
@@ -154,13 +192,12 @@ export function DiagramControls({ containerRef, className }: DiagramControlsProp
         size="icon-xs"
         onClick={handleReset}
         disabled={!isReady}
-        title="Fit / reset"
+        title="Reset zoom"
       >
-        <Maximize className="h-3 w-3" />
+        <GripHorizontal className="h-3 w-3" />
       </Button>
       {isReady && (
         <div className="pt-1 border-t border-white/10 flex items-center justify-center gap-1 text-[9px] text-white/50">
-          <GripHorizontal className="h-3 w-3" />
           <span>{Math.round(scale * 100)}%</span>
         </div>
       )}
