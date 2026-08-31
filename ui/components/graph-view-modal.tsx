@@ -134,12 +134,12 @@ interface PaneRatios {
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
   const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
+  const [hResizing, setHResizing] = useState<null | 'upper' | 'lower'>(null);
   const [fitToPage, setFitToPage] = useState(false);
   const [manualSource, setManualSource] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
-  const draggingRef = useRef<null | 'upper' | 'lower'>(null);
-  const dragStartRef = useRef({ y: 0, ratios: ratios, height: 0 });
+  const hResizeStartRef = useRef({ y: 0, ratios: ratios, height: 0 });
 
   const generatedSource = useMemo(() => {
     if (!graph.nodes.length && !graph.edges.length) return '';
@@ -226,62 +226,62 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     const container = rightColumnRef.current;
     if (!container) return;
     e.preventDefault();
-    draggingRef.current = 'upper';
-    dragStartRef.current = {
+    hResizeStartRef.current = {
       y: e.clientY,
       ratios: { ...ratios },
       height: container.getBoundingClientRect().height,
     };
+    setHResizing('upper');
   }, [ratios]);
 
   const startLowerResize = useCallback((e: React.MouseEvent) => {
     const container = rightColumnRef.current;
     if (!container) return;
     e.preventDefault();
-    draggingRef.current = 'lower';
-    dragStartRef.current = {
+    hResizeStartRef.current = {
       y: e.clientY,
       ratios: { ...ratios },
       height: container.getBoundingClientRect().height,
     };
+    setHResizing('lower');
   }, [ratios]);
 
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!draggingRef.current) return;
-      const { y, ratios: startRatios, height } = dragStartRef.current;
-      if (height <= 0) return;
-      const delta = (e.clientY - y) / height;
-      const MIN = 0.08;
+  const handleHResizeMove = useCallback((e: MouseEvent) => {
+    if (!hResizing) return;
+    const { y, ratios: startRatios, height } = hResizeStartRef.current;
+    if (height <= 0) return;
+    const delta = (e.clientY - y) / height;
+    const MIN = 0.08;
 
-      if (draggingRef.current === 'upper') {
-        // Moving down grows the tables pane and shrinks the source pane.
-        const nextTables = Math.max(MIN, Math.min(1 - MIN, startRatios.tables + delta));
-        const nextSource = Math.max(MIN, 1 - nextTables - startRatios.json);
-        const nextJson = Math.max(MIN, 1 - nextSource - nextTables);
-        setRatios({ source: nextSource, tables: nextTables, json: nextJson });
-      } else {
-        // Moving down grows the JSON pane and shrinks the tables pane.
-        const nextJson = Math.max(MIN, Math.min(1 - MIN, startRatios.json + delta));
-        const nextTables = Math.max(MIN, 1 - startRatios.source - nextJson);
-        const nextSource = Math.max(MIN, 1 - nextTables - nextJson);
-        setRatios({ source: nextSource, tables: nextTables, json: nextJson });
-      }
-    };
+    if (hResizing === 'upper') {
+      // Moving down grows the tables pane and shrinks the source pane.
+      const nextTables = Math.max(MIN, Math.min(1 - MIN, startRatios.tables + delta));
+      const nextSource = Math.max(MIN, 1 - nextTables - startRatios.json);
+      const nextJson = Math.max(MIN, 1 - nextSource - nextTables);
+      setRatios({ source: nextSource, tables: nextTables, json: nextJson });
+    } else {
+      // Moving down grows the JSON pane and shrinks the tables pane.
+      const nextJson = Math.max(MIN, Math.min(1 - MIN, startRatios.json + delta));
+      const nextTables = Math.max(MIN, 1 - startRatios.source - nextJson);
+      const nextSource = Math.max(MIN, 1 - nextTables - nextJson);
+      setRatios({ source: nextSource, tables: nextTables, json: nextJson });
+    }
+  }, [hResizing]);
 
-    const onUp = () => {
-      draggingRef.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
+  const handleHResizeEnd = useCallback(() => {
+    setHResizing(null);
   }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => handleHResizeMove(e);
+    const onUp = () => handleHResizeEnd();
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [handleHResizeMove, handleHResizeEnd]);
 
   const effectiveRenderer = useMemo(() => {
     const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
