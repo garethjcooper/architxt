@@ -8,6 +8,7 @@ import { Tag, tagHighlighter } from '@lezer/highlight';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
 import { MermaidDiagram } from '@/components/mermaid-diagram';
 import { DiagramControls } from '@/components/diagram-controls';
+import { Markdown } from '@/components/markdown';
 import {
   Dialog,
   DialogContent,
@@ -346,7 +347,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
                   <span>Node/edge tables</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
-                  <pre className="text-[11px] leading-relaxed font-mono text-white/80 whitespace-pre-wrap">{markdownTables}</pre>
+                  <Markdown className="text-[12px]">{markdownTables}</Markdown>
                 </div>
               </div>
               <ResizeHandle direction="horizontal" onMouseDown={startJsonResize} title="Drag to resize JSON panel" />
