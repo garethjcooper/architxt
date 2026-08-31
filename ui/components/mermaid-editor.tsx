@@ -9,6 +9,7 @@ import mermaid from 'mermaid';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DiagramControls } from '@/components/diagram-controls';
+import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 
 export interface MermaidEditorProps {
   /** Raw Mermaid source (without fence markers). */
@@ -284,13 +285,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
             />
           </div>
         </div>
-        <div
-          onMouseDown={startResize}
-          className="w-4 shrink-0 cursor-col-resize flex items-center justify-center group"
-          title="Drag to resize panels"
-        >
-          <div className="w-px h-16 bg-white/10 group-hover:bg-white/30 group-active:bg-emerald-400/60 rounded-full" />
-        </div>
+        <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />
         <div
           className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
           style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
