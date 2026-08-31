@@ -169,14 +169,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
 
     const edgeHeader = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
     const edgeRows = graph.edges.map((e) => {
-      const src = graph.nodes.find((n) => n.id === e.from);
-      const tgt = graph.nodes.find((n) => n.id === e.to);
+      const src = graph.nodes.find((n) => n.id === e.from)!;
+      const tgt = graph.nodes.find((n) => n.id === e.to)!;
       return edgeHeader
         .map((key) => {
-          if (key === 'from_name') return escapeMarkdownCell(src?.name ?? src?.label ?? e.from);
-          if (key === 'to_name') return escapeMarkdownCell(tgt?.name ?? tgt?.label ?? e.to);
-          if (key === 'from') return escapeMarkdownCell(src?.id ?? e.from);
-          if (key === 'to') return escapeMarkdownCell(tgt?.id ?? e.to);
+          if (key === 'from_name') return escapeMarkdownCell(src.name);
+          if (key === 'to_name') return escapeMarkdownCell(tgt.name);
+          if (key === 'from') return escapeMarkdownCell(src.id);
+          if (key === 'to') return escapeMarkdownCell(tgt.id);
           if (key === 'properties') return escapeMarkdownCell(e.properties ? JSON.stringify(e.properties) : '');
           if (key === 'evidence') return escapeMarkdownCell(Array.isArray(e.evidence) ? e.evidence.join(', ') : '');
           return escapeMarkdownCell(e[key as keyof GraphEdge]);
@@ -328,13 +328,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
         name: n.name || '',
       }));
       const edgeRows = graph.edges.map((e) => {
-        const src = graph.nodes.find((n) => n.id === e.from);
-        const tgt = graph.nodes.find((n) => n.id === e.to);
+        const src = graph.nodes.find((n) => n.id === e.from)!;
+        const tgt = graph.nodes.find((n) => n.id === e.to)!;
         return {
-          from_name: src?.name ?? src?.label ?? e.from,
-          to_name: tgt?.name ?? tgt?.label ?? e.to,
-          from: src?.id ?? e.from,
-          to: tgt?.id ?? e.to,
+          from_name: src.name,
+          to_name: tgt.name,
+          from: src.id,
+          to: tgt.id,
           type: e.type || '',
           label: e.label || '',
           detail: e.detail || '',
