@@ -18,12 +18,16 @@ import {
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 import { graphToMermaid } from '@/lib/graph/mermaid-flowchart';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
 export interface GraphViewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   graph: { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] };
   title?: string;
+  /** Called when Apply is pressed with the selected structured items. */
+  onApply?: (events: EnvelopeCopyEvent[]) => void;
 }
 
 type Renderer = 'dagre' | 'elk';
@@ -131,12 +135,14 @@ interface PaneRatios {
   json: number;
 }
 
-export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
+export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
   const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
   const [hResizing, setHResizing] = useState<null | 'upper' | 'lower'>(null);
   const [fitToPage, setFitToPage] = useState(false);
   const [manualSource, setManualSource] = useState<string | null>(null);
+  const [includeDiagram, setIncludeDiagram] = useState(false);
+  const [includeTables, setIncludeTables] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const hResizeStartRef = useRef({ y: 0, ratios: ratios, height: 0 });
@@ -185,9 +191,11 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     return `### Nodes (${graph.nodes.length})\n\n${nodeTable}\n\n### Edges (${graph.edges.length})\n\n${edgeTable}`;
   }, [graph]);
 
-  // Reset manual edits whenever the graph changes so we don't drift.
+  // Reset manual edits and selections whenever the graph changes so we don't drift.
   useEffect(() => {
     setManualSource(null);
+    setIncludeDiagram(false);
+    setIncludeTables(false);
   }, [graph]);
 
   const source = manualSource ?? generatedSource;
@@ -288,6 +296,66 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     return init ? (init[1] as Renderer) : 'dagre';
   }, [source]);
 
+  const toggleButtonClass = (active: boolean) =>
+    cn(
+      'px-2 py-1 rounded text-[10px] border transition-colors',
+      active
+        ? 'bg-emerald-600/30 border-emerald-500/50 text-emerald-200'
+        : 'bg-black/20 border-white/10 text-white/60 hover:text-white/90 hover:bg-white/5',
+    );
+
+  const handleApply = useCallback(() => {
+    const events: EnvelopeCopyEvent[] = [];
+    if (includeDiagram && source.trim()) {
+      const diagramName = title || graph.name || 'Graph diagram';
+      // Preserve any renderer directive from the source; diagram type is always mermaid/flowchart.
+      const type = source.trim().match(/^\s*classDiagram/i)
+        ? 'classDiagram'
+        : source.trim().match(/^\s*stateDiagram/i)
+        ? 'stateDiagram'
+        : 'flowchart';
+      events.push({
+        type: 'diagrams',
+        payload: JSON.stringify([{ name: diagramName, type, content: source }], null, 2),
+        label: diagramName,
+      });
+    }
+    if (includeTables && (graph.nodes.length > 0 || graph.edges.length > 0)) {
+      const tableRows = graph.nodes.map((n) => ({
+        id: n.id,
+        type: n.type || '',
+        label: n.label || '',
+        name: n.name || '',
+      }));
+      const edgeRows = graph.edges.map((e) => {
+        const src = graph.nodes.find((n) => n.id === e.from);
+        const tgt = graph.nodes.find((n) => n.id === e.to);
+        return {
+          from: src?.id ?? e.from,
+          to: tgt?.id ?? e.to,
+          type: e.type || '',
+          label: e.label || '',
+        };
+      });
+      const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
+      if (tableRows.length > 0) {
+        tables.push({ name: `${title || graph.name || 'Graph'} nodes`, columns: ['id', 'type', 'label', 'name'], rows: tableRows });
+      }
+      if (edgeRows.length > 0) {
+        tables.push({ name: `${title || graph.name || 'Graph'} edges`, columns: ['from', 'to', 'type', 'label'], rows: edgeRows });
+      }
+      if (tables.length > 0) {
+        events.push({
+          type: 'tables',
+          payload: JSON.stringify(tables, null, 2),
+          label: title || graph.name || 'Graph tables',
+        });
+      }
+    }
+    onApply?.(events);
+    onOpenChange(false);
+  }, [includeDiagram, includeTables, source, graph, title, onApply, onOpenChange]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] h-[90vh] max-w-none sm:max-w-none flex flex-col" showCloseButton>
@@ -336,6 +404,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               <div className="flex flex-col overflow-hidden" style={{ flex: ratios.source }}>
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Mermaid source</span>
+                  <button
+                    type="button"
+                    onClick={() => setIncludeDiagram((v) => !v)}
+                    className={toggleButtonClass(includeDiagram)}
+                  >
+                    {includeDiagram ? 'Add diagram' : 'Add to page'}
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0">
                   <CodeMirror
@@ -362,6 +437,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Node/edge tables</span>
+                  <button
+                    type="button"
+                    onClick={() => setIncludeTables((v) => !v)}
+                    className={toggleButtonClass(includeTables)}
+                  >
+                    {includeTables ? 'Add tables' : 'Add to page'}
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
                   <Markdown className="text-[12px]">{markdownTables}</Markdown>
@@ -379,6 +461,24 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
                   <Markdown className="text-[11px]">{`\`\`\`json\n${graphJson}\n\`\`\``}</Markdown>
                 </div>
               </div>
+            </div>
+            <div className="shrink-0 flex justify-end gap-2 px-1 pb-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleApply}
+                disabled={!includeDiagram && !includeTables}
+              >
+                Apply
+              </Button>
             </div>
           </div>
         )}
