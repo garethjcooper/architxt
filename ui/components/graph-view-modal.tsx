@@ -12,6 +12,7 @@ import { Markdown } from '@/components/markdown';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -462,26 +463,26 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
                 </div>
               </div>
             </div>
-            <div className="shrink-0 flex justify-end gap-2 px-1 pb-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleApply}
-                disabled={!includeDiagram && !includeTables}
-              >
-                Apply
-              </Button>
-            </div>
           </div>
         )}
+        <DialogFooter className="shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleApply}
+            disabled={!includeDiagram && !includeTables}
+          >
+            Apply
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
