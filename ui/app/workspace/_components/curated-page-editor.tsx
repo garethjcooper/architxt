@@ -470,6 +470,35 @@ export function CuratedPageEditor({
         onOpenChange={(open) => { if (!open) setFocusedGraph(null); }}
         graph={envelope.graph}
         title={focusedGraph?.name}
+        onApply={(events) => {
+          events.forEach((ev) => {
+            if (ev.type === 'diagrams') {
+              const parsed = JSON.parse(ev.payload);
+              const existingNames = new Set(envelope.diagrams.map((d) => d.name));
+              const newDiagrams = parsed.filter((d: { name: string }) => !existingNames.has(d.name));
+              if (newDiagrams.length === 0) return;
+              const nextEnvelope = { ...envelope, diagrams: [...envelope.diagrams, ...newDiagrams] };
+              onChange?.({
+                envelope: nextEnvelope,
+                dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
+                deletedBlockIds: Array.from(deletedBlockIds),
+                deletedStructuredKeys: Array.from(deletedStructuredKeys),
+              });
+            } else if (ev.type === 'tables') {
+              const parsed = JSON.parse(ev.payload);
+              const existingNames = new Set(envelope.tables.map((t) => t.name));
+              const newTables = parsed.filter((t: { name: string }) => !existingNames.has(t.name));
+              if (newTables.length === 0) return;
+              const nextEnvelope = { ...envelope, tables: [...envelope.tables, ...newTables] };
+              onChange?.({
+                envelope: nextEnvelope,
+                dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
+                deletedBlockIds: Array.from(deletedBlockIds),
+                deletedStructuredKeys: Array.from(deletedStructuredKeys),
+              });
+            }
+          });
+        }}
       />
     </div>
   );
