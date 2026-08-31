@@ -95,6 +95,7 @@ export function CuratedPageEditor({
   const [saving, setSaving] = useState(false);
   const [focusedDiagram, setFocusedDiagram] = useState<{ block: NarrativeBlock; name: string; content: string } | null>(null);
   const [focusedDiagramContent, setFocusedDiagramContent] = useState<string>('');
+  const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -296,6 +297,7 @@ export function CuratedPageEditor({
       const source = diagram.content;
       setFocusedDiagram({ block: b, name: diagram.name || parsed.name || 'Diagram', content: source });
       setFocusedDiagramContent(source);
+      setFocusedDiagramError(null);
       return;
     }
     // Fallback: extract the mermaid source from the block following the heading.
@@ -307,6 +309,7 @@ export function CuratedPageEditor({
         .replace(/\n?```\s*$/, '');
       setFocusedDiagram({ block: b, name: parsed.name || 'Diagram', content: source });
       setFocusedDiagramContent(source);
+      setFocusedDiagramError(null);
     }
   }, [envelope.diagrams, displayedBlocks]);
 
@@ -406,7 +409,10 @@ export function CuratedPageEditor({
           }}
         />
       </div>
-      <Dialog open={focusedDiagram != null} onOpenChange={(open) => { if (!open) setFocusedDiagram(null); }}>
+      <Dialog open={focusedDiagram != null} onOpenChange={(open) => { if (!open) {
+     setFocusedDiagram(null);
+     setFocusedDiagramError(null);
+   } }}>
         <DialogContent className="w-[95vw] h-[90vh] max-w-none sm:max-w-none flex flex-col" showCloseButton>
           <DialogHeader className="shrink-0">
             <DialogTitle>{focusedDiagram?.name}</DialogTitle>
@@ -417,6 +423,7 @@ export function CuratedPageEditor({
                 <MermaidEditor
                   content={focusedDiagramContent}
                   onChange={setFocusedDiagramContent}
+                  onErrorChange={setFocusedDiagramError}
                   name={focusedDiagram.name}
                   className="h-full"
                 />
@@ -434,6 +441,8 @@ export function CuratedPageEditor({
                   type="button"
                   size="sm"
                   onClick={applyFocusedDiagram}
+                  disabled={!!focusedDiagramError}
+                  title={focusedDiagramError ? 'Fix the diagram error before applying' : 'Apply changes'}
                 >
                   Apply
                 </Button>
