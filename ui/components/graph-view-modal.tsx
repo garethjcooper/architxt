@@ -359,7 +359,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
                   <span>Graph JSON</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
-                  <pre className="text-[11px] leading-relaxed font-mono text-white/80 whitespace-pre-wrap">{graphJson}</pre>
+                  <Markdown className="text-[11px]">{`\`\`\`json\n${graphJson}\n\`\`\``}</Markdown>
                 </div>
               </div>
             </div>
