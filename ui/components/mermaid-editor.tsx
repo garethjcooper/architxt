@@ -126,12 +126,14 @@ function PreviewPane({
   name,
   type,
   fitToPage,
+  onFitToPageChange,
   onRender,
 }: {
   content: string;
   name?: string;
   type?: string;
   fitToPage: boolean;
+  onFitToPageChange: (fit: boolean) => void;
   onRender?: (error: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -206,7 +208,7 @@ function PreviewPane({
         ) : !error ? (
           <div className="text-xs text-white/40">Rendering diagram…</div>
         ) : null}
-        {!error && svg && <DiagramControls containerRef={containerRef} />}
+        {!error && svg && <DiagramControls containerRef={containerRef} fitToPage={fitToPage} onFitToPageChange={onFitToPageChange} />}
       </div>
     </div>
   );
@@ -248,6 +250,7 @@ export function MermaidEditor({ content, onChange, className, name, type }: Merm
               name={name}
               type={type}
               fitToPage={fitToPage}
+              onFitToPageChange={setFitToPage}
               onRender={setLastError}
             />
           </div>
@@ -255,15 +258,6 @@ export function MermaidEditor({ content, onChange, className, name, type }: Merm
         <div className="basis-[35%] min-w-[16rem] max-w-[45%] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>Diagram source</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setFitToPage((prev) => !prev)}
-              title={fitToPage ? 'Actual size' : 'Fit to page'}
-            >
-              {fitToPage ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
-            </Button>
           </div>
           <div className="flex-1 min-h-0">
             <CodeMirror
