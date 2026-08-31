@@ -127,8 +127,9 @@ const mermaidTheme = EditorView.theme({
 
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
-  const [tablesHeight, setTablesHeight] = useState(35);
-  const [jsonHeight, setJsonHeight] = useState(35);
+  const [sourceFlex, setSourceFlex] = useState(3);
+  const [tablesFlex, setTablesFlex] = useState(2);
+  const [jsonFlex, setJsonFlex] = useState(2);
   const [fitToPage, setFitToPage] = useState(false);
   const [manualSource, setManualSource] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -222,15 +223,23 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     if (!container) return;
     e.preventDefault();
     tablesDraggingRef.current = true;
+    const startY = e.clientY;
+    const totalFlex = sourceFlex + tablesFlex + jsonFlex;
+    const startTablesRatio = tablesFlex / totalFlex;
 
     const onMove = (moveEvent: MouseEvent) => {
       if (!tablesDraggingRef.current) return;
       const rect = container.getBoundingClientRect();
-      const mermaidBox = container.firstElementChild?.getBoundingClientRect();
-      const mermaidBottom = mermaidBox?.bottom ?? rect.top;
-      const available = rect.height - (mermaidBottom - rect.top);
-      const pct = Math.min(70, Math.max(10, ((mermaidBottom - moveEvent.clientY) / available) * 100));
-      setTablesHeight(pct);
+      const deltaY = moveEvent.clientY - startY;
+      const deltaRatio = deltaY / rect.height;
+      const newTablesRatio = Math.min(0.6, Math.max(0.08, startTablesRatio + deltaRatio));
+      const newTablesFlex = Math.round(newTablesRatio * totalFlex);
+      const deltaFlex = newTablesFlex - tablesFlex;
+      const newSourceFlex = Math.max(1, sourceFlex - deltaFlex);
+      const actualDelta = sourceFlex - newSourceFlex;
+      setTablesFlex(newTablesFlex);
+      setSourceFlex(newSourceFlex);
+      setJsonFlex(Math.max(1, jsonFlex + (deltaFlex - actualDelta)));
     };
 
     const onUp = () => {
@@ -241,19 +250,30 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, []);
+  }, [sourceFlex, tablesFlex, jsonFlex]);
 
   const startJsonResize = useCallback((e: React.MouseEvent) => {
     const container = rightColumnRef.current;
     if (!container) return;
     e.preventDefault();
     jsonDraggingRef.current = true;
+    const startY = e.clientY;
+    const totalFlex = sourceFlex + tablesFlex + jsonFlex;
+    const startJsonRatio = jsonFlex / totalFlex;
 
     const onMove = (moveEvent: MouseEvent) => {
       if (!jsonDraggingRef.current) return;
       const rect = container.getBoundingClientRect();
-      const pct = Math.min(70, Math.max(10, ((rect.bottom - moveEvent.clientY) / rect.height) * 100));
-      setJsonHeight(pct);
+      const deltaY = moveEvent.clientY - startY;
+      const deltaRatio = deltaY / rect.height;
+      const newJsonRatio = Math.min(0.6, Math.max(0.08, startJsonRatio + deltaRatio));
+      const newJsonFlex = Math.round(newJsonRatio * totalFlex);
+      const deltaFlex = newJsonFlex - jsonFlex;
+      const newSourceFlex = Math.max(1, sourceFlex - deltaFlex);
+      const actualDelta = sourceFlex - newSourceFlex;
+      setJsonFlex(newJsonFlex);
+      setSourceFlex(newSourceFlex);
+      setTablesFlex(Math.max(1, tablesFlex + (deltaFlex - actualDelta)));
     };
 
     const onUp = () => {
@@ -264,7 +284,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, []);
+  }, [sourceFlex, tablesFlex, jsonFlex]);
 
   const effectiveRenderer = useMemo(() => {
     const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
@@ -341,7 +361,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               <ResizeHandle direction="horizontal" onMouseDown={startTablesResize} title="Drag to resize tables panel" />
               <div
                 className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
-                style={{ flexBasis: `${tablesHeight}%` }}
+                style={{ flex: tablesFlex }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Node/edge tables</span>
@@ -353,7 +373,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               <ResizeHandle direction="horizontal" onMouseDown={startJsonResize} title="Drag to resize JSON panel" />
               <div
                 className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
-                style={{ flexBasis: `${jsonHeight}%` }}
+                style={{ flex: jsonFlex }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Graph JSON</span>
