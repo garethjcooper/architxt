@@ -41,13 +41,6 @@ function nodeLabel(node: GraphNode): string {
   return truncateLabel(label, 28);
 }
 
-function nodeStyle(node: GraphNode): string {
-  const id = safeNodeId(node.id);
-  const color = node.color || colorForType(node.type) || '#64748b';
-  const hex = color.replace(/^#/, '');
-  return `style ${id} fill:#${hex},stroke:#ffffff33,color:#fff;`;
-}
-
 /**
  * Convert a canonical graph envelope into a Mermaid flowchart source string.
  */
@@ -75,13 +68,8 @@ export function graphToMermaid(
     const fromId = safeNodeId(edge.from);
     const toId = safeNodeId(edge.to);
     const label = showEdgeLabels && edge.label ? ` ${quotedLabel(edge.label)} ` : '';
-    // Use the standard arrow forms: --> for solid, -.-> for dotted with optional label.
     const arrow = label ? `-.${label}.->` : '-->';
     lines.push(`    ${fromId} ${arrow} ${toId}`);
-  }
-
-  for (const node of graph.nodes) {
-    lines.push(`    ${nodeStyle(node)}`);
   }
 
   return lines.join('\n').trim();
