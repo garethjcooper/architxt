@@ -12,33 +12,46 @@ export interface MermaidDiagramProps {
   name?: string;
   /** Optional type label shown as a badge. */
   type?: string;
+  /** Optional flowchart renderer override. Changing this re-initializes Mermaid. */
+  defaultRenderer?: 'dagre' | 'elk';
+  /** Optional flowchart direction override. Changing this updates the rendered source. */
+  direction?: 'TB' | 'LR' | 'BT' | 'RL';
 }
 
-let mermaidInitialized = false;
+let lastRenderer: 'dagre' | 'elk' | undefined;
 
-function initializeMermaid() {
-  if (mermaidInitialized) return;
-  mermaidInitialized = true;
-  mermaid.initialize({
+function initializeMermaid(renderer?: 'dagre' | 'elk') {
+  const config: any = {
     startOnLoad: false,
     theme: 'dark',
     securityLevel: 'strict',
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
     suppressErrorRendering: true,
-  });
+  };
+  if (renderer) {
+    config.flowchart = { defaultRenderer: renderer };
+  }
+  mermaid.initialize(config);
+  lastRenderer = renderer;
+}
+
+function maybeInitializeMermaid(renderer?: 'dagre' | 'elk') {
+  if (lastRenderer !== renderer) {
+    initializeMermaid(renderer);
+  }
 }
 
 /**
  * Render a Mermaid diagram from raw source in a dark-themed container.
  * Errors are displayed inline so malformed model output is easy to spot.
  */
-export function MermaidDiagram({ content, className = '', name, type }: MermaidDiagramProps) {
+export function MermaidDiagram({ content, className = '', name, type, defaultRenderer, direction }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    initializeMermaid();
+    maybeInitializeMermaid(defaultRenderer);
     let cancelled = false;
 
     const render = async () => {
@@ -66,7 +79,7 @@ export function MermaidDiagram({ content, className = '', name, type }: MermaidD
 
     render();
     return () => { cancelled = true; };
-  }, [content]);
+  }, [content, defaultRenderer]);
 
   return (
     <div className={`rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden ${className}`}>
