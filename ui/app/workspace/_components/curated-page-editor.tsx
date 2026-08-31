@@ -6,12 +6,14 @@ import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import { MermaidDiagram } from '@/components/mermaid-diagram';
+import { MermaidEditor } from '@/components/mermaid-editor';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
 import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { downloadMarkdown } from '@/lib/utils';
@@ -91,7 +93,8 @@ export function CuratedPageEditor({
   const [showIndex, setShowIndex] = useState(true);
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [focusedDiagram, setFocusedDiagram] = useState<{ name: string; content: string } | null>(null);
+  const [focusedDiagram, setFocusedDiagram] = useState<{ block: NarrativeBlock; name: string; content: string } | null>(null);
+  const [focusedDiagramContent, setFocusedDiagramContent] = useState<string>('');
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -290,7 +293,9 @@ export function CuratedPageEditor({
     if (!parsed || parsed.kind !== 'diagram') return;
     const diagram = envelope.diagrams.find((d) => d.name === parsed.name);
     if (diagram && typeof diagram.content === 'string') {
-      setFocusedDiagram({ name: diagram.name || parsed.name || 'Diagram', content: diagram.content });
+      const source = diagram.content;
+      setFocusedDiagram({ block: b, name: diagram.name || parsed.name || 'Diagram', content: source });
+      setFocusedDiagramContent(source);
       return;
     }
     // Fallback: extract the mermaid source from the block following the heading.
@@ -300,9 +305,31 @@ export function CuratedPageEditor({
       const source = (next.edited ?? next.raw)
         .replace(/^```mermaid\n?/, '')
         .replace(/\n?```\s*$/, '');
-      setFocusedDiagram({ name: parsed.name || 'Diagram', content: source });
+      setFocusedDiagram({ block: b, name: parsed.name || 'Diagram', content: source });
+      setFocusedDiagramContent(source);
     }
   }, [envelope.diagrams, displayedBlocks]);
+
+  const applyFocusedDiagram = useCallback(() => {
+    if (!focusedDiagram) return;
+    const parsed = parseSyntheticHeading(focusedDiagram.block.title);
+    if (!parsed || parsed.kind !== 'diagram') return;
+    const diagramIndex = envelope.diagrams.findIndex((d) => d.name === parsed.name);
+    const updatedDiagrams = [...envelope.diagrams];
+    if (diagramIndex >= 0) {
+      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], content: focusedDiagramContent };
+    } else {
+      updatedDiagrams.push({ name: parsed.name || focusedDiagram.name, type: 'flowchart', content: focusedDiagramContent });
+    }
+    const nextEnvelope = { ...envelope, diagrams: updatedDiagrams };
+    setFocusedDiagram(null);
+    onChange?.({
+      envelope: nextEnvelope,
+      dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
+      deletedBlockIds: Array.from(deletedBlockIds),
+      deletedStructuredKeys: Array.from(deletedStructuredKeys),
+    });
+  }, [focusedDiagram, focusedDiagramContent, envelope, effectiveBaseline, deletedBlockIds, deletedStructuredKeys, onChange]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -385,20 +412,31 @@ export function CuratedPageEditor({
             <DialogTitle>{focusedDiagram?.name}</DialogTitle>
           </DialogHeader>
           {focusedDiagram && (
-            <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
-              <div className="flex-1 min-w-0 min-h-0 overflow-auto rounded-md border border-white/10 bg-[oklch(0.18_0_0)] p-2">
-                <MermaidDiagram
-                  content={focusedDiagram.content}
-                  className="h-full border-0 bg-transparent"
+            <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MermaidEditor
+                  content={focusedDiagramContent}
+                  onChange={setFocusedDiagramContent}
+                  name={focusedDiagram.name}
+                  className="h-full"
                 />
               </div>
-              <div className="basis-[25%] min-w-[16rem] max-w-[35%] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
-                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70">
-                  Diagram source
-                </div>
-                <pre className="flex-1 min-h-0 overflow-auto p-3 text-[12px] leading-relaxed font-mono text-white/80 whitespace-pre">
-                  {focusedDiagram.content}
-                </pre>
+              <div className="shrink-0 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFocusedDiagram(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={applyFocusedDiagram}
+                >
+                  Apply
+                </Button>
               </div>
             </div>
           )}
