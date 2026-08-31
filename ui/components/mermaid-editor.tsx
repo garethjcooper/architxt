@@ -242,13 +242,13 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
   );
 
   const startResize = useCallback((e: React.MouseEvent) => {
+    const container = (e.currentTarget as HTMLElement).parentElement;
+    if (!container) return;
     e.preventDefault();
     draggingRef.current = true;
 
     const onMove = (moveEvent: MouseEvent) => {
       if (!draggingRef.current) return;
-      const container = (e.currentTarget as HTMLElement).parentElement;
-      if (!container) return;
       const rect = container.getBoundingClientRect();
       const pct = Math.min(80, Math.max(20, ((rect.right - moveEvent.clientX) / rect.width) * 100));
       setSourceWidth(pct);
