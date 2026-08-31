@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trash2, Undo2, Loader2, Eye } from 'lucide-react';
+import { Eye, Trash2, Undo2, Loader2, FileText } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
@@ -9,6 +9,7 @@ import { MermaidDiagram } from '@/components/mermaid-diagram';
 import { MermaidEditor } from '@/components/mermaid-editor';
 import { GraphViewModal } from '@/components/graph-view-modal';
 import { TableFocusModal } from '@/components/table-focus-modal';
+import { NarrativeFocusModal } from '@/components/narrative-focus-modal';
 import {
   Dialog,
   DialogContent,
@@ -101,6 +102,7 @@ export function CuratedPageEditor({
   const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
   const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
   const [focusedTable, setFocusedTable] = useState<{ block: NarrativeBlock; name: string } | null>(null);
+  const [focusedNarrative, setFocusedNarrative] = useState<{ block: NarrativeBlock } | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -335,6 +337,11 @@ export function CuratedPageEditor({
     setFocusedTable({ block: b, name: table.name });
   }, [envelope.tables]);
 
+  const openNarrativeFocus = useCallback((b: NarrativeBlock) => {
+    if (b.type !== 'text') return;
+    setFocusedNarrative({ block: b });
+  }, []);
+
   const applyFocusedDiagram = useCallback(() => {
     if (!focusedDiagram) return;
     const parsed = parseSyntheticHeading(focusedDiagram.block.title);
@@ -400,7 +407,8 @@ export function CuratedPageEditor({
           className="h-full"
           renderSidebarRowActions={(b) => {
             if (readOnly) return null;
-            if (b.type === 'text') return null;
+            const isText = b.type === 'text';
+            if (isText) return null;
             const isDeleted = b.deleted;
             const parsed = parseSyntheticHeading(b.title);
             const isDiagram = parsed?.kind === 'diagram';
@@ -425,6 +433,19 @@ export function CuratedPageEditor({
                     title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : 'Focus diagram'}
                   >
                     <Eye className="h-3 w-3" />
+                  </button>
+                )}
+                {isText && !isDeleted && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openNarrativeFocus(b);
+                    }}
+                    className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                    title="Focus narrative"
+                  >
+                    <FileText className="h-3 w-3" />
                   </button>
                 )}
                 <button
@@ -566,6 +587,22 @@ export function CuratedPageEditor({
             dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
             deletedBlockIds: Array.from(deletedBlockIds),
             deletedStructuredKeys: Array.from(nextDeletedKeys),
+          });
+        }}
+      />
+      <NarrativeFocusModal
+        open={focusedNarrative != null}
+        onOpenChange={(open) => { if (!open) setFocusedNarrative(null); }}
+        name={envelope.narrative_name || ''}
+        content={envelope.narrative || ''}
+        onApply={(ev) => {
+          const parsed = JSON.parse(ev.payload);
+          const nextEnvelope = { ...envelope, narrative_name: parsed.name, narrative: parsed.content };
+          onChange?.({
+            envelope: nextEnvelope,
+            dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
+            deletedBlockIds: Array.from(deletedBlockIds),
+            deletedStructuredKeys: Array.from(deletedStructuredKeys),
           });
         }}
       />
