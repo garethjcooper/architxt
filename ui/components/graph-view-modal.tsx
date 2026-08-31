@@ -127,7 +127,7 @@ const mermaidTheme = EditorView.theme({
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
   const [jsonHeight, setJsonHeight] = useState(30);
-  const [fitToPage, setFitToPage] = useState(true);
+  const [fitToPage, setFitToPage] = useState(false);
   const [manualSource, setManualSource] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
