@@ -183,32 +183,34 @@ function PreviewPane({
           )}
         </div>
       )}
-      <div
-        ref={containerRef}
-        className={cn(
-          'flex-1 min-h-0 p-3 overflow-hidden relative',
-          fitToPage && 'flex items-center justify-center',
-        )}
-      >
-        {error ? (
-          <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
-            <div className="max-w-full rounded-md border border-rose-500/30 bg-rose-950/60 backdrop-blur-sm px-3 py-2 text-xs text-rose-200/90 font-mono whitespace-pre-wrap shadow-lg">
-              {error}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        <div
+          ref={containerRef}
+          className={cn(
+            'absolute inset-0 p-3 overflow-hidden origin-top-left',
+            fitToPage && 'flex items-center justify-center',
+          )}
+        >
+          {error ? (
+            <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
+              <div className="max-w-full rounded-md border border-rose-500/30 bg-rose-950/60 backdrop-blur-sm px-3 py-2 text-xs text-rose-200/90 font-mono whitespace-pre-wrap shadow-lg">
+                {error}
+              </div>
             </div>
-          </div>
-        ) : null}
-        {svg ? (
-          <div
-            dangerouslySetInnerHTML={{ __html: svg }}
-            className={cn(
-              'mermaid-diagram',
-              fitToPage && 'w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full',
-            )}
-          />
-        ) : !error ? (
-          <div className="text-xs text-white/40">Rendering diagram…</div>
-        ) : null}
-        {!error && svg && <DiagramControls containerRef={containerRef} fitToPage={fitToPage} onFitToPageChange={onFitToPageChange} />}
+          ) : null}
+          {svg ? (
+            <div
+              dangerouslySetInnerHTML={{ __html: svg }}
+              className={cn(
+                'mermaid-diagram',
+                fitToPage && 'w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:!transform-none',
+              )}
+            />
+          ) : !error ? (
+            <div className="text-xs text-white/40">Rendering diagram…</div>
+          ) : null}
+        </div>
+        {!error && svg && <DiagramControls targetRef={containerRef} fitToPage={fitToPage} onFitToPageChange={onFitToPageChange} />}
       </div>
     </div>
   );
