@@ -19,6 +19,7 @@
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.9",
     "@lezer/highlight": "^1.2.3",
+    "@panzoom/panzoom": "^4.6.2",
     "@types/cytoscape": "^3.21.9",
     "@types/cytoscape-dagre": "^2.3.4",
     "@uiw/react-codemirror": "^4.25.11",

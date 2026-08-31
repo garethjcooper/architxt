@@ -9,6 +9,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import mermaid from 'mermaid';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { DiagramControls } from '@/components/diagram-controls';
 
 export interface MermaidEditorProps {
   /** Raw Mermaid source (without fence markers). */
@@ -205,6 +206,7 @@ function PreviewPane({
         ) : !error ? (
           <div className="text-xs text-white/40">Rendering diagram…</div>
         ) : null}
+        {!error && svg && <DiagramControls containerRef={containerRef} />}
       </div>
     </div>
   );
