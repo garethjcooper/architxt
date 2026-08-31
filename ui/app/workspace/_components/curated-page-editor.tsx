@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Eye, Trash2, Undo2, Loader2, FileText } from 'lucide-react';
+import { Eye, Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
@@ -407,16 +407,16 @@ export function CuratedPageEditor({
           className="h-full"
           renderSidebarRowActions={(b) => {
             if (readOnly) return null;
-            const isText = b.type === 'text';
-            if (isText) return null;
             const isDeleted = b.deleted;
+            const isText = b.type === 'text';
             const parsed = parseSyntheticHeading(b.title);
             const isDiagram = parsed?.kind === 'diagram';
             const isGraph = parsed?.kind === 'graph';
             const isTable = parsed?.kind === 'table';
+            const canFocus = isText || isDiagram || isGraph || isTable;
             return (
               <div className="flex items-center gap-0.5">
-                {(isDiagram || isGraph || isTable) && !isDeleted && (
+                {canFocus && !isDeleted && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -425,27 +425,16 @@ export function CuratedPageEditor({
                         openGraphFocus(b);
                       } else if (isTable) {
                         openTableFocus(b);
+                      } else if (isText) {
+                        openNarrativeFocus(b);
                       } else {
                         openDiagramFocus(b);
                       }
                     }}
                     className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                    title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : 'Focus diagram'}
+                    title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : isText ? 'Focus narrative' : 'Focus diagram'}
                   >
                     <Eye className="h-3 w-3" />
-                  </button>
-                )}
-                {isText && !isDeleted && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openNarrativeFocus(b);
-                    }}
-                    className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                    title="Focus narrative"
-                  >
-                    <FileText className="h-3 w-3" />
                   </button>
                 )}
                 <button
