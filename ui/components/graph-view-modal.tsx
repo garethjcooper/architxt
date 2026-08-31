@@ -126,8 +126,6 @@ const mermaidTheme = EditorView.theme({
 });
 
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
-  const [direction] = useState<Direction>('TB');
-  const [renderer, setRenderer] = useState<Renderer>('dagre');
   const [sourceWidth, setSourceWidth] = useState(35);
   const [fitToPage, setFitToPage] = useState(true);
   const [manualSource, setManualSource] = useState<string | null>(null);
@@ -136,8 +134,8 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
 
   const generatedSource = useMemo(() => {
     if (!graph.nodes.length && !graph.edges.length) return '';
-    return graphToMermaid(graph, { direction, defaultRenderer: renderer, showEdgeLabels: true });
-  }, [graph, direction, renderer]);
+    return graphToMermaid(graph, { showEdgeLabels: true });
+  }, [graph]);
 
   // Reset manual edits whenever the graph changes so we don't drift.
   useEffect(() => {
@@ -175,12 +173,10 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     window.addEventListener('mouseup', onUp);
   }, []);
 
-  // Mermaid defaultRenderer is controlled by editing the init directive in source;
-  // global instance re-init is driven by MermaidDiagram defaultRenderer prop.
   const effectiveRenderer = useMemo(() => {
     const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
-    return init ? (init[1] as Renderer) : renderer;
-  }, [source, renderer]);
+    return init ? (init[1] as Renderer) : 'dagre';
+  }, [source]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
