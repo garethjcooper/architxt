@@ -167,15 +167,18 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
       ...nodeRows.map((row) => `| ${row} |`),
     ].join('\n');
 
-    const edgeHeader = ['from', 'to', 'type', 'label', 'detail', 'properties'];
+    const edgeHeader = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
     const edgeRows = graph.edges.map((e) => {
       const src = graph.nodes.find((n) => n.id === e.from);
       const tgt = graph.nodes.find((n) => n.id === e.to);
       return edgeHeader
         .map((key) => {
+          if (key === 'from_name') return escapeMarkdownCell(src?.name ?? src?.label ?? e.from);
+          if (key === 'to_name') return escapeMarkdownCell(tgt?.name ?? tgt?.label ?? e.to);
           if (key === 'from') return escapeMarkdownCell(src?.id ?? e.from);
           if (key === 'to') return escapeMarkdownCell(tgt?.id ?? e.to);
           if (key === 'properties') return escapeMarkdownCell(e.properties ? JSON.stringify(e.properties) : '');
+          if (key === 'evidence') return escapeMarkdownCell(Array.isArray(e.source_fact_ids) ? e.source_fact_ids.join(', ') : '');
           return escapeMarkdownCell(e[key as keyof GraphEdge]);
         })
         .join(' | ');
@@ -328,12 +331,15 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
         const src = graph.nodes.find((n) => n.id === e.from);
         const tgt = graph.nodes.find((n) => n.id === e.to);
         return {
+          from_name: src?.name ?? src?.label ?? e.from,
+          to_name: tgt?.name ?? tgt?.label ?? e.to,
           from: src?.id ?? e.from,
           to: tgt?.id ?? e.to,
           type: e.type || '',
           label: e.label || '',
           detail: e.detail || '',
           properties: e.properties || null,
+          evidence: e.source_fact_ids || [],
         };
       });
       const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
@@ -341,7 +347,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
         tables.push({ name: `${title || graph.name || 'Graph'} nodes`, columns: ['id', 'type', 'label', 'name'], rows: nodeRows });
       }
       if (edgeRows.length > 0) {
-        tables.push({ name: `${title || graph.name || 'Graph'} edges`, columns: ['from', 'to', 'type', 'label', 'detail', 'properties'], rows: edgeRows });
+        tables.push({ name: `${title || graph.name || 'Graph'} edges`, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows });
       }
       if (tables.length > 0) {
         events.push({
