@@ -96,6 +96,7 @@ export function CuratedPageEditor({
   const [saving, setSaving] = useState(false);
   const [focusedDiagram, setFocusedDiagram] = useState<{ block: NarrativeBlock; name: string; content: string } | null>(null);
   const [focusedDiagramContent, setFocusedDiagramContent] = useState<string>('');
+  const [focusedDiagramName, setFocusedDiagramName] = useState<string>('');
   const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
   const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
 
@@ -299,6 +300,7 @@ export function CuratedPageEditor({
       const source = diagram.content;
       setFocusedDiagram({ block: b, name: diagram.name || parsed.name || 'Diagram', content: source });
       setFocusedDiagramContent(source);
+      setFocusedDiagramName(diagram.name || parsed.name || 'Diagram');
       setFocusedDiagramError(null);
       return;
     }
@@ -311,6 +313,7 @@ export function CuratedPageEditor({
         .replace(/\n?```\s*$/, '');
       setFocusedDiagram({ block: b, name: parsed.name || 'Diagram', content: source });
       setFocusedDiagramContent(source);
+      setFocusedDiagramName(parsed.name || 'Diagram');
       setFocusedDiagramError(null);
     }
   }, [envelope.diagrams, displayedBlocks]);
@@ -326,22 +329,34 @@ export function CuratedPageEditor({
     if (!focusedDiagram) return;
     const parsed = parseSyntheticHeading(focusedDiagram.block.title);
     if (!parsed || parsed.kind !== 'diagram') return;
-    const diagramIndex = envelope.diagrams.findIndex((d) => d.name === parsed.name);
+    const oldName = parsed.name;
+    const newName = focusedDiagramName.trim() || oldName || focusedDiagram.name;
     const updatedDiagrams = [...envelope.diagrams];
+    const diagramIndex = updatedDiagrams.findIndex((d) => d.name === oldName);
     if (diagramIndex >= 0) {
-      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], content: focusedDiagramContent };
+      // Rename in place, preserving position.
+      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], name: newName, content: focusedDiagramContent };
     } else {
-      updatedDiagrams.push({ name: parsed.name || focusedDiagram.name, type: 'flowchart', content: focusedDiagramContent });
+      updatedDiagrams.push({ name: newName, type: 'flowchart', content: focusedDiagramContent });
     }
+
+    // If the name changed, update the synthetic heading key so the section isn't orphaned.
+    const nextDeletedKeys = new Set(deletedStructuredKeys);
+    if (oldName && oldName !== newName && nextDeletedKeys.has(`diagram:${oldName}`)) {
+      nextDeletedKeys.delete(`diagram:${oldName}`);
+      nextDeletedKeys.add(`diagram:${newName}`);
+    }
+
     const nextEnvelope = { ...envelope, diagrams: updatedDiagrams };
     setFocusedDiagram(null);
+    setFocusedDiagramError(null);
     onChange?.({
       envelope: nextEnvelope,
       dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
       deletedBlockIds: Array.from(deletedBlockIds),
-      deletedStructuredKeys: Array.from(deletedStructuredKeys),
+      deletedStructuredKeys: Array.from(nextDeletedKeys),
     });
-  }, [focusedDiagram, focusedDiagramContent, envelope, effectiveBaseline, deletedBlockIds, deletedStructuredKeys, onChange]);
+  }, [focusedDiagram, focusedDiagramContent, focusedDiagramName, envelope, effectiveBaseline, deletedBlockIds, deletedStructuredKeys, onChange]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -433,12 +448,22 @@ export function CuratedPageEditor({
           </DialogHeader>
           {focusedDiagram && (
             <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+              <div className="shrink-0 flex items-center gap-2">
+                <span className="text-xs text-white/60">Name:</span>
+                <input
+                  type="text"
+                  value={focusedDiagramName}
+                  onChange={(e) => setFocusedDiagramName(e.target.value)}
+                  className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50"
+                  placeholder="Diagram name"
+                />
+              </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MermaidEditor
                   content={focusedDiagramContent}
                   onChange={setFocusedDiagramContent}
                   onErrorChange={setFocusedDiagramError}
-                  name={focusedDiagram.name}
+                  name={focusedDiagramName}
                   className="h-full"
                 />
               </div>
