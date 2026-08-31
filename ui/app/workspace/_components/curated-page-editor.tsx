@@ -8,6 +8,7 @@ import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, ty
 import { MermaidDiagram } from '@/components/mermaid-diagram';
 import { MermaidEditor } from '@/components/mermaid-editor';
 import { GraphViewModal } from '@/components/graph-view-modal';
+import { TableFocusModal } from '@/components/table-focus-modal';
 import {
   Dialog,
   DialogContent,
@@ -99,6 +100,7 @@ export function CuratedPageEditor({
   const [focusedDiagramName, setFocusedDiagramName] = useState<string>('');
   const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
   const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
+  const [focusedTable, setFocusedTable] = useState<{ block: NarrativeBlock; name: string } | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -325,6 +327,14 @@ export function CuratedPageEditor({
     setFocusedGraph({ block: b, name });
   }, [envelope.graph]);
 
+  const openTableFocus = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeading(b.title);
+    if (!parsed || parsed.kind !== 'table') return;
+    const table = envelope.tables.find((t) => t.name === parsed.name);
+    if (!table) return;
+    setFocusedTable({ block: b, name: table.name });
+  }, [envelope.tables]);
+
   const applyFocusedDiagram = useCallback(() => {
     if (!focusedDiagram) return;
     const parsed = parseSyntheticHeading(focusedDiagram.block.title);
@@ -395,21 +405,24 @@ export function CuratedPageEditor({
             const parsed = parseSyntheticHeading(b.title);
             const isDiagram = parsed?.kind === 'diagram';
             const isGraph = parsed?.kind === 'graph';
+            const isTable = parsed?.kind === 'table';
             return (
               <div className="flex items-center gap-0.5">
-                {(isDiagram || isGraph) && !isDeleted && (
+                {(isDiagram || isGraph || isTable) && !isDeleted && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (isGraph) {
                         openGraphFocus(b);
+                      } else if (isTable) {
+                        openTableFocus(b);
                       } else {
                         openDiagramFocus(b);
                       }
                     }}
                     className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                    title={isGraph ? 'Focus graph' : 'Focus diagram'}
+                    title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : 'Focus diagram'}
                   >
                     <Eye className="h-3 w-3" />
                   </button>
@@ -522,6 +535,37 @@ export function CuratedPageEditor({
                 deletedStructuredKeys: Array.from(deletedStructuredKeys),
               });
             }
+          });
+        }}
+      />
+      <TableFocusModal
+        open={focusedTable != null}
+        onOpenChange={(open) => { if (!open) setFocusedTable(null); }}
+        table={envelope.tables.find((t) => t.name === focusedTable?.name) ?? { name: focusedTable?.name ?? '', columns: [], rows: [] }}
+        onApply={(ev) => {
+          const parsed = JSON.parse(ev.payload);
+          const updated = parsed[0];
+          if (!updated) return;
+          const oldName = focusedTable!.name;
+          const newName = updated.name;
+          const tableIndex = envelope.tables.findIndex((t) => t.name === oldName);
+          const nextTables = [...envelope.tables];
+          if (tableIndex >= 0) {
+            nextTables[tableIndex] = updated;
+          } else {
+            nextTables.push(updated);
+          }
+          const nextDeletedKeys = new Set(deletedStructuredKeys);
+          if (oldName !== newName && nextDeletedKeys.has(`table:${oldName}`)) {
+            nextDeletedKeys.delete(`table:${oldName}`);
+            nextDeletedKeys.add(`table:${newName}`);
+          }
+          const nextEnvelope = { ...envelope, tables: nextTables };
+          onChange?.({
+            envelope: nextEnvelope,
+            dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
+            deletedBlockIds: Array.from(deletedBlockIds),
+            deletedStructuredKeys: Array.from(nextDeletedKeys),
           });
         }}
       />
