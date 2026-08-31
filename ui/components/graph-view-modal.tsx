@@ -142,7 +142,6 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
   const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
   const [hResizing, setHResizing] = useState<null | 'upper' | 'lower'>(null);
   const [fitToPage, setFitToPage] = useState(false);
-  const [manualSource, setManualSource] = useState<string | null>(null);
   const [includeDiagram, setIncludeDiagram] = useState(false);
   const [includeTables, setIncludeTables] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -192,14 +191,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
     return `### Nodes (${graph.nodes.length})\n\n${nodeTable}\n\n### Edges (${graph.edges.length})\n\n${edgeTable}`;
   }, [graph]);
 
-  // Reset manual edits and selections whenever the graph changes so we don't drift.
+  // Reset selections whenever the graph changes so we don't drift.
   useEffect(() => {
-    setManualSource(null);
     setIncludeDiagram(false);
     setIncludeTables(false);
   }, [graph]);
 
-  const source = manualSource ?? generatedSource;
+  const source = generatedSource;
   const isEmpty = !graph.nodes.length && !graph.edges.length;
 
   const extensions = useMemo(
@@ -420,7 +418,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
                 <div className="flex-1 min-h-0">
                   <CodeMirror
                     value={source}
-                    onChange={(v) => setManualSource(v)}
+                    editable={false}
                     extensions={extensions}
                     theme="none"
                     height="100%"
