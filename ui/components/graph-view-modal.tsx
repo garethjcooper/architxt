@@ -125,18 +125,21 @@ const mermaidTheme = EditorView.theme({
   '.mmd-comment': { color: '#6b7280' },
 });
 
+interface PaneRatios {
+  source: number;
+  tables: number;
+  json: number;
+}
+
 export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
-  const [flexA, setFlexA] = useState(4); // Mermaid source
-  const [flexB, setFlexB] = useState(2); // Node/edge tables
-  const [flexC, setFlexC] = useState(2); // Graph JSON
+  const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
   const [fitToPage, setFitToPage] = useState(false);
   const [manualSource, setManualSource] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
-  const colDraggingRef = useRef(false);
-  const upperDraggingRef = useRef(false);
-  const lowerDraggingRef = useRef(false);
+  const draggingRef = useRef<null | 'upper' | 'lower'>(null);
+  const dragStartRef = useRef({ y: 0, ratios: ratios, height: 0 });
 
   const generatedSource = useMemo(() => {
     if (!graph.nodes.length && !graph.edges.length) return '';
@@ -195,92 +198,90 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
     [],
   );
 
+  // Column resize: preview vs right-hand stack.
   const startColResize = useCallback((e: React.MouseEvent) => {
     const container = rightColumnRef.current?.parentElement;
     if (!container) return;
     e.preventDefault();
-    colDraggingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = sourceWidth;
+    const rect = container.getBoundingClientRect();
 
     const onMove = (moveEvent: MouseEvent) => {
-      if (!colDraggingRef.current) return;
-      const rect = container.getBoundingClientRect();
-      const pct = Math.min(80, Math.max(20, ((rect.right - moveEvent.clientX) / rect.width) * 100));
-      setSourceWidth(pct);
+      const deltaPct = ((moveEvent.clientX - startX) / rect.width) * 100;
+      setSourceWidth(Math.min(80, Math.max(20, startWidth - deltaPct)));
     };
 
     const onUp = () => {
-      colDraggingRef.current = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, []);
+  }, [sourceWidth]);
 
-  // Drag the horizontal divider between Mermaid source (flexA) and tables (flexB).
+  // Horizontal resizers: adjust ratios of adjacent panes in the right-hand stack.
   const startUpperResize = useCallback((e: React.MouseEvent) => {
     const container = rightColumnRef.current;
     if (!container) return;
     e.preventDefault();
-    upperDraggingRef.current = true;
-    const startY = e.clientY;
-    const startFlexA = flexA;
-    const startFlexB = flexB;
-    const pixelsPerFlexUnit = container.getBoundingClientRect().height / (flexA + flexB + flexC);
-
-    const onMove = (moveEvent: MouseEvent) => {
-      if (!upperDraggingRef.current) return;
-      const deltaY = moveEvent.clientY - startY;
-      const deltaFlex = Math.round(deltaY / pixelsPerFlexUnit);
-      // Moving down gives more space to flexB, less to flexA.
-      const nextA = Math.max(1, startFlexA - deltaFlex);
-      const nextB = Math.max(1, startFlexB + deltaFlex);
-      setFlexA(nextA);
-      setFlexB(nextB);
+    draggingRef.current = 'upper';
+    dragStartRef.current = {
+      y: e.clientY,
+      ratios: { ...ratios },
+      height: container.getBoundingClientRect().height,
     };
+  }, [ratios]);
 
-    const onUp = () => {
-      upperDraggingRef.current = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [flexA, flexB, flexC]);
-
-  // Drag the horizontal divider between tables (flexB) and JSON (flexC).
   const startLowerResize = useCallback((e: React.MouseEvent) => {
     const container = rightColumnRef.current;
     if (!container) return;
     e.preventDefault();
-    lowerDraggingRef.current = true;
-    const startY = e.clientY;
-    const startFlexB = flexB;
-    const startFlexC = flexC;
-    const pixelsPerFlexUnit = container.getBoundingClientRect().height / (flexA + flexB + flexC);
+    draggingRef.current = 'lower';
+    dragStartRef.current = {
+      y: e.clientY,
+      ratios: { ...ratios },
+      height: container.getBoundingClientRect().height,
+    };
+  }, [ratios]);
 
-    const onMove = (moveEvent: MouseEvent) => {
-      if (!lowerDraggingRef.current) return;
-      const deltaY = moveEvent.clientY - startY;
-      const deltaFlex = Math.round(deltaY / pixelsPerFlexUnit);
-      // Moving down gives more space to flexC, less to flexB.
-      const nextB = Math.max(1, startFlexB - deltaFlex);
-      const nextC = Math.max(1, startFlexC + deltaFlex);
-      setFlexB(nextB);
-      setFlexC(nextC);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const { y, ratios: startRatios, height } = dragStartRef.current;
+      if (height <= 0) return;
+      const delta = (e.clientY - y) / height;
+      const MIN = 0.08;
+
+      if (draggingRef.current === 'upper') {
+        // Moving down grows the tables pane and shrinks the source pane.
+        const nextTables = Math.max(MIN, Math.min(1 - MIN, startRatios.tables + delta));
+        const nextSource = Math.max(MIN, 1 - nextTables - startRatios.json);
+        const nextJson = Math.max(MIN, 1 - nextSource - nextTables);
+        setRatios({ source: nextSource, tables: nextTables, json: nextJson });
+      } else {
+        // Moving down grows the JSON pane and shrinks the tables pane.
+        const nextJson = Math.max(MIN, Math.min(1 - MIN, startRatios.json + delta));
+        const nextTables = Math.max(MIN, 1 - startRatios.source - nextJson);
+        const nextSource = Math.max(MIN, 1 - nextTables - nextJson);
+        setRatios({ source: nextSource, tables: nextTables, json: nextJson });
+      }
     };
 
     const onUp = () => {
-      lowerDraggingRef.current = false;
+      draggingRef.current = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [flexA, flexB, flexC]);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   const effectiveRenderer = useMemo(() => {
     const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
@@ -332,7 +333,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
               style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
-              <div className="flex flex-col overflow-hidden" style={{ flex: flexA }}>
+              <div className="flex flex-col overflow-hidden" style={{ flex: ratios.source }}>
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Mermaid source</span>
                 </div>
@@ -357,7 +358,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               <ResizeHandle direction="horizontal" onMouseDown={startUpperResize} title="Drag to resize tables panel" />
               <div
                 className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
-                style={{ flex: flexB }}
+                style={{ flex: ratios.tables }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Node/edge tables</span>
@@ -369,7 +370,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               <ResizeHandle direction="horizontal" onMouseDown={startLowerResize} title="Drag to resize JSON panel" />
               <div
                 className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
-                style={{ flex: flexC }}
+                style={{ flex: ratios.json }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Graph JSON</span>
