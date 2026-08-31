@@ -1,6 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { EditorView } from '@codemirror/view';
+import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
+import { Tag, tagHighlighter } from '@lezer/highlight';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
 import { MermaidDiagram } from '@/components/mermaid-diagram';
 import { DiagramControls } from '@/components/diagram-controls';
@@ -10,14 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectPopup,
-  SelectItem,
-} from '@/components/ui/select';
+import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 import { graphToMermaid } from '@/lib/graph/mermaid-flowchart';
+import { cn } from '@/lib/utils';
 
 export interface GraphViewModalProps {
   open: boolean;
@@ -29,18 +28,159 @@ export interface GraphViewModalProps {
 type Direction = 'TB' | 'LR' | 'BT' | 'RL';
 type Renderer = 'dagre' | 'elk';
 
-export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
-  const [direction, setDirection] = useState<Direction>('TB');
-  const [renderer, setRenderer] = useState<Renderer>('dagre');
-  const [fitToPage, setFitToPage] = useState(true);
-  const containerRef = { current: null as HTMLDivElement | null };
+const tKeyword = Tag.define();
+const tEdge = Tag.define();
+const tString = Tag.define();
+const tComment = Tag.define();
 
-  const source = useMemo(() => {
+const mermaidHighlightStyle = tagHighlighter([
+  { tag: tKeyword, class: 'mmd-keyword' },
+  { tag: tEdge, class: 'mmd-edge' },
+  { tag: tString, class: 'mmd-string' },
+  { tag: tComment, class: 'mmd-comment' },
+]);
+
+const mermaidLanguage = new LanguageSupport(
+  StreamLanguage.define({
+    token(stream) {
+      stream.eatSpace();
+      if (stream.eat('%')) {
+        if (stream.eat('%')) {
+          stream.skipToEnd();
+          return 'comment';
+        }
+        stream.next();
+        return null;
+      }
+      if (stream.eat('"')) {
+        while (!stream.eol() && stream.next() !== '"') { /* skip */ }
+        return 'string';
+      }
+      if (stream.match('-->') || stream.match('-.->') || stream.match('==>') || stream.match('--')) {
+        return 'edge';
+      }
+      const keywords = [
+        'graph', 'flowchart', 'subgraph', 'end', 'direction', 'TB', 'TD',
+        'BT', 'RL', 'LR', 'classDef', 'class', 'click', 'call', 'style',
+        'linkStyle', 'node', 'link', 'classDiagram', 'stateDiagram', 'erDiagram',
+        'gantt', 'pie', 'mindmap', 'timeline', 'quadrantChart', 'xychart',
+        'sankey', 'block', 'beta', 'requirementDiagram', 'gitGraph',
+      ];
+      if (stream.match(/[a-zA-Z][a-zA-Z0-9_-]*/)) {
+        if (keywords.includes(stream.current())) return 'keyword';
+        return null;
+      }
+      stream.next();
+      return null;
+    },
+    tokenTable: {
+      keyword: tKeyword,
+      edge: tEdge,
+      string: tString,
+      comment: tComment,
+    },
+  }),
+);
+
+const mermaidTheme = EditorView.theme({
+  '&': {
+    height: '100%',
+    width: '100%',
+    fontSize: '12px',
+    lineHeight: '1.5',
+    backgroundColor: 'transparent',
+    color: '#e5e7eb',
+  },
+  '.cm-scroller': {
+    overflow: 'auto',
+    fontFamily: 'inherit',
+  },
+  '.cm-content': {
+    width: '100%',
+    minWidth: '0',
+    padding: '6px 8px',
+    caretColor: 'white',
+  },
+  '.cm-line': {
+    whiteSpace: 'pre-wrap',
+  },
+  '.cm-cursor': {
+    borderLeftColor: 'white',
+  },
+  '.cm-selectionBackground': {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  '.cm-gutters': {
+    display: 'none',
+  },
+  '.cm-placeholder': {
+    color: 'rgba(255, 255, 255, 0.4)',
+  },
+  '.mmd-keyword': { color: '#93c5fd', fontWeight: 500 },
+  '.mmd-edge': { color: '#f472b6' },
+  '.mmd-string': { color: '#a7f3d0' },
+  '.mmd-comment': { color: '#6b7280' },
+});
+
+export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewModalProps) {
+  const [direction] = useState<Direction>('TB');
+  const [renderer, setRenderer] = useState<Renderer>('dagre');
+  const [sourceWidth, setSourceWidth] = useState(35);
+  const [fitToPage, setFitToPage] = useState(true);
+  const [manualSource, setManualSource] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const draggingRef = useRef(false);
+
+  const generatedSource = useMemo(() => {
     if (!graph.nodes.length && !graph.edges.length) return '';
     return graphToMermaid(graph, { direction, defaultRenderer: renderer, showEdgeLabels: true });
   }, [graph, direction, renderer]);
 
+  // Reset manual edits whenever the graph changes so we don't drift.
+  useEffect(() => {
+    setManualSource(null);
+  }, [graph]);
+
+  const source = manualSource ?? generatedSource;
   const isEmpty = !graph.nodes.length && !graph.edges.length;
+
+  const extensions = useMemo(
+    () => [mermaidLanguage, mermaidTheme, syntaxHighlighting(mermaidHighlightStyle)],
+    [],
+  );
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    const container = (e.currentTarget as HTMLElement).parentElement;
+    if (!container) return;
+    e.preventDefault();
+    draggingRef.current = true;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const rect = container.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((rect.right - moveEvent.clientX) / rect.width) * 100));
+      setSourceWidth(pct);
+    };
+
+    const onUp = () => {
+      draggingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
+  // Mermaid defaultRenderer is controlled by editing the init directive in source;
+  // global instance re-init is driven by MermaidDiagram defaultRenderer prop.
+  const effectiveRenderer = useMemo(() => {
+    const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
+    return init ? (init[1] as Renderer) : renderer;
+  }, [source, renderer]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,63 +188,69 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
         <DialogHeader className="shrink-0">
           <DialogTitle>{title || graph.name || 'Graph view'}</DialogTitle>
         </DialogHeader>
-        <div className="shrink-0 flex items-center gap-3 py-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-white/60">Direction</span>
-            <Select value={direction} onValueChange={(v) => setDirection(v as Direction)}>
-              <SelectTrigger className="h-7 w-20 text-xs bg-white/5 border-white/10 px-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                <SelectItem value="TB">TB</SelectItem>
-                <SelectItem value="LR">LR</SelectItem>
-                <SelectItem value="BT">BT</SelectItem>
-                <SelectItem value="RL">RL</SelectItem>
-              </SelectPopup>
-            </Select>
+        {isEmpty ? (
+          <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] flex items-center justify-center text-sm text-white/40">
+            No graph data available.
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-white/60">Renderer</span>
-            <Select value={renderer} onValueChange={(v) => setRenderer(v as Renderer)}>
-              <SelectTrigger className="h-7 w-24 text-xs bg-white/5 border-white/10 px-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                <SelectItem value="dagre">dagre</SelectItem>
-                <SelectItem value="elk">elk</SelectItem>
-              </SelectPopup>
-            </Select>
-          </div>
-          <div className="ml-auto text-[11px] text-white/40">
-            {graph.nodes.length} nodes · {graph.edges.length} edges
-          </div>
-        </div>
-        <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden relative">
-          {isEmpty ? (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-white/40">
-              No graph data available.
+        ) : (
+          <div className="flex-1 min-h-0 flex overflow-hidden">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+              <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                <span>Preview</span>
+                <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
+              </div>
+              <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
+                <div
+                  ref={containerRef}
+                  className={cn(
+                    'absolute inset-2 overflow-hidden origin-top-left',
+                    fitToPage && 'flex items-center justify-center'
+                  )}
+                >
+                  <MermaidDiagram
+                    content={source}
+                    name={graph.name || 'Graph'}
+                    type="flowchart"
+                    defaultRenderer={effectiveRenderer}
+                    className="h-full"
+                  />
+                </div>
+                <DiagramControls
+                  targetRef={containerRef as React.RefObject<HTMLElement | null>}
+                  fitToPage={fitToPage}
+                  onFitToPageChange={setFitToPage}
+                  className="top-2 right-2"
+                />
+              </div>
             </div>
-          ) : (
+            <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />
             <div
-              ref={(el) => { containerRef.current = el; }}
-              className="absolute inset-0 p-3 overflow-hidden"
+              className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+              style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
-              <MermaidDiagram
-                content={source}
-                name={graph.name || 'Graph'}
-                type="flowchart"
-                defaultRenderer={renderer}
-                className="h-full"
-              />
-              <DiagramControls
-                targetRef={containerRef as React.RefObject<HTMLElement | null>}
-                fitToPage={fitToPage}
-                onFitToPageChange={setFitToPage}
-                className="top-2 right-2"
-              />
+              <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                <span>Mermaid source</span>
+              </div>
+              <div className="flex-1 min-h-0">
+                <CodeMirror
+                  value={source}
+                  onChange={(v) => setManualSource(v)}
+                  extensions={extensions}
+                  theme="none"
+                  height="100%"
+                  className="h-full"
+                  basicSetup={{
+                    lineNumbers: false,
+                    foldGutter: false,
+                    highlightActiveLineGutter: false,
+                    highlightActiveLine: false,
+                    closeBrackets: false,
+                  }}
+                />
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
