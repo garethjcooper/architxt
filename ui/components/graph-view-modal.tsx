@@ -178,7 +178,12 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
           if (key === 'from') return escapeMarkdownCell(src?.id ?? e.from);
           if (key === 'to') return escapeMarkdownCell(tgt?.id ?? e.to);
           if (key === 'properties') return escapeMarkdownCell(e.properties ? JSON.stringify(e.properties) : '');
-          if (key === 'evidence') return escapeMarkdownCell(Array.isArray(e.source_fact_ids) ? e.source_fact_ids.join(', ') : '');
+          if (key === 'evidence') {
+            const evidence = e.source_fact_ids?.length ? e.source_fact_ids : e.properties?.evidence;
+            if (Array.isArray(evidence)) return escapeMarkdownCell(evidence.join(', '));
+            if (evidence) return escapeMarkdownCell(String(evidence));
+            return '';
+          }
           return escapeMarkdownCell(e[key as keyof GraphEdge]);
         })
         .join(' | ');
@@ -339,7 +344,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
           label: e.label || '',
           detail: e.detail || '',
           properties: e.properties || null,
-          evidence: e.source_fact_ids || [],
+          evidence: e.source_fact_ids?.length ? e.source_fact_ids : (e.properties?.evidence ?? []),
         };
       });
       const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
