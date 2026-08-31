@@ -275,7 +275,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
               <ResizeHandle direction="horizontal" onMouseDown={startJsonResize} title="Drag to resize JSON panel" />
               <div
                 className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
-                style={{ flexBasis: `${jsonHeight}%`, minWidth: '16rem', maxWidth: '80%' }}
+                style={{ flexBasis: `${jsonHeight}%` }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Graph JSON</span>
