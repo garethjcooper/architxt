@@ -3,6 +3,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { CuratedPageEditor, type CuratedPageEnvelope } from './curated-page-editor';
 import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
+import { EnvelopeControls } from '@/components/envelope-controls';
 
 export interface WorkspaceResultPanelProps {
   result: DiscoverStepResponse | ResearchStepSummary | null;
@@ -58,18 +59,52 @@ export function WorkspaceResultPanel({
   tabs,
   headerTitle,
 }: WorkspaceResultPanelProps) {
+  const showControls = true;
+
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center text-xs text-red-300/90 whitespace-pre-wrap p-4">
-        {error}
+      <div className="h-full flex flex-col overflow-hidden">
+        {showControls && (
+          <EnvelopeControls
+            title={title}
+            headerTitle={headerTitle}
+            count={count}
+            showIndex={false}
+            onShowIndexChange={() => {}}
+            plain={false}
+            onPlainChange={() => {}}
+            onCopyText={() => {}}
+            onSaveMd={() => {}}
+          />
+        )}
+        {tabs}
+        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-red-300/90 whitespace-pre-wrap p-4">
+          {error}
+        </div>
       </div>
     );
   }
 
   if (!result) {
     return (
-      <div className="h-full flex items-center justify-center text-xs text-white/40">
-        {isRunning ? 'Running query…' : 'Select a step or model to view its content.'}
+      <div className="h-full flex flex-col overflow-hidden">
+        {showControls && (
+          <EnvelopeControls
+            title={title}
+            headerTitle={headerTitle}
+            count={count}
+            showIndex={false}
+            onShowIndexChange={() => {}}
+            plain={false}
+            onPlainChange={() => {}}
+            onCopyText={() => {}}
+            onSaveMd={() => {}}
+          />
+        )}
+        {tabs}
+        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-white/40">
+          {isRunning ? 'Running query…' : 'Select a step or model to view its content.'}
+        </div>
       </div>
     );
   }
