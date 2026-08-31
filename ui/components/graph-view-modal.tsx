@@ -209,10 +209,8 @@ export function GraphViewModal({ open, onOpenChange, graph, title }: GraphViewMo
                 >
                   <MermaidDiagram
                     content={source}
-                    name={graph.name || 'Graph'}
-                    type="flowchart"
                     defaultRenderer={effectiveRenderer}
-                    className="h-full"
+                    className="h-full border-0"
                   />
                 </div>
                 <DiagramControls
