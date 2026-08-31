@@ -7,6 +7,7 @@ import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import { MermaidDiagram } from '@/components/mermaid-diagram';
 import { MermaidEditor } from '@/components/mermaid-editor';
+import { GraphViewModal } from '@/components/graph-view-modal';
 import {
   Dialog,
   DialogContent,
@@ -96,6 +97,7 @@ export function CuratedPageEditor({
   const [focusedDiagram, setFocusedDiagram] = useState<{ block: NarrativeBlock; name: string; content: string } | null>(null);
   const [focusedDiagramContent, setFocusedDiagramContent] = useState<string>('');
   const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
+  const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -313,6 +315,13 @@ export function CuratedPageEditor({
     }
   }, [envelope.diagrams, displayedBlocks]);
 
+  const openGraphFocus = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeading(b.title);
+    if (!parsed || parsed.kind !== 'graph') return;
+    const name = envelope.graph.name || parsed.name || 'Graph';
+    setFocusedGraph({ block: b, name });
+  }, [envelope.graph]);
+
   const applyFocusedDiagram = useCallback(() => {
     if (!focusedDiagram) return;
     const parsed = parseSyntheticHeading(focusedDiagram.block.title);
@@ -370,17 +379,22 @@ export function CuratedPageEditor({
             const isDeleted = b.deleted;
             const parsed = parseSyntheticHeading(b.title);
             const isDiagram = parsed?.kind === 'diagram';
+            const isGraph = parsed?.kind === 'graph';
             return (
               <div className="flex items-center gap-0.5">
-                {isDiagram && !isDeleted && (
+                {(isDiagram || isGraph) && !isDeleted && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openDiagramFocus(b);
+                      if (isGraph) {
+                        openGraphFocus(b);
+                      } else {
+                        openDiagramFocus(b);
+                      }
                     }}
                     className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                    title="Focus diagram"
+                    title={isGraph ? 'Focus graph' : 'Focus diagram'}
                   >
                     <Eye className="h-3 w-3" />
                   </button>
@@ -451,6 +465,12 @@ export function CuratedPageEditor({
           )}
         </DialogContent>
       </Dialog>
+      <GraphViewModal
+        open={focusedGraph != null}
+        onOpenChange={(open) => { if (!open) setFocusedGraph(null); }}
+        graph={envelope.graph}
+        title={focusedGraph?.name}
+      />
     </div>
   );
 }
