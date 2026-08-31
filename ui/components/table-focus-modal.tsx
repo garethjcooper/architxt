@@ -156,8 +156,8 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
                 <thead className="sticky top-0 bg-[oklch(0.22_0_0)] z-10">
                   <tr className="border-b border-white/20">
                     <th className="py-2 px-2 w-10"></th>
-                    {columns.map((c) => (
-                      <th key={c} className="py-2 px-2 font-semibold text-white/80 min-w-[8rem]">
+                    {columns.map((c, i) => (
+                      <th key={i} className="py-2 px-2 font-semibold text-white/80 min-w-[8rem]">
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
@@ -191,8 +191,8 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </td>
-                      {columns.map((c) => (
-                        <td key={c} className="py-1 px-2 align-middle">
+                      {columns.map((c, ci) => (
+                        <td key={ci} className="py-1 px-2 align-middle">
                           <input
                             type="text"
                             value={formatCell(row[c])}
