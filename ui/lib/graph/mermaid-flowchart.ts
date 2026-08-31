@@ -12,22 +12,38 @@ export interface GraphToMermaidOptions {
   showEdgeLabels?: boolean;
 }
 
+const RESERVED = new Set([
+  'flowchart', 'graph', 'subgraph', 'end', 'direction', 'style', 'classDef', 'class',
+  'linkStyle', 'click', 'call', 'tooltip', 'loop', 'alt', 'else', 'opt', 'par',
+  'and', 'break', 'critical', 'option', 'over', 'rect', 'newlines', 'comment',
+]);
+
 function safeNodeId(id: string): string {
-  // Mermaid node ids must be alphanumeric plus limited punctuation.
-  // Replace anything else with underscores, ensuring we never start with a digit.
-  const sanitized = id.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return /^[0-9]/.test(sanitized) ? `n_${sanitized}` : sanitized;
+  // Mermaid ids need to start with a letter or be quoted.
+  // Replace any character that is not alphanumeric/underscore with underscore.
+  let sanitized = id.replace(/[^a-zA-Z0-9_]/g, '_');
+  if (!sanitized || /^[0-9]/.test(sanitized)) {
+    sanitized = `n_${sanitized || 'x'}`;
+  }
+  if (RESERVED.has(sanitized)) {
+    sanitized = `n_${sanitized}`;
+  }
+  return sanitized;
+}
+
+function quotedLabel(label: string): string {
+  // Wrap labels in double quotes and escape any inner quotes.
+  return `"${label.replace(/"/g, '\\"')}"`;
 }
 
 function nodeLabel(node: GraphNode): string {
   const label = node.name || node.label || node.id;
-  return truncateLabel(label, 28).replace(/"/g, '\\"');
+  return truncateLabel(label, 28);
 }
 
 function nodeStyle(node: GraphNode): string {
   const id = safeNodeId(node.id);
-  const color = node.color || colorForType(node.type);
-  // Remove leading '#' for Mermaid hex colors.
+  const color = node.color || colorForType(node.type) || '#64748b';
   const hex = color.replace(/^#/, '');
   return `style ${id} fill:#${hex},stroke:#ffffff33,color:#fff;`;
 }
@@ -51,15 +67,16 @@ export function graphToMermaid(
   for (const node of graph.nodes) {
     const id = safeNodeId(node.id);
     const label = nodeLabel(node);
-    const shape = node.type ? `["${label}"]` : `[${label}]`;
-    lines.push(`    ${id}${shape}`);
+    // Always quote labels so spaces and punctuation are safe.
+    lines.push(`    ${id}[${quotedLabel(label)}]`);
   }
 
   for (const edge of visibleEdges) {
     const fromId = safeNodeId(edge.from);
     const toId = safeNodeId(edge.to);
-    const label = showEdgeLabels && edge.label ? `|${edge.label.replace(/"/g, '\\"')}|` : '';
-    const arrow = edge.type || edge.label ? `-.-${label}->` : '-->';
+    const label = showEdgeLabels && edge.label ? ` ${quotedLabel(edge.label)} ` : '';
+    // Use the standard arrow forms: --> for solid, -.-> for dotted with optional label.
+    const arrow = label ? `-.${label}.->` : '-->';
     lines.push(`    ${fromId} ${arrow} ${toId}`);
   }
 
