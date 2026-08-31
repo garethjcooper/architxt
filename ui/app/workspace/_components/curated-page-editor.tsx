@@ -338,7 +338,6 @@ export function CuratedPageEditor({
   }, [envelope.tables]);
 
   const openNarrativeFocus = useCallback((b: NarrativeBlock) => {
-    if (b.type !== 'text') return;
     setFocusedNarrative({ block: b });
   }, []);
 
