@@ -149,7 +149,8 @@ function PreviewPane({
       }
       try {
         const id = `mermaid-editor-${Math.random().toString(36).slice(2, 11)}`;
-        const { svg: rendered } = await mermaid.render(id, source);
+        const errorContainer = document.createElement('div');
+        const { svg: rendered } = await mermaid.render(id, source, errorContainer);
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
