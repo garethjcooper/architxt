@@ -1173,30 +1173,38 @@ router.get('/mental-models/content', async (req, res) => {
 
   try {
     logger.info('Research mental-models content request', { serverId, bankId, extId });
-    const result = await getHindsightMentalModel(serverId, bankId, extId, { detail: 'content' });
+    const result = await getHindsightMentalModel(serverId, bankId, extId, { detail: 'full' });
     if (!result.success) {
       const status = result.code === 'NOT_FOUND' ? 404 : 502;
       return res.status(status).json({ error: result.error, code: result.code || 'FETCH_FAILED' });
     }
 
     const model = result.mentalModel || {};
-    let rawContent = model.content ?? null;
+    const structuredOutput = model.reflect_response?.structured_output ?? null;
+
+    let rawContent;
     let parsedContent = null;
     let parseError = null;
 
-    if (typeof rawContent === 'string' && rawContent.trim()) {
-      try {
-        parsedContent = JSON.parse(rawContent);
-      } catch (err) {
-        parseError = err.message;
-        // Some stored mental-model content is the valid JSON envelope followed
-        // by extra LLM text (e.g. trailing prose after the closing brace). Fall
-        // back to the loose JSON extractors that pull the first balanced {...}
-        // or [...] payload and ignore surrounding/markdown content.
-        parsedContent = parseJsonString(rawContent) || extractBalancedJson(rawContent);
+    if (structuredOutput && typeof structuredOutput === 'object' && !Array.isArray(structuredOutput)) {
+      rawContent = JSON.stringify(structuredOutput);
+      parsedContent = structuredOutput;
+    } else {
+      rawContent = model.content ?? null;
+      if (typeof rawContent === 'string' && rawContent.trim()) {
+        try {
+          parsedContent = JSON.parse(rawContent);
+        } catch (err) {
+          parseError = err.message;
+          // Some stored mental-model content is the valid JSON envelope followed
+          // by extra LLM text (e.g. trailing prose after the closing brace). Fall
+          // back to the loose JSON extractors that pull the first balanced {...}
+          // or [...] payload and ignore surrounding/markdown content.
+          parsedContent = parseJsonString(rawContent) || extractBalancedJson(rawContent);
+        }
+      } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
+        parsedContent = rawContent;
       }
-    } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
-      parsedContent = rawContent;
     }
 
     const catalogEntities = await loadEntityCatalog(db);

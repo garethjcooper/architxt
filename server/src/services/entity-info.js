@@ -521,7 +521,7 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
     if (includeContent) {
       const contentEntries = await Promise.all(
         Array.from(allExtIds).map(async (extId) => {
-          const mmResult = await getMentalModel(serverId, bankId, extId, { detail: 'content' });
+          const mmResult = await getMentalModel(serverId, bankId, extId, { detail: 'full' });
           return [extId, mmResult.success ? { found: true, mental_model: mmResult.mentalModel } : { found: false, error: mmResult.error }];
         }),
       );
