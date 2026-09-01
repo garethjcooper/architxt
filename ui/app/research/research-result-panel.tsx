@@ -207,9 +207,11 @@ export function ResearchResultPanel({
     return selected
       .map((s) => {
         const envelope = normalizeEnvelope(s);
-        const narrative = envelope.narrative;
-        if (!narrative) return null;
-        return narrative;
+        const narratives = envelope.narratives
+          .map((n) => n.narrative)
+          .filter((n): n is string => Boolean(n));
+        if (narratives.length === 0) return null;
+        return narratives.join('\n\n');
       })
       .filter(Boolean)
       .join('\n\n---\n\n');
@@ -281,7 +283,7 @@ export function ResearchResultPanel({
   const narrative = useMemo(() => {
     if (viewMode === 'session') {
       const mergedEnvelope = {
-        narrative: mergedNarrative || '',
+        narratives: mergedNarrative ? [{ narrative_name: '', narrative: mergedNarrative }] : [],
         graph: mergedGraph ?? { nodes: [], edges: [] },
         tables: mergedTables ?? [],
         diagrams: mergedDiagrams ?? [],

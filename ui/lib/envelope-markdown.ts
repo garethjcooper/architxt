@@ -1,4 +1,4 @@
-import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedEnvelope } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedEnvelope, UnifiedNarrativeBlock } from '@/lib/api/client';
 
 type LegacyEnvelope = {
   synthesis?: { narrative?: string | null; narrative_name?: string | null } | null;
@@ -13,17 +13,35 @@ export type EnvelopeLike = LegacyEnvelope | UnifiedEnvelope | null | undefined;
 
 function isUnifiedEnvelope(envelope: EnvelopeLike): envelope is UnifiedEnvelope {
   if (!envelope || typeof envelope !== 'object') return false;
-  return 'narrative' in envelope && !('synthesis' in envelope);
+  return 'narratives' in envelope && !('synthesis' in envelope);
+}
+
+function toNarratives(envelope: EnvelopeLike): UnifiedNarrativeBlock[] {
+  if (!envelope || typeof envelope !== 'object') return [];
+  if (isUnifiedEnvelope(envelope)) {
+    return Array.isArray(envelope.narratives)
+      ? envelope.narratives.map((n) => ({
+          narrative_name: n.narrative_name ?? '',
+          narrative: n.narrative ?? '',
+        }))
+      : [];
+  }
+  const legacyNarrative = envelope.synthesis?.narrative ?? '';
+  const legacyName = envelope.synthesis?.narrative_name ?? '';
+  if (typeof legacyNarrative === 'string' && legacyNarrative.trim().length > 0) {
+    return [{ narrative_name: legacyName, narrative: legacyNarrative }];
+  }
+  return [];
 }
 
 function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   if (!envelope) {
-    return { narrative: '', narrative_name: '', graph: { name: '', nodes: [], edges: [] }, tables: [], diagrams: [] };
+    return { narratives: [], graph: { name: '', nodes: [], edges: [] }, tables: [], diagrams: [] };
   }
+
   if (!isUnifiedEnvelope(envelope)) {
     return {
-      narrative: envelope.synthesis?.narrative ?? '',
-      narrative_name: envelope.synthesis?.narrative_name ?? '',
+      narratives: toNarratives(envelope),
       graph: {
         name: envelope.canvas?.graph?.name ?? '',
         nodes: envelope.canvas?.graph?.nodes ?? [],
@@ -39,8 +57,7 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   }
 
   return {
-    narrative: envelope.narrative ?? '',
-    narrative_name: envelope.narrative_name ?? '',
+    narratives: toNarratives(envelope),
     graph: {
       name: envelope.graph?.name ?? '',
       nodes: envelope.graph?.nodes ?? [],
@@ -115,12 +132,13 @@ export function formatPropertiesCompact(properties: Record<string, any>): string
 
 export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
   const unified = toUnified(envelope);
-  const { narrative, narrative_name, graph, tables, diagrams } = unified;
+  const { narratives, graph, tables, diagrams } = unified;
   const parts: string[] = [];
 
-  if (narrative.trim()) {
-    const heading = narrative_name?.trim() ? `## ${narrative_name.trim()}` : '';
-    parts.push(heading ? `${heading}\n\n${narrative.trim()}` : narrative.trim());
+  for (const block of narratives) {
+    if (!block.narrative?.trim()) continue;
+    const heading = block.narrative_name?.trim() ? `## ${block.narrative_name.trim()}` : '';
+    parts.push(heading ? `${heading}\n\n${block.narrative.trim()}` : block.narrative.trim());
   }
 
   if (tables && tables.length > 0) {
