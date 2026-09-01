@@ -66,7 +66,7 @@ describe('addContext discovery integration', () => {
     const queued = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
       for (const spec of specs) queued.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: [], unchanged: specs.map((s) => s.ext_id), failed: [] };
     };
 
     const result = await addContext(db, serverId, 'Mozart-API', {
@@ -101,7 +101,7 @@ describe('addContext discovery integration', () => {
     const firstDeployed = [];
     const firstDeployBatch = async (_db, _serverId, _bankId, specs) => {
       for (const spec of specs) firstDeployed.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
     };
 
     await addContext(db, serverId, 'Mozart-API', {
@@ -118,7 +118,7 @@ describe('addContext discovery integration', () => {
     const secondQueued = [];
     const secondDeployBatch = async (_db, _serverId, _bankId, specs) => {
       for (const spec of specs) secondQueued.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: [], unchanged: specs.map((s) => s.ext_id), failed: [] };
     };
 
     const result = await addContext(db, serverId, 'Mozart-API', {

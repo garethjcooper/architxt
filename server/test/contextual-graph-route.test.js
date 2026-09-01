@@ -101,11 +101,13 @@ describe('contextual-graph route', () => {
       assert.equal(res.body.code, 'MISSING_PARAMS');
     });
 
-    it('returns queued and deployed model ids on success', async () => {
+    it('returns queued and composed model ids on success', async () => {
       const addContext = async () => ({
         success: true,
         queued: { entity: 2, edge: 1, discover: 0 },
-        deployed: ['entity-ctx-A', 'entity-ctx-B', 'edge-ctx-A|B'],
+        composed: ['entity-ctx-A', 'entity-ctx-B', 'edge-ctx-A|B'],
+        pushed: ['entity-ctx-A', 'entity-ctx-B', 'edge-ctx-A|B'],
+        unchanged: [],
         failed: [] });
 
       const app = makeApp({ db, addContext });
@@ -120,14 +122,14 @@ describe('contextual-graph route', () => {
       assert.equal(res.status, 200);
       assert.equal(res.body.success, true);
       assert.equal(res.body.queued.entity, 2);
-      assert.equal(res.body.deployed.length, 3);
+      assert.equal(res.body.composed.length, 3);
     });
 
     it('passes seed_node_ids and neighborhood to the service', async () => {
       let captured;
       const addContext = async (_db, _serverId, _bankId, options) => {
         captured = options;
-        return { success: true, queued: { entity: 0, edge: 0, discover: 0 }, deployed: [], failed: [] };
+        return { success: true, queued: { entity: 0, edge: 0, discover: 0 }, composed: [], pushed: [], unchanged: [], failed: [] };
       };
 
       const app = makeApp({ db, addContext });
