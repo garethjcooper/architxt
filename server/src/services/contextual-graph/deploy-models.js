@@ -112,8 +112,8 @@ export async function deployMentalModelBatch(db, serverId, bankId, specs) {
 
   for (let i = 0; i < specs.length; i += 1) {
     const spec = specs[i];
-    const composed = composedResults[i]?.composed_query ?? null;
-    if (!composed) {
+    const composedQuery = composedResults[i]?.composed_query ?? null;
+    if (!composedQuery) {
       failed.push({
         ext_id: spec.ext_id,
         error: composedResults[i]?.compose_error || 'Failed to compose prompt',
@@ -121,7 +121,7 @@ export async function deployMentalModelBatch(db, serverId, bankId, specs) {
       });
       continue;
     }
-    const result = await deployMentalModel(db, serverId, bankId, spec, composed);
+    const result = await deployMentalModel(db, serverId, bankId, spec, composedQuery);
     if (result.success) {
       composed.push(result.model_id);
       if (result.skipped) {
