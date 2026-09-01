@@ -107,7 +107,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
       const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
       const tables = Array.isArray(content.tables) ? content.tables : [];
       const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
-      const graphNormalized = normalizeGraph(graph, { source: 'template_model' });
+      const graphNormalized = normalizeGraph(graph, { source: 'template_model', preserveParallelEdges: true });
 
       return {
         ext_id: extId,

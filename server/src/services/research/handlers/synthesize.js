@@ -277,6 +277,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     knownCatalog,
     activity: 'synthesize',
     mode: 'generic',
+    preserveParallelEdges: true,
   });
 
   // Filter nodes based on discovery permission.

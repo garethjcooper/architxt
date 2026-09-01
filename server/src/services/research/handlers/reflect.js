@@ -140,8 +140,9 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const knownCatalog = await knownCatalogPromise;
   const envelope = toEnvelope(extracted, {
     knownCatalog,
+    mode,
     activity: 'reflect',
-    mode: 'generic',
+    preserveParallelEdges: true,
   });
 
   const hasGraph = envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0;
