@@ -86,7 +86,7 @@ export async function runDiscoverStep(params) {
       return failStep(handlerResult.error, handlerResult.code || 'HANDLER_FAILED');
     }
 
-    const narrative = handlerResult.narrative || '';
+    const narratives = handlerResult.narratives || [];
     const canvas = {
       ...EMPTY_CANVAS,
       graph: handlerResult.graph || { nodes: [], edges: [] },
@@ -94,8 +94,7 @@ export async function runDiscoverStep(params) {
       diagrams: handlerResult.diagrams || [],
     };
     const envelope = {
-      narrative,
-      narrative_name: handlerResult.narrative_name || '',
+      narratives,
       graph: canvas.graph,
       tables: canvas.tables,
       diagrams: canvas.diagrams,
@@ -103,7 +102,7 @@ export async function runDiscoverStep(params) {
 
     await updateStep(db, rstepId, {
       rstep_canvas_state: canvas,
-      rstep_synthesis: { narrative, narrative_name: handlerResult.narrative_name || '' },
+      rstep_synthesis: { narrative: '' },
       rstep_envelope: envelope,
       rstep_tool_calls_used: calls.length,
       rstep_calls: calls,
@@ -114,7 +113,7 @@ export async function runDiscoverStep(params) {
     return {
       success: true,
       data: {
-        synthesis: { narrative },
+        synthesis: { narrative: '' },
         canvas,
         calls,
         tool_calls_used: calls.length,

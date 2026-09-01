@@ -218,7 +218,7 @@ const toApiStepSummary = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
   const envelope = isCurated
     ? (dbRow.rstep_envelope ?? {
-        narrative: dbRow.rstep_synthesis?.narrative ?? '',
+        narratives: [],
         graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
         tables: dbRow.rstep_canvas_state?.tables ?? [],
         diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
@@ -249,7 +249,9 @@ const toApiStep = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
   const envelope = isCurated
     ? (dbRow.rstep_envelope ?? {
-        narrative: dbRow.rstep_synthesis?.narrative ?? '',
+        narratives: dbRow.rstep_synthesis?.narrative
+          ? [{ narrative_name: dbRow.rstep_synthesis?.narrative_name || '', narrative: dbRow.rstep_synthesis.narrative }]
+          : [],
         graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
         tables: dbRow.rstep_canvas_state?.tables ?? [],
         diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
@@ -1205,8 +1207,7 @@ router.get('/mental-models/content', async (req, res) => {
     const envelope = parsedContent
       ? toEnvelope(parsedContent, { knownCatalog, activity: 'mental-model', mode: 'generic' })
       : {
-          narrative: '',
-          narrative_name: '',
+          narratives: [],
           graph: { name: '', nodes: [], edges: [] },
           tables: [],
           diagrams: [],
@@ -1217,13 +1218,13 @@ router.get('/mental-models/content', async (req, res) => {
         || (Array.isArray(parsedContent.graph?.edges) && parsedContent.graph.edges.length > 0)
         || (Array.isArray(parsedContent.tables) && parsedContent.tables.length > 0)
         || (Array.isArray(parsedContent.diagrams) && parsedContent.diagrams.length > 0)
-        || (typeof parsedContent.narrative === 'string' && parsedContent.narrative.trim().length > 0));
+        || (Array.isArray(parsedContent.narratives) && parsedContent.narratives.some((n) => typeof n.narrative === 'string' && n.narrative.trim().length > 0)));
 
     const hasEnvelopeData = (envelope.graph?.nodes?.length ?? 0) > 0
       || (envelope.graph?.edges?.length ?? 0) > 0
       || (envelope.tables?.length ?? 0) > 0
       || (envelope.diagrams?.length ?? 0) > 0
-      || envelope.narrative?.trim().length > 0;
+      || envelope.narratives?.some((n) => n.narrative?.trim().length > 0);
 
     if (parseError && hasRawData) {
       logger.warn('Mental-model content required loose JSON extraction', {

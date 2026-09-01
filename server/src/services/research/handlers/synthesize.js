@@ -40,10 +40,17 @@ function collectFromSteps(sourceSteps) {
   for (const step of sourceSteps) {
     const canvas = step.canvas || {};
     const graph = canvas.graph || {};
+    const envelope = step.envelope || {};
     const synthesis = step.synthesis || {};
 
-    if (synthesis.narrative) {
-      narratives.push(`## Step: ${step.intent_text || 'untitled'}\n${synthesis.narrative}`);
+    // Prefer new envelope.narratives, fall back to legacy synthesis.narrative.
+    const stepNarratives = Array.isArray(envelope.narratives)
+      ? envelope.narratives
+      : (synthesis.narrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: synthesis.narrative }] : []);
+    if (stepNarratives.length > 0) {
+      const title = `## Step: ${step.intent_text || 'untitled'}`;
+      const body = stepNarratives.map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`).join('\n\n');
+      narratives.push(`${title}\n${body}`);
     }
 
     for (const n of graph.nodes || []) {
@@ -143,14 +150,15 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   }
 
   // Guard: ensure we have something to synthesize.
-  const { nodes: corpusNodes, edges: corpusEdges } = collectFromSteps(sourceSteps);
-  const hasNarratives = sourceSteps.some((s) => s.synthesis?.narrative);
+  const { nodes: corpusNodes, edges: corpusEdges, narratives: corpusNarratives } = collectFromSteps(sourceSteps);
+  const hasNarratives = corpusNarratives.length > 0;
   if (!hasNarratives && corpusNodes.length === 0 && corpusEdges.length === 0) {
     return {
       success: true,
-      narrative: 'No source material available for synthesis.',
+      narratives: [],
       graph: { nodes: [], edges: [] },
       tables: [],
+      diagrams: [],
       calls: [],
     };
   }
@@ -158,9 +166,10 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   if (!cfg.model && !options?.model) {
     return {
       success: true,
-      narrative: 'Synthesis is not configured: missing model.',
+      narratives: [],
       graph: { nodes: [], edges: [] },
       tables: [],
+      diagrams: [],
       calls: [],
     };
   }
@@ -298,10 +307,10 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   });
 
   // Defense in depth: if narrative was not requested, scrub any model-generated
-  // narrative so downstream consumers only see structured output.
-  let finalNarrative = envelope.narrative;
+  // narratives so downstream consumers only see structured output.
+  let finalNarratives = envelope.narratives;
   if (hasAnyDirective && !requestedNarrative) {
-    finalNarrative = '';
+    finalNarratives = [];
   }
 
   const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
@@ -310,8 +319,8 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   logger.info('Synthesize handler completed', {
     intentText,
     templateName: 'generic',
-    narrativeLength: finalNarrative.length,
-    narrativeNameLength: (envelope.narrative_name || '').length,
+    narrativeCount: finalNarratives.length,
+    narrativeNameLength: (finalNarratives[0]?.narrative_name || '').length,
     graphNameLength: (graph.name || '').length,
     graphNodeCount: graph.nodes.length,
     graphEdgeCount: graph.edges.length,
@@ -319,8 +328,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
 
   return {
     success: true,
-    narrative: finalNarrative,
-    narrative_name: envelope.narrative_name,
+    narratives: finalNarratives,
     graph,
     tables: envelope.tables,
     diagrams: envelope.diagrams,

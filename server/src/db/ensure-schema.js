@@ -1284,8 +1284,9 @@ function migrateCuratedPagesToEnvelope(db) {
   for (const row of pending) {
     const synthesis = row.rstep_synthesis ? JSON.parse(row.rstep_synthesis) : { narrative: '' };
     const canvas = row.rstep_canvas_state ? JSON.parse(row.rstep_canvas_state) : { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+    const firstNarrative = typeof synthesis.narrative === 'string' ? synthesis.narrative : '';
     const envelope = {
-      narrative: typeof synthesis.narrative === 'string' ? synthesis.narrative : '',
+      narratives: firstNarrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: firstNarrative }] : [],
       graph: canvas.graph ?? { nodes: [], edges: [] },
       tables: canvas.tables ?? [],
       diagrams: canvas.diagrams ?? [],

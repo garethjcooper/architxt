@@ -27,8 +27,9 @@ function makeCompletion(content) {
   });
 }
 
-function buildEnvelope({ narrative = '', nodes = [], edges = [], tables = [], diagrams = [] } = {}) {
-  return JSON.stringify({ narrative, graph: { nodes, edges }, tables, diagrams });
+function buildEnvelope({ narrative = '', narrative_name = '', nodes = [], edges = [], tables = [], diagrams = [] } = {}) {
+  const narratives = narrative ? [{ narrative_name, narrative }] : [];
+  return JSON.stringify({ narratives, graph: { nodes, edges }, tables, diagrams });
 }
 
 describe('synthesize handler', () => {
@@ -62,7 +63,7 @@ describe('synthesize handler', () => {
   it('returns empty result when no model is configured and no source material', async () => {
     const result = await handleSynthesize(1, 'bank', 'test query', { source_steps: [] }, db);
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'No source material available for synthesis.');
+    assert.deepEqual(result.narratives, []);
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
@@ -72,7 +73,7 @@ describe('synthesize handler', () => {
       output_mode: 'narrative+graph',
     }, db);
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'Synthesis is not configured: missing model.');
+    assert.deepEqual(result.narratives, []);
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
@@ -85,7 +86,7 @@ describe('synthesize handler', () => {
   it('returns empty result when no source material is provided', async () => {
     const result = await handleSynthesize(1, 'bank', 'test query', { source_steps: [], model: 'test-model' }, db);
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'No source material available for synthesis.');
+    assert.deepEqual(result.narratives, []);
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
@@ -127,7 +128,7 @@ describe('synthesize handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'Synthesized summary.');
+    assert.equal(result.narratives[0]?.narrative, 'Synthesized summary.');
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
     assert.equal(result.graph.nodes[0].id, 'a-com:COM-001');
@@ -222,7 +223,7 @@ describe('synthesize handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.equal(result.narrative, '');
+    assert.equal(result.narratives[0]?.narrative ?? '', '');
     assert.equal(result.diagrams.length, 1);
   });
 
@@ -249,6 +250,6 @@ describe('synthesize handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'Keep this summary.');
+    assert.equal(result.narratives[0]?.narrative, 'Keep this summary.');
   });
 });

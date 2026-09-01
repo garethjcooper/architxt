@@ -80,8 +80,11 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   }
 
   const content = structuredOutput;
-  const { narrative, graph, tables, diagrams, errors: modelErrors } = {
-    narrative: typeof content.narrative === 'string' ? content.narrative : '',
+  const narratives = Array.isArray(content.narratives)
+    ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+    : [];
+  const narrative = narratives.map((n) => `${n.narrative_name ? `## ${n.narrative_name}\n` : ''}${n.narrative}`.trim()).join('\n\n');
+  const { graph, tables, diagrams, errors: modelErrors } = {
     graph: normalizeGraph(content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] }),
     tables: Array.isArray(content.tables) ? content.tables : [],
     diagrams: Array.isArray(content.diagrams) ? content.diagrams : [],

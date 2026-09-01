@@ -91,6 +91,9 @@ export async function applyModelOutput(db, serverId, bankId, model, output, opti
   }
 }
 
+function firstNarrativeText(output) {
+  return output?.narratives?.[0]?.narrative ?? '';
+}
 
 function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
   const nodeId = model.scope?.node_id;
@@ -105,9 +108,10 @@ function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
   const node = nodeResult.data;
 
   const modelRef = buildModelRef(model, output.raw, timestamp);
+  const firstNarrative = firstNarrativeText(output);
   const properties = {
     ...node.properties,
-    summary: output.narrative || '',
+    summary: firstNarrative,
     provenance: {
       ...(node.properties?.provenance || {}),
       source: 'contextual-graph',
@@ -159,8 +163,8 @@ function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp)
     updated_at: timestamp,
   };
 
-  if (output.narrative.trim()) {
-    properties.summary = output.narrative;
+  if (firstNarrativeText(output).trim()) {
+    properties.summary = firstNarrativeText(output);
   }
 
   upsertNode(db, serverId, bankId, nodeId, node.labels || [], properties);

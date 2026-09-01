@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { handleModels } from '../src/services/research/handlers/models.js';
 
 const TEST_CONTENT = JSON.stringify({
-  narrative: 'Some narrative text.',
+  narratives: [{ narrative_name: 'Overview', narrative: 'Some narrative text.' }],
   graph: {
     nodes: [
       { id: 'a', name: 'Alpha' },
@@ -43,7 +43,7 @@ describe('models handler graph extraction', () => {
   });
 
   it('returns null when the envelope has no graph', () => {
-    const section = extractGraphDataSection(JSON.stringify({ narrative: 'Just narrative.' }));
+    const section = extractGraphDataSection(JSON.stringify({ narratives: [], narrative: 'Just narrative.' }));
     assert.equal(section, null);
   });
 });

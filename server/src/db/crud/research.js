@@ -219,7 +219,7 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
     rstep_tool_calls_used, rstep_calls
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  const blankEnvelope = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
+  const blankEnvelope = JSON.stringify({ narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
   const result = stmt(db, sql).run(
     rsId,
     null,
@@ -260,9 +260,10 @@ export const updateCuratedPage = (db, stepId, data) => dbExec(() => {
     const envelope = typeof updateData.rstep_envelope === 'string'
       ? JSON.parse(updateData.rstep_envelope)
       : updateData.rstep_envelope;
+    const firstNarrative = Array.isArray(envelope.narratives) ? envelope.narratives[0] : null;
     updateData.rstep_synthesis = {
-      narrative: typeof envelope.narrative === 'string' ? envelope.narrative : '',
-      narrative_name: typeof envelope.narrative_name === 'string' ? envelope.narrative_name : undefined,
+      narrative: firstNarrative?.narrative || '',
+      narrative_name: firstNarrative?.narrative_name || undefined,
     };
     updateData.rstep_canvas_state = {
       graph: envelope.graph ?? { nodes: [], edges: [] },
