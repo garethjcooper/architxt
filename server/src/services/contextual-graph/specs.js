@@ -124,10 +124,10 @@ export async function deriveSpecForRef(db, serverId, bankId, ref) {
       (e) =>
         e.cge_source_id === sourceId &&
         e.cge_target_id === targetId &&
-        (e.cge_properties?.labels?.includes('candidate') || e.cge_properties?.labels?.includes('grounded')),
+        e.cge_properties?.labels?.includes('grounded'),
     );
-    if (pairEdges.some((e) => e.cge_properties?.labels?.includes('candidate'))) {
-      logger.warn('Dropping edge-ctx ref because the edge is a candidate; promotion required', { serverId, bankId, ref });
+    if (pairEdges.length === 0) {
+      logger.warn('Dropping edge-ctx ref because no grounded edge exists between endpoints', { serverId, bankId, ref });
       return null;
     }
 

@@ -1,6 +1,6 @@
 import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
 import { pushMentalModel } from '../../services/hindsight/push-mental-model.js';
-import { composeMentalModelPrompt } from '../../prompts/template-service.js';
+import { composeMentalModelPromptBatch } from '../../prompts/template-service.js';
 import { buildMentalModelDivergence, hasDivergence } from '../../services/mental-model-divergence.js';
 import { UNIFIED_RESPONSE_SCHEMA } from '../../services/contextual-graph/unified-response-schema.js';
 import { createLogger } from '../../utils/logger.js';
@@ -9,30 +9,6 @@ import { extractModelRefsFromDb } from './refresh-patches.js';
 import { deriveSpecsForRefs } from './specs.js';
 
 const logger = createLogger('contextual-graph-sync-mental-model-config');
-
-function roleFromExtId(extId) {
-  if (extId.startsWith('entity-summary-')) return 'sys_entity_summary';
-  if (extId.startsWith('entity-capabilities-')) return 'sys_entity_capabilities';
-  if (extId.startsWith('edge-ctx-')) return 'sys_edge_context';
-  if (extId.startsWith('discover-')) return 'sys_discovery_context';
-  return null;
-}
-
-function buildFallbackSpecFromTemplate(template, hind, role, extId) {
-  return {
-    ext_id: extId,
-    role,
-    name: hind.name || template.data.name || null,
-    source_query: hind.source_query || template.data.source_query || '',
-    max_tokens: template.data.max_tokens,
-    refresh_mode: template.data.refresh_mode,
-    refresh_after_consolidation: template.data.refresh_after_consolidation,
-    exclude_all_mental_models: template.data.exclude_all_mental_models,
-    exclude_mental_model_list: template.data.exclude_mental_model_list,
-    tags_match_mode: template.data.tags_match_mode,
-    tags: Array.isArray(hind.tags) ? hind.tags : [],
-  };
-}
 
 function buildArchCandidate(spec, composed) {
   return {
@@ -65,10 +41,28 @@ function buildHindCandidate(hind) {
 }
 
 /**
+ * Build the desired local candidate for a contextual-graph mental model.
+ *
+ * The desired state is always derived from the current system template and the
+ * current working-graph node/edge. If the backing graph element is gone or no
+ * longer qualifies, `deriveSpecForRef` returns null and this model is skipped.
+ * No Hindsight-owned source_query is preserved.
+ *
+ * @param {object} db
+ * @param {number} serverId
+ * @param {string} bankId
+ * @param {Map<string, {type: 'node'|'edge', id: string, ref: object}>} refsByExtId
+ * @returns {Promise<Array<{extId: string, spec: object}>>}
+ */
+async function buildDesiredSpecs(db, serverId, bankId, refsByExtId) {
+  return deriveSpecsForRefs(db, serverId, bankId, refsByExtId);
+}
+
+/**
  * Sync the Hindsight-side configuration of all contextual mental models that
- * are referenced by the local working graph. Re-derives each spec from the
- * current system template in the DB, compares it to the live Hindsight model,
- * and pushes an update when they diverge.
+ * are referenced by the local working graph. Re-derives each desired spec from
+ * the current system template and graph state, compares it to the live
+ * Hindsight model, and pushes an update when they diverge.
  *
  * @param {object} db
  * @param {number} serverId
@@ -90,6 +84,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
     skippedMissingRemote: 0,
     skippedNoTemplate: 0,
     skippedNoSpec: 0,
+    skippedNoBacking: 0,
     updated: 0,
     failed: 0,
     errors: [],
@@ -112,9 +107,16 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       if (mm.id) hindByExtId.set(mm.id, mm);
     }
 
-    const derived = await deriveSpecsForRefs(db, serverId, bankId, refs);
+    const desired = await buildDesiredSpecs(db, serverId, bankId, refs);
+    stats.skippedNoSpec = refs.size - desired.length;
 
-    async function syncOne(extId, spec, reason) {
+    // Compose all desired prompts in one batch to avoid repeated template/entity
+    // catalog lookups. The batch helper keys templates by role.
+    const composeInputs = desired.map(({ spec }) => ({ role: spec.role, source_query: spec.source_query }));
+    const composedResults = await composeMentalModelPromptBatch(db, composeInputs);
+
+    async function syncOne(entry, composed) {
+      const { extId, spec } = entry;
       const role = spec.role;
       stats.checked += 1;
 
@@ -131,17 +133,6 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       }
 
       try {
-        // For stale refs whose backing node/edge is missing, we cannot reliably
-        // re-derive the raw topic from the template. Recomposing from the
-        // template would wrap Hindsight's already-wrapped source_query again,
-        // causing the prompt to grow every cycle. Preserve the remote query
-        // as-is for fallback specs, and only patch trigger-level config.
-        let composed;
-        if (reason === 'fallback' && hind.source_query) {
-          composed = hind.source_query;
-        } else {
-          composed = await composeMentalModelPrompt(db, role, spec.source_query);
-        }
         const archCandidate = buildArchCandidate(spec, composed);
         const hindCandidate = buildHindCandidate(hind);
         const divergence = buildMentalModelDivergence(archCandidate, hindCandidate);
@@ -150,7 +141,6 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
         logger.info('Checked contextual mental model config', {
           extId,
           role,
-          reason,
           shouldPush,
           divergence,
           archResponseSchema: archCandidate.response_schema,
@@ -178,7 +168,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
 
         stats.updated += 1;
         updatedExtIds.push(extId);
-        logger.info('Pushed contextual mental model config update', { extId, role, reason, status: pushResult.status, operationId: pushResult.operationId });
+        logger.info('Pushed contextual mental model config update', { extId, role, status: pushResult.status, operationId: pushResult.operationId });
       } catch (err) {
         stats.failed += 1;
         stats.errors.push({ extId, error: err.message });
@@ -186,22 +176,10 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
       }
     }
 
-    for (const { extId, spec } of derived) {
-      await syncOne(extId, spec, 'derived');
+    for (let i = 0; i < desired.length; i += 1) {
+      await syncOne(desired[i], composedResults[i]?.composed_query ?? null);
     }
 
-    for (const [extId, { ref }] of refs) {
-      if (derived.some((d) => d.extId === extId)) continue;
-      if (!hindByExtId.has(extId)) continue;
-      const role = ref.role || roleFromExtId(extId);
-      if (!role) continue;
-      const template = getContextualGraphTemplate(db, role);
-      if (!template?.data) continue;
-      const fallbackSpec = buildFallbackSpecFromTemplate(template, hindByExtId.get(extId), role, extId);
-      await syncOne(extId, fallbackSpec, 'fallback');
-    }
-
-    stats.skippedNoSpec = refs.size - derived.length;
     return { success: true, stats, updatedExtIds };
   } catch (err) {
     logger.error('syncContextualMentalModelConfig failed', { serverId, bankId, error: err.message });
