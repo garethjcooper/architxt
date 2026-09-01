@@ -52,7 +52,7 @@ describe('applyModelOutput', () => {
   it('applies entity summary to a node', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: 'Handles customer billing.',
+      narratives: [{ narrative: 'Handles customer billing.' }],
       graph: { nodes: [], edges: [] },
       tables: [],
       diagrams: [],
@@ -74,7 +74,7 @@ describe('applyModelOutput', () => {
   it('applies entity capabilities to a node', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: { nodes: [], edges: [] },
       tables: [{
         name: 'capabilities',
@@ -99,7 +99,7 @@ describe('applyModelOutput', () => {
     upsertEdge(db, serverId, bankId, 'edge-001', 'svc-001', 'svc-002', 'sends', { directed: false });
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [],
         edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'A sends usage data to B', evidence: ['mem-2'] }],
@@ -123,7 +123,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
 
     const firstOutput = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [{ id: 'candidate:a', name: 'A', type: 'service' }],
         edges: [{ from: 'svc-001', to: 'candidate:a', type: 'calls', label: 'calls', detail: 'detail', evidence: ['mem-3'] }],
@@ -142,7 +142,7 @@ describe('applyModelOutput', () => {
 
     // Re-apply with a different candidate; old candidate should be removed.
     const secondOutput = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [{ id: 'candidate:b', name: 'B', type: 'service' }],
         edges: [{ from: 'svc-001', to: 'candidate:b', type: 'sends', label: 'sends', detail: 'detail', evidence: ['mem-4'] }],
@@ -168,7 +168,7 @@ describe('applyModelOutput', () => {
 
   it('creates missing nodes and edges from edge-context model output', async () => {
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [
           { id: 'svc-001', name: 'Billing Service', type: 'service' },
@@ -203,7 +203,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'svc-002', ['active'], { display_name: 'Payment API' });
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [{ id: 'svc-001', name: 'Billing Service', type: 'service' }, { id: 'svc-002', name: 'Payment API', type: 'service' }],
         edges: [{ from: 'svc-001', to: 'svc-002', type: 'reads', label: 'account data', detail: 'Reads account data', evidence: ['mem-5'] }],
@@ -228,7 +228,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'svc:subscriber', ['active'], { display_name: 'Subscriber', aliases: ['subscriber'] });
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [
           { id: 'mozart-api', name: 'Mozart API', type: 'service' },
@@ -259,7 +259,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'subscriber', ['grounded', 'active'], { display_name: 'Subscriber', aliases: ['Subscriber'] });
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [
           { id: 'found:mozart-api', name: 'Mozart API', type: 'api' },
@@ -297,7 +297,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'svc-002', ['active'], {});
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: { nodes: [], edges: [] },
       tables: [],
       diagrams: [],
@@ -310,13 +310,13 @@ describe('applyModelOutput', () => {
 
   it('parses JSON containing non-breaking hyphens and no-break spaces', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
-    const output = normalizeModelOutput('Some prose before the envelope.\n\n{\n  "narrative": "payment‑method and account‑merge routing",\n  "graph": { "nodes": [], "edges": [] },\n  "tables": [],\n  "diagrams": []\n}\n\nTrailing prose.');
+    const output = normalizeModelOutput('Some prose before the envelope.\n\n{\n  "narratives": [{"narrative": "payment‑method and account‑merge routing"}],\n  "graph": { "nodes": [], "edges": [] },\n  "tables": [],\n  "diagrams": []\n}\n\nTrailing prose.');
     assert.equal(output.errors.length, 0);
-    assert.equal(output.narrative, 'payment-method and account-merge routing');
+    assert.equal(output.narratives[0].narrative, 'payment-method and account-merge routing');
   });
 
   it('parses real Hindsight content envelope for edge-context model', () => {
-    const realContent = '## Overview\n\n{ \\"narrative\\": \\"Singleview (a-com:COM-001) is the emerging canonical source for customer agreement, payment‑method and usage information. ICMS (a-com:COM-002) reads account and payment data from Singleview, depends on Singleview for account‑merge and transaction routing, and receives usage data forwarded by Singleview for rating and billing.\\", \\"graph\\": { \\"nodes\\": [ { \\"id\\": \\"a-com:COM-002\\", \\"name\\": \\"ICMS\\", \\"type\\": \\"component\\" }, { \\"id\\": \\"a-com:COM-001\\", \\"name\\": \\"Singleview\\", \\"type\\": \\"component\\" } ], \\"edges\\": [ { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"reads\\", \\"label\\": \\"account data\\", \\"detail\\": \\"ICMS reads account and payment‑method information from Singleview to populate credit‑account identifiers.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-capabilities-txt-COM-002\\"] }, { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"depends-on\\", \\"label\\": \\"account merge\\", \\"detail\\": \\"ICMS depends on Singleview for account‑merge and transaction routing in the future AR‑master role.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-summary-txt-COM-001\\"] }, { \\"from\\": \\"a-com:COM-001\\", \\"to\\": \\"a-com:COM-002\\", \\"type\\": \\"sends\\", \\"label\\": \\"usage data\\", \\"detail\\": \\"Singleview forwards product‑usage records to ICMS for rating and billing processing.\\", \\"evidence\\": [\\"architxt-summary-txt-COM-001\\"] } ] }, \\"tables\\": [], \"diagrams\\": [] }';
+    const realContent = '## Overview\n\n{ \\"narratives\\": [{\\"narrative_name\\": \\"\\", \\"narrative\\": \\"Singleview (a-com:COM-001) is the emerging canonical source for customer agreement, payment‑method and usage information. ICMS (a-com:COM-002) reads account and payment data from Singleview, depends on Singleview for account‑merge and transaction routing, and receives usage data forwarded by Singleview for rating and billing.\\"}], \\"graph\\": { \\"nodes\\": [ { \\"id\\": \\"a-com:COM-002\\", \\"name\\": \\"ICMS\\", \\"type\\": \\"component\\" }, { \\"id\\": \\"a-com:COM-001\\", \\"name\\": \\"Singleview\\", \\"type\\": \\"component\\" } ], \\"edges\\": [ { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"reads\\", \\"label\\": \\"account data\\", \\"detail\\": \\"ICMS reads account and payment‑method information from Singleview to populate credit‑account identifiers.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-capabilities-txt-COM-002\\"] }, { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"depends-on\\", \\"label\\": \\"account merge\\", \\"detail\\": \\"ICMS depends on Singleview for account‑merge and transaction routing in the future AR‑master role.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-summary-txt-COM-001\\"] }, { \\"from\\": \\"a-com:COM-001\\", \\"to\\": \\"a-com:COM-002\\", \\"type\\": \\"sends\\", \\"label\\": \\"usage data\\", \\"detail\\": \\"Singleview forwards product‑usage records to ICMS for rating and billing processing.\\", \\"evidence\\": [\\"architxt-summary-txt-COM-001\\"] } ] }, \\"tables\\": [], \\"diagrams\\": [] }';
     const output = normalizeModelOutput(realContent);
     assert.equal(output.errors.length, 0);
     assert.equal(output.graph.edges.length, 3);
@@ -327,10 +327,10 @@ describe('applyModelOutput', () => {
   });
 
   it('normalizes JSON containing smart quotes inside string values', () => {
-    const content = '{\n  "narrative": "Uses \u201cFile: DBnnnn00\u201d interface.",\n  "graph": {"nodes": [], "edges": []},\n  "tables": [],\n  "diagrams": []\n}';
+    const content = '{\n  "narratives": [{"narrative_name":"","narrative":"Uses \u201cFile: DBnnnn00\u201d interface."}],\n  "graph": {"nodes": [], "edges": []},\n  "tables": [],\n  "diagrams": []\n}';
     const output = normalizeModelOutput(content);
     assert.equal(output.errors.length, 0);
-    assert.ok(output.narrative.includes('File: DBnnnn00'));
+    assert.ok(output.narratives[0].narrative.includes('File: DBnnnn00'));
   });
 
   it('replaces prior edges when the same edge-context model is applied again', async () => {
@@ -338,7 +338,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
 
     const firstOutput = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [],
         edges: [
@@ -355,7 +355,7 @@ describe('applyModelOutput', () => {
     assert.equal(result.applied.edgeIds.length, 1);
 
     const secondOutput = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [],
         edges: [
@@ -384,7 +384,7 @@ describe('applyModelOutput', () => {
     });
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [],
         edges: [
@@ -417,7 +417,7 @@ describe('applyModelOutput', () => {
     upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
 
     const output = normalizeModelOutput(JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [],
         edges: [

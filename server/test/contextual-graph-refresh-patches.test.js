@@ -64,7 +64,7 @@ describe('refreshContextualGraphPatches', () => {
       },
     });
 
-    const newContent = JSON.stringify({ narrative: 'Updated summary.', graph: { nodes: [], edges: [] }, tables: [],
+    const newContent = JSON.stringify({ narratives: [{ narrative: 'Updated summary.' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const injectedList = async () => ({
       success: true,
@@ -88,7 +88,7 @@ describe('refreshContextualGraphPatches', () => {
   });
 
   it('skips application when content hash is unchanged and applied content exists', async () => {
-    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [],
+    const content = JSON.stringify({ narratives: [{ narrative: 'Same summary.' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const hash = contentHash(content);
 
@@ -118,7 +118,7 @@ describe('refreshContextualGraphPatches', () => {
   });
 
   it('skips application on second refresh when content has not changed', async () => {
-    const content = JSON.stringify({ narrative: 'Stable summary.', graph: { nodes: [], edges: [] }, tables: [],
+    const content = JSON.stringify({ narratives: [{ narrative: 'Stable summary.' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const hash = contentHash(content);
 
@@ -160,7 +160,7 @@ describe('refreshContextualGraphPatches', () => {
 
     const injectedList = async () => ({
       success: true,
-      mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narrative: 'Updated.', graph: { nodes: [], edges: [] }, tables: [],
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narratives: [{ narrative: 'Updated.' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] }))],
     });
 
@@ -175,7 +175,7 @@ describe('refreshContextualGraphPatches', () => {
 
 
   it('re-applies when content hash is unchanged but applied content is missing', async () => {
-    const content = JSON.stringify({ narrative: 'Same summary.', graph: { nodes: [], edges: [] }, tables: [],
+    const content = JSON.stringify({ narratives: [{ narrative: 'Same summary.' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const hash = contentHash(content);
 

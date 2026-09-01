@@ -6,7 +6,7 @@ import { extractGraph } from '../src/prompts/graph-parser.js';
 describe('graph-parser.extractGraph (defensive helper)', () => {
   it('parses the contextual graph envelope', () => {
     const content = JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [{ id: 'a-com:COM-002', name: 'ICMS' }],
         edges: [{ from: 'a-com:COM-002', to: 'a-com:COM-269', type: 'sends', detail: 'ICMS sends billable events' }],
@@ -32,7 +32,7 @@ describe('graph-parser.extractGraph (defensive helper)', () => {
 describe('normalizeModelOutput (contextual envelope)', () => {
   it('returns graph and no errors for valid mental-model content', () => {
     const content = JSON.stringify({
-      narrative: 'ICMS is the invoice system.',
+      narratives: [{ narrative: 'ICMS is the invoice system.' }],
       graph: {
         nodes: [{ id: 'a-com:COM-002', name: 'ICMS' }],
         edges: [{ from: 'a-com:COM-002', to: 'a-com:COM-269', type: 'sends' }],
@@ -40,11 +40,11 @@ describe('normalizeModelOutput (contextual envelope)', () => {
       tables: [],
       diagrams: [],
     });
-    const { graph, errors, narrative } = normalizeModelOutput(content);
+    const { graph, errors, narratives } = normalizeModelOutput(content);
     assert.equal(errors.length, 0);
     assert.equal(graph.nodes.length, 1);
     assert.equal(graph.nodes[0].id, 'a-com:COM-002');
-    assert.equal(narrative, 'ICMS is the invoice system.');
+    assert.deepEqual(narratives, [{ narrative_name: '', narrative: 'ICMS is the invoice system.' }]);
   });
 
   it('reports errors for invalid envelope', () => {
@@ -56,7 +56,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
   });
 
   it('returns empty graph when graph shape is empty', () => {
-    const content = JSON.stringify({ narrative: 'Nothing to graph.', graph: { unrelated: 'data' }, tables: [],
+    const content = JSON.stringify({ narratives: [{ narrative: 'Nothing to graph.' }], graph: { unrelated: 'data' }, tables: [],
       diagrams: [] });
     const { graph, errors } = normalizeModelOutput(content);
     assert.equal(graph.nodes.length, 0);
@@ -64,7 +64,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
   });
 
   it('returns empty graph when JSON parses to empty nodes/edges', () => {
-    const content = JSON.stringify({ narrative: '', graph: { nodes: [], edges: [] }, tables: [],
+    const content = JSON.stringify({ narratives: [], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const { graph, errors } = normalizeModelOutput(content);
     assert.ok(graph, 'expected graph to be returned');
@@ -81,7 +81,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
 
   it('parses graph wrapped in a Markdown fence', () => {
     const content = `\`\`\`json\n${JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [{ id: 'a-svc:SVC-019', name: 'Create Notification v1' }],
         edges: [{ from: 'a-svc:SVC-019', to: 'a-svc:SVC-020', type: 'sends' }],

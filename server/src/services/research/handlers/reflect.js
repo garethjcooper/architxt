@@ -149,9 +149,10 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const hasDiagrams = Array.isArray(envelope.diagrams) && envelope.diagrams.length > 0;
   const hasStructuredOutput = hasGraph || hasTables || hasDiagrams;
 
-  // Require a non-empty narrative only when narrative was explicitly requested
+  // Require at least one non-empty narrative only when narrative was explicitly requested
   // or when no structured output sections were produced.
-  if (!envelope.narrative || envelope.narrative.length === 0) {
+  const firstNarrative = envelope.narratives[0];
+  if (!firstNarrative || !firstNarrative.narrative || firstNarrative.narrative.length === 0) {
     if (requestedNarrative || !hasStructuredOutput) {
       logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
       return {
@@ -172,23 +173,24 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   // structured sections (graph/table/diagram) and the model also produced that
   // structured output. For plain Reflect queries with no explicit section
   // directives, the narrative is the primary output and must be preserved.
-  let finalNarrative = envelope.narrative;
-  let finalNarrativeName = envelope.narrative_name;
+  let finalNarratives = envelope.narratives;
   if (requestedStructured && !requestedNarrative && hasStructuredOutput) {
-    finalNarrative = '';
-    finalNarrativeName = '';
+    finalNarratives = [];
   }
 
-  // If narrative is empty but structured output exists, synthesize a header so
-  // downstream consumers still have a Markdown section to render.
-  const narrative = finalNarrative && finalNarrative.length > 0
-    ? finalNarrative + basedOnToMarkdown(result.data, query)
-    : basedOnToMarkdown(result.data, query);
+  // If no narrative remains but structured output exists, leave narratives empty.
+  const basedOnMarkdown = basedOnToMarkdown(result.data, query);
+  if (basedOnMarkdown && finalNarratives.length > 0) {
+    // Append source memories to the last narrative section.
+    const last = finalNarratives[finalNarratives.length - 1];
+    last.narrative = last.narrative + basedOnMarkdown;
+  } else if (basedOnMarkdown) {
+    finalNarratives = [{ narrative_name: '', narrative: basedOnMarkdown }];
+  }
 
   return {
     success: true,
-    narrative,
-    narrative_name: finalNarrativeName,
+    narratives: finalNarratives,
     graph: envelope.graph,
     tables: envelope.tables,
     diagrams: envelope.diagrams,

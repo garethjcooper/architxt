@@ -80,8 +80,9 @@ function edgeContentEqual(props, modelEdge) {
  * @returns {boolean}
  */
 function hasDivergence(db, serverId, bankId, scope, output) {
+  const firstNarrative = output.narratives?.[0]?.narrative ?? '';
   // Empty output = nothing to apply
-  if (!output.narrative && output.graph.edges.length === 0 && output.tables.length === 0) {
+  if (!firstNarrative && output.graph.edges.length === 0 && output.tables.length === 0) {
     return false;
   }
 
@@ -89,7 +90,7 @@ function hasDivergence(db, serverId, bankId, scope, output) {
     const current = scope.node?.properties || {};
 
     // Narrative divergence against summary
-    if (output.narrative !== undefined && current.summary !== output.narrative) {
+    if (firstNarrative !== undefined && current.summary !== firstNarrative) {
       return true;
     }
 

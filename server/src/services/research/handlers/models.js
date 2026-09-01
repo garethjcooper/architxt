@@ -103,7 +103,12 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
 
       const content = structuredOutput;
       const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
-      const narrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const narrative = Array.isArray(content.narratives)
+        ? content.narratives
+          .filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+          .map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`.trim())
+          .join('\n\n')
+        : '';
       const tables = Array.isArray(content.tables) ? content.tables : [];
       const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
 

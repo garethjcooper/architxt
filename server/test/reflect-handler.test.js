@@ -6,8 +6,9 @@ import path from 'node:path';
 import { ensureSchema } from '../src/db/ensure-schema.js';
 import { handleReflect } from '../src/services/research/handlers/reflect.js';
 
-function buildEnvelope({ narrative = '', nodes = [], edges = [] } = {}) {
-  return { narrative, graph: { nodes, edges }, tables: [], diagrams: [] };
+function buildEnvelope({ narrative = '', narrative_name = '', nodes = [], edges = [] } = {}) {
+  const narratives = narrative ? [{ narrative_name, narrative }] : [];
+  return { narratives, graph: { nodes, edges }, tables: [], diagrams: [] };
 }
 
 const REFLECT_STRUCT_WITH_GRAPH = buildEnvelope({
@@ -80,14 +81,14 @@ describe('reflect handler', () => {
     assert.ok(result.graph);
     assert.equal(result.graph.nodes.length, 0);
     assert.equal(result.graph.edges.length, 0);
-    assert.ok(result.narrative.includes('Just a plain text response with no graph data.'));
+    assert.ok(result.narratives[0]?.narrative.includes('Just a plain text response with no graph data.'));
   });
 
   it('composes the generic template by default and requests a structured response schema', async () => {
     let capturedBody = null;
     const reflectFn = async (body) => {
       capturedBody = body;
-      return { success: true, data: { text: 'ok', structured_output: { narrative: 'ok', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
+      return { success: true, data: { text: 'ok', structured_output: { narratives: [{ narrative_name: '', narrative: 'ok' }], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
     await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
@@ -103,7 +104,7 @@ describe('reflect handler', () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
-      return { success: true, data: { structured_output: { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
+      return { success: true, data: { structured_output: { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
     await handleReflect(1, 'bank', 'test query', {
@@ -127,7 +128,7 @@ describe('reflect handler', () => {
     assert.ok(capturedQuery);
     assert.ok(capturedQuery.includes('## Topic'));
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'Here is the analysis.');
+    assert.equal(result.narratives[0]?.narrative, 'Here is the analysis.');
     assert.equal(result.graph.nodes.length, 2);
   });
 
@@ -136,7 +137,7 @@ describe('reflect handler', () => {
       success: true,
       data: {
         structured_output: {
-          narrative: '',
+          narratives: [],
           graph: { nodes: [], edges: [] },
           tables: [],
           diagrams: [{
@@ -154,7 +155,7 @@ describe('reflect handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.equal(result.narrative, '');
+    assert.equal(result.narratives.length, 0);
     assert.equal(result.diagrams.length, 1);
     assert.equal(result.diagrams[0].type, 'erDiagram');
   });
@@ -164,7 +165,7 @@ describe('reflect handler', () => {
       success: true,
       data: {
         structured_output: {
-          narrative: '',
+          narratives: [],
           graph: { nodes: [], edges: [] },
           tables: [],
           diagrams: [],
@@ -204,7 +205,7 @@ describe('reflect handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.ok(!result.narrative.includes('The model should not have written this.'));
+    assert.ok(!result.narratives[0]?.narrative.includes('The model should not have written this.'));
     assert.equal(result.diagrams.length, 1);
   });
 
