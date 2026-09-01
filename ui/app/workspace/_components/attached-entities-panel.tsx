@@ -9,13 +9,20 @@ import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
 import { type EntityInfo, type Entity } from '@/lib/api/client';
 import { type DisplayNode, MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
+import { type ModelContentCacheEntry } from './model-content-utils';
 
 export interface ModelItem {
   key: string;
   label: string;
   extId: string;
   category: string;
-  edgeCount?: number;
+  edgeCount: number;
+}
+
+function countModelEdges(contentCache: Record<string, ModelContentCacheEntry> | undefined, extId: string): number | undefined {
+  const cached = contentCache?.[extId];
+  if (!cached || cached.loading || cached.envelope === undefined) return undefined;
+  return cached.envelope?.graph?.edges?.length ?? 0;
 }
 
 export interface AttachedEntitiesPanelProps {
@@ -28,13 +35,15 @@ export interface AttachedEntitiesPanelProps {
   selectedModel: { entityId: string; extId: string } | null;
   onToggleExpand: (entityId: string) => void;
   onSelectModel: (entityId: string, item: ModelItem, openInNewTab?: boolean) => void;
+  modelContentCache?: Record<string, ModelContentCacheEntry>;
 }
 
 function getEntityModelItems(
   info: EntityInfo,
   entityInfoMap?: Record<string, EntityInfo> | null,
   entityNameById?: Map<string, string>,
-  contextualNodeNameById?: Map<string, string>
+  contextualNodeNameById?: Map<string, string>,
+  contentCache?: Record<string, ModelContentCacheEntry>,
 ): ModelItem[] {
   const resolveName = (entityId: string): string => {
     const infoName = entityInfoMap?.[entityId]?.catalog?.name || entityInfoMap?.[entityId]?.graph_node?.display_name;
@@ -59,6 +68,7 @@ function getEntityModelItems(
       label,
       extId: ref.ext_id,
       category: roleLabel,
+      edgeCount: 0,
     });
   });
 
@@ -69,6 +79,7 @@ function getEntityModelItems(
       label: m.name || extId,
       extId,
       category: MODEL_TAB_LABELS.derived_models,
+      edgeCount: 0,
     });
   });
 
@@ -79,6 +90,7 @@ function getEntityModelItems(
       label: m.name || extId,
       extId,
       category: MODEL_TAB_LABELS.plain_models,
+      edgeCount: 0,
     });
   });
 
@@ -114,7 +126,7 @@ function getEntityModelItems(
       label,
       extId,
       category: MODEL_TAB_LABELS.edge_contexts,
-      edgeCount: contexts.length,
+      edgeCount: countModelEdges(contentCache, extId) ?? contexts.length,
     });
   });
 
@@ -131,6 +143,7 @@ export function AttachedEntitiesPanel({
   selectedModel,
   onToggleExpand,
   onSelectModel,
+  modelContentCache,
 }: AttachedEntitiesPanelProps) {
   const entityNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -152,14 +165,14 @@ export function AttachedEntitiesPanel({
     return entityIds
       .map((entityId) => {
         const info = entityInfoMap?.[entityId];
-        const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById) : [];
+        const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById, modelContentCache) : [];
         const node = contextualNodes.find((n) => n.id === entityId);
         const displayName = info?.catalog?.name || info?.graph_node?.display_name || node?.label || entityId;
         return { entityId, info, items, displayName, hasItems: items.length > 0 };
       })
       .filter((row) => row.hasItems)
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes]);
+  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, modelContentCache]);
 
   return (
     <Panel className="flex-1">

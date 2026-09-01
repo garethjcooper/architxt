@@ -1113,6 +1113,7 @@ export default function WorkspacePage() {
                       entityInfoMap={entityInfoMap}
                       entities={architxtEntities}
                       contextualNodes={entities}
+                      modelContentCache={modelContentCache}
                       loading={loadingEntityInfo}
                       expandedEntityIds={expandedEntityIds}
                       selectedModel={selectedModel}
