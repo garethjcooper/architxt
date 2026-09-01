@@ -257,7 +257,11 @@ async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntity
       if (typeof scopeSource !== 'string' || typeof scopeTarget !== 'string') continue;
 
       for (const entityId of requestedEntityIds) {
-        if (scopeSource === entityId || scopeTarget === entityId) {
+        // Attach this edge-context record to the entity only if the entity is
+        // actually one of the physical edge's endpoints. Using the model ref's
+        // scope would attribute every edge produced by the model to both
+        // scoped entities, inflating counts in the workspace panel.
+        if (edge.cge_source_id === entityId || edge.cge_target_id === entityId) {
           const isHindsightEdge = edge.cge_id.startsWith('hindsight-');
           byEntityId.get(entityId).push({
             source_id: edge.cge_source_id,
