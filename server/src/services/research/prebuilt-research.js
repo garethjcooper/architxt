@@ -85,7 +85,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     : [];
   const narrative = narratives.map((n) => `${n.narrative_name ? `## ${n.narrative_name}\n` : ''}${n.narrative}`.trim()).join('\n\n');
   const { graph, tables, diagrams, errors: modelErrors } = {
-    graph: normalizeGraph(content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] }),
+    graph: normalizeGraph(content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] }, { preserveParallelEdges: true }),
     tables: Array.isArray(content.tables) ? content.tables : [],
     diagrams: Array.isArray(content.diagrams) ? content.diagrams : [],
     errors: [],
