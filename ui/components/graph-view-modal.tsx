@@ -200,13 +200,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply }: Gr
   }, [graph]);
 
   // Reset selections and default names whenever the graph changes so we don't drift.
+  const graphKey = useMemo(() => JSON.stringify({ name: graph.name, nodeIds: graph.nodes.map((n) => n.id).sort(), edgeIds: graph.edges.map((e) => e.id).sort() }), [graph]);
   useEffect(() => {
     setIncludeDiagram(false);
     setIncludeTables(false);
     setDiagramName(defaultDiagramName);
     setNodeTableName(defaultNodeTableName);
     setEdgeTableName(defaultEdgeTableName);
-  }, [graph, defaultDiagramName, defaultNodeTableName, defaultEdgeTableName]);
+  }, [graphKey]);
 
   const source = generatedSource;
   const isEmpty = !graph.nodes.length && !graph.edges.length;
