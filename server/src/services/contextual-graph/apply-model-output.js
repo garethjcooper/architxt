@@ -193,10 +193,13 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
 
   const modelRef = buildModelRef(model, output.raw, timestamp);
 
-  // Remove any edges previously produced by this edge-context model so that
-  // each refresh yields a clean replacement rather than accumulating stale
-  // or partially-overlapping edges.
+  // Remove any directed edges previously produced by this edge-context model
+  // so that each refresh yields a clean replacement rather than accumulating
+  // stale or partially-overlapping edges. Undirected Hindsight skeleton edges
+  // are intentionally excluded; they carry the model ref but are not generated
+  // by the model output.
   const edgesToRemove = allEdges.filter((edge) => {
+    if (edge.cge_type === null && edge.cge_properties?.directed === false) return false;
     const refs = edge.cge_properties?.provenance?.model_refs || [];
     return refs.some((ref) => ref?.ext_id === model.mm_ext_id);
   });
