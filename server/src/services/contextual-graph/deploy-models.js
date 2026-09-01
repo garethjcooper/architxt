@@ -1,5 +1,5 @@
-import { createMentalModel, pushMentalModel } from '../../services/hindsight/push-mental-model.js';
-import { composeMentalModelPrompt } from '../../prompts/template-service.js';
+import { createMentalModel } from '../../services/hindsight/push-mental-model.js';
+import { composeMentalModelPromptBatch } from '../../prompts/template-service.js';
 import { getMentalModel } from '../../services/hindsight/mental-models.js';
 import { buildMentalModelDivergence, hasDivergence } from '../../services/mental-model-divergence.js';
 import { createLogger } from '../../utils/logger.js';
@@ -24,17 +24,15 @@ const logger = createLogger('contextual-graph-deploy-models');
  * @param {string} spec.dimension
  * @param {number} spec.max_tokens
  * @param {string[]} spec.tags
+ * @param {string} spec.composed - pre-composed prompt text (batch caller must supply)
  * @returns {Promise<{success: boolean, model_id?: string, operationId?: string|null, status?: string|null, popId?: number|null, error?: string, code?: string}>}
  */
-export async function deployMentalModel(db, serverId, bankId, spec) {
+export async function deployMentalModel(db, serverId, bankId, spec, composed) {
   if (!spec?.ext_id) {
     return { success: false, error: 'mental model spec requires ext_id', code: 'MISSING_EXT_ID' };
   }
 
   try {
-    // Contextual-graph prompts are looked up by mm_template_role, not by mm_returns.
-    const composed = await composeMentalModelPrompt(db, spec.role, spec.source_query);
-
     // Build the local candidate the same way /hindsight/diff builds arch rows.
     const archCandidate = {
       name: spec.name || null,
@@ -109,8 +107,21 @@ export async function deployMentalModelBatch(db, serverId, bankId, specs) {
   const failed = [];
   const skipped = [];
 
-  for (const spec of specs) {
-    const result = await deployMentalModel(db, serverId, bankId, spec);
+  const composeInputs = specs.map((spec) => ({ role: spec.role, source_query: spec.source_query }));
+  const composedResults = await composeMentalModelPromptBatch(db, composeInputs);
+
+  for (let i = 0; i < specs.length; i += 1) {
+    const spec = specs[i];
+    const composed = composedResults[i]?.composed_query ?? null;
+    if (!composed) {
+      failed.push({
+        ext_id: spec.ext_id,
+        error: composedResults[i]?.compose_error || 'Failed to compose prompt',
+        code: 'COMPOSE_FAILED',
+      });
+      continue;
+    }
+    const result = await deployMentalModel(db, serverId, bankId, spec, composed);
     if (result.success) {
       deployed.push(result.model_id);
       if (result.skipped) {
