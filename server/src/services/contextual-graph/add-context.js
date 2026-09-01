@@ -46,7 +46,7 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {number} [options.max_models_per_run] - cap total models deployed in one run
  * @param {string[]} [options.exclude_node_ids] - never deploy models for these nodes
  * @param {string[]} [options.include_node_ids] - if provided, only deploy models for these nodes
- * @returns {Promise<{success: boolean, queued?: {entitySummary: number, entityCapabilities: number, edge: number, discover: number, total: number}, deployed?: string[], failed?: {ext_id: string, error: string, code?: string}[], skipped_by_restriction?: number, error?: string, code?: string}>}
+ * @returns {Promise<{success: boolean, queued?: {entitySummary: number, entityCapabilities: number, edge: number, discover: number, total: number}, composed?: string[], failed?: {ext_id: string, error: string, code?: string}[], unchanged?: string[], pushed?: string[], skipped_by_restriction?: number, error?: string, code?: string}>}
  */
 export async function addContext(
   db,
@@ -282,7 +282,7 @@ export async function addContext(
 
   const now = new Date().toISOString();
   for (const spec of allSpecs) {
-    if (!deployResult.deployed.includes(spec.ext_id)) continue;
+    if (!deployResult.composed.includes(spec.ext_id)) continue;
     await recordModelProvenance(db, serverId, bankId, spec, now);
   }
 
@@ -295,9 +295,9 @@ export async function addContext(
       discover: dedupedDiscoverSpecs.length,
       total: allUnrestrictedSpecs.length,
     },
-    deployed: deployResult.deployed,
+    composed: deployResult.composed,
     pushed: deployResult.pushed || [],
-    skipped: deployResult.skipped || [],
+    unchanged: deployResult.unchanged || [],
     failed: deployResult.failed,
     skipped_by_restriction: skippedByRestriction,
   };
@@ -334,8 +334,14 @@ async function recordModelProvenance(db, serverId, bankId, spec, now) {
     const targetId = scope?.target_id;
     if (!sourceId || !targetId) return;
 
-    const edge = listEdges(db, serverId, bankId)?.data?.find((e) => {
-      return e.cge_source_id === sourceId && e.cge_target_id === targetId;
+    // Attach the edge-ctx ref to the undirected, grounded skeleton edge. Edge-ctx
+    // models may later produce directed typed edges; the model ref must live on
+    // the original undirected edge so the derivation loop can find it consistently.
+    const edge = listEdges(db, serverId, bankId, { limit: 10000 })?.data?.find((e) => {
+      const matchesEndpoints =
+        (e.cge_source_id === sourceId && e.cge_target_id === targetId) ||
+        (e.cge_source_id === targetId && e.cge_target_id === sourceId);
+      return matchesEndpoints && e.cge_type === null && e.cge_properties?.directed === false;
     });
     if (!edge) return;
 

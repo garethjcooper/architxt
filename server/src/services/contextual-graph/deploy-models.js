@@ -99,13 +99,13 @@ export async function deployMentalModel(db, serverId, bankId, spec, composed) {
 /**
  * Deploy a batch of mental model specs to Hindsight.
  *
- * @returns {Promise<{success: true, deployed: string[], pushed: string[], skipped: string[], failed: {ext_id: string, error: string, code?: string}[]}>}
+ * @returns {Promise<{success: true, composed: string[], pushed: string[], unchanged: string[], failed: {ext_id: string, error: string, code?: string}[]}>}
  */
 export async function deployMentalModelBatch(db, serverId, bankId, specs) {
-  const deployed = [];
+  const composed = [];
   const pushed = [];
   const failed = [];
-  const skipped = [];
+  const unchanged = [];
 
   const composeInputs = specs.map((spec) => ({ role: spec.role, source_query: spec.source_query }));
   const composedResults = await composeMentalModelPromptBatch(db, composeInputs);
@@ -123,9 +123,9 @@ export async function deployMentalModelBatch(db, serverId, bankId, specs) {
     }
     const result = await deployMentalModel(db, serverId, bankId, spec, composed);
     if (result.success) {
-      deployed.push(result.model_id);
+      composed.push(result.model_id);
       if (result.skipped) {
-        skipped.push(result.model_id);
+        unchanged.push(result.model_id);
       } else {
         pushed.push(result.model_id);
       }
@@ -134,5 +134,5 @@ export async function deployMentalModelBatch(db, serverId, bankId, specs) {
     }
   }
 
-  return { success: true, deployed, pushed, skipped, failed };
+  return { success: true, composed, pushed, unchanged, failed };
 }

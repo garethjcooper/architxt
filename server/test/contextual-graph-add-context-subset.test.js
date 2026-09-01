@@ -35,12 +35,12 @@ function makeFetchGraph({ nodes = [], edges = [] }) {
 }
 
 function collectDeployBatch() {
-  const deployed = [];
+  const composed = [];
   const deployBatch = async (_db, _serverId, _bankId, specs) => {
-    for (const spec of specs) deployed.push(spec.ext_id);
-    return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+    for (const spec of specs) composed.push(spec.ext_id);
+    return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
   };
-  return { deployed, deployBatch };
+  return { composed, deployBatch };
 }
 
 describe('addContext subset options', () => {
@@ -70,7 +70,7 @@ describe('addContext subset options', () => {
         { data: { source: 'h2', target: 'h3', weight: 3 } },
       ] });
 
-    const { deployed, deployBatch } = collectDeployBatch();
+    const { composed, deployBatch } = collectDeployBatch();
 
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
@@ -84,11 +84,11 @@ describe('addContext subset options', () => {
     assert.equal(result.queued.entityCapabilities, 2, 'only 2 entity-capabilities specs');
     assert.equal(result.queued.edge, 1, 'only 1 edge-ctx spec for the pair inside subset');
     assert.equal(result.queued.discover, 0, 'discovery disabled');
-    assert.ok(deployed.includes('entity-summary-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-capabilities-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-summary-svc:SVC-006'));
-    assert.ok(deployed.includes('entity-capabilities-svc:SVC-006'));
-    assert.ok(!deployed.includes('entity-summary-svc:SVC-007'));
+    assert.ok(composed.includes('entity-summary-svc:SVC-005'));
+    assert.ok(composed.includes('entity-capabilities-svc:SVC-005'));
+    assert.ok(composed.includes('entity-summary-svc:SVC-006'));
+    assert.ok(composed.includes('entity-capabilities-svc:SVC-006'));
+    assert.ok(!composed.includes('entity-summary-svc:SVC-007'));
   });
 
   it('skips skeleton import and contextualizes the current working graph', async () => {
@@ -106,7 +106,7 @@ describe('addContext subset options', () => {
       provenance: { source: 'hindsight' } });
 
     const fetchGraph = makeFetchGraph({ nodes: [], edges: [] });
-    const { deployed, deployBatch } = collectDeployBatch();
+    const { composed, deployBatch } = collectDeployBatch();
 
     const result = await addContext(db, serverId, 'Mozart-API', {
       fetchGraph,
@@ -118,7 +118,7 @@ describe('addContext subset options', () => {
     assert.equal(result.success, true);
     assert.equal(result.queued.entitySummary, 2);
     assert.equal(result.queued.entityCapabilities, 2);
-    assert.ok(deployed.includes('entity-summary-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-summary-svc:SVC-006'));
+    assert.ok(composed.includes('entity-summary-svc:SVC-005'));
+    assert.ok(composed.includes('entity-summary-svc:SVC-006'));
   });
 });

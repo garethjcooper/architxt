@@ -361,7 +361,9 @@ export function createContextualGraphRouter({
       data: {
         success: true,
         queued: result.queued,
-        deployed: result.deployed,
+        composed: result.composed,
+        pushed: result.pushed,
+        unchanged: result.unchanged,
         failed: result.failed,
       },
       logger,

@@ -67,10 +67,10 @@ describe('addContext', () => {
       ],
       edges: [] });
 
-    const deployed = [];
+    const composed = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
-      for (const spec of specs) deployed.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      for (const spec of specs) composed.push(spec.ext_id);
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
     };
 
     const result = await addContext(db, serverId, 'Mozart-API', {
@@ -84,10 +84,10 @@ describe('addContext', () => {
     assert.equal(result.queued.entityCapabilities, 2);
     assert.equal(result.queued.edge, 0);
     assert.equal(result.queued.discover, 0);
-    assert.ok(deployed.includes('entity-summary-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-capabilities-svc:SVC-005'));
-    assert.ok(deployed.includes('entity-summary-svc:SVC-006'));
-    assert.ok(deployed.includes('entity-capabilities-svc:SVC-006'));
+    assert.ok(composed.includes('entity-summary-svc:SVC-005'));
+    assert.ok(composed.includes('entity-capabilities-svc:SVC-005'));
+    assert.ok(composed.includes('entity-summary-svc:SVC-006'));
+    assert.ok(composed.includes('entity-capabilities-svc:SVC-006'));
   });
 
   it('queues edge-ctx models for undirected edges', async () => {
@@ -105,10 +105,10 @@ describe('addContext', () => {
         { data: { source: 'h1', target: 'h2', weight: 3 } },
       ] });
 
-    const deployed = [];
+    const composed = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
-      for (const spec of specs) deployed.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      for (const spec of specs) composed.push(spec.ext_id);
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
     };
 
     const result = await addContext(db, serverId, 'Mozart-API', {
@@ -121,7 +121,7 @@ describe('addContext', () => {
     assert.equal(result.queued.entitySummary, 2);
     assert.equal(result.queued.entityCapabilities, 2);
     assert.equal(result.queued.edge, 1);
-    assert.ok(deployed.includes('edge-ctx-svc:SVC-005|svc:SVC-006'));
+    assert.ok(composed.includes('edge-ctx-svc:SVC-005|svc:SVC-006'));
   });
 
   it('does not queue entity models for nodes that already have a model_ref', async () => {
@@ -143,7 +143,9 @@ describe('addContext', () => {
 
     const deployBatch = async (_db, _serverId, _bankId, specs) => ({
       success: true,
-      deployed: specs.map((s) => s.ext_id),
+      composed: specs.map((s) => s.ext_id),
+      pushed: specs.map((s) => s.ext_id),
+      unchanged: [],
       failed: [] });
 
     const result = await addContext(db, serverId, 'Mozart-API', {
@@ -169,7 +171,7 @@ describe('addContext', () => {
     const queued = [];
     const deployBatch = async (_db, _serverId, _bankId, specs) => {
       for (const spec of specs) queued.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
     };
 
     const result = await addContext(db, serverId, 'Mozart-API', {
@@ -195,7 +197,9 @@ describe('addContext', () => {
 
     const deployBatch = async (_db, _serverId, _bankId, specs) => ({
       success: true,
-      deployed: specs.map((s) => s.ext_id),
+      composed: specs.map((s) => s.ext_id),
+      pushed: specs.map((s) => s.ext_id),
+      unchanged: [],
       failed: [] });
 
     await addContext(db, serverId, 'Mozart-API', {
@@ -224,7 +228,7 @@ describe('addContext', () => {
     const firstDeployed = [];
     const firstDeployBatch = async (_db, _serverId, _bankId, specs) => {
       for (const spec of specs) firstDeployed.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
     };
 
     await addContext(db, serverId, 'Mozart-API', {
@@ -240,7 +244,7 @@ describe('addContext', () => {
     const secondQueued = [];
     const secondDeployBatch = async (_db, _serverId, _bankId, specs) => {
       for (const spec of specs) secondQueued.push(spec.ext_id);
-      return { success: true, deployed: specs.map((s) => s.ext_id), failed: [] };
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: [], unchanged: specs.map((s) => s.ext_id), failed: [] };
     };
 
     const result = await addContext(db, serverId, 'Mozart-API', {
