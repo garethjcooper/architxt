@@ -1,7 +1,8 @@
 'use client';
 
+import type { UnifiedNarrativeBlock } from '@/lib/api/client';
+
 /** Block-level parser for narrative / session-page content.
- *
  * This intentionally mirrors the shape of SmartBlock from
  * ./smart-document-editor but adds structural recognition for fenced code
  * blocks (```mermaid, etc.) and markdown tables. It is used by
@@ -177,6 +178,29 @@ export function buildUserNarrativeContent(blocks: NarrativeBlock[]): string {
     .filter((b) => !b.deleted && !b.synthetic && !syntheticSubtreeIds.has(b.id))
     .map((b) => b.edited ?? b.raw)
     .join('');
+}
+
+/** Render a single narrative envelope block into parsed blocks with a stable array index.
+ *
+ * The envelope's `narratives` array is the source of truth. We intentionally render
+ * and parse each narrative separately so that boundaries between narratives are never
+ * lost when concatenating markdown or when a narrative omits its own heading.
+ */
+export function buildNarrativeBlocks(narrative: UnifiedNarrativeBlock, idx: number): NarrativeBlock[] {
+  const name = narrative.narrative_name?.trim();
+  let source = narrative.narrative?.trim() ?? '';
+  if (source && name && !/^#{1,6}\s+/m.test(source)) {
+    source = `## ${name}\n\n${source}`;
+  }
+  const blocks = parseNarrativeBlocks(source, { attachNarrativeIdx: false });
+  // Inject the array index into every non-synthetic heading so UI actions map back
+  // to the correct canonical narrative.
+  for (const b of blocks) {
+    if (b.type === 'heading' && !b.synthetic) {
+      b.__narrativeIdx = idx;
+    }
+  }
+  return blocks;
 }
 
 export function getSectionBlockIds(blocks: NarrativeBlock[], targetId: string): string[] {
