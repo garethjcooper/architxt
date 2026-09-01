@@ -249,9 +249,7 @@ const toApiStep = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
   const envelope = isCurated
     ? (dbRow.rstep_envelope ?? {
-        narratives: dbRow.rstep_synthesis?.narrative
-          ? [{ narrative_name: dbRow.rstep_synthesis?.narrative_name || '', narrative: dbRow.rstep_synthesis.narrative }]
-          : [],
+        narratives: [],
         graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
         tables: dbRow.rstep_canvas_state?.tables ?? [],
         diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
