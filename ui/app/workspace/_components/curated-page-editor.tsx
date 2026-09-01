@@ -4,8 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Eye, Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { parseNarrativeBlocks, buildUserNarrativeContent, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
-import { MermaidDiagram } from '@/components/mermaid-diagram';
+import { parseNarrativeBlocks, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
 import { MermaidEditor } from '@/components/mermaid-editor';
 import { GraphViewModal } from '@/components/graph-view-modal';
 import { TableFocusModal } from '@/components/table-focus-modal';
@@ -90,7 +89,7 @@ export function CuratedPageEditor({
 }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
-  const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown), [displayMarkdown]);
+  const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown, { attachNarrativeIdx: true }), [displayMarkdown]);
   const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set(initialDeletedBlockIds ?? []));
   const [deletedStructuredKeys, setDeletedStructuredKeys] = useState<Set<string>>(new Set(initialDeletedStructuredKeys ?? []));
   const [showIndex, setShowIndex] = useState(true);
@@ -102,7 +101,7 @@ export function CuratedPageEditor({
   const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
   const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
   const [focusedTable, setFocusedTable] = useState<{ block: NarrativeBlock; name: string } | null>(null);
-  const [focusedNarrative, setFocusedNarrative] = useState<{ block: NarrativeBlock } | null>(null);
+  const [focusedNarrativeIndex, setFocusedNarrativeIndex] = useState<number | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -112,6 +111,7 @@ export function CuratedPageEditor({
     pageIdRef.current = nextId;
     setDeletedBlockIds(new Set());
     setDeletedStructuredKeys(new Set());
+    setFocusedNarrativeIndex(null);
   }, [page]);
 
   // Restore deletion sets from the parent when they change (e.g. returning to an
@@ -154,23 +154,20 @@ export function CuratedPageEditor({
     });
   }, [baseBlocks, deletedBlockIds, deletedStructuredKeys]);
 
+  // Deleted narrative indices are tracked separately from structured keys
+  // because narratives are an ordered array, not keyed by name.
+  const [deletedNarrativeIndices, setDeletedNarrativeIndices] = useState<Set<number>>(new Set());
+
   const workingEnvelope = useMemo(() => {
-    const userMarkdown = buildUserNarrativeContent(displayedBlocks);
-    const existingNarratives = envelope.narratives ?? [];
-    const nextNarratives: UnifiedNarrativeBlock[] =
-      existingNarratives.length > 0
-        ? [{ narrative_name: existingNarratives[0].narrative_name, narrative: userMarkdown }, ...existingNarratives.slice(1)]
-        : userMarkdown.trim()
-          ? [{ narrative_name: '', narrative: userMarkdown }]
-          : [];
+    const kept = (envelope.narratives ?? []).filter((_, i) => !deletedNarrativeIndices.has(i));
     return {
       ...envelope,
-      narratives: nextNarratives,
+      narratives: kept,
       tables: envelope.tables.filter((t) => !deletedStructuredKeys.has(`table:${t.name}`)),
       diagrams: envelope.diagrams.filter((d) => !deletedStructuredKeys.has(`diagram:${d.name}`)),
       graph: deletedStructuredKeys.has('graph') ? { name: envelope.graph.name, nodes: [], edges: [] } : envelope.graph,
     };
-  }, [envelope, displayedBlocks, deletedStructuredKeys]);
+  }, [envelope, deletedNarrativeIndices, deletedStructuredKeys]);
 
   const isDirty = useMemo(() => JSON.stringify(workingEnvelope) !== JSON.stringify(effectiveBaseline), [workingEnvelope, effectiveBaseline]);
 
@@ -203,6 +200,7 @@ export function CuratedPageEditor({
       await onSave(page.id, workingEnvelope);
       setDeletedBlockIds(new Set());
       setDeletedStructuredKeys(new Set());
+      setDeletedNarrativeIndices(new Set());
       toast.success('Saved curated page');
     } finally {
       setSaving(false);
@@ -270,18 +268,6 @@ export function CuratedPageEditor({
     });
   }, []);
 
-  const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
-    if (b.synthetic) {
-      addStructuredKey(b);
-      return;
-    }
-    if (b.type === 'heading') {
-      removeSection(b.id);
-    } else {
-      toggleDelete(b.id);
-    }
-  }, [removeSection, toggleDelete, addStructuredKey]);
-
   const restoreSection = useCallback((id: string) => {
     const ids = getSectionBlockIds(displayedBlocks, id);
     setDeletedBlockIds((prev) => {
@@ -291,13 +277,41 @@ export function CuratedPageEditor({
     });
   }, [displayedBlocks]);
 
+  const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
+    if (b.synthetic) {
+      addStructuredKey(b);
+      return;
+    }
+    if (b.type === 'heading') {
+      if (b.__narrativeIdx !== undefined) {
+        setDeletedNarrativeIndices((prev) => {
+          const next = new Set(prev);
+          next.add(b.__narrativeIdx!);
+          return next;
+        });
+      } else {
+        removeSection(b.id);
+      }
+    } else {
+      toggleDelete(b.id);
+    }
+  }, [removeSection, toggleDelete, addStructuredKey]);
+
   const restoreSectionOrBlock = useCallback((b: NarrativeBlock) => {
     if (b.synthetic) {
       removeStructuredKey(b);
       return;
     }
     if (b.type === 'heading') {
-      restoreSection(b.id);
+      if (b.__narrativeIdx !== undefined) {
+        setDeletedNarrativeIndices((prev) => {
+          const next = new Set(prev);
+          next.delete(b.__narrativeIdx!);
+          return next;
+        });
+      } else {
+        restoreSection(b.id);
+      }
     } else {
       toggleDelete(b.id);
     }
@@ -345,7 +359,7 @@ export function CuratedPageEditor({
   }, [envelope.tables]);
 
   const openNarrativeFocus = useCallback((b: NarrativeBlock) => {
-    setFocusedNarrative({ block: b });
+    setFocusedNarrativeIndex(b.__narrativeIdx ?? 0);
   }, []);
 
   const applyFocusedDiagram = useCallback(() => {
@@ -587,16 +601,17 @@ export function CuratedPageEditor({
         }}
       />
       <NarrativeFocusModal
-        open={focusedNarrative != null}
-        onOpenChange={(open) => { if (!open) setFocusedNarrative(null); }}
-        name={envelope.narratives?.[0]?.narrative_name || ''}
-        content={envelope.narratives?.[0]?.narrative || ''}
+        open={focusedNarrativeIndex != null}
+        onOpenChange={(open) => { if (!open) setFocusedNarrativeIndex(null); }}
+        name={focusedNarrativeIndex != null ? (envelope.narratives[focusedNarrativeIndex]?.narrative_name || '') : ''}
+        content={focusedNarrativeIndex != null ? (envelope.narratives[focusedNarrativeIndex]?.narrative || '') : ''}
         onApply={(ev) => {
           const parsed = JSON.parse(ev.payload);
           const existing = envelope.narratives ?? [];
+          const idx = focusedNarrativeIndex ?? 0;
           const nextNarratives: UnifiedNarrativeBlock[] =
             existing.length > 0
-              ? [{ narrative_name: parsed.name, narrative: parsed.content }, ...existing.slice(1)]
+              ? existing.map((n, i) => (i === idx ? { narrative_name: parsed.name, narrative: parsed.content } : n))
               : [{ narrative_name: parsed.name, narrative: parsed.content }];
           const nextEnvelope = { ...envelope, narratives: nextNarratives };
           onChange?.({
