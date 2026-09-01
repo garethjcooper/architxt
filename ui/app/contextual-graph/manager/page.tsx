@@ -660,14 +660,14 @@ export default function ContextManagerPage() {
                   {groupedEdgeRows.length === 0 && (
                     <div className="text-[11px] text-white/40 px-2 py-3">No grounded edges loaded.</div>
                   )}
-                  {groupedEdgeRows.map(({ edge, count, key }) => (
+                  {groupedEdgeRows.map(({ edge, count, key, isGroup }) => (
                     <EdgeListRow
                       key={key}
                       edge={edge}
                       active={selectedEdgeId === edge.id}
                       sourceLabel={nodeById.get(edge.source_id)?.label}
                       targetLabel={nodeById.get(edge.target_id)?.label}
-                      edgeContextCount={count > 0 ? count : undefined}
+                      edgeContextCount={count > 0 && isGroup ? count : undefined}
                       onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
                     />
                   ))}
