@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Eye, Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { parseNarrativeBlocks, getSectionBlockIds, type NarrativeBlock } from '@/components/narrative-blocks';
+import { parseNarrativeBlocks, getSectionBlockIds, buildNarrativeBlocks, type NarrativeBlock } from '@/components/narrative-blocks';
 import { MermaidEditor } from '@/components/mermaid-editor';
 import { GraphViewModal } from '@/components/graph-view-modal';
 import { TableFocusModal } from '@/components/table-focus-modal';
@@ -89,7 +89,21 @@ export function CuratedPageEditor({
 }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
-  const baseBlocks = useMemo(() => parseNarrativeBlocks(displayMarkdown, { attachNarrativeIdx: true }), [displayMarkdown]);
+  const narrativeBlocks = useMemo(() => {
+    return (envelope.narratives ?? []).flatMap((n, i) => buildNarrativeBlocks(n, i));
+  }, [envelope.narratives]);
+  const structuredMarkdown = useMemo(() => buildEnvelopeMarkdown({
+    narratives: [],
+    graph: envelope.graph,
+    tables: envelope.tables,
+    diagrams: envelope.diagrams,
+  } as CuratedPageEnvelope), [envelope.graph, envelope.tables, envelope.diagrams]);
+  const structuredBlocks = useMemo(() => parseNarrativeBlocks(structuredMarkdown, { attachNarrativeIdx: false }), [structuredMarkdown]);
+  const baseBlocks = useMemo(() => {
+    const all = [...narrativeBlocks, ...structuredBlocks];
+    // Renumber ids so the combined tree is stable across renders.
+    return all.map((b, i) => ({ ...b, id: `b${i}` }));
+  }, [narrativeBlocks, structuredBlocks]);
   const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set(initialDeletedBlockIds ?? []));
   const [deletedStructuredKeys, setDeletedStructuredKeys] = useState<Set<string>>(new Set(initialDeletedStructuredKeys ?? []));
   const [showIndex, setShowIndex] = useState(true);
