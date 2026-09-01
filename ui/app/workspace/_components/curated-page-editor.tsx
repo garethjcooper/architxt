@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, UnifiedNarrativeBlock } from '@/lib/api/client';
 import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -156,9 +156,17 @@ export function CuratedPageEditor({
 
   const workingEnvelope = useMemo(() => {
     const userMarkdown = buildUserNarrativeContent(displayedBlocks);
+    const existingNarratives = envelope.narratives ?? [];
+    const firstName = existingNarratives[0]?.narrative_name ?? '';
+    const nextNarratives: UnifiedNarrativeBlock[] =
+      existingNarratives.length > 0
+        ? [{ narrative_name: firstName, narrative: userMarkdown }, ...existingNarratives.slice(1)]
+        : userMarkdown.trim()
+          ? [{ narrative_name: '', narrative: userMarkdown }]
+          : [];
     return {
       ...envelope,
-      narrative: userMarkdown,
+      narratives: nextNarratives,
       tables: envelope.tables.filter((t) => !deletedStructuredKeys.has(`table:${t.name}`)),
       diagrams: envelope.diagrams.filter((d) => !deletedStructuredKeys.has(`diagram:${d.name}`)),
       graph: deletedStructuredKeys.has('graph') ? { name: envelope.graph.name, nodes: [], edges: [] } : envelope.graph,
@@ -582,11 +590,16 @@ export function CuratedPageEditor({
       <NarrativeFocusModal
         open={focusedNarrative != null}
         onOpenChange={(open) => { if (!open) setFocusedNarrative(null); }}
-        name={envelope.narrative_name || ''}
-        content={envelope.narrative || ''}
+        name={envelope.narratives?.[0]?.narrative_name || ''}
+        content={envelope.narratives?.[0]?.narrative || ''}
         onApply={(ev) => {
           const parsed = JSON.parse(ev.payload);
-          const nextEnvelope = { ...envelope, narrative_name: parsed.name, narrative: parsed.content };
+          const existing = envelope.narratives ?? [];
+          const nextNarratives: UnifiedNarrativeBlock[] =
+            existing.length > 0
+              ? [{ narrative_name: parsed.name, narrative: parsed.content }, ...existing.slice(1)]
+              : [{ narrative_name: parsed.name, narrative: parsed.content }];
+          const nextEnvelope = { ...envelope, narratives: nextNarratives };
           onChange?.({
             envelope: nextEnvelope,
             dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),

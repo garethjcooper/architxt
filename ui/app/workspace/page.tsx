@@ -537,7 +537,7 @@ export default function WorkspacePage() {
       // baseline, and enables Save so the user can persist the change.
       const sourceEnvelope = pendingCuratedEdits[stepId] ?? normalizeEnvelope(page);
       const nextEnvelope: CuratedPageEnvelope = {
-        narrative: sourceEnvelope.narrative,
+        narratives: sourceEnvelope.narratives ?? [],
         graph: {
           nodes: [...(sourceEnvelope.graph?.nodes ?? [])],
           edges: [...(sourceEnvelope.graph?.edges ?? [])],
@@ -551,9 +551,20 @@ export default function WorkspacePage() {
       for (const ev of events) {
         switch (ev.type) {
           case 'narrative': {
-            const prefix = nextEnvelope.narrative.trim() ? '\n\n' : '';
-            nextEnvelope.narrative = `${nextEnvelope.narrative}${prefix}${ev.payload}`;
-            toastMessage = `Added ${ev.label || 'section'} to ${page.intent_text || `Page ${page.id}`}`;
+            let name = ev.label || '';
+            let content = ev.payload;
+            try {
+              const parsed = JSON.parse(ev.payload);
+              if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+                name = parsed.name || name;
+                content = parsed.content;
+              }
+            } catch {
+              // Raw markdown payload: use it as-is with the event label as the name.
+            }
+            const newBlock = { narrative_name: name, narrative: content };
+            nextEnvelope.narratives = [...(nextEnvelope.narratives ?? []), newBlock];
+            toastMessage = `Added ${name || 'narrative'} to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
           case 'graph': {
@@ -848,7 +859,7 @@ export default function WorkspacePage() {
         (cachedEnvelope.graph?.edges?.length ?? 0) === 0 &&
         (cachedEnvelope.tables?.length ?? 0) === 0 &&
         (cachedEnvelope.diagrams?.length ?? 0) === 0 &&
-        !cachedEnvelope.narrative?.trim();
+        (cachedEnvelope.narratives?.length ?? 0) === 0;
       // Re-fetch if loading, never fetched, or the cached envelope is empty while
       // raw content exists (server may now normalize the same content correctly).
       const needsFetch =

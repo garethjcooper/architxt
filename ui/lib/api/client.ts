@@ -967,8 +967,7 @@ export interface EntityInfoEdgeContext {
 
 // Normalized envelope returned by `/research/mental-models/content` in addition to raw content.
 export interface MentalModelEnvelope {
-  narrative: string;
-  narrative_name: string;
+  narratives: UnifiedNarrativeBlock[];
   graph: { name: string; nodes: GraphNode[]; edges: GraphEdge[] };
   tables: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
   diagrams: Array<{ name: string; type: string; content: string }>;
@@ -981,8 +980,11 @@ export interface MentalModelContent {
   content_hash?: string | null;
   updated_at?: string | null;
   envelope?: MentalModelEnvelope;
+  /** @deprecated Prefer `narratives`. Kept for raw legacy payloads. */
   narrative?: string;
+  /** @deprecated Prefer `narratives`. Kept for raw legacy payloads. */
   narrative_name?: string;
+  narratives?: UnifiedNarrativeBlock[];
   concatenation?: string;
   graph?: { name?: string | null; nodes: unknown[]; edges: unknown[] };
   diagrams?: Array<{ name: string; type: string; content: string }>;
@@ -1133,9 +1135,13 @@ export interface DiscoverStepResponse {
   error_message?: string | null;
 }
 
-export interface UnifiedEnvelope {
+export interface UnifiedNarrativeBlock {
+  narrative_name: string;
   narrative: string;
-  narrative_name?: string | null;
+}
+
+export interface UnifiedEnvelope {
+  narratives: UnifiedNarrativeBlock[];
   graph: {
     name?: string | null;
     nodes: GraphNode[];
@@ -1359,7 +1365,7 @@ export const researchApi = {
       body: JSON.stringify({ title }),
     }),
 
-  updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string }; envelope?: { narrative: string; graph: { nodes: any[]; edges: any[] }; tables: any[]; diagrams: any[] } }) =>
+  updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string }; envelope?: UnifiedEnvelope }) =>
     fetchApi<ResearchStep>(`/research/steps/${stepId}`, {
       method: 'PUT',
       body: JSON.stringify(data),

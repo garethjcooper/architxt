@@ -2,7 +2,7 @@
 
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
-import { type EntityInfo, type MentalModelContent, type MentalModelEnvelope, type ResearchStepSummary, type GraphNode, type GraphEdge } from '@/lib/api/client';
+import { type EntityInfo, type MentalModelContent, type MentalModelEnvelope, type ResearchStepSummary, type GraphNode, type GraphEdge, type UnifiedNarrativeBlock } from '@/lib/api/client';
 import {
   DisplayNode,
   DisplayEdge,
@@ -34,11 +34,27 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
 function parseMentalModelContent(raw: HindsightContentResult | ModelContentCacheEntry): MentalModelContent {
   // Prefer the server-normalized envelope when present.
   const serverEnvelope = raw.envelope ?? undefined;
+
+  // Resolve narratives from the unified envelope first, then legacy scalar fields.
+  const resolveNarratives = (src: { narratives?: UnifiedNarrativeBlock[]; narrative?: string | null; narrative_name?: string | null } | null | undefined): UnifiedNarrativeBlock[] => {
+    if (src?.narratives && src.narratives.length > 0) {
+      return src.narratives.filter((n) => typeof n.narrative === 'string');
+    }
+    const legacyNarrative = src?.narrative ?? '';
+    const legacyName = src?.narrative_name ?? '';
+    if (typeof legacyNarrative === 'string' && legacyNarrative.trim().length > 0) {
+      return [{ narrative_name: legacyName, narrative: legacyNarrative }];
+    }
+    return [];
+  };
+
   if (serverEnvelope) {
+    const narratives = resolveNarratives(serverEnvelope);
     return {
       ext_id: '',
-      narrative: serverEnvelope.narrative,
-      narrative_name: serverEnvelope.narrative_name,
+      narratives,
+      narrative: narratives[0]?.narrative ?? '',
+      narrative_name: narratives[0]?.narrative_name,
       concatenation: undefined,
       graph: serverEnvelope.graph,
       tables: serverEnvelope.tables,
@@ -63,6 +79,7 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return {
       ext_id: '',
+      narratives: [],
       narrative: typeof rawContent === 'string' ? rawContent : '',
       concatenation: undefined,
       graph: { nodes: [], edges: [] },
@@ -71,10 +88,12 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
     };
   }
 
+  const narratives = resolveNarratives(parsed);
   return {
     ext_id: '',
-    narrative: typeof parsed.narrative === 'string' ? parsed.narrative : '',
-    narrative_name: typeof parsed.narrative_name === 'string' ? parsed.narrative_name : undefined,
+    narratives,
+    narrative: narratives[0]?.narrative ?? (typeof parsed.narrative === 'string' ? parsed.narrative : ''),
+    narrative_name: narratives[0]?.narrative_name ?? (typeof parsed.narrative_name === 'string' ? parsed.narrative_name : undefined),
     concatenation: undefined,
     graph: (parsed.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
     tables: Array.isArray(parsed.tables) ? parsed.tables : [],
@@ -88,6 +107,8 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
 export function mentalModelContentToStepSummary(name: string, raw: HindsightContentResult | ModelContentCacheEntry): ResearchStepSummary {
   const content = parseMentalModelContent(raw);
   const now = new Date().toISOString();
+  const firstNarrative = content.narratives?.[0]?.narrative ?? '';
+  const firstName = content.narratives?.[0]?.narrative_name;
   return {
     id: -1,
     session_id: -1,
@@ -104,8 +125,8 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
     selections: [],
     calls: [],
     synthesis: {
-      narrative: content.narrative || '',
-      narrative_name: content.narrative_name,
+      narrative: firstNarrative,
+      narrative_name: firstName,
     },
     canvas: {
       graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
@@ -114,8 +135,7 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
       meta: undefined,
     },
     envelope: content.envelope ?? {
-      narrative: content.narrative || '',
-      narrative_name: content.narrative_name,
+      narratives: content.narratives ?? [],
       graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
       tables: content.tables ?? [],
       diagrams: content.diagrams ?? [],
@@ -125,7 +145,7 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
 
 function getModelContentText(raw: HindsightContentResult | undefined): string {
   if (!raw) return '';
-  return parseMentalModelContent(raw).narrative || '';
+  return parseMentalModelContent(raw).narratives?.[0]?.narrative || '';
 }
 
 function hasStructuredEnvelope(entry: HindsightContentResult | undefined): boolean {
