@@ -137,8 +137,9 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
 
   for (const block of narratives) {
     if (!block.narrative?.trim()) continue;
-    const heading = block.narrative_name?.trim() ? `## ${block.narrative_name.trim()}` : '';
-    parts.push(heading ? `${heading}\n\n${block.narrative.trim()}` : block.narrative.trim());
+    const name = block.narrative_name?.trim();
+    const body = block.narrative.trim();
+    parts.push(name ? `## ${name}\n\n${body}` : body);
   }
 
   if (tables && tables.length > 0) {
@@ -178,4 +179,57 @@ export function normalizeEnvelopeFromNullable(
 ): UnifiedEnvelope {
   if (!page) return toUnified(null);
   return normalizeEnvelope(page);
+}
+
+/** Split a markdown document back into the narrative entries that produced it.
+ *
+ * `buildEnvelopeMarkdown` renders each named narrative as `## name\n\nbody`.
+ * This is the inverse: it finds those section headings in order and returns the
+ * bodies without the generated headings, so the `narratives` array stays canonical.
+ */
+export function splitNarrativeMarkdown(
+  markdown: string,
+  narratives: UnifiedNarrativeBlock[]
+): UnifiedNarrativeBlock[] {
+  const lines = markdown.split('\n');
+  type Heading = { line: number; level: number; title: string };
+  const headings: Heading[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,6})\s+(.+)$/);
+    if (m) headings.push({ line: i, level: m[1].length, title: m[2].trim() });
+  }
+
+  const result: UnifiedNarrativeBlock[] = [];
+  let cursor = 0;
+
+  for (const n of narratives) {
+    const name = n.narrative_name?.trim();
+    let startLine = cursor;
+    let endLine = lines.length;
+    let headingLine = -1;
+
+    if (name) {
+      const idx = headings.findIndex((h) => h.line >= cursor && h.title === name);
+      if (idx !== -1) {
+        headingLine = headings[idx].line;
+        startLine = headingLine;
+        const next = headings.slice(idx + 1).find((h) => h.level <= headings[idx].level);
+        endLine = next ? next.line : lines.length;
+        cursor = endLine;
+      }
+    }
+
+    const bodyStart = headingLine === -1 ? startLine : startLine + 1;
+    const bodyLines = lines.slice(bodyStart, endLine);
+    // Drop blank lines immediately after a generated heading so round-trips stay clean.
+    while (bodyLines.length && bodyLines[0].trim() === '') bodyLines.shift();
+    while (bodyLines.length && bodyLines[bodyLines.length - 1].trim() === '') bodyLines.pop();
+
+    result.push({
+      narrative_name: n.narrative_name,
+      narrative: bodyLines.join('\n'),
+    });
+  }
+
+  return result;
 }
