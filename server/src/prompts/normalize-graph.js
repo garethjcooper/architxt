@@ -26,7 +26,7 @@ const VALID_PROVENANCE = new Set(['known', 'discovered', 'inferred']);
  * @param {Map<string, EntityCatalogEntry>} [options.knownCatalog] - Known entity catalog for conflict resolution, validation warnings, and endpoint completion.
  * @returns {{nodes: object[], edges: object[]}}
  */
-export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map() } = {}) {
+export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map(), preserveParallelEdges = false } = {}) {
   if (!graph || typeof graph !== 'object') {
     return { nodes: [], edges: [] };
   }
@@ -154,7 +154,7 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       ? e.properties
       : undefined;
 
-    const key = `${from}|${to}|${type}`;
+    const key = preserveParallelEdges ? `${from}|${to}|${type}|${edgeByKey.size}` : `${from}|${to}|${type}`;
     const provenance = deriveProvenance(from, to, activity, nodeById);
 
     if (edgeByKey.has(key)) {

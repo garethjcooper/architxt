@@ -13,10 +13,11 @@ import { normalizeGraph } from '../../prompts/normalize-graph.js';
  * @param {Map} [options.knownCatalog] - Known entity catalog for graph normalization.
  * @param {string} [options.activity='unknown'] - Activity label passed to normalizeGraph.
  * @param {string} [options.mode='generic'] - Mode passed to normalizeGraph.
+ * @param {boolean} [options.preserveParallelEdges=false] - Passed to normalizeGraph.
  * @returns {{ narratives: Array<{ narrative: string, narrative_name: string }>, graph: { name: string, nodes: object[], edges: object[] }, tables: object[], diagrams: object[] }}
  */
 export function toEnvelope(structuredOutput, options = {}) {
-  const { knownCatalog = new Map(), activity = 'unknown', mode = 'generic' } = options;
+  const { knownCatalog = new Map(), activity = 'unknown', mode = 'generic', preserveParallelEdges = false } = options;
 
   const extracted = structuredOutput && typeof structuredOutput === 'object' && !Array.isArray(structuredOutput)
     ? structuredOutput
@@ -30,6 +31,7 @@ export function toEnvelope(structuredOutput, options = {}) {
     activity,
     knownCatalog,
     mode,
+    preserveParallelEdges,
   });
 
   const narratives = Array.isArray(extracted.narratives)
