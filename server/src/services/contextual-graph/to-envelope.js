@@ -13,7 +13,7 @@ import { normalizeGraph } from '../../prompts/normalize-graph.js';
  * @param {Map} [options.knownCatalog] - Known entity catalog for graph normalization.
  * @param {string} [options.activity='unknown'] - Activity label passed to normalizeGraph.
  * @param {string} [options.mode='generic'] - Mode passed to normalizeGraph.
- * @returns {{ narrative: string, narrative_name: string, graph: { name: string, nodes: object[], edges: object[] }, tables: object[], diagrams: object[] }}
+ * @returns {{ narratives: Array<{ narrative: string, narrative_name: string }>, graph: { name: string, nodes: object[], edges: object[] }, tables: object[], diagrams: object[] }}
  */
 export function toEnvelope(structuredOutput, options = {}) {
   const { knownCatalog = new Map(), activity = 'unknown', mode = 'generic' } = options;
@@ -32,9 +32,14 @@ export function toEnvelope(structuredOutput, options = {}) {
     mode,
   });
 
+  const narratives = Array.isArray(extracted.narratives)
+    ? extracted.narratives
+      .filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+      .map((n) => ({ narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '', narrative: n.narrative }))
+    : [];
+
   return {
-    narrative: typeof extracted.narrative === 'string' ? extracted.narrative : '',
-    narrative_name: typeof extracted.narrative_name === 'string' ? extracted.narrative_name : '',
+    narratives,
     graph: {
       name: normalizedGraph.name || graphInput.name || '',
       nodes: normalizedGraph.nodes,

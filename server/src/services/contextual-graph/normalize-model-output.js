@@ -285,6 +285,15 @@ function canonicalCapabilityColumn(raw) {
   return CAPABILITY_COLUMN_ALIASES[normalized] || null;
 }
 
+function normalizeNarrative(n) {
+  if (!n || typeof n !== 'object' || Array.isArray(n)) return null;
+  const narrative = typeof n.narrative === 'string' ? n.narrative : '';
+  return {
+    narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+    narrative,
+  };
+}
+
 function normalizeNode(n) {
   if (!n || typeof n !== 'object') return null;
   const id = typeof n.id === 'string' && n.id.length > 0 ? n.id : null;
@@ -352,7 +361,7 @@ function dropIsolatedNodes(nodes, edges) {
  *
  * @param {string|object|null} raw
  * @returns {{
- *   narrative: string,
+ *   narratives: Array<{ narrative_name: string, narrative: string }>,
  *   graph: { nodes: object[], edges: object[] },
  *   tables: object[],
  *   diagrams: object[],
@@ -365,7 +374,7 @@ export function normalizeModelOutput(raw) {
   const errors = [];
 
   if (rawString.trim() === '') {
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
+    return { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
   }
 
   let parsed = null;
@@ -398,7 +407,7 @@ export function normalizeModelOutput(raw) {
     if (table) {
       logger.warn('Model output ignored JSON envelope and returned a Markdown table; synthesizing envelope', { tableName: table.name, rows: table.rows.length });
       parsed = {
-        narrative: extractProseBeforeTable(preprocessed),
+        narratives: [{ narrative_name: '', narrative: extractProseBeforeTable(preprocessed) }],
         graph: { nodes: [], edges: [] },
         tables: [table],
         diagrams: [],
@@ -409,18 +418,21 @@ export function normalizeModelOutput(raw) {
 
   if (!parsed) {
     errors.push('Unable to parse JSON envelope from model output');
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
+    return { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     errors.push('Model output is not a JSON object');
-    return { narrative: '', graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
+    return { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [], errors, raw: rawString };
   }
 
   // 3. Validate required top-level keys and fill defaults.
-  const narrative = typeof parsed.narrative === 'string' ? parsed.narrative : '';
-  if (!Object.prototype.hasOwnProperty.call(parsed, 'narrative')) {
-    errors.push('Missing required top-level key: narrative');
+  if (!Object.prototype.hasOwnProperty.call(parsed, 'narratives')) {
+    errors.push('Missing required top-level key: narratives');
+  }
+  const narrativesInput = Array.isArray(parsed.narratives) ? parsed.narratives : [];
+  if (!Array.isArray(parsed.narratives)) {
+    errors.push('narratives must be an array');
   }
 
   const graphInput = parsed.graph && typeof parsed.graph === 'object' && !Array.isArray(parsed.graph)
@@ -467,8 +479,7 @@ export function normalizeModelOutput(raw) {
   }
 
   return {
-    narrative,
-    narrative_name: typeof parsed.narrative_name === 'string' ? parsed.narrative_name : '',
+    narratives: narrativesInput.map(normalizeNarrative).filter((n) => n !== null),
     graph: {
       name: typeof graphInput.name === 'string' ? graphInput.name : '',
       nodes: connectedNodes,
