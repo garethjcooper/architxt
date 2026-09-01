@@ -382,6 +382,7 @@ function mergeProperties(existing, incoming) {
     ...existingProvenance,
     ...incomingProvenance,
     evidence: mergeArrays(existingProvenance.evidence, incomingProvenance.evidence),
+    model_refs: mergeModelRefs(existingProvenance.model_refs, incomingProvenance.model_refs),
   };
 
   // Merge aliases without duplicates.
@@ -395,4 +396,17 @@ function mergeArrays(a, b) {
   if (Array.isArray(a)) for (const x of a) set.add(x);
   if (Array.isArray(b)) for (const x of b) set.add(x);
   return Array.from(set);
+}
+
+function mergeModelRefs(existingRefs, incomingRefs) {
+  const existing = Array.isArray(existingRefs) ? existingRefs : [];
+  const incoming = Array.isArray(incomingRefs) ? incomingRefs : [];
+  const byExtId = new Map();
+  for (const ref of existing) {
+    if (ref?.ext_id) byExtId.set(ref.ext_id, ref);
+  }
+  for (const ref of incoming) {
+    if (ref?.ext_id) byExtId.set(ref.ext_id, ref);
+  }
+  return Array.from(byExtId.values());
 }
