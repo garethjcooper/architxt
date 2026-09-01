@@ -49,12 +49,9 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
   };
 
   if (serverEnvelope) {
-    const narratives = resolveNarratives(serverEnvelope);
     return {
       ext_id: '',
-      narratives,
-      narrative: narratives[0]?.narrative ?? '',
-      narrative_name: narratives[0]?.narrative_name,
+      narratives: resolveNarratives(serverEnvelope),
       concatenation: undefined,
       graph: serverEnvelope.graph,
       tables: serverEnvelope.tables,
@@ -63,7 +60,7 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
     };
   }
 
-  let parsed: any = null;
+  let parsed: unknown = null;
   const rawContent = raw.content ?? null;
 
   if (typeof rawContent === 'string' && rawContent.trim()) {
@@ -80,7 +77,6 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
     return {
       ext_id: '',
       narratives: [],
-      narrative: typeof rawContent === 'string' ? rawContent : '',
       concatenation: undefined,
       graph: { nodes: [], edges: [] },
       tables: [],
@@ -88,16 +84,14 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
     };
   }
 
-  const narratives = resolveNarratives(parsed);
+  const parsedRecord = parsed as Record<string, unknown>;
   return {
     ext_id: '',
-    narratives,
-    narrative: narratives[0]?.narrative ?? (typeof parsed.narrative === 'string' ? parsed.narrative : ''),
-    narrative_name: narratives[0]?.narrative_name ?? (typeof parsed.narrative_name === 'string' ? parsed.narrative_name : undefined),
+    narratives: resolveNarratives(parsedRecord),
     concatenation: undefined,
-    graph: (parsed.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
-    tables: Array.isArray(parsed.tables) ? parsed.tables : [],
-    diagrams: Array.isArray(parsed.diagrams) ? parsed.diagrams : [],
+    graph: (parsedRecord.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
+    tables: Array.isArray(parsedRecord.tables) ? parsedRecord.tables : [],
+    diagrams: Array.isArray(parsedRecord.diagrams) ? parsedRecord.diagrams : [],
   };
 }
 
@@ -108,6 +102,7 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
   const content = parseMentalModelContent(raw);
   const now = new Date().toISOString();
   const firstNarrative = content.narratives?.[0]?.narrative ?? '';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const firstName = content.narratives?.[0]?.narrative_name;
   return {
     id: -1,

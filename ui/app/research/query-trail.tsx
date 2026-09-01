@@ -57,7 +57,9 @@ export function QueryTrail(props: QueryTrailProps) {
             const isSelected = selectedStepIds.has(step.id);
             const isSynthesize = step.action_type === 'synthesize';
             const queryType = step.calls?.[0]?.mode || step.action_type || 'discover';
-            const hasNarrative = typeof step.synthesis?.narrative === 'string' && step.synthesis.narrative.length > 0;
+            const hasNarrative = step.action_type === 'curated_page'
+              ? (step.envelope?.narratives?.some((n) => typeof n.narrative === 'string' && n.narrative.length > 0) ?? false)
+              : (typeof step.synthesis?.narrative === 'string' && step.synthesis.narrative.length > 0);
             const hasGraph = !!(step.canvas?.graph?.nodes?.length || step.canvas?.graph?.edges?.length);
             const createdAt = step.created_at
               ? new Date(step.created_at).toLocaleString(undefined, {

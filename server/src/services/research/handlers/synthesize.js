@@ -43,10 +43,11 @@ function collectFromSteps(sourceSteps) {
     const envelope = step.envelope || {};
     const synthesis = step.synthesis || {};
 
-    // Prefer new envelope.narratives, fall back to legacy synthesis.narrative.
+    // Prefer new envelope.narratives; synthesis.narrative is no longer used as a
+    // fallback because the agent always writes envelope.narratives.
     const stepNarratives = Array.isArray(envelope.narratives)
       ? envelope.narratives
-      : (synthesis.narrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: synthesis.narrative }] : []);
+      : [];
     if (stepNarratives.length > 0) {
       const title = `## Step: ${step.intent_text || 'untitled'}`;
       const body = stepNarratives.map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`).join('\n\n');

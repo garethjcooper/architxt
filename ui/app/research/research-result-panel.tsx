@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Copy, Download } from 'lucide-react';
+import { AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { InteractiveGraph, colorForType, type GraphLayout } from '@/components/research-canvas';
 import { ComponentDiagram } from '@/components/component-diagram';
@@ -183,6 +183,7 @@ export function ResearchResultPanel({
   const selectedStepIds = selectedStepIdsProp ?? new Set<number>();
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [hoveredInfo, setHoveredInfo] = useState<{ kind: 'node' | 'edge'; data: any } | null>(null);
   const [showNarrativeIndex, setShowNarrativeIndex] = useState(true);
   const cyRef = useRef<cytoscape.Core | null>(null);
@@ -198,30 +199,14 @@ export function ResearchResultPanel({
     return Array.from(new Set(source.map((e) => e.type).filter((t): t is string => Boolean(t)))).sort();
   }, [allGraphEdges, graphEdges]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasActiveFilters = edgeTypes.length > 0;
-
-  const mergedNarrative = useMemo(() => {
-    if (viewMode !== 'session') return null;
-    const selected = trail.filter((s) => selectedStepIds.has(s.id));
-    if (selected.length === 0) return null;
-    return selected
-      .map((s) => {
-        const envelope = normalizeEnvelope(s);
-        const narratives = envelope.narratives
-          .map((n) => n.narrative)
-          .filter((n): n is string => Boolean(n));
-        if (narratives.length === 0) return null;
-        return narratives.join('\n\n');
-      })
-      .filter(Boolean)
-      .join('\n\n---\n\n');
-  }, [trail, selectedStepIds, viewMode]);
 
   const mergedTables = useMemo(() => {
     if (viewMode !== 'session') return null;
     const selected = trail.filter((s) => selectedStepIds.has(s.id));
     if (selected.length === 0) return null;
-    const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
+    const tables: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }> = [];
     for (const s of selected) {
       const stepTables = normalizeEnvelope(s).tables;
       if (stepTables?.length) tables.push(...stepTables);
@@ -273,17 +258,20 @@ export function ResearchResultPanel({
   const sourceSteps = useMemo(() => {
     if (result?.action_type !== 'synthesize' || !Array.isArray(result?.parameters?.source_steps)) return [];
     return result.parameters.source_steps
-      .filter((s: any) => s && typeof s.intent_text === 'string')
-      .map((s: any) => ({
+      .filter((s) => s && typeof s.intent_text === 'string')
+      .map((s) => ({
         intent_text: s.intent_text,
         action_type: s.action_type,
       }));
-  }, [result?.action_type, result?.parameters?.source_steps]);
+  }, [result]);
 
   const narrative = useMemo(() => {
     if (viewMode === 'session') {
+      const selectedSteps = trail.filter((s) => selectedStepIds.has(s.id));
       const mergedEnvelope = {
-        narratives: mergedNarrative ? [{ narrative_name: '', narrative: mergedNarrative }] : [],
+        narratives: selectedSteps
+          .flatMap((s) => normalizeEnvelope(s).narratives.filter((n) => n.narrative?.trim()))
+          .map((n) => ({ narrative_name: n.narrative_name, narrative: n.narrative })),
         graph: mergedGraph ?? { nodes: [], edges: [] },
         tables: mergedTables ?? [],
         diagrams: mergedDiagrams ?? [],
@@ -291,7 +279,7 @@ export function ResearchResultPanel({
       return buildEnvelopeMarkdown(mergedEnvelope);
     }
     return buildEnvelopeMarkdown(result ?? null);
-  }, [viewMode, mergedNarrative, mergedTables, mergedDiagrams, mergedGraph, result]);
+  }, [viewMode, trail, selectedStepIds, mergedTables, mergedDiagrams, mergedGraph, result]);
 
   return (
     <div className="min-h-0 flex-1 flex flex-row overflow-hidden" style={{ flex: bottomFlex }}>
@@ -565,6 +553,7 @@ export function ResearchResultPanel({
                   const date = new Date().toISOString().split('T')[0];
                   const sanitized = sanitizeFilenameBase(sessionName);
                   const filename = `${sanitized}-${canvasView}-${date}.png`;
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const dataUrl = (cy as any).png({ full: true, bg: 'transparent', scale: 4 });
                   downloadBlob(dataUrlToBlob(dataUrl), filename, 'image/png');
                   toast.success(`Diagram saved as ${filename}`);
@@ -583,9 +572,12 @@ export function ResearchResultPanel({
                   const sanitized = sanitizeFilenameBase(sessionName);
                   const filename = `${sanitized}-${canvasView}-${date}.svg`;
                   const cytoscapeSvg = await import('cytoscape-svg');
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const registerSvg = (cytoscapeSvg as any).default ?? cytoscapeSvg;
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   registerSvg(cytoscape);
-                  const svg = (cy as any).svg({ full: true });
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const svg = (cy as any).svg({ full: true }) as string;
                   downloadBlob(svg, filename, 'image/svg+xml');
                   toast.success(`Diagram saved as ${filename}`);
                 }}
