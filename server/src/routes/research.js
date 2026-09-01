@@ -1211,7 +1211,7 @@ router.get('/mental-models/content', async (req, res) => {
     const knownCatalog = new Map(catalogEntities.map((e) => [e.id, e]));
 
     const envelope = parsedContent
-      ? toEnvelope(parsedContent, { knownCatalog, activity: 'mental-model', mode: 'generic' })
+      ? toEnvelope(parsedContent, { knownCatalog, activity: 'mental-model', mode: 'generic', preserveParallelEdges: true })
       : {
           narratives: [],
           graph: { name: '', nodes: [], edges: [] },
