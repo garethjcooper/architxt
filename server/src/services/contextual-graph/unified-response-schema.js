@@ -10,8 +10,17 @@
 export const UNIFIED_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
-    narrative: { type: 'string' },
-    narrative_name: { type: 'string' },
+    narratives: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          narrative_name: { type: 'string' },
+          narrative: { type: 'string' },
+        },
+        required: ['narrative'],
+      },
+    },
     graph: {
       type: 'object',
       properties: {
@@ -51,7 +60,7 @@ export const UNIFIED_RESPONSE_SCHEMA = {
     tables: { type: 'array' },
     diagrams: { type: 'array' },
   },
-  required: ['narrative', 'graph', 'tables', 'diagrams'],
+  required: ['narratives', 'graph', 'tables', 'diagrams'],
 };
 
 /**
@@ -63,7 +72,7 @@ export function isUnifiedResponseSchema(schema) {
   if (!schema || schema.type !== 'object') return false;
   const required = new Set(schema.required || []);
   return (
-    required.has('narrative') &&
+    required.has('narratives') &&
     required.has('graph') &&
     required.has('tables') &&
     required.has('diagrams')

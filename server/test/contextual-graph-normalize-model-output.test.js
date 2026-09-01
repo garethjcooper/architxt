@@ -17,31 +17,30 @@ function createDb() {
 describe('normalizeModelOutput', () => {
   it('parses a valid envelope', () => {
     const raw = JSON.stringify({
-      narrative: 'A system that bills customers.',
+      narratives: [{ narrative_name: 'Overview', narrative: 'A system that bills customers.' }],
       graph: { nodes: [], edges: [] },
       tables: [],
       diagrams: [],
     });
     const out = normalizeModelOutput(raw);
-    assert.equal(out.narrative, 'A system that bills customers.');
-    assert.equal(out.narrative_name, '');
+    assert.deepEqual(out.narratives, [{ narrative_name: 'Overview', narrative: 'A system that bills customers.' }]);
     assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.equal(out.errors.length, 0);
   });
 
   it('extracts JSON wrapped in markdown fences', () => {
-    const inner = JSON.stringify({ narrative: 'wrapped', graph: { nodes: [], edges: [] }, tables: [],
+    const inner = JSON.stringify({ narratives: [{ narrative: 'wrapped' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const raw = `Some prose before\n\n\`\`\`json\n${inner}\n\`\`\``;
     const out = normalizeModelOutput(raw);
-    assert.equal(out.narrative, 'wrapped');
+    assert.deepEqual(out.narratives, [{ narrative_name: '', narrative: 'wrapped' }]);
     assert.equal(out.errors.length, 0);
   });
 
   it('fills missing sections with defaults and records errors', () => {
-    const out = normalizeModelOutput(JSON.stringify({ narrative: 'only narrative' }));
-    assert.equal(out.narrative, 'only narrative');
+    const out = normalizeModelOutput(JSON.stringify({ narratives: [{ narrative: 'only narrative' }] }));
+    assert.deepEqual(out.narratives, [{ narrative_name: '', narrative: 'only narrative' }]);
     assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.ok(out.errors.length >= 2);
@@ -49,7 +48,7 @@ describe('normalizeModelOutput', () => {
 
   it('drops isolated graph nodes', () => {
     const raw = JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [
           { id: 'svc-001', name: 'A' },
@@ -67,7 +66,7 @@ describe('normalizeModelOutput', () => {
 
   it('drops nodes that have no connecting edges', () => {
     const raw = JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: {
         nodes: [
           { id: 'svc-001', name: 'A' },
@@ -86,7 +85,7 @@ describe('normalizeModelOutput', () => {
 
   it('validates tables require name and columns/rows', () => {
     const raw = JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: { name: '', nodes: [], edges: [] },
       tables: [
         { name: 'capabilities', columns: ['name'], rows: [{ name: 'billing' }] },
@@ -102,12 +101,12 @@ describe('normalizeModelOutput', () => {
   it('returns errors for malformed JSON', () => {
     const out = normalizeModelOutput('not json');
     assert.equal(out.errors.length, 1);
-    assert.equal(out.narrative, '');
+    assert.deepEqual(out.narratives, []);
   });
 
   it('extracts JSON buried after narrative prose and ignores smart-quoted asides inside string values', () => {
     const raw = JSON.stringify({
-      narrative: 'Context.',
+      narratives: [{ narrative: 'Context.' }],
       graph: {
         nodes: [{ id: 'a-com:COM-002', name: 'ICMS', type: 'component' }, { id: 'a-com:COM-001', name: 'Singleview', type: 'component' }],
         edges: [{ from: 'a-com:COM-002', to: 'a-com:COM-001', type: 'reads', label: 'account data', detail: 'reads account data', evidence: ['entity-summary-a-com:COM-001'] }],
@@ -122,15 +121,15 @@ describe('normalizeModelOutput', () => {
   });
 
   it('handles smart quotes inside JSON string values without breaking the envelope', () => {
-    const content = '{\n  "narrative": "Uses \u201cFile: DBnnnn00\u201d interface.",\n  "graph": {"nodes": [], "edges": []},\n  "tables": [],\n  "diagrams": []\n}';
+    const content = '{\n  "narratives": [{"narrative_name":"","narrative":"Uses \u201cFile: DBnnnn00\u201d interface."}],\n  "graph": {"nodes": [], "edges": []},\n  "tables": [],\n  "diagrams": []\n}';
     const out = normalizeModelOutput(content);
     assert.equal(out.errors.length, 0);
-    assert.ok(out.narrative.includes('File: DBnnnn00'));
+    assert.ok(out.narratives[0].narrative.includes('File: DBnnnn00'));
   });
 
   it('parses and validates diagrams', () => {
     const raw = JSON.stringify({
-      narrative: '',
+      narratives: [],
       graph: { name: '', nodes: [], edges: [] },
       tables: [],
       diagrams: [
@@ -156,10 +155,10 @@ describe('normalizeModelOutput', () => {
   });
 
   it('fixes literal unescaped newlines inside JSON string values', () => {
-    const raw = '{"narrative":"Test","graph":{"nodes":[],"edges":[]},"tables":[{"name":"Data Flows","columns":["Capability"],"rows":[["OCS","handles calls,\nhandling charging"]]}],"diagrams":[]}';
+    const raw = '{"narratives":[{"narrative_name":"","narrative":"Test"}],"graph":{"nodes":[],"edges":[]},"tables":[{"name":"Data Flows","columns":["Capability"],"rows":[["OCS","handles calls,\nhandling charging"]]}],"diagrams":[]}';
     const out = normalizeModelOutput(raw);
     assert.equal(out.errors.length, 0);
-    assert.equal(out.narrative, 'Test');
+    assert.equal(out.narratives[0].narrative, 'Test');
     assert.equal(out.tables.length, 1);
     assert.equal(out.tables[0].rows[0][0], 'OCS');
     assert.equal(out.tables[0].rows[0][1], 'handles calls,\nhandling charging');
