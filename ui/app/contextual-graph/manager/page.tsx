@@ -667,7 +667,7 @@ export default function ContextManagerPage() {
                       active={selectedEdgeId === edge.id}
                       sourceLabel={nodeById.get(edge.source_id)?.label}
                       targetLabel={nodeById.get(edge.target_id)?.label}
-                      edgeContextCount={count > 1 ? count : undefined}
+                      edgeContextCount={count > 0 ? count : undefined}
                       onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
                     />
                   ))}
