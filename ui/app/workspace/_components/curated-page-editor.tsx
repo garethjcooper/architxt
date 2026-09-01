@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { DiscoverStepResponse, ResearchStepSummary, UnifiedNarrativeBlock } from '@/lib/api/client';
-import { buildEnvelopeMarkdown, normalizeEnvelope, splitNarrativeMarkdown } from '@/lib/envelope-markdown';
+import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -156,9 +156,13 @@ export function CuratedPageEditor({
 
   const workingEnvelope = useMemo(() => {
     const userMarkdown = buildUserNarrativeContent(displayedBlocks);
-    // The rendered markdown uses each narrative_name as a section heading. Parse it
-    // back into the original array entries so the narratives array stays canonical.
-    const nextNarratives = splitNarrativeMarkdown(userMarkdown, envelope.narratives ?? []);
+    const existingNarratives = envelope.narratives ?? [];
+    const nextNarratives: UnifiedNarrativeBlock[] =
+      existingNarratives.length > 0
+        ? [{ narrative_name: existingNarratives[0].narrative_name, narrative: userMarkdown }, ...existingNarratives.slice(1)]
+        : userMarkdown.trim()
+          ? [{ narrative_name: '', narrative: userMarkdown }]
+          : [];
     return {
       ...envelope,
       narratives: nextNarratives,
