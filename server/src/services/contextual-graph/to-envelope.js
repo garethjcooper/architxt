@@ -1,4 +1,5 @@
 import { normalizeGraph } from '../../prompts/normalize-graph.js';
+import { normalizeNarrative } from './normalize-model-output.js';
 
 /**
  * Convert a raw structured-output envelope (from Hindsight Reflect, Synthesize,
@@ -37,7 +38,8 @@ export function toEnvelope(structuredOutput, options = {}) {
   const narratives = Array.isArray(extracted.narratives)
     ? extracted.narratives
       .filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
-      .map((n) => ({ narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '', narrative: n.narrative }))
+      .map(normalizeNarrative)
+      .filter((n) => n !== null)
     : [];
 
   return {
