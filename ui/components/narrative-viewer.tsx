@@ -1,12 +1,54 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, FileText, Table2, GitGraph, Workflow } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
+
+interface SyntheticHeadingInfo {
+  kind: 'narrative' | 'table' | 'graph' | 'diagram';
+  name: string;
+}
+
+function parseSyntheticHeadingTitle(title?: string): SyntheticHeadingInfo | null {
+  if (!title) return null;
+  const trimmed = title.trim();
+  const narrativeMatch = trimmed.match(/^Narrative:\s*(.+)$/i);
+  if (narrativeMatch) return { kind: 'narrative', name: narrativeMatch[1].trim() };
+  const graphMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
+  if (graphMatch) return { kind: 'graph', name: graphMatch[1]?.trim() || trimmed };
+  const tableMatch = trimmed.match(/^Table:\s*(.+)$/i);
+  if (tableMatch) return { kind: 'table', name: tableMatch[1].trim() };
+  const diagramMatch = trimmed.match(/^Diagram:\s*(.+)$/i);
+  if (diagramMatch) return { kind: 'diagram', name: diagramMatch[1].trim() };
+  return null;
+}
+
+const SECTION_ICON_CLASS = 'h-3 w-3 text-white/60';
+
+function sectionIcon(kind: SyntheticHeadingInfo['kind']) {
+  switch (kind) {
+    case 'table': return <Table2 className={SECTION_ICON_CLASS} />;
+    case 'graph': return <GitGraph className={SECTION_ICON_CLASS} />;
+    case 'diagram': return <Workflow className={SECTION_ICON_CLASS} />;
+    default: return <FileText className={SECTION_ICON_CLASS} />;
+  }
+}
+
+function formatSectionLabel(title?: string) {
+  const parsed = parseSyntheticHeadingTitle(title);
+  if (!parsed) return { icon: null, label: title || '' };
+  return { icon: sectionIcon(parsed.kind), label: parsed.name };
+}
+
+function resolveMarkdownHeadingIcon(text: string): { icon: React.ReactNode; text: string } | null {
+  const parsed = parseSyntheticHeadingTitle(text);
+  if (!parsed) return null;
+  return { icon: sectionIcon(parsed.kind), text: parsed.name };
+}
 
 export interface NarrativeViewerProps {
   /** Markdown narrative content to display/index. Either this or `blocks` must be provided. */
@@ -242,6 +284,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
 
   const defaultSidebarRow = (b: NarrativeBlock, idx: number, isActive: boolean) => {
     const indent = 0.5 + getSidebarIndent(structuralBlocks, idx) * 0.75;
+    const { icon, label } = formatSectionLabel(b.title);
     return (
       <div
         key={`${prefix}index-${b.id}`}
@@ -259,7 +302,10 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           onClick={() => scrollToBlock(b.id)}
           className="flex-1 min-w-0 text-left"
         >
-          <span className="truncate block" title={b.title}>{b.title}</span>
+          <span className="flex items-center gap-1.5 truncate" title={b.title}>
+            {icon}
+            {label}
+          </span>
         </button>
         <div className="flex items-center flex-shrink-0">
           {onFocusSection && b.type === 'heading' && (
@@ -325,7 +371,16 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           }`}
         >
           <div className="flex items-start gap-1">
-            <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
+            <div className="flex-1 min-w-0">
+              {b.type === 'heading' ? (
+                <span className="flex items-center gap-1.5">
+                  {formatSectionLabel(b.title).icon}
+                  <span>{formatSectionLabel(b.title).label}</span>
+                </span>
+              ) : (
+                b.edited ?? b.raw
+              )}
+            </div>
             {renderBlockActions && !b.deleted && (
               <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
                 {onAddToPage && b.type !== 'text' && !b.synthetic && (
@@ -440,7 +495,16 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
         }`}
       >
         <div className="flex items-start gap-1">
-          <div className="flex-1 min-w-0">{b.edited ?? b.raw}</div>
+          <div className="flex-1 min-w-0">
+            {b.type === 'heading' ? (
+              <span className="flex items-center gap-1.5">
+                {formatSectionLabel(b.title).icon}
+                <span>{formatSectionLabel(b.title).label}</span>
+              </span>
+            ) : (
+              b.edited ?? b.raw
+            )}
+          </div>
           {renderBlockActions && !b.deleted && (
             <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity">
               {onAddToPage && b.type !== 'text' && !b.synthetic && (
@@ -529,7 +593,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           }`}
         >
           {viewMode === 'markdown' ? (
-            <Markdown className="text-[12px] leading-relaxed">{renderedMarkdown}</Markdown>
+            <Markdown className="text-[12px] leading-relaxed" headingIconResolver={resolveMarkdownHeadingIcon}>{renderedMarkdown}</Markdown>
           ) : (
             blocks.map(b => {
               const isActive = activeRangeIds.has(b.id);

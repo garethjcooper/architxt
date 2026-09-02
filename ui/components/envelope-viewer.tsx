@@ -86,9 +86,11 @@ export function EnvelopeViewer({
     | null
   >(null);
 
-  const parseSyntheticHeading = useCallback((heading?: string): { kind: 'graph' | 'table' | 'diagram'; name?: string } | null => {
+  const parseSyntheticHeading = useCallback((heading?: string): { kind: 'graph' | 'table' | 'diagram' | 'narrative'; name?: string } | null => {
     if (!heading) return null;
     const trimmed = heading.trim();
+    const narrativeMatch = trimmed.match(/^Narrative:\s*(.+)$/i);
+    if (narrativeMatch) return { kind: 'narrative', name: narrativeMatch[1].trim() };
     const graphMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
     if (graphMatch) return { kind: 'graph', name: graphMatch[1]?.trim() };
     const tableMatch = trimmed.match(/^Table:\s*(.+)$/i);

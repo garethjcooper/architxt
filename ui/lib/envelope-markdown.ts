@@ -141,7 +141,7 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
     const body = block.narrative.trim();
     const alreadyHasNameHeading =
       name && new RegExp(`^#{1,6}\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'im').test(body);
-    parts.push(name && !alreadyHasNameHeading ? `## ${name}\n\n${body}` : body);
+    parts.push(name && !alreadyHasNameHeading ? `## Narrative: ${name}\n\n${body}` : body);
   }
 
   if (tables && tables.length > 0) {
