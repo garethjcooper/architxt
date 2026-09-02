@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
 import { contextualGraphApi } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
@@ -292,19 +293,27 @@ export function SyncJobsTab({
         )}
 
         <div className="flex items-center gap-2 ml-auto">
-          <label className="flex items-center gap-1.5 text-[11px] text-white/60 cursor-pointer">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2">
+            <Switch
+              size="sm"
               checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="accent-emerald-500"
+              onCheckedChange={setAutoRefresh}
+              id="sync-auto-refresh"
             />
-            Auto-refresh
-          </label>
-          <Button variant="outline" size="sm" disabled={loading} onClick={loadJobs}>
-            <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', loading && 'animate-spin')} />
-            Refresh
-          </Button>
+            <label htmlFor="sync-auto-refresh" className="text-[11px] text-white/60 cursor-pointer select-none">
+              Auto-refresh
+            </label>
+          </div>
+          <div className="w-px h-5 bg-white/10" />
+          <button
+            type="button"
+            disabled={loading}
+            onClick={loadJobs}
+            title="Refresh"
+            className="h-8 w-8 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </button>
         </div>
       </div>
 
