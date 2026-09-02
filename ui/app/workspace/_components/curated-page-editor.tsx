@@ -22,9 +22,11 @@ import { downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
-function parseSyntheticHeading(title?: string): { kind: 'graph' | 'table' | 'diagram'; name?: string } | null {
+function parseSyntheticHeading(title?: string): { kind: 'graph' | 'table' | 'diagram' | 'narrative'; name?: string } | null {
   if (!title) return null;
   const trimmed = title.trim();
+  const narrativeMatch = trimmed.match(/^Narrative:\s*(.+)$/i);
+  if (narrativeMatch) return { kind: 'narrative', name: narrativeMatch[1].trim() };
   const graphMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
   if (graphMatch) return { kind: 'graph', name: graphMatch[1]?.trim() };
   const tableMatch = trimmed.match(/^Table:\s*(.+)$/i);
@@ -36,7 +38,12 @@ function parseSyntheticHeading(title?: string): { kind: 'graph' | 'table' | 'dia
 
 function structuredKey(parsed: NonNullable<ReturnType<typeof parseSyntheticHeading>>): string {
   if (parsed.kind === 'graph') return 'graph';
+  if (parsed.kind === 'narrative') return `narrative:${parsed.name || 'untitled'}`;
   return `${parsed.kind}:${parsed.name || 'untitled'}`;
+}
+
+function isStructuredKey(parsed: NonNullable<ReturnType<typeof parseSyntheticHeading>>): boolean {
+  return parsed.kind !== 'narrative';
 }
 
 export type CuratedPageEnvelope = ReturnType<typeof normalizeEnvelope>;
@@ -155,7 +162,7 @@ export function CuratedPageEditor({
       const b = baseBlocks[i];
       if (b.type !== 'heading' || !b.synthetic) continue;
       const parsed = parseSyntheticHeading(b.title);
-      if (!parsed || !deletedStructuredKeys.has(structuredKey(parsed))) continue;
+      if (!parsed || !isStructuredKey(parsed) || !deletedStructuredKeys.has(structuredKey(parsed))) continue;
       for (const id of getSectionBlockIds(baseBlocks, b.id)) {
         deletedSubtreeIds.add(id);
       }
@@ -260,7 +267,7 @@ export function CuratedPageEditor({
 
   const addStructuredKey = useCallback((b: NarrativeBlock) => {
     const parsed = parseSyntheticHeading(b.title);
-    if (!parsed) return;
+    if (!parsed || !isStructuredKey(parsed)) return;
     const key = structuredKey(parsed);
     setDeletedStructuredKeys((prev) => {
       const next = new Set(prev);
@@ -271,7 +278,7 @@ export function CuratedPageEditor({
 
   const removeStructuredKey = useCallback((b: NarrativeBlock) => {
     const parsed = parseSyntheticHeading(b.title);
-    if (!parsed) return;
+    if (!parsed || !isStructuredKey(parsed)) return;
     const key = structuredKey(parsed);
     setDeletedStructuredKeys((prev) => {
       const next = new Set(prev);

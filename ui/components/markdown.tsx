@@ -6,35 +6,49 @@ import { MermaidDiagram } from './mermaid-diagram';
 interface MarkdownProps {
   children: string;
   className?: string;
+  /** Optional resolver that returns an icon element for a heading text. When returned, the icon is prepended to the heading and the matched prefix is removed. */
+  headingIconResolver?: (text: string) => { icon: React.ReactNode; text: string } | null;
 }
 
-export function Markdown({ children, className = '' }: MarkdownProps) {
+export function Markdown({ children, className = '', headingIconResolver }: MarkdownProps) {
   const headingWithId = ({ node, children, level, ...props }: any) => {
     const text = node?.children
       ?.map((c: any) => (c.type === 'text' ? c.value : ''))
       .join('') || '';
     const id = slugifyHeading(text);
+    const resolved = headingIconResolver?.(text);
+    const displayText = resolved?.text ?? text;
+    const icon = resolved?.icon;
     const baseClass = level === 1
       ? 'text-lg font-semibold mb-2 mt-4 first:mt-0'
       : level === 2
         ? 'text-base font-semibold mb-2 mt-3 first:mt-0'
         : 'text-sm font-semibold mb-1 mt-2 first:mt-0';
 
+    const childrenWithIcon = icon ? (
+      <span className="flex items-center gap-1.5">
+        {icon}
+        <span>{displayText}</span>
+      </span>
+    ) : (
+      children
+    );
+
     switch (level) {
       case 1:
-        return <h1 id={id} className={baseClass} {...props}>{children}</h1>;
+        return <h1 id={id} className={baseClass} {...props}>{childrenWithIcon}</h1>;
       case 2:
-        return <h2 id={id} className={baseClass} {...props}>{children}</h2>;
+        return <h2 id={id} className={baseClass} {...props}>{childrenWithIcon}</h2>;
       case 3:
-        return <h3 id={id} className={baseClass} {...props}>{children}</h3>;
+        return <h3 id={id} className={baseClass} {...props}>{childrenWithIcon}</h3>;
       case 4:
-        return <h4 id={id} className={baseClass} {...props}>{children}</h4>;
+        return <h4 id={id} className={baseClass} {...props}>{childrenWithIcon}</h4>;
       case 5:
-        return <h5 id={id} className={baseClass} {...props}>{children}</h5>;
+        return <h5 id={id} className={baseClass} {...props}>{childrenWithIcon}</h5>;
       case 6:
-        return <h6 id={id} className={baseClass} {...props}>{children}</h6>;
+        return <h6 id={id} className={baseClass} {...props}>{childrenWithIcon}</h6>;
       default:
-        return <h3 id={id} className={baseClass} {...props}>{children}</h3>;
+        return <h3 id={id} className={baseClass} {...props}>{childrenWithIcon}</h3>;
     }
   };
 
