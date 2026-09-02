@@ -223,6 +223,61 @@ describe('applyModelOutput', () => {
     assert.equal(edge.cge_type, 'reads');
   });
 
+  it('does not create working-graph nodes for intermediaries in edge-context output', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-024', ['active'], { display_name: 'Siebel CRM' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+    // Simulate a stale orphan node left by an earlier edge-context run that
+    // emitted the intermediary as an endpoint.
+    upsertNode(db, serverId, bankId, 'a-com:COM-132', ['active'], {
+      display_name: 'EAI',
+      provenance: {
+        source: 'contextual-graph',
+        inferred: 'edge-context',
+        model_refs: [{ role: 'sys_edge_context', ext_id: 'edge-ctx-a-com:COM-024|a-com:COM-002' }],
+      },
+    });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        name: 'Siebel‑ICMS Integration Flows',
+        nodes: [
+          { id: 'a-com:COM-024', name: 'Siebel CRM' },
+          { id: 'a-com:COM-002', name: 'ICMS' },
+          { id: 'a-com:COM-132', name: 'EAI' },
+        ],
+        edges: [
+          {
+            from: 'a-com:COM-002',
+            to: 'a-com:COM-024',
+            type: 'sends',
+            label: 'MQ notifications',
+            detail: 'ICMS publishes MQ notifications through the EAI layer to Siebel.',
+            properties: {
+              protocol: 'MQ',
+              frequency: 'real-time',
+              intermediaries: ['a-com:COM-132'],
+            },
+          },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-024|a-com:COM-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+    assert.equal(result.applied.deletedNodes, 1);
+
+    const intermediary = getNode(db, serverId, bankId, 'a-com:COM-132').data;
+    assert.equal(intermediary, null, 'stale intermediary node should be removed on refresh');
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.deepEqual(edge.properties.intermediaries, ['a-com:COM-132']);
+  });
+
   it('resolves model-emitted bare ids to existing typed nodes', async () => {
     upsertNode(db, serverId, bankId, 'svc:mozart-api', ['active'], { display_name: 'Mozart API', aliases: ['mozart-api'] });
     upsertNode(db, serverId, bankId, 'svc:subscriber', ['active'], { display_name: 'Subscriber', aliases: ['subscriber'] });
