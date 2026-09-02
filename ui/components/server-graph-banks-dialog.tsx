@@ -312,18 +312,14 @@ export function ServerGraphBanksDialog({
                         <>
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-white/50 whitespace-nowrap">Mode</Label>
-                            <Select
+                            <select
                               value={cfg.mode}
-                              onValueChange={(value) => setMode(bank.bank_id, value as 'manual' | 'auto')}
+                              onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
+                              className="h-8 w-[110px] text-xs rounded-md border border-white/10 bg-white/5 px-2 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                             >
-                              <SelectTrigger className="h-8 w-[110px] text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectPopup>
-                                <SelectItem value="manual" className="text-xs">Manual</SelectItem>
-                                <SelectItem value="auto" className="text-xs">Auto</SelectItem>
-                              </SelectPopup>
-                            </Select>
+                              <option value="manual">Manual</option>
+                              <option value="auto">Auto</option>
+                            </select>
                           </div>
 
                           {cfg.mode === 'auto' && (
