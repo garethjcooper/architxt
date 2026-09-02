@@ -28,6 +28,7 @@ import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
 import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
+import { normalizeEnvelopeForApi } from '../services/contextual-graph/normalize-model-output.js';
 import { parseJsonString } from '../prompts/graph-parser.js';
 
 /**
@@ -218,7 +219,7 @@ const toApiSession = (dbRow) => ({
 const toApiStepSummary = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
   const envelope = isCurated
-    ? (dbRow.rstep_envelope ?? {
+    ? normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
         narratives: [],
         graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
         tables: dbRow.rstep_canvas_state?.tables ?? [],
@@ -249,7 +250,7 @@ const toApiStepSummary = (dbRow) => {
 const toApiStep = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
   const envelope = isCurated
-    ? (dbRow.rstep_envelope ?? {
+    ? normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
         narratives: [],
         graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
         tables: dbRow.rstep_canvas_state?.tables ?? [],
