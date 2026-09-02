@@ -46,17 +46,45 @@ function svgToPngBlob(svg: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     // Normalize SVG so it can be drawn to a canvas without tainting.
     // Using a data URL and crossOrigin='anonymous' avoids blob-URL tainting issues.
-    const normalized = svg.includes('xmlns') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    let normalized = svg.includes('xmlns') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    // Remove max-width constraints that could limit the intrinsic size.
+    normalized = normalized.replace(/max-width:\s*[^;"]+;?/gi, '');
+
+    // Extract current intrinsic size and scale the SVG up to a usable minimum width.
+    const targetMinWidth = 3200;
+    const widthMatch = normalized.match(/width="([^"]+)"/);
+    const heightMatch = normalized.match(/height="([^"]+)"/);
+    const vbMatch = normalized.match(/viewBox="([^"]+)"/);
+    const currentWidth = widthMatch ? parseFloat(widthMatch[1]) : 0;
+    const currentHeight = heightMatch ? parseFloat(heightMatch[1]) : 0;
+    let svgWidth = currentWidth;
+    let svgHeight = currentHeight;
+    if (!svgWidth || !svgHeight) {
+      const parts = vbMatch ? vbMatch[1].split(/\s+/) : [];
+      if (parts.length === 4) {
+        svgWidth = parseFloat(parts[2]);
+        svgHeight = parseFloat(parts[3]);
+      }
+    }
+    svgWidth = Math.max(1, svgWidth);
+    svgHeight = Math.max(1, svgHeight);
+    const scale = Math.max(1, targetMinWidth / svgWidth);
+    const newWidth = Math.floor(svgWidth * scale);
+    const newHeight = Math.floor(svgHeight * scale);
+
+    // Update width/height attributes on the root SVG so the coordinate system scales up.
+    normalized = normalized
+      .replace(/width="[^"]+"/, `width="${newWidth}px"`)
+      .replace(/height="[^"]+"/, `height="${newHeight}px"`);
+
     const encoded = typeof window !== 'undefined' ? window.btoa(unescape(encodeURIComponent(normalized))) : '';
     const url = `data:image/svg+xml;base64,${encoded}`;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const targetMinWidth = 1600;
-      const scale = Math.max(1, targetMinWidth / Math.max(1, img.naturalWidth));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.floor(img.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.floor(img.naturalHeight * scale));
+      canvas.width = newWidth;
+      canvas.height = newHeight;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('Could not get canvas context'));
