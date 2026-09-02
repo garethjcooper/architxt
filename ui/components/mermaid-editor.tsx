@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DiagramControls } from '@/components/diagram-controls';
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
+import { CopyDiagramMenu } from '@/components/copy-diagram-menu';
 
 export interface MermaidEditorProps {
   /** Raw Mermaid source (without fence markers). */
@@ -274,7 +275,10 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
         <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>Preview</span>
-            {lastError && <span className="text-rose-300/80 text-[10px]">Parse error</span>}
+            <div className="flex items-center gap-2">
+              {lastError && <span className="text-rose-300/80 text-[10px]">Parse error</span>}
+              <CopyDiagramMenu source={content} />
+            </div>
           </div>
           <div className="flex-1 min-h-0 p-2 overflow-hidden">
             <PreviewPane
@@ -295,6 +299,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
         >
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>{readOnly ? 'Diagram source (read-only)' : 'Diagram source'}</span>
+            <CopyDiagramMenu source={content} />
           </div>
           <div className="flex-1 min-h-0">
             <CodeMirror

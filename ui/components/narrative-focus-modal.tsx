@@ -6,6 +6,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Copy } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
+import { copyText } from '@/lib/clipboard-utils';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
 export interface NarrativeFocusModalProps {
@@ -131,6 +133,14 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
             >
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                 <span>{readOnly ? 'Markdown source (read-only)' : 'Markdown source'}</span>
+                <button
+                  type="button"
+                  onClick={() => copyText(draftContent, 'Markdown')}
+                  className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                  title="Copy markdown source"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
               </div>
               <div className="flex-1 min-h-0">
                 <CodeMirror
