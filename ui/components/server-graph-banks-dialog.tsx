@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -256,15 +256,15 @@ export function ServerGraphBanksDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
             <Network className="h-5 w-5 text-emerald-400" />
             Graph Banks — {server.name || server.base_url}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-4 pr-1">
           <p className="text-sm text-white/60">
             Choose which banks are managed by the contextual graph. Manual banks appear in the Context Manager but never auto-sync. Auto banks sync on a refresh interval when the sync daemon is enabled.
           </p>
@@ -518,25 +518,25 @@ export function ServerGraphBanksDialog({
               })}
             </div>
           )}
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-            <Button
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || saving}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
         </div>
+
+        <DialogFooter className="shrink-0">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="text-white/70 hover:text-white hover:bg-white/5"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!hasChanges || saving}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
