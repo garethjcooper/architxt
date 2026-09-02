@@ -347,6 +347,18 @@ export default function WorkspacePage() {
     document.body.style.userSelect = '';
   }, []);
 
+  const handleResizeReset = useCallback(() => {
+    setColumnWidths({ left: 0.42, right: 0.58 });
+  }, []);
+
+  const handleInnerResizeReset = useCallback(() => {
+    setInnerWidths({ left: 0.5, right: 0.5 });
+  }, []);
+
+  const handleHResizeReset = useCallback(() => {
+    setLeftPaneHeights({ top: 0.4, bottom: 0.6 });
+  }, []);
+
   // Layout sizing: scope/query top pane + combined bottom pane in the left column.
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const [leftPaneHeights, setLeftPaneHeights] = useState({ top: 0.4, bottom: 0.6 });
@@ -1102,7 +1114,7 @@ export default function WorkspacePage() {
               />
             </div>
 
-            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} title="Drag to resize query / lower panels" />
+            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} onDoubleClick={handleHResizeReset} title="Drag to resize query / lower panels; double-click to reset" />
 
             <div ref={leftBottomRef} className="flex min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 140 }}>
               {serverId && bankId ? (
@@ -1122,7 +1134,7 @@ export default function WorkspacePage() {
                     />
                   </div>
 
-                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} title="Drag to resize contextual data / session items" />
+                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} onDoubleClick={handleInnerResizeReset} title="Drag to resize contextual data / session items; double-click to reset" />
 
                   <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
                     <SessionItemsPanel
@@ -1150,7 +1162,7 @@ export default function WorkspacePage() {
                     </Panel>
                   </div>
 
-                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} title="Drag to resize contextual data / session items" />
+                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} onDoubleClick={handleInnerResizeReset} title="Drag to resize contextual data / session items; double-click to reset" />
 
                   <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
                     <Panel className="flex-1 min-h-0">
@@ -1165,7 +1177,7 @@ export default function WorkspacePage() {
             </div>
           </div>
 
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} title="Drag to resize left/right columns" />
+          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} onDoubleClick={handleResizeReset} title="Drag to resize left/right columns; double-click to reset" />
 
           {/* Column 2: result viewer */}
           <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
