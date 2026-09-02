@@ -560,9 +560,9 @@ export default function ContextManagerPage() {
 
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] uppercase tracking-wider text-white/40">Graph</span>
-                <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
                   {nodes.length} node{nodes.length !== 1 ? 's' : ''} / {edges.length} edge{edges.length !== 1 ? 's' : ''}
-                </Badge>
+                </span>
               </div>
             </div>
           )}
@@ -600,7 +600,7 @@ export default function ContextManagerPage() {
                 className="h-8 pl-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/40"
               />
             </div>
-            <span className="text-[11px] text-white/50 ml-auto">
+            <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded ml-auto">
               {filteredSortedNodes.length} node{filteredSortedNodes.length !== 1 ? 's' : ''} / {filteredSortedEdges.length} edge
               {filteredSortedEdges.length !== 1 ? 's' : ''}
             </span>
@@ -614,7 +614,7 @@ export default function ContextManagerPage() {
               <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: topFlex }}>
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Entities</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
+                  <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
                     {filteredSortedNodes.length}
                   </span>
                 </div>
@@ -652,7 +652,7 @@ export default function ContextManagerPage() {
               <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Edges</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
+                  <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
                     {filteredSortedEdges.length}
                   </span>
                 </div>

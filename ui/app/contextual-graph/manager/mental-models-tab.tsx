@@ -376,7 +376,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
               className="h-8 pl-8 pr-2 bg-black/20 border-white/10 text-white/80 placeholder:text-white/40 text-xs"
             />
           </div>
-          <span className="text-xs text-white/50">{refs.length} model ref{refs.length === 1 ? '' : 's'}</span>
+          <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">{refs.length} model ref{refs.length === 1 ? '' : 's'}</span>
         </div>
         <Button
           variant="outline"
@@ -397,7 +397,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
         >
           <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Mental Models</span>
-            <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-emerald-300 font-mono">
+            <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
               {filteredRefs.length}
             </span>
           </div>
