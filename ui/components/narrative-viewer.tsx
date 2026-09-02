@@ -579,10 +579,10 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   return (
     <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${className}`}>
       {header}
-      <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Index sidebar */}
         {showIndex && (
-          <div className="contents">
+          <div className="contents mr-3">
             <div
               className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
               style={{ width: sidebarWidth, flexShrink: 0 }}
