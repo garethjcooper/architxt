@@ -117,9 +117,18 @@ export function DiagramControls({
     target.addEventListener('panzoomzoom', updateScale);
     target.addEventListener('panzoompan', updateScale);
 
+    // Bind wheel zoom on the target (middle-mouse / trackpad wheel) and stop
+    // the event from bubbling so the host page does not scroll.
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      panzoom.zoomWithWheel(event);
+    };
+    target.addEventListener('wheel', handleWheel, { passive: false });
+
     const cleanup = () => {
       target.removeEventListener('panzoomzoom', updateScale);
       target.removeEventListener('panzoompan', updateScale);
+      target.removeEventListener('wheel', handleWheel);
       panzoom.destroy();
     };
     cleanupRef.current = cleanup;
