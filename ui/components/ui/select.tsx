@@ -22,57 +22,47 @@ const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+    <ChevronDown className="h-4 w-4 opacity-50 ml-2 pointer-events-none" />
   </SelectUI.Trigger>
 ));
 SelectTrigger.displayName = 'SelectTrigger';
 
-const SelectPopup = React.forwardRef<
-  React.ElementRef<typeof SelectUI.Popup>,
-  React.ComponentPropsWithoutRef<typeof SelectUI.Popup>
->(({ className, ...props }, ref) => (
-  <SelectUI.Portal>
-    <SelectUI.Positioner align="start" sideOffset={4}>
-      <SelectUI.Popup
-        ref={ref}
-        className={cn(
-          'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md',
-          className
-        )}
-        {...props}
-      />
-    </SelectUI.Positioner>
-  </SelectUI.Portal>
-));
-SelectPopup.displayName = 'SelectPopup';
+function SelectPopup({ className, ...props }: React.ComponentPropsWithoutRef<typeof SelectUI.Popup>) {
+  return (
+    <SelectUI.Portal>
+      <SelectUI.Positioner align="start" sideOffset={4}>
+        <SelectUI.Popup
+          className={cn(
+            'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md',
+            className
+          )}
+          {...props}
+        />
+      </SelectUI.Positioner>
+    </SelectUI.Portal>
+  );
+}
 
-const SelectItem = React.forwardRef<
-  React.ElementRef<typeof SelectUI.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectUI.Item>
->(({ className, children, ...props }, ref) => (
-  <SelectUI.Item
-    ref={ref}
-    className={cn(
-      'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-white/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-white/10',
-      className
-    )}
-    {...props}
-  >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <SelectUI.ItemIndicator className="h-2 w-2 bg-emerald-500 rounded-full" />
-    </span>
-    <SelectUI.ItemText>{children}</SelectUI.ItemText>
-  </SelectUI.Item>
-));
-SelectItem.displayName = 'SelectItem';
+function SelectItem({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof SelectUI.Item>) {
+  return (
+    <SelectUI.Item
+      className={cn(
+        'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-white/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-white/10',
+        className
+      )}
+      {...props}
+    >
+      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        <SelectUI.ItemIndicator className="h-2 w-2 bg-emerald-500 rounded-full" />
+      </span>
+      <SelectUI.ItemText>{children}</SelectUI.ItemText>
+    </SelectUI.Item>
+  );
+}
 
-const SelectSeparator = React.forwardRef<
-  React.ElementRef<typeof SelectUI.Separator>,
-  React.ComponentPropsWithoutRef<typeof SelectUI.Separator>
->(({ className, ...props }, ref) => (
-  <SelectUI.Separator ref={ref} className={cn('-mx-1 my-1 h-px bg-white/10', className)} {...props} />
-));
-SelectSeparator.displayName = 'SelectSeparator';
+function SelectSeparator({ className, ...props }: React.ComponentPropsWithoutRef<typeof SelectUI.Separator>) {
+  return <SelectUI.Separator className={cn('-mx-1 my-1 h-px bg-white/10', className)} {...props} />;
+}
 
 export {
   Select,
