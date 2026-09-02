@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Panzoom from '@panzoom/panzoom';
 import type { PanzoomObject } from '@panzoom/panzoom';
-import { ZoomIn, ZoomOut, Maximize, Move, GripHorizontal } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, GripHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -26,7 +26,6 @@ export function DiagramControls({
 }: DiagramControlsProps) {
   const panzoomRef = useRef<PanzoomObject | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
-  const [panning, setPanning] = useState(false);
   const [scale, setScale] = useState(1);
   const [isReady, setIsReady] = useState(false);
 
@@ -70,8 +69,8 @@ export function DiagramControls({
       startX: 0,
       startY: 0,
       step: 0.1,
+      disablePan: false,
       panOnlyWhenZoomed: false,
-      disablePan: !panning,
     });
 
     panzoomRef.current = panzoom;
@@ -92,7 +91,7 @@ export function DiagramControls({
     };
     cleanupRef.current = cleanup;
     return cleanup;
-  }, [fitToPage, panning, resetTargetStyles, targetRef]);
+  }, [fitToPage, resetTargetStyles, targetRef]);
 
   // Initialize Panzoom when the target or mode changes, and re-initialize
   // whenever Mermaid replaces the SVG inside the target.
@@ -141,15 +140,6 @@ export function DiagramControls({
     setScale(1);
   }, [fitToPage]);
 
-  const togglePanning = useCallback(() => {
-    if (fitToPage) return;
-    const next = !panning;
-    setPanning(next);
-    if (panzoomRef.current?.setOptions) {
-      panzoomRef.current.setOptions({ disablePan: !next });
-    }
-  }, [fitToPage, panning]);
-
   return (
     <div
       className={cn(
@@ -184,7 +174,6 @@ export function DiagramControls({
         onClick={() => {
           if (fitToPage) {
             setScale(1);
-            setPanning(false);
           }
           onFitToPageChange?.(!fitToPage);
         }}
@@ -192,16 +181,6 @@ export function DiagramControls({
         title={fitToPage ? 'Fit to page' : 'Actual size'}
       >
         <Maximize className="h-3 w-3" />
-      </Button>
-      <Button
-        type="button"
-        variant={panning ? 'secondary' : 'ghost'}
-        size="icon-xs"
-        onClick={togglePanning}
-        disabled={!isReady || fitToPage}
-        title={panning ? 'Panning enabled' : fitToPage ? 'Pan disabled in fit mode' : 'Enable pan'}
-      >
-        <Move className="h-3 w-3" />
       </Button>
       <Button
         type="button"
