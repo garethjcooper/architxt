@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import { serversApi, contextualGraphApi, entityInfoApi, entitiesApi, researchApi, mentalModelsApi, type Server, type Entity, type EntityInfo } from '@/lib/api/client';
-import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
+import { ServerBankSelectors, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import {
   DisplayNode,
@@ -25,7 +25,7 @@ import {
   backendNodeToDisplayNode,
   backendEdgeToDisplayEdge,
 } from '@/lib/contextual-graph/display';
-import { canonicalNodeId, resolveNodeType } from '@/app/research/graph-utils';
+import { canonicalNodeId, resolveNodeType } from '@/app/research-shared/graph-utils';
 import {
   isGroundedNodeForWorkspace,
   isGroundedEdgeForWorkspace,
@@ -37,7 +37,7 @@ import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
 import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
-import { QueryInspectDialog } from '@/app/research/query-inspect-dialog';
+import { QueryInspectDialog } from '@/app/research-shared/query-inspect-dialog';
 import { SessionSelector } from './_components/session-selector';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 

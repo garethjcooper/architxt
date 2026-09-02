@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
+import { ServerBankSelectors, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
 import { contextualGraphApi } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';

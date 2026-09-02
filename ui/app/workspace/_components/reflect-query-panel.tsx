@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
-import { QueryForm, type EntityLike, type EdgeLike } from '@/app/research/query-form';
-import type { ResearchQueryOptions } from '@/app/research/use-research-session';
+import { QueryForm, type EntityLike, type EdgeLike } from '@/app/research-shared/query-form';
+import type { ResearchQueryOptions } from '@/app/research-shared/use-research-session';
 import { Panel, PanelHeader, PanelContent } from './panel-layout';
 
 interface ReflectQueryPanelProps {

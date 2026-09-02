@@ -9,7 +9,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import type { DerivedMentalModel } from '@/lib/types/index';
 import { mentalModelsApi, hindsightApi, serversApi } from '@/lib/api/client';
-import { ServerBankSelectors, type SelectorServer, type SelectorBank } from '@/app/research/server-bank-selectors';
+import { ServerBankSelectors, type SelectorServer, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 

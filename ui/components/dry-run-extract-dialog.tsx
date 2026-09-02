@@ -24,7 +24,7 @@ import {
   ServerBankSelectors,
   SelectorServer,
   SelectorBank,
-} from "@/app/research/server-bank-selectors";
+} from "@/app/research-shared/server-bank-selectors";
 import { usePersistentServerBank } from "@/lib/use-persistent-server-bank";
 import {
   serversApi,

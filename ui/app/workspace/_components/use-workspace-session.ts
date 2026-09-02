@@ -4,7 +4,7 @@ import { createLogger } from '@/lib/logger';
 import {
   useResearchSession,
   type ResearchQueryOptions,
-} from '@/app/research/use-research-session';
+} from '@/app/research-shared/use-research-session';
 import { researchApi, type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 
 const logger = createLogger('useWorkspaceSession');

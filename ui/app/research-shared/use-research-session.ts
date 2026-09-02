@@ -14,7 +14,7 @@ import {
   toSectionFocus,
   parseReferences,
 } from '@architxt/aql';
-import { transformPrebuiltToDiscoverResponse } from './prebuilt';
+import { transformPrebuiltToDiscoverResponse } from '@/app/research-shared/prebuilt';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 
