@@ -743,7 +743,7 @@ router.get('/diff', async (req, res) => {
     }
 
     // 2b. Fetch all architxt tags for fast comparison
-    const archResult = await listDocumentsForDiff(db);
+    const archResult = await getDocumentsForDiff(db);
     const tagResult = await getAllDocumentTags(db);
     if (!tagResult.success) {
       return res.status(500).json({ error: tagResult.error, code: tagResult.code });
