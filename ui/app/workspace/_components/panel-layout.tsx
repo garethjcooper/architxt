@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -11,9 +10,9 @@ function PanelHeader({ title, count, actions }: { title: string; count?: number;
       <div className="flex items-center gap-2 shrink-0">
         {actions}
         {count !== undefined && (
-          <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-white/20 text-emerald-200/80">
+          <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
             {count}
-          </Badge>
+          </span>
         )}
       </div>
     </div>
