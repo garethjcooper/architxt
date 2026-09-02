@@ -483,7 +483,7 @@ export function CuratedPageEditor({
             const isNarrative = b.type === 'heading' && (!b.synthetic || parsed?.kind === 'narrative');
             const canFocus = isText || isNarrative || isDiagram || isGraph || isTable;
             return (
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5 opacity-0 group-hover/copy:opacity-100 focus-within:opacity-100 transition-opacity">
                 {canFocus && !isDeleted && (
                   <button
                     type="button"
