@@ -103,7 +103,16 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
       }
 
       const content = structuredOutput;
-      const narrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const rawNarratives = Array.isArray(content.narratives)
+        ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+        : [];
+      const legacyNarrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const narratives = rawNarratives.length > 0
+        ? rawNarratives.map((n) => ({
+          narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+          narrative: n.narrative,
+        }))
+        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
       const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
       const tables = Array.isArray(content.tables) ? content.tables : [];
       const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
@@ -114,7 +123,7 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         name,
         found: true,
         content,
-        narrative,
+        narratives,
         graph: graphNormalized,
         tables,
         diagrams,
@@ -134,13 +143,17 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
       errors.push({ model: item.name || item.ext_id, error: item.error || 'Not found' });
       continue;
     }
-    if (item.narrative) {
-      narratives.push(`## ${item.name || item.ext_id}\n\n${item.narrative}`);
+    if (item.narratives && item.narratives.length > 0) {
+      for (const n of item.narratives) {
+        if (!n.narrative) continue;
+        const name = n.narrative_name || `${item.name || item.ext_id}`;
+        narratives.push({ narrative_name: name, narrative: n.narrative });
+      }
     } else if (item.diagrams?.length > 0 || item.tables?.length > 0 || item.graph?.nodes?.length > 0 || item.graph?.edges?.length > 0) {
-      narratives.push(`## ${item.name || item.ext_id}\n\nNo narrative text provided.`);
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: 'No narrative text provided.' });
     } else if (item.content != null) {
       const fallback = typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
-      narratives.push(`## ${item.name || item.ext_id}\n\n${fallback}`);
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback });
     }
     if (item.graph) {
       if (item.graph.nodes.length > 0 || item.graph.edges.length > 0) {
@@ -157,22 +170,11 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
     }
   }
 
-  let narrative = narratives.join('\n\n');
-  if (narrative) {
-    narrative = `# Templates Query\n\n${narrative}`;
-  } else if (graphs.length > 0 || tables.length > 0 || diagrams.length > 0) {
-    narrative = `Found template data for ${graphs.length} selected model(s).`;
-  }
-
-  if (!narrative && errors.length > 0) {
-    narrative = 'No template content could be retrieved.';
-  }
-
   const graph = graphs.length > 0 ? mergeGraphs(graphs) : { nodes: [], edges: [] };
 
   return {
     success: true,
-    narrative,
+    narratives,
     graph,
     tables,
     diagrams,

@@ -146,8 +146,9 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
       .filter((v, i, a) => a.indexOf(v) === i);
     const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
     const lines = [`## ${roleLabel}`, ''];
-    if (roleResult.result?.narrative) {
-      lines.push(roleResult.result.narrative);
+    const roleNarratives = roleResult.result?.narratives;
+    if (roleNarratives && roleNarratives.length > 0) {
+      lines.push(roleNarratives.map((n) => n.narrative).join('\n\n'));
     } else {
       lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
       lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
@@ -746,8 +747,9 @@ router.post('/prebuilt', async (req, res) => {
         .filter((v, i, a) => a.indexOf(v) === i);
       const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
       const lines = [`## ${roleLabel}`, ''];
-      if (roleResult.result?.narrative) {
-        lines.push(roleResult.result.narrative);
+      const roleNarratives = roleResult.result?.narratives;
+      if (roleNarratives && roleNarratives.length > 0) {
+        lines.push(roleNarratives.map((n) => n.narrative).join('\n\n'));
       } else {
         lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
         lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);

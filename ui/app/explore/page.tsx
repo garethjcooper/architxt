@@ -117,8 +117,11 @@ function extractEntitySummary(prebuilt: PrebuiltResponse | undefined, entityId: 
     const first = summaryDim.result.errors[0];
     return { text: '', ok: false, reason: `Summary failed: ${first.model || 'model'} — ${first.error}` };
   }
-  const raw = summaryDim.result?.narrative;
-  if (!raw || typeof raw !== 'string' || raw.trim().length === 0) {
+  const rawNarratives = summaryDim.result?.narratives;
+  const raw = Array.isArray(rawNarratives) && rawNarratives.length > 0
+    ? rawNarratives.map((n) => n.narrative).join('\n\n')
+    : '';
+  if (!raw || raw.trim().length === 0) {
     return { text: '', ok: false, reason: 'Summary returned empty text.' };
   }
   return { text: stripMarkdown(raw), ok: true };
@@ -207,7 +210,9 @@ function buildPrebuiltRoleStatuses(
     }
 
     const loaded = errors.length === 0;
-    const hasData = dim.found_count > 0 || (dim.result?.narrative ? dim.result.narrative.trim().length > 0 : false);
+    const hasData = dim.found_count > 0 || (Array.isArray(dim.result?.narratives)
+      ? dim.result.narratives.some((n) => n.narrative?.trim().length > 0)
+      : false);
     return {
       role: dim.role,
       label: roleLabels.get(dim.role) || dim.role,

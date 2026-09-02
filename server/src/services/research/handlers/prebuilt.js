@@ -51,20 +51,25 @@ export async function handlePrebuilt(serverId, bankId, query, options = {}) {
     return result;
   }
 
-  const { graph, narrative, missingEntityIds } = result;
+  const { graph, narratives = [], missingEntityIds } = result;
 
-  let finalNarrative = narrative || '';
+  const finalNarratives = narratives.length > 0 ? [...narratives] : [];
   if (missingEntityIds.length > 0) {
-    const missingNote = `\n\n_No mental model found for: ${missingEntityIds.join(', ')}_`;
-    finalNarrative = finalNarrative ? finalNarrative + missingNote : missingNote.trim();
+    finalNarratives.push({
+      narrative_name: '',
+      narrative: `_No mental model found for: ${missingEntityIds.join(', ')}_`,
+    });
   }
-  if (!finalNarrative) {
-    finalNarrative = `Found mental-model data for ${graph.nodes.length} nodes and ${graph.edges.length} edges.`;
+  if (finalNarratives.length === 0) {
+    finalNarratives.push({
+      narrative_name: '',
+      narrative: `Found mental-model data for ${graph.nodes.length} nodes and ${graph.edges.length} edges.`,
+    });
   }
 
   return {
     success: true,
-    narrative: finalNarrative,
+    narratives: finalNarratives,
     graph,
     calls_used: ['list_mental_models'],
   };

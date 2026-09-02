@@ -103,12 +103,17 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
 
       const content = structuredOutput;
       const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
-      const narrative = Array.isArray(content.narratives)
+      const rawNarratives = Array.isArray(content.narratives)
         ? content.narratives
           .filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
-          .map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`.trim())
-          .join('\n\n')
-        : '';
+        : [];
+      const legacyNarrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const narratives = rawNarratives.length > 0
+        ? rawNarratives.map((n) => ({
+          narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+          narrative: n.narrative,
+        }))
+        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
       const tables = Array.isArray(content.tables) ? content.tables : [];
       const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
 
@@ -117,7 +122,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         name,
         content,
         found: true,
-        narrative,
+        narratives,
         graph,
         tables,
         diagrams,
@@ -137,10 +142,15 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
       errors.push({ model: item.name || item.ext_id, error: item.error || 'Not found' });
       continue;
     }
-    if (item.narrative) {
-      narratives.push(`## ${item.name || item.ext_id}\n\n${item.narrative}`);
+    if (item.narratives && item.narratives.length > 0) {
+      for (const n of item.narratives) {
+        if (!n.narrative) continue;
+        const name = n.narrative_name || `${item.name || item.ext_id}`;
+        narratives.push({ narrative_name: name, narrative: n.narrative });
+      }
     } else if (item.content) {
-      narratives.push(`## ${item.name || item.ext_id}\n\n${item.content}`);
+      const fallback = typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback });
     }
     if (item.graph && (item.graph.nodes.length > 0 || item.graph.edges.length > 0)) {
       graphs.push(item.graph);
@@ -158,22 +168,11 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
     }
   }
 
-  let narrative = narratives.join('\n\n');
-  if (narrative) {
-    narrative = `# Models Query\n\n${narrative}`;
-  } else if (graphs.length > 0 || tables.length > 0 || diagrams.length > 0) {
-    narrative = `Found model data for ${graphs.length} selected model(s).`;
-  }
-
-  if (!narrative && errors.length > 0) {
-    narrative = 'No model content could be retrieved.';
-  }
-
   const graph = graphs.length > 0 ? mergeGraphs(graphs) : { nodes: [], edges: [] };
 
   return {
     success: true,
-    narrative,
+    narratives,
     graph,
     tables,
     diagrams,

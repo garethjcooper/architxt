@@ -31,13 +31,16 @@ export function transformPrebuiltToDiscoverResponse(
 
   for (const roleResult of response.roles || []) {
     const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
-    if (roleResult.result?.narrative) {
-      narratives.push(`## ${roleLabel}\n\n${roleResult.result.narrative}`);
+    if (roleResult.result?.narratives && roleResult.result.narratives.length > 0) {
+      const body = roleResult.result.narratives
+        .map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`)
+        .join('\n\n');
+      narratives.push(`## ${roleLabel}\n\n${body}`);
     }
     const graph = extractGraphFromJsonResult(roleResult.result?.json_result);
     if (graph) {
       graphs.push(graph);
-      if (!roleResult.result?.narrative) {
+      if (!roleResult.result?.narratives || roleResult.result.narratives.length === 0) {
         const found = roleResult.entities?.filter((e) => e.found).map((e) => e.entity) || [];
         const modelNames = roleResult.entities
           ?.flatMap((e) => e.model_results.filter((m) => m.found).map((m) => m.name))
