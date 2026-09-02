@@ -26,7 +26,7 @@ export function CopyDiagramMenu({ source }: CopyDiagramMenuProps) {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => copyMermaidSource(source)}>Copy Mermaid source</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copyMermaidSource(source)}>Copy Mermaid</DropdownMenuItem>
         <DropdownMenuItem onClick={() => copyMermaidSvg(source)}>Copy as SVG</DropdownMenuItem>
         <DropdownMenuItem onClick={() => copyMermaidPng(source)}>Copy as PNG</DropdownMenuItem>
       </DropdownMenuContent>
