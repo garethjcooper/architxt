@@ -6,7 +6,7 @@ import { EditorView } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import { Tag, tagHighlighter } from '@lezer/highlight';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
-import { MermaidDiagram } from '@/components/mermaid-diagram';
+import mermaid from 'mermaid';
 import { DiagramControls } from '@/components/diagram-controls';
 import { Markdown } from '@/components/markdown';
 import {
@@ -147,14 +147,91 @@ interface PaneRatios {
   json: number;
 }
 
+function PreviewPane({
+  content,
+  fitToPage,
+  onFitToPageChange,
+}: {
+  content: string;
+  fitToPage: boolean;
+  onFitToPageChange: (fit: boolean) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [svg, setSvg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const render = async () => {
+      const source = content.trim();
+      if (!source) {
+        setSvg(null);
+        setError('No diagram source provided.');
+        return;
+      }
+      try {
+        const id = `graph-view-${Math.random().toString(36).slice(2, 11)}`;
+        const { svg: rendered } = await mermaid.render(id, source);
+        if (!cancelled) {
+          setSvg(rendered);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSvg(null);
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      }
+    };
+    render();
+    return () => { cancelled = true; };
+  }, [content]);
+
+  return (
+    <div className="flex flex-col h-full rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        <div
+          ref={containerRef}
+          className={cn(
+            'absolute inset-0 p-3 overflow-hidden origin-top-left cursor-grab active:cursor-grabbing',
+          )}
+        >
+          {error ? (
+            <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
+              <div className="max-w-full rounded-md border border-rose-500/30 bg-rose-950/60 backdrop-blur-sm px-3 py-2 text-xs text-rose-200/90 font-mono whitespace-pre-wrap shadow-lg">
+                {error}
+              </div>
+            </div>
+          ) : null}
+          {svg ? (
+            <div
+              dangerouslySetInnerHTML={{ __html: svg }}
+              className="mermaid-diagram"
+            />
+          ) : !error ? (
+            <div className="text-xs text-white/40">Rendering diagram…</div>
+          ) : null}
+        </div>
+        {!error && svg && (
+          <DiagramControls
+            targetRef={containerRef}
+            fitToPage={fitToPage}
+            onFitToPageChange={onFitToPageChange}
+            className="top-2 right-2"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function GraphViewModal({ open, onOpenChange, graph, title, onApply, readOnly = false }: GraphViewModalProps) {
   const [sourceWidth, setSourceWidth] = useState(35);
   const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
   const [hResizing, setHResizing] = useState<null | 'upper' | 'lower'>(null);
-  const [fitToPage, setFitToPage] = useState(true);
+  const [fitToPage, setFitToPage] = useState(false);
   const [includeDiagram, setIncludeDiagram] = useState(false);
   const [includeTables, setIncludeTables] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const hResizeStartRef = useRef({ y: 0, ratios: ratios, height: 0 });
 
@@ -430,26 +507,10 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                 <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
               </div>
               <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
-                <div
-                  ref={containerRef}
-                  className={cn(
-                    'absolute inset-2 overflow-hidden origin-top-left',
-                    !fitToPage && 'cursor-grab active:cursor-grabbing',
-                    fitToPage && 'flex items-center justify-center'
-                  )}
-                >
-                  <MermaidDiagram
-                    content={source}
-                    defaultRenderer={effectiveRenderer}
-                    className="h-full border-0"
-                    fitToPage={fitToPage}
-                  />
-                </div>
-                <DiagramControls
-                  targetRef={containerRef as React.RefObject<HTMLElement | null>}
+                <PreviewPane
+                  content={source}
                   fitToPage={fitToPage}
                   onFitToPageChange={setFitToPage}
-                  className="top-2 right-2"
                 />
               </div>
             </div>

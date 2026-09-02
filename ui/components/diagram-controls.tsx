@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 export interface DiagramControlsProps {
   /** The element that contains the SVG and will be panned/zoomed. */
   targetRef: React.RefObject<HTMLElement | null>;
-  /** When true, CSS auto-fits the SVG and Panzoom is disabled. */
+  /** When true, the diagram is scaled to fit and centered in its container. */
   fitToPage?: boolean;
   /** Called when the user toggles fit-to-page from the control box. */
   onFitToPageChange?: (fit: boolean) => void;
@@ -20,7 +20,7 @@ export interface DiagramControlsProps {
 
 export function DiagramControls({
   targetRef,
-  fitToPage = true,
+  fitToPage = false,
   onFitToPageChange,
   className,
 }: DiagramControlsProps) {
@@ -34,6 +34,46 @@ export function DiagramControls({
     target.style.transformOrigin = '';
     target.style.cursor = '';
   }, []);
+
+  const getSvgSize = useCallback((svg: SVGSVGElement) => {
+    const viewBox = svg.viewBox.baseVal;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      return { width: viewBox.width, height: viewBox.height };
+    }
+    const bbox = svg.getBBox();
+    if (bbox.width > 0 && bbox.height > 0) {
+      return { width: bbox.width, height: bbox.height };
+    }
+    const width = parseFloat(svg.getAttribute('width') || '0');
+    const height = parseFloat(svg.getAttribute('height') || '0');
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+    return { width: svg.clientWidth || 1, height: svg.clientHeight || 1 };
+  }, []);
+
+  const applyFit = useCallback(() => {
+    const target = targetRef.current;
+    const panzoom = panzoomRef.current;
+    if (!target || !panzoom) return;
+
+    const svg = target.querySelector('svg');
+    if (!svg) return;
+
+    const containerRect = target.getBoundingClientRect();
+    const { width: svgWidth, height: svgHeight } = getSvgSize(svg);
+
+    const scale = Math.min(
+      containerRect.width / svgWidth,
+      containerRect.height / svgHeight,
+    );
+
+    const x = (containerRect.width - svgWidth * scale) / 2;
+    const y = (containerRect.height - svgHeight * scale) / 2;
+
+    panzoom.zoom(scale, { animate: true });
+    panzoom.pan(x, y, { animate: true });
+  }, [getSvgSize, targetRef]);
 
   const init = useCallback(() => {
     const target = targetRef.current;
@@ -54,16 +94,9 @@ export function DiagramControls({
     }
     resetTargetStyles(target);
 
-    if (fitToPage) {
-      // Fit-to-page: CSS handles sizing, no Panzoom transforms.
-      setIsReady(true);
-      setScale(1);
-      return;
-    }
-
     const panzoom = Panzoom(target, {
       maxScale: 5,
-      minScale: 0.2,
+      minScale: 0.1,
       cursor: 'grab',
       startScale: 1,
       startX: 0,
@@ -90,8 +123,14 @@ export function DiagramControls({
       panzoom.destroy();
     };
     cleanupRef.current = cleanup;
+
+    if (fitToPage) {
+      // Defer fit so the DOM layout is stable.
+      requestAnimationFrame(() => applyFit());
+    }
+
     return cleanup;
-  }, [fitToPage, resetTargetStyles, targetRef]);
+  }, [applyFit, fitToPage, resetTargetStyles, targetRef]);
 
   // Initialize Panzoom when the target or mode changes, and re-initialize
   // whenever Mermaid replaces the SVG inside the target.
@@ -124,15 +163,19 @@ export function DiagramControls({
     };
   }, [fitToPage, init, targetRef]);
 
+  // Re-apply fit when fitToPage becomes true after initialisation.
+  useEffect(() => {
+    if (!fitToPage || !panzoomRef.current) return;
+    applyFit();
+  }, [fitToPage, applyFit]);
+
   const handleZoomIn = useCallback(() => {
-    if (fitToPage) return;
     panzoomRef.current?.zoomIn();
-  }, [fitToPage]);
+  }, []);
 
   const handleZoomOut = useCallback(() => {
-    if (fitToPage) return;
     panzoomRef.current?.zoomOut();
-  }, [fitToPage]);
+  }, []);
 
   return (
     <div
@@ -146,7 +189,7 @@ export function DiagramControls({
         variant="ghost"
         size="icon-xs"
         onClick={handleZoomIn}
-        disabled={!isReady || fitToPage}
+        disabled={!isReady}
         title="Zoom in"
       >
         <ZoomIn className="h-3 w-3" />
@@ -156,7 +199,7 @@ export function DiagramControls({
         variant="ghost"
         size="icon-xs"
         onClick={handleZoomOut}
-        disabled={!isReady || fitToPage}
+        disabled={!isReady}
         title="Zoom out"
       >
         <ZoomOut className="h-3 w-3" />
@@ -166,7 +209,6 @@ export function DiagramControls({
         variant="ghost"
         size="icon-xs"
         onClick={() => {
-          setScale(1);
           onFitToPageChange?.(true);
         }}
         disabled={!isReady}
@@ -179,11 +221,11 @@ export function DiagramControls({
         variant="ghost"
         size="icon-xs"
         onClick={() => {
-          setScale(1);
           onFitToPageChange?.(false);
           panzoomRef.current?.reset();
+          setScale(1);
         }}
-        disabled={!isReady || !fitToPage}
+        disabled={!isReady}
         title="Actual size"
       >
         <GripHorizontal className="h-3 w-3" />
