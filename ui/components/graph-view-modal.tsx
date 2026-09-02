@@ -541,13 +541,12 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                     )}
                     <DropdownMenu>
                       <DropdownMenuTrigger>
-                        <button
-                          type="button"
-                          className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                        <span
+                          className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
                           title="Copy tables"
                         >
                           <Copy className="h-3.5 w-3.5" />
-                        </button>
+                        </span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-[oklch(0.18_0_0)] border-white/10">
                         <DropdownMenuItem
