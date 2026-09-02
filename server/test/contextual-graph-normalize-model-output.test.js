@@ -34,13 +34,13 @@ describe('normalizeModelOutput', () => {
       diagrams: [] });
     const raw = `Some prose before\n\n\`\`\`json\n${inner}\n\`\`\``;
     const out = normalizeModelOutput(raw);
-    assert.deepEqual(out.narratives, [{ narrative_name: '', narrative: 'wrapped' }]);
+    assert.deepEqual(out.narratives, [{ narrative_name: 'wrapped', narrative: 'wrapped' }]);
     assert.equal(out.errors.length, 0);
   });
 
   it('fills missing sections with defaults and records errors', () => {
     const out = normalizeModelOutput(JSON.stringify({ narratives: [{ narrative: 'only narrative' }] }));
-    assert.deepEqual(out.narratives, [{ narrative_name: '', narrative: 'only narrative' }]);
+    assert.deepEqual(out.narratives, [{ narrative_name: 'only narrative', narrative: 'only narrative' }]);
     assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.ok(out.errors.length >= 2);
