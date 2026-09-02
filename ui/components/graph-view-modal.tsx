@@ -22,6 +22,7 @@ import { escapeMarkdownCell } from '@/lib/envelope-markdown';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
+import { CopyDiagramMenu } from '@/components/copy-diagram-menu';
 
 export interface GraphViewModalProps {
   open: boolean;
@@ -387,7 +388,10 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
             <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                 <span>Preview</span>
-                <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
+                  <CopyDiagramMenu source={source} />
+                </div>
               </div>
               <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
                 <div
@@ -420,26 +424,29 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               <div className="flex flex-col overflow-hidden" style={{ flex: ratios.source }}>
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Mermaid source</span>
-                  {!readOnly && (
-                    <div className="flex items-center gap-2">
-                      {includeDiagram && (
-                        <input
-                          type="text"
-                          value={diagramName}
-                          onChange={(e) => setDiagramName(e.target.value)}
-                          className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-48"
-                          placeholder="Diagram name"
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setIncludeDiagram((v) => !v)}
-                        className={toggleButtonClass(includeDiagram)}
-                      >
-                        {includeDiagram ? 'Add diagram' : 'Add to page'}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <CopyDiagramMenu source={source} />
+                    {!readOnly && (
+                      <>
+                        {includeDiagram && (
+                          <input
+                            type="text"
+                            value={diagramName}
+                            onChange={(e) => setDiagramName(e.target.value)}
+                            className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-48"
+                            placeholder="Diagram name"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIncludeDiagram((v) => !v)}
+                          className={toggleButtonClass(includeDiagram)}
+                        >
+                          {includeDiagram ? 'Add diagram' : 'Add to page'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="flex-1 min-h-0">
                   <CodeMirror

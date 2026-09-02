@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { copyText, tableToCsv, tableToJson } from '@/lib/clipboard-utils';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
 export interface TableFocusModalProps {
@@ -116,20 +123,36 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
     );
   }, [rows]);
 
-  const handleApply = useCallback(() => {
-    const finalName = name.trim() || table.name;
-    const finalRows = rows.map((row) => {
+  const finalRows = useMemo(() => {
+    return rows.map((row) => {
       const cleaned: Record<string, any> = {};
       for (const c of columns) cleaned[c] = row[c] ?? '';
       return cleaned;
     });
+  }, [rows, columns]);
+
+  const tablePayload = useMemo(() => ({
+    name: name.trim() || table.name,
+    columns,
+    rows: finalRows,
+  }), [name, table.name, columns, finalRows]);
+
+  const handleCopyJson = useCallback(() => {
+    copyText(tableToJson(tablePayload), 'Table JSON');
+  }, [tablePayload]);
+
+  const handleCopyCsv = useCallback(() => {
+    copyText(tableToCsv(finalRows, columns), 'Table CSV');
+  }, [finalRows, columns]);
+
+  const handleApply = useCallback(() => {
     onApply?.({
       type: 'tables',
-      payload: JSON.stringify([{ name: finalName, columns, rows: finalRows }], null, 2),
-      label: finalName,
+      payload: JSON.stringify([tablePayload], null, 2),
+      label: name.trim() || table.name,
     });
     onOpenChange(false);
-  }, [name, columns, rows, table.name, onApply, onOpenChange]);
+  }, [tablePayload, name, table.name, onApply, onOpenChange]);
 
   const emptyColumns = columns.length === 0;
 
@@ -152,6 +175,24 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
             />
           </div>
           <div className="flex-1 min-h-0 overflow-auto custom-scrollbar rounded-md border border-white/10 bg-[oklch(0.18_0_0)]">
+            <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0 sticky top-0 bg-[oklch(0.18_0_0)] z-10">
+              <span>{emptyColumns ? 'Table' : `${rows.length} row${rows.length === 1 ? '' : 's'}`}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <span
+                    role="button"
+                    className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                    title="Copy table"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleCopyJson}>Copy JSON</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyCsv}>Copy CSV</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             {emptyColumns ? (
               <div className="p-4 text-sm text-white/40">No columns. Add a column to start editing.</div>
             ) : (
