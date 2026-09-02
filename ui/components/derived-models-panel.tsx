@@ -93,8 +93,8 @@ export function DerivedModelsPanel({
           </div>
           <Button
             onClick={() => onHealth(derived.filter((d) => isSelected(d.id)))}
-            disabled={selectionCount === 0 || model.dimension === 'none'}
-            title={model.dimension === 'none' ? 'Health check requires a dimension' : 'Check Hindsight content health'}
+            disabled={selectionCount === 0}
+            title="Check Hindsight content health"
             className="h-7 px-2 text-xs bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
             <Activity className="h-3.5 w-3.5" />

@@ -181,7 +181,6 @@ export interface MentalModel {
   exclude_mental_model_list: string | null;
   max_tokens: number;
   tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-  dimension: string | null;
   is_template: boolean;
   template_role?: string | null;
   is_system_template: boolean;
@@ -191,7 +190,7 @@ export interface MentalModel {
   updated_at: string;
 }
 
-export type StandardDimension = {
+export type TemplateRole = {
   value: string;
   label: string;
 };

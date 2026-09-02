@@ -232,7 +232,6 @@ function ModelsPageContent() {
                   </TableHead>
                   <TableHead className={["w-12 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>ID</TableHead>
                   <TableHead className={["w-20 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Template</TableHead>
-                  <TableHead className={["w-24 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Dimension</TableHead>
                   <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>External ID</TableHead>
                   <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</TableHead>
                   <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entities</TableHead>
@@ -251,7 +250,6 @@ function ModelsPageContent() {
                     <TableRow key={i} className="border-b border-white/5">
                       <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
-                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-14" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-14" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
@@ -302,9 +300,6 @@ function ModelsPageContent() {
                         ) : (
                           <span className="text-white/30">-</span>
                         )}
-                      </TableCell>
-                      <TableCell className="py-1.5 px-4 text-xs text-white/70">
-                        {model.dimension ?? <span className="text-white/30">-</span>}
                       </TableCell>
                       <TableCell className="py-1.5 px-4 font-mono text-xs text-white font-semibold">
                         <span className="truncate max-w-full inline-block">{model.ext_id || '-'}</span>

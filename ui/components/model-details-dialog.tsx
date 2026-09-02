@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi } from '@/lib/api/client';
 import {
-  StandardDimension,
   type DerivedMentalModel,
   type Entity,
   type MentalModel,
@@ -44,7 +43,6 @@ export interface BaseConfig {
   refresh_after_consolidation: boolean;
   exclude_all_mental_models: boolean;
   max_tokens: number;
-  dimension: string | null;
 }
 
 interface ModelDetailsDialogProps {
@@ -82,7 +80,6 @@ function buildBaseConfig(
     exclude_all_mental_models:
       local.exclude_all_mental_models ?? model.exclude_all_mental_models ?? false,
     max_tokens: local.max_tokens ?? model.max_tokens ?? 2048,
-    dimension: local.dimension ?? model.dimension ?? null,
   };
 }
 
@@ -107,7 +104,6 @@ function buildDerivedRow(
     exclude_mental_model_list: null,
     max_tokens: overrides.max_tokens ?? baseConfig.max_tokens,
     tags_match_mode: model.tags_match_mode,
-    dimension: baseConfig.dimension,
     is_template: false,
     is_system_template: false,
     is_derived: true,
@@ -139,7 +135,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
-  const [dimension, setDimension] = useState(model.dimension || 'none');
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
     buildDerivedRows(model, buildBaseConfig(model))
   );
@@ -148,17 +143,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const [derivedHealthOpen, setDerivedHealthOpen] = useState(false);
   const [derivedQueryPreviewOpen, setDerivedQueryPreviewOpen] = useState(false);
   const [confirmTemplateOffOpen, setConfirmTemplateOffOpen] = useState(false);
-  const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    mentalModelsApi.listStandardDimensions().then((dims) => {
-      if (!cancelled) setStandardDimensions(dims);
-    }).catch(() => {
-      if (!cancelled) setStandardDimensions([]);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const baseConfig: BaseConfig = useMemo(
     () => ({
@@ -169,9 +153,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       refresh_after_consolidation: refreshAfterConsolidation,
       exclude_all_mental_models: excludeAll,
       max_tokens: parseMaxTokens(maxTokens, model.max_tokens ?? 2048),
-      dimension: dimension.trim() || null,
     }),
-    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens, dimension]
+    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
   );
 
   const derivedRef = useRef(derived);
@@ -193,7 +176,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setMaxTokensError(null);
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
-    setDimension(model.dimension || 'none');
     setDerived(buildDerivedRows(model, buildBaseConfig(model)));
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
@@ -254,7 +236,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     parsedMaxTokens !== (model.max_tokens ?? 2048) ||
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
     isTemplate !== (model.is_template ?? false) ||
-    dimension !== (model.dimension || 'none') ||
     derivedChanged;
 
   const isSystemTemplate = model.is_system_template;
@@ -331,12 +312,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     }
   };
 
-  const handleDimensionChange = (value: string) => {
-    if (isSystemTemplate) return;
-    setDimension(value);
-    setDerived((prev) => prev.map((d) => ({ ...d, dimension: value.trim() || null })));
-  };
-
   const handleSave = async () => {
     if (!name.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
@@ -384,8 +359,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       }
       if (tagsMatchMode !== (model.tags_match_mode ?? 'all_strict')) updates.tags_match_mode = tagsMatchMode;
       if (isTemplate !== (model.is_template ?? false)) updates.is_template = isTemplate;
-      const nextDimension = dimension.trim() || null;
-      if (nextDimension !== (model.dimension ?? null)) updates.dimension = nextDimension;
 
       if (Object.keys(updates).length > 0) {
         await mentalModelsApi.update(model.id, updates);
@@ -444,27 +417,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           </div>
           <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} disabled={isSystemTemplate} />
         </div>
-
-        {!isTemplate && (
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
-                Dimension
-              </Label>
-              <select
-                id="mm-detail-dimension"
-                value={dimension}
-                onChange={(e) => handleDimensionChange(e.target.value)}
-                disabled={isSystemTemplate}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {standardDimensions.map((d) => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -703,23 +655,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
                 <div className="w-1/2 min-w-[480px] p-4 flex flex-col gap-4 overflow-hidden">
                   <div className="shrink-0 border border-white/10 rounded-lg p-3 bg-white/[0.02]">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
-                          Dimension
-                        </Label>
-                        <select
-                          id="mm-detail-dimension"
-                          value={dimension}
-                          onChange={(e) => handleDimensionChange(e.target.value)}
-                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-                        >
-                          {standardDimensions.map((d) => (
-                            <option key={d.value} value={d.value}>{d.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                    <p className="text-xs uppercase text-white/50 font-medium">Derived instances inherit the template configuration above.</p>
                   </div>
 
                   <DerivedModelsPanel
