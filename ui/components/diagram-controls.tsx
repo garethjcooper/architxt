@@ -172,13 +172,11 @@ export function DiagramControls({
         variant={fitToPage ? 'secondary' : 'ghost'}
         size="icon-xs"
         onClick={() => {
-          if (fitToPage) {
-            setScale(1);
-          }
-          onFitToPageChange?.(!fitToPage);
+          setScale(1);
+          onFitToPageChange?.(true);
         }}
         disabled={!isReady}
-        title={fitToPage ? 'Fit to page' : 'Actual size'}
+        title="Fit to page"
       >
         <Maximize className="h-3 w-3" />
       </Button>
