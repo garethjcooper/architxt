@@ -193,6 +193,17 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
 
   const modelRef = buildModelRef(model, output.raw, timestamp);
 
+  // Compute the set of node ids that are actually used as edge endpoints in the
+  // model output. The graph-format contract requires every emitted node to be an
+  // endpoint; enforcing this in code prevents models from accidentally creating
+  // working-graph nodes for intermediaries that should only live inside edge
+  // properties.
+  const endpointModelIds = new Set();
+  for (const modelEdge of output.graph.edges) {
+    if (modelEdge.from) endpointModelIds.add(modelEdge.from);
+    if (modelEdge.to) endpointModelIds.add(modelEdge.to);
+  }
+
   // Remove any directed edges previously produced by this edge-context model
   // so that each refresh yields a clean replacement rather than accumulating
   // stale or partially-overlapping edges. Undirected Hindsight skeleton edges
@@ -207,6 +218,40 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     deleteEdge(db, serverId, bankId, edge.cge_id);
   }
 
+  // Remove orphan nodes that were created by this edge-context model and are
+  // no longer endpoints of any emitted edge. This prevents models from leaving
+  // behind stale intermediaries when a refreshed output no longer references
+  // them as endpoints.
+  const remainingEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
+  const remainingEdges = remainingEdgesResult?.success ? remainingEdgesResult.data : [];
+  const endpointIds = new Set();
+  for (const edge of output.graph.edges) {
+    if (edge.from) endpointIds.add(edge.from);
+    if (edge.to) endpointIds.add(edge.to);
+  }
+  for (const edge of remainingEdges) {
+    endpointIds.add(edge.cge_source_id);
+    endpointIds.add(edge.cge_target_id);
+  }
+
+  let deletedNodes = 0;
+  for (const node of allNodes) {
+    const id = node.cgn_id;
+    if (endpointIds.has(id)) continue;
+
+    const provenance = node.cgn_properties?.provenance || {};
+    if (provenance.source !== 'contextual-graph' || provenance.inferred !== 'edge-context') continue;
+
+    const refs = provenance.model_refs || [];
+    const hasThisRef = refs.some((ref) => ref?.ext_id === model.mm_ext_id);
+    const hasOtherRefs = refs.some((ref) => ref?.ext_id && ref.ext_id !== model.mm_ext_id);
+    if (!hasThisRef || hasOtherRefs) continue;
+
+    deleteNode(db, serverId, bankId, id);
+    deletedNodes += 1;
+    existingNodeIds.delete(id);
+  }
+
   // Ensure endpoint nodes emitted by the model exist in the working graph.
   // If a node is missing, create it from the model output so asserted edges have endpoints.
   // We always normalize model-emitted ids through buildNodeId so a bare
@@ -215,6 +260,10 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   let createdNodes = 0;
   const idRemap = new Map();
   for (const node of output.graph.nodes) {
+    if (!endpointModelIds.has(node.id)) {
+      warnings.push(`Ignoring non-endpoint node emitted by edge-ctx model: ${node.id}`);
+      continue;
+    }
     const resolvedId = resolveModelNodeId(node.id, existingNodeIds, nodeIdByModelId);
     idRemap.set(node.id, resolvedId);
     if (existingNodeIds.has(resolvedId)) continue;
@@ -288,6 +337,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       target = existing.cge_target_id;
       properties = {
         ...existing.cge_properties,
+        ...(modelEdge.properties || {}),
         provenance: {
           ...(existing.cge_properties?.provenance || {}),
           source: 'contextual-graph',
@@ -301,6 +351,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       source = fromId;
       target = toId;
       properties = {
+        ...(modelEdge.properties || {}),
         directed: true,
         label: modelEdge.label,
         detail: modelEdge.detail,
@@ -324,7 +375,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     appliedEdges.push(edgeId);
   }
 
-  return { success: true, applied: { edgeIds: appliedEdges, createdNodes }, warnings };
+  return { success: true, applied: { edgeIds: appliedEdges, createdNodes, deletedNodes }, warnings };
 }
 
 /**
