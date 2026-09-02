@@ -494,7 +494,6 @@ export const mentalModelsApi = {
     exclude_mental_model_list?: string;
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-    dimension?: string | null;
     is_template?: boolean;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
     method: 'POST',
@@ -510,7 +509,6 @@ export const mentalModelsApi = {
     exclude_mental_model_list?: string;
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-    dimension?: string | null;
     is_template?: boolean;
   }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
     method: 'PUT',
@@ -1246,7 +1244,6 @@ export const researchApi = {
     intent_text: string;
     raw_query?: string;
     query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
-    dimension?: string;
     selections?: any[];
     budget?: 'low' | 'mid' | 'high';
     max_tokens?: number;

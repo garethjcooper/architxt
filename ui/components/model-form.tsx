@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { MentalModel, StandardDimension } from '@/lib/types/index';
-import { mentalModelsApi } from '@/lib/api/client';
+import type { MentalModel } from '@/lib/types/index';
 import { AqlEditor } from '@/components/aql-editor';
 
 const inputFocusStyle = {
@@ -30,7 +29,6 @@ interface ModelFormProps {
     exclude_mental_model_list?: string;
     max_tokens: number;
     tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-    dimension: string | null;
     is_template: boolean;
   }) => Promise<void>;
   onCancel: () => void;
@@ -62,19 +60,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
-  const [dimension, setDimension] = useState(initial?.dimension || 'none');
   const [submitting, setSubmitting] = useState(false);
-  const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    mentalModelsApi.listStandardDimensions().then((dims) => {
-      if (!cancelled) setStandardDimensions(dims);
-    }).catch(() => {
-      if (!cancelled) setStandardDimensions([]);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
@@ -118,7 +104,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
         exclude_mental_model_list: excludeList.trim() || undefined,
         max_tokens: maxTokensValidation.value,
         tags_match_mode: tagsMatchMode,
-        dimension: dimension.trim() || null,
         is_template: isTemplate,
       });
     } catch (err) {
@@ -151,28 +136,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           disabled={isSystemTemplate}
         />
       </div>
-
-      {isTemplate && (
-        <div className="border border-white/10 rounded-lg p-3 bg-white/[0.02]">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
-              <select
-                id="mm-dimension"
-                value={dimension}
-                onChange={(e) => setDimension(e.target.value)}
-                disabled={isSystemTemplate}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {standardDimensions.map((d) => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
-
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -303,25 +266,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           )}
         </div>
       </div>
-
-      {!isTemplate && (
-        <div className="grid grid-cols-1 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="mm-dimension" className="text-xs uppercase text-white/50 font-medium">Dimension</Label>
-            <select
-              id="mm-dimension"
-              value={dimension}
-              onChange={(e) => setDimension(e.target.value)}
-              disabled={isSystemTemplate}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {standardDimensions.map((d) => (
-                <option key={d.value} value={d.value}>{d.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
 
       <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
         <Button type="button" variant="ghost" onClick={onCancel} className="text-white/70 hover:text-white hover:bg-white/5">Close</Button>
