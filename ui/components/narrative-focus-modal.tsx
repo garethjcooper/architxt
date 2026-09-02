@@ -25,6 +25,8 @@ export interface NarrativeFocusModalProps {
   content: string;
   /** Called when Apply is pressed with the updated narrative. */
   onApply?: (event: EnvelopeCopyEvent) => void;
+  /** When true, renders a read-only view with no editing controls. */
+  readOnly?: boolean;
 }
 
 const darkMarkdownTheme = EditorView.theme({
@@ -45,7 +47,7 @@ const darkMarkdownTheme = EditorView.theme({
   '.cm-gutters': { display: 'none' },
 });
 
-export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply }: NarrativeFocusModalProps) {
+export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply, readOnly = false }: NarrativeFocusModalProps) {
   const [draftName, setDraftName] = useState(name);
   const [draftContent, setDraftContent] = useState(content);
   const [sourceWidth, setSourceWidth] = useState(50);
@@ -104,7 +106,8 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
               type="text"
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50"
+              disabled={readOnly}
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Narrative name"
             />
           </div>
@@ -121,13 +124,13 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
                 </div>
               </div>
             </div>
-            <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />
+            {!readOnly && <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />}
             <div
               className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
               style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
-                <span>Markdown source</span>
+                <span>{readOnly ? 'Markdown source (read-only)' : 'Markdown source'}</span>
               </div>
               <div className="flex-1 min-h-0">
                 <CodeMirror
@@ -137,6 +140,7 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
                   theme="none"
                   height="100%"
                   className="h-full text-[13px]"
+                  editable={!readOnly}
                 />
               </div>
             </div>
@@ -144,11 +148,13 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
         </div>
         <DialogFooter className="shrink-0">
           <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
+            {readOnly ? 'Close' : 'Cancel'}
           </Button>
-          <Button type="button" size="sm" onClick={handleApply}>
-            Apply
-          </Button>
+          {!readOnly && (
+            <Button type="button" size="sm" onClick={handleApply}>
+              Apply
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

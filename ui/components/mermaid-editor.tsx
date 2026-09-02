@@ -24,6 +24,8 @@ export interface MermaidEditorProps {
   name?: string;
   /** Optional type label shown as a badge. */
   type?: string;
+  /** When true, the source editor is read-only and cannot be edited. */
+  readOnly?: boolean;
 }
 
 const tKeyword = Tag.define();
@@ -218,7 +220,7 @@ function PreviewPane({
   );
 }
 
-export function MermaidEditor({ content, onChange, onErrorChange, className, name, type }: MermaidEditorProps) {
+export function MermaidEditor({ content, onChange, onErrorChange, className, name, type, readOnly = false }: MermaidEditorProps) {
   const [fitToPage, setFitToPage] = useState(true);
   const [lastError, setLastError] = useState<string | null>(null);
   const [sourceWidth, setSourceWidth] = useState(35);
@@ -231,10 +233,11 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
 
   const handleChange = useCallback(
     (newValue: string) => {
+      if (readOnly) return;
       lastValueRef.current = newValue;
       onChange(newValue);
     },
-    [onChange],
+    [onChange, readOnly],
   );
 
   const extensions = useMemo(
@@ -291,7 +294,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
           style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
         >
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
-            <span>Diagram source</span>
+            <span>{readOnly ? 'Diagram source (read-only)' : 'Diagram source'}</span>
           </div>
           <div className="flex-1 min-h-0">
             <CodeMirror
@@ -301,6 +304,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
               theme="none"
               height="100%"
               className="h-full"
+              editable={!readOnly}
               basicSetup={{
                 lineNumbers: false,
                 foldGutter: false,
