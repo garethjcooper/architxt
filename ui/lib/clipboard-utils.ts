@@ -50,20 +50,27 @@ function svgToPngBlob(svg: string): Promise<Blob> {
     // Remove max-width constraints that could limit the intrinsic size.
     normalized = normalized.replace(/max-width:\s*[^;"]+;?/gi, '');
 
-    // Extract current intrinsic size and scale the SVG up to a usable minimum width.
+    // Extract current intrinsic size from viewBox as the source of truth,
+    // falling back to width/height only if they are absolute px values.
     const targetMinWidth = 3200;
     const widthMatch = normalized.match(/width="([^"]+)"/);
     const heightMatch = normalized.match(/height="([^"]+)"/);
     const vbMatch = normalized.match(/viewBox="([^"]+)"/);
-    const currentWidth = widthMatch ? parseFloat(widthMatch[1]) : 0;
-    const currentHeight = heightMatch ? parseFloat(heightMatch[1]) : 0;
-    let svgWidth = currentWidth;
-    let svgHeight = currentHeight;
-    if (!svgWidth || !svgHeight) {
-      const parts = vbMatch ? vbMatch[1].split(/\s+/) : [];
+    let svgWidth = 0;
+    let svgHeight = 0;
+    if (vbMatch) {
+      const parts = vbMatch[1].split(/\s+/);
       if (parts.length === 4) {
         svgWidth = parseFloat(parts[2]);
         svgHeight = parseFloat(parts[3]);
+      }
+    }
+    if (!svgWidth || !svgHeight) {
+      const w = widthMatch ? parseFloat(widthMatch[1]) : 0;
+      const h = heightMatch ? parseFloat(heightMatch[1]) : 0;
+      if (w > 0 && h > 0) {
+        svgWidth = w;
+        svgHeight = h;
       }
     }
     svgWidth = Math.max(1, svgWidth);
