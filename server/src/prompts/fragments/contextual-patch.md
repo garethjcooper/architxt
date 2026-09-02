@@ -9,7 +9,7 @@ Required envelope:
 All five top-level keys are required. Empty arrays or an empty string are acceptable, but the keys must not be omitted.
 
 - `narratives` is an array of narrative sections. Each entry has `narrative_name` and `narrative`. Only populate entries when the narrative section is active. If the active sections are graph, tables, or diagrams only, set `narratives` to an empty array and express all findings through the structured output sections.
-- `narrative_name` inside a `narratives` entry is the short title/label for that narrative section. **This MUST be the exact title provided via `#narrative-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If no name is provided, generate a short descriptive name (4–6 words) based on the narrative's content, or leave empty.
+- `narrative_name` inside a `narratives` entry is the short title/label for that narrative section. **This MUST be the exact title provided via `#narrative-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If no name is provided, generate a short descriptive name (4–6 words) based on the narrative's content.
 - `graph` is for nodes and edges. Graph generation rules live in `output-format-graph-contextual.md`.
 - `tables` is for structured tables. Table generation rules live in `output-format-table-contextual.md`.
 - `diagrams` is for Mermaid diagrams. Diagram generation rules live in `output-format-diagram-contextual.md`.
