@@ -335,7 +335,7 @@ export function normalizeEnvelopeForApi(envelope) {
   };
 }
 
-function normalizeNarrative(n) {
+export function normalizeNarrative(n) {
   if (!n || typeof n !== 'object' || Array.isArray(n)) return null;
   const narrative = typeof n.narrative === 'string' ? n.narrative : '';
   let narrative_name = typeof n.narrative_name === 'string' ? n.narrative_name : '';
