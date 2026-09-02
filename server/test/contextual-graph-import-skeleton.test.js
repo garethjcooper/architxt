@@ -204,15 +204,15 @@ describe('importHindsightSkeleton', () => {
   });
 
   it('guarantees include_patterns as seeds and caps only the remaining top_k_nodes', async () => {
-    // COM-019 is low-degree but explicitly included; top_k_nodes:4 should keep
-    // it plus the 3 highest-degree other nodes so its edges are imported.
+    // COM-019 is low-mention but explicitly included; top_k_nodes:4 should keep
+    // it plus the 3 highest-mention other nodes so its edges are imported.
     const fetchGraph = makeFetchGraph({
       nodes: [
-        { data: { id: 'h1', label: 'a-com:COM-001' } },
-        { data: { id: 'h2', label: 'a-com:COM-002' } },
-        { data: { id: 'h3', label: 'a-com:COM-003' } },
-        { data: { id: 'h4', label: 'a-com:COM-004' } },
-        { data: { id: 'h5', label: 'a-com:COM-019' } },
+        { data: { id: 'h1', label: 'a-com:COM-001', mentionCount: 100 } },
+        { data: { id: 'h2', label: 'a-com:COM-002', mentionCount: 10 } },
+        { data: { id: 'h3', label: 'a-com:COM-003', mentionCount: 8 } },
+        { data: { id: 'h4', label: 'a-com:COM-004', mentionCount: 6 } },
+        { data: { id: 'h5', label: 'a-com:COM-019', mentionCount: 3 } },
       ],
       edges: [
         { data: { source: 'h1', target: 'h2', weight: 10 } },
