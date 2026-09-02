@@ -52,15 +52,17 @@ function svgToPngBlob(svg: string): Promise<Blob> {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      const targetMinWidth = 1600;
+      const scale = Math.max(1, targetMinWidth / Math.max(1, img.naturalWidth));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.floor(img.naturalWidth));
-      canvas.height = Math.max(1, Math.floor(img.naturalHeight));
+      canvas.width = Math.max(1, Math.floor(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.floor(img.naturalHeight * scale));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('Could not get canvas context'));
         return;
       }
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error('PNG export failed'));
