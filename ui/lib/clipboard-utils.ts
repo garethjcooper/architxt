@@ -44,30 +44,29 @@ export async function copyMermaidPng(source: string) {
 
 function svgToPngBlob(svg: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+    // Normalize SVG so it can be drawn to a canvas without tainting.
+    // Using a data URL and crossOrigin='anonymous' avoids blob-URL tainting issues.
+    const normalized = svg.includes('xmlns') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    const encoded = typeof window !== 'undefined' ? window.btoa(unescape(encodeURIComponent(normalized))) : '';
+    const url = `data:image/svg+xml;base64,${encoded}`;
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.floor(img.naturalWidth));
       canvas.height = Math.max(1, Math.floor(img.naturalHeight));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        URL.revokeObjectURL(url);
         reject(new Error('Could not get canvas context'));
         return;
       }
       ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error('PNG export failed'));
       }, 'image/png');
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Failed to load SVG for PNG export'));
-    };
+    img.onerror = () => reject(new Error('Failed to load SVG for PNG export'));
     img.src = url;
   });
 }
