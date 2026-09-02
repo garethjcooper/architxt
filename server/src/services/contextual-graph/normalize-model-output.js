@@ -285,13 +285,44 @@ function canonicalCapabilityColumn(raw) {
   return CAPABILITY_COLUMN_ALIASES[normalized] || null;
 }
 
+function inferNarrativeName(narrative) {
+  if (typeof narrative !== 'string') return '';
+  // 1. First markdown heading.
+  const headingMatch = narrative.match(/^#{1,6}\s+(.+?)$/m);
+  if (headingMatch) return headingMatch[1].trim();
+
+  const lines = narrative.split(/\n/);
+  const firstNonEmpty = lines.find((l) => l.trim());
+  if (!firstNonEmpty) return '';
+  const trimmed = firstNonEmpty.trim();
+
+  // 2. First standalone bold/italic line.
+  const boldMatch = trimmed.match(/^(?:\*\*|__)([^*_]+)(?:\*\*|__)$/);
+  if (boldMatch) return boldMatch[1].trim();
+
+  // 3. Plain-text fallback: first line/sentence, stripped of inline markdown, truncated.
+  const stripped = trimmed
+    .replace(/(\*\*|__)([^*_]+)\1/g, '$2')
+    .replace(/(\*|_)([^*_]+)\1/g, '$2')
+    .replace(/`([^`]+)`/g, '$1')
+    .trim();
+  if (!stripped) return '';
+  const sentence = stripped.split(/[.!?](?:\s|$)/)[0].trim();
+  const name = sentence.length > 50 ? `${sentence.slice(0, 47).trim()}...` : sentence;
+  return name || '';
+}
+
 function normalizeNarrative(n) {
   if (!n || typeof n !== 'object' || Array.isArray(n)) return null;
   const narrative = typeof n.narrative === 'string' ? n.narrative : '';
-  return {
-    narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
-    narrative,
-  };
+  let narrative_name = typeof n.narrative_name === 'string' ? n.narrative_name : '';
+  if (!narrative_name && narrative) {
+    narrative_name = inferNarrativeName(narrative);
+  }
+  if (!narrative_name && narrative) {
+    narrative_name = 'Narrative';
+  }
+  return { narrative_name, narrative };
 }
 
 function normalizeNode(n) {
