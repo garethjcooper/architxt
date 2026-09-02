@@ -23,7 +23,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { CopyDiagramMenu } from '@/components/copy-diagram-menu';
-
 export interface GraphViewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -388,10 +387,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
             <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                 <span>Preview</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
-                  <CopyDiagramMenu source={source} />
-                </div>
+                <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
               </div>
               <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
                 <div

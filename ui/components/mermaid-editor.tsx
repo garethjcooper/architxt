@@ -277,7 +277,6 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
             <span>Preview</span>
             <div className="flex items-center gap-2">
               {lastError && <span className="text-rose-300/80 text-[10px]">Parse error</span>}
-              <CopyDiagramMenu source={content} />
             </div>
           </div>
           <div className="flex-1 min-h-0 p-2 overflow-hidden">
