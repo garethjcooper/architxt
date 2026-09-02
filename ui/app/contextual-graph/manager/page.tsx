@@ -14,11 +14,12 @@ import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { Search } from "lucide-react";
+import { Search, RefreshCw } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SyncJobsTab } from './sync-jobs-tab';
 import { MentalModelsTab } from './mental-models-tab';
 import { CandidatesTab } from './candidates-tab';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 import {
   BackendNode,
@@ -63,6 +64,7 @@ export default function ContextManagerPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmRunSyncOpen, setConfirmRunSyncOpen] = useState(false);
 
   // Graph tab search/filter state.
   const [graphSearch, setGraphSearch] = useState('');
@@ -151,7 +153,6 @@ export default function ContextManagerPage() {
 
   const handleRunSyncJob = useCallback(async () => {
     if (!serverId || !bankId) return;
-    if (!window.confirm(`Run a full contextual sync job for ${bankId}? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.`)) return;
     try {
       setActionLoading('sync-job');
       const result = await contextualGraphApi.startSyncJob(serverId, bankId);
@@ -569,11 +570,13 @@ export default function ContextManagerPage() {
         </div>
         {bankMode === 'manual' && (
           <Button
-            variant="outline"
-            size="sm"
+            onClick={() => setConfirmRunSyncOpen(true)}
             disabled={!serverId || !bankId || actionLoading === 'sync-job'}
-            onClick={handleRunSyncJob}
+            className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-emerald-900/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
           >
+            {actionLoading === 'sync-job' ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : null}
             {actionLoading === 'sync-job' ? 'Running…' : 'Run sync job'}
           </Button>
         )}
@@ -723,6 +726,16 @@ export default function ContextManagerPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={confirmRunSyncOpen}
+        onOpenChange={setConfirmRunSyncOpen}
+        title="Run sync job?"
+        description={bankId ? `Run a full contextual sync job for ${bankId}? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.` : 'Run a full contextual sync job? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.'}
+        confirmLabel="Run sync job"
+        cancelLabel="Cancel"
+        onConfirm={handleRunSyncJob}
+      />
     </PageShell>
   );
 }
