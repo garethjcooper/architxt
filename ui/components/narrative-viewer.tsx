@@ -139,6 +139,37 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   const activeBlockId = activeBlockIdProp ?? internalActiveBlockId;
   const activeRangeIds = activeRangeIdsProp ?? internalActiveRangeIds;
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const [sidebarWidth, setSidebarWidth] = useState(13 * 16); // 13rem default
+  const isDraggingRef = useRef(false);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (moveEv: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const container = markdownContainerRef.current?.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const minWidth = 10 * 16;
+      const maxWidth = rect.width * 0.5;
+      const x = moveEv.clientX - rect.left;
+      setSidebarWidth(Math.max(minWidth, Math.min(maxWidth, x)));
+    };
+
+    const onUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
   const markdownContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -551,38 +582,51 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
       <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
         {/* Index sidebar */}
         {showIndex && (
-          <div className="w-[13rem] flex-shrink-0 flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
-            <div className="group/header px-2 py-1.5 border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center min-w-0">
-                <span className="text-[11px] font-medium text-white/70 truncate" title={title}>{title}</span>
-                <span className="text-[10px] text-white/40 ml-1 flex-shrink-0">({structuralBlocks.length})</span>
-              </div>
-              {effectiveShowHeaderActions && onCopyWholeDocument && (
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyWholeDocument();
-                    }}
-                    className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
-                    title={addToPageLabel}
-                    aria-label={addToPageLabel}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
+          <div className="contents">
+            <div
+              className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+              style={{ width: sidebarWidth, flexShrink: 0 }}
+            >
+              <div className="group/header px-2 py-1.5 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center min-w-0">
+                  <span className="text-[11px] font-medium text-white/70 truncate" title={title}>{title}</span>
+                  <span className="text-[10px] text-white/40 ml-1 flex-shrink-0">({structuralBlocks.length})</span>
                 </div>
-              )}
+                {effectiveShowHeaderActions && onCopyWholeDocument && (
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyWholeDocument();
+                      }}
+                      className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-purple-300 hover:bg-white/10 transition-opacity"
+                      title={addToPageLabel}
+                      aria-label={addToPageLabel}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-1.5 space-y-0.5">
+                {structuralBlocks.length === 0 && (
+                  <p className="text-xs text-white/30 p-1">No sections found</p>
+                )}
+                {structuralBlocks.map((b, idx) => {
+                  const isActive = activeBlockId === b.id;
+                  return defaultSidebarRow(b, idx, isActive);
+                })}
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-1.5 space-y-0.5">
-              {structuralBlocks.length === 0 && (
-                <p className="text-xs text-white/30 p-1">No sections found</p>
-              )}
-              {structuralBlocks.map((b, idx) => {
-                const isActive = activeBlockId === b.id;
-                return defaultSidebarRow(b, idx, isActive);
-              })}
-            </div>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              onMouseDown={startResize}
+              onDoubleClick={() => setSidebarWidth(13 * 16)}
+              className="w-1.5 -ml-1 cursor-col-resize hover:bg-emerald-500/20 active:bg-emerald-500/30 transition-colors flex-shrink-0 rounded-full z-10"
+              title="Drag to resize, double-click to reset"
+            />
           </div>
         )}
 
