@@ -78,8 +78,9 @@ describe('models handler integration', () => {
     });
 
     assert.equal(result.success, true);
-    assert.ok(result.narrative.includes('Model A'));
-    assert.ok(result.narrative.includes('Some narrative text.'));
+    assert.equal(result.narratives.length, 1);
+    assert.equal(result.narratives[0].narrative_name, 'Overview');
+    assert.ok(result.narratives[0].narrative.includes('Some narrative text.'));
   });
 
   it('returns a merged graph object when multiple models are selected', async () => {

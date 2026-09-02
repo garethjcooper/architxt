@@ -60,9 +60,10 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
       if (graphText.includes(id)) appliedEntityIds.add(id);
     }
   }
-  if (result.narrative) {
+  if (result.narratives && result.narratives.length > 0) {
+    const narrativeText = result.narratives.map((n) => n.narrative).join('\n');
     for (const id of entityIds) {
-      if (result.narrative.includes(id)) appliedEntityIds.add(id);
+      if (narrativeText.includes(id)) appliedEntityIds.add(id);
     }
   }
 
@@ -83,7 +84,7 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
   return {
     success: true,
     graph: result.graph || { nodes: [], edges: [] },
-    narrative: result.narrative || '',
+    narratives: result.narratives || [],
     appliedEntityIds: Array.from(appliedEntityIds),
     missingEntityIds,
     errors: result.errors || [],

@@ -140,7 +140,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const knownCatalog = await knownCatalogPromise;
   const envelope = toEnvelope(extracted, {
     knownCatalog,
-    mode,
+    mode: 'generic',
     activity: 'reflect',
     preserveParallelEdges: true,
   });

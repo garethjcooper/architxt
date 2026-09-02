@@ -36,10 +36,13 @@ describe('handleTemplates narrative fallback', () => {
     });
 
     assert.equal(result.success, true);
-    assert.ok(result.narrative.includes('# Templates Query'), 'should include top-level heading');
-    assert.ok(result.narrative.includes('## architxt-dataflow-txt-{entity-id}-{entity-name}'), 'should include per-model heading');
-    assert.ok(!result.narrative.includes('[object Object]'), 'should not stringify the content object');
-    assert.ok(!result.narrative.includes('"graph"'), 'should not dump raw JSON envelope into narrative');
+    assert.ok(result.narratives.length > 0, 'should have at least one narrative');
+    assert.ok(
+      result.narratives.some((n) => n.narrative_name === 'architxt-dataflow-txt-{entity-id}-{entity-name}'),
+      'should include per-model name',
+    );
+    assert.ok(!result.narratives.some((n) => n.narrative.includes('[object Object]')), 'should not stringify the content object');
+    assert.ok(!result.narratives.some((n) => n.narrative.includes('"graph"')), 'should not dump raw JSON envelope into narrative');
     assert.equal(result.diagrams.length, 1);
     assert.equal(result.diagrams[0].name, 'COM-001 Data Flows');
   });
@@ -59,7 +62,7 @@ describe('handleTemplates narrative fallback', () => {
     });
 
     assert.equal(result.success, true);
-    assert.ok(result.narrative.includes('## Model One\n\n# Summary\n\nIt works.'));
+    assert.ok(result.narratives.some((n) => n.narrative === '# Summary\n\nIt works.' && n.narrative_name === 'Model One'));
   });
 
   it('falls back to JSON stringification only when no narrative, graph, tables, or diagrams exist', async () => {
@@ -77,7 +80,7 @@ describe('handleTemplates narrative fallback', () => {
     });
 
     assert.equal(result.success, true);
-    assert.ok(!result.narrative.includes('[object Object]'));
-    assert.ok(result.narrative.includes('"narrative": ""') || result.narrative.includes('{'));
+    assert.ok(!result.narratives.some((n) => n.narrative.includes('[object Object]')));
+    assert.ok(result.narratives.some((n) => n.narrative.includes('"narrative": ""') || n.narrative.includes('{')));
   });
 });

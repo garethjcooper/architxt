@@ -258,7 +258,16 @@ async function mergeRoleResult(candidates, entityIds) {
     if (!modelMatchesEntities({ content: candidate.content }, entityIds)) continue;
 
     const content = candidate.content;
-    const narrative = typeof content.narrative === 'string' ? content.narrative : '';
+    const rawNarratives = Array.isArray(content.narratives)
+      ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+      : [];
+    const legacyNarrative = typeof content.narrative === 'string' ? content.narrative : '';
+    const roleNarratives = rawNarratives.length > 0
+      ? rawNarratives.map((n) => ({
+        narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+        narrative: n.narrative,
+      }))
+      : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
     let graph = { nodes: [], edges: [] };
     if (content.graph && typeof content.graph === 'object') {
       graph = {
@@ -267,8 +276,8 @@ async function mergeRoleResult(candidates, entityIds) {
       };
     }
 
-    if (narrative) {
-      narratives.push(narrative);
+    for (const n of roleNarratives) {
+      if (n.narrative) narratives.push(n);
     }
 
     if (graph.nodes.length > 0 || graph.edges.length > 0) {
@@ -289,7 +298,7 @@ async function mergeRoleResult(candidates, entityIds) {
     result.graph = { nodes: Array.from(nodeById.values()), edges };
   }
   if (narratives.length > 0) {
-    result.narrative = narratives.join('\n\n');
+    result.narratives = narratives;
   }
   if (errors.length > 0) {
     result.errors = errors;

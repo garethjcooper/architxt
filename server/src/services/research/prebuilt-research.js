@@ -81,9 +81,11 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
 
   const content = structuredOutput;
   const narratives = Array.isArray(content.narratives)
-    ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+    ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string').map((n) => ({
+      narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+      narrative: n.narrative,
+    }))
     : [];
-  const narrative = narratives.map((n) => `${n.narrative_name ? `## ${n.narrative_name}\n` : ''}${n.narrative}`.trim()).join('\n\n');
   const { graph, tables, diagrams, errors: modelErrors } = {
     graph: normalizeGraph(content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] }, { preserveParallelEdges: true }),
     tables: Array.isArray(content.tables) ? content.tables : [],
@@ -107,7 +109,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     ...candidate,
     found: true,
     content: null,
-    narrative,
+    narratives,
     graph,
     tables: tables || [],
     diagrams: diagrams || [],
@@ -152,8 +154,8 @@ function toApiModelResult(candidate) {
     return { ...base, error: candidate.error || 'Not found' };
   }
   const result = { ...base };
-  if (candidate.narrative != null) {
-    result.narrative = candidate.narrative;
+  if (candidate.narratives != null && candidate.narratives.length > 0) {
+    result.narratives = candidate.narratives;
   }
   if (candidate.graph) {
     result.graph = candidate.graph;
@@ -181,8 +183,8 @@ function aggregateRoleResults(entityResults) {
   for (const entityResult of entityResults) {
     for (const candidate of entityResult.model_results) {
       if (!candidate.found) continue;
-      if (candidate.narrative) {
-        narratives.push(candidate.narrative);
+      if (candidate.narratives && candidate.narratives.length > 0) {
+        narratives.push(...candidate.narratives);
       }
       if (candidate.graph) {
         if (candidate.graph.nodes.length > 0 || candidate.graph.edges.length > 0) {
@@ -203,7 +205,7 @@ function aggregateRoleResults(entityResults) {
 
   const result = {};
   if (narratives.length > 0) {
-    result.narrative = narratives.join('\n\n');
+    result.narratives = narratives;
   }
   if (graphs.length > 0) {
     result.json_result = effectiveConcatenation === 'compile'

@@ -1033,13 +1033,18 @@ export interface PrebuiltEntityResult {
   model_results: PrebuiltModelResult[];
 }
 
+export interface NarrativeSection {
+  narrative_name: string;
+  narrative: string;
+}
+
 export interface PrebuiltRoleResult {
   role: string;
   entities: PrebuiltEntityResult[];
   found_count: number;
   missing_count: number;
   result: {
-    narrative?: string;
+    narratives?: NarrativeSection[];
     json_result?:
       | {
           nodes: GraphNode[];
