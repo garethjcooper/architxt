@@ -151,7 +151,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
   const [sourceWidth, setSourceWidth] = useState(35);
   const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
   const [hResizing, setHResizing] = useState<null | 'upper' | 'lower'>(null);
-  const [fitToPage, setFitToPage] = useState(false);
+  const [fitToPage, setFitToPage] = useState(true);
   const [includeDiagram, setIncludeDiagram] = useState(false);
   const [includeTables, setIncludeTables] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -434,6 +434,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                   ref={containerRef}
                   className={cn(
                     'absolute inset-2 overflow-hidden origin-top-left',
+                    !fitToPage && 'cursor-grab active:cursor-grabbing',
                     fitToPage && 'flex items-center justify-center'
                   )}
                 >
@@ -441,6 +442,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                     content={source}
                     defaultRenderer={effectiveRenderer}
                     className="h-full border-0"
+                    fitToPage={fitToPage}
                   />
                 </div>
                 <DiagramControls

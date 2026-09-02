@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
+import { cn } from '@/lib/utils';
 
 export interface MermaidDiagramProps {
   /** Raw Mermaid source (without fence markers). */
@@ -14,8 +15,8 @@ export interface MermaidDiagramProps {
   type?: string;
   /** Optional flowchart renderer override. Changing this re-initializes Mermaid. */
   defaultRenderer?: 'dagre' | 'elk';
-  /** Optional flowchart direction override. Changing this updates the rendered source. */
-  direction?: 'TB' | 'LR' | 'BT' | 'RL';
+  /** When true, the SVG is scaled to fit its container via CSS. */
+  fitToPage?: boolean;
 }
 
 let lastRenderer: 'dagre' | 'elk' | undefined;
@@ -45,7 +46,7 @@ function maybeInitializeMermaid(renderer?: 'dagre' | 'elk') {
  * Render a Mermaid diagram from raw source in a dark-themed container.
  * Errors are displayed inline so malformed model output is easy to spot.
  */
-export function MermaidDiagram({ content, className = '', name, type, defaultRenderer, direction }: MermaidDiagramProps) {
+export function MermaidDiagram({ content, className = '', name, type, defaultRenderer, fitToPage }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,11 +94,18 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
           )}
         </div>
       )}
-      <div className="p-3 overflow-x-auto">
+      <div className={cn('p-3 overflow-hidden h-full', fitToPage && 'flex items-center justify-center')}>
         {error ? (
           <div className="text-xs text-red-300/90 font-mono whitespace-pre-wrap">{error}</div>
         ) : svg ? (
-          <div ref={containerRef} dangerouslySetInnerHTML={{ __html: svg }} className="mermaid-diagram" />
+          <div
+            ref={containerRef}
+            dangerouslySetInnerHTML={{ __html: svg }}
+            className={cn(
+              'mermaid-diagram',
+              fitToPage && 'w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:!transform-none'
+            )}
+          />
         ) : (
           <div className="text-xs text-white/40">Rendering diagram…</div>
         )}
