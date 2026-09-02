@@ -56,10 +56,12 @@ function PanelContent({ children, className }: { children: React.ReactNode; clas
 function ResizeHandle({
   direction,
   onMouseDown,
+  onDoubleClick,
   title,
 }: {
   direction: 'vertical' | 'horizontal';
   onMouseDown: (e: React.MouseEvent) => void;
+  onDoubleClick?: () => void;
   title?: string;
 }) {
   const isHorizontal = direction === 'horizontal';
@@ -69,6 +71,7 @@ function ResizeHandle({
       aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
       aria-label={title || `Resize ${direction} pane`}
       onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
       className={cn(
         'shrink-0 flex items-center justify-center group',
         isHorizontal
