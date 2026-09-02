@@ -312,6 +312,29 @@ function inferNarrativeName(narrative) {
   return name || '';
 }
 
+export function normalizeEnvelopeForApi(envelope) {
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+    return { narratives: [], graph: { name: '', nodes: [], edges: [] }, tables: [], diagrams: [] };
+  }
+  const narrativesInput = Array.isArray(envelope.narratives) ? envelope.narratives : [];
+  const graphInput = envelope.graph && typeof envelope.graph === 'object' && !Array.isArray(envelope.graph)
+    ? envelope.graph
+    : { name: '', nodes: [], edges: [] };
+  const tablesInput = Array.isArray(envelope.tables) ? envelope.tables : [];
+  const diagramsInput = Array.isArray(envelope.diagrams) ? envelope.diagrams : [];
+
+  return {
+    narratives: narrativesInput.map(normalizeNarrative).filter((n) => n !== null),
+    graph: {
+      name: typeof graphInput.name === 'string' ? graphInput.name : '',
+      nodes: Array.isArray(graphInput.nodes) ? graphInput.nodes : [],
+      edges: Array.isArray(graphInput.edges) ? graphInput.edges : [],
+    },
+    tables: tablesInput,
+    diagrams: diagramsInput,
+  };
+}
+
 function normalizeNarrative(n) {
   if (!n || typeof n !== 'object' || Array.isArray(n)) return null;
   const narrative = typeof n.narrative === 'string' ? n.narrative : '';
