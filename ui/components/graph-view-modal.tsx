@@ -22,7 +22,15 @@ import { escapeMarkdownCell } from '@/lib/envelope-markdown';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
+import { Copy, FileJson, FileSpreadsheet } from 'lucide-react';
 import { CopyDiagramMenu } from '@/components/copy-diagram-menu';
+import { tableToCsv, tableToJson, copyText } from '@/lib/clipboard-utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 export interface GraphViewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -164,6 +172,38 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
   }, [graph]);
 
   const graphJson = useMemo(() => JSON.stringify(graph, null, 2), [graph]);
+
+  const nodeColumns = ['id', 'type', 'label', 'name'];
+  const nodeRows = useMemo(
+    () =>
+      graph.nodes.map((n) => ({
+        id: n.id,
+        type: n.type || '',
+        label: n.label || '',
+        name: n.name || '',
+      })),
+    [graph.nodes],
+  );
+  const edgeColumns = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
+  const edgeRows = useMemo(
+    () =>
+      graph.edges.map((e) => {
+        const src = graph.nodes.find((n) => n.id === e.from)!;
+        const tgt = graph.nodes.find((n) => n.id === e.to)!;
+        return {
+          from_name: src?.name || '',
+          to_name: tgt?.name || '',
+          from: e.from,
+          to: e.to,
+          type: e.type || '',
+          label: e.label || '',
+          detail: e.detail || '',
+          properties: e.properties ? JSON.stringify(e.properties) : '',
+          evidence: Array.isArray(e.evidence) ? e.evidence.join(', ') : '',
+        };
+      }),
+    [graph.edges, graph.nodes],
+  );
 
   const markdownTables = useMemo(() => {
     const nodeHeader = ['id', 'type', 'label', 'name'];
@@ -469,35 +509,74 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Node/edge tables</span>
-                  {!readOnly && (
-                    <div className="flex items-center gap-2">
-                      {includeTables && (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            value={nodeTableName}
-                            onChange={(e) => setNodeTableName(e.target.value)}
-                            className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
-                            placeholder="Nodes name"
-                          />
-                          <input
-                            type="text"
-                            value={edgeTableName}
-                            onChange={(e) => setEdgeTableName(e.target.value)}
-                            className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
-                            placeholder="Edges name"
-                          />
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setIncludeTables((v) => !v)}
-                        className={toggleButtonClass(includeTables)}
-                      >
-                        {includeTables ? 'Add tables' : 'Add to page'}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!readOnly && (
+                      <>
+                        {includeTables && (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={nodeTableName}
+                              onChange={(e) => setNodeTableName(e.target.value)}
+                              className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
+                              placeholder="Nodes name"
+                            />
+                            <input
+                              type="text"
+                              value={edgeTableName}
+                              onChange={(e) => setEdgeTableName(e.target.value)}
+                              className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
+                              placeholder="Edges name"
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIncludeTables((v) => !v)}
+                          className={toggleButtonClass(includeTables)}
+                        >
+                          {includeTables ? 'Add tables' : 'Add to page'}
+                        </button>
+                      </>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger>
+                        <button
+                          type="button"
+                          className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                          title="Copy tables"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[oklch(0.18_0_0)] border-white/10">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            copyText(
+                              JSON.stringify({ nodes: nodeRows, edges: edgeRows }, null, 2),
+                              'Tables JSON',
+                            )
+                          }
+                          className="text-xs text-white/80 focus:bg-white/10 focus:text-white cursor-pointer"
+                        >
+                          <FileJson className="h-3.5 w-3.5 mr-2" />
+                          Copy as JSON
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            copyText(
+                              `${tableToCsv(nodeRows, nodeColumns)}\n\n${tableToCsv(edgeRows, edgeColumns)}`,
+                              'Tables CSV',
+                            )
+                          }
+                          className="text-xs text-white/80 focus:bg-white/10 focus:text-white cursor-pointer"
+                        >
+                          <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
+                          Copy as CSV
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
                   <Markdown className="text-[12px]">{markdownTables}</Markdown>
@@ -510,6 +589,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                   <span>Graph JSON</span>
+                  <button
+                    type="button"
+                    onClick={() => copyText(graphJson, 'Graph JSON')}
+                    className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                    title="Copy graph JSON"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3">
                   <Markdown className="text-[11px]">{`\`\`\`json\n${graphJson}\n\`\`\``}</Markdown>
