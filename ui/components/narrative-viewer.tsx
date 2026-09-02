@@ -624,7 +624,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               aria-orientation="vertical"
               onMouseDown={startResize}
               onDoubleClick={() => setSidebarWidth(13 * 16)}
-              className="w-1.5 -ml-1 cursor-col-resize hover:bg-emerald-500/20 active:bg-emerald-500/30 transition-colors flex-shrink-0 rounded-full z-10"
+              className="w-1 cursor-col-resize hover:bg-white/20 active:bg-white/30 transition-colors flex-shrink-0 rounded-full z-10"
               title="Drag to resize, double-click to reset"
             />
           </div>
