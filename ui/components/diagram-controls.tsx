@@ -134,12 +134,6 @@ export function DiagramControls({
     panzoomRef.current?.zoomOut();
   }, [fitToPage]);
 
-  const handleReset = useCallback(() => {
-    if (fitToPage) return;
-    panzoomRef.current?.reset();
-    setScale(1);
-  }, [fitToPage]);
-
   return (
     <div
       className={cn(
@@ -169,7 +163,7 @@ export function DiagramControls({
       </Button>
       <Button
         type="button"
-        variant={fitToPage ? 'secondary' : 'ghost'}
+        variant="ghost"
         size="icon-xs"
         onClick={() => {
           setScale(1);
@@ -184,9 +178,13 @@ export function DiagramControls({
         type="button"
         variant="ghost"
         size="icon-xs"
-        onClick={handleReset}
-        disabled={!isReady || fitToPage}
-        title="Reset zoom"
+        onClick={() => {
+          setScale(1);
+          onFitToPageChange?.(false);
+          panzoomRef.current?.reset();
+        }}
+        disabled={!isReady || !fitToPage}
+        title="Actual size"
       >
         <GripHorizontal className="h-3 w-3" />
       </Button>
