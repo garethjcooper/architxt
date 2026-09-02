@@ -15,7 +15,7 @@ interface DerivedModelsPanelProps {
   model: MentalModel;
   derived: DerivedMentalModel[];
   loading?: boolean;
-  onConfigure: (derived: DerivedMentalModel[]) => void;
+  onConfigure?: (derived: DerivedMentalModel[]) => void;
   onHealth: (derived: DerivedMentalModel[]) => void;
   onPreviewQuery: (derived: DerivedMentalModel[]) => void;
   className?: string;
@@ -109,14 +109,16 @@ export function DerivedModelsPanel({
             <Eye className="h-3.5 w-3.5" />
             Query
           </Button>
-          <Button
-            onClick={() => onConfigure(derived.filter((d) => isSelected(d.id)))}
-            disabled={selectionCount === 0}
-            className="h-7 px-2 text-xs bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-            Config
-          </Button>
+          {onConfigure && (
+            <Button
+              onClick={() => onConfigure(derived.filter((d) => isSelected(d.id)))}
+              disabled={selectionCount === 0}
+              className="h-7 px-2 text-xs bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              Config
+            </Button>
+          )}
         </div>
       </div>
 
