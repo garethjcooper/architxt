@@ -619,14 +619,16 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 })}
               </div>
             </div>
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              onMouseDown={startResize}
-              onDoubleClick={() => setSidebarWidth(13 * 16)}
-              className="w-1 cursor-col-resize hover:bg-white/20 active:bg-white/30 transition-colors flex-shrink-0 rounded-full z-10"
-              title="Drag to resize, double-click to reset"
-            />
+            <div className="w-3 shrink-0 cursor-col-resize flex items-center justify-center group">
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                onMouseDown={startResize}
+                onDoubleClick={() => setSidebarWidth(13 * 16)}
+                className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors"
+                title="Drag to resize, double-click to reset"
+              />
+            </div>
           </div>
         )}
 
