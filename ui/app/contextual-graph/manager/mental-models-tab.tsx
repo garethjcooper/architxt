@@ -14,6 +14,7 @@ import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
 import { MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import type { ModelRef } from './page';
 
@@ -56,6 +57,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
   const [selectedExtId, setSelectedExtId] = useState<string | null>(null);
   const [panelWidth, setPanelWidth] = useState(45);
+  const [confirmRefreshAllOpen, setConfirmRefreshAllOpen] = useState(false);
   const activeRefreshIdsRef = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isResizingRef = useRef(false);
@@ -378,13 +380,14 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
           </div>
         </div>
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded bg-[oklch(0.21_0_0)] text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
           disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0}
-          onClick={handleRefreshAll}
+          onClick={() => setConfirmRefreshAllOpen(true)}
+          title="Refresh all mental models"
         >
-          <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshingIds.size > 0 && 'animate-spin')} />
-          Refresh all
+          <RefreshCw className={cn('h-4 w-4', refreshingIds.size > 0 && 'animate-spin')} />
         </Button>
       </div>
 
@@ -560,6 +563,16 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmRefreshAllOpen}
+        onOpenChange={setConfirmRefreshAllOpen}
+        title="Refresh all mental models?"
+        description={`This will queue a refresh for all ${filteredRefs.length} visible mental model ref${filteredRefs.length === 1 ? '' : 's'}. This operation can be expensive and may take time to complete.`}
+        confirmLabel="Refresh all"
+        cancelLabel="Cancel"
+        onConfirm={handleRefreshAll}
+      />
     </div>
   );
 }
