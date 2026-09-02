@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { ServerBankSelectors, type SelectorBank } from '@/app/research/server-bank-selectors';
+import { ServerBankSelectors, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
 import { serversApi, contextualGraphApi, type GraphNode as ApiGraphNode, type GraphEdge as ApiGraphEdge } from '@/lib/api/client';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { createLogger } from '@/lib/logger';

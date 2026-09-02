@@ -20,8 +20,6 @@ import {
   ChevronRight,
   Users,
   Layers,
-  Microscope,
-  Globe,
   LayoutTemplate,
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
@@ -34,8 +32,6 @@ import { useServerEnv } from '@/lib/use-server-env';
 
 const navItems = [
   { href: '/workspace', label: 'Workspace', icon: LayoutTemplate },
-  { href: '/research', label: 'Research', icon: Microscope },
-  { href: '/explore', label: 'Explore', icon: Globe },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/contextual-graph/manager', label: 'Context Manager', icon: Layers },
