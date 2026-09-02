@@ -56,14 +56,31 @@ export async function importHindsightSkeleton(
   const rawNodes = Array.isArray(graphResult.data.nodes) ? graphResult.data.nodes : [];
   const rawEdges = Array.isArray(graphResult.data.edges) ? graphResult.data.edges : [];
 
-  // Pre-compute raw degrees for top-k filtering.
-  const rawDegrees = new Map();
+  // Pre-compute raw degrees for top-k filtering. Hindsight provides each node
+  // with a canonical mentionCount, so prefer that for ranking. Fall back to
+  // counting raw edges only when mentionCount is missing.
+  const mentionCounts = new Map();
+  for (const n of rawNodes) {
+    const id = n?.data?.id;
+    const count = n?.data?.mentionCount;
+    if (id && typeof count === 'number' && !Number.isNaN(count)) {
+      mentionCounts.set(id, count);
+    }
+  }
+
+  const edgeDegrees = new Map();
   for (const e of rawEdges) {
     const source = e?.data?.source;
     const target = e?.data?.target;
-    if (source) rawDegrees.set(source, (rawDegrees.get(source) || 0) + 1);
-    if (target) rawDegrees.set(target, (rawDegrees.get(target) || 0) + 1);
+    if (source) edgeDegrees.set(source, (edgeDegrees.get(source) || 0) + 1);
+    if (target) edgeDegrees.set(target, (edgeDegrees.get(target) || 0) + 1);
   }
+
+  const nodeScore = (n) => {
+    const id = n?.data?.id;
+    if (mentionCounts.has(id)) return mentionCounts.get(id);
+    return edgeDegrees.get(id) || 0;
+  };
 
   let candidateNodes = rawNodes.filter((n) => {
     const label = n?.data?.label;
@@ -97,8 +114,8 @@ export async function importHindsightSkeleton(
   if (typeof options.top_k_nodes === 'number' && options.top_k_nodes > 0) {
     const remainingSlots = Math.max(0, options.top_k_nodes - includedNodes.length);
     const rankedOtherNodes = otherNodes
-      .map((n) => ({ n, degree: rawDegrees.get(n.data.id) || 0 }))
-      .sort((a, b) => b.degree - a.degree || a.n.data.label.localeCompare(b.n.data.label))
+      .map((n) => ({ n, score: nodeScore(n) }))
+      .sort((a, b) => b.score - a.score || a.n.data.label.localeCompare(b.n.data.label))
       .slice(0, remainingSlots)
       .map(({ n }) => n);
     candidateNodes = [...includedNodes, ...rankedOtherNodes];
