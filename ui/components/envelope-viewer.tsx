@@ -6,8 +6,13 @@ import { buildEnvelopeMarkdown, formatPropertiesCompact, normalizeEnvelopeFromNu
 import { EnvelopeControls } from './envelope-controls';
 import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
-import type { DiscoverStepResponse, ResearchStepSummary } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedEnvelope } from '@/lib/api/client';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
+import { NarrativeFocusModal } from './narrative-focus-modal';
+import { TableFocusModal } from './table-focus-modal';
+import { GraphViewModal } from './graph-view-modal';
+import { DiagramViewModal } from './diagram-view-modal';
+import type { NarrativeBlock } from './narrative-blocks';
 
 export type { EnvelopeCopyEvent };
 
@@ -72,6 +77,51 @@ export function EnvelopeViewer({
   }, [envelope, title]);
 
   const normalized = useMemo(() => normalizeEnvelopeFromNullable(envelope), [envelope]);
+
+  const [focus, setFocus] = useState<
+    | { kind: 'narrative'; name: string; content: string }
+    | { kind: 'table'; table: UnifiedEnvelope['tables'][number] }
+    | { kind: 'diagram'; name: string; content: string }
+    | { kind: 'graph'; graph: { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] }; title?: string }
+    | null
+  >(null);
+
+  const parseSyntheticHeading = useCallback((heading?: string): { kind: 'graph' | 'table' | 'diagram'; name?: string } | null => {
+    if (!heading) return null;
+    const trimmed = heading.trim();
+    const graphMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
+    if (graphMatch) return { kind: 'graph', name: graphMatch[1]?.trim() };
+    const tableMatch = trimmed.match(/^Table:\s*(.+)$/i);
+    if (tableMatch) return { kind: 'table', name: tableMatch[1].trim() };
+    const diagramMatch = trimmed.match(/^Diagram:\s*(.+)$/i);
+    if (diagramMatch) return { kind: 'diagram', name: diagramMatch[1].trim() };
+    return null;
+  }, []);
+
+  const handleFocusSection = useCallback((block: NarrativeBlock, _markdown: string, resolvedEvent: EnvelopeCopyEvent | null) => {
+    const parsed = parseSyntheticHeading(block.title);
+    if (parsed?.kind === 'graph' || resolvedEvent?.type === 'graph') {
+      setFocus({ kind: 'graph', graph: normalized.graph, title: parsed?.name ?? normalized.graph.name ?? titleLabel });
+      return;
+    }
+    if (parsed?.kind === 'table' || resolvedEvent?.type === 'tables') {
+      const tableName = parsed?.name;
+      const table = tableName ? normalized.tables.find((t) => t.name === tableName) : normalized.tables[0];
+      if (table) {
+        setFocus({ kind: 'table', table });
+      }
+      return;
+    }
+    if (parsed?.kind === 'diagram' || resolvedEvent?.type === 'diagrams') {
+      const diagramName = parsed?.name;
+      const diagram = diagramName ? normalized.diagrams.find((d) => d.name === diagramName) : normalized.diagrams[0];
+      if (diagram && typeof diagram.content === 'string') {
+        setFocus({ kind: 'diagram', name: diagram.name || diagramName || 'Diagram', content: diagram.content });
+      }
+      return;
+    }
+    setFocus({ kind: 'narrative', name: block.title || 'Narrative', content: resolvedEvent?.payload || _markdown });
+  }, [normalized, parseSyntheticHeading, titleLabel]);
 
   const structuredItems = useMemo(() => {
     if (!normalized) return undefined;
@@ -236,8 +286,43 @@ export function EnvelopeViewer({
           addToPageLabel={addToPageLabel}
           keyPrefix={keyPrefix}
           className="h-full"
+          onFocusSection={handleFocusSection}
         />
       </div>
+      {focus?.kind === 'narrative' && (
+        <NarrativeFocusModal
+          open
+          onOpenChange={() => setFocus(null)}
+          name={focus.name}
+          content={focus.content}
+          readOnly
+        />
+      )}
+      {focus?.kind === 'table' && (
+        <TableFocusModal
+          open
+          onOpenChange={() => setFocus(null)}
+          table={focus.table}
+          readOnly
+        />
+      )}
+      {focus?.kind === 'diagram' && (
+        <DiagramViewModal
+          open
+          onOpenChange={() => setFocus(null)}
+          name={focus.name}
+          content={focus.content}
+        />
+      )}
+      {focus?.kind === 'graph' && (
+        <GraphViewModal
+          open
+          onOpenChange={() => setFocus(null)}
+          graph={focus.graph}
+          title={focus.title}
+          readOnly
+        />
+      )}
     </div>
   );
 }

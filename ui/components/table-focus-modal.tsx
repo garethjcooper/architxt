@@ -19,6 +19,8 @@ export interface TableFocusModalProps {
   table: { name: string; columns: string[]; rows: Record<string, any>[] };
   /** Called when Apply is pressed with the updated table. */
   onApply?: (event: EnvelopeCopyEvent) => void;
+  /** When true, renders a read-only view with no editing controls. */
+  readOnly?: boolean;
 }
 
 function formatCell(value: unknown): string {
@@ -54,7 +56,7 @@ function parseCell(text: string, original: unknown): unknown {
   return trimmed;
 }
 
-export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFocusModalProps) {
+export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly = false }: TableFocusModalProps) {
   const [name, setName] = useState(table.name);
   const [columns, setColumns] = useState<string[]>(table.columns);
   const [rows, setRows] = useState<Record<string, any>[]>(table.rows);
@@ -144,7 +146,8 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50"
+              disabled={readOnly}
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Table name"
             />
           </div>
@@ -163,16 +166,19 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
                             type="text"
                             value={c}
                             onChange={(e) => handleRenameColumn(c, e.target.value)}
-                            className="flex-1 min-w-0 px-1 py-0.5 rounded bg-transparent border border-transparent hover:border-white/10 focus:border-emerald-500/50 focus:outline-none text-white/80"
+                            disabled={readOnly}
+                            className="flex-1 min-w-0 px-1 py-0.5 rounded bg-transparent border border-transparent hover:border-white/10 focus:border-emerald-500/50 focus:outline-none text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveColumn(c)}
-                            className="p-0.5 rounded text-white/30 hover:text-rose-400 hover:bg-rose-500/10"
-                            title="Remove column"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveColumn(c)}
+                              className="p-0.5 rounded text-white/30 hover:text-rose-400 hover:bg-rose-500/10"
+                              title="Remove column"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       </th>
                     ))}
@@ -182,14 +188,16 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
                   {rows.map((row, i) => (
                     <tr key={i} className="border-b border-white/10">
                       <td className="py-1 px-2 align-middle">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRow(i)}
-                          className="p-1 rounded text-white/30 hover:text-rose-400 hover:bg-rose-500/10"
-                          title="Remove row"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRow(i)}
+                            className="p-1 rounded text-white/30 hover:text-rose-400 hover:bg-rose-500/10"
+                            title="Remove row"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </td>
                       {columns.map((c, ci) => (
                         <td key={ci} className="py-1 px-2 align-middle">
@@ -197,7 +205,8 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
                             type="text"
                             value={formatCell(row[c])}
                             onChange={(e) => handleCellChange(i, c, e.target.value)}
-                            className="w-full px-1 py-0.5 rounded bg-black/20 border border-transparent hover:border-white/10 focus:border-emerald-500/50 focus:outline-none text-white/70"
+                            disabled={readOnly}
+                            className="w-full px-1 py-0.5 rounded bg-black/20 border border-transparent hover:border-white/10 focus:border-emerald-500/50 focus:outline-none text-white/70 disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                         </td>
                       ))}
@@ -207,22 +216,26 @@ export function TableFocusModal({ open, onOpenChange, table, onApply }: TableFoc
               </table>
             )}
           </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={handleAddColumn}>
-              <Plus className="h-3 w-3 mr-1" /> Add column
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={handleAddRow} disabled={emptyColumns}>
-              <Plus className="h-3 w-3 mr-1" /> Add row
-            </Button>
-          </div>
+          {!readOnly && (
+            <div className="shrink-0 flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={handleAddColumn}>
+                <Plus className="h-3 w-3 mr-1" /> Add column
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddRow} disabled={emptyColumns}>
+                <Plus className="h-3 w-3 mr-1" /> Add row
+              </Button>
+            </div>
+          )}
         </div>
         <DialogFooter className="shrink-0">
           <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
+            {readOnly ? 'Close' : 'Cancel'}
           </Button>
-          <Button type="button" size="sm" onClick={handleApply} disabled={emptyColumns}>
-            Apply
-          </Button>
+          {!readOnly && (
+            <Button type="button" size="sm" onClick={handleApply} disabled={emptyColumns}>
+              Apply
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

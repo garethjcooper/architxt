@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Eye } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
@@ -56,6 +56,10 @@ export interface NarrativeViewerProps {
   resolveSectionCopy?: (heading: string, level: number, contentMarkdown: string) => EnvelopeCopyEvent | null;
   /** Called when the user copies/adds the whole document. Decomposes into one or more envelope events. */
   onCopyWholeDocument?: (events: EnvelopeCopyEvent[]) => void;
+  /** Optional callback when the user focuses a section to examine it in a dedicated modal. Receives the heading block, the section markdown, and any structured event resolved from it. */
+  onFocusSection?: (block: NarrativeBlock, markdown: string, resolvedEvent: EnvelopeCopyEvent | null) => void;
+  /** Optional label for the focus action. */
+  focusLabel?: string;
 }
 
 export const NarrativeViewer = forwardRef(function NarrativeViewer({
@@ -81,6 +85,8 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   showHeaderActions,
   resolveSectionCopy,
   onCopyWholeDocument,
+  onFocusSection,
+  focusLabel = 'Focus section',
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
   const instanceId = useId().replace(/:/g, '');
   const prefix = keyPrefix ? `${keyPrefix}-` : `${instanceId}-`;
@@ -125,6 +131,20 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     }
     return { type: 'narrative', payload: markdown, label: b.title };
   }, [blocks, resolveSectionCopy]);
+
+  const handleFocusSection = useCallback((b: NarrativeBlock) => {
+    if (!onFocusSection) return;
+    const ids = getSectionBlockIds(blocks, b.id);
+    const markdown = blocks
+      .filter((bb) => ids.includes(bb.id))
+      .map((bb) => bb.edited ?? bb.raw)
+      .join('');
+    let resolved: EnvelopeCopyEvent | null = null;
+    if (resolveSectionCopy) {
+      resolved = resolveSectionCopy(b.title ?? '', b.level ?? 0, markdown);
+    }
+    onFocusSection(b, markdown, resolved);
+  }, [blocks, resolveSectionCopy, onFocusSection]);
 
   const makeBlockEvent = (raw: string, title?: string): EnvelopeCopyEvent => {
     if (resolveSectionCopy) {
@@ -242,6 +262,20 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           <span className="truncate block" title={b.title}>{b.title}</span>
         </button>
         <div className="flex items-center flex-shrink-0">
+          {onFocusSection && b.type === 'heading' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFocusSection(b);
+              }}
+              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-white/30 hover:text-emerald-300 hover:bg-white/10 transition-opacity"
+              title={focusLabel}
+              aria-label={focusLabel}
+            >
+              <Eye className="h-3 w-3" />
+            </button>
+          )}
           {onAddToPage && b.type === 'heading' && (
             <button
               type="button"
