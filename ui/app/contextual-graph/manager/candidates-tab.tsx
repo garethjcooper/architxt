@@ -99,7 +99,7 @@ export function CandidatesTab({
           <option value="nodes">Nodes</option>
           <option value="edges">Edges</option>
         </select>
-        <span className="text-[11px] text-white/50 ml-auto">
+        <span className="text-xs font-mono text-amber-400 bg-black/30 border border-amber-500/30 px-2 py-0.5 rounded ml-auto">
           {filteredNodes.length} node{filteredNodes.length !== 1 ? 's' : ''} / {filteredEdges.length} edge
           {filteredEdges.length !== 1 ? 's' : ''}
         </span>
@@ -111,7 +111,7 @@ export function CandidatesTab({
             <>
               <div className="h-10 px-3 border-b border-white/10 bg-amber-900/20 text-amber-300 flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Discovered nodes</span>
-                <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-amber-300 font-mono">
+                <span className="text-xs font-mono text-amber-400 bg-black/30 border border-amber-500/30 px-2 py-0.5 rounded">
                   {filteredNodes.length}
                 </span>
               </div>
@@ -167,7 +167,7 @@ export function CandidatesTab({
               {showNodes && <div className="h-px bg-white/10" />}
               <div className="h-10 px-3 border-b border-white/10 bg-amber-900/20 text-amber-300 flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Discovered edges</span>
-                <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-amber-300 font-mono">
+                <span className="text-xs font-mono text-amber-400 bg-black/30 border border-amber-500/30 px-2 py-0.5 rounded">
                   {filteredEdges.length}
                 </span>
               </div>
