@@ -376,7 +376,6 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
               className="h-8 pl-8 pr-2 bg-black/20 border-white/10 text-white/80 placeholder:text-white/40 text-xs"
             />
           </div>
-          <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">{refs.length} model ref{refs.length === 1 ? '' : 's'}</span>
         </div>
         <Button
           variant="outline"
