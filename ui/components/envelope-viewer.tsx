@@ -11,7 +11,7 @@ import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { NarrativeFocusModal } from './narrative-focus-modal';
 import { TableFocusModal } from './table-focus-modal';
 import { GraphViewModal } from './graph-view-modal';
-import { DiagramViewModal } from './diagram-view-modal';
+import { DiagramFocusModal } from './diagram-focus-modal';
 import type { NarrativeBlock } from './narrative-blocks';
 
 export type { EnvelopeCopyEvent };
@@ -307,11 +307,12 @@ export function EnvelopeViewer({
         />
       )}
       {focus?.kind === 'diagram' && (
-        <DiagramViewModal
+        <DiagramFocusModal
           open
           onOpenChange={() => setFocus(null)}
           name={focus.name}
           content={focus.content}
+          readOnly
         />
       )}
       {focus?.kind === 'graph' && (
