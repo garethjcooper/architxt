@@ -16,7 +16,7 @@ const SelectTrigger = React.forwardRef<
   <SelectUI.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+      'flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
     {...props}
@@ -31,16 +31,18 @@ const SelectPopup = React.forwardRef<
   React.ElementRef<typeof SelectUI.Popup>,
   React.ComponentPropsWithoutRef<typeof SelectUI.Popup>
 >(({ className, ...props }, ref) => (
-  <SelectUI.Positioner>
-    <SelectUI.Popup
-      ref={ref}
-      className={cn(
-        'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
-        className
-      )}
-      {...props}
-    />
-  </SelectUI.Positioner>
+  <SelectUI.Portal>
+    <SelectUI.Positioner align="start" sideOffset={4}>
+      <SelectUI.Popup
+        ref={ref}
+        className={cn(
+          'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md',
+          className
+        )}
+        {...props}
+      />
+    </SelectUI.Positioner>
+  </SelectUI.Portal>
 ));
 SelectPopup.displayName = 'SelectPopup';
 
