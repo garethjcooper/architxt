@@ -27,7 +27,7 @@ function parseSyntheticHeadingTitle(title?: string): SyntheticHeadingInfo | null
   return null;
 }
 
-const SECTION_ICON_CLASS = 'h-3 w-3 text-white/60';
+const SECTION_ICON_CLASS = 'h-4 w-4 shrink-0';
 
 function sectionIcon(kind: SyntheticHeadingInfo['kind']) {
   switch (kind) {

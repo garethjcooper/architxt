@@ -122,7 +122,7 @@ export function EnvelopeViewer({
       }
       return;
     }
-    setFocus({ kind: 'narrative', name: block.title || 'Narrative', content: resolvedEvent?.payload || _markdown });
+    setFocus({ kind: 'narrative', name: parsed?.name || block.title || 'Narrative', content: resolvedEvent?.payload || _markdown });
   }, [normalized, parseSyntheticHeading, titleLabel]);
 
   const structuredItems = useMemo(() => {

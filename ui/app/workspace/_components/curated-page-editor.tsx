@@ -297,11 +297,24 @@ export function CuratedPageEditor({
   }, [displayedBlocks]);
 
   const removeSectionOrBlock = useCallback((b: NarrativeBlock) => {
-    if (b.synthetic) {
+    const parsed = parseSyntheticHeading(b.title);
+    if (b.synthetic && parsed?.kind !== 'narrative') {
       addStructuredKey(b);
       return;
     }
     if (b.type === 'heading') {
+      if (parsed?.kind === 'narrative') {
+        const name = parsed.name;
+        const idx = name ? envelope.narratives.findIndex((n) => n.narrative_name?.trim() === name) : -1;
+        if (idx >= 0) {
+          setDeletedNarrativeIndices((prev) => {
+            const next = new Set(prev);
+            next.add(idx);
+            return next;
+          });
+          return;
+        }
+      }
       if (b.__narrativeIdx !== undefined) {
         setDeletedNarrativeIndices((prev) => {
           const next = new Set(prev);
@@ -314,14 +327,27 @@ export function CuratedPageEditor({
     } else {
       toggleDelete(b.id);
     }
-  }, [removeSection, toggleDelete, addStructuredKey]);
+  }, [removeSection, toggleDelete, addStructuredKey, envelope.narratives]);
 
   const restoreSectionOrBlock = useCallback((b: NarrativeBlock) => {
-    if (b.synthetic) {
+    const parsed = parseSyntheticHeading(b.title);
+    if (b.synthetic && parsed?.kind !== 'narrative') {
       removeStructuredKey(b);
       return;
     }
     if (b.type === 'heading') {
+      if (parsed?.kind === 'narrative') {
+        const name = parsed.name;
+        const idx = name ? envelope.narratives.findIndex((n) => n.narrative_name?.trim() === name) : -1;
+        if (idx >= 0) {
+          setDeletedNarrativeIndices((prev) => {
+            const next = new Set(prev);
+            next.delete(idx);
+            return next;
+          });
+          return;
+        }
+      }
       if (b.__narrativeIdx !== undefined) {
         setDeletedNarrativeIndices((prev) => {
           const next = new Set(prev);
@@ -334,7 +360,7 @@ export function CuratedPageEditor({
     } else {
       toggleDelete(b.id);
     }
-  }, [restoreSection, toggleDelete, removeStructuredKey]);
+  }, [restoreSection, toggleDelete, removeStructuredKey, envelope.narratives]);
 
   const openDiagramFocus = useCallback((b: NarrativeBlock) => {
     const parsed = parseSyntheticHeading(b.title);
@@ -371,8 +397,16 @@ export function CuratedPageEditor({
   }, [envelope.tables]);
 
   const openNarrativeFocus = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeading(b.title);
+    if (parsed?.kind === 'narrative' && parsed.name) {
+      const idx = envelope.narratives.findIndex((n) => n.narrative_name?.trim() === parsed.name);
+      if (idx >= 0) {
+        setFocusedNarrativeIndex(idx);
+        return;
+      }
+    }
     setFocusedNarrativeIndex(b.__narrativeIdx ?? 0);
-  }, []);
+  }, [envelope.narratives]);
 
   const applyFocusedDiagram = useCallback((ev: EnvelopeCopyEvent) => {
     if (!focusedDiagram) return;
@@ -446,7 +480,7 @@ export function CuratedPageEditor({
             const isDiagram = parsed?.kind === 'diagram';
             const isGraph = parsed?.kind === 'graph';
             const isTable = parsed?.kind === 'table';
-            const isNarrative = b.type === 'heading' && !b.synthetic;
+            const isNarrative = b.type === 'heading' && (!b.synthetic || parsed?.kind === 'narrative');
             const canFocus = isText || isNarrative || isDiagram || isGraph || isTable;
             return (
               <div className="flex items-center gap-0.5">
