@@ -5,10 +5,10 @@ import { Eye, Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, getSectionBlockIds, buildNarrativeBlocks, type NarrativeBlock } from '@/components/narrative-blocks';
-import { MermaidEditor } from '@/components/mermaid-editor';
 import { GraphViewModal } from '@/components/graph-view-modal';
 import { TableFocusModal } from '@/components/table-focus-modal';
 import { NarrativeFocusModal } from '@/components/narrative-focus-modal';
+import { DiagramFocusModal } from '@/components/diagram-focus-modal';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import type { DiscoverStepResponse, ResearchStepSummary, UnifiedNarrativeBlock }
 import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
+import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 
 function parseSyntheticHeading(title?: string): { kind: 'graph' | 'table' | 'diagram'; name?: string } | null {
   if (!title) return null;
@@ -110,9 +111,6 @@ export function CuratedPageEditor({
   const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
   const [focusedDiagram, setFocusedDiagram] = useState<{ block: NarrativeBlock; name: string; content: string } | null>(null);
-  const [focusedDiagramContent, setFocusedDiagramContent] = useState<string>('');
-  const [focusedDiagramName, setFocusedDiagramName] = useState<string>('');
-  const [focusedDiagramError, setFocusedDiagramError] = useState<string | null>(null);
   const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
   const [focusedTable, setFocusedTable] = useState<{ block: NarrativeBlock; name: string } | null>(null);
   const [focusedNarrativeIndex, setFocusedNarrativeIndex] = useState<number | null>(null);
@@ -336,11 +334,7 @@ export function CuratedPageEditor({
     if (!parsed || parsed.kind !== 'diagram') return;
     const diagram = envelope.diagrams.find((d) => d.name === parsed.name);
     if (diagram && typeof diagram.content === 'string') {
-      const source = diagram.content;
-      setFocusedDiagram({ block: b, name: diagram.name || parsed.name || 'Diagram', content: source });
-      setFocusedDiagramContent(source);
-      setFocusedDiagramName(diagram.name || parsed.name || 'Diagram');
-      setFocusedDiagramError(null);
+      setFocusedDiagram({ block: b, name: diagram.name || parsed.name || 'Diagram', content: diagram.content });
       return;
     }
     // Fallback: extract the mermaid source from the block following the heading.
@@ -351,9 +345,6 @@ export function CuratedPageEditor({
         .replace(/^```mermaid\n?/, '')
         .replace(/\n?```\s*$/, '');
       setFocusedDiagram({ block: b, name: parsed.name || 'Diagram', content: source });
-      setFocusedDiagramContent(source);
-      setFocusedDiagramName(parsed.name || 'Diagram');
-      setFocusedDiagramError(null);
     }
   }, [envelope.diagrams, displayedBlocks]);
 
@@ -376,19 +367,21 @@ export function CuratedPageEditor({
     setFocusedNarrativeIndex(b.__narrativeIdx ?? 0);
   }, []);
 
-  const applyFocusedDiagram = useCallback(() => {
+  const applyFocusedDiagram = useCallback((ev: EnvelopeCopyEvent) => {
     if (!focusedDiagram) return;
     const parsed = parseSyntheticHeading(focusedDiagram.block.title);
     if (!parsed || parsed.kind !== 'diagram') return;
     const oldName = parsed.name;
-    const newName = focusedDiagramName.trim() || oldName || focusedDiagram.name;
+    const payload = JSON.parse(ev.payload);
+    const updated = payload[0];
+    const newName = updated?.name?.trim() || oldName || focusedDiagram.name;
+    const newContent = updated?.content ?? focusedDiagram.content;
     const updatedDiagrams = [...envelope.diagrams];
     const diagramIndex = updatedDiagrams.findIndex((d) => d.name === oldName);
     if (diagramIndex >= 0) {
-      // Rename in place, preserving position.
-      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], name: newName, content: focusedDiagramContent };
+      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], name: newName, content: newContent };
     } else {
-      updatedDiagrams.push({ name: newName, type: 'flowchart', content: focusedDiagramContent });
+      updatedDiagrams.push({ name: newName, type: 'flowchart', content: newContent });
     }
 
     // If the name changed, update the synthetic heading key so the section isn't orphaned.
@@ -400,14 +393,13 @@ export function CuratedPageEditor({
 
     const nextEnvelope = { ...envelope, diagrams: updatedDiagrams };
     setFocusedDiagram(null);
-    setFocusedDiagramError(null);
     onChange?.({
       envelope: nextEnvelope,
       dirty: JSON.stringify(nextEnvelope) !== JSON.stringify(effectiveBaseline),
       deletedBlockIds: Array.from(deletedBlockIds),
       deletedStructuredKeys: Array.from(nextDeletedKeys),
     });
-  }, [focusedDiagram, focusedDiagramContent, focusedDiagramName, envelope, effectiveBaseline, deletedBlockIds, deletedStructuredKeys, onChange]);
+  }, [focusedDiagram, envelope, effectiveBaseline, deletedBlockIds, deletedStructuredKeys, onChange]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -496,58 +488,13 @@ export function CuratedPageEditor({
           }}
         />
       </div>
-      <Dialog open={focusedDiagram != null} onOpenChange={(open) => { if (!open) {
-     setFocusedDiagram(null);
-     setFocusedDiagramError(null);
-   } }}>
-        <DialogContent className="w-[95vw] h-[90vh] max-w-none sm:max-w-none flex flex-col" showCloseButton>
-          <DialogHeader className="shrink-0">
-            <DialogTitle>{focusedDiagram?.name}</DialogTitle>
-          </DialogHeader>
-          {focusedDiagram && (
-            <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
-              <div className="shrink-0 flex items-center gap-2">
-                <span className="text-xs text-white/60">Name:</span>
-                <input
-                  type="text"
-                  value={focusedDiagramName}
-                  onChange={(e) => setFocusedDiagramName(e.target.value)}
-                  className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50"
-                  placeholder="Diagram name"
-                />
-              </div>
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <MermaidEditor
-                  content={focusedDiagramContent}
-                  onChange={setFocusedDiagramContent}
-                  onErrorChange={setFocusedDiagramError}
-                  name={focusedDiagramName}
-                  className="h-full"
-                />
-              </div>
-              <div className="shrink-0 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setFocusedDiagram(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={applyFocusedDiagram}
-                  disabled={!!focusedDiagramError}
-                  title={focusedDiagramError ? 'Fix the diagram error before applying' : 'Apply changes'}
-                >
-                  Apply
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <DiagramFocusModal
+        open={focusedDiagram != null}
+        onOpenChange={(open) => { if (!open) setFocusedDiagram(null); }}
+        name={focusedDiagram?.name ?? ''}
+        content={focusedDiagram?.content ?? ''}
+        onApply={applyFocusedDiagram}
+      />
       <GraphViewModal
         open={focusedGraph != null}
         onOpenChange={(open) => { if (!open) setFocusedGraph(null); }}
