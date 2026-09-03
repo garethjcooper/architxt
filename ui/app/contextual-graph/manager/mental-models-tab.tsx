@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, Copy, Download } from 'lucide-react';
+import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, Copy, Download, MessageSquareText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -15,8 +15,9 @@ import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { MODEL_ROLE_LABELS, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
+import { MODEL_ROLE_LABELS, isContextualRole, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
+import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
 const ROLE_LABELS = MODEL_ROLE_LABELS;
 
@@ -79,6 +80,10 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   const [selectedRefIds, setSelectedRefIds] = useState<Set<string>>(new Set());
   const [panelWidth, setPanelWidth] = useState(45);
   const [confirmRefreshAllOpen, setConfirmRefreshAllOpen] = useState(false);
+  const [queryDialogRef, setQueryDialogRef] = useState<ModelRef | null>(null);
+  const [queryLoading, setQueryLoading] = useState(false);
+  const [queryResult, setQueryResult] = useState<string | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
   const activeRefreshIdsRef = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isResizingRef = useRef(false);
@@ -304,6 +309,51 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     await fetchPendingOps();
   }, [serverId, bankId, selectedRefIds, fetchPendingOps]);
 
+  const handleQuery = useCallback(async (ref: ModelRef) => {
+    const role = ref.role;
+    if (!role || !isContextualRole(role)) {
+      toast.error('Query preview is only available for system-template roles');
+      return;
+    }
+    setQueryDialogRef(ref);
+    setQueryLoading(true);
+    setQueryResult(null);
+    setQueryError(null);
+    try {
+      const all = await mentalModelsApi.list({ limit: 1000 });
+      const template = all.find((m) => m.template_role === role || (m.is_system_template && m.ext_id === role));
+      if (!template) {
+        throw new Error(`No local system template found for role "${role}"`);
+      }
+      const res = await mentalModelsApi.composePreview([
+        {
+          role,
+          template_role: role,
+          returns: role,
+          source_query: template.source_query || '',
+        },
+      ]);
+      const row = res.results[0];
+      if (row?.compose_error) {
+        setQueryError(row.compose_error);
+      } else {
+        setQueryResult(row?.composed_query ?? null);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setQueryError(message);
+      toast.error(`Failed to compose query: ${message}`);
+    } finally {
+      setQueryLoading(false);
+    }
+  }, []);
+
+  const closeQueryDialog = useCallback(() => {
+    setQueryDialogRef(null);
+    setQueryResult(null);
+    setQueryError(null);
+  }, []);
+
   const formatPreview = (result: ContentResult | null, error: string | null): React.ReactNode => {
     if (error) return <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
@@ -527,19 +577,36 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           )}
                         </TableCell>
                         <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            disabled={!extId || isRefreshing}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRefreshSelected([extId]);
-                            }}
-                            title="Refresh model"
-                          >
-                            <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              disabled={!extId || isRefreshing}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRefreshSelected([extId]);
+                              }}
+                              title="Refresh model"
+                            >
+                              <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+                            </Button>
+                            {isContextualRole(ref.role) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                disabled={!extId}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuery(ref);
+                                }}
+                                title="Preview composed query"
+                              >
+                                <MessageSquareText className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -624,6 +691,15 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           setConfirmRefreshAllOpen(false);
           handleRefreshSelected();
         }}
+      />
+
+      <SystemTemplateQueryPreviewDialog
+        isOpen={!!queryDialogRef}
+        onClose={closeQueryDialog}
+        refItem={queryDialogRef}
+        composedQuery={queryResult}
+        composeError={queryError}
+        loading={queryLoading}
       />
     </div>
   );
