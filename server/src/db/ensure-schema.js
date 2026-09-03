@@ -275,7 +275,9 @@ function ensureMissingTables(db) {
         tr_role_id TEXT PRIMARY KEY,
         tr_display_name TEXT NOT NULL,
         tr_derivation_scope TEXT NOT NULL,
-        tr_sort_order INTEGER
+        tr_sort_order INTEGER,
+        tr_created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        tr_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`
     }
   ];
@@ -551,6 +553,29 @@ function backfillUserTemplateRoles(db) {
   const result = stmt.run(...reservedExtIds);
   if (result.changes > 0) {
     logger.info(`Backfilled ${result.changes} user template(s) with role 'user_entity_derived'`);
+  }
+  return result.changes;
+}
+
+/**
+ * Backfill legacy template_roles rows that were created before the timestamp
+ * columns existed. Uses the migration epoch for rows that still carry the
+ * placeholder default value.
+ */
+function backfillTemplateRoleTimestamps(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='template_roles'").get();
+  if (!tableExists) return 0;
+
+  const cols = new Set(db.prepare("PRAGMA table_info(template_roles)").all().map((r) => r.name));
+  if (!cols.has('tr_created_at') || !cols.has('tr_updated_at')) return 0;
+
+  const result = db.prepare(`
+    UPDATE template_roles
+    SET tr_created_at = CURRENT_TIMESTAMP, tr_updated_at = CURRENT_TIMESTAMP
+    WHERE tr_created_at = '1970-01-01T00:00:00Z' OR tr_updated_at = '1970-01-01T00:00:00Z'
+  `).run();
+  if (result.changes > 0) {
+    logger.info(`Backfilled ${result.changes} template role timestamp(s)`);
   }
   return result.changes;
 }
@@ -1158,6 +1183,19 @@ function ensureMissingColumns(db) {
           ddl: "ALTER TABLE entities ADD COLUMN ent_word_boundary_match TEXT DEFAULT 'boundaries' CHECK (ent_word_boundary_match IN ('boundaries', 'no-boundaries'))"
         }
       ]
+    },
+    {
+      table: 'template_roles',
+      columns: [
+        {
+          name: 'tr_created_at',
+          ddl: "ALTER TABLE template_roles ADD COLUMN tr_created_at DATETIME NOT NULL DEFAULT '1970-01-01T00:00:00Z'"
+        },
+        {
+          name: 'tr_updated_at',
+          ddl: "ALTER TABLE template_roles ADD COLUMN tr_updated_at DATETIME NOT NULL DEFAULT '1970-01-01T00:00:00Z'"
+        }
+      ]
     }
   ];
 
@@ -1498,6 +1536,7 @@ export function ensureSchema(db) {
     const created = ensureMissingTables(db);
     const templatesSeeded = ensureBuiltinPromptTemplates(db);
     const added = ensureMissingColumns(db);
+    backfillTemplateRoleTimestamps(db);
     const userRolesBackfilled = backfillUserTemplateRoles(db);
     const removed = removeMentalModelCheckConstraints(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);

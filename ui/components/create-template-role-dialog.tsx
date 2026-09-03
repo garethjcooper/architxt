@@ -116,7 +116,9 @@ export function CreateTemplateRoleDialog({
                 '--tw-ring-opacity': '0.4',
               } as React.CSSProperties}
             />
-            <p className="text-[11px] text-white/40">Lowercase letters, numbers, underscores and hyphens only. Cannot start with sys_.</p>
+            <p className="text-[11px] text-white/40">
+              Max 64 characters. The <code className="text-amber-400">sys_</code> prefix is reserved for system roles.
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -1,20 +1,18 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectPopup,
-  SelectItem,
-} from '@/components/ui/select';
-import { Plus, Trash2, Search, X, RefreshCw, Puzzle, Save, Pencil } from 'lucide-react';
+import { Plus, Trash2, Puzzle, Search, X, RefreshCw, TableIcon } from 'lucide-react';
 import { templateRolesApi, type TemplateRole } from '@/lib/api/client';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CreateTemplateRoleDialog } from '@/components/create-template-role-dialog';
+import { ViewTemplateRoleDialog } from '@/components/view-template-role-dialog';
+import { BatchProgressDialog, type BatchItem, type BatchResult } from '@/components/batch-progress-dialog';
+import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 
@@ -27,18 +25,22 @@ const SCOPE_LABELS: Record<'node' | 'edge' | 'seed' | 'graph', string> = {
   graph: 'GRAPH',
 };
 
-type Scope = keyof typeof SCOPE_LABELS;
-const SCOPES: Scope[] = ['node', 'edge', 'seed', 'graph'];
-
 export default function TemplateRolesPage() {
   const [roles, setRoles] = useState<TemplateRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<TemplateRole>>({});
+  const [batchProgressOpen, setBatchProgressOpen] = useState(false);
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [batchTitle, setBatchTitle] = useState('');
+  const [batchDescription, setBatchDescription] = useState('');
+  const [batchOperation, setBatchOperation] = useState<(item: BatchItem) => Promise<void>>(() => async () => {});
+  const [selectedRole, setSelectedRole] = useState<TemplateRole | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [freeze, setFreeze] = useState(false);
+  const [compactBadges, setCompactBadges] = useState(false);
 
   const filteredRoles = useMemo(() => {
     if (!search.trim()) return roles;
@@ -50,6 +52,38 @@ export default function TemplateRolesPage() {
         r.derivation_scope.toLowerCase().includes(q)
     );
   }, [roles, search]);
+
+  const isAllSelected = filteredRoles.length > 0 && filteredRoles.every((r) => selected.has(r.role_id));
+  const isIndeterminate = filteredRoles.some((r) => selected.has(r.role_id)) && !isAllSelected;
+
+  const displayRoles = useMemo(() => {
+    if (!search.trim()) return filteredRoles;
+    const visibleIds = new Set(filteredRoles.map((r) => r.role_id));
+    const selectedHidden = roles.filter((r) => selected.has(r.role_id) && !visibleIds.has(r.role_id));
+    return [...filteredRoles, ...selectedHidden];
+  }, [filteredRoles, roles, search, selected]);
+
+  const toggleSelection = useCallback((roleId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(roleId)) next.delete(roleId);
+      else next.add(roleId);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => {
+      if (isAllSelected) {
+        const next = new Set(prev);
+        filteredRoles.forEach((r) => next.delete(r.role_id));
+        return next;
+      }
+      return new Set([...prev, ...filteredRoles.map((r) => r.role_id)]);
+    });
+  }, [filteredRoles, isAllSelected]);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
 
   const fetchRoles = async () => {
     setLoading(true);
@@ -67,54 +101,57 @@ export default function TemplateRolesPage() {
     fetchRoles();
   }, []);
 
-  const startEdit = (role: TemplateRole) => {
-    setEditingId(role.role_id);
-    setEditForm({
-      display_name: role.display_name,
-      derivation_scope: role.derivation_scope,
-      sort_order: role.sort_order,
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-  };
-
-  const saveEdit = async (roleId: string) => {
-    try {
-      await templateRolesApi.update(roleId, {
-        display_name: editForm.display_name,
-        ...(editForm.derivation_scope !== undefined && { derivation_scope: editForm.derivation_scope }),
-        sort_order: editForm.sort_order,
-      });
-      toast.success('Template role updated');
-      setEditingId(null);
-      fetchRoles();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to update template role';
-      toast.error(msg);
-    }
-  };
-
-  const openDeleteConfirm = (roleId: string) => {
-    setPendingDelete(roleId);
+  const openDeleteConfirm = () => {
     setConfirmOpen(true);
   };
 
   const handleDeleteConfirmed = async () => {
-    if (!pendingDelete) return;
-    try {
-      await templateRolesApi.delete(pendingDelete);
-      toast.success('Template role deleted');
-      fetchRoles();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete template role';
-      toast.error(msg);
-    } finally {
-      setPendingDelete(null);
+    const ids = Array.from(selected);
+    if (ids.length === 0) {
       setConfirmOpen(false);
+      return;
     }
+    setBatchTitle('Deleting Template Roles');
+    setBatchDescription(`${ids.length} role${ids.length !== 1 ? 's' : ''}`);
+    setBatchItems(
+      ids.map((roleId) => {
+        const role = roles.find((r) => r.role_id === roleId);
+        return { id: roleId, label: role ? `${role.display_name} (${roleId})` : roleId };
+      })
+    );
+    setBatchOperation(() => async (item: BatchItem) => {
+      await templateRolesApi.delete(item.id as string);
+    });
+    setConfirmOpen(false);
+    setBatchProgressOpen(true);
+  };
+
+  const impactedModels = useMemo(() => {
+    return Array.from(selected).reduce((sum, roleId) => {
+      const role = roles.find((r) => r.role_id === roleId);
+      return sum + (role?.usage_count || 0);
+    }, 0);
+  }, [selected, roles]);
+
+  const handleBatchDeleteComplete = (results: BatchResult[]) => {
+    const succeeded = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+    if (failed === 0) {
+      toast.success(`${succeeded} role${succeeded !== 1 ? 's' : ''} deleted`);
+    } else if (succeeded === 0) {
+      toast.error(`All ${failed} delete operations failed`);
+    } else {
+      toast.warning(`${succeeded} deleted, ${failed} failed`);
+    }
+    clearSelection();
+    fetchRoles();
+  };
+
+  const handleRoleClick = (role: TemplateRole, e: React.MouseEvent) => {
+    e.preventDefault();
+    if ((e.target as HTMLElement).closest('[role="checkbox"]')) return;
+    setSelectedRole(role);
+    setViewOpen(true);
   };
 
   return (
@@ -143,8 +180,20 @@ export default function TemplateRolesPage() {
         </div>
         <div className="flex-1" />
         <div className="w-px h-5 bg-white/10 mx-1" />
-        <Button onClick={fetchRoles} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors">
+        <Button
+          onClick={fetchRoles}
+          title="Refresh"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+        >
           <RefreshCw className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          onClick={openDeleteConfirm}
+          disabled={selected.size === 0}
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
         </Button>
         <Button
           onClick={() => setCreateOpen(true)}
@@ -159,28 +208,50 @@ export default function TemplateRolesPage() {
         <div className="flex items-center justify-between px-4 py-2 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCompactBadges(!compactBadges)}
+              title={compactBadges ? 'Expand badges' : 'Compact badges'}
+              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+            >
+              <BadgeCompactIcon className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setFreeze(!freeze)}
+              title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
+              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+            >
+              <TableIcon className="h-3.5 w-3.5" />
+            </button>
             <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
-              {filteredRoles.length}
+              {filteredRoles.length} ({selected.size})
             </span>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className={["flex-1 overflow-auto", !freeze ? "min-h-0" : ""].filter(Boolean).join(" ")}>
           <table className="w-full caption-bottom text-sm">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left sticky top-0 z-20 bg-[oklch(0.23_0_0)]">Role ID</th>
-                <th className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left sticky top-0 z-20 bg-[oklch(0.23_0_0)]">Display Name</th>
-                <th className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left sticky top-0 z-20 bg-[oklch(0.23_0_0)]">Scope</th>
-                <th className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left sticky top-0 z-20 bg-[oklch(0.23_0_0)]">Sort</th>
-                <th className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left sticky top-0 z-20 bg-[oklch(0.23_0_0)]">Type</th>
-                <th className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left sticky top-0 z-20 bg-[oklch(0.23_0_0)]">Actions</th>
+                <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={isAllSelected}
+                    data-state={isIndeterminate ? 'indeterminate' : isAllSelected ? 'checked' : 'unchecked'}
+                    onCheckedChange={toggleAll}
+                  />
+                </th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Role ID</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Display Name</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Scope</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Sort</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Type</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Mental Models</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Created</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRoles.length === 0 && !loading ? (
+              {displayRoles.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-white/70">
+                  <td colSpan={8} className="text-center py-8 text-white/70">
                     <div className="flex flex-col items-center gap-2">
                       <Puzzle className="h-8 w-8 opacity-50" />
                       <p>No template roles found.</p>
@@ -188,54 +259,39 @@ export default function TemplateRolesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredRoles.map((role) => {
-                  const isEditing = editingId === role.role_id;
+                displayRoles.map((role) => {
+                  const isSelected = selected.has(role.role_id);
                   return (
-                    <tr key={role.role_id} className="border-b border-white/5">
+                    <tr
+                      key={role.role_id}
+                      className={`border-b border-white/5 transition-colors cursor-pointer ${
+                        role.is_system
+                          ? 'bg-amber-900/10 hover:bg-amber-900/15'
+                          : isSelected
+                            ? 'bg-emerald-900/20'
+                            : 'hover:bg-white/5'
+                      }`}
+                      onClick={(e) => handleRoleClick(role, e)}
+                    >
+                      <td
+                        className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", role.is_system ? "bg-amber-900/10" : isSelected ? "bg-emerald-900/20" : "bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelection(role.role_id)}
+                        />
+                      </td>
                       <td className="py-1.5 px-4 text-xs text-white/50 font-mono">{role.role_id}</td>
                       <td className="py-1.5 px-4 text-xs">
-                        {isEditing ? (
-                          <Input
-                            value={editForm.display_name ?? ''}
-                            onChange={(e) => setEditForm((f) => ({ ...f, display_name: e.target.value }))}
-                            className="h-7 text-xs bg-white/5 border-white/20 text-white"
-                          />
-                        ) : (
-                          <span className="font-semibold text-white">{role.display_name}</span>
-                        )}
+                        <span className="font-semibold text-white">{role.display_name}</span>
                       </td>
                       <td className="py-1.5 px-4 text-xs">
-                        {isEditing && !role.is_system ? (
-                          <Select value={editForm.derivation_scope ?? role.derivation_scope} onValueChange={(v) => setEditForm((f) => ({ ...f, derivation_scope: v as TemplateRole['derivation_scope'] }))}>
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue placeholder="Scope" />
-                            </SelectTrigger>
-                            <SelectPopup>
-                              {SCOPES.map((scope) => (
-                                <SelectItem key={scope} value={scope}>
-                                  {SCOPE_LABELS[scope]}
-                                </SelectItem>
-                              ))}
-                            </SelectPopup>
-                          </Select>
-                        ) : (
-                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border bg-emerald-950/30 text-emerald-400 border-emerald-500/40">
-                            {SCOPE_LABELS[role.derivation_scope] ?? role.derivation_scope}
-                          </span>
-                        )}
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border bg-emerald-950/30 text-emerald-400 border-emerald-500/40">
+                          {SCOPE_LABELS[role.derivation_scope] ?? role.derivation_scope}
+                        </span>
                       </td>
-                      <td className="py-1.5 px-4 text-xs">
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={editForm.sort_order ?? ''}
-                            onChange={(e) => setEditForm((f) => ({ ...f, sort_order: Number(e.target.value) }))}
-                            className="h-7 w-20 text-xs bg-white/5 border-white/20 text-white"
-                          />
-                        ) : (
-                          <span className="text-white/60">{role.sort_order}</span>
-                        )}
-                      </td>
+                      <td className="py-1.5 px-4 text-xs text-white/60">{role.sort_order}</td>
                       <td className="py-1.5 px-4 text-xs">
                         {role.is_system ? (
                           <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-semibold tracking-wide border bg-blue-950/30 text-blue-400 border-blue-500/40">
@@ -248,46 +304,16 @@ export default function TemplateRolesPage() {
                         )}
                       </td>
                       <td className="py-1.5 px-4 text-xs">
-                        <div className="flex items-center gap-2">
-                          {isEditing ? (
-                            <>
-                              <Button
-                                onClick={() => saveEdit(role.role_id)}
-                                className="h-7 w-7 inline-flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white"
-                                title="Save"
-                              >
-                                <Save className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                onClick={cancelEdit}
-                                variant="ghost"
-                                className="h-7 w-7 inline-flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10"
-                                title="Cancel"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                onClick={() => startEdit(role)}
-                                variant="ghost"
-                                className="h-7 w-7 inline-flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10"
-                                title="Edit"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                onClick={() => openDeleteConfirm(role.role_id)}
-                                variant="ghost"
-                                className="h-7 w-7 inline-flex items-center justify-center rounded text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                        {role.usage_count ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-400/20 text-blue-300 border border-blue-400/30">
+                            {role.usage_count} model{role.usage_count !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-white/30 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="py-1.5 px-4 text-xs text-white/50">
+                        {formatDistanceToNow(new Date(role.created_at), { addSuffix: true })}
                       </td>
                     </tr>
                   );
@@ -301,10 +327,36 @@ export default function TemplateRolesPage() {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Delete Template Role"
-        description="Are you sure you want to delete this template role? This action cannot be undone and is only allowed when no mental models reference the role."
+        title="Delete Selected Template Roles"
+        description={
+          selected.size === 0
+            ? 'No roles selected.'
+            : impactedModels > 0
+              ? `Are you sure you want to delete ${selected.size} template role${selected.size !== 1 ? 's' : ''}? This will remove the role from ${impactedModels} mental model${impactedModels !== 1 ? 's' : ''}. Roles in use cannot be deleted and will fail in the batch.`
+              : `Are you sure you want to delete ${selected.size} template role${selected.size !== 1 ? 's' : ''}? This action cannot be undone.`
+        }
         onConfirm={handleDeleteConfirmed}
         variant="destructive"
+      />
+
+      <BatchProgressDialog
+        open={batchProgressOpen}
+        onClose={() => {
+          setBatchProgressOpen(false);
+          setBatchItems([]);
+        }}
+        title={batchTitle}
+        description={batchDescription}
+        items={batchItems}
+        operation={batchOperation}
+        onComplete={handleBatchDeleteComplete}
+      />
+
+      <ViewTemplateRoleDialog
+        role={selectedRole}
+        open={viewOpen}
+        onOpenChange={setViewOpen}
+        onRoleUpdated={fetchRoles}
       />
 
       <CreateTemplateRoleDialog

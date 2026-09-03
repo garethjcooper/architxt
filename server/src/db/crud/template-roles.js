@@ -23,13 +23,27 @@ export const ROLE_TO_MODEL_TYPE = Object.fromEntries(
 );
 
 export const getTemplateRole = (db, roleId) => dbExec(() => {
-  const row = db.prepare(`SELECT * FROM ${TABLE} WHERE ${PK} = ?`).get(roleId);
+  const row = db.prepare(`
+    SELECT
+      tr_role_id AS role_id,
+      tr_display_name AS display_name,
+      tr_derivation_scope AS derivation_scope,
+      tr_sort_order AS sort_order,
+      tr_created_at AS created_at,
+      tr_updated_at AS updated_at,
+      (SELECT COUNT(*) FROM mental_models WHERE mm_template_role = tr.tr_role_id) AS usage_count
+    FROM ${TABLE} tr
+    WHERE ${PK} = ?
+  `).get(roleId);
   if (!row) return null;
   return {
-    role_id: row.tr_role_id,
-    display_name: row.tr_display_name,
-    derivation_scope: row.tr_derivation_scope,
-    sort_order: row.tr_sort_order,
+    role_id: row.role_id,
+    display_name: row.display_name,
+    derivation_scope: row.derivation_scope,
+    sort_order: row.sort_order,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    usage_count: row.usage_count,
   };
 }, 'templateRoles.get');
 
@@ -39,11 +53,15 @@ export const getTemplateRole = (db, roleId) => dbExec(() => {
  */
 export const listTemplateRoles = (db) => dbExec(() => {
   const rows = db.prepare(`
-    SELECT tr_role_id AS role_id,
-           tr_display_name AS display_name,
-           tr_derivation_scope AS derivation_scope,
-           tr_sort_order AS sort_order
-    FROM ${TABLE}
+    SELECT
+      tr_role_id AS role_id,
+      tr_display_name AS display_name,
+      tr_derivation_scope AS derivation_scope,
+      tr_sort_order AS sort_order,
+      tr_created_at AS created_at,
+      tr_updated_at AS updated_at,
+      (SELECT COUNT(*) FROM mental_models WHERE mm_template_role = tr.tr_role_id) AS usage_count
+    FROM ${TABLE} tr
     ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_display_name ASC
   `).all();
   return rows;

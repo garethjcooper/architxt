@@ -310,7 +310,9 @@ CREATE TABLE template_roles (
   tr_role_id TEXT PRIMARY KEY,
   tr_display_name TEXT NOT NULL,
   tr_derivation_scope TEXT NOT NULL,
-  tr_sort_order INTEGER
+  tr_sort_order INTEGER,
+  tr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  tr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order) VALUES
