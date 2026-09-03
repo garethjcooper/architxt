@@ -223,11 +223,13 @@ router.get('/dimensions/standard', async (req, res) => {
 router.get('/roles/template', async (req, res) => {
   const start = Date.now();
   const rows = await listTemplateRoles(db);
-  const roles = rows.map((r) => ({
-    value: r.role_id,
-    label: r.display_name,
-    derivation_scope: r.derivation_scope,
-  }));
+  const roles = rows
+    .filter((r) => r.value)
+    .map((r) => ({
+      value: r.value,
+      label: r.label || r.value,
+      derivation_scope: r.derivation_scope,
+    }));
   sendResponse({ res, status: 200, data: roles, logger, method: 'GET', path: '/mentalmodels/roles/template', duration: Date.now() - start });
 });
 
