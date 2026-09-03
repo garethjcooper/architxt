@@ -119,38 +119,6 @@ function buildDerivedRows(model: MentalModel, baseConfig: BaseConfig): DerivedMe
   return (model.entities ?? []).map((entity) => buildDerivedRow(entity, model, baseConfig));
 }
 
-function buildSystemDerivedRow(model: MentalModel): DerivedMentalModel {
-  return {
-    id: model.id,
-    ext_id: model.ext_id,
-    name: model.name,
-    source_query: model.source_query,
-    viewp_description: null,
-    viewp_meta: null,
-    refresh_mode: model.refresh_mode,
-    refresh_after_consolidation: model.refresh_after_consolidation,
-    exclude_all_mental_models: model.exclude_all_mental_models,
-    exclude_mental_model_list: null,
-    max_tokens: model.max_tokens,
-    tags_match_mode: model.tags_match_mode,
-    is_template: false,
-    is_system_template: false,
-    is_derived: true,
-    derived_entity: {
-      id: model.id,
-      entity_id: model.ext_id || `system-model-${model.id}`,
-      name: model.name || 'System model',
-      type_name: 'system',
-      created_at: model.created_at,
-      updated_at: model.updated_at,
-    } as Entity,
-    tags: [],
-    entities: [],
-    created_at: model.created_at,
-    updated_at: model.updated_at,
-  };
-}
-
 export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: ModelDetailsDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState(model.name ?? '');
@@ -168,9 +136,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
-    model.is_system_template
-      ? [buildSystemDerivedRow(model)]
-      : buildDerivedRows(model, buildBaseConfig(model))
+    model.is_system_template ? [] : buildDerivedRows(model, buildBaseConfig(model))
   );
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
@@ -211,19 +177,16 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
     setDerived(
-      model.is_system_template
-        ? [buildSystemDerivedRow(model)]
-        : buildDerivedRows(model, buildBaseConfig(model))
+      model.is_system_template ? [] : buildDerivedRows(model, buildBaseConfig(model))
     );
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
     setDerivedHealthOpen(false);
     setDerivedQueryPreviewOpen(false);
-  }, [open]);
+  }, [open, model]);
 
   // If entities are added/removed while the modal is open, rebuild derived
-  // rows. Existing rows are preserved so live edits survive; new entities
-  // inherit the current template form values. Skip for system templates.
+  // rows. Existing rows are preserved so live edits survive. Skip for system templates.
   useEffect(() => {
     if (!open || !model || model.is_system_template) return;
     setDerived((prev) => {
@@ -238,10 +201,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   }, [model.entities, open]);
 
   const baselineDerived = useMemo(
-    () =>
-      model.is_system_template
-        ? [buildSystemDerivedRow(model)]
-        : buildDerivedRows(model, buildBaseConfig(model)),
+    () => (model.is_system_template ? [] : buildDerivedRows(model, buildBaseConfig(model))),
     [model]
   );
 
@@ -305,7 +265,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleNameChange = (value: string) => {
-    if (isSystemTemplate) return;
     setName(value);
     updateDerivedPlaceholders({
       ...baseConfig,
@@ -683,23 +642,21 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           className={`${
-            isTemplate || isSystemTemplate ? '!w-[85vw] !max-w-none' : 'sm:max-w-4xl'
+            isTemplate && !isSystemTemplate ? '!w-[85vw] !max-w-none' : 'sm:max-w-4xl'
           } max-h-[85vh] overflow-hidden p-0 flex flex-col`}
         >
           <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle className="text-xl font-semibold text-white">Mental Model Details</DialogTitle>
           </DialogHeader>
 
-          {isTemplate || isSystemTemplate ? (
+          {isTemplate && !isSystemTemplate ? (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
                 <div className="w-1/2 min-w-[480px] p-4 flex flex-col gap-4 overflow-hidden">
                   <div className="shrink-0 border border-white/10 rounded-lg p-3 bg-white/[0.02]">
                     <p className="text-xs uppercase text-white/50 font-medium">
-                      {isSystemTemplate
-                        ? 'System mental model. Health check and query preview are available below.'
-                        : 'Derived instances inherit the template configuration above.'}
+                      Derived instances inherit the template configuration above.
                     </p>
                   </div>
 
@@ -707,14 +664,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                     model={model}
                     derived={derived}
                     className="flex-1 border border-white/10 rounded-md overflow-hidden"
-                    onConfigure={
-                      isSystemTemplate
-                        ? undefined
-                        : (selected) => {
-                            setSelectedDerived(selected);
-                            setDerivedConfigOpen(true);
-                          }
-                    }
+                    onConfigure={(selected) => {
+                      setSelectedDerived(selected);
+                      setDerivedConfigOpen(true);
+                    }}
                     onHealth={(selected) => {
                       setSelectedDerived(selected);
                       setDerivedHealthOpen(true);
