@@ -495,6 +495,7 @@ export const mentalModelsApi = {
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     is_template?: boolean;
+    template_role?: string;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -643,6 +644,37 @@ export const mentalModelsApi = {
         body: JSON.stringify({ mental_model_ids: mmIds, ...config }),
       }
     ),
+};
+
+// Template Roles API
+export interface TemplateRole {
+  role_id: string;
+  display_name: string;
+  derivation_scope: 'node' | 'edge' | 'seed' | 'graph';
+  sort_order: number;
+  is_system: boolean;
+}
+
+export const templateRolesApi = {
+  list: () => fetchApi<TemplateRole[]>('/template-roles'),
+  create: (data: {
+    role_id: string;
+    display_name: string;
+    derivation_scope: 'node' | 'edge' | 'seed' | 'graph';
+    sort_order?: number;
+  }) => fetchApi<{ role_id: string }>('/template-roles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (roleId: string, data: {
+    display_name?: string;
+    derivation_scope?: 'node' | 'edge' | 'seed' | 'graph';
+    sort_order?: number;
+  }) => fetchApi<{ success: boolean }>(`/template-roles/${roleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: (roleId: string) => fetchApi<void>(`/template-roles/${roleId}`, { method: 'DELETE' }),
 };
 
 // Health check

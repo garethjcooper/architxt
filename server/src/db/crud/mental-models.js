@@ -604,11 +604,10 @@ export const createMentalModel = (db, data) => dbExec(() => {
     throw err;
   }
 
-  // Roles that exist in template_roles are reserved for templates managed
-  // through the template role system; regular users cannot mint them.
-  if (data.mm_template_role && isKnownTemplateRole(db, data.mm_template_role) && !isSystemTemplateRole(data.mm_template_role)) {
-    const err = new Error('Template role is reserved and cannot be assigned to a plain mental model.');
-    err.code = 'TEMPLATE_ROLE_RESERVED';
+  // Contextual roles require a source query so derivation has something to compose.
+  if (data.mm_template_role && !data.mm_source_query) {
+    const err = new Error('Contextual template role requires a source_query.');
+    err.code = 'VALIDATION_ERROR';
     throw err;
   }
 
@@ -632,16 +631,22 @@ export const updateMentalModel = (db, id, data) => dbExec(() => {
 
   const identity = getMentalModelTemplateIdentity(db, id);
   const role = identity?.role ?? null;
+
+  // For system templates, keep the historical SYSTEM_TEMPLATE_IMMUTABLE code
+  // when any role change is attempted. Otherwise use the generic immutability
+  // code for all other mental models.
+  if (data.mm_template_role !== undefined && data.mm_template_role !== role) {
+    const isSystem = isSystemTemplateRole(role);
+    const err = new Error(isSystem ? 'System template role cannot be changed.' : 'Template role cannot be changed after creation.');
+    err.code = isSystem ? 'SYSTEM_TEMPLATE_IMMUTABLE' : 'TEMPLATE_ROLE_IMMUTABLE';
+    throw err;
+  }
+
   if (isSystemTemplateRole(role)) {
     // System templates cannot stop being templates, change role, change
     // their reserved ext_id, or be renamed. Other configurable fields remain editable.
     if (data.mm_is_template === 'false') {
       const err = new Error('System template cannot be converted to a non-template.');
-      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
-      throw err;
-    }
-    if (data.mm_template_role !== undefined && data.mm_template_role !== role) {
-      const err = new Error('System template role cannot be changed.');
       err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
       throw err;
     }
