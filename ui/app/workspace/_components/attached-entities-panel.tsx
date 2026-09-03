@@ -8,7 +8,7 @@ import { colorForType } from '@/components/research-canvas';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
 import { type EntityInfo, type Entity } from '@/lib/api/client';
-import { type DisplayNode, MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
+import { type DisplayNode, getRoleScopeLabel } from '@/lib/contextual-graph/display';
 import { type ModelContentCacheEntry } from './model-content-utils';
 
 export interface ModelItem {
@@ -59,7 +59,7 @@ function getEntityModelItems(
 
   info.contextual_refs.forEach((ref, i) => {
     if (!ref.ext_id) return;
-    const roleLabel = MODEL_ROLE_LABELS[ref.role] || ref.role;
+    const roleLabel = getRoleScopeLabel(ref.role);
     const rolePrefix = ref.role.replace(/^sys_/, '').replace(/_/g, '-') + '-';
     const entityId = ref.ext_id.startsWith(rolePrefix) ? ref.ext_id.slice(rolePrefix.length) : ref.ext_id;
     const label = resolveName(entityId);

@@ -6,10 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Search } from 'lucide-react';
-import { formatRelative, getLastRefreshedAt, MODEL_ROLE_LABELS, isCandidateNode, isCandidateEdge } from '@/lib/contextual-graph/display';
+import { formatRelative, getLastRefreshedAt, getRoleScopeLabel, isCandidateNode, isCandidateEdge } from '@/lib/contextual-graph/display';
 import type { DisplayNode, DisplayEdge } from './page';
-
-const ROLE_LABELS = MODEL_ROLE_LABELS;
 
 export interface CandidatesTabProps {
   nodes: DisplayNode[];
@@ -149,7 +147,7 @@ export function CandidatesTab({
                           <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {node.modelRefs.map((ref, i) => (
                               <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                                {ROLE_LABELS[ref.role || ''] || ref.role}
+                                {getRoleScopeLabel(ref.role)}
                               </Badge>
                             ))}
                           </div>
@@ -208,7 +206,7 @@ export function CandidatesTab({
                           <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {edge.modelRefs.map((ref, i) => (
                               <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
-                                {ROLE_LABELS[ref.role || ''] || ref.role}
+                                {getRoleScopeLabel(ref.role)}
                               </Badge>
                             ))}
                           </div>

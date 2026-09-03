@@ -528,32 +528,35 @@ const ROLE_LABELS = {
   sys_discovery_context: 'Discovery',
 };
 
-export const listTemplateRoles = (db) => dbExec(() => {
-  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
-  if (tableExists) {
-    const rows = stmt(db, `
-      SELECT tr_role_id AS role,
-             tr_display_name AS label,
-             tr_derivation_scope AS derivation_scope
-      FROM template_roles
-      ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_role_id ASC
-    `).all();
-    return rows;
-  }
+export const listTemplateRoles = (db) => {
+  const result = dbExec(() => {
+    const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
+    if (tableExists) {
+      const rows = stmt(db, `
+        SELECT tr_role_id AS role,
+               tr_display_name AS label,
+               tr_derivation_scope AS derivation_scope
+        FROM template_roles
+        ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_role_id ASC
+      `).all();
+      return rows;
+    }
 
-  // Legacy fallback for old schemas before template_roles migration.
-  const rows = stmt(db, `
-    SELECT DISTINCT mm_template_role AS role
-    FROM ${TABLE}
-    WHERE mm_template_role IS NOT NULL
-      AND mm_template_role LIKE 'sys_%'
-    ORDER BY mm_template_role ASC
-  `).all();
-  return rows.map((r) => ({
-    value: r.role,
-    label: ROLE_LABELS[r.role] ?? r.role,
-  }));
-}, 'mentalModels.listTemplateRoles');
+    // Legacy fallback for old schemas before template_roles migration.
+    const rows = stmt(db, `
+      SELECT DISTINCT mm_template_role AS role
+      FROM ${TABLE}
+      WHERE mm_template_role IS NOT NULL
+        AND mm_template_role LIKE 'sys_%'
+      ORDER BY mm_template_role ASC
+    `).all();
+    return rows.map((r) => ({
+      value: r.role,
+      label: ROLE_LABELS[r.role] ?? r.role,
+    }));
+  }, 'mentalModels.listTemplateRoles');
+  return result.success ? result.data : [];
+};
 
 /**
  * Get a single mental model with tags and entities.

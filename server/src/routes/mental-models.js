@@ -218,11 +218,16 @@ router.get('/dimensions/standard', async (req, res) => {
  *                 properties:
  *                   value: { type: string }
  *                   label: { type: string }
+ *                   derivation_scope: { type: string }
  */
 router.get('/roles/template', async (req, res) => {
   const start = Date.now();
-  const result = await listTemplateRoles(db);
-  const roles = Array.isArray(result) ? result : (result.success ? result.data : []);
+  const rows = await listTemplateRoles(db);
+  const roles = rows.map((r) => ({
+    value: r.role_id,
+    label: r.display_name,
+    derivation_scope: r.derivation_scope,
+  }));
   sendResponse({ res, status: 200, data: roles, logger, method: 'GET', path: '/mentalmodels/roles/template', duration: Date.now() - start });
 });
 

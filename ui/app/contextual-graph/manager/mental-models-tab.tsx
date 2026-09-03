@@ -16,11 +16,9 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { MODEL_ROLE_LABELS, isContextualRole, getRoleScopeLabel, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
+import { isContextualRole, getRoleScopeLabel, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
-
-const ROLE_LABELS = MODEL_ROLE_LABELS;
 
 function getScopeLabel(ref: ModelRef, nodes?: DisplayNode[], edges?: DisplayEdge[]): string {
   const scope = ref.scope;

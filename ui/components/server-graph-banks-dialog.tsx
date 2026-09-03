@@ -19,19 +19,12 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from './confirm-dialog';
 import type { Server, ContextualGraphBankConfig } from '@/lib/types';
 
-const MODEL_TYPE_LABELS: Record<string, string> = {
-  'entity-summary': 'Entity summary',
-  'entity-capabilities': 'Entity capabilities',
-  'edge-ctx': 'Edge context',
-  'discover': 'Discovery',
+const LEGACY_MODEL_TYPE_TO_ROLE: Record<string, string> = {
+  'entity-summary': 'sys_entity_summary',
+  'entity-capabilities': 'sys_entity_capabilities',
+  'edge-ctx': 'sys_edge_context',
+  'discover': 'sys_discovery_context',
 };
-const ALL_MODEL_TYPES = Object.keys(MODEL_TYPE_LABELS);
-
-interface TemplateRoleOption {
-  role_id: string;
-  display_name: string;
-  derivation_scope: string;
-}
 
 interface ServerGraphBanksDialogProps {
   server: Server | null;
@@ -53,7 +46,7 @@ export function ServerGraphBanksDialog({
   const [banks, setBanks] = useState<Array<{ bank_id: string; name?: string }>>([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [configs, setConfigs] = useState<Record<string, ContextualGraphBankConfig>>({});
-  const [templateRoles, setTemplateRoles] = useState<TemplateRoleOption[]>([]);
+  const [templateRoles, setTemplateRoles] = useState<{ role_id: string; display_name: string; derivation_scope: string }[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -91,7 +84,7 @@ export function ServerGraphBanksDialog({
           (roles || []).map((r) => ({
             role_id: r.value,
             display_name: r.label || r.value,
-            derivation_scope: '',
+            derivation_scope: r.derivation_scope || '',
           })),
         );
       } catch (err) {
@@ -181,12 +174,12 @@ export function ServerGraphBanksDialog({
     });
   };
 
-  const toggleModelType = (bankId: string, type: string) => {
+  const toggleModelType = (bankId: string, roleId: string) => {
     setConfigs((prev) => {
       const cfg = prev[bankId];
       const restriction = ensureRestriction(cfg);
       const current = restriction.deploy?.allowed_model_types || [];
-      const next = current.includes(type) ? current.filter((t: string) => t !== type) : [...current, type];
+      const next = current.includes(roleId) ? current.filter((t: string) => t !== roleId) : [...current, roleId];
       return {
         ...prev,
         [bankId]: {
@@ -501,16 +494,16 @@ export function ServerGraphBanksDialog({
                             <div>
                               <Label className="text-xs text-white/50">Model types</Label>
                               <div className="flex flex-wrap gap-2 mt-1.5">
-                                {ALL_MODEL_TYPES.map((type) => (
+                                {templateRoles.map((role) => (
                                   <label
-                                    key={type}
+                                    key={role.role_id}
                                     className="inline-flex items-center gap-1.5 text-xs text-white/70 cursor-pointer"
                                   >
                                     <Checkbox
-                                      checked={(deploy.allowed_model_types || []).includes(type)}
-                                      onCheckedChange={() => toggleModelType(bank.bank_id, type)}
+                                      checked={(deploy.allowed_model_types || []).includes(role.role_id)}
+                                      onCheckedChange={() => toggleModelType(bank.bank_id, role.role_id)}
                                     />
-                                    {MODEL_TYPE_LABELS[type]}
+                                    {role.display_name}
                                   </label>
                                 ))}
                               </div>
