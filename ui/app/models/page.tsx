@@ -24,7 +24,7 @@ import { ModelForm } from '@/components/model-form';
 import { ModelDetailsDialog } from '@/components/model-details-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Plus, Trash2, RefreshCw, Tag, Search, X, TableIcon, Settings2, LayoutTemplate, Eye } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, RefreshCw, Tag, Search, X, TableIcon, Settings2, LayoutTemplate, MessageSquareText } from 'lucide-react';
 import { EntityIcon } from '@/components/icons/entity-icon';
 import { toast } from 'sonner';
 import { PageShell } from '@/app/components/page-shell';
@@ -66,10 +66,10 @@ function ModelsPageContent() {
   const [selectedModel, setSelectedModel] = useState<MentalModel | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [queryPreviewModel, setQueryPreviewModel] = useState<MentalModel | null>(null);
-  const [systemQueryModel, setSystemQueryModel] = useState<MentalModel | null>(null);
-  const [systemQueryLoading, setSystemQueryLoading] = useState(false);
-  const [systemQueryResult, setSystemQueryResult] = useState<string | null>(null);
-  const [systemQueryError, setSystemQueryError] = useState<string | null>(null);
+  const [composePreviewModel, setComposePreviewModel] = useState<MentalModel | null>(null);
+  const [composePreviewLoading, setComposePreviewLoading] = useState(false);
+  const [composePreviewResult, setComposePreviewResult] = useState<string | null>(null);
+  const [composePreviewError, setComposePreviewError] = useState<string | null>(null);
   const [freeze, setFreeze] = useState(false);
   const [compactBadges, setCompactBadges] = useState(false);
   const [showAllBadges, setShowAllBadges] = useState(false);
@@ -150,39 +150,43 @@ function ModelsPageContent() {
 
   const handleViewQuery = async (model: MentalModel, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (model.is_system_template) {
-      setSystemQueryModel(model);
-      setSystemQueryLoading(true);
-      setSystemQueryResult(null);
-      setSystemQueryError(null);
-      try {
-        const role = model.template_role || model.ext_id;
-        if (!role) {
-          throw new Error('System template has no role');
-        }
-        const res = await mentalModelsApi.composePreview([
-          {
-            role,
-            template_role: role,
-            returns: role,
-            source_query: model.source_query || '',
-          },
-        ]);
-        const row = res.results[0];
-        if (row?.compose_error) {
-          setSystemQueryError(row.compose_error);
-        } else {
-          setSystemQueryResult(row?.composed_query ?? null);
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setSystemQueryError(message);
-        toast.error(`Failed to compose query: ${message}`);
-      } finally {
-        setSystemQueryLoading(false);
-      }
-    } else {
+    if (model.is_template && !model.is_system_template) {
       setQueryPreviewModel(model);
+      return;
+    }
+
+    const role = model.template_role || model.ext_id;
+    if (!role) {
+      toast.error('Model has no role to compose');
+      return;
+    }
+
+    setComposePreviewModel(model);
+    setComposePreviewLoading(true);
+    setComposePreviewResult(null);
+    setComposePreviewError(null);
+
+    try {
+      const res = await mentalModelsApi.composePreview([
+        {
+          role,
+          template_role: model.is_system_template ? role : undefined,
+          returns: role,
+          source_query: model.source_query || '',
+        },
+      ]);
+      const row = res.results[0];
+      if (row?.compose_error) {
+        setComposePreviewError(row.compose_error);
+      } else {
+        setComposePreviewResult(row?.composed_query ?? null);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setComposePreviewError(message);
+      toast.error(`Failed to compose query: ${message}`);
+    } finally {
+      setComposePreviewLoading(false);
     }
   };
 
@@ -190,10 +194,10 @@ function ModelsPageContent() {
     setQueryPreviewModel(null);
   };
 
-  const closeSystemQueryPreview = () => {
-    setSystemQueryModel(null);
-    setSystemQueryResult(null);
-    setSystemQueryError(null);
+  const closeComposePreview = () => {
+    setComposePreviewModel(null);
+    setComposePreviewResult(null);
+    setComposePreviewError(null);
   };
 
   const formatDate = (date?: string | null) => {
@@ -467,11 +471,10 @@ function ModelsPageContent() {
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
-                          disabled={!model.is_template && !model.is_system_template}
                           onClick={(e) => handleViewQuery(model, e)}
-                          title={model.is_system_template ? 'Preview system-template composed query' : model.is_template ? 'Preview derived composed queries' : 'No composition available'}
+                          title="Preview composed query"
                         >
-                          <Eye className="h-3.5 w-3.5" />
+                          <MessageSquareText className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -577,12 +580,12 @@ function ModelsPageContent() {
       )}
 
       <SystemTemplateQueryPreviewDialog
-        isOpen={!!systemQueryModel}
-        onClose={closeSystemQueryPreview}
-        refItem={systemQueryModel ? { role: systemQueryModel.template_role || systemQueryModel.ext_id, ext_id: systemQueryModel.ext_id, scope: undefined } : null}
-        composedQuery={systemQueryResult}
-        composeError={systemQueryError}
-        loading={systemQueryLoading}
+        isOpen={!!composePreviewModel}
+        onClose={closeComposePreview}
+        refItem={composePreviewModel ? { role: composePreviewModel.template_role || composePreviewModel.ext_id, ext_id: composePreviewModel.ext_id, scope: undefined } : null}
+        composedQuery={composePreviewResult}
+        composeError={composePreviewError}
+        loading={composePreviewLoading}
       />
     </>
   );
