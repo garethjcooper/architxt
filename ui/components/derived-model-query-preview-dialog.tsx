@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, Loader2 } from 'lucide-react';
+import { MessageSquareText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { DerivedMentalModel } from '@/lib/types/index';
 import { mentalModelsApi } from '@/lib/api/client';
@@ -104,7 +104,7 @@ export function DerivedModelQueryPreviewDialog({
       <DialogContent className="!w-[85vw] !max-w-none max-h-[85vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
-            <Eye className="h-5 w-5 text-purple-400" />
+            <MessageSquareText className="h-5 w-5 text-purple-400" />
             Provisioning Query Preview
           </DialogTitle>
         </DialogHeader>
