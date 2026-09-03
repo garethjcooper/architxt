@@ -396,14 +396,12 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     if (result.content == null) {
       return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
     }
-    // Always render through the standard envelope viewer. Plain text/non-envelope
-    // content is wrapped as a narrative-only envelope by the helper below.
+    // Show raw content as plain text for instance health checks so that malformed
+    // Mermaid or other structured payloads do not break the preview.
     return (
-      <EnvelopeViewer
-        envelope={mentalModelContentToStepSummary(result.ext_id || 'Content', result)}
-        title="Content"
-        className="h-full"
-      />
+      <div className="h-full overflow-auto p-3 text-xs text-white/80 font-mono whitespace-pre-wrap">
+        {formatPreviewText(result, error)}
+      </div>
     );
   };
 
