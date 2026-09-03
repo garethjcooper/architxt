@@ -639,8 +639,6 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
             onPlainChange={setPlainView}
             onCopyText={copyContent}
             onSaveMd={saveContentMd}
-            showIndex={false}
-            onShowIndexChange={() => {}}
             showControlsToggle
           />
 
