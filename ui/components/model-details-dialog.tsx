@@ -21,7 +21,6 @@ import { DerivedModelsPanel } from '@/components/derived-models-panel';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DerivedModelHealthDialog } from '@/components/derived-model-health-dialog';
-import { DerivedModelQueryPreviewDialog } from '@/components/derived-model-query-preview-dialog';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -141,7 +140,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
   const [derivedHealthOpen, setDerivedHealthOpen] = useState(false);
-  const [derivedQueryPreviewOpen, setDerivedQueryPreviewOpen] = useState(false);
   const [confirmTemplateOffOpen, setConfirmTemplateOffOpen] = useState(false);
 
   const baseConfig: BaseConfig = useMemo(
@@ -182,7 +180,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
     setDerivedHealthOpen(false);
-    setDerivedQueryPreviewOpen(false);
   }, [open, model]);
 
   // If entities are added/removed while the modal is open, rebuild derived
@@ -633,7 +630,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && (derivedConfigOpen || derivedHealthOpen || derivedQueryPreviewOpen)) return;
+    if (!nextOpen && (derivedConfigOpen || derivedHealthOpen)) return;
     onOpenChange(nextOpen);
   };
 
@@ -672,10 +669,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                       setSelectedDerived(selected);
                       setDerivedHealthOpen(true);
                     }}
-                    onPreviewQuery={(selected) => {
-                      setSelectedDerived(selected);
-                      setDerivedQueryPreviewOpen(true);
-                    }}
                   />
                 </div>
               </div>
@@ -712,16 +705,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           setDerivedHealthOpen(false);
           setSelectedDerived([]);
         }}
-        derived={selectedDerived}
-      />
-
-      <DerivedModelQueryPreviewDialog
-        isOpen={derivedQueryPreviewOpen}
-        onClose={() => {
-          setDerivedQueryPreviewOpen(false);
-          setSelectedDerived([]);
-        }}
-        modelId={model.id}
         derived={selectedDerived}
       />
 

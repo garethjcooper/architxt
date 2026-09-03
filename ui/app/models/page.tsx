@@ -24,7 +24,7 @@ import { ModelForm } from '@/components/model-form';
 import { ModelDetailsDialog } from '@/components/model-details-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Plus, Trash2, RefreshCw, Tag, Search, X, TableIcon, Settings2, LayoutTemplate } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, RefreshCw, Tag, Search, X, TableIcon, Settings2, LayoutTemplate, Eye } from 'lucide-react';
 import { EntityIcon } from '@/components/icons/entity-icon';
 import { toast } from 'sonner';
 import { PageShell } from '@/app/components/page-shell';
@@ -32,6 +32,8 @@ import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
+import { DerivedModelQueryPreviewDialog } from '@/components/derived-model-query-preview-dialog';
+import { SystemTemplateQueryPreviewDialog } from '@/app/contextual-graph/manager/system-template-query-preview-dialog';
 
 const logger = createLogger('ModelsPage');
 
@@ -63,6 +65,11 @@ function ModelsPageContent() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<MentalModel | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [queryPreviewModel, setQueryPreviewModel] = useState<MentalModel | null>(null);
+  const [systemQueryModel, setSystemQueryModel] = useState<MentalModel | null>(null);
+  const [systemQueryLoading, setSystemQueryLoading] = useState(false);
+  const [systemQueryResult, setSystemQueryResult] = useState<string | null>(null);
+  const [systemQueryError, setSystemQueryError] = useState<string | null>(null);
   const [freeze, setFreeze] = useState(false);
   const [compactBadges, setCompactBadges] = useState(false);
   const [showAllBadges, setShowAllBadges] = useState(false);
@@ -139,6 +146,54 @@ function ModelsPageContent() {
   const handleRowClick = (model: MentalModel) => {
     setSelectedModel(model);
     setDetailsOpen(true);
+  };
+
+  const handleViewQuery = async (model: MentalModel, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (model.is_system_template) {
+      setSystemQueryModel(model);
+      setSystemQueryLoading(true);
+      setSystemQueryResult(null);
+      setSystemQueryError(null);
+      try {
+        const role = model.template_role || model.ext_id;
+        if (!role) {
+          throw new Error('System template has no role');
+        }
+        const res = await mentalModelsApi.composePreview([
+          {
+            role,
+            template_role: role,
+            returns: role,
+            source_query: model.source_query || '',
+          },
+        ]);
+        const row = res.results[0];
+        if (row?.compose_error) {
+          setSystemQueryError(row.compose_error);
+        } else {
+          setSystemQueryResult(row?.composed_query ?? null);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setSystemQueryError(message);
+        toast.error(`Failed to compose query: ${message}`);
+      } finally {
+        setSystemQueryLoading(false);
+      }
+    } else {
+      setQueryPreviewModel(model);
+    }
+  };
+
+  const closeQueryPreview = () => {
+    setQueryPreviewModel(null);
+  };
+
+  const closeSystemQueryPreview = () => {
+    setSystemQueryModel(null);
+    setSystemQueryResult(null);
+    setSystemQueryError(null);
   };
 
   const formatDate = (date?: string | null) => {
@@ -242,6 +297,7 @@ function ModelsPageContent() {
                   <TableHead className={["w-24 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Exclude All</TableHead>
                   <TableHead className={["w-24 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Max Tokens</TableHead>
                   <TableHead className={["w-32 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Created</TableHead>
+                  <TableHead className={["w-10 text-xs uppercase text-white/60 font-medium py-1.5 px-2", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -261,11 +317,12 @@ function ModelsPageContent() {
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                     </TableRow>
                   ))
                 ) : displayModels.length === 0 ? (
                   <TableRow>
-                  <TableCell colSpan={13} className="text-center py-8 text-white/70">
+                  <TableCell colSpan={14} className="text-center py-8 text-white/70">
                       <div className="flex flex-col items-center gap-2">
                         <EntityIcon className="h-8 w-8 opacity-50" />
                         <p>No mental models found.</p>
@@ -405,6 +462,18 @@ function ModelsPageContent() {
                       <TableCell className="py-1.5 px-4 text-xs text-white/50">
                         {formatDistanceToNow(new Date(model.created_at), { addSuffix: true })}
                       </TableCell>
+                      <TableCell className="py-1.5 px-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          disabled={!model.is_template && !model.is_system_template}
+                          onClick={(e) => handleViewQuery(model, e)}
+                          title={model.is_system_template ? 'Preview system-template composed query' : model.is_template ? 'Preview derived composed queries' : 'No composition available'}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -497,6 +566,24 @@ function ModelsPageContent() {
           }}
         />
       )}
+
+      {queryPreviewModel && (
+        <DerivedModelQueryPreviewDialog
+          isOpen={!!queryPreviewModel}
+          onClose={closeQueryPreview}
+          modelId={queryPreviewModel.id}
+          derived={[]}
+        />
+      )}
+
+      <SystemTemplateQueryPreviewDialog
+        isOpen={!!systemQueryModel}
+        onClose={closeSystemQueryPreview}
+        refItem={systemQueryModel ? { role: systemQueryModel.template_role || systemQueryModel.ext_id, ext_id: systemQueryModel.ext_id, scope: undefined } : null}
+        composedQuery={systemQueryResult}
+        composeError={systemQueryError}
+        loading={systemQueryLoading}
+      />
     </>
   );
 }

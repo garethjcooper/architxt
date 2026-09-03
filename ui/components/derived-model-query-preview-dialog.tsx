@@ -61,15 +61,18 @@ export function DerivedModelQueryPreviewDialog({
           }
         }
 
-        const merged: PreviewRow[] = derived.map((d) => {
-          const entityId = d.derived_entity?.id;
-          const serverRow = entityId != null ? composedByEntityId.get(entityId) : undefined;
-          return {
-            ...d,
-            composed_query: serverRow?.composed_query ?? null,
-            compose_error: serverRow?.compose_error ?? null,
-          };
-        });
+        const merged: PreviewRow[] =
+          derived.length > 0
+            ? derived.map((d) => {
+                const entityId = d.derived_entity?.id;
+                const serverRow = entityId != null ? composedByEntityId.get(entityId) : undefined;
+                return {
+                  ...d,
+                  composed_query: serverRow?.composed_query ?? null,
+                  compose_error: serverRow?.compose_error ?? null,
+                };
+              })
+            : (serverRows as PreviewRow[]);
 
         setStatus({ state: 'done', rows: merged });
         if (merged.length > 0) {
