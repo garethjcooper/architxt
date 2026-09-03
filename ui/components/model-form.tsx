@@ -19,6 +19,8 @@ const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-w
 
 interface ModelFormProps {
   initial?: MentalModel | null;
+  mode: 'create' | 'edit';
+  templateRoles?: { value: string; label: string; derivation_scope: string }[];
   onSubmit: (data: {
     ext_id: string;
     name: string;
@@ -30,6 +32,7 @@ interface ModelFormProps {
     max_tokens: number;
     tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
     is_template: boolean;
+    template_role?: string;
   }) => Promise<void>;
   onCancel: () => void;
   submitLabel: string;
@@ -47,7 +50,7 @@ function validateMaxTokens(value: string): { valid: true; value: number } | { va
   return { valid: true, value: n };
 }
 
-export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFormProps) {
+export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, submitLabel }: ModelFormProps) {
   const isSystemTemplate = initial?.is_system_template ?? false;
   const [extId, setExtId] = useState(initial?.ext_id ?? '');
   const [name, setName] = useState(initial?.name ?? '');
@@ -60,6 +63,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
+  const [templateRole, setTemplateRole] = useState(initial?.template_role ?? '');
   const [submitting, setSubmitting] = useState(false);
 
   const templateValidation = useMemo(() => {
@@ -105,6 +109,7 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
         max_tokens: maxTokensValidation.value,
         tags_match_mode: tagsMatchMode,
         is_template: isTemplate,
+        template_role: templateRole || undefined,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save mental model');
@@ -180,6 +185,26 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
+          <Label htmlFor="mm-template-role" className="text-xs uppercase text-white/50 font-medium">Template Role</Label>
+          <select
+            id="mm-template-role"
+            value={templateRole}
+            disabled={mode === 'edit' || isSystemTemplate}
+            onChange={(e) => setTemplateRole(e.target.value)}
+            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50"
+          >
+            <option value="">Generic / no role</option>
+            {templateRoles?.map((role) => (
+              <option key={role.value} value={role.value}>
+                {role.label} ({role.derivation_scope})
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-white/40">
+            {mode === 'edit' ? 'Role is immutable after creation.' : 'Assigns derivation scope and contextual behavior.'}
+          </p>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="mm-refresh-mode" className="text-xs uppercase text-white/50 font-medium">Refresh Mode</Label>
           <select
             id="mm-refresh-mode"
@@ -191,6 +216,9 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
             <option value="delta">Delta</option>
           </select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="mm-tags-match-mode" className="text-xs uppercase text-white/50 font-medium">Tags Match</Label>
           <select
@@ -207,9 +235,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           </select>
           <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
           <div className="space-y-0.5">
             <Label className="text-xs uppercase text-white/50 font-medium">Refresh after consolidation</Label>
@@ -220,6 +245,9 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
             onCheckedChange={(v) => setRefreshAfterConsolidation(!!v)}
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
           <div className="space-y-0.5">
             <Label className="text-xs uppercase text-white/50 font-medium">Exclude All Mental Models</Label>
@@ -228,20 +256,6 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           <Switch
             checked={excludeAll}
             onCheckedChange={(v) => setExcludeAll(!!v)}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="mm-exclude-list" className="text-xs uppercase text-white/50 font-medium">Exclude List</Label>
-          <Input
-            id="mm-exclude-list"
-            value={excludeList}
-            onChange={(e) => setExcludeList(e.target.value)}
-            placeholder="Comma-separated model IDs"
-            className={inputClass}
-            style={inputFocusStyle}
           />
         </div>
         <div className="space-y-2">
@@ -264,6 +278,20 @@ export function ModelForm({ initial, onSubmit, onCancel, submitLabel }: ModelFor
           {maxTokensError && (
             <p className="text-[10px] text-red-400">{maxTokensError}</p>
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="mm-exclude-list" className="text-xs uppercase text-white/50 font-medium">Exclude List</Label>
+          <Input
+            id="mm-exclude-list"
+            value={excludeList}
+            onChange={(e) => setExcludeList(e.target.value)}
+            placeholder="Comma-separated model IDs"
+            className={inputClass}
+            style={inputFocusStyle}
+          />
         </div>
       </div>
 

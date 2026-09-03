@@ -100,6 +100,8 @@ function ModelsPageContent() {
     return [...filteredModels, ...selectedHidden];
   }, [filteredModels, models, search, selected]);
 
+  const [templateRoleOptions, setTemplateRoleOptions] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
+
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
       setCreateDialogOpen(true);
@@ -108,6 +110,11 @@ function ModelsPageContent() {
 
   useEffect(() => {
     fetchModels();
+    mentalModelsApi.listTemplateRoles().then((roles) => {
+      setTemplateRoleOptions(roles);
+    }).catch((err) => {
+      logger.error('Failed to load template roles', { error: err });
+    });
   }, []);
 
   async function fetchModels() {
@@ -537,6 +544,8 @@ function ModelsPageContent() {
               <DialogTitle className="text-xl font-semibold text-white">Create Mental Model</DialogTitle>
             </DialogHeader>
             <ModelForm
+              mode="create"
+              templateRoles={templateRoleOptions}
               onSubmit={async (data) => {
                 try {
                   await mentalModelsApi.create(data);

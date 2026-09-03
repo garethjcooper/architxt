@@ -345,6 +345,7 @@ router.post('/', async (req, res) => {
     mm_tags_match_mode: normaliseTagsMatchMode(body.tags_match_mode) ?? DEFAULT_TAGS_MATCH_MODE,
     mm_is_template: isTemplate,
     mm_max_tokens: normaliseMaxTokens(body.max_tokens) ?? DEFAULT_MAX_TOKENS,
+    mm_template_role: body.template_role ?? null,
   });
 
   handleCrudResult({
