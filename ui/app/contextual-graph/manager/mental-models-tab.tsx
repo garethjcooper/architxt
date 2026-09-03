@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, Copy, Download, MessageSquareText } from 'lucide-react';
+import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, MessageSquareText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -15,6 +15,7 @@ import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EnvelopeControls } from '@/components/envelope-controls';
 import { MODEL_ROLE_LABELS, isContextualRole, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
@@ -84,6 +85,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   const [queryLoading, setQueryLoading] = useState(false);
   const [queryResult, setQueryResult] = useState<string | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [plainView, setPlainView] = useState(false);
   const activeRefreshIdsRef = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isResizingRef = useRef(false);
@@ -386,15 +388,15 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     navigator.clipboard.writeText(text).then(() => toast.success('Content copied to clipboard'));
   }, [selectedContent, selectedContentError]);
 
-  const downloadContent = useCallback(() => {
+  const saveContentMd = useCallback(() => {
     const text = formatPreviewText(selectedContent, selectedContentError);
     if (!text) return;
     const extId = selectedExtId || 'model';
-    const blob = new Blob([text], { type: 'text/plain' });
+    const blob = new Blob([text], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${extId.replace(/[^a-zA-Z0-9\\-_]/g, '_')}.txt`;
+    a.download = `${extId.replace(/[^a-zA-Z0-9\\-_]/g, '_')}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -631,33 +633,16 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
           style={{ width: `${panelWidth}%` }}
         >
-          <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
-            <span className="font-medium text-sm truncate" title={selectedExtId || undefined}>
-              {selectedRef ? (ROLE_LABELS[selectedRef.role || ''] || selectedRef.role || 'Model') : 'Content'}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                disabled={!selectedContent}
-                onClick={copyContent}
-                title="Copy content"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                disabled={!selectedContent}
-                onClick={downloadContent}
-                title="Download content"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
+          <EnvelopeControls
+            headerTitle={selectedRef ? (ROLE_LABELS[selectedRef.role || ''] || selectedRef.role || 'Model') : 'Content'}
+            plain={plainView}
+            onPlainChange={setPlainView}
+            onCopyText={copyContent}
+            onSaveMd={saveContentMd}
+            showIndex={false}
+            onShowIndexChange={() => {}}
+            showControlsToggle
+          />
 
           <div className="flex-1 min-h-0 overflow-auto p-3">
             {!selectedExtId ? (
@@ -673,6 +658,10 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
               <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">
                 {selectedContentError}
               </div>
+            ) : plainView ? (
+              <pre className="text-xs text-white/80 font-mono whitespace-pre-wrap">
+                {formatPreviewText(selectedContent, selectedContentError)}
+              </pre>
             ) : (
               formatPreview(selectedContent, selectedContentError)
             )}
