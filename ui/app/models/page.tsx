@@ -155,7 +155,7 @@ function ModelsPageContent() {
       return;
     }
 
-    const role = model.template_role || model.ext_id;
+    const role = model.is_system_template ? (model.template_role || model.ext_id) : 'generic';
     if (!role) {
       toast.error('Model has no role to compose');
       return;
@@ -171,7 +171,7 @@ function ModelsPageContent() {
         {
           role,
           template_role: model.is_system_template ? role : undefined,
-          returns: role,
+          returns: 'generic',
           source_query: model.source_query || '',
         },
       ]);
