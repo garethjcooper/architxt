@@ -718,6 +718,21 @@ export const hindsightApi = {
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, targets }),
     }),
 
+  clearAllMentalModels: (serverId: number, bankId: string) =>
+    fetchApi<{
+      success: boolean;
+      total?: number;
+      deleted_count?: number;
+      failed_count?: number;
+      deleted?: string[];
+      failed?: { ext_id: string; error: string }[];
+      error?: string;
+      code?: string;
+    }>('/hindsight/mental-models/bulk', {
+      method: 'DELETE',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
+
   compare: (serverId: number, bankId: string, documentId: string) =>
     fetchApi<{
       ext_id: string;

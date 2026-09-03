@@ -11,7 +11,10 @@ import {
   deleteBank,
 } from '../services/hindsight/index.js';
 import { pushEntities, pushEntityTypes, pullEntities, pullEntityTypes } from '../services/hindsight/entities.js';
-import { listAllMentalModels as hindsightListAllMentalModels } from '../services/hindsight/mental-models.js';
+import {
+  listAllMentalModels as hindsightListAllMentalModels,
+  deleteMentalModel,
+} from '../services/hindsight/mental-models.js';
 import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import { listDirectives as hindsightListDirectives } from '../services/hindsight/directives.js';
 import { pushDirective as pushHindsightDirective } from '../services/hindsight/push-directive.js';
@@ -2000,6 +2003,116 @@ router.get('/bank-config', async (req, res) => {
   } catch (err) {
     logger.error('Bank config route error', { serverId, bankId, error: err.message });
     sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/bank-config', duration: Date.now() - start });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clear all mental models from a Hindsight bank
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /hindsight/mental-models/bulk:
+ *   delete:
+ *     summary: Delete all mental models from a Hindsight bank
+ *     description: |
+ *       Lists every mental model in the remote Hindsight bank and deletes each
+ *       one. This is a destructive operation intended for cleanup/reset. Hindsight
+ *       404 responses are treated as success (already deleted).
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *             required: [server_id, bank_id]
+ *     responses:
+ *       200:
+ *         description: Deletion summary
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 total: { type: integer }
+ *                 deleted_count: { type: integer }
+ *                 failed_count: { type: integer }
+ *                 deleted: { type: array, items: { type: string } }
+ *                 failed: { type: array, items: { type: object } }
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight server error
+ *       500:
+ *         description: Internal error
+ */
+router.delete('/mental-models/bulk', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'DELETE', path: '/hindsight/mental-models/bulk', duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const listResult = await hindsightListAllMentalModels(serverId, bankId, { detail: 'metadata' });
+    if (!listResult.success) {
+      sendResponse({ res, status: 502, error: listResult.error, code: 'REMOTE_ERROR', logger, method: 'DELETE', path: '/hindsight/mental-models/bulk', duration: Date.now() - start });
+      return;
+    }
+
+    const mentalModels = listResult.mentalModels || [];
+    const deleted = [];
+    const failed = [];
+
+    for (const mm of mentalModels) {
+      const extId = mm.ext_id || mm.id;
+      if (!extId) {
+        failed.push({ ext_id: null, error: 'Mental model has no ext_id or id' });
+        continue;
+      }
+      const deleteResult = await deleteMentalModel(serverId, bankId, extId);
+      if (deleteResult.success) {
+        deleted.push(extId);
+      } else {
+        failed.push({ ext_id: extId, error: deleteResult.error || 'Delete failed' });
+      }
+    }
+
+    logger.info('Cleared all mental models from Hindsight bank', {
+      serverId,
+      bankId,
+      total: mentalModels.length,
+      deleted: deleted.length,
+      failed: failed.length,
+    });
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        success: true,
+        total: mentalModels.length,
+        deleted_count: deleted.length,
+        failed_count: failed.length,
+        deleted,
+        failed,
+      },
+      logger,
+      method: 'DELETE',
+      path: '/hindsight/mental-models/bulk',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Clear all mental models route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'DELETE', path: '/hindsight/mental-models/bulk', duration: Date.now() - start });
   }
 });
 

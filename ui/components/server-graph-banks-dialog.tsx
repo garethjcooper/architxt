@@ -13,9 +13,10 @@ import {
   SelectPopup,
   SelectItem,
 } from '@/components/ui/select';
-import { Loader2, Network, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-import { serversApi, contextualGraphApi } from '@/lib/api/client';
+import { Loader2, Network, AlertTriangle, ChevronDown, ChevronUp, Trash2, Bomb } from 'lucide-react';
+import { serversApi, contextualGraphApi, hindsightApi } from '@/lib/api/client';
 import { toast } from 'sonner';
+import { ConfirmDialog } from './confirm-dialog';
 import type { Server, ContextualGraphBankConfig } from '@/lib/types';
 
 const MODEL_TYPE_LABELS: Record<string, string> = {
@@ -49,6 +50,8 @@ export function ServerGraphBanksDialog({
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [cleaning, setCleaning] = useState<Record<string, boolean>>({});
+  const [clearingAll, setClearingAll] = useState<Record<string, boolean>>({});
+  const [confirmClearBankId, setConfirmClearBankId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!server || !open) return;
@@ -243,6 +246,26 @@ export function ServerGraphBanksDialog({
     }
   };
 
+  const handleClearAllMentalModels = async (bankId: string) => {
+    setClearingAll((prev) => ({ ...prev, [bankId]: true }));
+    try {
+      const result = await hindsightApi.clearAllMentalModels(server.id, bankId);
+      if (!result.success) {
+        toast.error(result.error || 'Failed to clear mental models');
+        return;
+      }
+      toast.success(
+        `Cleared ${result.deleted_count ?? 0} of ${result.total ?? 0} mental models from ${bankId}` +
+          (result.failed_count ? ` (${result.failed_count} failed)` : ''),
+      );
+      onServerUpdated?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to clear mental models');
+    } finally {
+      setClearingAll((prev) => ({ ...prev, [bankId]: false }));
+    }
+  };
+
   const isAutoWithNoRestriction = (cfg: ContextualGraphBankConfig) => {
     if (cfg.mode !== 'auto') return false;
     const r = cfg.restriction;
@@ -255,39 +278,40 @@ export function ServerGraphBanksDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
-            <Network className="h-5 w-5 text-emerald-400" />
-            Graph Banks — {server.name || server.base_url}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh]">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+              <Network className="h-5 w-5 text-emerald-400" />
+              Graph Banks — {server.name || server.base_url}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-4 pr-1">
-          <p className="text-sm text-white/60">
-            Choose which banks are managed by the contextual graph. Manual banks appear in the Context Manager but never auto-sync. Auto banks sync on a refresh interval when the sync daemon is enabled.
-          </p>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-4 pr-1">
+            <p className="text-sm text-white/60">
+              Choose which banks are managed by the contextual graph. Manual banks appear in the Context Manager but never auto-sync. Auto banks sync on a refresh interval when the sync daemon is enabled.
+            </p>
 
-          {loadingBanks ? (
-            <div className="flex items-center justify-center py-8 text-white/50">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Loading banks...
-            </div>
-          ) : banks.length === 0 ? (
-            <div className="text-center py-6 text-white/50 text-sm">
-              No banks found on this server.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {banks.map((bank) => {
-                const cfg = configs[bank.bank_id];
-                const enabled = !!cfg;
-                const isExpanded = !!expanded[bank.bank_id];
-                const restriction = ensureRestriction(cfg || {});
-                const importR = restriction.import || {};
-                const deploy = restriction.deploy || {};
-                const needsWarning = enabled && isAutoWithNoRestriction(cfg);
+            {loadingBanks ? (
+              <div className="flex items-center justify-center py-8 text-white/50">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Loading banks...
+              </div>
+            ) : banks.length === 0 ? (
+              <div className="text-center py-6 text-white/50 text-sm">
+                No banks found on this server.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {banks.map((bank) => {
+                  const cfg = configs[bank.bank_id];
+                  const enabled = !!cfg;
+                  const isExpanded = !!expanded[bank.bank_id];
+                  const restriction = ensureRestriction(cfg || {});
+                  const importR = restriction.import || {};
+                  const deploy = restriction.deploy || {};
+                  const needsWarning = enabled && isAutoWithNoRestriction(cfg);
 
                 return (
                   <div
@@ -509,6 +533,16 @@ export function ServerGraphBanksDialog({
                               {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
                               Clean everything
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={clearingAll[bank.bank_id]}
+                              onClick={() => setConfirmClearBankId(bank.bank_id)}
+                              className="h-7 text-[11px] text-red-600 hover:text-red-500 hover:bg-red-500/10"
+                            >
+                              {clearingAll[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bomb className="h-3 w-3 mr-1" />}
+                              Clear all mental models
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -539,5 +573,23 @@ export function ServerGraphBanksDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={!!confirmClearBankId}
+      onOpenChange={(open) => {
+        if (!open) setConfirmClearBankId(null);
+      }}
+      title="Clear all mental models?"
+      description={`This will permanently delete all mental models from the Hindsight bank "${confirmClearBankId}". This action cannot be undone and will break any contextual graph or research features relying on them.`}
+      confirmLabel="Clear all"
+      cancelLabel="Cancel"
+      variant="destructive"
+      onConfirm={() => {
+        if (confirmClearBankId) {
+          handleClearAllMentalModels(confirmClearBankId);
+        }
+      }}
+    />
+  </>
   );
 }
