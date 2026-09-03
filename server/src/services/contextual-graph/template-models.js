@@ -1,5 +1,6 @@
 import { dbExec } from '../../utils/db-helpers.js';
 import { stmt } from '../../cache.js';
+import { getRoleScopeMap, isKnownTemplateRole } from '../../db/crud/template-roles.js';
 
 export const CONTEXTUAL_GRAPH_ROLES = {
   entitySummary: 'sys_entity_summary',
@@ -8,22 +9,8 @@ export const CONTEXTUAL_GRAPH_ROLES = {
   discover: 'sys_discovery_context',
 };
 
-export const MODEL_TYPE_TO_ROLE = Object.freeze({
-  'entity-summary': CONTEXTUAL_GRAPH_ROLES.entitySummary,
-  'entity-capabilities': CONTEXTUAL_GRAPH_ROLES.entityCapabilities,
-  'edge-ctx': CONTEXTUAL_GRAPH_ROLES.edge,
-  discover: CONTEXTUAL_GRAPH_ROLES.discover,
-});
-
-export const ROLE_TO_MODEL_TYPE = Object.freeze({
-  [CONTEXTUAL_GRAPH_ROLES.entitySummary]: 'entity-summary',
-  [CONTEXTUAL_GRAPH_ROLES.entityCapabilities]: 'entity-capabilities',
-  [CONTEXTUAL_GRAPH_ROLES.edge]: 'edge-ctx',
-  [CONTEXTUAL_GRAPH_ROLES.discover]: 'discover',
-});
-
 /**
- * Fetch a contextual-graph system template by role.
+ * Fetch a contextual-graph template by role.
  * Returns the normalized row with tags array, or null if not seeded.
  */
 export function getContextualGraphTemplate(db, role) {
@@ -70,6 +57,9 @@ export async function deriveEntitySummaryModel(db, node) {
   const values = {
     '{id}': node.id,
     '{entity-name}': node.displayName || node.id,
+    '{entity-id}': node.id,
+    '{seed-id}': node.id,
+    '{seed-name}': node.displayName || node.id,
   };
 
   return {
@@ -97,6 +87,9 @@ export async function deriveEntityCapabilitiesModel(db, node) {
   const values = {
     '{id}': node.id,
     '{entity-name}': node.displayName || node.id,
+    '{entity-id}': node.id,
+    '{seed-id}': node.id,
+    '{seed-name}': node.displayName || node.id,
   };
 
   return {
@@ -151,8 +144,11 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = []) {
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.discover}`);
 
   const values = {
+    '{id}': seedNode.id,
+    '{entity-id}': seedNode.id,
     '{seed-id}': seedNode.id,
     '{seed-name}': seedNode.displayName || seedNode.id,
+    '{entity-name}': seedNode.displayName || seedNode.id,
   };
 
   return {

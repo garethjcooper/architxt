@@ -4,6 +4,7 @@ import { fromJson, requireInt, requireString, dbExec } from '../../utils/db-help
 import { getOrCreateTagByName } from './tags.js';
 import { createLogger } from '../../utils/logger.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
+import { isKnownTemplateRole } from './template-roles.js';
 
 const logger = createLogger('mental-models-crud');
 
@@ -28,6 +29,12 @@ export const CONTEXTUAL_RETURNS = new Set(['sys_patch']);
 
 export function isSystemTemplateRole(role) {
   return SYSTEM_TEMPLATE_ROLES.has(role);
+}
+
+/** Returns true if the role is in template_roles (system or user). */
+export function isTemplateRole(db, role) {
+  if (!role) return false;
+  return isKnownTemplateRole(db, role);
 }
 
 /** Read the template role and external id for a mental model directly from the current DB. */
@@ -511,7 +518,8 @@ export const listMentalModelsForDiff = (db, options = {}) => dbExec(() => {
   return rows.map(r => fromJson(r, ['mm_tag_names', 'mm_entities']));
 }, 'mentalModels.listForDiff');
 /**
- * List distinct system template roles (sys_*) with display labels.
+ * List distinct template roles with display labels from template_roles table.
+ * Falls back to sys_* roles discovered in mental_models if template_roles missing.
  */
 const ROLE_LABELS = {
   sys_entity_summary: 'Entity summary',
@@ -521,20 +529,31 @@ const ROLE_LABELS = {
 };
 
 export const listTemplateRoles = (db) => dbExec(() => {
-  const sql = `
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
+  if (tableExists) {
+    const rows = stmt(db, `
+      SELECT tr_role_id AS role,
+             tr_display_name AS label,
+             tr_derivation_scope AS derivation_scope
+      FROM template_roles
+      ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_role_id ASC
+    `).all();
+    return rows;
+  }
+
+  // Legacy fallback for old schemas before template_roles migration.
+  const rows = stmt(db, `
     SELECT DISTINCT mm_template_role AS role
     FROM ${TABLE}
     WHERE mm_template_role IS NOT NULL
       AND mm_template_role LIKE 'sys_%'
     ORDER BY mm_template_role ASC
-  `;
-  const rows = stmt(db, sql).all();
+  `).all();
   return rows.map((r) => ({
     value: r.role,
     label: ROLE_LABELS[r.role] ?? r.role,
   }));
 }, 'mentalModels.listTemplateRoles');
-
 
 /**
  * Get a single mental model with tags and entities.
@@ -579,6 +598,14 @@ export const createMentalModel = (db, data) => dbExec(() => {
   if (SYSTEM_TEMPLATE_ROLES.has(data.mm_ext_id)) {
     const err = new Error('Reserved system template external id cannot be used.');
     err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+    throw err;
+  }
+
+  // Roles that exist in template_roles are reserved for templates managed
+  // through the template role system; regular users cannot mint them.
+  if (data.mm_template_role && isKnownTemplateRole(db, data.mm_template_role) && !isSystemTemplateRole(data.mm_template_role)) {
+    const err = new Error('Template role is reserved and cannot be assigned to a plain mental model.');
+    err.code = 'TEMPLATE_ROLE_RESERVED';
     throw err;
   }
 

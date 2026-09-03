@@ -268,6 +268,15 @@ function ensureMissingTables(db) {
         cgjl_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         FOREIGN KEY (cgj_id) REFERENCES contextual_graph_jobs(cgj_id) ON DELETE CASCADE
       )`
+    },
+    {
+      name: 'template_roles',
+      ddl: `CREATE TABLE IF NOT EXISTS template_roles (
+        tr_role_id TEXT PRIMARY KEY,
+        tr_display_name TEXT NOT NULL,
+        tr_derivation_scope TEXT NOT NULL,
+        tr_sort_order INTEGER
+      )`
     }
   ];
 
@@ -482,9 +491,46 @@ function ensureBuiltinPromptTemplates(db) {
 }
 
 /**
+ * Seed system template roles for contextual-graph mental models.
+ * Idempotent: inserts missing roles and updates labels/scopes/sort order when
+ * rows already exist. User-created roles are never modified.
+ */
+function ensureTemplateRoles(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
+  if (!tableExists) return 0;
+
+  const roles = [
+    { role_id: 'sys_entity_summary', display_name: 'Entity summary', derivation_scope: 'node', sort_order: 1 },
+    { role_id: 'sys_entity_capabilities', display_name: 'Entity capabilities', derivation_scope: 'node', sort_order: 2 },
+    { role_id: 'sys_edge_context', display_name: 'Edge context', derivation_scope: 'edge', sort_order: 3 },
+    { role_id: 'sys_discovery_context', display_name: 'Discovery', derivation_scope: 'seed', sort_order: 4 },
+  ];
+
+  const upsert = db.prepare(`
+    INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(tr_role_id) DO UPDATE SET
+      tr_display_name = excluded.tr_display_name,
+      tr_derivation_scope = excluded.tr_derivation_scope,
+      tr_sort_order = excluded.tr_sort_order
+  `);
+
+  let seeded = 0;
+  for (const r of roles) {
+    const result = upsert.run(r.role_id, r.display_name, r.derivation_scope, r.sort_order);
+    if (result.changes > 0) seeded++;
+  }
+
+  if (seeded > 0) {
+    logger.info('Ensured template roles', { seeded, roles: roles.map((r) => r.role_id) });
+  }
+  return seeded;
+}
+
+/**
  * Backfill legacy user-created mental-model templates with the default role
  * 'user_entity_derived'. Anything that is marked as a template but has no role
- * and is not one of the reserved system ext_ids is a user template.
+ * and is not one of the reserved system extIds is a user template.
  */
 function backfillUserTemplateRoles(db) {
   const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mental_models'").get();
@@ -1464,12 +1510,13 @@ export function ensureSchema(db) {
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
     const cgTemplates = ensureContextualGraphTemplates(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}`);
+    const templateRolesSeeded = ensureTemplateRoles(db);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${userRolesBackfilled} user template role(s) backfilled, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || userRolesBackfilled > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
