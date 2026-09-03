@@ -256,24 +256,27 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs, scopeM
 function clearNodeRoleData(properties, scopeMap, nodeId, disallowedRefsOnNode, refs) {
   let changed = false;
 
-  // Clear summary fields for any node-scoped role that is disallowed.
-  const nodeRoles = new Set();
-  for (const [role, scope] of scopeMap) {
-    if (scope === 'node') nodeRoles.add(role);
-  }
-  const hasNodeRoleRef = disallowedRefsOnNode.some((extId) => {
-    const role = refs.byExtId?.get(extId)?.role;
-    return nodeRoles.has(role);
-  });
-  if (hasNodeRoleRef && properties.summary !== undefined) {
-    delete properties.summary;
-    changed = true;
-  }
+  // Map node-scoped roles to the canonical fields they generate. When a role is
+  // disallowed, only the fields it owns are removed, so other allowed node
+  // scoped roles (e.g. capabilities) remain untouched.
+  const ROLE_FIELDS = {
+    sys_entity_summary: ['summary'],
+    sys_entity_capabilities: ['capabilities'],
+  };
 
-  // Clear capabilities fields for any node-scoped role that is disallowed.
-  if (hasNodeRoleRef && properties.capabilities !== undefined) {
-    delete properties.capabilities;
-    changed = true;
+  const seenRoles = new Set(
+    disallowedRefsOnNode.map((extId) => refs.byExtId?.get(extId)?.role).filter(Boolean),
+  );
+
+  for (const role of seenRoles) {
+    const fields = ROLE_FIELDS[role];
+    if (!fields) continue;
+    for (const field of fields) {
+      if (properties[field] !== undefined) {
+        delete properties[field];
+        changed = true;
+      }
+    }
   }
 
   return changed;

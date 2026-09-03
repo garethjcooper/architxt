@@ -45,11 +45,9 @@ import {
   formatRelative,
   renderValue,
   getLastRefreshedAt,
-  MODEL_ROLE_LABELS,
+  getRoleScopeLabel,
 } from '@/lib/contextual-graph/display';
 export type { BackendNode, BackendEdge, ModelRef, DisplayNode, DisplayEdge } from '@/lib/contextual-graph/display';
-
-const ROLE_LABELS = MODEL_ROLE_LABELS;
 
 const logger = createLogger('ContextManagerPage');
 
@@ -437,7 +435,7 @@ export default function ContextManagerPage() {
                   <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
                     <div className="flex items-center gap-2">
                       <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
-                        {ROLE_LABELS[ref.role || ''] || ref.role || 'model'}
+                        {getRoleScopeLabel(ref.role) || ref.role || 'model'}
                       </Badge>
                       {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
                     </div>

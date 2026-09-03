@@ -1,3 +1,5 @@
+import { ROLE_TO_MODEL_TYPE } from '../../db/crud/template-roles.js';
+
 const VALID_UNITS = new Set(['m', 'h', 'd', 'w']);
 const UNIT_MINUTES = {
   m: 1,

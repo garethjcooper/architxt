@@ -6,9 +6,10 @@ import {
   deriveEntityCapabilitiesModel,
   deriveEdgeContextModel,
   deriveDiscoverContextModel,
+  CONTEXTUAL_GRAPH_ROLES,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
-import { getRoleScopeMap } from '../../db/crud/template-roles.js';
+import { getRoleScopeMap, MODEL_TYPE_TO_ROLE } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-add-context');
 

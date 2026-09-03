@@ -36,7 +36,7 @@ export const listTemplateRoles = (db) => dbExec(() => {
     FROM ${TABLE}
     ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_role_id ASC
   `).all();
-  return { success: true, data: rows };
+  return rows;
 }, 'templateRoles.list');
 
 /**
@@ -44,7 +44,7 @@ export const listTemplateRoles = (db) => dbExec(() => {
  */
 export function getTemplateRoleIds(db) {
   const result = listTemplateRoles(db);
-  const rows = result.success ? result.data : [];
+  const rows = Array.isArray(result) ? result : (result.success ? result.data : []);
   return new Set(rows.map((r) => r.role_id));
 }
 
@@ -53,7 +53,7 @@ export function getTemplateRoleIds(db) {
  */
 export function getRoleScopeMap(db) {
   const result = listTemplateRoles(db);
-  const rows = result.success ? result.data : [];
+  const rows = Array.isArray(result) ? result : (result.success ? result.data : []);
   return new Map(rows.map((r) => [r.role_id, r.derivation_scope]));
 }
 

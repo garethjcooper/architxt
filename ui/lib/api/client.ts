@@ -482,7 +482,7 @@ export const mentalModelsApi = {
   },
   listDimensions: () => fetchApi<string[]>('/mentalmodels/dimensions'),
   listStandardDimensions: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/dimensions/standard'),
-  listTemplateRoles: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/roles/template'),
+  listTemplateRoles: () => fetchApi<{ value: string; label: string; derivation_scope: string }[]>('/mentalmodels/roles/template'),
   get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
   create: (data: {
     ext_id: string;

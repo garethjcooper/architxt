@@ -459,6 +459,8 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     return { success: false, error: 'Cannot resolve seed id from discover model scope', code: 'BAD_SCOPE' };
   }
 
+  const scopeMap = getRoleScopeMap(db);
+
   const seedNodeResult = getNode(db, serverId, bankId, seedId);
   if (!seedNodeResult?.success || !seedNodeResult.data) {
     return { success: false, error: `Seed node not found: ${seedId}`, code: 'NODE_NOT_FOUND' };

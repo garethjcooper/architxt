@@ -14,7 +14,6 @@ function getKnownRoles(db) {
   return knownRoleIds;
 }
 
-/** Clear the known-role cache, mainly useful for tests. */
 export function resetKnownRolesCache() {
   knownRoleIds = null;
 }
@@ -25,39 +24,37 @@ export function resetKnownRolesCache() {
  * Reads every `provenance.model_refs[].ext_id`.
  * Optionally filters by role (exact match) or a matching predicate.
  *
- * @param {Object} properties
- * @param {Object} [options]
- * @param {string} [options.role] - exact contextual role to include
- * @param {Function} [options.filterFn] - receives { role, ext_id, scope }
+ * @param {Object} dbOrProperties - Either a DB instance (for known-role filtering) or the properties object
+ * @param {Object} [propertiesOrOptions]
+ * @param {Object} [maybeOptions]
+ * @param {string} [maybeOptions.role] - exact contextual role to include
+ * @param {Function} [maybeOptions.filterFn] - receives { role, ext_id, scope }
  * @returns {string[]}
  */
-export function extractRefsFromProperties(db, properties, options = {}) {
-  if (!properties || typeof properties !== 'object') return [];
-
-  const provenance = properties.provenance;
-  if (!provenance || typeof provenance !== 'object') return [];
-
-  const refs = [];
-  const KNOWN_ROLES = getKnownRoles(db);
-
-  if (Array.isArray(provenance.model_refs)) {
-    for (const ref of provenance.model_refs) {
-      if (ref && typeof ref.ext_id === 'string' && ref.ext_id) {
-        const role = ref.role;
-        if (!role || !KNOWN_ROLES.has(role)) continue;
-        refs.push({ role, ext_id: ref.ext_id, scope: ref.scope });
-      }
-    }
+export function extractRefsFromProperties(dbOrProperties, propertiesOrOptions, maybeOptions = {}) {
+  // Backward-compatible overloads:
+  //   extractRefsFromProperties(properties, options)
+  //   extractRefsFromProperties(db, properties, options)
+  let db;
+  let properties;
+  let options;
+  if (
+    propertiesOrOptions !== undefined &&
+    typeof dbOrProperties === 'object' &&
+    dbOrProperties !== null &&
+    typeof dbOrProperties.prepare === 'function' &&
+    !Array.isArray(propertiesOrOptions)
+  ) {
+    db = dbOrProperties;
+    properties = propertiesOrOptions;
+    options = maybeOptions;
+  } else {
+    properties = dbOrProperties;
+    options = propertiesOrOptions || {};
   }
 
-  const { role, filterFn } = options;
-  const filtered = refs.filter((item) => {
-    if (role && item.role !== role) return false;
-    if (typeof filterFn === 'function' && !filterFn(item)) return false;
-    return true;
-  });
-
-  return [...new Set(filtered.map((item) => item.ext_id))];
+  const refs = extractRefObjectsFromProperties(db, properties, options);
+  return [...new Set(refs.map((item) => item.ext_id))];
 }
 
 /**
@@ -71,7 +68,7 @@ function extractRefObjectsFromProperties(db, properties, options = {}) {
   if (!provenance || typeof provenance !== 'object') return [];
 
   const refs = [];
-  const KNOWN_ROLES = getKnownRoles(db);
+  const KNOWN_ROLES = db ? getKnownRoles(db) : new Set(Object.values(CONTEXTUAL_GRAPH_ROLES));
 
   if (Array.isArray(provenance.model_refs)) {
     for (const ref of provenance.model_refs) {

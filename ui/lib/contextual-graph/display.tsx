@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { mentalModelsApi } from '@/lib/api/client';
 
 const TYPE_PALETTE = [
   '#E06C75', // red
@@ -133,11 +134,11 @@ export function isUndirectedEdge(edge: DisplayEdge): boolean {
 }
 
 export function hasEdgeContextRef(edge: DisplayEdge, roles?: Set<string>): boolean {
-  return edge.modelRefs.some((r) => (roles?.has(r.role) ?? false) || r.role === 'sys_edge_context');
+  return edge.modelRefs.some((r) => r.role && ((roles?.has(r.role) ?? false) || r.role === 'sys_edge_context'));
 }
 
 export function getEdgeContextPairKey(edge: DisplayEdge, roles?: Set<string>): string | null {
-  const ref = edge.modelRefs.find((r) => (roles?.has(r.role) ?? false) || r.role === 'sys_edge_context');
+  const ref = edge.modelRefs.find((r) => r.role && ((roles?.has(r.role) ?? false) || r.role === 'sys_edge_context'));
   if (!ref?.scope || !('source_id' in ref.scope) || !('target_id' in ref.scope)) return null;
   const { source_id: a, target_id: b } = ref.scope as { source_id: string; target_id: string };
   return [a, b].sort().join('|');
@@ -211,6 +212,9 @@ export function PropertyRow({ label, value }: { label: string; value: unknown })
   );
 }
 
+// Obsolete hardcoded role -> badge map. Kept for backwards compatibility until
+// all consumers are migrated; prefer getRoleScopeLabel() which derives from the
+// template_roles table's derivation_scope when known.
 export const MODEL_ROLE_LABELS: Record<string, string> = {
   sys_entity_summary: 'NODE',
   sys_entity_capabilities: 'NODE',
@@ -241,9 +245,31 @@ export function getContextualPatchRefs(item: DisplayNode | DisplayEdge): ModelRe
   return refs.filter((ref) => roleIsEntityLike(ref.role));
 }
 
+// Client-side derivation of a scope badge from a role id. This mirrors the
+// server-side template_roles table: sys_* roles map to NODE / EDGE / SEED /
+// GRAPH; unknown roles fall back to a normalized readable label.
 export function getRoleScopeLabel(role?: string): string {
   if (!role) return 'PATCH';
-  return MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
+  return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
+}
+
+let roleScopeMap: Record<string, string> | null = null;
+
+export async function loadRoleScopeMap(): Promise<Record<string, string>> {
+  if (roleScopeMap) return roleScopeMap;
+  try {
+    const roles = await mentalModelsApi.listTemplateRoles();
+    roleScopeMap = Object.fromEntries(
+      (roles || []).map((r: { value: string; label?: string; derivation_scope?: string }) => [r.value, (r.derivation_scope || '').toUpperCase()]),
+    );
+    return roleScopeMap;
+  } catch {
+    return MODEL_ROLE_LABELS;
+  }
+}
+
+export function setRoleScopeMap(map: Record<string, string>) {
+  roleScopeMap = map;
 }
 
 export function EntityListRow({
