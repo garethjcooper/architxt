@@ -25,6 +25,9 @@ const toApiRole = (dbRow) => ({
   display_name: dbRow.display_name,
   derivation_scope: dbRow.derivation_scope,
   sort_order: dbRow.sort_order,
+  created_at: dbRow.created_at,
+  updated_at: dbRow.updated_at,
+  usage_count: dbRow.usage_count ?? 0,
   is_system: dbRow.role_id?.startsWith('sys_') ?? false,
 });
 

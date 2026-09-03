@@ -653,6 +653,9 @@ export interface TemplateRole {
   derivation_scope: 'node' | 'edge' | 'seed' | 'graph';
   sort_order: number;
   is_system: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export const templateRolesApi = {
