@@ -722,6 +722,8 @@ export default function ContextManagerPage() {
             serverId={selectedServerId ? Number(selectedServerId) : null}
             bankId={selectedBankId}
             modelRefs={allModelRefs}
+            nodes={nodes}
+            edges={edges}
             isActive={activeTab === 'models'}
           />
         </TabsContent>

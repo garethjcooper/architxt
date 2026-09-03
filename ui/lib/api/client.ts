@@ -588,6 +588,13 @@ export const mentalModelsApi = {
       body: JSON.stringify({ id: entId }),
     }),
 
+  // Compose preview for mental-model prompts (templates and system templates)
+  composePreview: (items: { returns?: string | null; source_query?: string | null; role?: string | null; template_role?: string | null }[]) =>
+    fetchApi<{ results: { composed_query: string | null; compose_error?: string }[] }>('/mentalmodels/compose-preview', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
   // Derived instances
   getDerived: (id: number) => fetchApi<DerivedMentalModel[]>(`/mentalmodels/${id}/derived`),
   batchUpdateEntityOverrides: (mmId: number, entityIds: number[], overrides: MentalModelEntityOverrides) =>
