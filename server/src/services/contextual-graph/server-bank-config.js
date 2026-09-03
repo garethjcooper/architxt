@@ -103,7 +103,7 @@ export function parseRefreshInterval(value) {
  *
  * Returns { success, data?, error? } where data is the normalized array.
  */
-export function validateContextualGraphBanks(value) {
+export function validateContextualGraphBanks(value, db) {
   if (value === undefined || value === null) {
     return { success: true, data: [] };
   }
@@ -154,7 +154,7 @@ export function validateContextualGraphBanks(value) {
       normalizedEntry.refresh_interval_minutes = parsed.minutes;
     }
 
-    const restrictionResult = validateRestriction(restriction);
+    const restrictionResult = validateRestriction(restriction, db);
     if (!restrictionResult.valid) {
       return { success: false, error: `contextual_graph_banks[${i}].restriction: ${restrictionResult.error}` };
     }
@@ -172,7 +172,7 @@ export function validateContextualGraphBanks(value) {
  * @param {Object} [restriction]
  * @returns {{valid: boolean, error?: string, restriction?: Object}}
  */
-function validateRestriction(restriction) {
+function validateRestriction(restriction, db) {
   const normalised = {
     import: {},
     deploy: {},

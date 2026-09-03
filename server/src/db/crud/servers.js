@@ -73,7 +73,7 @@ export const updateServer = (db, id, data) => dbExec(() => {
   }
   
   if (data.svr_contextual_graph_banks !== undefined) {
-    const validated = validateContextualGraphBanks(data.svr_contextual_graph_banks);
+    const validated = validateContextualGraphBanks(data.svr_contextual_graph_banks, db);
     if (!validated.success) {
       throw new Error(validated.error);
     }
