@@ -17,9 +17,32 @@ import {
   listServers
 } from '../db/crud/servers.js';
 import { listBanks } from '../services/hindsight/banks.js';
+import { MODEL_TYPE_TO_ROLE } from '../db/crud/template-roles.js';
 
 const logger = createLogger('servers-route');
 const router = Router();
+
+const normaliseAllowedModelTypes = (banks) => {
+  if (!Array.isArray(banks)) return banks;
+  return banks.map((bank) => {
+    if (!bank || typeof bank !== 'object') return bank;
+    const restriction = bank.restriction || {};
+    const deploy = restriction.deploy || {};
+    if (!Array.isArray(deploy.allowed_model_types)) return bank;
+    return {
+      ...bank,
+      restriction: {
+        ...restriction,
+        deploy: {
+          ...deploy,
+          allowed_model_types: deploy.allowed_model_types.map(
+            (t) => MODEL_TYPE_TO_ROLE[t] || t,
+          ),
+        },
+      },
+    };
+  });
+};
 
 // DB → API name transform
 const toApiServer = (dbRow) => ({
@@ -28,7 +51,7 @@ const toApiServer = (dbRow) => ({
   name: dbRow.svr_name,
   api_key: dbRow.svr_api_key,
   api_version: dbRow.svr_api_version,
-  contextual_graph_banks: dbRow.svr_contextual_graph_banks || [],
+  contextual_graph_banks: normaliseAllowedModelTypes(dbRow.svr_contextual_graph_banks || []),
   created_at: dbRow.svr_created_at,
   updated_at: dbRow.svr_updated_at
 });

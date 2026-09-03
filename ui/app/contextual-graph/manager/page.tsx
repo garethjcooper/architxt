@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
-import { serversApi, contextualGraphApi, type GraphNode as ApiGraphNode, type GraphEdge as ApiGraphEdge } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, mentalModelsApi, type GraphNode as ApiGraphNode, type GraphEdge as ApiGraphEdge } from '@/lib/api/client';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -89,7 +89,39 @@ export default function ContextManagerPage() {
   const restriction = bankConfig?.restriction || {};
   const importRestriction = restriction.import || {};
   const deployRestriction = restriction.deploy || {};
-  const allowedModelTypes = deployRestriction.allowed_model_types || [];
+  const [templateRoles, setTemplateRoles] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+
+  useEffect(() => {
+    if (!selectedServer) return;
+    let cancelled = false;
+    setLoadingRoles(true);
+    mentalModelsApi.listTemplateRoles()
+      .then((roles) => {
+        if (cancelled) return;
+        setTemplateRoles(roles || []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        logger.error('Failed to load template roles', { error: err });
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRoles(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedServer?.id]);
+
+  const allowedModelTypes = useMemo(() => {
+    return deployRestriction.allowed_model_types || [];
+  }, [deployRestriction.allowed_model_types]);
+
+  const modelTypeLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of templateRoles) {
+      if (r.value) map.set(r.value, r.label || r.value);
+    }
+    return map;
+  }, [templateRoles]);
   const topKNodes = importRestriction.top_k_nodes;
   const maxModelsPerRun = deployRestriction.max_models_per_run;
 
@@ -547,7 +579,7 @@ export default function ContextManagerPage() {
                 {allowedModelTypes.length > 0 ? (
                   allowedModelTypes.map((type: string) => (
                     <Badge key={type} variant="outline" className="text-[10px] border-white/10 text-white/50">
-                      {type}
+                      {modelTypeLabelMap.get(type) || type}
                     </Badge>
                   ))
                 ) : (
