@@ -13,7 +13,7 @@ import {
   getTemplateRole,
   validateRoleId,
 } from '../src/db/crud/template-roles.js';
-import { createMentalModel, updateMentalModel } from '../src/db/crud/mental-models.js';
+import { createMentalModel, updateMentalModel, listTemplateRoles as listMentalModelTemplateRoles } from '../src/db/crud/mental-models.js';
 
 function getTestDb() {
   clearCache();
@@ -213,6 +213,20 @@ describe('template roles CRUD', () => {
       'sys_discovery_context',
     ]);
     assert.equal(roles.every((r) => r.label && r.value), true);
+  });
+
+  it('mental-models listTemplateRoles returns the legacy shape used by /roles/template', () => {
+    const rows = listMentalModelTemplateRoles(db);
+    assert.ok(Array.isArray(rows), 'expected an array');
+    assert.equal(rows.length, 4, JSON.stringify(rows));
+    const roles = rows.map((r) => r.role);
+    assert.deepEqual(roles, [
+      'sys_entity_summary',
+      'sys_entity_capabilities',
+      'sys_edge_context',
+      'sys_discovery_context',
+    ]);
+    assert.ok(rows.every((r) => r.role && r.label && r.derivation_scope !== undefined));
   });
 });
 

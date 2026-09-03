@@ -224,10 +224,10 @@ router.get('/roles/template', async (req, res) => {
   const start = Date.now();
   const rows = await listTemplateRoles(db);
   const roles = rows
-    .filter((r) => r.role_id)
+    .filter((r) => r.role)
     .map((r) => ({
-      value: r.role_id,
-      label: r.display_name || r.role_id,
+      value: r.role,
+      label: r.label || r.role,
       derivation_scope: r.derivation_scope || '',
     }));
   sendResponse({ res, status: 200, data: roles, logger, method: 'GET', path: '/mentalmodels/roles/template', duration: Date.now() - start });
