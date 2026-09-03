@@ -7,10 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Activity, Eye, RefreshCw, Search, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Activity, Eye, RefreshCw, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi } from '@/lib/api/client';
 import { MODEL_ROLE_LABELS, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
 import type { MentalModel } from '@/lib/types/index';
@@ -283,13 +282,12 @@ export function SystemTemplateDerivedPanel({
               </TableHead>
               <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-2">Scope</TableHead>
               <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-2">External ID</TableHead>
-              <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-2">Fetched</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-xs text-white/50">
+                <TableCell colSpan={3} className="text-center py-8 text-xs text-white/50">
                   {search.trim() ? 'No grounded instances match your search.' : `No grounded instances for ${roleLabel}.`}
                 </TableCell>
               </TableRow>
@@ -312,9 +310,6 @@ export function SystemTemplateDerivedPanel({
                     </TableCell>
                     <TableCell className="py-2 px-2 text-xs font-mono text-white/60 truncate" title={extId}>
                       {extId}
-                    </TableCell>
-                    <TableCell className="py-2 px-2 text-xs text-white/60">
-                      {ref.fetched_at ? formatDistanceToNow(new Date(ref.fetched_at), { addSuffix: true }) : 'never'}
                     </TableCell>
                   </TableRow>
                 );
