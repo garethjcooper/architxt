@@ -284,13 +284,12 @@ export function SystemTemplateDerivedPanel({
               <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-2">Scope</TableHead>
               <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-2">External ID</TableHead>
               <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-2">Fetched</TableHead>
-              <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-2">State</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-xs text-white/50">
+                <TableCell colSpan={4} className="text-center py-8 text-xs text-white/50">
                   {search.trim() ? 'No grounded instances match your search.' : `No grounded instances for ${roleLabel}.`}
                 </TableCell>
               </TableRow>
@@ -316,26 +315,6 @@ export function SystemTemplateDerivedPanel({
                     </TableCell>
                     <TableCell className="py-2 px-2 text-xs text-white/60">
                       {ref.fetched_at ? formatDistanceToNow(new Date(ref.fetched_at), { addSuffix: true }) : 'never'}
-                    </TableCell>
-                    <TableCell className="py-2 px-2 text-xs">
-                      {isRefreshing ? (
-                        <span className="inline-flex items-center gap-1 text-amber-300">
-                          <Loader2 className="h-3 w-3 animate-spin" /> refreshing
-                        </span>
-                      ) : ref.last_refresh_status === 'error' ? (
-                        <span className="inline-flex items-center gap-1 text-red-400" title={ref.last_refresh_error || ''}>
-                          <AlertCircle className="h-3 w-3" /> error
-                        </span>
-                      ) : ref.last_refresh_status === 'ok' ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400">
-                          <CheckCircle2 className="h-3 w-3" /> ok
-                          {ref.last_refresh_at ? ` ${formatDistanceToNow(new Date(ref.last_refresh_at), { addSuffix: true })}` : ''}
-                        </span>
-                      ) : ref.last_refresh_status === 'skipped' ? (
-                        <span className="inline-flex items-center gap-1 text-amber-400">⊘ skipped</span>
-                      ) : (
-                        <span className="text-white/40">−</span>
-                      )}
                     </TableCell>
                   </TableRow>
                 );
