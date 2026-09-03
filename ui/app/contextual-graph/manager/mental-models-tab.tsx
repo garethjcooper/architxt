@@ -592,7 +592,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-auto p-3">
             {!selectedExtId ? (
               <div className="h-full flex items-center justify-center text-xs text-white/50">Select a mental model to view its fetched content.</div>
             ) : loading && !selectedContent ? (
@@ -607,9 +607,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                 {selectedContentError}
               </div>
             ) : (
-              <div className="flex-1 min-h-0 overflow-hidden p-3">
-                {formatPreview(selectedContent, selectedContentError)}
-              </div>
+              formatPreview(selectedContent, selectedContentError)
             )}
           </div>
         </div>
