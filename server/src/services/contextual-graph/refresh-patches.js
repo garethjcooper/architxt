@@ -5,6 +5,7 @@ import { contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { createLogger } from '../../utils/logger.js';
 import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
+import { stripModelRefsFromProperties } from './graph-model-refs.js';
 
 const logger = createLogger('contextual-graph-refresh-patches');
 
@@ -221,6 +222,32 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
 }
 
 /**
+ * Strip a single contextual model_ref from a node or edge when its remote model
+ * no longer exists in Hindsight. We use stripModelRefsFromProperties so the same
+ * empty-provenance cleanup rules apply.
+ */
+function stripModelRefOnScope(db, serverId, bankId, scope, extId, timestamp) {
+  if (scope.type === 'node') {
+    const nodeResult = getNode(db, serverId, bankId, scope.id);
+    const node = nodeResult?.success ? nodeResult.data : null;
+    if (!node) return;
+    const nextProperties = stripModelRefsFromProperties(node.properties, new Set([extId]));
+    if (!nextProperties) return;
+    nextProperties.updated_at = timestamp;
+    upsertNode(db, serverId, bankId, node.cgn_id, node.cgn_labels, nextProperties);
+    return;
+  }
+
+  const edgeResult = getEdge(db, serverId, bankId, scope.id);
+  const edge = edgeResult?.success ? edgeResult.data : null;
+  if (!edge) return;
+  const nextProperties = stripModelRefsFromProperties(edge.cge_properties, new Set([extId]));
+  if (!nextProperties) return;
+  nextProperties.updated_at = timestamp;
+  upsertEdge(db, serverId, bankId, edge.cge_id, edge.cge_source_id, edge.cge_target_id, edge.cge_type, nextProperties);
+}
+
+/**
  * Refresh contextual-graph patches from Hindsight.
  *
  * Fetches mental models (detail=full) for every model_ref attached to the local
@@ -268,6 +295,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     skippedBuilding: 0,
     skippedPendingRerun: 0,
     skippedStaleRef: 0,
+    strippedMissingRemote: 0,
     applied: 0,
     failed: 0,
     rerunRequested: 0,
@@ -344,6 +372,24 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
     const models = listResult.mentalModels || [];
     stats.fetched = models.length;
+    const remoteExtIds = new Set(models.map((m) => m.id).filter(Boolean));
+
+    // Detect local refs whose remote model no longer exists in Hindsight.
+    // Exclude newly deployed / pending-rerun models because those are expected
+    // to be missing from the list until Hindsight finishes building them.
+    for (const [extId, scope] of localRefs) {
+      if (remoteExtIds.has(extId)) continue;
+      if (newlyDeployedExtIds.has(extId) || pendingRerunExtIds.has(extId)) continue;
+
+      stats.strippedMissingRemote += 1;
+      logger.info('Stripping local ref for missing remote contextual mental model', {
+        extId,
+        role: scope.ref?.role,
+        scopeType: scope.type,
+        scopeId: scope.id,
+      });
+      stripModelRefOnScope(db, serverId, bankId, scope, extId, timestamp);
+    }
 
     for (const model of models) {
       const scope = localRefs.get(model.id);

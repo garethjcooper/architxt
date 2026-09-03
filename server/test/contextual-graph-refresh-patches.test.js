@@ -301,6 +301,56 @@ describe('refreshContextualGraphPatches', () => {
     assert.equal(ref.content_hash, undefined);
   });
 
+  it('strips local refs when the remote mental model is missing and skips newly deployed models', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [
+          { ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', attached_at: '2026-01-01T00:00:00Z' },
+          { ext_id: 'entity-summary-svc-002', role: 'sys_entity_summary', scope: { node_id: 'svc-002' }, content_hash: 'oldhash2', attached_at: '2026-01-01T00:00:00Z' },
+        ],
+      },
+    });
+
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], {
+      display_name: 'Payment Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [
+          { ext_id: 'entity-summary-svc-002', role: 'sys_entity_summary', scope: { node_id: 'svc-002' }, content_hash: 'oldhash2', attached_at: '2026-01-01T00:00:00Z' },
+        ],
+      },
+    });
+
+    // Only svc-001 exists in Hindsight; svc-002 is missing because it was just
+    // deleted by the user.
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [mentalModelWithContent('entity-summary-svc-001', JSON.stringify({ narratives: [{ narrative: 'Same summary.' }], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }))],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, {
+      listAllMentalModels: injectedList,
+      newlyDeployedExtIds: ['entity-summary-svc-001'],
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.stats.strippedMissingRemote, 1);
+    assert.equal(result.stats.skippedBuilding, 1);
+    assert.equal(result.stats.applied, 0);
+    assert.equal(result.stats.failed, 0);
+
+    // svc-001 ref is preserved because it is newly deployed.
+    const node1 = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node1.properties.provenance.model_refs.length, 2);
+    assert.ok(node1.properties.provenance.model_refs.some((r) => r.ext_id === 'entity-summary-svc-001'));
+
+    // svc-002 ref is stripped because the remote model is gone.
+    const node2 = getNode(db, serverId, bankId, 'svc-002').data;
+    assert.equal(node2.properties.provenance?.model_refs?.length ?? 0, 0);
+  });
+
   it('fails models with malformed structured_output', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
