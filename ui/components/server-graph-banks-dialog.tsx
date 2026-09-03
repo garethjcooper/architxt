@@ -80,12 +80,20 @@ export function ServerGraphBanksDialog({
       setLoadingRoles(true);
       try {
         const roles = await mentalModelsApi.listTemplateRoles();
+        const seen = new Set<string>();
         setTemplateRoles(
-          (roles || []).map((r) => ({
-            role_id: r.value,
-            display_name: r.label || r.value,
-            derivation_scope: r.derivation_scope || '',
-          })),
+          (roles || [])
+            .filter((r) => r.value)
+            .filter((r) => {
+              if (seen.has(r.value)) return false;
+              seen.add(r.value);
+              return true;
+            })
+            .map((r) => ({
+              role_id: r.value,
+              display_name: r.label || r.value,
+              derivation_scope: r.derivation_scope || '',
+            })),
         );
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load template roles');
