@@ -195,6 +195,25 @@ describe('template roles CRUD', () => {
   it('blocks deleting a system role referenced by its seeded mental model', () => {
     expectInUseError(deleteTemplateRole(db, 'sys_discovery_context'));
   });
+
+  it('exposes seeded roles through the legacy model-type API shape', () => {
+    const result = listTemplateRoles(db);
+    assert.equal(result.success, true, result.error);
+    const roles = result.data
+      .filter((r) => r.role_id)
+      .map((r) => ({
+        value: r.role_id,
+        label: r.display_name || r.role_id,
+        derivation_scope: r.derivation_scope || '',
+      }));
+    assert.deepEqual(roles.map((r) => r.value), [
+      'sys_entity_summary',
+      'sys_entity_capabilities',
+      'sys_edge_context',
+      'sys_discovery_context',
+    ]);
+    assert.equal(roles.every((r) => r.label && r.value), true);
+  });
 });
 
 describe('mental model role assignment rules', () => {
