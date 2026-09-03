@@ -132,24 +132,24 @@ export function isUndirectedEdge(edge: DisplayEdge): boolean {
   return edge.properties.directed === false;
 }
 
-export function hasEdgeContextRef(edge: DisplayEdge): boolean {
-  return edge.modelRefs.some((r) => r.role === 'sys_edge_context');
+export function hasEdgeContextRef(edge: DisplayEdge, roles?: Set<string>): boolean {
+  return edge.modelRefs.some((r) => (roles?.has(r.role) ?? false) || r.role === 'sys_edge_context');
 }
 
-export function getEdgeContextPairKey(edge: DisplayEdge): string | null {
-  const ref = edge.modelRefs.find((r) => r.role === 'sys_edge_context');
+export function getEdgeContextPairKey(edge: DisplayEdge, roles?: Set<string>): string | null {
+  const ref = edge.modelRefs.find((r) => (roles?.has(r.role) ?? false) || r.role === 'sys_edge_context');
   if (!ref?.scope || !('source_id' in ref.scope) || !('target_id' in ref.scope)) return null;
   const { source_id: a, target_id: b } = ref.scope as { source_id: string; target_id: string };
   return [a, b].sort().join('|');
 }
 
-export function getEdgeSortGroup(edge: DisplayEdge): string {
-  return getEdgeContextPairKey(edge) || [edge.source_id, edge.target_id].sort().join('|');
+export function getEdgeSortGroup(edge: DisplayEdge, roles?: Set<string>): string {
+  return getEdgeContextPairKey(edge, roles) || [edge.source_id, edge.target_id].sort().join('|');
 }
 
-export function getEdgeSortRank(edge: DisplayEdge): number {
+export function getEdgeSortRank(edge: DisplayEdge, roles?: Set<string>): number {
   if (isUndirectedEdge(edge)) return 0;
-  if (hasEdgeContextRef(edge)) return 1;
+  if (hasEdgeContextRef(edge, roles)) return 1;
   return 2;
 }
 
@@ -212,10 +212,10 @@ export function PropertyRow({ label, value }: { label: string; value: unknown })
 }
 
 export const MODEL_ROLE_LABELS: Record<string, string> = {
-  sys_entity_summary: 'summary',
-  sys_entity_capabilities: 'capabilities',
-  sys_edge_context: 'edge context',
-  sys_discovery_context: 'discovery',
+  sys_entity_summary: 'NODE',
+  sys_entity_capabilities: 'NODE',
+  sys_edge_context: 'EDGE',
+  sys_discovery_context: 'SEED',
 };
 
 const CONTEXTUAL_ROLES = new Set([
@@ -239,6 +239,11 @@ export function getContextualPatchRefs(item: DisplayNode | DisplayEdge): ModelRe
     return refs.filter((ref) => ref.role === 'sys_edge_context');
   }
   return refs.filter((ref) => roleIsEntityLike(ref.role));
+}
+
+export function getRoleScopeLabel(role?: string): string {
+  if (!role) return 'PATCH';
+  return MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
 }
 
 export function EntityListRow({
@@ -331,7 +336,7 @@ export function PatchRefRow({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const label = MODEL_ROLE_LABELS[ref.role || ''] || ref.role || 'patch';
+  const label = getRoleScopeLabel(ref.role);
   const type = ref.role || 'patch';
   return (
     <button

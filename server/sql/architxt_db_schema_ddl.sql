@@ -303,6 +303,23 @@ CREATE TABLE mental_model_entities (
 );
 
 -- ============================================================================
+-- TEMPLATE ROLES — derivation scope and display label for mental-model templates
+-- ============================================================================
+
+CREATE TABLE template_roles (
+  tr_role_id TEXT PRIMARY KEY,
+  tr_display_name TEXT NOT NULL,
+  tr_derivation_scope TEXT NOT NULL,
+  tr_sort_order INTEGER
+);
+
+INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order) VALUES
+('sys_entity_summary', 'Entity summary', 'node', 1),
+('sys_entity_capabilities', 'Entity capabilities', 'node', 2),
+('sys_edge_context', 'Edge context', 'edge', 3),
+('sys_discovery_context', 'Discovery', 'seed', 4);
+
+-- ============================================================================
 -- PROMPT TEMPLATES — reusable prompt compositions for graph/narrative output
 -- ============================================================================
 

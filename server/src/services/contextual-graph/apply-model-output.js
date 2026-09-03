@@ -12,6 +12,7 @@ import {
 import { buildDirectedEdgeId, normalizeModelNodeId, modelNodeLookupKeys, stripDiscoveryPrefix } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
 import { contentHash } from './normalize-model-output.js';
+import { getRoleScopeMap } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-apply-model-output');
 
@@ -69,24 +70,28 @@ function now() {
 export async function applyModelOutput(db, serverId, bankId, model, output, options = {}) {
   const timestamp = options.now || now();
   const role = model.mm_template_role;
+  const scopeMap = getRoleScopeMap(db);
+  const roleScope = scopeMap.get(role);
 
   try {
-    if (role === ROLES.entitySummary) {
-      return applyEntitySummary(db, serverId, bankId, model, output, timestamp);
+    if (roleScope === 'node') {
+      if (role === ROLES.entitySummary) {
+        return applyEntitySummary(db, serverId, bankId, model, output, timestamp);
+      }
+      if (role === ROLES.entityCapabilities) {
+        return applyEntityCapabilities(db, serverId, bankId, model, output, timestamp);
+      }
+      return { success: false, error: `Unsupported node-scoped template role: ${role}`, code: 'UNSUPPORTED_ROLE' };
     }
-    if (role === ROLES.entityCapabilities) {
-      return applyEntityCapabilities(db, serverId, bankId, model, output, timestamp);
-    }
-    if (role === ROLES.edgeContext) {
+    if (role === ROLES.edgeContext || roleScope === 'edge') {
       return applyEdgeContext(db, serverId, bankId, model, output, timestamp);
     }
-    if (role === ROLES.discoveryContext) {
+    if (role === ROLES.discoveryContext || roleScope === 'seed') {
       return applyDiscoveryContext(db, serverId, bankId, model, output, timestamp);
     }
-
-    return { success: false, error: `Unsupported contextual-graph role: ${role}`, code: 'UNSUPPORTED_ROLE' };
+    return { success: false, error: `Unknown template role: ${role}`, code: 'UNKNOWN_ROLE' };
   } catch (err) {
-    logger.error('applyModelOutput failed', { serverId, bankId, extId: model.mm_ext_id, role, error: err.message });
+    logger.error('Failed to apply model output', { serverId, bankId, role, extId: model.mm_ext_id, error: err.message });
     return { success: false, error: err.message, code: 'APPLY_FAILED' };
   }
 }
@@ -493,9 +498,10 @@ function applyDiscoveryContext(db, serverId, bankId, model, output, timestamp) {
     const refs = node.cgn_properties?.provenance?.model_refs || [];
     // Preserve nodes that are seeds for their own discovery model; they are not
     // disposable discovered nodes for this ref.
-    const isOwnSeed = refs.some((ref) =>
-      ref?.role === 'sys_discovery_context' && ref?.scope?.seed_id === node.cgn_id,
-    );
+    const isOwnSeed = refs.some((ref) => {
+      const roleScope = scopeMap.get(ref?.role);
+      return roleScope === 'seed' && ref?.scope?.seed_id === node.cgn_id;
+    });
     if (isOwnSeed) continue;
     if (refs.some((ref) => ref?.ext_id === model.mm_ext_id)) {
       deleteNode(db, serverId, bankId, node.cgn_id);

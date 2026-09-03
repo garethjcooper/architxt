@@ -8,6 +8,7 @@ import {
   deriveDiscoverContextModel,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
+import { getRoleScopeMap } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-add-context');
 
@@ -22,11 +23,11 @@ const DEFAULT_NEIGHBORHOOD = {
  *
  * User-led job that:
  * 1. Imports the current Hindsight entity graph skeleton.
- * 2. Derives and deploys `entity-summary` and `entity-capabilities` mental models for active nodes.
- * 3. Derives and deploys `edge-ctx` mental models for active undirected edges.
- * 4. Optionally derives and deploys `discover` mental models around seeds.
+ * 2. Derives and deploys mental models for active nodes based on configured node-scoped template roles.
+ * 3. Derives and deploys mental models for active undirected edges based on configured edge-scoped template roles.
+ * 4. Optionally derives and deploys mental models around seeds based on configured seed-scoped template roles.
  *
- * Derived models are rendered from system templates (mm_template_role) and pushed
+ * Derived models are rendered from templates (mm_template_role) and pushed
  * directly to Hindsight; no per-instance mental_models rows are created.
  *
  * Existing working-graph nodes that are absent from the import are never deleted.
@@ -42,7 +43,7 @@ const DEFAULT_NEIGHBORHOOD = {
  * @param {string[]} [options.seed_node_ids] - manual seed nodes to discover around
  * @param {Object} [options.neighborhood] - discovery scope
  * @param {number} [options.neighborhood.top_k_neighbors]
- * @param {string[]} [options.allowed_model_types] - which model roles to deploy; defaults to all
+ * @param {string[]} [options.allowed_model_types] - which model roles to deploy; defaults to all configured roles
  * @param {number} [options.max_models_per_run] - cap total models deployed in one run
  * @param {string[]} [options.exclude_node_ids] - never deploy models for these nodes
  * @param {string[]} [options.include_node_ids] - if provided, only deploy models for these nodes
@@ -58,14 +59,24 @@ export async function addContext(
     return { success: false, error: 'server_id and bank_id are required', code: 'MISSING_PARAMS' };
   }
 
+  const scopeMap = getRoleScopeMap(db);
+  const configuredRoleIds = new Set(scopeMap.keys());
+
   const importSkeleton = options.import_skeleton !== false;
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
-  const allowedModelTypes = new Set(Array.isArray(options.allowed_model_types) ? options.allowed_model_types : [
-    'entity-summary',
-    'entity-capabilities',
-    'edge-ctx',
-    'discover',
-  ]);
+
+  // Normalize allowed_model_types to role IDs. Accept legacy slugs and raw role IDs.
+  let allowedRoleIds;
+  if (Array.isArray(options.allowed_model_types) && options.allowed_model_types.length > 0) {
+    allowedRoleIds = new Set(
+      options.allowed_model_types
+        .map((t) => MODEL_TYPE_TO_ROLE[t] || (configuredRoleIds.has(t) ? t : null))
+        .filter(Boolean),
+    );
+  } else {
+    allowedRoleIds = new Set(configuredRoleIds);
+  }
+
   const maxModelsPerRun = typeof options.max_models_per_run === 'number' && options.max_models_per_run > 0
     ? options.max_models_per_run
     : Infinity;
@@ -123,8 +134,8 @@ export async function addContext(
     ? existingEdges.filter((e) => subsetNodeIds.has(e.cge_source_id) && subsetNodeIds.has(e.cge_target_id))
     : existingEdges;
 
-  // Step 3: derive entity-summary and entity-capabilities models for active nodes
-  // without an existing ref for the same role.
+  // Step 3: derive node-scoped models for active nodes without an existing ref for the same role.
+  const nodeScopedRoles = [...scopeMap.entries()].filter(([, scope]) => scope === 'node').map(([role]) => role);
   const entitySummarySpecs = [];
   const entityCapabilitiesSpecs = [];
   for (const node of filteredNodes) {
@@ -134,69 +145,74 @@ export async function addContext(
     // Candidate nodes and plain active edge-ctx endpoints must be promoted first.
     if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) continue;
 
-    if (allowedModelTypes.has('entity-summary') && !hasModelRef(node.cgn_properties, 'sys_entity_summary')) {
+    const nodeDisplayName = node.cgn_properties?.display_name || node.cgn_id;
+
+    // Entity summary is the legacy sys_entity_summary role; skip if a node-scoped role is not allowed.
+    if (allowedRoleIds.has(CONTEXTUAL_GRAPH_ROLES.entitySummary) && !hasModelRef(node.cgn_properties, CONTEXTUAL_GRAPH_ROLES.entitySummary)) {
       const summarySpec = await deriveEntitySummaryModel(db, {
         id: node.cgn_id,
-        displayName: node.cgn_properties?.display_name || node.cgn_id,
+        displayName: nodeDisplayName,
       });
       entitySummarySpecs.push(summarySpec);
     }
 
-    if (allowedModelTypes.has('entity-capabilities') && !hasModelRef(node.cgn_properties, 'sys_entity_capabilities')) {
+    if (allowedRoleIds.has(CONTEXTUAL_GRAPH_ROLES.entityCapabilities) && !hasModelRef(node.cgn_properties, CONTEXTUAL_GRAPH_ROLES.entityCapabilities)) {
       const capabilitiesSpec = await deriveEntityCapabilitiesModel(db, {
         id: node.cgn_id,
-        displayName: node.cgn_properties?.display_name || node.cgn_id,
+        displayName: nodeDisplayName,
       });
       entityCapabilitiesSpecs.push(capabilitiesSpec);
     }
   }
 
-  // Step 4: derive edge-ctx models for active undirected edge pairs without an edge-ctx ref.
+  // Step 4: derive edge-scoped models for active undirected edge pairs without an edge-scoped ref.
+  const edgeScopedRoles = [...scopeMap.entries()].filter(([, scope]) => scope === 'edge').map(([role]) => role);
+  const hasAnyAllowedEdgeRole = edgeScopedRoles.some((role) => allowedRoleIds.has(role));
   const edgeSpecs = [];
   const seenEdgePairs = new Set();
   for (const edge of filteredEdges) {
-    if (allowedModelTypes.has('edge-ctx')) {
-      if (hasModelRef(edge.cge_properties, 'sys_edge_context')) continue;
+    if (!hasAnyAllowedEdgeRole) continue;
 
-      // Only run edge-ctx on grounded/canonical working-graph edges. Directed
-      // edges are produced by edge-ctx itself; candidate edges are not eligible.
-      if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
+    if (hasModelRef(edge.cge_properties, CONTEXTUAL_GRAPH_ROLES.edge)) continue;
 
-      // Candidate edges (or edges touching only candidate endpoints) are not
-      // eligible for edge-ctx.
-      if (edge.cge_properties?.labels?.includes('candidate')) continue;
+    // Only run edge-ctx on grounded/canonical working-graph edges. Directed
+    // edges are produced by edge-ctx itself; candidate edges are not eligible.
+    if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
 
-      // Only run on edges whose endpoints are grounded or canonical.
-      const sourceGroundedOrCanonical = existingNodes.some(
-        (n) => n.cgn_id === edge.cge_source_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
-      );
-      const targetGroundedOrCanonical = existingNodes.some(
-        (n) => n.cgn_id === edge.cge_target_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
-      );
-      if (!sourceGroundedOrCanonical || !targetGroundedOrCanonical) continue;
+    // Candidate edges (or edges touching only candidate endpoints) are not
+    // eligible for edge-ctx.
+    if (edge.cge_properties?.labels?.includes('candidate')) continue;
 
-      if (!inSubset(edge.cge_source_id) || !inSubset(edge.cge_target_id)) continue;
+    // Only run on edges whose endpoints are grounded or canonical.
+    const sourceGroundedOrCanonical = existingNodes.some(
+      (n) => n.cgn_id === edge.cge_source_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
+    );
+    const targetGroundedOrCanonical = existingNodes.some(
+      (n) => n.cgn_id === edge.cge_target_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
+    );
+    if (!sourceGroundedOrCanonical || !targetGroundedOrCanonical) continue;
 
-      const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active'));
-      const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active'));
-      if (!sourceActive || !targetActive) continue;
+    if (!inSubset(edge.cge_source_id) || !inSubset(edge.cge_target_id)) continue;
 
-      const pk = `${edge.cge_source_id}|${edge.cge_target_id}`;
-      if (seenEdgePairs.has(pk)) continue;
-      seenEdgePairs.add(pk);
+    const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active'));
+    const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active'));
+    if (!sourceActive || !targetActive) continue;
 
-      const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
-      const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
+    const pk = `${edge.cge_source_id}|${edge.cge_target_id}`;
+    if (seenEdgePairs.has(pk)) continue;
+    seenEdgePairs.add(pk);
 
-      const spec = await deriveEdgeContextModel(db, {
-        id: edge.cge_source_id,
-        displayName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
-      }, {
-        id: edge.cge_target_id,
-        displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
-      });
-      edgeSpecs.push(spec);
-    }
+    const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
+    const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
+
+    const spec = await deriveEdgeContextModel(db, {
+      id: edge.cge_source_id,
+      displayName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
+    }, {
+      id: edge.cge_target_id,
+      displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
+    });
+    edgeSpecs.push(spec);
   }
 
   // Step 5: queue discovery models around seeds (no LLM call here; candidates
@@ -212,7 +228,7 @@ export async function addContext(
 
   // Auto-rank high-degree nodes as additional discovery seeds when discovery is
   // an allowed model type.
-  if (allowedModelTypes.has('discover')) {
+  if (allowedRoleIds.has(CONTEXTUAL_GRAPH_ROLES.discover)) {
     const nodeDegrees = new Map();
     for (const edge of filteredEdges) {
       nodeDegrees.set(edge.cge_source_id, (nodeDegrees.get(edge.cge_source_id) || 0) + 1);
@@ -232,7 +248,7 @@ export async function addContext(
 
   for (const seedId of discoverQueue) {
     const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
-    const hasExistingDiscoverModel = hasModelRef(seedNode?.cgn_properties, 'sys_discovery_context');
+    const hasExistingDiscoverModel = hasModelRef(seedNode?.cgn_properties, CONTEXTUAL_GRAPH_ROLES.discover);
 
     // Only mint a new discover mental model the first time a seed is run.
     if (!hasExistingDiscoverModel) {
@@ -306,8 +322,10 @@ export async function addContext(
 async function recordModelProvenance(db, serverId, bankId, spec, now) {
   const role = spec.role;
   const scope = spec.scope;
+  const scopeMap = getRoleScopeMap(db);
+  const roleScope = scopeMap.get(role);
 
-  if (role === 'sys_entity_summary') {
+  if (roleScope === 'node') {
     const nodeId = scope?.node_id;
     if (!nodeId) return;
     const node = getNode(db, serverId, bankId, nodeId)?.data;
@@ -318,18 +336,7 @@ async function recordModelProvenance(db, serverId, bankId, spec, now) {
     return;
   }
 
-  if (role === 'sys_entity_capabilities') {
-    const nodeId = scope?.node_id;
-    if (!nodeId) return;
-    const node = getNode(db, serverId, bankId, nodeId)?.data;
-    if (!node) return;
-
-    const properties = mergeProperties(node.cgn_properties, spec, now);
-    upsertNode(db, serverId, bankId, nodeId, node.cgn_labels, properties);
-    return;
-  }
-
-  if (role === 'sys_edge_context') {
+  if (roleScope === 'edge') {
     const sourceId = scope?.source_id;
     const targetId = scope?.target_id;
     if (!sourceId || !targetId) return;
@@ -350,7 +357,7 @@ async function recordModelProvenance(db, serverId, bankId, spec, now) {
     return;
   }
 
-  if (role === 'sys_discovery_context') {
+  if (roleScope === 'seed') {
     const seedId = scope?.seed_id;
     if (!seedId) return;
 

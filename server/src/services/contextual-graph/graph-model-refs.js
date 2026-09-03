@@ -1,9 +1,23 @@
 import { createLogger } from '../../utils/logger.js';
-import { CONTEXTUAL_GRAPH_ROLES, ROLE_TO_MODEL_TYPE } from './template-models.js';
+import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
+import { getTemplateRoleIds, ROLE_TO_MODEL_TYPE } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-model-refs');
 
-const KNOWN_ROLES = new Set(Object.values(CONTEXTUAL_GRAPH_ROLES));
+/** Known roles from the template_roles table; initialised lazily per DB. */
+let knownRoleIds = null;
+
+function getKnownRoles(db) {
+  if (!knownRoleIds) {
+    knownRoleIds = getTemplateRoleIds(db);
+  }
+  return knownRoleIds;
+}
+
+/** Clear the known-role cache, mainly useful for tests. */
+export function resetKnownRolesCache() {
+  knownRoleIds = null;
+}
 
 /**
  * Extract generated mental-model ext_ids from a single properties object.
@@ -17,13 +31,14 @@ const KNOWN_ROLES = new Set(Object.values(CONTEXTUAL_GRAPH_ROLES));
  * @param {Function} [options.filterFn] - receives { role, ext_id, scope }
  * @returns {string[]}
  */
-export function extractRefsFromProperties(properties, options = {}) {
+export function extractRefsFromProperties(db, properties, options = {}) {
   if (!properties || typeof properties !== 'object') return [];
 
   const provenance = properties.provenance;
   if (!provenance || typeof provenance !== 'object') return [];
 
   const refs = [];
+  const KNOWN_ROLES = getKnownRoles(db);
 
   if (Array.isArray(provenance.model_refs)) {
     for (const ref of provenance.model_refs) {
@@ -49,13 +64,14 @@ export function extractRefsFromProperties(properties, options = {}) {
  * Same as extractRefsFromProperties but returns the full ref objects.
  * Internal helper for callers that also need role and scope.
  */
-function extractRefObjectsFromProperties(properties, options = {}) {
+function extractRefObjectsFromProperties(db, properties, options = {}) {
   if (!properties || typeof properties !== 'object') return [];
 
   const provenance = properties.provenance;
   if (!provenance || typeof provenance !== 'object') return [];
 
   const refs = [];
+  const KNOWN_ROLES = getKnownRoles(db);
 
   if (Array.isArray(provenance.model_refs)) {
     for (const ref of provenance.model_refs) {
@@ -90,7 +106,7 @@ function extractRefObjectsFromProperties(properties, options = {}) {
  * @param {Function} [options.filterFn]
  * @returns {{ extIds: string[], byExtId: Map<string, {role, ext_id, scope}>, byNodeId: Map<string, string[]>, byEdgeId: Map<string, string[]> }}
  */
-export function extractModelRefs(graph, options = {}) {
+export function extractModelRefs(graph, db, options = {}) {
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
 
@@ -102,7 +118,7 @@ export function extractModelRefs(graph, options = {}) {
   for (const node of nodes) {
     const id = node.id ?? node.cgn_id;
     const properties = node.properties ?? node.cgn_properties;
-    const refs = extractRefObjectsFromProperties(properties, options);
+    const refs = extractRefObjectsFromProperties(db, properties, options);
     if (refs.length > 0) {
       byNodeId.set(id, refs.map((r) => r.ext_id));
       for (const ref of refs) {
@@ -115,7 +131,7 @@ export function extractModelRefs(graph, options = {}) {
   for (const edge of edges) {
     const id = edge.id ?? edge.cge_id;
     const properties = edge.cge_properties ?? edge.properties;
-    const refs = extractRefObjectsFromProperties(properties, options);
+    const refs = extractRefObjectsFromProperties(db, properties, options);
     if (refs.length > 0) {
       byEdgeId.set(id, refs.map((r) => r.ext_id));
       for (const ref of refs) {
@@ -192,6 +208,7 @@ export async function extractModelRefsFromDb(db, serverId, bankId, options = {})
 
   return extractModelRefs(
     { nodes: nodesResult.data || [], edges: edgesResult.data || [] },
+    db,
     options,
   );
 }

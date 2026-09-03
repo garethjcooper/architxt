@@ -10,6 +10,38 @@ const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = UNIT_MINUTES.w * 52; // ~ 1 year
 
 /**
+ * Cache of valid allowed_model_type values. Populated lazily from the
+ * template_roles table. Keys are role IDs (e.g. sys_entity_summary); legacy
+ * model-type slugs (entity-summary) are accepted by mapping through the
+ * ROLE_TO_MODEL_TYPE table.
+ */
+let cachedValidModelTypes = null;
+let cachedModelTypeToRole = null;
+
+function ensureModelTypeCache(db) {
+  if (cachedValidModelTypes) return { validTypes: cachedValidModelTypes, modelTypeToRole: cachedModelTypeToRole };
+  const { getRoleScopeMap } = require('../../db/crud/template-roles.js');
+  const scopeMap = getRoleScopeMap(db);
+  const modelTypeToRole = new Map();
+  for (const [role, modelType] of Object.entries(ROLE_TO_MODEL_TYPE)) {
+    modelTypeToRole.set(modelType, role);
+    modelTypeToRole.set(role, role);
+  }
+  for (const role of scopeMap.keys()) {
+    modelTypeToRole.set(role, role);
+  }
+  cachedValidModelTypes = new Set(modelTypeToRole.keys());
+  cachedModelTypeToRole = modelTypeToRole;
+  return { validTypes: cachedValidModelTypes, modelTypeToRole: cachedModelTypeToRole };
+}
+
+/** Clear the model-type cache, mainly useful for tests. */
+export function resetModelTypeCache() {
+  cachedValidModelTypes = null;
+  cachedModelTypeToRole = null;
+}
+
+/**
  * Default safe restrictions applied to any bank with mode === 'auto' that does
  * not explicitly override them. These prevent runaway provisioning.
  */
@@ -173,13 +205,13 @@ function validateRestriction(restriction) {
   }
   if (dep.allowed_model_types !== undefined) {
     const types = parseStringArray(dep.allowed_model_types);
-    const validTypes = new Set(['entity-summary', 'entity-capabilities', 'edge-ctx', 'discover']);
+    const { validTypes, modelTypeToRole } = ensureModelTypeCache(db);
     for (const t of types) {
       if (!validTypes.has(t)) {
         return { valid: false, error: `deploy.allowed_model_types contains invalid type "${t}"` };
       }
     }
-    normalised.deploy.allowed_model_types = types;
+    normalised.deploy.allowed_model_types = types.map((t) => modelTypeToRole.get(t) || t);
   }
   normalised.deploy.include_node_ids = parseStringArray(dep.include_node_ids);
   normalised.deploy.exclude_node_ids = parseStringArray(dep.exclude_node_ids);

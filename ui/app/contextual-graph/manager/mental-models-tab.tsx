@@ -16,7 +16,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { MODEL_ROLE_LABELS, isContextualRole, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
+import { MODEL_ROLE_LABELS, isContextualRole, getRoleScopeLabel, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
@@ -523,7 +523,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                 ) : (
                   filteredRefs.map((ref) => {
                     const extId = ref.ext_id || '';
-                    const roleLabel = ROLE_LABELS[ref.role || ''] || ref.role || 'model';
+                    const roleLabel = getRoleScopeLabel(ref.role);
                     const scopeLabel = getScopeLabel(ref, nodes, edges);
                     const op = getOperationForRow(extId);
                     const isRefreshing = Boolean(op) || refreshingIds.has(extId);
@@ -634,7 +634,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           style={{ width: `${panelWidth}%` }}
         >
           <EnvelopeControls
-            headerTitle={selectedRef ? (ROLE_LABELS[selectedRef.role || ''] || selectedRef.role || 'Model') : 'Content'}
+            headerTitle={selectedRef ? getRoleScopeLabel(selectedRef.role) : 'Content'}
             plain={plainView}
             onPlainChange={setPlainView}
             onCopyText={copyContent}

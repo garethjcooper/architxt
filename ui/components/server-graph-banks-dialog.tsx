@@ -14,7 +14,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Loader2, Network, AlertTriangle, ChevronDown, ChevronUp, Trash2, Bomb } from 'lucide-react';
-import { serversApi, contextualGraphApi, hindsightApi } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, hindsightApi, mentalModelsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { ConfirmDialog } from './confirm-dialog';
 import type { Server, ContextualGraphBankConfig } from '@/lib/types';
@@ -26,6 +26,12 @@ const MODEL_TYPE_LABELS: Record<string, string> = {
   'discover': 'Discovery',
 };
 const ALL_MODEL_TYPES = Object.keys(MODEL_TYPE_LABELS);
+
+interface TemplateRoleOption {
+  role_id: string;
+  display_name: string;
+  derivation_scope: string;
+}
 
 interface ServerGraphBanksDialogProps {
   server: Server | null;
@@ -47,6 +53,8 @@ export function ServerGraphBanksDialog({
   const [banks, setBanks] = useState<Array<{ bank_id: string; name?: string }>>([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [configs, setConfigs] = useState<Record<string, ContextualGraphBankConfig>>({});
+  const [templateRoles, setTemplateRoles] = useState<TemplateRoleOption[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [cleaning, setCleaning] = useState<Record<string, boolean>>({});
@@ -75,7 +83,27 @@ export function ServerGraphBanksDialog({
       }
     }
 
+    async function loadTemplateRoles() {
+      setLoadingRoles(true);
+      try {
+        const roles = await mentalModelsApi.listTemplateRoles();
+        setTemplateRoles(
+          (roles || []).map((r) => ({
+            role_id: r.value,
+            display_name: r.label || r.value,
+            derivation_scope: '',
+          })),
+        );
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to load template roles');
+        setTemplateRoles([]);
+      } finally {
+        setLoadingRoles(false);
+      }
+    }
+
     loadBanks();
+    loadTemplateRoles();
   }, [server, open]);
 
   if (!server) return null;
