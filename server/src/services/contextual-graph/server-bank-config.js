@@ -1,4 +1,4 @@
-import { ROLE_TO_MODEL_TYPE } from '../../db/crud/template-roles.js';
+import { ROLE_TO_MODEL_TYPE, getRoleScopeMap } from '../../db/crud/template-roles.js';
 
 const VALID_UNITS = new Set(['m', 'h', 'd', 'w']);
 const UNIT_MINUTES = {
@@ -22,7 +22,6 @@ let cachedModelTypeToRole = null;
 
 function ensureModelTypeCache(db) {
   if (cachedValidModelTypes) return { validTypes: cachedValidModelTypes, modelTypeToRole: cachedModelTypeToRole };
-  const { getRoleScopeMap } = require('../../db/crud/template-roles.js');
   const scopeMap = getRoleScopeMap(db);
   const modelTypeToRole = new Map();
   for (const [role, modelType] of Object.entries(ROLE_TO_MODEL_TYPE)) {
