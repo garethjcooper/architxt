@@ -5,18 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi, hindsightApi } from '@/lib/api/client';
-import { MODEL_ROLE_LABELS } from '@/lib/contextual-graph/display';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { SystemTemplateDerivedPanel } from './system-template-derived-panel';
+import { isContextualRole, MODEL_ROLE_LABELS, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
-import type { ModelRef } from './page';
 
 const ROLE_LABELS = MODEL_ROLE_LABELS;
 
@@ -45,10 +46,12 @@ export interface MentalModelsTabProps {
   serverId: number | null;
   bankId: string | null;
   modelRefs: ModelRef[];
+  nodes?: DisplayNode[];
+  edges?: DisplayEdge[];
   isActive?: boolean;
 }
 
-export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: MentalModelsTabProps) {
+export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isActive }: MentalModelsTabProps) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [contents, setContents] = useState<Record<string, ContentResult>>({});
@@ -56,6 +59,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
   const [selectedExtId, setSelectedExtId] = useState<string | null>(null);
+  const [selectedRefIds, setSelectedRefIds] = useState<Set<string>>(new Set());
   const [panelWidth, setPanelWidth] = useState(45);
   const [confirmRefreshAllOpen, setConfirmRefreshAllOpen] = useState(false);
   const activeRefreshIdsRef = useRef<Set<string>>(new Set());
@@ -104,6 +108,33 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
   const selectedRef = useMemo(() => filteredRefs.find((r) => (r.ext_id || null) === selectedExtId) || null, [filteredRefs, selectedExtId]);
   const selectedContent = selectedExtId ? contents[selectedExtId] || null : null;
   const selectedContentError = selectedExtId ? contentErrors[selectedExtId] || null : null;
+  const selectedRefIsSystem = useMemo(() => isContextualRole(selectedRef?.role), [selectedRef?.role]);
+
+  // Main-table multi-select helpers
+  const toggleRefSelection = useCallback((extId: string) => {
+    setSelectedRefIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(extId)) next.delete(extId);
+      else next.add(extId);
+      return next;
+    });
+  }, []);
+
+  const visibleRefIds = useMemo(() => filteredRefs.map((r) => r.ext_id || ''), [filteredRefs]);
+  const isAllVisibleRefsSelected = visibleRefIds.length > 0 && visibleRefIds.every((id) => selectedRefIds.has(id));
+  const isSomeVisibleRefsSelected = visibleRefIds.length > 0 && visibleRefIds.some((id) => selectedRefIds.has(id)) && !isAllVisibleRefsSelected;
+
+  const toggleAllVisibleRefs = useCallback(() => {
+    setSelectedRefIds((prev) => {
+      const next = new Set(prev);
+      if (visibleRefIds.every((id) => next.has(id))) {
+        visibleRefIds.forEach((id) => next.delete(id));
+      } else {
+        visibleRefIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }, [visibleRefIds]);
 
   const fetchPendingOps = useCallback(async () => {
     if (!serverId || !bankId) {
@@ -210,46 +241,25 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
     }
   }, [isActive, serverId, bankId, selectedExtId, fetchPendingOps, runHealthCheck]);
 
-  const handleRefresh = useCallback(async (ref: ModelRef, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const extId = ref.ext_id || '';
-    if (!extId || !serverId || !bankId) {
-      toast.error('Select a server and bank first');
-      return;
-    }
-    setRefreshingIds((prev) => new Set(prev).add(extId));
-    try {
-      await mentalModelsApi.refresh({ server_id: serverId, bank_id: bankId, ext_id: extId });
-      toast.success(`Refresh queued for ${extId}`);
-      await fetchPendingOps();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Refresh failed: ${message}`);
-    } finally {
-      setRefreshingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(extId);
-        return next;
-      });
-    }
-  }, [serverId, bankId, fetchPendingOps]);
-
-  const handleRefreshAll = useCallback(async () => {
+  // Refresh selected refs in the main table.
+  const handleRefreshSelected = useCallback(async (extIds?: string[]) => {
     if (!serverId || !bankId) {
       toast.error('Select a server and bank first');
       return;
     }
-    const eligible = filteredRefs.filter((r) => r.ext_id).map((r) => r.ext_id!);
-    if (eligible.length === 0) return;
-
+    const targets = extIds?.length ? extIds : Array.from(selectedRefIds).filter(Boolean);
+    if (targets.length === 0) {
+      toast.error('Select at least one mental model');
+      return;
+    }
     setRefreshingIds((prev) => {
       const next = new Set(prev);
-      for (const id of eligible) next.add(id);
+      for (const id of targets) next.add(id);
       return next;
     });
 
     const results = await Promise.all(
-      eligible.map(async (extId) => {
+      targets.map(async (extId) => {
         try {
           await mentalModelsApi.refresh({ server_id: serverId, bank_id: bankId, ext_id: extId });
           return { extId, success: true };
@@ -257,12 +267,12 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
           const message = err instanceof Error ? err.message : String(err);
           return { extId, success: false, message };
         }
-      }),
+      })
     );
 
     setRefreshingIds((prev) => {
       const next = new Set(prev);
-      for (const id of eligible) next.delete(id);
+      for (const id of targets) next.delete(id);
       return next;
     });
 
@@ -276,7 +286,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
       });
     }
     await fetchPendingOps();
-  }, [serverId, bankId, filteredRefs, fetchPendingOps]);
+  }, [serverId, bankId, selectedRefIds, fetchPendingOps]);
 
   const formatPreview = (result: ContentResult | null, error: string | null): React.ReactNode => {
     if (error) return <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">{`Error:\n${error}`}</div>;
@@ -383,9 +393,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
           variant="ghost"
           size="icon"
           className="h-8 w-8 rounded bg-[oklch(0.21_0_0)] text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
-          disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0}
+          disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0 || selectedRefIds.size === 0}
           onClick={() => setConfirmRefreshAllOpen(true)}
-          title="Refresh all mental models"
+          title="Refresh selected mental models"
         >
           <RefreshCw className={cn('h-4 w-4', refreshingIds.size > 0 && 'animate-spin')} />
         </Button>
@@ -407,6 +417,14 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
             <Table className="w-full caption-bottom text-sm">
               <TableHeader>
                 <TableRow className="border-b border-white/10 hover:bg-transparent">
+                  <TableHead className="w-8 py-2 px-2">
+                    <Checkbox
+                      checked={isAllVisibleRefsSelected}
+                      indeterminate={isSomeVisibleRefsSelected}
+                      onCheckedChange={toggleAllVisibleRefs}
+                      aria-label="Select all visible mental models"
+                    />
+                  </TableHead>
                   <TableHead className="w-[18%] text-xs uppercase text-white/60 font-medium py-2 px-3">Role</TableHead>
                   <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Fetched</TableHead>
@@ -418,6 +436,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
                 {loading && filteredRefs.length === 0 ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-b border-white/5">
+                      <TableCell className="py-2 px-2"><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
@@ -427,7 +446,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
                   ))
                 ) : filteredRefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-xs text-white/50">
+                    <TableCell colSpan={6} className="text-center py-8 text-xs text-white/50">
                       {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
                     </TableCell>
                   </TableRow>
@@ -437,16 +456,23 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
                     const roleLabel = ROLE_LABELS[ref.role || ''] || ref.role || 'model';
                     const op = getOperationForRow(extId);
                     const isRefreshing = Boolean(op) || refreshingIds.has(extId);
-                    const isSelected = selectedExtId === extId;
+                    const isRowSelected = selectedExtId === extId;
                     return (
                       <TableRow
                         key={extId || `${ref.role}-${Math.random()}`}
                         onClick={() => handleSelectRow(ref)}
                         className={cn(
                           'border-b border-white/5 cursor-pointer transition-colors',
-                          isSelected ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+                          isRowSelected ? 'bg-emerald-900/30' : 'hover:bg-white/5'
                         )}
                       >
+                        <TableCell className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedRefIds.has(extId)}
+                            onCheckedChange={() => toggleRefSelection(extId)}
+                            aria-label={`Select ${extId || 'model ref'}`}
+                          />
+                        </TableCell>
                         <TableCell className="py-2 px-3">
                           <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
                             {roleLabel}
@@ -484,7 +510,10 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
                             size="sm"
                             className="h-7 w-7 p-0"
                             disabled={!extId || isRefreshing}
-                            onClick={(e) => handleRefresh(ref, e)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRefreshSelected([extId]);
+                            }}
                             title="Refresh model"
                           >
                             <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
@@ -517,33 +546,47 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
             <span className="font-medium text-sm truncate" title={selectedExtId || undefined}>
               {selectedRef ? (ROLE_LABELS[selectedRef.role || ''] || selectedRef.role || 'Model') : 'Content'}
             </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                disabled={!selectedContent}
-                onClick={copyContent}
-                title="Copy content"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                disabled={!selectedContent}
-                onClick={downloadContent}
-                title="Download content"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            {!selectedRefIsSystem && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={!selectedContent}
+                  onClick={copyContent}
+                  title="Copy content"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={!selectedContent}
+                  onClick={downloadContent}
+                  title="Download content"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-auto p-3">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {!selectedExtId ? (
               <div className="h-full flex items-center justify-center text-xs text-white/50">Select a mental model to view its fetched content.</div>
+            ) : selectedRefIsSystem ? (
+              <SystemTemplateDerivedPanel
+                role={selectedRef?.role || ''}
+                modelRefs={refs}
+                nodes={nodes}
+                edges={edges}
+                serverId={serverId}
+                bankId={bankId}
+                onHealthCheck={(extIds) => runHealthCheck(extIds, { silent: false })}
+                onRefresh={handleRefreshSelected}
+                refreshingIds={refreshingIds}
+              />
             ) : loading && !selectedContent ? (
               <div className="space-y-2 p-2">
                 <Skeleton className="h-4 w-3/4 bg-white/10" />
@@ -556,7 +599,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
                 {selectedContentError}
               </div>
             ) : (
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden p-3">
                 {formatPreview(selectedContent, selectedContentError)}
               </div>
             )}
@@ -567,11 +610,14 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, isActive }: Menta
       <ConfirmDialog
         open={confirmRefreshAllOpen}
         onOpenChange={setConfirmRefreshAllOpen}
-        title="Refresh all mental models?"
-        description={`This will queue a refresh for all ${filteredRefs.length} visible mental model ref${filteredRefs.length === 1 ? '' : 's'}. This operation can be expensive and may take time to complete.`}
-        confirmLabel="Refresh all"
+        title="Refresh selected mental models?"
+        description={`This will queue a refresh for ${selectedRefIds.size} selected mental model ref${selectedRefIds.size === 1 ? '' : 's'}. This operation can be expensive and may take time to complete.`}
+        confirmLabel="Refresh selected"
         cancelLabel="Cancel"
-        onConfirm={handleRefreshAll}
+        onConfirm={() => {
+          setConfirmRefreshAllOpen(false);
+          handleRefreshSelected();
+        }}
       />
     </div>
   );

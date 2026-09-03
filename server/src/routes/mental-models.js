@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
+import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import {
   sendResponse,
   validateId,
@@ -503,6 +504,63 @@ router.get('/:id/derived', async (req, res) => {
   const derived = deriveMentalModels(template);
   const composed = await composeDerivedMentalModels(db, derived);
   sendResponse({ res, status: 200, data: composed, logger, method: 'GET', path, duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/compose-preview:
+ *   post:
+ *     summary: Preview composed prompts for mental-model items
+ *     tags: [MentalModels]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [items]
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     role: { type: string }
+ *                     template_role: { type: string }
+ *                     source_query: { type: string }
+ *                     returns: { type: string }
+ *     responses:
+ *       200:
+ *         description: Array of composed query results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       composed_query: { type: string, nullable: true }
+ *                       compose_error: { type: string, nullable: true }
+ */
+router.post('/compose-preview', async (req, res) => {
+  const start = Date.now();
+  const path = '/mentalmodels/compose-preview';
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    sendResponse({ res, status: 400, error: 'items must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path, duration: Date.now() - start });
+    return;
+  }
+  const inputs = items.map((item) => ({
+    returns: item.returns,
+    source_query: item.source_query,
+    role: item.role,
+    template_role: item.template_role,
+  }));
+  const results = await composeMentalModelPromptBatch(db, inputs);
+  sendResponse({ res, status: 200, data: { results }, logger, method: 'POST', path, duration: Date.now() - start });
 });
 
 /**
