@@ -9,6 +9,13 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { MentalModel } from '@/lib/types/index';
 import { AqlEditor } from '@/components/aql-editor';
+import {
+  getRoleTemplateRule,
+  getRoleTemplateInstructions,
+  extractRoleTemplatePrefix,
+  buildRoleTemplateValue,
+  validateRoleBasedTemplate,
+} from '@/lib/validation/contextual-template';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -52,8 +59,7 @@ function validateMaxTokens(value: string): { valid: true; value: number } | { va
 
 export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, submitLabel }: ModelFormProps) {
   const isSystemTemplate = initial?.is_system_template ?? false;
-  const [extId, setExtId] = useState(initial?.ext_id ?? '');
-  const [name, setName] = useState(initial?.name ?? '');
+
   const [sourceQuery, setSourceQuery] = useState(initial?.source_query ?? '');
   const [refreshMode, setRefreshMode] = useState<'full' | 'delta'>(initial?.refresh_mode ?? 'full');
   const [refreshAfterConsolidation, setRefreshAfterConsolidation] = useState(initial?.refresh_after_consolidation ?? false);
@@ -77,6 +83,37 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
     [availableRoles, templateRole]
   );
 
+  const roleScope = selectedRole?.derivation_scope ?? null;
+  const roleRule = roleScope ? getRoleTemplateRule(roleScope) : null;
+
+  // For role-based templates the user edits a prefix and the mandatory tail is appended.
+  const [rawExtId, setRawExtId] = useState(initial?.ext_id ?? '');
+  const [rawName, setRawName] = useState(initial?.name ?? '');
+  const [extIdPrefix, setExtIdPrefix] = useState('');
+  const [namePrefix, setNamePrefix] = useState('');
+
+  useEffect(() => {
+    if (!roleScope) {
+      setExtIdPrefix('');
+      setNamePrefix('');
+      return;
+    }
+    const nextExtPrefix = extractRoleTemplatePrefix(roleScope, 'extId', initial?.ext_id ?? '') ?? '';
+    const nextNamePrefix = extractRoleTemplatePrefix(roleScope, 'name', initial?.name ?? '') ?? '';
+    setExtIdPrefix(nextExtPrefix);
+    setNamePrefix(nextNamePrefix);
+  }, [roleScope, initial?.ext_id, initial?.name]);
+
+  const effectiveExtId = useMemo(() => {
+    if (!roleScope || !roleRule) return rawExtId;
+    return buildRoleTemplateValue(roleScope, 'extId', extIdPrefix) ?? roleRule.extIdTail;
+  }, [roleScope, roleRule, extIdPrefix, rawExtId]);
+
+  const effectiveName = useMemo(() => {
+    if (!roleScope || !roleRule) return rawName;
+    return buildRoleTemplateValue(roleScope, 'name', namePrefix) ?? roleRule.nameTail;
+  }, [roleScope, roleRule, namePrefix, rawName]);
+
   // A non-Generic template role implies templated derivation, so force Entity Template on.
   const effectiveIsTemplate = isTemplate || !!templateRole;
   const roleControlsTemplate = !!templateRole;
@@ -87,19 +124,34 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
     }
   }, [templateRole, isTemplate]);
 
-  const templateValidation = useMemo(() => {
+  const genericTemplateValidation = useMemo(() => {
     if (!effectiveIsTemplate) return null;
     if (isSystemTemplate) return null;
-    if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(`${extId}${name}`)) {
+    if (roleRule) return null; // role-based validation takes over
+    if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(`${effectiveExtId}${effectiveName}`)) {
       return "Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.";
     }
     return null;
-  }, [effectiveIsTemplate, isSystemTemplate, extId, name]);
+  }, [effectiveIsTemplate, isSystemTemplate, roleRule, effectiveExtId, effectiveName]);
+
+  const roleTemplateValidation = useMemo(() => {
+    if (!roleScope) return null;
+    return validateRoleBasedTemplate(roleScope, {
+      extId: effectiveExtId,
+      name: effectiveName,
+      sourceQuery,
+    });
+  }, [roleScope, effectiveExtId, effectiveName, sourceQuery]);
 
   const roleRequirementHint = useMemo(() => {
     if (!selectedRole) return null;
-    return `Role "${selectedRole.label}" (${selectedRole.derivation_scope}) requires Entity Template mode and a supported placeholder in External ID or Name.`;
+    return `Role "${selectedRole.label}" (${selectedRole.derivation_scope}) requires Entity Template mode.`;
   }, [selectedRole]);
+
+  const roleInstructions = useMemo(() => {
+    if (!roleScope) return null;
+    return getRoleTemplateInstructions(roleScope);
+  }, [roleScope]);
 
   const handleIsTemplateChange = (v: boolean) => {
     if (isSystemTemplate || roleControlsTemplate) return;
@@ -113,9 +165,17 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
     }
   };
 
+  const canSubmit =
+    effectiveExtId.trim() !== '' &&
+    effectiveName.trim() !== '' &&
+    sourceQuery.trim() !== '' &&
+    !genericTemplateValidation &&
+    !(roleTemplateValidation && !roleTemplateValidation.valid) &&
+    !maxTokensError;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!extId.trim() || !name.trim() || !sourceQuery.trim()) {
+    if (!effectiveExtId.trim() || !effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('External ID, Name and Source Query are required');
       return;
     }
@@ -125,15 +185,19 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
       setMaxTokensError(maxTokensValidation.error);
       return;
     }
-    if (templateValidation) {
-      toast.error(templateValidation);
+    if (genericTemplateValidation) {
+      toast.error(genericTemplateValidation);
+      return;
+    }
+    if (roleTemplateValidation && !roleTemplateValidation.valid) {
+      toast.error(roleTemplateValidation.errors.join(' '));
       return;
     }
     try {
       setSubmitting(true);
       await onSubmit({
-        ext_id: extId.trim(),
-        name: name.trim(),
+        ext_id: effectiveExtId.trim(),
+        name: effectiveName.trim(),
         source_query: sourceQuery.trim(),
         refresh_mode: refreshMode,
         refresh_after_consolidation: refreshAfterConsolidation,
@@ -172,10 +236,16 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
           {roleRequirementHint && (
             <p className="text-[10px] text-emerald-400/80 mt-0.5">{roleRequirementHint}</p>
           )}
-          {templateValidation && !roleRequirementHint && (
-            <p className="text-[10px] text-red-400 mt-0.5">{templateValidation}</p>
+          {roleInstructions && (
+            <p className="text-[10px] text-amber-400/80 mt-0.5">{roleInstructions}</p>
           )}
-          {!templateValidation && !roleRequirementHint && isTemplate && !templateRole && (
+          {genericTemplateValidation && (
+            <p className="text-[10px] text-red-400 mt-0.5">{genericTemplateValidation}</p>
+          )}
+          {roleTemplateValidation && roleTemplateValidation.errors.length > 0 && (
+            <p className="text-[10px] text-red-400 mt-0.5">{roleTemplateValidation.errors.join(' ')}</p>
+          )}
+          {!genericTemplateValidation && !roleScope && isTemplate && (
             <p className="text-[10px] text-white/40 mt-0.5">Generic templates also require a placeholder.</p>
           )}
         </div>
@@ -189,31 +259,76 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="mm-ext-id" className="text-xs uppercase text-white/50 font-medium">External ID *</Label>
-          <Input
-            id="mm-ext-id"
-            value={extId}
-            onChange={(e) => setExtId(e.target.value)}
-            placeholder="e.g. mental-model-001"
-            className={inputClass}
-            style={inputFocusStyle}
-          />
+          {roleRule ? (
+            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+              <Input
+                id="mm-ext-id"
+                value={extIdPrefix}
+                onChange={(e) => setExtIdPrefix(e.target.value)}
+                placeholder="prefix"
+                className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                style={inputFocusStyle}
+              />
+              <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs font-mono whitespace-nowrap border-l border-white/10">
+                {roleRule.extIdTail}
+              </span>
+            </div>
+          ) : (
+            <Input
+              id="mm-ext-id"
+              value={effectiveExtId}
+              onChange={(e) => setRawExtId(e.target.value)}
+              placeholder="e.g. mental-model-001"
+              className={inputClass}
+              style={inputFocusStyle}
+            />
+          )}
+          <p className="text-[10px] text-white/40 font-mono">{effectiveExtId}</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="mm-name" className="text-xs uppercase text-white/50 font-medium">Name *</Label>
-          <Input
-            id="mm-name"
-            value={name}
-            disabled={isSystemTemplate}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Display name"
-            className={inputClass}
-            style={inputFocusStyle}
-          />
+          {roleRule ? (
+            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+              <Input
+                id="mm-name"
+                value={namePrefix}
+                onChange={(e) => setNamePrefix(e.target.value)}
+                placeholder="prefix"
+                disabled={isSystemTemplate}
+                className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                style={inputFocusStyle}
+              />
+              <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
+                {roleRule.nameTail}
+              </span>
+            </div>
+          ) : (
+            <Input
+              id="mm-name"
+              value={effectiveName}
+              disabled={isSystemTemplate}
+              onChange={(e) => setRawName(e.target.value)}
+              placeholder="Display name"
+              className={inputClass}
+              style={inputFocusStyle}
+            />
+          )}
+          <p className="text-[10px] text-white/40">{effectiveName}</p>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="mm-source-query" className="text-xs uppercase text-white/50 font-medium">Source Query *</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="mm-source-query" className="text-xs uppercase text-white/50 font-medium">Source Query *</Label>
+          {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
+            <span className="text-[10px] text-amber-400">
+              Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
+            </span>
+          )}
+          {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
+            <span className="text-[10px] text-emerald-400">All required placeholders present</span>
+          )}
+        </div>
         <AqlEditor
           id="mm-source-query"
           value={sourceQuery}
@@ -341,7 +456,7 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
 
       <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
         <Button type="button" variant="ghost" onClick={onCancel} className="text-white/70 hover:text-white hover:bg-white/5">Close</Button>
-        <Button type="submit" disabled={submitting || !extId.trim() || !name.trim() || !sourceQuery.trim() || !!templateValidation || !!maxTokensError} className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+        <Button type="submit" disabled={submitting || !canSubmit} className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitLabel}
         </Button>

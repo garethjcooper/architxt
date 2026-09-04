@@ -4,7 +4,7 @@ import { fromJson, requireInt, requireString, dbExec } from '../../utils/db-help
 import { getOrCreateTagByName } from './tags.js';
 import { createLogger } from '../../utils/logger.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
-import { isKnownTemplateRole } from './template-roles.js';
+import { validateRoleBasedTemplate } from '../../services/contextual-graph/template-validation.js';
 
 const logger = createLogger('mental-models-crud');
 
@@ -270,7 +270,6 @@ export function validateEntityTemplateEligibility({
   mm_is_template,
   mm_name,
   mm_ext_id,
-  mm_source_query,
   mm_template_role,
 }) {
   if (mm_is_template !== 'true') {
@@ -288,6 +287,32 @@ export function validateEntityTemplateEligibility({
       error: `Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {entity-description}, {entity-aliases}, {bank-id}, {server-id}, {now}, {date}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.`,
       code: 'VALIDATION_ERROR',
     };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate that a role-based template conforms to the required format for its
+ * derivation scope. Called after the generic placeholder check.
+ *
+ * @param {object} db
+ * @param {object} params
+ * @returns {{valid: boolean, error?: string, code?: string}}
+ */
+export function validateRoleBasedTemplateEligibility(db, { mm_template_role, mm_ext_id, mm_name, mm_source_query }) {
+  if (!mm_template_role) return { valid: true };
+  if (isSystemTemplateRole(mm_template_role)) return { valid: true };
+
+  const result = validateRoleBasedTemplate(db, {
+    roleId: mm_template_role,
+    extId: mm_ext_id,
+    name: mm_name,
+    sourceQuery: mm_source_query,
+  });
+
+  if (!result.valid) {
+    return { valid: false, error: result.errors.join(' '), code: 'VALIDATION_ERROR' };
   }
 
   return { valid: true };

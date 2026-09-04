@@ -30,6 +30,7 @@ import {
   batchUpdateMentalModelEntities,
   batchUpdateMentalModelConfig,
   validateEntityTemplateEligibility,
+  validateRoleBasedTemplateEligibility,
   deriveMentalModels,
   composeDerivedMentalModels,
   updateMentalModelEntityOverrides,
@@ -334,6 +335,18 @@ router.post('/', async (req, res) => {
     return sendResponse({ res, status: 400, error: eligibility.error, code: eligibility.code, logger, method: 'POST', path, duration });
   }
 
+  const roleEligibility = validateRoleBasedTemplateEligibility(db, {
+    mm_template_role: body.template_role ?? null,
+    mm_ext_id: extIdCheck.value,
+    mm_name: body.name,
+    mm_source_query: body.source_query,
+  });
+
+  if (!roleEligibility.valid) {
+    const duration = Date.now() - start;
+    return sendResponse({ res, status: 400, error: roleEligibility.error, code: roleEligibility.code, logger, method: 'POST', path, duration });
+  }
+
   const result = await createMentalModel(db, {
     mm_ext_id: extIdCheck.value,
     mm_name: body.name ?? null,
@@ -429,6 +442,17 @@ router.put('/:id', async (req, res) => {
     if (!eligibility.valid) {
       const duration = Date.now() - start;
       return sendResponse({ res, status: 400, error: eligibility.error, code: eligibility.code, logger, method: 'PUT', path, duration });
+    }
+
+    const roleEligibility = validateRoleBasedTemplateEligibility(db, {
+      mm_template_role: row?.mm_template_role ?? null,
+      mm_ext_id: data.mm_ext_id ?? row?.mm_ext_id ?? null,
+      mm_name: data.mm_name ?? row?.mm_name ?? null,
+      mm_source_query: data.mm_source_query ?? row?.mm_source_query ?? null,
+    });
+    if (!roleEligibility.valid) {
+      const duration = Date.now() - start;
+      return sendResponse({ res, status: 400, error: roleEligibility.error, code: roleEligibility.code, logger, method: 'PUT', path, duration });
     }
   }
 
