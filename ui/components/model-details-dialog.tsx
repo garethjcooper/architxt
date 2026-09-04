@@ -277,7 +277,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const parsedMaxTokens = parseMaxTokens(maxTokens, model.max_tokens ?? 2048);
 
   const hasChanges =
-    effectiveName.trim() !== (model.name ?? '').trim() ||
+    (!isSystemTemplate && effectiveName.trim() !== (model.name ?? '').trim()) ||
     sourceQuery.trim() !== (model.source_query ?? '').trim() ||
     refreshMode !== (model.refresh_mode ?? 'full') ||
     refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false) ||
@@ -440,7 +440,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     setIsSaving(true);
     try {
       const updates: Record<string, any> = {};
-      if (effectiveName.trim() !== (model.name ?? '')) updates.name = effectiveName.trim();
+      if (!isSystemTemplate && effectiveName.trim() !== (model.name ?? '')) updates.name = effectiveName.trim();
       if (sourceQuery.trim() !== (model.source_query ?? '')) updates.source_query = sourceQuery.trim();
       if (refreshMode !== (model.refresh_mode ?? 'full')) updates.refresh_mode = refreshMode;
       if (refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false)) {
