@@ -174,7 +174,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   }, [roleScope, roleRule, namePrefix, name]);
 
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
-    isLockedTemplate ? [] : buildDerivedRows(model, buildBaseConfig(model))
+    model.is_template ? buildDerivedRows(model, buildBaseConfig(model)) : []
   );
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
@@ -214,7 +214,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
     setDerived(
-      isLockedTemplate ? [] : buildDerivedRows(model, buildBaseConfig(model))
+      model.is_template ? buildDerivedRows(model, buildBaseConfig(model)) : []
     );
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
@@ -222,10 +222,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   }, [open, model]);
 
   // If entities are added/removed while the modal is open, rebuild derived
-  // rows. Existing rows are preserved so live edits survive. Skip for locked
-  // templates (system or template-role models).
+  // rows. Existing rows are preserved so live edits survive. Skip for non-template models.
   useEffect(() => {
-    if (!open || !model || isLockedTemplate) return;
+    if (!open || !model || !model.is_template) return;
     setDerived((prev) => {
       const existingById = new Map(prev.map((d) => [d.derived_entity.id, d]));
       const next: DerivedMentalModel[] = [];
@@ -238,8 +237,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   }, [model.entities, open]);
 
   const baselineDerived = useMemo(
-    () => (isLockedTemplate ? [] : buildDerivedRows(model, buildBaseConfig(model))),
-    [model, isLockedTemplate]
+    () => (model.is_template ? buildDerivedRows(model, buildBaseConfig(model)) : []),
+    [model]
   );
 
   const derivedChanged = useMemo(() => {
@@ -274,7 +273,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     parsedMaxTokens !== (model.max_tokens ?? 2048) ||
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
     (!isLockedTemplate && isTemplate !== (model.is_template ?? false)) ||
-    (!isLockedTemplate && derivedChanged);
+    (!isSystemTemplate && derivedChanged);
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
@@ -779,7 +778,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             <DialogTitle className="text-xl font-semibold text-white">Mental Model Details</DialogTitle>
           </DialogHeader>
 
-          {isTemplate && !isLockedTemplate ? (
+          {isTemplate ? (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
