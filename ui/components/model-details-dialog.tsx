@@ -410,7 +410,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               )}
               {isRoleTemplate && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/40 text-emerald-200/80 border-emerald-700/50">
-                  Template role
+                  {model.template_role}
                 </span>
               )}
             </div>
