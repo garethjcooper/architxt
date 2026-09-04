@@ -16,7 +16,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { isContextualRole, getRoleScopeLabel, type ModelRef, type DisplayNode, type DisplayEdge } from '@/lib/contextual-graph/display';
+import { isContextualRole, getRoleScopeLabel, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
@@ -90,6 +90,11 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(45);
   const containerWidthRef = useRef(0);
+  const [roleScopeMap, setRoleScopeMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    loadRoleScopeMap().then(setRoleScopeMap);
+  }, []);
 
   const refs = useMemo(() => {
     const byId = new Map<string, ModelRef>();
@@ -591,7 +596,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                             >
                               <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
                             </Button>
-                            {isContextualRole(ref.role) && (
+                            {(isContextualRole(ref.role) || !!roleScopeMap[ref.role || '']) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
