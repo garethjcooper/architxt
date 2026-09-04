@@ -157,12 +157,14 @@ function ModelsPageContent() {
 
   const handleViewQuery = async (model: MentalModel, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (model.is_template && !model.is_system_template) {
+    if (model.is_template && !model.is_system_template && !model.template_role) {
       setQueryPreviewModel(model);
       return;
     }
 
-    const role = model.is_system_template ? (model.template_role || model.ext_id) : 'generic';
+    const role = (model.is_system_template || model.template_role)
+      ? (model.template_role || model.ext_id)
+      : 'generic';
     if (!role) {
       toast.error('Model has no role to compose');
       return;
@@ -177,7 +179,7 @@ function ModelsPageContent() {
       const res = await mentalModelsApi.composePreview([
         {
           role,
-          template_role: model.is_system_template ? role : undefined,
+          template_role: (model.is_system_template || model.template_role) ? role : undefined,
           returns: 'generic',
           source_query: model.source_query || '',
         },
