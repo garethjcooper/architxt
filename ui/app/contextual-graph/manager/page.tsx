@@ -46,6 +46,7 @@ import {
   renderValue,
   getLastRefreshedAt,
   getRoleScopeLabel,
+  setRoleScopeMap,
 } from '@/lib/contextual-graph/display';
 export type { BackendNode, BackendEdge, ModelRef, DisplayNode, DisplayEdge } from '@/lib/contextual-graph/display';
 
@@ -100,6 +101,11 @@ export default function ContextManagerPage() {
       .then((roles) => {
         if (cancelled) return;
         setTemplateRoles(roles || []);
+        setRoleScopeMap(
+          Object.fromEntries(
+            (roles || []).map((r) => [r.value, (r.derivation_scope || '').toUpperCase()])
+          )
+        );
       })
       .catch((err) => {
         if (cancelled) return;
