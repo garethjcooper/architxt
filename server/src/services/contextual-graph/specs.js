@@ -122,11 +122,15 @@ export async function deriveSpecForRef(db, serverId, bankId, ref) {
     const edges = listEdges(db, serverId, bankId, { limit: 10000 })?.data || [];
     const pairEdges = edges.filter(
       (e) =>
-        e.cge_source_id === sourceId &&
-        e.cge_target_id === targetId &&
-        e.cge_properties?.labels?.includes('grounded'),
+        (e.cge_source_id === sourceId &&
+          e.cge_target_id === targetId) ||
+        (e.cge_source_id === targetId &&
+          e.cge_target_id === sourceId),
     );
-    if (pairEdges.length === 0) {
+    const groundedPairEdges = pairEdges.filter((e) =>
+      e.cge_properties?.labels?.includes('grounded'),
+    );
+    if (groundedPairEdges.length === 0) {
       logger.warn('Dropping edge-ctx ref because no grounded edge exists between endpoints', { serverId, bankId, ref });
       return null;
     }

@@ -117,7 +117,7 @@ export async function cleanupDisallowedModels(
   };
 }
 
-async function clearLocalModelData(db, serverId, bankId, removeSet, refs, scopeMap) {
+export async function clearLocalModelData(db, serverId, bankId, removeSet, refs, scopeMap) {
   const byRole = new Map();
   for (const extId of removeSet) {
     const role = refs.byExtId?.get(extId)?.role || roleFromExtId(extId, scopeMap);
@@ -253,7 +253,7 @@ async function clearLocalModelData(db, serverId, bankId, removeSet, refs, scopeM
   return { nodes: nodesCleared, edges: edgesCleared };
 }
 
-function clearNodeRoleData(properties, scopeMap, nodeId, disallowedRefsOnNode, refs) {
+function clearNodeRoleData(properties, _scopeMap, nodeId, disallowedRefsOnNode, refs) {
   let changed = false;
 
   // Map node-scoped roles to the canonical fields they generate. When a role is
