@@ -5,6 +5,7 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { upsertNode, getNode } from '../src/db/crud/contextual-graph.js';
 import { refreshContextualGraphPatches, extractModelRefsFromDb } from '../src/services/contextual-graph/refresh-patches.js';
 import { contentHash } from '../src/services/contextual-graph/normalize-model-output.js';
+import { createTemplateRole } from '../src/db/crud/template-roles.js';
 import { clearCache } from '../src/cache.js';
 
 function createDb() {
@@ -372,5 +373,35 @@ describe('refreshContextualGraphPatches', () => {
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
     assert.equal(node.properties.provenance.model_refs[0].content_hash, 'oldhash');
+  });
+
+  it('applies output for a custom node-scoped template role', async () => {
+    createTemplateRole(db, { role_id: 'software_tech_stack', display_name: 'Software Tech Stack', derivation_scope: 'node' });
+
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'software-tech-stack-svc-001', role: 'software_tech_stack', scope: { node_id: 'svc-001' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const newContent = JSON.stringify({ narratives: [{ narrative: 'Node.js, PostgreSQL, Redis.' }], graph: { nodes: [], edges: [] }, tables: [],
+      diagrams: [] });
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [mentalModelWithContent('software-tech-stack-svc-001', newContent)],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.applied, 1);
+    assert.equal(result.stats.failed, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, 'Node.js, PostgreSQL, Redis.');
+    const ref = node.properties.provenance.model_refs[0];
+    assert.equal(ref.role, 'software_tech_stack');
+    assert.equal(ref.last_refresh_status, 'ok');
   });
 });

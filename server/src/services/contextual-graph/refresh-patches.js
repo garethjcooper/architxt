@@ -4,7 +4,6 @@ import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge, findEdg
 import { contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { createLogger } from '../../utils/logger.js';
-import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
 import { stripModelRefsFromProperties } from './graph-model-refs.js';
 
 const logger = createLogger('contextual-graph-refresh-patches');
@@ -37,8 +36,8 @@ function getModelContentHashSource(model) {
 
 function buildLocalModel(model, scope) {
   const refRole = scope?.ref?.role;
-  if (!refRole || !Object.values(CONTEXTUAL_GRAPH_ROLES).includes(refRole)) {
-    throw new Error(`Cannot build local model without known role: ${refRole}`);
+  if (!refRole) {
+    throw new Error('Cannot build local model without known role');
   }
   return {
     mm_ext_id: model.id,
