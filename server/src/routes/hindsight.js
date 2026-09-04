@@ -15,7 +15,6 @@ import {
   listAllMentalModels as hindsightListAllMentalModels,
   deleteMentalModel,
 } from '../services/hindsight/mental-models.js';
-import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import { listDirectives as hindsightListDirectives } from '../services/hindsight/directives.js';
 import { pushDirective as pushHindsightDirective } from '../services/hindsight/push-directive.js';
 import { pullDirective as pullHindsightDirective } from '../services/hindsight/pull-directive.js';
@@ -47,7 +46,15 @@ import {
 import { getDocumentsForDiff, getDocumentByExtId, getAllDocumentContexts } from '../db/crud/documents.js';
 import { getAllDocumentTags, getDocumentTagsByDocId } from '../db/crud/document-tags.js';
 import { getContextDescriptionById } from '../db/crud/contexts.js';
-import { listMentalModelsForDiff, DEFAULT_MAX_TOKENS, DEFAULT_REFRESH_MODE, DEFAULT_TAGS_MATCH_MODE, normaliseMaxTokens } from '../db/crud/mental-models.js';
+import {
+  listMentalModelsForDiff,
+  deriveMentalModels,
+  composeDerivedMentalModels,
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_REFRESH_MODE,
+  DEFAULT_TAGS_MATCH_MODE,
+  normaliseMaxTokens,
+} from '../db/crud/mental-models.js';
 import { listDirectivesForDiff } from '../db/crud/directives.js';
 
 const logger = createLogger('hindsight-route');
@@ -87,61 +94,80 @@ function arraySetEqual(a, b) {
   return a.every((x) => setB.has(x));
 }
 
-function substituteDerived(template, entity) {
-  if (!template) return template;
-  return template
-    .replaceAll('{entity-name}', entity.name ?? '')
-    .replaceAll('{entity-id}', entity.entity_id ?? '')
-    .replaceAll('{entity-type}', entity.type_name ?? '');
-}
+const normaliseBool = (value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    return value.trim().toLowerCase() === 'true';
+  }
+  return false;
+};
 
-function deriveMentalModelsForDiff(template) {
-  const entities = template.mm_entities || [];
-  if (!entities.length) return [];
+const toApiMentalModelForDiff = (dbRow) => ({
+  id: dbRow.mm_id,
+  ext_id: dbRow.mm_ext_id,
+  name: dbRow.mm_name,
+  source_query: dbRow.mm_source_query,
+  refresh_after_consolidation: normaliseBool(dbRow.mm_refresh_after_consolidation),
+  refresh_mode: dbRow.mm_refresh_mode,
+  exclude_all_mental_models: normaliseBool(dbRow.mm_exclude_all_mental_models),
+  exclude_mental_model_list: dbRow.mm_exclude_mental_model_list,
+  max_tokens: dbRow.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+  tags_match_mode: dbRow.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
+  is_template: dbRow.mm_is_template === 'true',
+  template_role: dbRow.mm_template_role ?? null,
+  tags: dbRow.mm_tag_names || [],
+  entities: (dbRow.mm_entities || []).map((e) => ({
+    ...e,
+    overrides: e.overrides
+      ? {
+          refresh_mode: e.overrides.refresh_mode,
+          refresh_after_consolidation:
+            e.overrides.refresh_after_consolidation === null
+              ? null
+              : normaliseBool(e.overrides.refresh_after_consolidation),
+          exclude_all_mental_models:
+            e.overrides.exclude_all_mental_models === null
+              ? null
+              : normaliseBool(e.overrides.exclude_all_mental_models),
+          max_tokens: e.overrides.max_tokens ?? null,
+        }
+      : undefined,
+  })),
+});
 
-  return entities.map((entity) => {
-    const overrides = entity.overrides || {};
-
-    /**
-     * Mental model entity overrides are stored as TEXT in SQLite with values
-     * 'true' / 'false' / NULL, but defensive parsing also accepts 1/0 and
-     * real booleans in case the UI or future migration writes other forms.
-     */
-    const parseOverrideBool = (v) => {
-      if (v === null || v === undefined) return null;
-      if (typeof v === 'boolean') return v;
-      if (typeof v === 'number') return v === 1;
-      if (typeof v === 'string') {
-        const trimmed = v.trim().toLowerCase();
-        if (trimmed === 'true' || trimmed === '1') return true;
-        if (trimmed === 'false' || trimmed === '0') return false;
-      }
-      logger.warn('Unrecognized mental model entity override boolean value; treating as unset', { value: v, entity });
-      return null;
-    };
-
-    const refreshAfterConsolidation = parseOverrideBool(overrides.refresh_after_consolidation) ?? template.mm_refresh_after_consolidation === 'true';
-    const excludeAll = parseOverrideBool(overrides.exclude_all_mental_models) ?? template.mm_exclude_all_mental_models === 'true';
-
-    return {
-      id: `${template.mm_id}:${entity.id}`,
-      ext_id: substituteDerived(template.mm_ext_id, entity),
-      name: substituteDerived(template.mm_name, entity),
-      source_query: substituteDerived(template.mm_source_query, entity),
-      returns: template.mm_returns,
-      refresh_after_consolidation: refreshAfterConsolidation,
-      refresh_mode: overrides.refresh_mode || template.mm_refresh_mode || DEFAULT_REFRESH_MODE,
-      exclude_all_mental_models: excludeAll,
-      exclude_mental_model_list: template.mm_exclude_mental_model_list,
-      max_tokens: normaliseMaxTokens(overrides.max_tokens) ?? template.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
-      tags_match_mode: template.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
-      tags: template.mm_tag_names || [],
-      is_derived: true,
+/**
+ * Compose a single plain mental model prompt using the generic template.
+ * Used by the Hindsight diff path so plain rows are composed the same way as
+ * derived rows (via the generic prompt template).
+ */
+async function composePlainMentalModels(db, rows) {
+  const composed = await composeDerivedMentalModels(
+    db,
+    rows.map((r) => ({
+      id: r.mm_id,
+      ext_id: r.mm_ext_id,
+      name: r.mm_name,
+      source_query: r.mm_source_query,
+      refresh_after_consolidation: normaliseBool(r.mm_refresh_after_consolidation),
+      refresh_mode: r.mm_refresh_mode,
+      exclude_all_mental_models: normaliseBool(r.mm_exclude_all_mental_models),
+      exclude_mental_model_list: r.mm_exclude_mental_model_list,
+      max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+      tags_match_mode: r.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
+      tags: r.mm_tag_names || [],
+      is_derived: false,
       response_schema: UNIFIED_RESPONSE_SCHEMA,
-      derived_entity: { id: entity.id, mm_id: template.mm_id, entity_id: entity.entity_id, name: entity.name },
-      __rawOverrides: overrides,
-    };
-  });
+    }))
+  );
+  for (let i = 0; i < rows.length; i += 1) {
+    rows[i].composed_query = composed[i].composed_query;
+    if (composed[i].compose_error) {
+      rows[i].compose_error = composed[i].compose_error;
+    }
+  }
+  return rows;
 }
 
 /**
@@ -442,50 +468,46 @@ router.get('/diff', async (req, res) => {
       const templates = archRows.filter((r) => r.mm_is_template === 'true');
       const plainRows = archRows.filter((r) => r.mm_is_template !== 'true');
 
+      // Use the same derivation and composition as the models-page preview.
+      // The shared helpers support all placeholders and compose with the
+      // generic prompt template, so the Hindsight diff sees the same fully
+      // composed prompts as the preview dialog.
       const derivedRows = [];
-      for (const template of templates) {
-        const templateDerived = deriveMentalModelsForDiff(template);
+      for (const dbRow of templates) {
+        const template = toApiMentalModelForDiff(dbRow);
+        const templateDerived = deriveMentalModels(template);
         derivedRows.push(...templateDerived);
       }
-
-      // Compose prompts for plain and derived rows in a single batch.
-      // composeMentalModelPromptBatch builds the entity catalog once and caches
-      // templates/examples, so this is much faster than per-row composition.
-      const allComposeInputs = [
-        ...plainRows.map((r) => ({ returns: r.mm_returns, source_query: r.mm_source_query })),
-        ...derivedRows.map((r) => ({ returns: r.returns, source_query: r.source_query })),
-      ];
-      const allComposed = await composeMentalModelPromptBatch(db, allComposeInputs);
-
-      const plainComposed = allComposed.slice(0, plainRows.length);
-      const derivedComposed = allComposed.slice(plainRows.length);
+      const composedDerived = await composeDerivedMentalModels(db, derivedRows);
       for (let i = 0; i < derivedRows.length; i += 1) {
-        derivedRows[i].composed_query = derivedComposed[i].composed_query;
-        if (derivedComposed[i].compose_error) {
-          derivedRows[i].compose_error = derivedComposed[i].compose_error;
+        derivedRows[i].composed_query = composedDerived[i].composed_query;
+        if (composedDerived[i].compose_error) {
+          derivedRows[i].compose_error = composedDerived[i].compose_error;
         }
+        // The diff/push surface expects these fields on derived rows.
+        derivedRows[i].response_schema = UNIFIED_RESPONSE_SCHEMA;
+        derivedRows[i].is_derived = true;
       }
 
-      const plainCandidates = plainRows.map((r, i) => {
-        const composed = plainComposed[i];
-        return {
-          id: r.mm_id,
-          ext_id: r.mm_ext_id,
-          name: r.mm_name,
-          source_query: r.mm_source_query,
-          refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
-          refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
-          exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
-          exclude_mental_model_list: r.mm_exclude_mental_model_list,
-          max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
-          tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
-          tags: r.mm_tag_names || [],
-          is_derived: false,
-          composed_query: composed.composed_query,
-          response_schema: UNIFIED_RESPONSE_SCHEMA,
-          ...(composed.compose_error ? { compose_error: composed.compose_error } : {}),
-        };
-      });
+      const composedPlain = await composePlainMentalModels(db, plainRows);
+
+      const plainCandidates = composedPlain.map((r) => ({
+        id: r.mm_id,
+        ext_id: r.mm_ext_id,
+        name: r.mm_name,
+        source_query: r.mm_source_query,
+        refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
+        refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
+        exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
+        exclude_mental_model_list: r.mm_exclude_mental_model_list,
+        max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+        tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
+        tags: r.mm_tag_names || [],
+        is_derived: false,
+        composed_query: r.composed_query,
+        response_schema: UNIFIED_RESPONSE_SCHEMA,
+        ...(r.compose_error ? { compose_error: r.compose_error } : {}),
+      }));
 
       // 3. Categorise. Keep plain and derived candidates in separate buckets so a
       // plain model and a derived instance with the same ext_id do not shadow
