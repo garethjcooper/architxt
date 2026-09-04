@@ -75,13 +75,12 @@ export async function applyModelOutput(db, serverId, bankId, model, output, opti
 
   try {
     if (roleScope === 'node') {
-      if (role === ROLES.entitySummary) {
-        return applyEntitySummary(db, serverId, bankId, model, output, timestamp);
-      }
       if (role === ROLES.entityCapabilities) {
         return applyEntityCapabilities(db, serverId, bankId, model, output, timestamp);
       }
-      return { success: false, error: `Unsupported node-scoped template role: ${role}`, code: 'UNSUPPORTED_ROLE' };
+      // Any other node-scoped role (entity summary or custom) applies narrative
+      // and optional capability tables to the scoped node.
+      return applyEntitySummary(db, serverId, bankId, model, output, timestamp);
     }
     if (role === ROLES.edgeContext || roleScope === 'edge') {
       return applyEdgeContext(db, serverId, bankId, model, output, timestamp);
@@ -89,7 +88,7 @@ export async function applyModelOutput(db, serverId, bankId, model, output, opti
     if (role === ROLES.discoveryContext || roleScope === 'seed') {
       return applyDiscoveryContext(db, serverId, bankId, model, output, timestamp);
     }
-    return { success: false, error: `Unknown template role: ${role}`, code: 'UNKNOWN_ROLE' };
+    return { success: false, error: `Unknown template role scope: ${roleScope}`, code: 'UNKNOWN_ROLE_SCOPE' };
   } catch (err) {
     logger.error('Failed to apply model output', { serverId, bankId, role, extId: model.mm_ext_id, error: err.message });
     return { success: false, error: err.message, code: 'APPLY_FAILED' };

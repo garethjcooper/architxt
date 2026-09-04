@@ -5,6 +5,7 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { upsertNode, upsertEdge, getNode, getEdge, listEdges } from '../src/db/crud/contextual-graph.js';
 import { normalizeModelOutput } from '../src/services/contextual-graph/normalize-model-output.js';
 import { applyModelOutput } from '../src/services/contextual-graph/apply-model-output.js';
+import { createTemplateRole } from '../src/db/crud/template-roles.js';
 import { clearCache } from '../src/cache.js';
 
 function createDb() {
@@ -507,5 +508,36 @@ describe('applyModelOutput', () => {
     assert.deepStrictEqual(output.tables[0].columns, ['name', 'responsibility', 'purpose', 'business_capability_mapping']);
     assert.equal(output.tables[0].rows.length, 1);
     assert.equal(output.tables[0].rows[0].name, 'Adjustments');
+  });
+
+  it('applies a custom node-scoped template role generically', async () => {
+    createTemplateRole(db, { role_id: 'software_tech_stack', display_name: 'Software Tech Stack', derivation_scope: 'node' });
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [{ narrative: 'Node.js, PostgreSQL, Redis.' }],
+      graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const customModel = {
+      mm_ext_id: 'software-tech-stack-svc-001',
+      mm_template_role: 'software_tech_stack',
+      mm_dimension: 'software_tech_stack',
+      mm_name: 'Software Tech Stack',
+      scope: { node_id: 'svc-001' },
+    };
+
+    const result = await applyModelOutput(db, serverId, bankId, customModel, output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.nodeId, 'svc-001');
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, 'Node.js, PostgreSQL, Redis.');
+    assert.equal(node.properties.provenance.source, 'contextual-graph');
+    assert.equal(node.properties.provenance.model_refs.length, 1);
+    assert.equal(node.properties.provenance.model_refs[0].role, 'software_tech_stack');
+    assert.equal(node.properties.provenance.model_refs[0].ext_id, 'software-tech-stack-svc-001');
   });
 });
