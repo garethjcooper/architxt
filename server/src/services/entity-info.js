@@ -3,16 +3,10 @@ import { dbExec } from '../utils/db-helpers.js';
 import { createLogger } from '../utils/logger.js';
 import { listEdges } from '../db/crud/contextual-graph.js';
 import { deriveMentalModels, isSystemTemplateRole } from '../db/crud/mental-models.js';
+import { getRoleScopeMap } from '../db/crud/template-roles.js';
 import { getMentalModel } from '../services/hindsight/mental-models.js';
 
 const logger = createLogger('entity-info');
-
-const CONTEXTUAL_ROLES = new Set([
-  'sys_entity_summary',
-  'sys_entity_capabilities',
-  'sys_edge_context',
-  'sys_discovery_context',
-]);
 
 /**
  * Validate the incoming entity-info request payload.
@@ -115,10 +109,11 @@ function loadGraphNodes(db, serverId, bankId, entityIds) {
 }
 
 /**
- * Extract model refs from a node/edge properties object, keeping only known
- * contextual roles. Returns full ref objects including role/ext_id/scope.
+ * Extract model refs from a node/edge properties object, keeping only refs
+ * whose role is a known template role. Returns full ref objects including
+ * role/ext_id/scope.
  */
-function extractContextualRefs(properties) {
+function extractContextualRefs(properties, knownRoleIds) {
   if (!properties || typeof properties !== 'object') return [];
   const provenance = properties.provenance;
   if (!provenance || typeof provenance !== 'object') return [];
@@ -126,7 +121,7 @@ function extractContextualRefs(properties) {
   if (!Array.isArray(refs)) return [];
 
   return refs
-    .filter((ref) => ref && typeof ref.ext_id === 'string' && CONTEXTUAL_ROLES.has(ref.role))
+    .filter((ref) => ref && typeof ref.ext_id === 'string' && knownRoleIds.has(ref.role))
     .map((ref) => ({
       role: ref.role,
       ext_id: ref.ext_id,
@@ -232,23 +227,31 @@ function deriveInstancesForEntity(template, entity, serverId, bankId) {
  * Load edge-context refs for the requested entity ids.
  *
  * Returns every physical edge in the bank whose provenance includes a
- * sys_edge_context ref where the requested entity appears in the ref scope.
- * The other endpoint in the scope need not be part of the request.
+ * contextual ref for an edge-scoped role where the requested entity appears
+ * as one of the physical edge's endpoints. The other endpoint in the scope need
+ * not be part of the request.
  *
  * For very large graphs, switch the edge scan to an IN-clause query on endpoints.
  */
-async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntityIds) {
+async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntityIds, roleScopes) {
   const edgesResult = await listEdges(db, serverId, bankId, { limit: 10000 });
   if (!edgesResult.success) {
     logger.warn('Failed to load edges for entity info', { serverId, bankId, error: edgesResult.error });
     return { success: true, data: new Map() };
   }
 
+  const edgeRoleIds = new Set(
+    Array.from(roleScopes.entries())
+      .filter(([, scope]) => scope === 'edge')
+      .map(([roleId]) => roleId),
+  );
+
   const byEntityId = new Map();
   for (const entityId of requestedEntityIds) byEntityId.set(entityId, []);
 
   for (const edge of edgesResult.data || []) {
-    const refs = extractContextualRefs(edge.properties).filter((r) => r.role === 'sys_edge_context');
+    const refs = extractContextualRefs(edge.properties, new Set(roleScopes.keys()))
+      .filter((r) => edgeRoleIds.has(r.role));
     if (refs.length === 0) continue;
 
     for (const ref of refs) {
@@ -466,7 +469,10 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       }
     }
 
-    const edgeContextsResult = await loadEdgeContextsForEntities(db, serverId, bankId, entityIds);
+    const roleScopes = getRoleScopeMap(db);
+    const knownRoleIds = new Set(roleScopes.keys());
+
+    const edgeContextsResult = await loadEdgeContextsForEntities(db, serverId, bankId, entityIds, roleScopes);
     if (!edgeContextsResult.success) {
       return { success: false, error: edgeContextsResult.error, code: edgeContextsResult.code };
     }
@@ -481,7 +487,7 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       const catalog = requestedToCatalog.get(id) || null;
       const localId = parseEntityId(id).localId;
 
-      const contextualRefs = graphNode ? extractContextualRefs(graphNode.properties) : [];
+      const contextualRefs = graphNode ? extractContextualRefs(graphNode.properties, knownRoleIds) : [];
       for (const ref of contextualRefs) allExtIds.add(ref.ext_id);
 
       const catalogEntityId = catalog?.entity_id || localId;
