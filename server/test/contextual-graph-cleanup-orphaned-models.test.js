@@ -11,6 +11,22 @@ import {
 } from '../src/db/crud/contextual-graph.js';
 import { cleanupOrphanedModels } from '../src/services/contextual-graph/cleanup-orphaned-models.js';
 import { clearCache } from '../src/cache.js';
+import { createTemplateRole } from '../src/db/crud/template-roles.js';
+import { createMentalModel } from '../src/db/crud/mental-models.js';
+import { resetKnownRolesCache } from '../src/services/contextual-graph/graph-model-refs.js';
+
+function seedCustomTemplate(db, { role, scope, extId, name, sourceQuery }) {
+  createTemplateRole(db, { role_id: role, display_name: `${role} display`, derivation_scope: scope });
+  createMentalModel(db, {
+    mm_ext_id: extId,
+    mm_name: name,
+    mm_source_query: sourceQuery,
+    mm_is_template: 'true',
+    mm_template_role: role,
+    mm_max_tokens: 4096,
+  });
+  resetKnownRolesCache();
+}
 
 function createDb() {
   clearCache();
@@ -214,5 +230,83 @@ describe('cleanupOrphanedModels', () => {
     assert.equal(result.failed.length, 1);
     assert.equal(result.failed[0].ext_id, extId);
     assert.equal(result.cleared.nodes, 1);
+  });
+
+  it('keeps a custom node-scoped role model when the node still qualifies', async () => {
+    const bankId = 'bank-custom-node';
+    const nodeId = 'svc:CUSTOM';
+    const role = 'custom_node_role';
+    const extId = `${role}-${nodeId}`;
+
+    seedCustomTemplate(db, {
+      role,
+      scope: 'node',
+      extId: 'custom-node-{id}',
+      name: 'Custom node: {entity-name}',
+      sourceQuery: 'MATCH (n {id: "{id}"}) RETURN n',
+    });
+
+    upsertNode(db, serverId, bankId, nodeId, ['grounded', 'active'], {
+      display_name: 'Custom Node',
+      provenance: {
+        model_refs: [
+          { role, ext_id: extId, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },
+        ],
+      },
+    });
+
+    const result = await makeCleanup(db, serverId, bankId);
+
+    assert.equal(result.success, true);
+    assert.deepEqual(result.deleted, []);
+    assert.equal(result.cleared.nodes, 0);
+    assert.equal(result.cleared.edges, 0);
+    assert.equal(result.skipped, 1);
+
+    const nodeResult = getNode(db, serverId, bankId, nodeId);
+    assert.equal(nodeResult.data.properties.provenance.model_refs[0].ext_id, extId);
+  });
+
+  it('keeps a custom edge-scoped role model when a grounded edge still exists', async () => {
+    const bankId = 'bank-custom-edge';
+    const sourceId = 'svc:CUSTOM-SRC';
+    const targetId = 'svc:CUSTOM-DST';
+    const role = 'custom_edge_role';
+    const extId = `${role}-${sourceId}|${targetId}`;
+
+    seedCustomTemplate(db, {
+      role,
+      scope: 'edge',
+      extId: 'custom-edge-{source-id}|{target-id}',
+      name: 'Custom edge: {source-name} → {target-name}',
+      sourceQuery: 'MATCH (a {id: "{source-id}"})-[r]-(b {id: "{target-id}"}) RETURN r',
+    });
+
+    upsertNode(db, serverId, bankId, sourceId, ['grounded', 'active'], { display_name: 'Source' });
+    upsertNode(db, serverId, bankId, targetId, ['grounded', 'active'], { display_name: 'Target' });
+    upsertEdge(db, serverId, bankId, 'grounded-custom', sourceId, targetId, 'relates-to', {
+      labels: ['grounded'],
+      directed: false,
+    });
+    upsertEdge(db, serverId, bankId, 'generated-custom', sourceId, targetId, 'relates-to', {
+      directed: true,
+      label: 'custom',
+      provenance: {
+        model_refs: [
+          { role, ext_id: extId, scope: { source_id: sourceId, target_id: targetId }, attached_at: '2026-01-01T00:00:00Z' },
+        ],
+      },
+    });
+
+    const result = await makeCleanup(db, serverId, bankId);
+
+    assert.equal(result.success, true);
+    assert.deepEqual(result.deleted, []);
+    assert.equal(result.cleared.nodes, 0);
+    assert.equal(result.cleared.edges, 0);
+    assert.equal(result.skipped, 1);
+
+    const edgeResult = getEdge(db, serverId, bankId, 'generated-custom');
+    assert.equal(edgeResult.data.cge_properties.provenance.model_refs[0].ext_id, extId);
   });
 });
