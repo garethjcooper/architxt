@@ -148,7 +148,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const isSystemTemplate = model.is_system_template;
   const isRoleTemplate = !!model.template_role;
   const isLockedTemplate = isSystemTemplate || isRoleTemplate;
-  const showDerivedPanel = model.template_role === 'user_entity_derived';
+  const showDerivedPanel = model.is_template === true && (model.entities?.length > 0 || isRoleTemplate) && !isSystemTemplate;
 
   const selectedTemplateRole = useMemo(
     () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
@@ -508,6 +508,11 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               {isRoleTemplate && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/40 text-emerald-200/80 border-emerald-700/50">
                   {model.template_role}
+                </span>
+              )}
+              {!isSystemTemplate && !isRoleTemplate && isTemplate && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-800/40 text-purple-200/80 border-purple-700/50">
+                  User entity derived
                 </span>
               )}
             </div>
