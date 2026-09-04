@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -66,18 +66,51 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
   const [templateRole, setTemplateRole] = useState(initial?.template_role ?? '');
   const [submitting, setSubmitting] = useState(false);
 
+  // Reserved system roles cannot be minted manually; hide them from the create dropdown.
+  const availableRoles = useMemo(() => {
+    if (mode === 'edit') return templateRoles ?? [];
+    return (templateRoles ?? []).filter((r) => !r.value.startsWith('sys_'));
+  }, [templateRoles, mode]);
+
+  const selectedRole = useMemo(
+    () => availableRoles.find((r) => r.value === templateRole) ?? null,
+    [availableRoles, templateRole]
+  );
+
+  // A non-Generic template role implies templated derivation, so force Entity Template on.
+  const effectiveIsTemplate = isTemplate || !!templateRole;
+  const roleControlsTemplate = !!templateRole;
+
+  useEffect(() => {
+    if (templateRole && !isTemplate) {
+      setIsTemplate(true);
+    }
+  }, [templateRole, isTemplate]);
+
   const templateValidation = useMemo(() => {
-    if (!isTemplate) return null;
+    if (!effectiveIsTemplate) return null;
     if (isSystemTemplate) return null;
     if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(`${extId}${name}`)) {
       return "Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.";
     }
     return null;
-  }, [isTemplate, isSystemTemplate, extId, name]);
+  }, [effectiveIsTemplate, isSystemTemplate, extId, name]);
+
+  const roleRequirementHint = useMemo(() => {
+    if (!selectedRole) return null;
+    return `Role "${selectedRole.label}" (${selectedRole.derivation_scope}) requires Entity Template mode and a supported placeholder in External ID or Name.`;
+  }, [selectedRole]);
 
   const handleIsTemplateChange = (v: boolean) => {
-    if (isSystemTemplate) return;
+    if (isSystemTemplate || roleControlsTemplate) return;
     setIsTemplate(v);
+  };
+
+  const handleTemplateRoleChange = (value: string) => {
+    setTemplateRole(value);
+    if (value && !isTemplate) {
+      setIsTemplate(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,7 +141,7 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
         exclude_mental_model_list: excludeList.trim() || undefined,
         max_tokens: maxTokensValidation.value,
         tags_match_mode: tagsMatchMode,
-        is_template: isTemplate,
+        is_template: effectiveIsTemplate,
         template_role: templateRole || undefined,
       });
     } catch (err) {
@@ -129,16 +162,27 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
                 System template
               </span>
             )}
+            {selectedRole && !isSystemTemplate && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/40 text-emerald-300 border-emerald-700/50">
+                {selectedRole.label} · {selectedRole.derivation_scope}
+              </span>
+            )}
           </div>
           <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
-          {templateValidation && (
+          {roleRequirementHint && (
+            <p className="text-[10px] text-emerald-400/80 mt-0.5">{roleRequirementHint}</p>
+          )}
+          {templateValidation && !roleRequirementHint && (
             <p className="text-[10px] text-red-400 mt-0.5">{templateValidation}</p>
+          )}
+          {!templateValidation && !roleRequirementHint && isTemplate && !templateRole && (
+            <p className="text-[10px] text-white/40 mt-0.5">Generic templates also require a placeholder.</p>
           )}
         </div>
         <Switch
-          checked={isTemplate}
+          checked={effectiveIsTemplate}
           onCheckedChange={(v) => handleIsTemplateChange(!!v)}
-          disabled={isSystemTemplate}
+          disabled={isSystemTemplate || roleControlsTemplate}
         />
       </div>
 
@@ -187,21 +231,21 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
         <div className="space-y-2">
           <Label htmlFor="mm-template-role" className="text-xs uppercase text-white/50 font-medium">Template Role</Label>
           <select
-            id="mm-template-role"
-            value={templateRole}
-            disabled={mode === 'edit' || isSystemTemplate}
-            onChange={(e) => setTemplateRole(e.target.value)}
-            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50"
+          id="mm-template-role"
+          value={templateRole}
+          disabled={mode === 'edit' || isSystemTemplate}
+          onChange={(e) => handleTemplateRoleChange(e.target.value)}
+          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50"
           >
-            <option value="">Generic / no role</option>
-            {templateRoles?.map((role) => (
-              <option key={role.value} value={role.value}>
-                {role.label} ({role.derivation_scope})
-              </option>
-            ))}
+          <option value="">Generic / no role</option>
+          {availableRoles?.map((role) => (
+            <option key={role.value} value={role.value}>
+              {role.label} ({role.derivation_scope})
+            </option>
+          ))}
           </select>
           <p className="text-[10px] text-white/40">
-            {mode === 'edit' ? 'Role is immutable after creation.' : 'Assigns derivation scope and contextual behavior.'}
+          {mode === 'edit' ? 'Role is immutable after creation.' : 'Assigns derivation scope and contextual behavior. Reserved system roles are hidden because they cannot be created manually.'}
           </p>
         </div>
         <div className="space-y-2">
