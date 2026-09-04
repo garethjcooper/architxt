@@ -510,10 +510,16 @@ export async function composeMentalModelPromptBatch(db, items) {
     if (template) templatesByName.set(name, template);
   }
 
+  // Load the generic fallback once, used for roles that don't have a dedicated template.
+  const genericTemplate = getTemplateByName(db, 'generic');
+
   const results = [];
   for (const item of items) {
     const lookupKey = item.role || item.template_role || item.returns;
-    const template = templatesByName.get(lookupKey);
+    let template = templatesByName.get(lookupKey);
+    if (!template && genericTemplate) {
+      template = genericTemplate;
+    }
     if (!template) {
       results.push({ composed_query: null, compose_error: `Prompt template not found: ${lookupKey}` });
       continue;

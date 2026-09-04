@@ -1,11 +1,9 @@
 import { createLogger } from '../../utils/logger.js';
 import { importHindsightSkeleton } from './import-hindsight-skeleton.js';
-import { listNodes, listEdges, upsertNode, upsertEdge, getNode, getEdge } from '../../db/crud/contextual-graph.js';
+import { listNodes, listEdges, upsertNode, upsertEdge, getNode } from '../../db/crud/contextual-graph.js';
 import {
-  deriveEntitySummaryModel,
-  deriveEntityCapabilitiesModel,
-  deriveEdgeContextModel,
-  deriveDiscoverContextModel,
+  deriveContextualModelSpec,
+  SCOPE_VALUES,
   CONTEXTUAL_GRAPH_ROLES,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
@@ -24,9 +22,9 @@ const DEFAULT_NEIGHBORHOOD = {
  *
  * User-led job that:
  * 1. Imports the current Hindsight entity graph skeleton.
- * 2. Derives and deploys mental models for active nodes based on configured node-scoped template roles.
- * 3. Derives and deploys mental models for active undirected edges based on configured edge-scoped template roles.
- * 4. Optionally derives and deploys mental models around seeds based on configured seed-scoped template roles.
+ * 2. Derives and deploys mental models for active graph elements based on the
+ *    configured template roles in `template_roles` and the bank's
+ *    `allowed_model_types`.
  *
  * Derived models are rendered from templates (mm_template_role) and pushed
  * directly to Hindsight; no per-instance mental_models rows are created.
@@ -135,101 +133,102 @@ export async function addContext(
     ? existingEdges.filter((e) => subsetNodeIds.has(e.cge_source_id) && subsetNodeIds.has(e.cge_target_id))
     : existingEdges;
 
-  // Step 3: derive node-scoped models for active nodes without an existing ref for the same role.
-  const nodeScopedRoles = [...scopeMap.entries()].filter(([, scope]) => scope === 'node').map(([role]) => role);
-  const entitySummarySpecs = [];
-  const entityCapabilitiesSpecs = [];
+  // Step 3: derive node-scoped models for active, grounded/canonical nodes
+  // without an existing ref for each allowed node-scoped role.
+  const nodeScopedRoles = [...scopeMap.entries()]
+    .filter(([role, scope]) => scope === 'node' && allowedRoleIds.has(role))
+    .map(([role]) => role);
+  const specsByRole = new Map();
+  for (const role of nodeScopedRoles) {
+    specsByRole.set(role, []);
+  }
+
   for (const node of filteredNodes) {
     if (!node.cgn_labels?.includes('active')) continue;
     if (!inSubset(node.cgn_id)) continue;
-    // Only derive mental models for explicitly grounded or canonical nodes.
     // Candidate nodes and plain active edge-ctx endpoints must be promoted first.
     if (!node.cgn_labels?.includes('grounded') && !node.cgn_labels?.includes('canonical')) continue;
 
-    const nodeDisplayName = node.cgn_properties?.display_name || node.cgn_id;
+    const target = {
+      id: node.cgn_id,
+      displayName: node.cgn_properties?.display_name || node.cgn_id,
+    };
 
-    // Entity summary is the legacy sys_entity_summary role; skip if a node-scoped role is not allowed.
-    if (allowedRoleIds.has(CONTEXTUAL_GRAPH_ROLES.entitySummary) && !hasModelRef(node.cgn_properties, CONTEXTUAL_GRAPH_ROLES.entitySummary)) {
-      const summarySpec = await deriveEntitySummaryModel(db, {
-        id: node.cgn_id,
-        displayName: nodeDisplayName,
-      });
-      entitySummarySpecs.push(summarySpec);
-    }
-
-    if (allowedRoleIds.has(CONTEXTUAL_GRAPH_ROLES.entityCapabilities) && !hasModelRef(node.cgn_properties, CONTEXTUAL_GRAPH_ROLES.entityCapabilities)) {
-      const capabilitiesSpec = await deriveEntityCapabilitiesModel(db, {
-        id: node.cgn_id,
-        displayName: nodeDisplayName,
-      });
-      entityCapabilitiesSpecs.push(capabilitiesSpec);
+    for (const role of nodeScopedRoles) {
+      if (hasModelRef(node.cgn_properties, role)) continue;
+      const values = SCOPE_VALUES.node(target);
+      const spec = await deriveContextualModelSpec(db, role, 'node', values);
+      specsByRole.get(role).push(spec);
     }
   }
 
-  // Step 4: derive edge-scoped models for active undirected edge pairs without an edge-scoped ref.
-  const edgeScopedRoles = [...scopeMap.entries()].filter(([, scope]) => scope === 'edge').map(([role]) => role);
-  const hasAnyAllowedEdgeRole = edgeScopedRoles.some((role) => allowedRoleIds.has(role));
-  const edgeSpecs = [];
+  // Step 4: derive edge-scoped models for active undirected edge pairs
+  // without an existing ref for each allowed edge-scoped role.
+  const edgeScopedRoles = [...scopeMap.entries()]
+    .filter(([role, scope]) => scope === 'edge' && allowedRoleIds.has(role))
+    .map(([role]) => role);
+
+  for (const role of edgeScopedRoles) {
+    specsByRole.set(role, []);
+  }
+
   const seenEdgePairs = new Set();
   for (const edge of filteredEdges) {
-    if (!hasAnyAllowedEdgeRole) continue;
-
-    if (hasModelRef(edge.cge_properties, CONTEXTUAL_GRAPH_ROLES.edge)) continue;
-
-    // Only run edge-ctx on grounded/canonical working-graph edges. Directed
-    // edges are produced by edge-ctx itself; candidate edges are not eligible.
+    // Only run on undirected skeleton edges.
     if (edge.cge_type !== null && edge.cge_properties?.directed !== false) continue;
-
-    // Candidate edges (or edges touching only candidate endpoints) are not
-    // eligible for edge-ctx.
     if (edge.cge_properties?.labels?.includes('candidate')) continue;
 
-    // Only run on edges whose endpoints are grounded or canonical.
-    const sourceGroundedOrCanonical = existingNodes.some(
-      (n) => n.cgn_id === edge.cge_source_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
-    );
-    const targetGroundedOrCanonical = existingNodes.some(
-      (n) => n.cgn_id === edge.cge_target_id && (n.cgn_labels?.includes('grounded') || n.cgn_labels?.includes('canonical')),
-    );
-    if (!sourceGroundedOrCanonical || !targetGroundedOrCanonical) continue;
+    // Endpoints must be grounded/canonical and active.
+    const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
+    const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
+    const sourceActive = sourceNode?.cgn_labels?.includes('active');
+    const targetActive = targetNode?.cgn_labels?.includes('active');
+    const sourceGroundedOrCanonical = sourceNode?.cgn_labels?.includes('grounded') || sourceNode?.cgn_labels?.includes('canonical');
+    const targetGroundedOrCanonical = targetNode?.cgn_labels?.includes('grounded') || targetNode?.cgn_labels?.includes('canonical');
 
+    if (!sourceActive || !targetActive) continue;
+    if (!sourceGroundedOrCanonical || !targetGroundedOrCanonical) continue;
     if (!inSubset(edge.cge_source_id) || !inSubset(edge.cge_target_id)) continue;
 
-    const sourceActive = existingNodes.some((n) => n.cgn_id === edge.cge_source_id && n.cgn_labels?.includes('active'));
-    const targetActive = existingNodes.some((n) => n.cgn_id === edge.cge_target_id && n.cgn_labels?.includes('active'));
-    if (!sourceActive || !targetActive) continue;
-
-    const pk = `${edge.cge_source_id}|${edge.cge_target_id}`;
+    const pk = sortPair(edge.cge_source_id, edge.cge_target_id);
     if (seenEdgePairs.has(pk)) continue;
     seenEdgePairs.add(pk);
 
-    const sourceNode = existingNodes.find((n) => n.cgn_id === edge.cge_source_id);
-    const targetNode = existingNodes.find((n) => n.cgn_id === edge.cge_target_id);
-
-    const spec = await deriveEdgeContextModel(db, {
-      id: edge.cge_source_id,
-      displayName: sourceNode?.cgn_properties?.display_name || edge.cge_source_id,
-    }, {
-      id: edge.cge_target_id,
-      displayName: targetNode?.cgn_properties?.display_name || edge.cge_target_id,
-    });
-    edgeSpecs.push(spec);
+    for (const role of edgeScopedRoles) {
+      if (hasModelRef(edge.cge_properties, role)) continue;
+      const sourceTarget = {
+        id: sourceNode.cgn_id,
+        displayName: sourceNode.cgn_properties?.display_name || sourceNode.cgn_id,
+      };
+      const targetTarget = {
+        id: targetNode.cgn_id,
+        displayName: targetNode.cgn_properties?.display_name || targetNode.cgn_id,
+      };
+      const values = SCOPE_VALUES.edge(sourceTarget, targetTarget);
+      const spec = await deriveContextualModelSpec(db, role, 'edge', values);
+      specsByRole.get(role).push(spec);
+    }
   }
 
-  // Step 5: queue discovery models around seeds (no LLM call here; candidates
-  // are fetched later from the discover-ctx mental model content).
-  const discoverQueue = new Set();
-  const discoverSpecs = [];
+  // Step 5: queue seed-scoped (discovery) models around seeds.
+  const seedScopedRoles = [...scopeMap.entries()]
+    .filter(([, scope]) => scope === 'seed')
+    .map(([role]) => role);
+  const allowedSeedScopedRoles = seedScopedRoles.filter((role) => allowedRoleIds.has(role));
+  for (const role of seedScopedRoles) {
+    if (!specsByRole.has(role)) specsByRole.set(role, []);
+  }
 
+  const discoverQueue = new Set();
   if (Array.isArray(options.seed_node_ids)) {
     for (const seedId of options.seed_node_ids) {
       if (existingNodeIds.has(seedId) && inSubset(seedId)) discoverQueue.add(seedId);
     }
   }
 
-  // Auto-rank high-degree nodes as additional discovery seeds when discovery is
-  // an allowed model type.
-  if (allowedRoleIds.has(CONTEXTUAL_GRAPH_ROLES.discover)) {
+  // Auto-rank high-degree nodes as additional discovery seeds only when at
+  // least one allowed seed-scoped role is configured.
+  if (allowedSeedScopedRoles.length > 0) {
     const nodeDegrees = new Map();
     for (const edge of filteredEdges) {
       nodeDegrees.set(edge.cge_source_id, (nodeDegrees.get(edge.cge_source_id) || 0) + 1);
@@ -249,40 +248,47 @@ export async function addContext(
 
   for (const seedId of discoverQueue) {
     const seedNode = existingNodes.find((n) => n.cgn_id === seedId);
-    const hasExistingDiscoverModel = hasModelRef(seedNode?.cgn_properties, CONTEXTUAL_GRAPH_ROLES.discover);
+    const neighbors = filteredEdges
+      .filter((e) => e.cge_source_id === seedId || e.cge_target_id === seedId)
+      .map((e) => (e.cge_source_id === seedId ? e.cge_target_id : e.cge_source_id))
+      .slice(0, neighborhood.top_k_neighbors);
 
-    // Only mint a new discover mental model the first time a seed is run.
-    if (!hasExistingDiscoverModel) {
-      const neighbors = filteredEdges
-        .filter((e) => e.cge_source_id === seedId || e.cge_target_id === seedId)
-        .map((e) => (e.cge_source_id === seedId ? e.cge_target_id : e.cge_source_id))
-        .slice(0, neighborhood.top_k_neighbors);
+    // Manual seeds always derive all configured seed-scoped roles; auto-ranked
+    // seeds only derive roles explicitly allowed for the bank.
+    const isManualSeed = Array.isArray(options.seed_node_ids) && options.seed_node_ids.includes(seedId);
+    const rolesToDerive = isManualSeed ? seedScopedRoles : allowedSeedScopedRoles;
 
-      discoverSpecs.push(await deriveDiscoverContextModel(db, {
-        id: seedId,
-        displayName: seedNode?.cgn_properties?.display_name || seedId,
-      }, neighbors));
-    } else {
-      logger.info('Skipping duplicate discover model for seed', { serverId, bankId, seedId });
+    for (const role of rolesToDerive) {
+      if (hasModelRef(seedNode?.cgn_properties, role)) {
+        logger.info('Skipping duplicate seed-scoped model for seed', { serverId, bankId, seedId, role });
+        continue;
+      }
+      const seedTarget = {
+        id: seedNode.cgn_id,
+        displayName: seedNode.cgn_properties?.display_name || seedNode.cgn_id,
+      };
+      const values = SCOPE_VALUES.seed(seedTarget, neighbors);
+      const spec = await deriveContextualModelSpec(db, role, 'seed', values);
+      specsByRole.get(role).push(spec);
     }
   }
 
-  // Step 5: deploy all queued models to Hindsight and record provenance.
-  const dedupedSummarySpecs = dedupeSpecsByExtId(entitySummarySpecs);
-  const dedupedCapabilitiesSpecs = dedupeSpecsByExtId(entityCapabilitiesSpecs);
-  const dedupedEdgeSpecs = dedupeSpecsByExtId(edgeSpecs);
-  const dedupedDiscoverSpecs = dedupeSpecsByExtId(discoverSpecs);
+  // Step 6: dedupe, cap, deploy, and record provenance.
+  const dedupedSpecsByRole = new Map();
+  for (const [role, specs] of specsByRole) {
+    dedupedSpecsByRole.set(role, dedupeSpecsByExtId(specs));
+  }
 
-  const allUnrestrictedSpecs = [
-    ...dedupedSummarySpecs,
-    ...dedupedCapabilitiesSpecs,
-    ...dedupedEdgeSpecs,
-    ...dedupedDiscoverSpecs,
-  ];
+  const entitySummarySpecs = dedupedSpecsByRole.get(CONTEXTUAL_GRAPH_ROLES.entitySummary) || [];
+  const entityCapabilitiesSpecs = dedupedSpecsByRole.get(CONTEXTUAL_GRAPH_ROLES.entityCapabilities) || [];
+  const edgeSpecs = dedupedSpecsByRole.get(CONTEXTUAL_GRAPH_ROLES.edge) || [];
+  const discoverSpecs = dedupedSpecsByRole.get(CONTEXTUAL_GRAPH_ROLES.discover) || [];
 
-  // Apply the max-models-per-run cap, preserving the order above (entities
-  // first, edges second, discovery last) so the most useful models are
-  // deployed first.
+  const roleOrder = [...scopeMap.keys()];
+  const allUnrestrictedSpecs = [...dedupedSpecsByRole.entries()]
+    .sort(([a], [b]) => roleOrder.indexOf(a) - roleOrder.indexOf(b))
+    .flatMap(([, specs]) => specs);
+
   const skippedByRestriction = Math.max(0, allUnrestrictedSpecs.length - maxModelsPerRun);
   const allSpecs = allUnrestrictedSpecs.slice(0, maxModelsPerRun);
 
@@ -306,10 +312,10 @@ export async function addContext(
   return {
     success: true,
     queued: {
-      entitySummary: dedupedSummarySpecs.length,
-      entityCapabilities: dedupedCapabilitiesSpecs.length,
-      edge: dedupedEdgeSpecs.length,
-      discover: dedupedDiscoverSpecs.length,
+      entitySummary: entitySummarySpecs.length,
+      entityCapabilities: entityCapabilitiesSpecs.length,
+      edge: edgeSpecs.length,
+      discover: discoverSpecs.length,
       total: allUnrestrictedSpecs.length,
     },
     composed: deployResult.composed,
@@ -404,4 +410,8 @@ function dedupeSpecsByExtId(specs) {
     seen.add(spec.ext_id);
     return true;
   });
+}
+
+function sortPair(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }

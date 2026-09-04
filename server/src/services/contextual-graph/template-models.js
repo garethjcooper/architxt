@@ -168,6 +168,71 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = []) {
   };
 }
 
+
+/**
+ * Derive a contextual mental-model spec for any configured role.
+ *
+ * @param {Object} db
+ * @param {string} role - template role id
+ * @param {'node'|'edge'|'seed'} scopeType
+ * @param {Record<string, string>} values - placeholder substitutions
+ * @returns {Object} spec compatible with deployMentalModelBatch
+ */
+export async function deriveContextualModelSpec(db, role, scopeType, values) {
+  const template = getContextualGraphTemplate(db, role)?.data;
+  if (!template) throw new Error(`Missing contextual graph template: ${role}`);
+
+  const scope =
+    scopeType === 'edge'
+      ? { source_id: values['{source-id}'], target_id: values['{target-id}'] }
+      : scopeType === 'seed'
+        ? { seed_id: values['{seed-id}'] }
+        : { node_id: values['{node-id}'] };
+
+  return {
+    role: template.role,
+    scope,
+    ext_id: substituteTemplateFields(template.ext_id, values),
+    name: substituteTemplateFields(template.name, values),
+    source_query: substituteTemplateFields(template.source_query, values),
+    max_tokens: template.max_tokens,
+    refresh_mode: template.refresh_mode,
+    refresh_after_consolidation: template.refresh_after_consolidation,
+    exclude_all_mental_models: template.exclude_all_mental_models,
+    exclude_mental_model_list: template.exclude_mental_model_list,
+    tags_match_mode: template.tags_match_mode,
+    neighbor_ids: scopeType === 'seed' ? (values.neighbor_ids || []).map((n) => (typeof n === 'string' ? n : n.id)) : undefined,
+  };
+}
+
+export const SCOPE_VALUES = {
+  node: (target) => ({
+    '{id}': target.id,
+    '{entity-id}': target.id,
+    '{node-id}': target.id,
+    '{entity-name}': target.displayName || target.id,
+    '{node-name}': target.displayName || target.id,
+    '{seed-id}': target.id,
+    '{seed-name}': target.displayName || target.id,
+  }),
+  edge: (sourceNode, targetNode) => ({
+    '{source-id}': sourceNode.id,
+    '{source-name}': sourceNode.displayName || sourceNode.id,
+    '{target-id}': targetNode.id,
+    '{target-name}': targetNode.displayName || targetNode.id,
+  }),
+  seed: (seedNode, neighborIds = []) => ({
+    '{id}': seedNode.id,
+    '{entity-id}': seedNode.id,
+    '{node-id}': seedNode.id,
+    '{entity-name}': seedNode.displayName || seedNode.id,
+    '{node-name}': seedNode.displayName || seedNode.id,
+    '{seed-id}': seedNode.id,
+    '{seed-name}': seedNode.displayName || seedNode.id,
+    neighbor_ids: neighborIds,
+  }),
+};
+
 function normalizeTemplateRow(row) {
   return {
     id: row.mm_id,
