@@ -145,6 +145,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const isSystemTemplate = model.is_system_template;
   const isRoleTemplate = !!model.template_role;
   const isLockedTemplate = isSystemTemplate || isRoleTemplate;
+  const showDerivedPanel = model.template_role === 'user_entity_derived';
 
   const selectedTemplateRole = useMemo(
     () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
@@ -174,7 +175,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   }, [roleScope, roleRule, namePrefix, name]);
 
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
-    model.is_template ? buildDerivedRows(model, buildBaseConfig(model)) : []
+    showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []
   );
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
@@ -214,7 +215,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
     setDerived(
-      model.is_template ? buildDerivedRows(model, buildBaseConfig(model)) : []
+      showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []
     );
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
@@ -222,9 +223,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   }, [open, model]);
 
   // If entities are added/removed while the modal is open, rebuild derived
-  // rows. Existing rows are preserved so live edits survive. Skip for non-template models.
+  // rows. Existing rows are preserved so live edits survive. Skip when the
+  // derived panel is not shown for this template role.
   useEffect(() => {
-    if (!open || !model || !model.is_template) return;
+    if (!open || !model || !showDerivedPanel) return;
     setDerived((prev) => {
       const existingById = new Map(prev.map((d) => [d.derived_entity.id, d]));
       const next: DerivedMentalModel[] = [];
@@ -237,8 +239,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   }, [model.entities, open]);
 
   const baselineDerived = useMemo(
-    () => (model.is_template ? buildDerivedRows(model, buildBaseConfig(model)) : []),
-    [model]
+    () => (showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []),
+    [model, showDerivedPanel]
   );
 
   const derivedChanged = useMemo(() => {
@@ -273,7 +275,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     parsedMaxTokens !== (model.max_tokens ?? 2048) ||
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
     (!isLockedTemplate && isTemplate !== (model.is_template ?? false)) ||
-    (!isSystemTemplate && derivedChanged);
+    (showDerivedPanel && derivedChanged);
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
@@ -771,14 +773,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           className={`${
-            isTemplate && !isLockedTemplate ? '!w-[85vw] !max-w-none' : 'sm:max-w-4xl'
+            showDerivedPanel ? '!w-[85vw] !max-w-none' : 'sm:max-w-4xl'
           } max-h-[85vh] overflow-hidden p-0 flex flex-col`}
         >
           <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle className="text-xl font-semibold text-white">Mental Model Details</DialogTitle>
           </DialogHeader>
 
-          {isTemplate ? (
+          {showDerivedPanel ? (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
