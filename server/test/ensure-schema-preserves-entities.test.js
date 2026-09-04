@@ -177,7 +177,7 @@ describe('ensureSchema preserves mental_model_entities across CHECK constraint r
 });
 
 describe('ensureSchema backfills user template roles and validates contextual placeholders', () => {
-  it('backfills mm_template_role for legacy user templates', () => {
+  it('does not auto-backfill legacy user templates to avoid violating the unique role constraint', () => {
     const { db, file } = tempDb();
     try {
       seedOldSchema(db);
@@ -193,7 +193,7 @@ describe('ensureSchema backfills user template roles and validates contextual pl
       const row = db.prepare(`
         SELECT mm_template_role, mm_ext_id FROM mental_models WHERE mm_ext_id = ?
       `).get('user-template-{entity-id}');
-      assert.equal(row.mm_template_role, 'user_entity_derived');
+      assert.equal(row.mm_template_role, null);
     } finally {
       closeAndDelete({ db, file });
     }
@@ -222,13 +222,15 @@ describe('ensureSchema backfills user template roles and validates contextual pl
     try {
       seedOldSchema(db);
 
-      // Run migration once so the mm_template_role column exists.
-      ensureSchema(db);
+      // Add the role column manually so we can seed a stale template before
+      // ensureSchema seeds the canonical templates and enforces uniqueness.
+      db.exec(`ALTER TABLE mental_models ADD COLUMN mm_template_role TEXT`);
 
       // Insert a stale discover template that predates the deterministic ext_id.
+      // Use a legacy returns value that the old CHECK constraint allows.
       db.prepare(`
         INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
-        VALUES ('discover-a-com:COM-001-{batch}', 'Old discover template', 'Old query', 'true', 'sys_discovery_context', 'sys_patch', 'sys_discovery_context', 4096)
+        VALUES ('discover-a-com:COM-001-{batch}', 'Old discover template', 'Old query', 'true', 'sys_discovery_context', 'narrative', 'sys_discovery_context', 4096)
       `).run();
 
       // Re-run migration: it should delete the stale row and upsert the canonical one.

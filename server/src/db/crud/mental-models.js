@@ -585,6 +585,13 @@ export const getMentalModelIdByExtId = (db, extId) => dbExec(() => {
   return row ? row[PK] : null;
 }, `${TABLE}.getIdByExtId`);
 
+/** Read the mental model id that currently owns a non-null template role, if any. */
+function getMentalModelIdByTemplateRole(db, role) {
+  if (!role) return null;
+  const row = db.prepare(`SELECT ${PK} FROM ${TABLE} WHERE mm_template_role = ?`).get(role);
+  return row ? row[PK] : null;
+}
+
 /**
  * Create mental model.
  * Route layer should already validate and translate API field names to DB names.
@@ -601,6 +608,14 @@ export const createMentalModel = (db, data) => dbExec(() => {
   if (SYSTEM_TEMPLATE_ROLES.has(data.mm_ext_id)) {
     const err = new Error('Reserved system template external id cannot be used.');
     err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+    throw err;
+  }
+
+  // Each non-null template role may be assigned to at most one mental model.
+  const existingId = getMentalModelIdByTemplateRole(db, data.mm_template_role);
+  if (existingId) {
+    const err = new Error(`Template role is already assigned to mental model ${existingId}.`);
+    err.code = 'TEMPLATE_ROLE_IN_USE';
     throw err;
   }
 
@@ -640,6 +655,17 @@ export const updateMentalModel = (db, id, data) => dbExec(() => {
     const err = new Error(isSystem ? 'System template role cannot be changed.' : 'Template role cannot be changed after creation.');
     err.code = isSystem ? 'SYSTEM_TEMPLATE_IMMUTABLE' : 'TEMPLATE_ROLE_IMMUTABLE';
     throw err;
+  }
+
+  // Guard against assigning a role that is already owned by a different model
+  // during an update that introduces a new role (e.g., from null to a role).
+  if (role === null && data.mm_template_role !== undefined && data.mm_template_role !== null) {
+    const existingId = getMentalModelIdByTemplateRole(db, data.mm_template_role);
+    if (existingId && existingId !== id) {
+      const err = new Error(`Template role is already assigned to mental model ${existingId}.`);
+      err.code = 'TEMPLATE_ROLE_IN_USE';
+      throw err;
+    }
   }
 
   if (isSystemTemplateRole(role)) {

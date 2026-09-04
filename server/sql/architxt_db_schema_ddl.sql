@@ -267,7 +267,7 @@ CREATE TABLE mental_models (
   mm_exclude_mental_model_list TEXT,
   mm_tags_match_mode TEXT DEFAULT 'all_strict',
   mm_is_template TEXT DEFAULT 'false',
-  mm_template_role TEXT,
+  mm_template_role TEXT UNIQUE,
   mm_max_tokens INTEGER DEFAULT 2048,
   mm_viewp_description TEXT,
   mm_viewp_meta JSON,

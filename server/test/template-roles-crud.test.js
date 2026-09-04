@@ -291,6 +291,25 @@ describe('mental model role assignment rules', () => {
     expectImmutableError(updateResult, 'TEMPLATE_ROLE_IMMUTABLE');
   });
 
+  it('blocks assigning the same custom role to two models', () => {
+    createTemplateRole(db, { role_id: 'shared_role', display_name: 'Shared', derivation_scope: 'node' });
+    const first = createMentalModel(db, {
+      mm_ext_id: 'mm-first',
+      mm_name: 'First',
+      mm_source_query: 'MATCH (n) RETURN n',
+      mm_template_role: 'shared_role',
+    });
+    assert.equal(first.success, true, first.error);
+
+    const second = createMentalModel(db, {
+      mm_ext_id: 'mm-second',
+      mm_name: 'Second',
+      mm_source_query: 'MATCH (n) RETURN n',
+      mm_template_role: 'shared_role',
+    });
+    expectInUseError(second);
+  });
+
   it('allows updating a model when mm_template_role is unchanged', () => {
     createTemplateRole(db, { role_id: 'role_a', display_name: 'Role A', derivation_scope: 'node' });
     const createResult = createMentalModel(db, {
