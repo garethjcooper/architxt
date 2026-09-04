@@ -21,6 +21,13 @@ import { DerivedModelsPanel } from '@/components/derived-models-panel';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DerivedModelHealthDialog } from '@/components/derived-model-health-dialog';
+import {
+  getRoleTemplateRule,
+  getRoleTemplateInstructions,
+  extractRoleTemplatePrefix,
+  buildRoleTemplateValue,
+  validateRoleBasedTemplate,
+} from '@/lib/validation/contextual-template';
 
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
@@ -49,6 +56,7 @@ interface ModelDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
+  templateRoles?: { value: string; label: string; derivation_scope: string }[];
 }
 
 function substitutePlaceholders(template: string | null, entity: Entity): string {
@@ -118,7 +126,7 @@ function buildDerivedRows(model: MentalModel, baseConfig: BaseConfig): DerivedMe
   return (model.entities ?? []).map((entity) => buildDerivedRow(entity, model, baseConfig));
 }
 
-export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: ModelDetailsDialogProps) {
+export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templateRoles }: ModelDetailsDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState(model.name ?? '');
   const [sourceQuery, setSourceQuery] = useState(model.source_query ?? '');
@@ -137,6 +145,34 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const isSystemTemplate = model.is_system_template;
   const isRoleTemplate = !!model.template_role;
   const isLockedTemplate = isSystemTemplate || isRoleTemplate;
+
+  const selectedTemplateRole = useMemo(
+    () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
+    [templateRoles, model.template_role]
+  );
+  const roleScope = selectedTemplateRole?.derivation_scope ?? null;
+  const roleRule = roleScope ? getRoleTemplateRule(roleScope) : null;
+
+  // For role-based templates, the user only edits the prefix of the name; the
+  // mandatory placeholder tail is read-only. ext_id is immutable, so we only
+  // validate that it matches the expected format and derive the prefix from it.
+  const [namePrefix, setNamePrefix] = useState('');
+
+  useEffect(() => {
+    if (!roleScope) {
+      setNamePrefix('');
+      return;
+    }
+    const extPrefix = extractRoleTemplatePrefix(roleScope, 'extId', model.ext_id ?? '') ?? '';
+    const namePrefixFromModel = extractRoleTemplatePrefix(roleScope, 'name', model.name ?? '') ?? '';
+    setNamePrefix(namePrefixFromModel || extPrefix);
+  }, [roleScope, model.ext_id, model.name]);
+
+  const effectiveName = useMemo(() => {
+    if (!roleScope || !roleRule) return name;
+    return buildRoleTemplateValue(roleScope, 'name', namePrefix) ?? roleRule.nameTail;
+  }, [roleScope, roleRule, namePrefix, name]);
+
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
     isLockedTemplate ? [] : buildDerivedRows(model, buildBaseConfig(model))
   );
@@ -148,14 +184,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const baseConfig: BaseConfig = useMemo(
     () => ({
       ext_id: model.ext_id,
-      name: name.trim() || null,
+      name: effectiveName.trim() || null,
       source_query: sourceQuery.trim() || null,
       refresh_mode: refreshMode,
       refresh_after_consolidation: refreshAfterConsolidation,
       exclude_all_mental_models: excludeAll,
       max_tokens: parseMaxTokens(maxTokens, model.max_tokens ?? 2048),
     }),
-    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
+    [model.ext_id, effectiveName, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
   );
 
   const derivedRef = useRef(derived);
@@ -229,8 +265,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const parsedMaxTokens = parseMaxTokens(maxTokens, model.max_tokens ?? 2048);
 
   const hasChanges =
-    name !== (model.name ?? '') ||
-    sourceQuery !== (model.source_query ?? '') ||
+    effectiveName.trim() !== (model.name ?? '').trim() ||
+    sourceQuery.trim() !== (model.source_query ?? '').trim() ||
     refreshMode !== (model.refresh_mode ?? 'full') ||
     refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false) ||
     excludeAll !== (model.exclude_all_mental_models ?? false) ||
@@ -242,12 +278,40 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    if (isLockedTemplate) return null;
+    if (isSystemTemplate) return null;
+    if (roleRule) return null; // role-based validation takes over
     if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(model.ext_id ?? '')) {
       return 'Template mode requires a supported placeholder in External ID. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.';
     }
     return null;
-  }, [isTemplate, isLockedTemplate, model.ext_id]);
+  }, [isTemplate, isSystemTemplate, roleRule, model.ext_id]);
+
+  const roleTemplateValidation = useMemo(() => {
+    if (!roleScope || !model.template_role) return null;
+    return validateRoleBasedTemplate(roleScope, {
+      extId: model.ext_id ?? '',
+      name: effectiveName,
+      sourceQuery,
+    });
+  }, [roleScope, model.ext_id, model.template_role, effectiveName, sourceQuery]);
+
+  const extIdFormatWarning = useMemo(() => {
+    if (!roleScope || !model.template_role) return null;
+    const result = validateRoleBasedTemplate(roleScope, {
+      extId: model.ext_id ?? '',
+      name: model.name ?? '',
+      sourceQuery: model.source_query ?? '',
+    });
+    if (result.valid) return null;
+    // Surface only ext_id related errors; name/source_query will be validated live.
+    const extIdErrors = result.errors.filter((e) => e.includes('External ID'));
+    return extIdErrors.length > 0 ? extIdErrors.join(' ') : null;
+  }, [roleScope, model.ext_id, model.name, model.source_query, model.template_role]);
+
+  const roleInstructions = useMemo(() => {
+    if (!roleScope) return null;
+    return getRoleTemplateInstructions(roleScope);
+  }, [roleScope]);
 
   const willDisableTemplateOnSave =
     model.is_template === true && isTemplate === false && (model.entities?.length ?? 0) > 0;
@@ -264,10 +328,20 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleNameChange = (value: string) => {
-    setName(value);
+    if (!roleScope) {
+      setName(value);
+      updateDerivedPlaceholders({
+        ...baseConfig,
+        name: value.trim() || null,
+      });
+      return;
+    }
+    // The role tail is immutable; only accept changes to the prefix.
+    const prefix = extractRoleTemplatePrefix(roleScope, 'name', value) ?? value;
+    setNamePrefix(prefix);
     updateDerivedPlaceholders({
       ...baseConfig,
-      name: value.trim() || null,
+      name: buildRoleTemplateValue(roleScope, 'name', prefix) ?? null,
     });
   };
 
@@ -312,7 +386,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !sourceQuery.trim()) {
+    if (!effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
       return;
     }
@@ -320,6 +394,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     if (Number(maxTokens.trim()) !== parsed) {
       toast.error('Max tokens must be an integer between 1 and 8192');
       setMaxTokensError('Max tokens must be an integer between 1 and 8192');
+      return;
+    }
+    if (roleTemplateValidation && !roleTemplateValidation.valid) {
+      toast.error(roleTemplateValidation.errors.join(' '));
       return;
     }
     if (willDisableTemplateOnSave) {
@@ -330,7 +408,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const executeSave = async () => {
-    if (!name.trim() || !sourceQuery.trim()) {
+    if (!effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
       return;
     }
@@ -343,7 +421,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setIsSaving(true);
     try {
       const updates: Record<string, any> = {};
-      if (name.trim() !== (model.name ?? '')) updates.name = name.trim();
+      if (effectiveName.trim() !== (model.name ?? '')) updates.name = effectiveName.trim();
       if (sourceQuery.trim() !== (model.source_query ?? '')) updates.source_query = sourceQuery.trim();
       if (refreshMode !== (model.refresh_mode ?? 'full')) updates.refresh_mode = refreshMode;
       if (refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false)) {
@@ -433,6 +511,17 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           </div>
         )}
 
+        {roleInstructions && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+            <p className="font-medium">{selectedTemplateRole?.label} format requirements</p>
+            <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
+          </div>
+        )}
+
+        {extIdFormatWarning && (
+          <p className="text-[10px] text-red-400">External ID: {extIdFormatWarning}</p>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="mm-detail-ext-id" className="text-xs uppercase text-white/50 font-medium">
@@ -446,15 +535,41 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
             <Label htmlFor="mm-detail-name" className="text-xs uppercase text-white/50 font-medium">
               Name *
             </Label>
-            <Input
-              id="mm-detail-name"
-              value={name}
-              disabled={isSystemTemplate}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="Display name"
-              className={inputClass}
-              style={inputFocusStyle}
-            />
+            {roleScope && roleRule ? (
+              <div className="flex items-center">
+                <Input
+                  id="mm-detail-name"
+                  value={namePrefix}
+                  disabled={isSystemTemplate}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="prefix"
+                  className={`${inputClass} rounded-r-none border-r-0`}
+                  style={inputFocusStyle}
+                />
+                <span className="flex items-center h-10 px-3 rounded-r-lg border border-l-0 border-white/20 bg-white/5 text-sm text-white/70 whitespace-nowrap">
+                  {roleRule.nameTail}
+                </span>
+              </div>
+            ) : (
+              <Input
+                id="mm-detail-name"
+                value={name}
+                disabled={isSystemTemplate}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="Display name"
+                className={inputClass}
+                style={inputFocusStyle}
+              />
+            )}
+            {roleTemplateValidation && !roleTemplateValidation.valid && (
+              <div className="mt-1 space-y-0.5">
+                {roleTemplateValidation.errors
+                  .filter((e) => !e.includes('External ID'))
+                  .map((err, idx) => (
+                    <p key={idx} className="text-[10px] text-red-400">{err}</p>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -638,7 +753,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       </Button>
       <Button
         onClick={handleSave}
-        disabled={!hasChanges || isSaving}
+        disabled={!hasChanges || isSaving || !!(roleTemplateValidation && !roleTemplateValidation.valid)}
         className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}

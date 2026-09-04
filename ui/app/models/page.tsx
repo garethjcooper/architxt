@@ -578,6 +578,7 @@ function ModelsPageContent() {
             setSelectedModel(null);
             fetchModels();
           }}
+          templateRoles={templateRoleOptions}
         />
       )}
 
