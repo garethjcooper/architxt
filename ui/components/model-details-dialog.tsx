@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { AqlEditor } from '@/components/aql-editor';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
@@ -130,6 +130,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState(model.name ?? '');
   const [sourceQuery, setSourceQuery] = useState(model.source_query ?? '');
+  const [systemTemplateDefaults, setSystemTemplateDefaults] = useState<
+    { role: string; ext_id: string; name: string; source_query: string }[] | null
+  >(null);
   const [refreshMode, setRefreshMode] = useState<'full' | 'delta'>(model.refresh_mode ?? 'full');
   const [refreshAfterConsolidation, setRefreshAfterConsolidation] = useState(
     model.refresh_after_consolidation ?? false
@@ -220,6 +223,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
     setDerivedHealthOpen(false);
+    if (model.is_system_template) {
+      mentalModelsApi
+        .getSystemTemplateDefaults()
+        .then((defaults) => setSystemTemplateDefaults(defaults))
+        .catch(() => setSystemTemplateDefaults(null));
+    } else {
+      setSystemTemplateDefaults(null);
+    }
   }, [open, model]);
 
   // If entities are added/removed while the modal is open, rebuild derived
@@ -352,6 +363,13 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
       ...baseConfig,
       source_query: value.trim() || null,
     });
+  };
+
+  const handleResetSourceQuery = () => {
+    if (!model.template_role || !systemTemplateDefaults) return;
+    const defaultDef = systemTemplateDefaults.find((d) => d.role === model.template_role);
+    if (!defaultDef) return;
+    handleSourceQueryChange(defaultDef.source_query);
   };
 
   const handleRefreshModeChange = (value: 'full' | 'delta') => {
@@ -582,7 +600,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             id="mm-detail-source-query"
             value={sourceQuery}
             onChange={(value) => handleSourceQueryChange(value)}
-            disabled={isSystemTemplate}
+            disabled={false}
             placeholder="AQL query used to source this model"
             availableEntities={[]}
             availableEdges={[]}
@@ -745,6 +763,18 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
 
   const actionBar = (
     <div className="shrink-0 px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+      {isSystemTemplate && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleResetSourceQuery}
+          disabled={!systemTemplateDefaults}
+          className="text-white/80 border-white/20 hover:bg-white/10 hover:text-white flex items-center gap-2 mr-auto"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset query to default
+        </Button>
+      )}
       <Button
         variant="ghost"
         onClick={() => onOpenChange(false)}

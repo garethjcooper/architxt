@@ -47,6 +47,7 @@ import {
   DEFAULT_BOOL,
   isSystemTemplateRole,
 } from '../db/crud/mental-models.js';
+import { CONTEXTUAL_GRAPH_TEMPLATES } from '../db/ensure-schema.js';
 const logger = createLogger('mental-models-route');
 const router = Router();
 
@@ -232,6 +233,38 @@ router.get('/roles/template', async (req, res) => {
       derivation_scope: r.derivation_scope || '',
     }));
   sendResponse({ res, status: 200, data: roles, logger, method: 'GET', path: '/mentalmodels/roles/template', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/system-template-defaults:
+ *   get:
+ *     summary: Canonical defaults for system-owned contextual-graph templates
+ *     tags: [MentalModels]
+ *     responses:
+ *       200:
+ *         description: Array of canonical system template defaults
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   role: { type: string }
+ *                   ext_id: { type: string }
+ *                   name: { type: string }
+ *                   source_query: { type: string }
+ */
+router.get('/system-template-defaults', async (req, res) => {
+  const start = Date.now();
+  const data = CONTEXTUAL_GRAPH_TEMPLATES.map((t) => ({
+    role: t.role,
+    ext_id: t.extId,
+    name: t.name,
+    source_query: t.sourceQuery,
+  }));
+  sendResponse({ res, status: 200, data, logger, method: 'GET', path: '/mentalmodels/system-template-defaults', duration: Date.now() - start });
 });
 
 /**
