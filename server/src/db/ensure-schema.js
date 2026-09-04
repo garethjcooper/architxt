@@ -559,7 +559,7 @@ function backfillTemplateRoleTimestamps(db) {
  * derived from mental_model_entities; add-context renders instances from the
  * working graph and pushes them directly to Hindsight.
  */
-const CONTEXTUAL_GRAPH_TEMPLATES = [
+export const CONTEXTUAL_GRAPH_TEMPLATES = [
   {
     extId: 'entity-summary-{id}',
     name: 'Entity summary: {entity-name}',
@@ -628,11 +628,7 @@ function ensureContextualGraphTemplates(db) {
   if (!mmTableExists || !ptTableExists) return 0;
 
   const existing = db.prepare('SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = ?').all('true');
-  const existingByExtId = new Map(existing.map((r) => [r.mm_ext_id, r]));
   const existingRoles = new Set(existing.map((r) => r.mm_template_role));
-
-  const canonicalExtIds = new Set(CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.extId));
-  const canonicalRoles = new Set(CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role));
 
   // Delete stale contextual-graph template rows whose role is one of ours but
   // whose ext_id no longer matches the canonical shape. This prevents old
@@ -663,23 +659,14 @@ function ensureContextualGraphTemplates(db) {
   }
 
   let seeded = 0;
-  const upsert = db.prepare(`
-    INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_max_tokens, mm_refresh_mode, mm_refresh_after_consolidation, mm_exclude_all_mental_models, mm_tags_match_mode)
+  const insertIfMissing = db.prepare(`
+    INSERT OR IGNORE INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_max_tokens, mm_refresh_mode, mm_refresh_after_consolidation, mm_exclude_all_mental_models, mm_tags_match_mode)
     VALUES (?, ?, ?, 'true', ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(mm_ext_id) DO UPDATE SET
-      mm_name = excluded.mm_name,
-      mm_source_query = excluded.mm_source_query,
-      mm_template_role = excluded.mm_template_role,
-      mm_max_tokens = excluded.mm_max_tokens,
-      mm_refresh_mode = excluded.mm_refresh_mode,
-      mm_refresh_after_consolidation = excluded.mm_refresh_after_consolidation,
-      mm_exclude_all_mental_models = excluded.mm_exclude_all_mental_models,
-      mm_tags_match_mode = excluded.mm_tags_match_mode
   `);
 
   for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
     try {
-      upsert.run(
+      const result = insertIfMissing.run(
         t.extId,
         t.name,
         t.sourceQuery,
@@ -691,7 +678,7 @@ function ensureContextualGraphTemplates(db) {
         t.tagsMatchMode,
       );
 
-      if (!existingByExtId.has(t.extId) || !existingRoles.has(t.role)) {
+      if (result.changes > 0) {
         seeded++;
       }
     } catch (err) {
