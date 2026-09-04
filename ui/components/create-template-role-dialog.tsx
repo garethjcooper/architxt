@@ -10,13 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectPopup,
-  SelectItem,
-} from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { templateRolesApi } from '@/lib/api/client';
@@ -143,18 +136,18 @@ export function CreateTemplateRoleDialog({
               <Label htmlFor="derivation_scope" className="text-xs uppercase text-white/50 font-medium">
                 Derivation Scope *
               </Label>
-              <Select value={derivationScope} onValueChange={(v) => setDerivationScope(v as Scope)}>
-                <SelectTrigger id="derivation_scope" className="w-full">
-                  <SelectValue placeholder="Scope" />
-                </SelectTrigger>
-                <SelectPopup>
-                  {SCOPES.map((scope) => (
-                    <SelectItem key={scope} value={scope}>
-                      {SCOPE_LABELS[scope]}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
+              <select
+                id="derivation_scope"
+                value={derivationScope}
+                onChange={(e) => setDerivationScope(e.target.value as Scope)}
+                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              >
+                {SCOPES.map((scope) => (
+                  <option key={scope} value={scope}>
+                    {SCOPE_LABELS[scope]}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
