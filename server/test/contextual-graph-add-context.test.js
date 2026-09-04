@@ -262,4 +262,55 @@ describe('addContext', () => {
     // deterministically because the seed lacks a sys_entity_summary ref. This is a
     // test artifact; the behavior under real deployBatch is idempotent.
   });
+
+  it('queues models for custom node-scoped template roles in allowed_model_types', async () => {
+    seedEntities(db, [
+      { type: 'svc', entityId: 'SVC-005', name: 'Billing Service' },
+    ]);
+
+    // Register a custom node-scoped template role and its template.
+    db.prepare(`
+      INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run('custom_node_role', 'Custom Node Role', 'node', 1);
+
+    db.prepare(`
+      INSERT INTO mental_models (
+        mm_name, mm_ext_id, mm_source_query, mm_template_role, mm_is_template,
+        mm_returns, mm_exclude_all_mental_models, mm_tags_match_mode, mm_concatenation
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'Custom Node Role Template',
+      'custom-node-{entity-id}',
+      'Summarize [[{entity-name} ({entity-id})]] as a custom node role.',
+      'custom_node_role',
+      'true',
+      'full',
+      'true',
+      'any',
+      'compile',
+    );
+
+    const fetchGraph = makeFetchGraph({
+      nodes: [{ data: { id: 'h1', label: 'svc:SVC-005' } }],
+      edges: [],
+    });
+
+    const composed = [];
+    const deployBatch = async (_db, _serverId, _bankId, specs) => {
+      for (const spec of specs) composed.push(spec.ext_id);
+      return { success: true, composed: specs.map((s) => s.ext_id), pushed: specs.map((s) => s.ext_id), unchanged: [], failed: [] };
+    };
+
+    const result = await addContext(db, serverId, 'Mozart-API', {
+      fetchGraph,
+      deployBatch,
+      allowed_model_types: ['custom_node_role'],
+      neighborhood: {},
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued.total, 1);
+    assert.ok(composed.includes('custom-node-svc:SVC-005'));
+  });
 });
