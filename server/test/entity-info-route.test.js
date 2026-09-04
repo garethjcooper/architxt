@@ -168,9 +168,20 @@ describe('POST /api/v1/entities/info', () => {
             ext_id: 'entity-capabilities-svc:SVC-005',
             scope: 'node',
           },
+          {
+            role: 'software_tech_stack',
+            ext_id: 'software-tech-stack-svc:SVC-005',
+            scope: { node_id: 'svc:SVC-005' },
+            attached_at: '2026-01-01T00:00:00Z',
+          },
         ],
       },
     });
+
+    db.prepare(`
+      INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run('software_tech_stack', 'Software Tech Stack', 'node', 20);
 
     const res = await makeRequest(app, {
       server_id: serverId,
@@ -184,9 +195,11 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(info.graph_node.is_grounded, true);
     assert.equal(info.catalog.name, 'Payment Service');
     assert.equal(info.catalog.type_name, 'Service');
-    assert.equal(info.contextual_refs.length, 2);
+    assert.equal(info.contextual_refs.length, 3);
     assert.equal(info.contextual_refs[0].role, 'sys_entity_summary');
     assert.equal(info.contextual_refs[0].ext_id, 'entity-summary-svc:SVC-005');
+    assert.equal(info.contextual_refs[2].role, 'software_tech_stack');
+    assert.equal(info.contextual_refs[2].ext_id, 'software-tech-stack-svc:SVC-005');
   });
 
   it('returns derived and plain mental models linked to the entity', async () => {

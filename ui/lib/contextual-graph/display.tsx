@@ -133,17 +133,6 @@ export function isUndirectedEdge(edge: DisplayEdge): boolean {
   return edge.properties.directed === false;
 }
 
-export function hasEdgeContextRef(edge: DisplayEdge, roles?: Set<string>): boolean {
-  return edge.modelRefs.some((r) => r.role && ((roles?.has(r.role) ?? false) || r.role === 'sys_edge_context'));
-}
-
-export function getEdgeContextPairKey(edge: DisplayEdge, roles?: Set<string>): string | null {
-  const ref = edge.modelRefs.find((r) => r.role && ((roles?.has(r.role) ?? false) || r.role === 'sys_edge_context'));
-  if (!ref?.scope || !('source_id' in ref.scope) || !('target_id' in ref.scope)) return null;
-  const { source_id: a, target_id: b } = ref.scope as { source_id: string; target_id: string };
-  return [a, b].sort().join('|');
-}
-
 export function getEdgeSortGroup(edge: DisplayEdge, roles?: Set<string>): string {
   return getEdgeContextPairKey(edge, roles) || [edge.source_id, edge.target_id].sort().join('|');
 }
@@ -234,15 +223,23 @@ function roleIsEntityLike(role?: string): boolean {
 }
 
 export function isContextualRole(role?: string): boolean {
-  return typeof role === 'string' && CONTEXTUAL_ROLES.has(role);
+  return typeof role === 'string' && (CONTEXTUAL_ROLES.has(role) || !!roleScopeMap?.[role]);
 }
 
 export function getContextualPatchRefs(item: DisplayNode | DisplayEdge): ModelRef[] {
   const refs = item.modelRefs.filter((ref) => ref.ext_id && isContextualRole(ref.role));
   if ('source_id' in item && 'target_id' in item) {
-    return refs.filter((ref) => ref.role === 'sys_edge_context');
+    return refs.filter((ref) => roleIsEdgeLike(ref.role));
   }
-  return refs.filter((ref) => roleIsEntityLike(ref.role));
+  return refs.filter((ref) => roleIsEntityLike(ref.role) || roleIsNodeLike(ref.role));
+}
+
+function roleIsNodeLike(role?: string): boolean {
+  return !!roleScopeMap?.[role || ''];
+}
+
+function roleIsEdgeLike(role?: string): boolean {
+  return roleScopeMap?.[role || ''] === 'EDGE' || role === 'sys_edge_context';
 }
 
 // Client-side derivation of a scope badge from a role id. This mirrors the
@@ -270,6 +267,17 @@ export async function loadRoleScopeMap(): Promise<Record<string, string>> {
 
 export function setRoleScopeMap(map: Record<string, string>) {
   roleScopeMap = map;
+}
+
+export function hasEdgeContextRef(edge: DisplayEdge, roles?: Set<string>): boolean {
+  return edge.modelRefs.some((r) => r.role && ((roles?.has(r.role) ?? false) || roleIsEdgeLike(r.role)));
+}
+
+export function getEdgeContextPairKey(edge: DisplayEdge, roles?: Set<string>): string | null {
+  const ref = edge.modelRefs.find((r) => r.role && ((roles?.has(r.role) ?? false) || roleIsEdgeLike(r.role)));
+  if (!ref?.scope || !('source_id' in ref.scope) || !('target_id' in ref.scope)) return null;
+  const { source_id: a, target_id: b } = ref.scope as { source_id: string; target_id: string };
+  return [a, b].sort().join('|');
 }
 
 export function EntityListRow({
