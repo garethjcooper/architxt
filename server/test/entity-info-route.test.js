@@ -194,11 +194,19 @@ describe('POST /api/v1/entities/info', () => {
     const typeId = seedEntityType(db, 'Service', 'SVC');
     const entId = seedEntity(db, typeId, 'SVC-005', 'Payment Service');
 
+    // Use a distinct custom role so this test model does not collide with the
+    // unique constraint on mm_template_role (the seeded system templates already
+    // occupy sys_* roles).
+    db.prepare(`
+      INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run('risk_profile', 'Risk profile', 'node', 10);
+
     const userTemplateId = seedMentalModel(db, {
       ext_id: 'user-template-risk-{entity-id}',
       name: 'Risk profile: {entity-name}',
       is_template: true,
-      template_role: 'user_entity_derived',
+      template_role: 'risk_profile',
       dimension: 'risk',
       returns: 'narrative',
       source_query: 'Risk profile for {entity-id}',
@@ -214,13 +222,14 @@ describe('POST /api/v1/entities/info', () => {
     });
     seedMentalModelEntity(db, plainModelId, entId);
 
-    const systemTemplateId = seedMentalModel(db, {
-      ext_id: 'test-entity-summary-{id}',
-      name: 'Test entity summary: {entity-name}',
-      is_template: true,
-      template_role: 'sys_entity_summary',
-    });
-    seedMentalModelEntity(db, systemTemplateId, entId);
+    // Use the seeded canonical system summary template to verify system roles
+    // are excluded from derived_models. Creating a second sys_entity_summary
+    // row would violate the unique mm_template_role constraint.
+    const systemTemplateRow = db.prepare(`
+      SELECT mm_id, mm_ext_id FROM mental_models WHERE mm_template_role = ?
+    `).get('sys_entity_summary');
+    assert.ok(systemTemplateRow, 'seeded sys_entity_summary template should exist');
+    seedMentalModelEntity(db, systemTemplateRow.mm_id, entId);
 
     const res = await makeRequest(app, {
       server_id: serverId,
@@ -231,7 +240,7 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(res.status, 200);
     const info = res.body.entities['svc:SVC-005'];
     assert.equal(info.derived_models.length, 1);
-    assert.equal(info.derived_models[0].template_role, 'user_entity_derived');
+    assert.equal(info.derived_models[0].template_role, 'risk_profile');
     assert.equal(info.derived_models[0].ext_id, 'user-template-risk-SVC-005');
     assert.equal(info.derived_models[0].name, 'Risk profile: Payment Service');
     assert.equal(info.derived_models[0].meta.derived_from.template_id, userTemplateId);
