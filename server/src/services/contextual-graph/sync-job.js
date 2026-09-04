@@ -16,12 +16,14 @@ import { addContext as defaultAddContext } from './add-context.js';
 import { refreshContextualGraphPatches as defaultRefreshPatches } from './refresh-patches.js';
 import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from './sync-mental-model-config.js';
 import { cleanupDisallowedModels as defaultCleanupDisallowedModels } from './cleanup-disallowed-models.js';
+import { cleanupOrphanedModels as defaultCleanupOrphanedModels } from './cleanup-orphaned-models.js';
 
 const logger = createLogger('contextual-graph-sync-job');
 
 const STAGES = [
   { name: 'importing_skeleton', label: 'Import Hindsight skeleton' },
   { name: 'cleaning_up_models', label: 'Remove disallowed models' },
+  { name: 'cleaning_up_orphans', label: 'Remove orphaned models' },
   { name: 'deploying_models', label: 'Deploy contextual models' },
   { name: 'syncing_config', label: 'Sync mental-model config' },
   { name: 'refreshing_patches', label: 'Refresh patches' },
@@ -111,6 +113,7 @@ export async function startContextualGraphSyncJob(
 function buildRunner(deps) {
   const importSkeleton = deps.importHindsightSkeleton || defaultImportSkeleton;
   const cleanupDisallowedModels = deps.cleanupDisallowedModels || defaultCleanupDisallowedModels;
+  const cleanupOrphanedModels = deps.cleanupOrphanedModels || defaultCleanupOrphanedModels;
   const addContext = deps.addContext || defaultAddContext;
   const syncMentalModelConfig = deps.syncMentalModelConfig || defaultSyncMentalModelConfig;
   const refreshPatches = deps.refreshPatches || defaultRefreshPatches;
@@ -128,6 +131,7 @@ function buildRunner(deps) {
     const stats = {
       import: {},
       cleanup: {},
+      orphan_cleanup: {},
       deploy: {},
       sync: {},
       refresh: {},
@@ -158,6 +162,15 @@ function buildRunner(deps) {
           throw new StageError(result.error, result.code || 'CLEANUP_FAILED');
         }
         stats.cleanup = result;
+        return result;
+      });
+
+      await runStage(db, jobId, 'cleaning_up_orphans', async () => {
+        const result = await cleanupOrphanedModels(db, serverId, bankId);
+        if (!result.success) {
+          throw new StageError(result.error, result.code || 'ORPHAN_CLEANUP_FAILED');
+        }
+        stats.orphan_cleanup = result;
         return result;
       });
 
