@@ -63,6 +63,7 @@ describe('template roles CRUD', () => {
       'sys_entity_capabilities',
       'sys_edge_context',
       'sys_discovery_context',
+      'user_entity_derived',
     ]);
   });
 
@@ -211,6 +212,7 @@ describe('template roles CRUD', () => {
       'sys_entity_capabilities',
       'sys_edge_context',
       'sys_discovery_context',
+      'user_entity_derived',
     ]);
     assert.equal(roles.every((r) => r.label && r.value), true);
   });
@@ -218,13 +220,14 @@ describe('template roles CRUD', () => {
   it('mental-models listTemplateRoles returns the legacy shape used by /roles/template', () => {
     const rows = listMentalModelTemplateRoles(db);
     assert.ok(Array.isArray(rows), 'expected an array');
-    assert.equal(rows.length, 4, JSON.stringify(rows));
+    assert.equal(rows.length, 5, JSON.stringify(rows));
     const roles = rows.map((r) => r.role);
     assert.deepEqual(roles, [
       'sys_entity_summary',
       'sys_entity_capabilities',
       'sys_edge_context',
       'sys_discovery_context',
+      'user_entity_derived',
     ]);
     assert.ok(rows.every((r) => r.role && r.label && r.derivation_scope !== undefined));
   });

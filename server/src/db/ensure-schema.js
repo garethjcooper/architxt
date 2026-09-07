@@ -504,6 +504,7 @@ function ensureTemplateRoles(db) {
     { role_id: 'sys_entity_capabilities', display_name: 'Entity capabilities', derivation_scope: 'node', sort_order: 2 },
     { role_id: 'sys_edge_context', display_name: 'Edge context', derivation_scope: 'edge', sort_order: 3 },
     { role_id: 'sys_discovery_context', display_name: 'Discovery', derivation_scope: 'seed', sort_order: 4 },
+    { role_id: 'user_entity_derived', display_name: 'User entity derived', derivation_scope: 'node', sort_order: 5 },
   ];
 
   const upsert = db.prepare(`

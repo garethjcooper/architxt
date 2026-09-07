@@ -319,7 +319,8 @@ INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr
 ('sys_entity_summary', 'Entity summary', 'node', 1),
 ('sys_entity_capabilities', 'Entity capabilities', 'node', 2),
 ('sys_edge_context', 'Edge context', 'edge', 3),
-('sys_discovery_context', 'Discovery', 'seed', 4);
+('sys_discovery_context', 'Discovery', 'seed', 4),
+('user_entity_derived', 'User entity derived', 'node', 5);
 
 -- ============================================================================
 -- PROMPT TEMPLATES — reusable prompt compositions for graph/narrative output

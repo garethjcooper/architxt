@@ -260,12 +260,10 @@ export function getDerivationScope(role?: string): string {
 // Human-readable role label from the template_roles table.
 export function getRoleLabel(role?: string): string {
   if (!role) return 'Unknown role';
-  if (role === 'user_entity_derived') return 'User entity derived';
   return roleLabelMap?.[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function getRoleScope(role?: string): string {
-  if (role === 'user_entity_derived') return 'node';
   return roleScopeMap?.[role || ''] || MODEL_ROLE_LABELS[role || ''];
 }
 
