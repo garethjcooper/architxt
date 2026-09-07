@@ -42,8 +42,8 @@ const navItems = [
   { href: '/entities', label: 'Entities', icon: Users },
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
   { href: '/hindsight', label: 'Hindsight Sync', icon: HindsightIcon },
-  { href: '/template-roles', label: 'Template roles', icon: Puzzle },
   { href: '/directives', label: 'Directives', icon: DirectiveIcon },
+  { href: '/template-roles', label: 'Template Roles', icon: Puzzle },
   { href: '/servers', label: 'Servers', icon: Server },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
