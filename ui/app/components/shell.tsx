@@ -36,7 +36,7 @@ const navItems = [
   { href: '/workspace', label: 'Workspace', icon: LayoutTemplate },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/contextual-graph/manager', label: 'Context Patches', icon: Network },
-  { href: '/models', label: 'Models', icon: Layers },
+  { href: '/models', label: 'Mental Models', icon: Layers },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/tags', label: 'Tags', icon: Tags },
   { href: '/entities', label: 'Entities', icon: Users },

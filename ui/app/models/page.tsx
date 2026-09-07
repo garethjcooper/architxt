@@ -41,7 +41,7 @@ const logger = createLogger('ModelsPage');
 export default function ModelsPage() {
   return (
     <Suspense fallback={
-      <PageShell title="Models" loading={true}>
+      <PageShell title="Mental Models" loading={true}>
         <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08]">
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
             <span className="font-medium text-sm">Mental Models</span>
@@ -248,7 +248,7 @@ function ModelsPageContent() {
         </Alert>
       )}
 
-      <PageShell title="Models" loading={loading}>
+      <PageShell title="Mental Models" loading={loading}>
         {
           <div className="flex items-center gap-2 mb-2">
             <div className="relative flex-1 max-w-xs">
