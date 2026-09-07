@@ -223,20 +223,11 @@ function toApiEnvelope(dbRow) {
   if (canonical && typeof canonical === 'object' && Array.isArray(canonical.narratives)) {
     return normalizeEnvelopeForApi(canonical);
   }
-  // Legacy rows may only have split synthesis/canvas fields. Synthesize a
-  // unified envelope once at the API boundary so the UI never has to reason
-  // about two shapes.
-  const synthesis = dbRow.rstep_synthesis;
-  const canvas = dbRow.rstep_canvas_state;
-  const legacyNarrative =
-    typeof synthesis?.narrative === 'string' && synthesis.narrative.trim().length > 0
-      ? [{ narrative_name: synthesis.narrative_name || '', narrative: synthesis.narrative }]
-      : [];
   return normalizeEnvelopeForApi({
-    narratives: legacyNarrative,
-    graph: canvas?.graph || { name: '', nodes: [], edges: [] },
-    tables: canvas?.tables || [],
-    diagrams: canvas?.diagrams || [],
+    narratives: [],
+    graph: { name: '', nodes: [], edges: [] },
+    tables: [],
+    diagrams: [],
   });
 }
 
@@ -252,8 +243,6 @@ const toApiStepSummary = (dbRow) => {
     created_at: dbRow.rstep_created_at,
     selections: dbRow.rstep_selections,
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
-    canvas: dbRow.rstep_canvas_state,
-    synthesis: dbRow.rstep_synthesis,
     envelope: toApiEnvelope(dbRow),
     tool_calls_used: dbRow.rstep_tool_calls_used,
     calls: dbRow.rstep_calls,
@@ -273,8 +262,6 @@ const toApiStep = (dbRow) => {
     parameters: dbRow.rstep_parameters,
     selections: dbRow.rstep_selections,
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
-    canvas: dbRow.rstep_canvas_state,
-    synthesis: dbRow.rstep_synthesis,
     envelope: toApiEnvelope(dbRow),
     tool_calls_used: dbRow.rstep_tool_calls_used,
     calls: dbRow.rstep_calls,
@@ -1417,8 +1404,7 @@ router.post('/synthesize', async (req, res) => {
         parameters: s.rstep_parameters,
         selections: s.rstep_selections,
         viewpoint_ids: s.rstep_viewpoint_ids,
-        canvas: s.rstep_canvas_state,
-        synthesis: s.rstep_synthesis,
+        envelope: s.rstep_envelope,
         calls: s.rstep_calls,
       })),
     };
@@ -1437,8 +1423,6 @@ router.post('/synthesize', async (req, res) => {
       rstep_action_type: 'synthesize',
       rstep_parameters: handlerOptions,
       rstep_viewpoint_ids: [],
-      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
-      rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
       rstep_error_message: null,
@@ -1764,11 +1748,9 @@ router.put('/steps/:id', async (req, res) => {
     return;
   }
 
-  const { intent_text, canvas, synthesis, envelope } = req.body;
+  const { intent_text, envelope } = req.body;
   const updateData = {};
   if (intent_text !== undefined) updateData.rstep_intent_text = intent_text;
-  if (canvas !== undefined) updateData.rstep_canvas_state = canvas;
-  if (synthesis !== undefined) updateData.rstep_synthesis = synthesis;
   if (envelope !== undefined) updateData.rstep_envelope = envelope;
 
   if (Object.keys(updateData).length === 0) {
@@ -1892,8 +1874,7 @@ router.post('/steps/:id/rerun', async (req, res) => {
   }
 
   const snapshot = {
-    rstep_canvas_state: step.rstep_canvas_state,
-    rstep_synthesis: step.rstep_synthesis,
+    rstep_envelope: step.rstep_envelope,
     rstep_calls: step.rstep_calls,
     rstep_status: step.rstep_status,
     rstep_error_message: step.rstep_error_message,

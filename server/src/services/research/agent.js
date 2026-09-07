@@ -36,8 +36,8 @@ function buildCallLog(handlerResult, options, duration_ms) {
 /**
  * Run a single research discovery step.
  *
- * Dispatches to a query-depth handler (prebuilt, recall, reflect, synthesize, models). The handler returns { narrative, graph }. We store only the narrative
- * in rstep_synthesis; findings/seams are no longer part of the contract.
+ * Dispatches to a query-depth handler (prebuilt, recall, reflect, synthesize, models).
+ * Stores the canonical unified envelope in rstep_envelope.
  */
 export async function runDiscoverStep(params) {
   const {
@@ -114,8 +114,7 @@ export async function runDiscoverStep(params) {
     return {
       success: true,
       data: {
-        synthesis: { narrative: '' },
-        canvas,
+        envelope,
         calls,
         tool_calls_used: calls.length,
       },

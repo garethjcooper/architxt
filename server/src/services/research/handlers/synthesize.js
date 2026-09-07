@@ -38,16 +38,10 @@ function collectFromSteps(sourceSteps) {
   const narratives = [];
 
   for (const step of sourceSteps) {
-    const canvas = step.canvas || {};
-    const graph = canvas.graph || {};
     const envelope = step.envelope || {};
-    const synthesis = step.synthesis || {};
+    const graph = envelope.graph || {};
 
-    // Prefer new envelope.narratives; synthesis.narrative is no longer used as a
-    // fallback because the agent always writes envelope.narratives.
-    const stepNarratives = Array.isArray(envelope.narratives) && envelope.narratives.length > 0
-      ? envelope.narratives
-      : (synthesis.narrative ? [{ narrative_name: '', narrative: synthesis.narrative }] : []);
+    const stepNarratives = Array.isArray(envelope.narratives) ? envelope.narratives : [];
     if (stepNarratives.length > 0) {
       const title = `## Step: ${step.intent_text || 'untitled'}`;
       const body = stepNarratives.map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`).join('\n\n');
@@ -193,7 +187,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     sourceStepCount: sourceSteps.length,
     nodeCount: corpusNodes.length,
     edgeCount: corpusEdges.length,
-    narrativeCount: sourceSteps.filter((s) => s.synthesis?.narrative).length,
+    narrativeCount: sourceSteps.filter((s) => s.envelope?.narratives?.some((n) => n.narrative)).length,
   });
 
   const focus = options?.section_focus || {};

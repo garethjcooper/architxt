@@ -1157,27 +1157,6 @@ export interface DiscoverStepResponse {
   query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | string;
   action_type?: string;
   parameters?: Record<string, any> | null;
-  synthesis?: {
-    narrative: string;
-    narrative_name?: string;
-  } | null;
-  canvas?: {
-    graph: {
-      nodes: GraphNode[];
-      edges: GraphEdge[];
-    };
-    tables?: Array<{
-      name: string;
-      columns: string[];
-      rows: Record<string, any>[];
-    }>;
-    diagrams?: Array<{
-      name: string;
-      type: string;
-      content: string;
-    }>;
-    meta?: GraphMeta;
-  } | null;
   /** Unified envelope is the canonical shape for all step responses. */
   envelope: UnifiedEnvelope;
   calls?: Array<{
@@ -1261,8 +1240,6 @@ export interface ResearchStep {
   parameters: Record<string, any> | null;
   selections: any[] | null;
   viewpoint_ids: number[] | null;
-  canvas: DiscoverStepResponse['canvas'] | null;
-  synthesis: DiscoverStepResponse['synthesis'] | null;
   /** Unified envelope is the canonical shape for all step responses. */
   envelope: UnifiedEnvelope;
   calls: ResearchStepCall[] | null;
@@ -1281,8 +1258,6 @@ export interface ResearchStepSummary {
   action_type: string;
   parameters: Record<string, any> | null;
   created_at: string;
-  canvas: DiscoverStepResponse['canvas'] | null;
-  synthesis: DiscoverStepResponse['synthesis'] | null;
   /** Unified envelope is the canonical shape for all step responses. */
   envelope: UnifiedEnvelope;
   selections: any[] | null;

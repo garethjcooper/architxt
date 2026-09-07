@@ -401,8 +401,6 @@ CREATE TABLE research_steps (
   rstep_action_type TEXT NOT NULL,
   rstep_parameters JSON,
   rstep_viewpoint_ids JSON,
-  rstep_canvas_state JSON,
-  rstep_synthesis JSON,
   rstep_envelope JSON,
   rstep_tool_calls_used INTEGER DEFAULT 0,
   rstep_status TEXT,

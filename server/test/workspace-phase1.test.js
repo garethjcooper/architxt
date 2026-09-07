@@ -125,8 +125,6 @@ describe('workspace phase 1: schema and CRUD', () => {
     assert.equal(step.rstep_intent_text, 'My curated page');
     assert.equal(step.rstep_status, 'completed');
     assert.deepEqual(step.rstep_envelope, { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
-    assert.equal(step.rstep_canvas_state, null);
-    assert.equal(step.rstep_synthesis, null);
   });
 
   it('updates a curated_page envelope and title', () => {

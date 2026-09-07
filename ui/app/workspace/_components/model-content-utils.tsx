@@ -119,16 +119,6 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
     viewpoint_ids: [],
     selections: [],
     calls: [],
-    synthesis: {
-      narrative: firstNarrative,
-      narrative_name: firstName,
-    },
-    canvas: {
-      graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
-      tables: content.tables ?? [],
-      diagrams: content.diagrams ?? [],
-      meta: undefined,
-    },
     envelope: content.envelope ?? {
       narratives: content.narratives ?? [],
       graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
