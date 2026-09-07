@@ -80,8 +80,6 @@ const router = Router();
 
 async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, errorMessage = null } = {}) {
   return updateStep(db, stepId, {
-    rstep_canvas_state: snapshot.rstep_canvas_state,
-    rstep_synthesis: snapshot.rstep_synthesis,
     rstep_calls: snapshot.rstep_calls,
     rstep_status: keepFailed ? 'failed' : snapshot.rstep_status,
     rstep_error_message: keepFailed ? errorMessage : snapshot.rstep_error_message,
@@ -184,8 +182,12 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
   await updateStep(db, step.rstep_id, {
-    rstep_canvas_state: { graph: mergedGraph, tables: mergedTables, diagrams: mergedDiagrams },
-    rstep_synthesis: { narrative: narratives.join('\n\n') },
+    rstep_envelope: {
+      narratives: narratives.map((body) => ({ narrative_name: '', narrative: body })),
+      graph: mergedGraph,
+      tables: mergedTables,
+      diagrams: mergedDiagrams,
+    },
     rstep_status: 'completed',
     rstep_error_message: null,
     rstep_tool_calls_used: 1,
@@ -451,8 +453,6 @@ router.post('/discover', async (req, res) => {
       rstep_action_type: effectiveDepth,
       rstep_parameters: handlerOptions,
       rstep_viewpoint_ids: viewpoint_ids,
-      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
-      rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
       rstep_error_message: null,
@@ -685,8 +685,6 @@ router.post('/prebuilt', async (req, res) => {
       rstep_action_type: 'prebuilt',
       rstep_parameters: { roles },
       rstep_viewpoint_ids: [],
-      rstep_canvas_state: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
-      rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
       rstep_error_message: null,
@@ -797,8 +795,12 @@ router.post('/prebuilt', async (req, res) => {
     const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
     await updateStep(db, stepId, {
-      rstep_canvas_state: { graph: mergedGraph, tables: mergedTables, diagrams: mergedDiagrams },
-      rstep_synthesis: { narrative: narratives.join('\n\n') },
+      rstep_envelope: {
+        narratives: narratives.map((body) => ({ narrative_name: '', narrative: body })),
+        graph: mergedGraph,
+        tables: mergedTables,
+        diagrams: mergedDiagrams,
+      },
       rstep_status: 'completed',
       rstep_error_message: parseErrors.length > 0 ? `Some mental models could not be parsed. ${parseErrors.map((e) => `${e.model}: ${e.error}`).join('; ')}` : null,
       rstep_tool_calls_used: 1,
