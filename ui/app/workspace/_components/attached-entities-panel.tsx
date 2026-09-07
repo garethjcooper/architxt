@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/components/research-canvas';
@@ -8,7 +8,7 @@ import { colorForType } from '@/components/research-canvas';
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { MODEL_TAB_LABELS } from './model-content-utils';
 import { type EntityInfo, type Entity } from '@/lib/api/client';
-import { type DisplayNode, getRoleScopeLabel } from '@/lib/contextual-graph/display';
+import { type DisplayNode, getRoleScopeLabel, getRoleLabel, loadRoleScopeMap } from '@/lib/contextual-graph/display';
 import { type ModelContentCacheEntry } from './model-content-utils';
 
 export interface ModelItem {
@@ -16,6 +16,7 @@ export interface ModelItem {
   label: string;
   extId: string;
   category: string;
+  roleLabel?: string;
   edgeCount: number;
 }
 
@@ -68,6 +69,7 @@ function getEntityModelItems(
       label,
       extId: ref.ext_id,
       category: roleLabel,
+      roleLabel: getRoleLabel(ref.role),
       edgeCount: 0,
     });
   });
@@ -79,6 +81,7 @@ function getEntityModelItems(
       label: m.name || extId,
       extId,
       category: MODEL_TAB_LABELS.derived_models,
+      roleLabel: m.template_role ? getRoleLabel(m.template_role) : undefined,
       edgeCount: 0,
     });
   });
@@ -90,6 +93,7 @@ function getEntityModelItems(
       label: m.name || extId,
       extId,
       category: MODEL_TAB_LABELS.plain_models,
+      roleLabel: m.template_role ? getRoleLabel(m.template_role) : undefined,
       edgeCount: 0,
     });
   });
@@ -121,11 +125,14 @@ function getEntityModelItems(
       label = targetLabel ? `${sourceLabel} → ${targetLabel}` : sourceLabel;
     }
 
+    const firstRefRole = contexts[0]?.refs[0]?.role;
+
     items.push({
       key: `edge-${extId}`,
       label,
       extId,
       category: MODEL_TAB_LABELS.edge_contexts,
+      roleLabel: firstRefRole ? getRoleLabel(firstRefRole) : undefined,
       edgeCount: countModelEdges(contentCache, extId) ?? contexts.length,
     });
   });
@@ -160,6 +167,12 @@ export function AttachedEntitiesPanel({
     }
     return map;
   }, [contextualNodes]);
+
+  useEffect(() => {
+    loadRoleScopeMap().catch(() => {
+      // ignore; helpers fall back to role-id formatting
+    });
+  }, []);
 
   const visibleRows = useMemo(() => {
     return entityIds
@@ -255,6 +268,11 @@ export function AttachedEntitiesPanel({
                                   <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
                                     {item.category}
                                   </span>
+                                  {item.roleLabel && (
+                                    <span className="text-[9px] uppercase tracking-wider text-emerald-400/80 shrink-0">
+                                      {item.roleLabel}
+                                    </span>
+                                  )}
                                   <span className="truncate min-w-0 flex-1">{item.label}</span>
                                 </button>
                                 {item.edgeCount !== undefined && item.edgeCount > 0 && (
