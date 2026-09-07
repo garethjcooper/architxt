@@ -216,16 +216,29 @@ const toApiSession = (dbRow) => ({
   updated_at: dbRow.rs_updated_at,
 });
 
+function toApiEnvelope(dbRow) {
+  const canonical = dbRow.rstep_envelope;
+  if (canonical && typeof canonical === 'object' && Array.isArray(canonical.narratives)) {
+    return normalizeEnvelopeForApi(canonical);
+  }
+  // Legacy rows may only have split synthesis/canvas fields. Synthesize a
+  // unified envelope once at the API boundary so the UI never has to reason
+  // about two shapes.
+  const synthesis = dbRow.rstep_synthesis;
+  const canvas = dbRow.rstep_canvas_state;
+  const legacyNarrative =
+    typeof synthesis?.narrative === 'string' && synthesis.narrative.trim().length > 0
+      ? [{ narrative_name: synthesis.narrative_name || '', narrative: synthesis.narrative }]
+      : [];
+  return normalizeEnvelopeForApi({
+    narratives: legacyNarrative,
+    graph: canvas?.graph || { name: '', nodes: [], edges: [] },
+    tables: canvas?.tables || [],
+    diagrams: canvas?.diagrams || [],
+  });
+}
+
 const toApiStepSummary = (dbRow) => {
-  const isCurated = dbRow.rstep_action_type === 'curated_page';
-  const envelope = isCurated
-    ? normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
-        narratives: [],
-        graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
-        tables: dbRow.rstep_canvas_state?.tables ?? [],
-        diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
-      })
-    : undefined;
   return {
     id: dbRow.rstep_id,
     session_id: dbRow.rs_id,
@@ -239,7 +252,7 @@ const toApiStepSummary = (dbRow) => {
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
     canvas: dbRow.rstep_canvas_state,
     synthesis: dbRow.rstep_synthesis,
-    envelope,
+    envelope: toApiEnvelope(dbRow),
     tool_calls_used: dbRow.rstep_tool_calls_used,
     calls: dbRow.rstep_calls,
     status: dbRow.rstep_status || 'completed',
@@ -248,15 +261,6 @@ const toApiStepSummary = (dbRow) => {
 };
 
 const toApiStep = (dbRow) => {
-  const isCurated = dbRow.rstep_action_type === 'curated_page';
-  const envelope = isCurated
-    ? normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
-        narratives: [],
-        graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
-        tables: dbRow.rstep_canvas_state?.tables ?? [],
-        diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
-      })
-    : undefined;
   return {
     id: dbRow.rstep_id,
     session_id: dbRow.rs_id,
@@ -269,7 +273,7 @@ const toApiStep = (dbRow) => {
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
     canvas: dbRow.rstep_canvas_state,
     synthesis: dbRow.rstep_synthesis,
-    envelope,
+    envelope: toApiEnvelope(dbRow),
     tool_calls_used: dbRow.rstep_tool_calls_used,
     calls: dbRow.rstep_calls,
     status: dbRow.rstep_status || 'completed',

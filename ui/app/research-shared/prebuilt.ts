@@ -80,6 +80,7 @@ export function transformPrebuiltToDiscoverResponse(
     bank_id: bankId,
     viewpoint_ids: [],
     query_depth: 'prebuilt',
+    action_type: 'prebuilt',
     synthesis: {
       narrative: narrativeParts.join('\n'),
     },
@@ -94,6 +95,12 @@ export function transformPrebuiltToDiscoverResponse(
           .map((s) => `${s.entity} (${s.role})`) || [],
         mental_model_referenced_entity_ids: response.entities,
       },
+    },
+    envelope: {
+      narratives: [{ narrative_name: '', narrative: narrativeParts.join('\n') }],
+      graph: graphs.length > 0 ? mergeGraphs(...graphs) : { name: '', nodes: [], edges: [] },
+      tables,
+      diagrams,
     },
     tool_calls_used: 0,
   };

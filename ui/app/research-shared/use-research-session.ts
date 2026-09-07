@@ -251,7 +251,7 @@ export function useResearchSession({
   const focusEntityIds = useMemo(() => {
     const ids = new Set<string>();
     for (const step of trail.filter((s) => selectedStepIds.has(s.id))) {
-      for (const n of normalizeGraphShape(step.canvas?.graph).nodes) {
+      for (const n of normalizeGraphShape(step.envelope?.graph).nodes) {
         if (n.source === 'canonical' || n.source === 'alias') ids.add(n.id);
       }
     }
@@ -369,7 +369,7 @@ export function useResearchSession({
           } else {
             setSelectedStepIds((prev) => new Set([...prev, stepId]));
           }
-          if (step.canvas && step.synthesis) {
+          if (step.envelope) {
             setResult({
               step_id: step.id,
               session_id: step.session_id,
@@ -379,6 +379,7 @@ export function useResearchSession({
               query_depth: step.action_type,
               action_type: step.action_type,
               parameters: step.parameters,
+              envelope: step.envelope,
               synthesis: step.synthesis,
               canvas: step.canvas,
               tool_calls_used: step.tool_calls_used,
@@ -488,7 +489,7 @@ export function useResearchSession({
       setLoading(true);
       setError(null);
       const step = await researchApi.getStep(stepId);
-      if (!step.canvas || !step.synthesis) {
+      if (!step.envelope) {
         toast.error('Step has no rendered data');
         return;
       }
@@ -501,6 +502,7 @@ export function useResearchSession({
         query_depth: step.action_type,
         action_type: step.action_type,
         parameters: step.parameters,
+        envelope: step.envelope,
         synthesis: step.synthesis,
         canvas: step.canvas,
         tool_calls_used: step.tool_calls_used,
