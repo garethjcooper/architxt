@@ -152,7 +152,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const isSystemTemplate = model.is_system_template;
   const isRoleTemplate = !!model.template_role;
   const isLockedTemplate = isSystemTemplate || isRoleTemplate;
-  const showDerivedPanel = model.is_template === true && (model.entities?.length > 0 || isRoleTemplate) && !isSystemTemplate;
+  // Derived panel only applies to entity-bound templates. Edge role templates derive from
+  // contextual graph edges, not model.entities, so they use a different UI surface.
+  const showDerivedPanel = model.is_template === true && (model.entities?.length ?? 0) > 0 && !isSystemTemplate;
 
   const selectedTemplateRole = useMemo(
     () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
