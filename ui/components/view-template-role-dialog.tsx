@@ -17,15 +17,14 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-const SCOPE_LABELS: Record<'node' | 'edge' | 'seed' | 'graph', string> = {
+const SCOPE_LABELS: Record<'node' | 'edge' | 'seed', string> = {
   node: 'NODE',
   edge: 'EDGE',
   seed: 'SEED',
-  graph: 'GRAPH',
 };
 
 type Scope = keyof typeof SCOPE_LABELS;
-const SCOPES: Scope[] = ['node', 'edge', 'seed', 'graph'];
+const SCOPES: Scope[] = ['node', 'edge', 'seed'];
 
 interface ViewTemplateRoleDialogProps {
   role: TemplateRole | null;
