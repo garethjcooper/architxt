@@ -18,6 +18,8 @@ import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
+
+const USER_ENTITY_DERIVED_LABEL = 'User entity derived';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DerivedModelHealthDialog } from '@/components/derived-model-health-dialog';
@@ -507,11 +509,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                   System template
                 </span>
               )}
-              {!isSystemTemplate && !isRoleTemplate && isTemplate && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-800/40 text-purple-200/80 border-purple-700/50">
-                  User entity derived
-                </span>
-              )}
             </div>
             <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
             {templateValidation && (
@@ -521,16 +518,16 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
           <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} disabled={isLockedTemplate} />
         </div>
 
-        {isRoleTemplate && (
+          {isTemplate && (
           <div className="space-y-2">
             <Label htmlFor="mm-detail-template-role" className="text-xs uppercase text-white/50 font-medium">
               Template Role
             </Label>
             <p id="mm-detail-template-role" className="text-sm text-white font-mono truncate">
-              {model.template_role}
+              {selectedTemplateRole?.label || model.template_role || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
             </p>
           </div>
-        )}
+          )}
 
         {roleInstructions && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
