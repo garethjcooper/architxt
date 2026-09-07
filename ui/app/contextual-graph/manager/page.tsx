@@ -538,7 +538,7 @@ export default function ContextManagerPage() {
 
   return (
     <PageShell
-      title="Context Manager"
+      title="Context Patches"
     >
       <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-white/10">
         <div className="flex items-center gap-3 flex-wrap">
