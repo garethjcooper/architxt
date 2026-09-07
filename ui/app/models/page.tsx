@@ -419,11 +419,7 @@ function ModelsPageContent() {
                           const roleInfo = model.template_role ? roleLookup.get(model.template_role) : null;
                           if (!roleInfo) return <span className="text-white/30">-</span>;
                           const scope = roleInfo.derivation_scope;
-                          const scopeClass = scope === 'node'
-                            ? 'bg-blue-950/30 text-blue-400 border-blue-500/40'
-                            : scope === 'edge'
-                            ? 'bg-amber-950/30 text-amber-400 border-amber-500/40'
-                            : 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40';
+                          const scopeClass = 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40';
                           return (
                             <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border ${scopeClass}`}>
                               {scope.toUpperCase()}
