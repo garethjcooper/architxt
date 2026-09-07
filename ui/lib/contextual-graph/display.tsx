@@ -243,11 +243,18 @@ function roleIsEdgeLike(role?: string): boolean {
   return roleScopeMap?.[role || ''] === 'EDGE' || role === 'sys_edge_context';
 }
 
-// Client-side derivation of a scope badge from a role id. This mirrors the
-// server-side template_roles table's derivation_scope.
+// Client-side derivation of a scope badge from a role id. Mirrors the
+// server-side template_roles table. Falls back to a readable label for unknown
+// roles; use getDerivationScope() when only NODE/EDGE/SEED/PATCH is needed.
 export function getRoleScopeLabel(role?: string): string {
   if (!role) return 'PATCH';
   return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
+}
+
+// Clean derivation scope (NODE / EDGE / SEED / PATCH) for the scope badge.
+export function getDerivationScope(role?: string): string {
+  if (!role) return 'PATCH';
+  return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || 'PATCH';
 }
 
 // Human-readable role label from the template_roles table.

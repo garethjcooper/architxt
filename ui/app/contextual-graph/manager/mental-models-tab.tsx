@@ -16,7 +16,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { isContextualRole, getRoleScopeLabel, getRoleLabel, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
+import { isContextualRole, getRoleScopeLabel, getRoleLabel, getDerivationScope, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
@@ -499,7 +499,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                     />
                   </TableHead>
                   <TableHead className="w-[16%] text-xs uppercase text-white/60 font-medium py-2 px-3">Template Role</TableHead>
-                  <TableHead className="w-[12%] text-xs uppercase text-white/60 font-medium py-2 px-3">Scope</TableHead>
+                  <TableHead className="w-[8%] text-xs uppercase text-white/60 font-medium py-2 px-3">Scope</TableHead>
+                  <TableHead className="w-[16%] text-xs uppercase text-white/60 font-medium py-2 px-3">Target</TableHead>
                   <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Fetched</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Refresh state</TableHead>
@@ -511,8 +512,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-b border-white/5">
                       <TableCell className="py-2 px-2"><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-10" /></TableCell>
+                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
@@ -521,7 +523,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                   ))
                 ) : filteredRefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-xs text-white/50">
+                    <TableCell colSpan={8} className="text-center py-8 text-xs text-white/50">
                       {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
                     </TableCell>
                   </TableRow>
@@ -529,7 +531,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                   filteredRefs.map((ref) => {
                     const extId = ref.ext_id || '';
                     const roleLabel = getRoleLabel(ref.role);
-                    const scopeLabel = getRoleScopeLabel(ref.role);
+                    const scopeBadge = getDerivationScope(ref.role);
                     const scopeDetail = getScopeLabel(ref, nodes, edges);
                     const op = getOperationForRow(extId);
                     const isRefreshing = Boolean(op) || refreshingIds.has(extId);
@@ -554,14 +556,12 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           <span className="text-xs text-white/90 truncate" title={ref.role}>{roleLabel}</span>
                         </TableCell>
                         <TableCell className="py-2 px-3">
-                          <div className="flex flex-col gap-0.5">
-                            <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20 w-fit">
-                              {scopeLabel}
-                            </Badge>
-                            {scopeDetail && scopeDetail !== '-' && (
-                              <span className="text-[10px] text-white/50 truncate" title={scopeDetail}>{scopeDetail}</span>
-                            )}
-                          </div>
+                          <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20 w-fit">
+                            {scopeBadge}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-xs text-white/70 truncate" title={scopeDetail}>
+                          {scopeDetail}
                         </TableCell>
                         <TableCell className="py-2 px-3 font-mono text-xs text-white/80 truncate" title={extId || '-'}>
                           {extId || '-'}
