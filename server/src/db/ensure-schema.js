@@ -579,7 +579,7 @@ Describe its core architectural role, responsibilities, and relationships to oth
     sourceQuery: `[[{entity-name} ({id})]].
 #table
 #table-name Capabilities
-Return the major architectural capabilities of the entity in a table named "capabilities" with columns: name, responsibility, purpose, business_capability_mapping, evidence.
+Return the major architectural capabilities of the entity in a table with columns: name, responsibility, purpose, business_capability_mapping, evidence.
 - name: the capability name.
 - responsibility: what the entity does for this capability.
 - purpose: why the capability matters.
