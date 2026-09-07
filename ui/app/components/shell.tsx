@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Users,
   Layers,
+  Network,
   LayoutTemplate,
   Puzzle,
 } from "lucide-react";
@@ -34,7 +35,7 @@ import { useServerEnv } from '@/lib/use-server-env';
 const navItems = [
   { href: '/workspace', label: 'Workspace', icon: LayoutTemplate },
   { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/contextual-graph/manager', label: 'Context Patches', icon: Layers },
+  { href: '/contextual-graph/manager', label: 'Context Patches', icon: Network },
   { href: '/models', label: 'Models', icon: Layers },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/tags', label: 'Tags', icon: Tags },
