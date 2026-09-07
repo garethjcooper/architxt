@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { AqlEditor } from '@/components/aql-editor';
+import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -57,6 +57,8 @@ interface ModelDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
   templateRoles?: { value: string; label: string; derivation_scope: string }[];
+  availableEntities?: AqlEntityLike[];
+  availableEdges?: AqlEdgeLike[];
 }
 
 function substitutePlaceholders(template: string | null, entity: Entity): string {
@@ -126,7 +128,7 @@ function buildDerivedRows(model: MentalModel, baseConfig: BaseConfig): DerivedMe
   return (model.entities ?? []).map((entity) => buildDerivedRow(entity, model, baseConfig));
 }
 
-export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templateRoles }: ModelDetailsDialogProps) {
+export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templateRoles, availableEntities = [], availableEdges = [] }: ModelDetailsDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState(model.name ?? '');
   const [sourceQuery, setSourceQuery] = useState(model.source_query ?? '');
@@ -607,8 +609,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             onChange={(value) => handleSourceQueryChange(value)}
             disabled={false}
             placeholder="AQL query used to source this model"
-            availableEntities={[]}
-            availableEdges={[]}
+            availableEntities={availableEntities}
+            availableEdges={availableEdges}
             className={inputClass}
             style={{ ...inputFocusStyle, minHeight: '80px' }}
           />

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { MentalModel } from '@/lib/types/index';
-import { AqlEditor } from '@/components/aql-editor';
+import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import {
   getRoleTemplateRule,
   getRoleTemplateInstructions,
@@ -28,6 +28,8 @@ interface ModelFormProps {
   initial?: MentalModel | null;
   mode: 'create' | 'edit';
   templateRoles?: { value: string; label: string; derivation_scope: string }[];
+  availableEntities?: AqlEntityLike[];
+  availableEdges?: AqlEdgeLike[];
   onSubmit: (data: {
     ext_id: string;
     name: string;
@@ -57,7 +59,7 @@ function validateMaxTokens(value: string): { valid: true; value: number } | { va
   return { valid: true, value: n };
 }
 
-export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, submitLabel }: ModelFormProps) {
+export function ModelForm({ initial, mode, templateRoles, availableEntities = [], availableEdges = [], onSubmit, onCancel, submitLabel }: ModelFormProps) {
   const isSystemTemplate = initial?.is_system_template ?? false;
 
   const [sourceQuery, setSourceQuery] = useState(initial?.source_query ?? '');
@@ -335,8 +337,8 @@ export function ModelForm({ initial, mode, templateRoles, onSubmit, onCancel, su
           onChange={(value) => setSourceQuery(value)}
           disabled={false}
           placeholder="Query used to source this model"
-          availableEntities={[]}
-          availableEdges={[]}
+          availableEntities={availableEntities}
+          availableEdges={availableEdges}
           className={inputClass}
           style={{ ...inputFocusStyle, minHeight: '80px' }}
         />
