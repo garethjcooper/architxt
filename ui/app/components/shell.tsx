@@ -39,7 +39,7 @@ const navItems = [
   { href: '/tags', label: 'Tags', icon: Tags },
   { href: '/entities', label: 'Entities', icon: Users },
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
-  { href: '/hindsight', label: 'Hindsight', icon: HindsightIcon },
+  { href: '/hindsight', label: 'Hindsight Sync', icon: HindsightIcon },
   { href: '/models', label: 'Models', icon: Layers },
   { href: '/template-roles', label: 'Template roles', icon: Puzzle },
   { href: '/directives', label: 'Directives', icon: DirectiveIcon },

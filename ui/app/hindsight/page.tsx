@@ -706,7 +706,7 @@ export default function HindsightPage() {
 
   return (
     <PageShell
-      title="Hindsight"
+      title="Hindsight Sync"
       subtitle={isEntityMode
         ? "Compare and synchronise entity labels with a remote Hindsight server."
         : isMentalModelMode
