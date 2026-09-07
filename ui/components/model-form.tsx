@@ -17,6 +17,9 @@ import {
   validateRoleBasedTemplate,
 } from '@/lib/validation/contextual-template';
 
+const USER_ENTITY_DERIVED_ROLE = 'user_entity_derived';
+const USER_ENTITY_DERIVED_LABEL = 'User entity derived';
+
 const inputFocusStyle = {
   '--tw-ring-color': 'rgb(52, 211, 153)',
   '--tw-ring-opacity': '0.4',
