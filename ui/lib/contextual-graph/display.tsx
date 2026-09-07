@@ -201,9 +201,10 @@ export function PropertyRow({ label, value }: { label: string; value: unknown })
   );
 }
 
-// Obsolete hardcoded role -> badge map. Kept for backwards compatibility until
-// all consumers are migrated; prefer getRoleScopeLabel() which derives from the
-// template_roles table's derivation_scope when known.
+// Obsolete hardcoded role -> scope badge map. Kept for backwards compatibility
+// until all consumers are migrated; prefer getRoleScopeLabel() which derives the
+// derivation_scope from the template_roles table, and getRoleLabel() for the
+// human-readable role name.
 export const MODEL_ROLE_LABELS: Record<string, string> = {
   sys_entity_summary: 'NODE',
   sys_entity_capabilities: 'NODE',
@@ -243,24 +244,34 @@ function roleIsEdgeLike(role?: string): boolean {
 }
 
 // Client-side derivation of a scope badge from a role id. This mirrors the
-// server-side template_roles table: sys_* roles map to NODE / EDGE / SEED /
-// GRAPH; unknown roles fall back to a normalized readable label.
+// server-side template_roles table's derivation_scope.
 export function getRoleScopeLabel(role?: string): string {
   if (!role) return 'PATCH';
   return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
 }
 
+// Human-readable role label from the template_roles table.
+export function getRoleLabel(role?: string): string {
+  if (!role) return 'Unknown role';
+  return roleLabelMap?.[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 let roleScopeMap: Record<string, string> | null = null;
+let roleLabelMap: Record<string, string> | null = null;
 
 export async function loadRoleScopeMap(): Promise<Record<string, string>> {
-  if (roleScopeMap) return roleScopeMap;
+  if (roleScopeMap && roleLabelMap) return roleScopeMap;
   try {
     const roles = await mentalModelsApi.listTemplateRoles();
     roleScopeMap = Object.fromEntries(
       (roles || []).map((r: { value: string; label?: string; derivation_scope?: string }) => [r.value, (r.derivation_scope || '').toUpperCase()]),
     );
+    roleLabelMap = Object.fromEntries(
+      (roles || []).map((r: { value: string; label?: string }) => [r.value, r.label || '']),
+    );
     return roleScopeMap;
   } catch {
+    roleLabelMap = Object.fromEntries(Object.entries(MODEL_ROLE_LABELS).map(([k]) => [k, k.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())]));
     return MODEL_ROLE_LABELS;
   }
 }
@@ -370,7 +381,8 @@ export function PatchRefRow({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const label = getRoleScopeLabel(ref.role);
+  const scopeLabel = getRoleScopeLabel(ref.role);
+  const roleLabel = getRoleLabel(ref.role);
   const type = ref.role || 'patch';
   return (
     <button
@@ -386,8 +398,9 @@ export function PatchRefRow({
     >
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
         <div className="flex items-center gap-2">
+          <span className="text-xs text-white/90 truncate" title={ref.role}>{roleLabel}</span>
           <Badge className="text-[10px] h-4 px-1 bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
-            {label}
+            {scopeLabel}
           </Badge>
           {ref.last_refresh_status && (
             <span className={cn(

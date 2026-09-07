@@ -16,7 +16,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { isContextualRole, getRoleScopeLabel, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
+import { isContextualRole, getRoleScopeLabel, getRoleLabel, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
@@ -128,7 +128,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     return refs.filter((r) => {
       const id = (r.ext_id || '').toLowerCase();
       const role = (r.role || '').toLowerCase();
-      return id.includes(q) || role.includes(q);
+      const roleLabel = getRoleLabel(r.role).toLowerCase();
+      const scopeLabel = getRoleScopeLabel(r.role).toLowerCase();
+      return id.includes(q) || role.includes(q) || roleLabel.includes(q) || scopeLabel.includes(q);
     });
   }, [refs, search]);
 
@@ -496,8 +498,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                       aria-label="Select all visible mental models"
                     />
                   </TableHead>
-                  <TableHead className="w-[16%] text-xs uppercase text-white/60 font-medium py-2 px-3">Role</TableHead>
-                  <TableHead className="w-[18%] text-xs uppercase text-white/60 font-medium py-2 px-3">Scope</TableHead>
+                  <TableHead className="w-[16%] text-xs uppercase text-white/60 font-medium py-2 px-3">Template Role</TableHead>
+                  <TableHead className="w-[12%] text-xs uppercase text-white/60 font-medium py-2 px-3">Scope</TableHead>
                   <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Fetched</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Refresh state</TableHead>
@@ -526,8 +528,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                 ) : (
                   filteredRefs.map((ref) => {
                     const extId = ref.ext_id || '';
-                    const roleLabel = getRoleScopeLabel(ref.role);
-                    const scopeLabel = getScopeLabel(ref, nodes, edges);
+                    const roleLabel = getRoleLabel(ref.role);
+                    const scopeLabel = getRoleScopeLabel(ref.role);
+                    const scopeDetail = getScopeLabel(ref, nodes, edges);
                     const op = getOperationForRow(extId);
                     const isRefreshing = Boolean(op) || refreshingIds.has(extId);
                     const isRowSelected = selectedExtId === extId;
@@ -548,12 +551,17 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           />
                         </TableCell>
                         <TableCell className="py-2 px-3">
-                          <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
-                            {roleLabel}
-                          </Badge>
+                          <span className="text-xs text-white/90 truncate" title={ref.role}>{roleLabel}</span>
                         </TableCell>
-                        <TableCell className="py-2 px-3 text-xs text-white/80 truncate" title={scopeLabel}>
-                          {scopeLabel}
+                        <TableCell className="py-2 px-3">
+                          <div className="flex flex-col gap-0.5">
+                            <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20 w-fit">
+                              {scopeLabel}
+                            </Badge>
+                            {scopeDetail && scopeDetail !== '-' && (
+                              <span className="text-[10px] text-white/50 truncate" title={scopeDetail}>{scopeDetail}</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="py-2 px-3 font-mono text-xs text-white/80 truncate" title={extId || '-'}>
                           {extId || '-'}
@@ -637,7 +645,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           style={{ width: `${panelWidth}%` }}
         >
           <EnvelopeControls
-            headerTitle={selectedRef ? getRoleScopeLabel(selectedRef.role) : 'Content'}
+            headerTitle={selectedRef ? getRoleLabel(selectedRef.role) : 'Content'}
             plain={plainView}
             onPlainChange={setPlainView}
             onCopyText={copyContent}

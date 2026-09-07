@@ -46,6 +46,7 @@ import {
   renderValue,
   getLastRefreshedAt,
   getRoleScopeLabel,
+  getRoleLabel,
   setRoleScopeMap,
 } from '@/lib/contextual-graph/display';
 export type { BackendNode, BackendEdge, ModelRef, DisplayNode, DisplayEdge } from '@/lib/contextual-graph/display';
@@ -468,34 +469,39 @@ export default function ContextManagerPage() {
             <span className="text-white/50 italic">No mental-model refs attached.</span>
           ) : (
             <div className="space-y-2">
-              {modelRefs.map((ref, i) => {
-                return (
-                  <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
-                        {getRoleScopeLabel(ref.role) || ref.role || 'model'}
-                      </Badge>
-                      {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-[10px] text-white/50">
-                      {ref.attached_at && <span>attached {formatRelative(ref.attached_at)}</span>}
-                      {ref.fetched_at && <span>fetched {formatRelative(ref.fetched_at)}</span>}
-                      {ref.content_hash && <span className="font-mono col-span-2">hash {ref.content_hash}</span>}
-                    </div>
-                    <div className="flex flex-col gap-0.5 text-[10px]">
-                      {ref.last_refresh_status ? (
-                        <span className={cn('font-medium', ref.last_refresh_status === 'error' ? 'text-red-400' : ref.last_refresh_status === 'skipped' ? 'text-amber-400' : 'text-emerald-400')}>
-                          {ref.last_refresh_status === 'error' ? '✗' : ref.last_refresh_status === 'skipped' ? '⊘' : '✓'} refresh {ref.last_refresh_status}
-                          {ref.last_refresh_at ? ` ${formatRelative(ref.last_refresh_at)}` : ''}
-                        </span>
-                      ) : null}
-                      {ref.last_refresh_error ? (
-                        <span className="text-red-300/80 line-clamp-2" title={ref.last_refresh_error}>{ref.last_refresh_error}</span>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+                  {modelRefs.map((ref, i) => {
+                    const roleLabel = getRoleLabel(ref.role);
+                    const scopeLabel = getRoleScopeLabel(ref.role);
+                    return (
+                      <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
+                            {scopeLabel}
+                          </Badge>
+                          {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
+                        </div>
+                        <div className="text-[10px] text-white/70 truncate" title={ref.role || 'model'}>
+                          <span className="text-white/40">Template Role:</span> {roleLabel}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-white/50">
+                          {ref.attached_at && <span>attached {formatRelative(ref.attached_at)}</span>}
+                          {ref.fetched_at && <span>fetched {formatRelative(ref.fetched_at)}</span>}
+                          {ref.content_hash && <span className="font-mono col-span-2">hash {ref.content_hash}</span>}
+                        </div>
+                        <div className="flex flex-col gap-0.5 text-[10px]">
+                          {ref.last_refresh_status ? (
+                            <span className={cn('font-medium', ref.last_refresh_status === 'error' ? 'text-red-400' : ref.last_refresh_status === 'skipped' ? 'text-amber-400' : 'text-emerald-400')}>
+                              {ref.last_refresh_status === 'error' ? '✗' : ref.last_refresh_status === 'skipped' ? '⊘' : '✓'} refresh {ref.last_refresh_status}
+                              {ref.last_refresh_at ? ` ${formatRelative(ref.last_refresh_at)}` : ''}
+                            </span>
+                          ) : null}
+                          {ref.last_refresh_error ? (
+                            <span className="text-red-300/80 line-clamp-2" title={ref.last_refresh_error}>{ref.last_refresh_error}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
             </div>
           )}
         </Section>
