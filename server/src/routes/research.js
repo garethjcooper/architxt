@@ -218,13 +218,18 @@ const toApiSession = (dbRow) => ({
 
 const toApiStepSummary = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
-  const envelope = isCurated
-    ? normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
-        narratives: [],
-        graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
-        tables: dbRow.rstep_canvas_state?.tables ?? [],
-        diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
-      })
+  // Newer research handlers store the canonical unified envelope in
+  // rstep_envelope for every step type. Always expose it when present so
+  // the UI can render reflect/synthesize/recall outputs from the envelope
+  // even when the legacy synthesis/canvas split is empty.
+  const envelope = normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
+    narratives: [],
+    graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
+    tables: dbRow.rstep_canvas_state?.tables ?? [],
+    diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
+  });
+  const apiEnvelope = isCurated || envelope.narratives.length > 0 || envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0 || envelope.tables.length > 0 || envelope.diagrams.length > 0
+    ? envelope
     : undefined;
   return {
     id: dbRow.rstep_id,
@@ -239,7 +244,7 @@ const toApiStepSummary = (dbRow) => {
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
     canvas: dbRow.rstep_canvas_state,
     synthesis: dbRow.rstep_synthesis,
-    envelope,
+    envelope: apiEnvelope,
     tool_calls_used: dbRow.rstep_tool_calls_used,
     calls: dbRow.rstep_calls,
     status: dbRow.rstep_status || 'completed',
@@ -249,13 +254,18 @@ const toApiStepSummary = (dbRow) => {
 
 const toApiStep = (dbRow) => {
   const isCurated = dbRow.rstep_action_type === 'curated_page';
-  const envelope = isCurated
-    ? normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
-        narratives: [],
-        graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
-        tables: dbRow.rstep_canvas_state?.tables ?? [],
-        diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
-      })
+  // Newer research handlers store the canonical unified envelope in
+  // rstep_envelope for every step type. Always expose it when present so
+  // the UI can render reflect/synthesize/recall outputs from the envelope
+  // even when the legacy synthesis/canvas split is empty.
+  const envelope = normalizeEnvelopeForApi(dbRow.rstep_envelope ?? {
+    narratives: [],
+    graph: dbRow.rstep_canvas_state?.graph ?? { nodes: [], edges: [] },
+    tables: dbRow.rstep_canvas_state?.tables ?? [],
+    diagrams: dbRow.rstep_canvas_state?.diagrams ?? [],
+  });
+  const apiEnvelope = isCurated || envelope.narratives.length > 0 || envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0 || envelope.tables.length > 0 || envelope.diagrams.length > 0
+    ? envelope
     : undefined;
   return {
     id: dbRow.rstep_id,
@@ -269,7 +279,7 @@ const toApiStep = (dbRow) => {
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
     canvas: dbRow.rstep_canvas_state,
     synthesis: dbRow.rstep_synthesis,
-    envelope,
+    envelope: apiEnvelope,
     tool_calls_used: dbRow.rstep_tool_calls_used,
     calls: dbRow.rstep_calls,
     status: dbRow.rstep_status || 'completed',
