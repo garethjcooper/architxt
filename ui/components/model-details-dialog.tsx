@@ -507,11 +507,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                   System template
                 </span>
               )}
-              {isRoleTemplate && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/40 text-emerald-200/80 border-emerald-700/50">
-                  {model.template_role}
-                </span>
-              )}
               {!isSystemTemplate && !isRoleTemplate && isTemplate && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-800/40 text-purple-200/80 border-purple-700/50">
                   User entity derived
