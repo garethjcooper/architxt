@@ -74,14 +74,27 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
-  const [templateRole, setTemplateRole] = useState(initial?.template_role ?? '');
+  const [templateRole, setTemplateRole] = useState(initial?.template_role || USER_ENTITY_DERIVED_ROLE);
   const [submitting, setSubmitting] = useState(false);
 
   // Reserved system roles cannot be minted manually; hide them from the create dropdown.
+  // For create mode, user-created entity templates default to the user_entity_derived role
+  // so the model has a known derivation scope.
   const availableRoles = useMemo(() => {
     if (mode === 'edit') return templateRoles ?? [];
     return (templateRoles ?? []).filter((r) => !r.value.startsWith('sys_'));
   }, [templateRoles, mode]);
+
+  useEffect(() => {
+    if (mode !== 'create' || isSystemTemplate) return;
+    // Default new user entity templates to user_entity_derived if no role was picked.
+    if (!templateRole) {
+      const exists = availableRoles.find((r) => r.value === USER_ENTITY_DERIVED_ROLE);
+      if (exists) {
+        setTemplateRole(USER_ENTITY_DERIVED_ROLE);
+      }
+    }
+  }, [mode, isSystemTemplate, templateRole, availableRoles]);
 
   const selectedRole = useMemo(
     () => availableRoles.find((r) => r.value === templateRole) ?? null,
@@ -119,7 +132,6 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
     return buildRoleTemplateValue(roleScope, 'name', namePrefix) ?? roleRule.nameTail;
   }, [roleScope, roleRule, namePrefix, rawName]);
 
-  // A non-Generic template role implies templated derivation, so force Entity Template on.
   const effectiveIsTemplate = isTemplate || !!templateRole;
   const roleControlsTemplate = !!templateRole;
 
@@ -211,7 +223,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
         max_tokens: maxTokensValidation.value,
         tags_match_mode: tagsMatchMode,
         is_template: effectiveIsTemplate,
-        template_role: templateRole || undefined,
+        template_role: templateRole === USER_ENTITY_DERIVED_ROLE ? templateRole : templateRole || undefined,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save mental model');

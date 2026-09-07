@@ -157,9 +157,12 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   // contextual graph edges, not model.entities, so they use a different UI surface.
   const showDerivedPanel = model.is_template === true && (model.entities?.length ?? 0) > 0 && !isSystemTemplate;
 
+  const effectiveTemplateRoleId = isSystemTemplate
+    ? model.template_role
+    : (model.template_role || 'user_entity_derived');
   const selectedTemplateRole = useMemo(
-    () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
-    [templateRoles, model.template_role]
+    () => (templateRoles ?? []).find((r) => r.value === effectiveTemplateRoleId) ?? null,
+    [templateRoles, effectiveTemplateRoleId]
   );
   const roleScope = selectedTemplateRole?.derivation_scope ?? null;
   const roleRule = roleScope ? getRoleTemplateRule(roleScope) : null;
@@ -527,7 +530,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               Template Role
             </Label>
             <p id="mm-detail-template-role" className="text-sm text-white font-mono truncate">
-              {selectedTemplateRole?.label || getRoleLabel(model.template_role ?? undefined) || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
+              {selectedTemplateRole?.label || getRoleLabel(effectiveTemplateRoleId || undefined) || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
             </p>
           </div>
           )}
