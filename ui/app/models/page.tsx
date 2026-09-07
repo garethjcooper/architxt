@@ -78,22 +78,37 @@ function ModelsPageContent() {
   const searchParams = useSearchParams();
 
   const [availableEntities, setAvailableEntities] = useState<AqlEntityLike[]>([]);
+  const [templateRoleOptions, setTemplateRoleOptions] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
+
+  const roleLookup = useMemo(() => {
+    const map = new Map<string, { label: string; derivation_scope: string }>();
+    for (const role of templateRoleOptions) {
+      map.set(role.value, { label: role.label, derivation_scope: role.derivation_scope });
+    }
+    return map;
+  }, [templateRoleOptions]);
 
   const filteredModels = useMemo(() => {
     let filtered = models;
     if (search.trim()) {
       const q = search.toLowerCase();
-      filtered = filtered.filter((m) =>
-        m.id.toString().includes(q) ||
-        (m.ext_id && m.ext_id.toLowerCase().includes(q)) ||
-        (m.name && m.name.toLowerCase().includes(q)) ||
-        (m.source_query && m.source_query.toLowerCase().includes(q)) ||
-        (m.tags?.some((t) => t.name.toLowerCase().includes(q))) ||
-        (m.entities?.some((e) => e.name.toLowerCase().includes(q) || e.entity_id.toLowerCase().includes(q)))
-      );
+      filtered = filtered.filter((m) => {
+        const roleInfo = m.template_role ? roleLookup.get(m.template_role) : null;
+        return (
+          m.id.toString().includes(q) ||
+          (m.ext_id && m.ext_id.toLowerCase().includes(q)) ||
+          (m.name && m.name.toLowerCase().includes(q)) ||
+          (m.source_query && m.source_query.toLowerCase().includes(q)) ||
+          (m.template_role && m.template_role.toLowerCase().includes(q)) ||
+          (roleInfo?.label.toLowerCase().includes(q)) ||
+          (roleInfo?.derivation_scope.toLowerCase().includes(q)) ||
+          (m.tags?.some((t) => t.name.toLowerCase().includes(q))) ||
+          (m.entities?.some((e) => e.name.toLowerCase().includes(q) || e.entity_id.toLowerCase().includes(q)))
+        );
+      });
     }
     return filtered;
-  }, [models, search]);
+  }, [models, search, roleLookup]);
 
   const { selected, toggleSelection, toggleAll, clearSelection } = useMultiSelect(filteredModels);
   const displayModels = useMemo(() => {
@@ -102,8 +117,6 @@ function ModelsPageContent() {
     const selectedHidden = models.filter((item) => selected.has(item.id) && !visibleIds.has(item.id));
     return [...filteredModels, ...selectedHidden];
   }, [filteredModels, models, search, selected]);
-
-  const [templateRoleOptions, setTemplateRoleOptions] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -315,6 +328,8 @@ function ModelsPageContent() {
                   </TableHead>
                   <TableHead className={["w-12 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>ID</TableHead>
                   <TableHead className={["w-20 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Template</TableHead>
+                  <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Template Role</TableHead>
+                  <TableHead className={["w-16 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Scope</TableHead>
                   <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>External ID</TableHead>
                   <TableHead className={["w-[16%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</TableHead>
                   <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entities</TableHead>
@@ -336,21 +351,23 @@ function ModelsPageContent() {
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-14" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
-                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
-                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
-                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-10" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                     </TableRow>
                   ))
                 ) : displayModels.length === 0 ? (
                   <TableRow>
-                  <TableCell colSpan={14} className="text-center py-8 text-white/70">
+                  <TableCell colSpan={17} className="text-center py-8 text-white/70">
                       <div className="flex flex-col items-center gap-2">
                         <EntityIcon className="h-8 w-8 opacity-50" />
                         <p>No mental models found.</p>
@@ -385,6 +402,34 @@ function ModelsPageContent() {
                         ) : (
                           <span className="text-white/30">-</span>
                         )}
+                      </TableCell>
+                      <TableCell className="py-1.5 px-4 font-mono text-xs text-white font-semibold">
+                        {(() => {
+                          const roleInfo = model.template_role ? roleLookup.get(model.template_role) : null;
+                          if (!roleInfo) return <span className="text-white/30">-</span>;
+                          return (
+                            <span className="truncate max-w-full inline-block" title={`${model.template_role}`}>
+                              {roleInfo.label}
+                            </span>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="py-1.5 px-4 text-xs">
+                        {(() => {
+                          const roleInfo = model.template_role ? roleLookup.get(model.template_role) : null;
+                          if (!roleInfo) return <span className="text-white/30">-</span>;
+                          const scope = roleInfo.derivation_scope;
+                          const scopeClass = scope === 'node'
+                            ? 'bg-blue-950/30 text-blue-400 border-blue-500/40'
+                            : scope === 'edge'
+                            ? 'bg-amber-950/30 text-amber-400 border-amber-500/40'
+                            : 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40';
+                          return (
+                            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border ${scopeClass}`}>
+                              {scope.toUpperCase()}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="py-1.5 px-4 font-mono text-xs text-white font-semibold">
                         <span className="truncate max-w-full inline-block">{model.ext_id || '-'}</span>
