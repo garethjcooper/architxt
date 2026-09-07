@@ -155,7 +155,7 @@ export default function TemplateRolesPage() {
 
   return (
     <PageShell
-      title="Template roles"
+      title="Template Roles"
       subtitle="Manage system and custom mental-model template roles."
       loading={loading}
     >
