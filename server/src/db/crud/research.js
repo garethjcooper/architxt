@@ -17,8 +17,6 @@ const STEP_JSON_FIELDS = [
   'rstep_selections',
   'rstep_parameters',
   'rstep_viewpoint_ids',
-  'rstep_canvas_state',
-  'rstep_synthesis',
   'rstep_envelope',
   'rstep_calls',
 ];
@@ -179,10 +177,10 @@ export const createStep = (db, data) => dbExec(() => {
   const prepared = toJson(data, STEP_JSON_FIELDS);
   const sql = `INSERT INTO ${STEP_TABLE} (
     rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
-    rstep_action_type, rstep_parameters, rstep_viewpoint_ids, rstep_canvas_state,
-    rstep_synthesis, rstep_status, rstep_error_message,
+    rstep_action_type, rstep_parameters, rstep_viewpoint_ids,
+    rstep_status, rstep_error_message,
     rstep_tool_calls_used, rstep_calls
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     prepared.rs_id,
@@ -193,8 +191,6 @@ export const createStep = (db, data) => dbExec(() => {
     prepared.rstep_action_type,
     prepared.rstep_parameters ?? null,
     prepared.rstep_viewpoint_ids ?? null,
-    prepared.rstep_canvas_state ?? null,
-    prepared.rstep_synthesis ?? null,
     data.rstep_status ?? 'running',
     data.rstep_error_message ?? null,
     prepared.rstep_tool_calls_used ?? 0,
@@ -214,10 +210,10 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
 
   const sql = `INSERT INTO ${STEP_TABLE} (
     rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
-    rstep_action_type, rstep_parameters, rstep_viewpoint_ids, rstep_canvas_state,
-    rstep_synthesis, rstep_envelope, rstep_status, rstep_error_message,
+    rstep_action_type, rstep_parameters, rstep_viewpoint_ids,
+    rstep_envelope, rstep_status, rstep_error_message,
     rstep_tool_calls_used, rstep_calls
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const blankEnvelope = JSON.stringify({ narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
   const result = stmt(db, sql).run(
@@ -229,8 +225,6 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
     'curated_page',
     null,
     null,
-    JSON.stringify({ graph: { nodes: [], edges: [] }, tables: [], diagrams: [] }),
-    JSON.stringify({ narrative: '' }),
     blankEnvelope,
     'completed',
     null,
@@ -252,25 +246,7 @@ export const updateCuratedPage = (db, stepId, data) => dbExec(() => {
     throw new Error('No allowed fields to update');
   }
 
-  // For curated pages, an rstep_envelope update is the canonical write. Keep the
-  // legacy split fields in sync so older consumers continue to work until the
-  // full migration is complete.
   const updateData = Object.fromEntries(entries);
-  if (updateData.rstep_envelope) {
-    const envelope = typeof updateData.rstep_envelope === 'string'
-      ? JSON.parse(updateData.rstep_envelope)
-      : updateData.rstep_envelope;
-    const firstNarrative = Array.isArray(envelope.narratives) ? envelope.narratives[0] : null;
-    updateData.rstep_synthesis = {
-      narrative: firstNarrative?.narrative || '',
-      narrative_name: firstNarrative?.narrative_name || undefined,
-    };
-    updateData.rstep_canvas_state = {
-      graph: envelope.graph ?? { nodes: [], edges: [] },
-      tables: envelope.tables ?? [],
-      diagrams: envelope.diagrams ?? [],
-    };
-  }
 
   const prepared = toJson(updateData, STEP_JSON_FIELDS);
   const columns = Object.keys(updateData).map((key) => `${key} = ?`).join(', ');

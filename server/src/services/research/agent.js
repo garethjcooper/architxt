@@ -104,8 +104,6 @@ export async function runDiscoverStep(params) {
     };
 
     await updateStep(db, rstepId, {
-      rstep_canvas_state: canvas,
-      rstep_synthesis: { narrative: '' },
       rstep_envelope: envelope,
       rstep_tool_calls_used: calls.length,
       rstep_calls: calls,

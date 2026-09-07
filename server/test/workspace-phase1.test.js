@@ -124,8 +124,9 @@ describe('workspace phase 1: schema and CRUD', () => {
     assert.equal(step.rstep_action_type, 'curated_page');
     assert.equal(step.rstep_intent_text, 'My curated page');
     assert.equal(step.rstep_status, 'completed');
-    assert.deepEqual(step.rstep_canvas_state, { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
-    assert.deepEqual(step.rstep_synthesis, { narrative: '' });
+    assert.deepEqual(step.rstep_envelope, { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
+    assert.equal(step.rstep_canvas_state, null);
+    assert.equal(step.rstep_synthesis, null);
   });
 
   it('updates a curated_page envelope and title', () => {
@@ -139,19 +140,19 @@ describe('workspace phase 1: schema and CRUD', () => {
 
     const updateResult = updateCuratedPage(db, stepId, {
       rstep_intent_text: 'Renamed page',
-      rstep_canvas_state: {
-        graph: { nodes: [{ id: 'n1' }], edges: [] },
-        tables: [{ name: 'T1' }],
-        diagrams: [{ name: 'D1', source: 'graph LR\nA-->B' }],
+      rstep_envelope: {
+        narratives: [{ narrative_name: '', narrative: '# Summary\nHello' }],
+        graph: { name: '', nodes: [{ id: 'n1' }], edges: [] },
+        tables: [{ name: 'T1', columns: [], rows: [] }],
+        diagrams: [{ name: 'D1', type: 'mermaid', content: 'graph LR\nA-->B' }],
       },
-      rstep_synthesis: { narrative: '# Summary\nHello' },
     });
     assert.equal(updateResult.success, true);
 
     const step = getStep(db, stepId).data;
     assert.equal(step.rstep_intent_text, 'Renamed page');
-    assert.deepEqual(step.rstep_canvas_state.graph.nodes, [{ id: 'n1' }]);
-    assert.deepEqual(step.rstep_synthesis, { narrative: '# Summary\nHello' });
+    assert.deepEqual(step.rstep_envelope.graph.nodes, [{ id: 'n1' }]);
+    assert.deepEqual(step.rstep_envelope.narratives, [{ narrative_name: '', narrative: '# Summary\nHello' }]);
   });
 
   it('refuses to update a non-curated_page step via updateCuratedPage', () => {
