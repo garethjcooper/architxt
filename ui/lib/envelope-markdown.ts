@@ -1,59 +1,20 @@
-import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedEnvelope, UnifiedNarrativeBlock } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, UnifiedEnvelope, UnifiedNarrativeBlock } from '@/lib/api/client';
 
-type LegacyEnvelope = {
-  synthesis?: { narrative?: string | null; narrative_name?: string | null } | null;
-  canvas?: {
-    graph?: { name?: string | null; nodes?: GraphNode[]; edges?: GraphEdge[] } | null;
-    tables?: Array<{ name: string; columns?: string[]; rows: Record<string, any>[] }> | null;
-    diagrams?: Array<{ name: string; type: string; content: string }> | null;
-  } | null;
-};
-
-export type EnvelopeLike = LegacyEnvelope | UnifiedEnvelope | null | undefined;
-
-function isUnifiedEnvelope(envelope: EnvelopeLike): envelope is UnifiedEnvelope {
-  if (!envelope || typeof envelope !== 'object') return false;
-  return 'narratives' in envelope && !('synthesis' in envelope);
-}
+export type EnvelopeLike = UnifiedEnvelope | null | undefined;
 
 function toNarratives(envelope: EnvelopeLike): UnifiedNarrativeBlock[] {
   if (!envelope || typeof envelope !== 'object') return [];
-  if (isUnifiedEnvelope(envelope)) {
-    return Array.isArray(envelope.narratives)
-      ? envelope.narratives.map((n) => ({
-          narrative_name: n.narrative_name ?? '',
-          narrative: n.narrative ?? '',
-        }))
-      : [];
-  }
-  const legacyNarrative = envelope.synthesis?.narrative ?? '';
-  const legacyName = envelope.synthesis?.narrative_name ?? '';
-  if (typeof legacyNarrative === 'string' && legacyNarrative.trim().length > 0) {
-    return [{ narrative_name: legacyName, narrative: legacyNarrative }];
-  }
-  return [];
+  return Array.isArray(envelope.narratives)
+    ? envelope.narratives.map((n) => ({
+        narrative_name: n.narrative_name ?? '',
+        narrative: n.narrative ?? '',
+      }))
+    : [];
 }
 
 function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   if (!envelope) {
     return { narratives: [], graph: { name: '', nodes: [], edges: [] }, tables: [], diagrams: [] };
-  }
-
-  if (!isUnifiedEnvelope(envelope)) {
-    return {
-      narratives: toNarratives(envelope),
-      graph: {
-        name: envelope.canvas?.graph?.name ?? '',
-        nodes: envelope.canvas?.graph?.nodes ?? [],
-        edges: envelope.canvas?.graph?.edges ?? [],
-      },
-      tables: (envelope.canvas?.tables ?? []).map((t) => ({
-        name: t.name,
-        columns: t.columns ?? [],
-        rows: t.rows,
-      })),
-      diagrams: envelope.canvas?.diagrams ?? [],
-    };
   }
 
   return {
@@ -170,10 +131,10 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
 }
 
 export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): UnifiedEnvelope {
-  // Prefer the unified envelope field when present; fall back to the legacy
-  // split synthesis/canvas shape for non-curated or older responses.
-  const envelopeLike = page.envelope ?? { synthesis: page.synthesis, canvas: page.canvas };
-  return toUnified(envelopeLike);
+  // The server now always returns the canonical unified envelope. If it's ever
+  // missing, treat the step as empty rather than reconstructing from legacy
+  // split fields.
+  return toUnified(page.envelope);
 }
 
 export function normalizeEnvelopeFromNullable(

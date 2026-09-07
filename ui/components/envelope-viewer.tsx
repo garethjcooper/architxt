@@ -63,7 +63,10 @@ export function EnvelopeViewer({
   tabs,
   headerTitle,
 }: EnvelopeViewerProps) {
-  const markdown = useMemo(() => buildEnvelopeMarkdown(envelope ?? null), [envelope]);
+  const markdown = useMemo(() => {
+    const normalized = normalizeEnvelopeFromNullable(envelope);
+    return buildEnvelopeMarkdown(normalized);
+  }, [envelope]);
   const [showIndexState, setShowIndexState] = useState(showIndex);
   const [plain, setPlain] = useState(defaultViewMode === 'plain');
 

@@ -1160,7 +1160,7 @@ export interface DiscoverStepResponse {
   synthesis?: {
     narrative: string;
     narrative_name?: string;
-  };
+  } | null;
   canvas?: {
     graph: {
       nodes: GraphNode[];
@@ -1177,9 +1177,9 @@ export interface DiscoverStepResponse {
       content: string;
     }>;
     meta?: GraphMeta;
-  };
-  /** Unified envelope shape (used by curated_page steps). */
-  envelope?: UnifiedEnvelope;
+  } | null;
+  /** Unified envelope is the canonical shape for all step responses. */
+  envelope: UnifiedEnvelope;
   calls?: Array<{
     tool: string;
     mode: string;
@@ -1263,8 +1263,8 @@ export interface ResearchStep {
   viewpoint_ids: number[] | null;
   canvas: DiscoverStepResponse['canvas'] | null;
   synthesis: DiscoverStepResponse['synthesis'] | null;
-  /** Unified envelope for curated_page steps. Undefined for non-curated steps. */
-  envelope?: UnifiedEnvelope;
+  /** Unified envelope is the canonical shape for all step responses. */
+  envelope: UnifiedEnvelope;
   calls: ResearchStepCall[] | null;
   status: 'running' | 'completed' | 'failed';
   error_message: string | null;
@@ -1283,8 +1283,8 @@ export interface ResearchStepSummary {
   created_at: string;
   canvas: DiscoverStepResponse['canvas'] | null;
   synthesis: DiscoverStepResponse['synthesis'] | null;
-  /** Unified envelope for curated_page steps. Undefined for non-curated steps. */
-  envelope?: UnifiedEnvelope;
+  /** Unified envelope is the canonical shape for all step responses. */
+  envelope: UnifiedEnvelope;
   selections: any[] | null;
   viewpoint_ids: number[] | null;
   calls: ResearchStepCall[] | null;

@@ -74,8 +74,8 @@ export default function WorkspacePage() {
   const selectedStep = useMemo(() => (selectedView?.kind === 'step' ? selectedView.step : null), [selectedView]);
   const selectedModel = useMemo(() => (selectedView?.kind === 'model' ? { entityId: selectedView.entityId, extId: selectedView.extId } : null), [selectedView]);
   const selectedStepHasGraph = useMemo(() => {
-    if (!selectedStep?.canvas?.graph) return false;
-    return selectedStep.canvas.graph.nodes?.length > 0;
+    if (!selectedStep?.envelope?.graph) return false;
+    return selectedStep.envelope.graph.nodes?.length > 0;
   }, [selectedStep]);
   const [inspectingStep, setInspectingStep] = useState<ResearchStepSummary | null>(null);
 
