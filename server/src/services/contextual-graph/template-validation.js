@@ -58,11 +58,6 @@ export function validateRoleBasedTemplate(db, { roleId, extId, name, sourceQuery
     return { valid: false, errors: [`Unknown template role: ${roleId}`] };
   }
 
-  if (scope === 'graph') {
-    // Graph-scoped contextual templates have no fixed placeholder requirements.
-    return { valid: true, errors: [] };
-  }
-
   const rules = SCOPE_RULES[scope];
   if (!rules) {
     return { valid: false, errors: [`Unhandled derivation scope: ${scope}`] };

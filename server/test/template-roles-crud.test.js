@@ -120,7 +120,7 @@ describe('template roles CRUD', () => {
     const result = createTemplateRole(db, {
       role_id: 'Role With Spaces & Symbols!',
       display_name: 'Freeform Role',
-      derivation_scope: 'graph',
+      derivation_scope: 'edge',
     });
     assert.equal(result.success, true, result.error);
   });
@@ -167,9 +167,9 @@ describe('template roles CRUD', () => {
 
   it('updates derivation_scope on custom roles', () => {
     createTemplateRole(db, { role_id: 'editable_scope', display_name: 'Editable', derivation_scope: 'node' });
-    const result = updateTemplateRole(db, 'editable_scope', { derivation_scope: 'graph' });
+    const result = updateTemplateRole(db, 'editable_scope', { derivation_scope: 'edge' });
     assert.equal(result.success, true, result.error);
-    assert.equal(getTemplateRole(db, 'editable_scope').data.derivation_scope, 'graph');
+    assert.equal(getTemplateRole(db, 'editable_scope').data.derivation_scope, 'edge');
   });
 
   it('deletes a custom role when not in use', () => {

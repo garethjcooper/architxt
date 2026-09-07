@@ -108,17 +108,6 @@ describe('template-validation', () => {
     assert.ok(badName.errors.some((e) => e.includes('Name must be')));
   });
 
-  it('allows graph-scoped contextual templates without placeholders', () => {
-    createTemplateRole(db, { role_id: 'graph_role', display_name: 'Graph Role', derivation_scope: 'graph' });
-    const result = validateRoleBasedTemplate(db, {
-      roleId: 'graph_role',
-      extId: 'graph-role',
-      name: 'Graph Role',
-      sourceQuery: 'summary of all entities',
-    });
-    assert.equal(result.valid, true);
-  });
-
   it('extracts and rebuilds prefixes', () => {
     assert.equal(extractRoleTemplatePrefix('node', 'extId', 'prefix-{id}'), 'prefix');
     assert.equal(extractRoleTemplatePrefix('node', 'name', 'Prefix {entity-name}'), 'Prefix');
