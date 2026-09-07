@@ -209,7 +209,7 @@ function loadMentalModelsByEntities(db, entIds) {
 /**
  * Derive per-entity instances for a user-defined template.
  */
-function deriveInstancesForEntity(template, entity, serverId, bankId) {
+function deriveInstancesForEntity(template, entity, db, serverId, bankId) {
   const derived = deriveMentalModels(
     {
       ...template,
@@ -217,7 +217,7 @@ function deriveInstancesForEntity(template, entity, serverId, bankId) {
       created_at: null,
       updated_at: null,
     },
-    { serverId, bankId },
+    { db, serverId, bankId },
     { includeSystemTemplates: true },
   );
   return derived.find((d) => d.derived_entity?.id === entity.id) || null;
@@ -397,7 +397,7 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
         if (isSystemTemplateRole(model.template_role)) continue;
 
         for (const entity of model.entities) {
-          const derived = deriveInstancesForEntity(model, entity, serverId, bankId);
+          const derived = deriveInstancesForEntity(model, entity, db, serverId, bankId);
           if (!derived) continue;
 
           const key = entity.entity_id;

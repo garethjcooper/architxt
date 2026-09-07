@@ -207,6 +207,33 @@ describe('system template hygiene', () => {
     assert.deepEqual(derived, []);
   });
 
+  it('substitutes {id} alias for {entity-id} in derived user templates', () => {
+    const db = getTestDb().db;
+    const derived = deriveMentalModels(
+      {
+        id: 1,
+        is_template: true,
+        template_role: 'user_entity_derived',
+        ext_id: 'derived-{id}',
+        name: 'Derived {entity-name}',
+        source_query: 'Tell me about {id}',
+        refresh_after_consolidation: false,
+        refresh_mode: 'full',
+        exclude_all_mental_models: false,
+        exclude_mental_model_list: null,
+        max_tokens: 2048,
+        tags_match_mode: 'all_strict',
+        tags: [],
+        entities: [{ id: 99, name: 'some-entity', entity_id: 'ent-99' }],
+      },
+      { db }
+    );
+    assert.equal(derived.length, 1);
+    assert.equal(derived[0].ext_id, 'derived-ent-99');
+    assert.equal(derived[0].name, 'Derived some-entity');
+    assert.equal(derived[0].source_query, 'Tell me about ent-99');
+  });
+
   it('allows a normal user template to be deleted and updated', () => {
     const createResult = db.prepare(
       "INSERT INTO mental_models (mm_ext_id, mm_name, mm_is_template, mm_template_role) VALUES (?, ?, ?, ?)"

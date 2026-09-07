@@ -5,6 +5,7 @@ import { getOrCreateTagByName } from './tags.js';
 import { createLogger } from '../../utils/logger.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 import { validateRoleBasedTemplate } from '../../services/contextual-graph/template-validation.js';
+import { getRoleScopeMap } from './template-roles.js';
 
 const logger = createLogger('mental-models-crud');
 
@@ -258,7 +259,10 @@ export function substitutePlaceholders(template, entity, context = {}) {
     .replaceAll(BANK_ID_PLACEHOLDER, context.bankId ?? '')
     .replaceAll(SERVER_ID_PLACEHOLDER, context.serverId != null ? String(context.serverId) : '')
     .replaceAll(NOW_PLACEHOLDER, now.toISOString())
-    .replaceAll(DATE_PLACEHOLDER, date);
+    .replaceAll(DATE_PLACEHOLDER, date)
+    // {id} is a shorthand alias for {entity-id} used by system templates and
+    // user-defined contextual templates; keep it last so explicit replacements win.
+    .replaceAll('{id}', entity.entity_id ?? '');
 }
 
 /**
@@ -286,6 +290,7 @@ export function validateEntityTemplateEligibility({
   mm_name,
   mm_ext_id,
   mm_template_role,
+  mm_source_query,
 }) {
   if (mm_is_template !== 'true') {
     return { valid: true };
@@ -293,6 +298,20 @@ export function validateEntityTemplateEligibility({
 
   // System templates are pre-seeded and do not require user entity placeholders.
   if (isSystemTemplateRole(mm_template_role)) {
+    return { valid: true };
+  }
+
+  // The default user entity role is a plain template; it only needs the
+  // generic entity placeholders used during derivation, not the strict
+  // contextual role format enforced by validateRoleBasedTemplate.
+  if (isUnlimitedTemplateRole(mm_template_role)) {
+    if (!mm_source_query || mm_source_query.trim() === '') {
+      return {
+        valid: false,
+        error: 'Template mode requires a source_query.',
+        code: 'VALIDATION_ERROR',
+      };
+    }
     return { valid: true };
   }
 
@@ -318,6 +337,7 @@ export function validateEntityTemplateEligibility({
 export function validateRoleBasedTemplateEligibility(db, { mm_template_role, mm_ext_id, mm_name, mm_source_query }) {
   if (!mm_template_role) return { valid: true };
   if (isSystemTemplateRole(mm_template_role)) return { valid: true };
+  if (isUnlimitedTemplateRole(mm_template_role)) return { valid: true };
 
   const result = validateRoleBasedTemplate(db, {
     roleId: mm_template_role,
@@ -342,6 +362,7 @@ export function validateRoleBasedTemplateEligibility(db, { mm_template_role, mm_
  * @param {string} [context.bankId]
  * @param {number|string} [context.serverId]
  * @param {string|Date} [context.now]
+ * @param {Object} [context.db] - optional database connection for role scope lookup
  */
 export function deriveMentalModels(template, context = {}, { includeSystemTemplates = false } = {}) {
   const entities = template?.entities;
@@ -352,6 +373,16 @@ export function deriveMentalModels(template, context = {}, { includeSystemTempla
   // System templates are normally derived by the contextual-graph service from
   // graph state, but the prebuilt research path needs per-entity derivation too.
   if (!includeSystemTemplates && isSystemTemplateRole(template.template_role)) {
+    return [];
+  }
+
+  const effectiveRole = template.template_role || 'user_entity_derived';
+  const scopeMap = getRoleScopeMap(context?.db);
+  const scope = scopeMap.get(effectiveRole) || null;
+
+  if (scope === 'edge') {
+    // Edge role templates cannot derive per-entity instances from attached
+    // entities. Derivation for edges is handled by the contextual graph.
     return [];
   }
 
