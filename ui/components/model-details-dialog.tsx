@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
+import { getRoleLabel } from '@/lib/contextual-graph/display';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
 
 const USER_ENTITY_DERIVED_LABEL = 'User entity derived';
@@ -526,7 +527,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               Template Role
             </Label>
             <p id="mm-detail-template-role" className="text-sm text-white font-mono truncate">
-              {selectedTemplateRole?.label || model.template_role || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
+              {selectedTemplateRole?.label || getRoleLabel(model.template_role ?? undefined) || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
             </p>
           </div>
           )}
