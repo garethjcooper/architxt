@@ -59,6 +59,21 @@ function systemTemplateGuard(role, action) {
   };
 }
 
+/** Returns true if the role is a built-in role that should be protected in admin. */
+export function isBuiltInTemplateRole(role) {
+  return role === 'user_entity_derived' || isSystemTemplateRole(role);
+}
+
+/** Reusable guard result for built-in template-role mutations. */
+function builtInTemplateRoleGuard(role, action) {
+  if (!isBuiltInTemplateRole(role)) return { blocked: false };
+  return {
+    blocked: true,
+    error: `Built-in template role cannot be ${action}.`,
+    code: 'BUILT_IN_TEMPLATE_ROLE_IMMUTABLE',
+  };
+}
+
 export function getMentalModelSystemTemplateGuard(db, id, action) {
   const role = getMentalModelTemplateRole(db, id);
   return systemTemplateGuard(role, action);
@@ -610,9 +625,13 @@ export const getMentalModelIdByExtId = (db, extId) => dbExec(() => {
   return row ? row[PK] : null;
 }, `${TABLE}.getIdByExtId`);
 
+export function isUnlimitedTemplateRole(role) {
+  return role === 'user_entity_derived';
+}
+
 /** Read the mental model id that currently owns a non-null template role, if any. */
 function getMentalModelIdByTemplateRole(db, role) {
-  if (!role) return null;
+  if (!role || isUnlimitedTemplateRole(role)) return null;
   const row = db.prepare(`SELECT ${PK} FROM ${TABLE} WHERE mm_template_role = ?`).get(role);
   return row ? row[PK] : null;
 }

@@ -162,7 +162,7 @@ describe('template roles CRUD', () => {
   it('blocks changing derivation_scope on system roles', () => {
     expectImmutableError(
       updateTemplateRole(db, 'sys_entity_summary', { derivation_scope: 'edge' }),
-      'SYSTEM_TEMPLATE_IMMUTABLE'
+      'BUILT_IN_TEMPLATE_ROLE_IMMUTABLE'
     );
   });
 
@@ -194,7 +194,9 @@ describe('template roles CRUD', () => {
   });
 
   it('blocks deleting a system role referenced by its seeded mental model', () => {
-    expectInUseError(deleteTemplateRole(db, 'sys_discovery_context'));
+    const result = deleteTemplateRole(db, 'sys_discovery_context');
+    assert.equal(result.success, false, 'expected delete to fail');
+    assert.equal(result.code, 'BUILT_IN_TEMPLATE_ROLE_IMMUTABLE', `expected BUILT_IN_TEMPLATE_ROLE_IMMUTABLE, got ${result.code}`);
   });
 
   it('exposes seeded roles through the legacy model-type API shape', () => {

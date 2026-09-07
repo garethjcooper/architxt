@@ -93,10 +93,16 @@ export function isKnownTemplateRole(db, roleId) {
   return !!row;
 }
 
+/** Returns true for roles that are seeded/protected by the system. */
+export function isBuiltInTemplateRole(roleId) {
+  return roleId === 'user_entity_derived' || roleId.startsWith('sys_');
+}
+
 /**
  * Validate role_id constraints.
  * No pattern is enforced, but role_id is capped at 64 chars and the
  * sys_ prefix is reserved for seeded system roles.
+ * The user_entity_derived id is also reserved.
  */
 export function validateRoleId(roleId) {
   if (!roleId || typeof roleId !== 'string') {
@@ -111,6 +117,9 @@ export function validateRoleId(roleId) {
   }
   if (trimmed.startsWith('sys_')) {
     return { valid: false, error: 'role_id cannot start with sys_ (reserved prefix)', code: 'VALIDATION_ERROR' };
+  }
+  if (trimmed === 'user_entity_derived') {
+    return { valid: false, error: 'role_id is reserved by the system', code: 'VALIDATION_ERROR' };
   }
   return { valid: true, value: trimmed };
 }
@@ -145,11 +154,11 @@ export const createTemplateRole = (db, { role_id, display_name, derivation_scope
 
 /**
  * Update editable fields of a template role.
- * System roles can only edit display_name and sort_order.
+ * Built-in roles (system and user_entity_derived) can only edit display_name and sort_order.
  * Custom roles can also edit derivation_scope.
  */
 export const updateTemplateRole = (db, roleId, { display_name, derivation_scope, sort_order }) => dbExec(() => {
-  const isSystem = roleId.startsWith('sys_');
+  const isBuiltIn = isBuiltInTemplateRole(roleId);
   const updates = [];
   const values = [];
 
@@ -163,8 +172,8 @@ export const updateTemplateRole = (db, roleId, { display_name, derivation_scope,
   }
 
   if (derivation_scope !== undefined && derivation_scope !== null) {
-    if (isSystem) {
-      throw Object.assign(new Error('derivation_scope cannot be changed for system roles'), { code: 'SYSTEM_TEMPLATE_IMMUTABLE' });
+    if (isBuiltIn) {
+      throw Object.assign(new Error('derivation_scope cannot be changed for built-in roles'), { code: 'BUILT_IN_TEMPLATE_ROLE_IMMUTABLE' });
     }
     if (!VALID_SCOPES.has(derivation_scope)) {
       throw Object.assign(new Error('derivation_scope must be node, edge or seed'), { code: 'VALIDATION_ERROR' });
@@ -194,9 +203,13 @@ export const updateTemplateRole = (db, roleId, { display_name, derivation_scope,
 
 /**
  * Delete a template role. Blocked when any mental model references it.
- * System roles are deletable only when not in use.
+ * Built-in roles (system and user_entity_derived) cannot be deleted.
  */
 export const deleteTemplateRole = (db, roleId) => dbExec(() => {
+  if (isBuiltInTemplateRole(roleId)) {
+    throw Object.assign(new Error('Built-in template role cannot be deleted'), { code: 'BUILT_IN_TEMPLATE_ROLE_IMMUTABLE' });
+  }
+
   const inUse = db.prepare(`SELECT 1 FROM mental_models WHERE mm_template_role = ? LIMIT 1`).get(roleId);
   if (inUse) {
     throw Object.assign(new Error('Template role is in use by one or more mental models'), { code: 'TEMPLATE_ROLE_IN_USE' });
