@@ -231,11 +231,6 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
                 System template
               </span>
             )}
-            {selectedRole && !isSystemTemplate && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-900/40 text-emerald-300 border-emerald-700/50">
-                {selectedRole.label} · {selectedRole.derivation_scope}
-              </span>
-            )}
           </div>
           <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
           {roleRequirementHint && (
