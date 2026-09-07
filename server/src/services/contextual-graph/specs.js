@@ -163,12 +163,6 @@ export async function deriveSpecForRef(db, serverId, bankId, ref) {
     return deriveContextualModelSpec(db, ref.role, 'seed', SCOPE_VALUES.seed(seedTarget, []));
   }
 
-  if (scopeType === 'graph') {
-    // Graph-scoped contextual models have no single backing item; they always
-    // qualify as long as their role is configured.
-    return deriveContextualModelSpec(db, ref.role, 'graph', {});
-  }
-
   logger.warn('Unhandled derivation scope', { serverId, bankId, ref, scopeType });
   return null;
 }

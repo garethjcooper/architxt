@@ -2,7 +2,7 @@ import { dbExec } from '../../utils/db-helpers.js';
 
 const TABLE = 'template_roles';
 const PK = 'tr_role_id';
-const VALID_SCOPES = new Set(['node', 'edge', 'seed', 'graph']);
+const VALID_SCOPES = new Set(['node', 'edge', 'seed']);
 
 // Direct db.prepare is used below (instead of the shared stmt cache) because
 // template role primary keys are strings and tests create many ephemeral SQLite
@@ -130,7 +130,7 @@ export const createTemplateRole = (db, { role_id, display_name, derivation_scope
   }
 
   if (!VALID_SCOPES.has(derivation_scope)) {
-    throw Object.assign(new Error('derivation_scope must be node, edge, seed or graph'), { code: 'VALIDATION_ERROR' });
+    throw Object.assign(new Error('derivation_scope must be node, edge or seed'), { code: 'VALIDATION_ERROR' });
   }
 
   const order = sort_order === undefined || sort_order === null ? 1 : Number(sort_order);
@@ -167,7 +167,7 @@ export const updateTemplateRole = (db, roleId, { display_name, derivation_scope,
       throw Object.assign(new Error('derivation_scope cannot be changed for system roles'), { code: 'SYSTEM_TEMPLATE_IMMUTABLE' });
     }
     if (!VALID_SCOPES.has(derivation_scope)) {
-      throw Object.assign(new Error('derivation_scope must be node, edge, seed or graph'), { code: 'VALIDATION_ERROR' });
+      throw Object.assign(new Error('derivation_scope must be node, edge or seed'), { code: 'VALIDATION_ERROR' });
     }
     updates.push('tr_derivation_scope = ?');
     values.push(derivation_scope);
