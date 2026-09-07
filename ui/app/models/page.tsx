@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { mentalModelsApi, serversApi, contextualGraphApi, ApiError, type Server } from '@/lib/api/client';
+import { mentalModelsApi, entitiesApi, ApiError } from '@/lib/api/client';
 import { useMultiSelect } from '@/hooks/useMultiSelect';
 import type { MentalModel } from '@/lib/types/index';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,8 +28,7 @@ import { AlertCircle, Plus, Trash2, RefreshCw, Tag, Search, X, TableIcon, Settin
 import { EntityIcon } from '@/components/icons/entity-icon';
 import { toast } from 'sonner';
 import { PageShell } from '@/app/components/page-shell';
-import { backendNodeToDisplayNode, backendEdgeToDisplayEdge, isGroundedNode, isGroundedEdge } from '@/lib/contextual-graph/display';
-import type { EntityLike as AqlEntityLike, EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
+import type { EntityLike as AqlEntityLike } from '@/components/aql-editor';
 import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { Button } from '@/components/ui/button';
@@ -78,11 +77,7 @@ function ModelsPageContent() {
   const [search, setSearch] = useState('');
   const searchParams = useSearchParams();
 
-  const [servers, setServers] = useState<Server[]>([]);
-  const [selectedServerId, setSelectedServerId] = useState<string>('');
-  const [selectedBankId, setSelectedBankId] = useState<string>('');
-  const [graphNodes, setGraphNodes] = useState<ReturnType<typeof backendNodeToDisplayNode>[]>([]);
-  const [graphEdges, setGraphEdges] = useState<ReturnType<typeof backendEdgeToDisplayEdge>[]>([]);
+  const [availableEntities, setAvailableEntities] = useState<AqlEntityLike[]>([]);
 
   const filteredModels = useMemo(() => {
     let filtered = models;
@@ -123,59 +118,19 @@ function ModelsPageContent() {
     }).catch((err) => {
       logger.error('Failed to load template roles', { error: err });
     });
+
+    // Load Architxt's own entity catalogue to power [[ completion in source queries.
+    entitiesApi.list().then((entities) => {
+      setAvailableEntities(entities.map((e) => ({
+        id: e.entity_id,
+        entity_id: e.entity_id,
+        label: e.name,
+        type: e.type_name,
+      })));
+    }).catch((err) => {
+      logger.error('Failed to load entities for source-query completion', { error: err });
+    });
   }, []);
-
-  // Load first available contextual graph bank to power [[ completion in source queries.
-  useEffect(() => {
-    let cancelled = false;
-    async function loadServersAndGraph() {
-      try {
-        const serverData = await serversApi.list();
-        if (cancelled) return;
-        const serverList = Array.isArray(serverData) ? serverData : [];
-        setServers(serverList);
-        if (serverList.length === 0) return;
-
-        const firstServer = serverList[0];
-        setSelectedServerId(String(firstServer.id));
-        const bankData = await serversApi.listBanks(firstServer.id);
-        if (cancelled) return;
-        const bankList = Array.isArray(bankData) ? bankData : [];
-        if (bankList.length === 0) return;
-
-        const bank = bankList[0];
-        setSelectedBankId(bank.bank_id);
-        const [nodesData, edgesData] = await Promise.all([
-          contextualGraphApi.listNodes(firstServer.id, bank.bank_id, { limit: 2000 }),
-          contextualGraphApi.listEdges(firstServer.id, bank.bank_id, { limit: 2000 }),
-        ]);
-        if (cancelled) return;
-        setGraphNodes(nodesData.map(backendNodeToDisplayNode).filter(isGroundedNode));
-        setGraphEdges(edgesData.map(backendEdgeToDisplayEdge).filter(isGroundedEdge));
-      } catch (err) {
-        logger.error('Failed to load contextual graph for source-query completion', { error: err });
-      }
-    }
-    loadServersAndGraph();
-    return () => { cancelled = true; };
-  }, []);
-
-  const aqlEntities: AqlEntityLike[] = useMemo(() => {
-    return graphNodes.map((node) => ({
-      id: node.id,
-      label: node.label,
-      type: node.type,
-    }));
-  }, [graphNodes]);
-
-  const aqlEdges: AqlEdgeLike[] = useMemo(() => {
-    return graphEdges.map((edge) => ({
-      from: edge.source_id,
-      to: edge.target_id,
-      label: edge.label || edge.type,
-      type: edge.type,
-    }));
-  }, [graphEdges]);
 
   async function fetchModels() {
     try {
@@ -608,8 +563,8 @@ function ModelsPageContent() {
             <ModelForm
               mode="create"
               templateRoles={templateRoleOptions}
-              availableEntities={aqlEntities}
-              availableEdges={aqlEdges}
+              availableEntities={availableEntities}
+              availableEdges={[]}
               onSubmit={async (data) => {
                 try {
                   await mentalModelsApi.create(data);
@@ -641,8 +596,8 @@ function ModelsPageContent() {
             fetchModels();
           }}
           templateRoles={templateRoleOptions}
-          availableEntities={aqlEntities}
-          availableEdges={aqlEdges}
+          availableEntities={availableEntities}
+          availableEdges={[]}
         />
       )}
 
