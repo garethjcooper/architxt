@@ -60,7 +60,7 @@ function getEntityModelItems(
 
   info.contextual_refs.forEach((ref, i) => {
     if (!ref.ext_id) return;
-    const roleLabel = getRoleScopeLabel(ref.role);
+    const roleLabel = getRoleLabel(ref.role);
     const rolePrefix = ref.role.replace(/^sys_/, '').replace(/_/g, '-') + '-';
     const entityId = ref.ext_id.startsWith(rolePrefix) ? ref.ext_id.slice(rolePrefix.length) : ref.ext_id;
     const label = resolveName(entityId);

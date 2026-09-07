@@ -248,19 +248,25 @@ function roleIsEdgeLike(role?: string): boolean {
 // roles; use getDerivationScope() when only NODE/EDGE/SEED/PATCH is needed.
 export function getRoleScopeLabel(role?: string): string {
   if (!role) return 'PATCH';
-  return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
+  return getRoleScope(role).toUpperCase() || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
 }
 
 // Clean derivation scope (NODE / EDGE / SEED) for the scope badge.
 export function getDerivationScope(role?: string): string {
-  const scope = roleScopeMap?.[role || ''] || MODEL_ROLE_LABELS[role || ''];
+  const scope = getRoleScope(role);
   return scope === 'NODE' || scope === 'EDGE' || scope === 'SEED' ? scope : '-';
 }
 
 // Human-readable role label from the template_roles table.
 export function getRoleLabel(role?: string): string {
   if (!role) return 'Unknown role';
+  if (role === 'user_entity_derived') return 'User entity derived';
   return roleLabelMap?.[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function getRoleScope(role?: string): string {
+  if (role === 'user_entity_derived') return 'node';
+  return roleScopeMap?.[role || ''] || MODEL_ROLE_LABELS[role || ''];
 }
 
 let roleScopeMap: Record<string, string> | null = null;
