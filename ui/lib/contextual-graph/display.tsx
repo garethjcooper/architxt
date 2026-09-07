@@ -251,10 +251,10 @@ export function getRoleScopeLabel(role?: string): string {
   return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
 }
 
-// Clean derivation scope (NODE / EDGE / SEED / PATCH) for the scope badge.
+// Clean derivation scope (NODE / EDGE / SEED) for the scope badge.
 export function getDerivationScope(role?: string): string {
-  if (!role) return 'PATCH';
-  return roleScopeMap?.[role] || MODEL_ROLE_LABELS[role] || 'PATCH';
+  const scope = roleScopeMap?.[role || ''] || MODEL_ROLE_LABELS[role || ''];
+  return scope === 'NODE' || scope === 'EDGE' || scope === 'SEED' ? scope : '-';
 }
 
 // Human-readable role label from the template_roles table.
