@@ -10,6 +10,7 @@ import {
   buildConditionalFragments,
 } from '../src/prompts/template-service.js';
 import { validateEntityTemplateEligibility } from '../src/db/crud/mental-models.js';
+import { clearCache } from '../src/cache.js';
 
 const NON_CONTEXTUAL_MODES = [
   'generic',
@@ -84,6 +85,47 @@ describe('composeMentalModelPrompt', () => {
           `composed prompt for ${mode} should not contain unsubstituted ARCHITXT_TOPIC placeholder`,
         );
       }
+    } finally {
+      db.close();
+      fs.unlinkSync(file);
+    }
+  });
+
+  it('composes sys_entity_capabilities from the #table-name directive, not a hardcoded table name', async () => {
+    const file = path.join(process.cwd(), `tmp/test-compose-capabilities-${Date.now()}.db`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    clearCache();
+    const db = new Database(file);
+    try {
+      db.pragma('journal_mode = WAL');
+      db.pragma('foreign_keys = ON');
+      ensureSchema(db);
+
+      const topic = [
+        '[[Singleview (Company:COM-001)]].',
+        '#table',
+        '#table-name Capabilities',
+        'Return the major architectural capabilities of the entity with columns: name, responsibility, purpose, business_capability_mapping, evidence.',
+        '#end',
+      ].join('\n');
+
+      const prompt = await composeMentalModelPrompt(db, 'sys_entity_capabilities', topic);
+      assert.ok(
+        prompt.includes('Capabilities'),
+        'composed prompt should include the #table-name value in the output directive',
+      );
+      assert.ok(
+        !prompt.includes('table named "capabilities"'),
+        'composed prompt should not hardcode the old capabilities table name in the body',
+      );
+      assert.ok(
+        prompt.includes('### Table generation rules'),
+        'composed prompt should include the shared output-format-table-contextual.md fragment',
+      );
+      assert.ok(
+        !prompt.includes('{{ARCHITXT_TABLE_FOCUS}}'),
+        'ARCHITXT_TABLE_FOCUS placeholder should be substituted',
+      );
     } finally {
       db.close();
       fs.unlinkSync(file);
