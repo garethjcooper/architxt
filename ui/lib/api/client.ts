@@ -651,7 +651,7 @@ export const mentalModelsApi = {
 export interface TemplateRole {
   role_id: string;
   display_name: string;
-  derivation_scope: 'node' | 'edge' | 'seed' | 'graph';
+  derivation_scope: 'node' | 'edge' | 'seed';
   sort_order: number;
   is_system: boolean;
   usage_count: number;
@@ -664,7 +664,7 @@ export const templateRolesApi = {
   create: (data: {
     role_id: string;
     display_name: string;
-    derivation_scope: 'node' | 'edge' | 'seed' | 'graph';
+    derivation_scope: 'node' | 'edge' | 'seed';
     sort_order?: number;
   }) => fetchApi<{ role_id: string }>('/template-roles', {
     method: 'POST',
@@ -672,7 +672,7 @@ export const templateRolesApi = {
   }),
   update: (roleId: string, data: {
     display_name?: string;
-    derivation_scope?: 'node' | 'edge' | 'seed' | 'graph';
+    derivation_scope?: 'node' | 'edge' | 'seed';
     sort_order?: number;
   }) => fetchApi<{ success: boolean }>(`/template-roles/${roleId}`, {
     method: 'PATCH',

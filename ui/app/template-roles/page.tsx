@@ -18,11 +18,10 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('TemplateRolesPage');
 
-const SCOPE_LABELS: Record<'node' | 'edge' | 'seed' | 'graph', string> = {
+const SCOPE_LABELS: Record<'node' | 'edge' | 'seed', string> = {
   node: 'NODE',
   edge: 'EDGE',
   seed: 'SEED',
-  graph: 'GRAPH',
 };
 
 export default function TemplateRolesPage() {

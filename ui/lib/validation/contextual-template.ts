@@ -1,4 +1,4 @@
-export type DerivationScope = 'node' | 'edge' | 'seed' | 'graph';
+export type DerivationScope = 'node' | 'edge' | 'seed';
 
 interface ScopeRule {
   extIdTail: string;
@@ -80,7 +80,7 @@ export function validateRoleBasedTemplate(
 ): { valid: boolean; errors: string[]; missingQueryPlaceholders: string[] } {
   const rule = getRoleTemplateRule(scope);
   if (!rule) {
-    return { valid: scope === 'graph' || !scope, errors: [], missingQueryPlaceholders: [] };
+    return { valid: !scope, errors: [], missingQueryPlaceholders: [] };
   }
 
   const errors: string[] = [];
