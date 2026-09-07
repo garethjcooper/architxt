@@ -1,4 +1,4 @@
-import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, GraphNode, GraphEdge, UnifiedNarrativeBlock } from '@/lib/api/client';
 
 export interface TableItem {
   name: string;
@@ -13,8 +13,8 @@ export interface DiagramItem {
 }
 
 type EnvelopeLike = {
-  synthesis?: { narrative?: string | null } | null;
-  canvas?: {
+  envelope?: {
+    narratives?: UnifiedNarrativeBlock[];
     graph?: { nodes?: GraphNode[]; edges?: GraphEdge[] } | null;
     tables?: TableItem[] | null;
     diagrams?: DiagramItem[] | null;

@@ -380,8 +380,6 @@ export function useResearchSession({
               action_type: step.action_type,
               parameters: step.parameters,
               envelope: step.envelope,
-              synthesis: step.synthesis,
-              canvas: step.canvas,
               tool_calls_used: step.tool_calls_used,
               error_message: step.error_message || null,
             });
@@ -503,8 +501,6 @@ export function useResearchSession({
         action_type: step.action_type,
         parameters: step.parameters,
         envelope: step.envelope,
-        synthesis: step.synthesis,
-        canvas: step.canvas,
         tool_calls_used: step.tool_calls_used,
         error_message: step.error_message || null,
       });

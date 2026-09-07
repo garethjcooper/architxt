@@ -81,21 +81,6 @@ export function transformPrebuiltToDiscoverResponse(
     viewpoint_ids: [],
     query_depth: 'prebuilt',
     action_type: 'prebuilt',
-    synthesis: {
-      narrative: narrativeParts.join('\n'),
-    },
-    canvas: {
-      graph: graphs.length > 0 ? mergeGraphs(...graphs) : { nodes: [], edges: [] },
-      tables,
-      diagrams,
-      meta: {
-        mental_model_applied_to: response.entities,
-        mental_model_missing: response.entity_summary
-          ?.filter((s) => !s.found)
-          .map((s) => `${s.entity} (${s.role})`) || [],
-        mental_model_referenced_entity_ids: response.entities,
-      },
-    },
     envelope: {
       narratives: [{ narrative_name: '', narrative: narrativeParts.join('\n') }],
       graph: graphs.length > 0 ? mergeGraphs(...graphs) : { name: '', nodes: [], edges: [] },

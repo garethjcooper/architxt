@@ -69,7 +69,7 @@ describe('synthesize handler', () => {
 
   it('returns missing model response when source material exists but no model is configured', async () => {
     const result = await handleSynthesize(1, 'bank', 'test query', {
-      source_steps: [{ synthesis: { narrative: 'Narrative' }, canvas: { graph: { nodes: [], edges: [] } } }],
+      source_steps: [{ envelope: { narratives: [{ narrative_name: '', narrative: 'Narrative' }], graph: { nodes: [], edges: [] } } }],
       output_mode: 'narrative+graph',
     }, db);
     assert.equal(result.success, true);
@@ -107,8 +107,8 @@ describe('synthesize handler', () => {
     const sourceSteps = [
       {
         intent_text: 'step one',
-        synthesis: { narrative: 'Narrative one' },
-        canvas: {
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
           graph: {
             nodes: [
               { id: 'a-com:COM-001', name: 'Singleview' },
@@ -162,8 +162,8 @@ describe('synthesize handler', () => {
     const sourceSteps = [
       {
         intent_text: 'step one',
-        synthesis: { narrative: 'Narrative one' },
-        canvas: {
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
           graph: {
             nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }],
             edges: [],
@@ -202,8 +202,8 @@ describe('synthesize handler', () => {
     const sourceSteps = [
       {
         intent_text: 'step one',
-        synthesis: { narrative: 'Narrative one' },
-        canvas: {
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
           graph: { nodes: [], edges: [] },
           tables: [],
           diagrams: [{
@@ -237,8 +237,10 @@ describe('synthesize handler', () => {
     const sourceSteps = [
       {
         intent_text: 'step one',
-        synthesis: { narrative: 'Narrative one' },
-        canvas: { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] },
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
+          graph: { nodes: [], edges: [] },
+        },
       },
     ];
 

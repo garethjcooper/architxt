@@ -98,8 +98,6 @@ function ensureMissingTables(db) {
         rstep_action_type TEXT NOT NULL,
         rstep_parameters JSON,
         rstep_viewpoint_ids JSON,
-        rstep_canvas_state JSON,
-        rstep_synthesis JSON,
         rstep_envelope JSON,
         rstep_tool_calls_used INTEGER DEFAULT 0,
         rstep_status TEXT,
@@ -719,8 +717,7 @@ function relaxResearchStepsParentCascade(db) {
   // table when adding a column. Existing columns are preserved.
   const columns = [
     'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
-    'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_canvas_state',
-    'rstep_synthesis', 'rstep_proposed_actions', 'rstep_anchors', 'rstep_intent_tag',
+    'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
     'rstep_status', 'rstep_error_message',
     'rstep_tool_calls_used', 'rstep_tool_tokens_used', 'rstep_synthesis_tokens_used',
     'rstep_truncated_by', 'rstep_created_at'
@@ -740,8 +737,7 @@ function relaxResearchStepsParentCascade(db) {
       rstep_action_type TEXT NOT NULL,
       rstep_parameters JSON,
       rstep_viewpoint_ids JSON,
-      rstep_canvas_state JSON,
-      rstep_synthesis JSON,
+      rstep_envelope JSON,
       rstep_status TEXT,
       rstep_error_message TEXT,
       rstep_tool_calls_used INTEGER DEFAULT 0,
@@ -1298,49 +1294,95 @@ function ensureResearchSessionsServerFk(db) {
   }
 }
 
-/**
- * Migrate curated_page steps so they store their entire content as a single
- * rstep_envelope object. Non-curated steps keep legacy rstep_synthesis and
- * rstep_canvas_state untouched.
- */
-function migrateCuratedPagesToEnvelope(db) {
+function migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db) {
   const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='research_steps'").get();
   if (!tableExists) return 0;
-  const colExists = db.prepare("PRAGMA table_info(research_steps)").all().some((c) => c.name === 'rstep_envelope');
-  if (!colExists) return 0;
 
-  const pending = db.prepare(`
-    SELECT rstep_id, rstep_synthesis, rstep_canvas_state
-    FROM research_steps
-    WHERE rstep_action_type = 'curated_page' AND rstep_envelope IS NULL
-  `).all();
+  const cols = new Set(db.prepare("PRAGMA table_info(research_steps)").all().map((r) => r.name));
+  const hasCanvas = cols.has('rstep_canvas_state');
+  const hasSynthesis = cols.has('rstep_synthesis');
+  const hasEnvelope = cols.has('rstep_envelope');
 
-  if (!pending || pending.length === 0) return 0;
+  if (!hasCanvas && !hasSynthesis) return 0;
 
-  const update = db.prepare(`
-    UPDATE research_steps
-    SET rstep_envelope = ?
-    WHERE rstep_id = ?
-  `);
+  if (hasEnvelope) {
+    // Backfill rows that have legacy split fields but no unified envelope.
+    const pending = db.prepare(`
+      SELECT rstep_id, rstep_synthesis, rstep_canvas_state
+      FROM research_steps
+      WHERE rstep_envelope IS NULL AND (rstep_synthesis IS NOT NULL OR rstep_canvas_state IS NOT NULL)
+    `).all();
 
-  let migrated = 0;
-  for (const row of pending) {
-    const synthesis = row.rstep_synthesis ? JSON.parse(row.rstep_synthesis) : { narrative: '' };
-    const canvas = row.rstep_canvas_state ? JSON.parse(row.rstep_canvas_state) : { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
-    const firstNarrative = typeof synthesis.narrative === 'string' ? synthesis.narrative : '';
-    const envelope = {
-      narratives: firstNarrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: firstNarrative }] : [],
-      graph: canvas.graph ?? { nodes: [], edges: [] },
-      tables: canvas.tables ?? [],
-      diagrams: canvas.diagrams ?? [],
-    };
-    update.run(JSON.stringify(envelope), row.rstep_id);
-    migrated++;
+    const update = db.prepare(`
+      UPDATE research_steps
+      SET rstep_envelope = ?
+      WHERE rstep_id = ?
+    `);
+
+    for (const row of pending) {
+      const synthesis = row.rstep_synthesis ? JSON.parse(row.rstep_synthesis) : { narrative: '' };
+      const canvas = row.rstep_canvas_state ? JSON.parse(row.rstep_canvas_state) : { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+      const firstNarrative = typeof synthesis.narrative === 'string' ? synthesis.narrative : '';
+      const envelope = {
+        narratives: firstNarrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: firstNarrative }] : [],
+        graph: canvas.graph ?? { nodes: [], edges: [] },
+        tables: canvas.tables ?? [],
+        diagrams: canvas.diagrams ?? [],
+      };
+      update.run(JSON.stringify(envelope), row.rstep_id);
+    }
+
+    if (pending.length > 0) {
+      logger.info(`Backfilled ${pending.length} legacy step(s) into rstep_envelope`);
+    }
   }
-  if (migrated > 0) {
-    logger.info(`Migrated ${migrated} curated_page step(s) to rstep_envelope`);
+
+  // Recreate research_steps without the legacy split columns.
+  logger.warn('Recreating research_steps to remove rstep_canvas_state and rstep_synthesis');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`CREATE TABLE _research_steps_new (
+      rstep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rs_id INTEGER NOT NULL,
+      rstep_parent_step_id INTEGER,
+      rstep_intent_text TEXT NOT NULL,
+      rstep_raw_query TEXT,
+      rstep_selections JSON,
+      rstep_action_type TEXT NOT NULL,
+      rstep_parameters JSON,
+      rstep_viewpoint_ids JSON,
+      rstep_envelope JSON,
+      rstep_tool_calls_used INTEGER DEFAULT 0,
+      rstep_status TEXT,
+      rstep_error_message TEXT,
+      rstep_calls JSON,
+      rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+      FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+    )`);
+
+    const columns = [
+      'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
+      'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
+      'rstep_tool_calls_used', 'rstep_status', 'rstep_error_message', 'rstep_calls', 'rstep_created_at'
+    ];
+    const colList = columns.join(', ');
+    db.exec(`INSERT INTO _research_steps_new (${colList}) SELECT ${colList} FROM research_steps`);
+    db.exec('DROP TABLE research_steps');
+    db.exec('ALTER TABLE _research_steps_new RENAME TO research_steps');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_steps_session ON research_steps(rs_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_steps_parent ON research_steps(rstep_parent_step_id)');
+
+    const fkCheck = db.pragma('foreign_key_check');
+    if (fkCheck && fkCheck.length > 0) {
+      logger.warn('Foreign key check found issues after research_steps migration', { issues: fkCheck });
+    }
+
+    logger.info('Recreated research_steps without legacy canvas/synthesis columns');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
   }
-  return migrated;
 }
 
 /**
@@ -1543,7 +1585,7 @@ export function ensureSchema(db) {
     const removed = removeMentalModelCheckConstraints(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
     const mmReturnsMigrated = migrateMentalModelReturnsToGeneric(db);
-    const curatedPagesMigrated = migrateCuratedPagesToEnvelope(db);
+    const curatedPagesMigrated = migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db);
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
     const researchFkFixed = ensureResearchSessionsServerFk(db);
