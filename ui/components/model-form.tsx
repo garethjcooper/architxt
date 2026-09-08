@@ -239,17 +239,21 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             )}
           </div>
           <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
-          {roleRequirementHint && (
-            <p className="text-[10px] text-emerald-400/80 mt-0.5">{roleRequirementHint}</p>
-          )}
           {roleInstructions && (
-            <p className="text-[10px] text-amber-400/80 mt-0.5">{roleInstructions}</p>
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100 mt-2">
+              <p className="font-medium">{selectedRole?.label} format requirements</p>
+              <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
+            </div>
+          )}
+          {roleTemplateValidation && roleTemplateValidation.errors.length > 0 && (
+            <div className="mt-2 space-y-0.5">
+              {roleTemplateValidation.errors.map((err, idx) => (
+                <p key={idx} className="text-[10px] text-red-400">{err}</p>
+              ))}
+            </div>
           )}
           {genericTemplateValidation && (
             <p className="text-[10px] text-red-400 mt-0.5">{genericTemplateValidation}</p>
-          )}
-          {roleTemplateValidation && roleTemplateValidation.errors.length > 0 && (
-            <p className="text-[10px] text-red-400 mt-0.5">{roleTemplateValidation.errors.join(' ')}</p>
           )}
           {!genericTemplateValidation && !roleScope && isTemplate && (
             <p className="text-[10px] text-white/40 mt-0.5">Generic templates also require a placeholder.</p>
