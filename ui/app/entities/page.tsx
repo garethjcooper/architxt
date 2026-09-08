@@ -38,7 +38,6 @@ import { CreateEntityTypeDialog } from '@/components/create-entity-type-dialog';
 import { ViewEntityDialog } from '@/components/view-entity-dialog';
 import { ViewEntityTypeDialog } from '@/components/view-entity-type-dialog';
 import { ImportDialog, parseEntityImport } from '@/components/import-dialog';
-import { colorForType } from '@/components/research-canvas';
 import { ManageEntityConfigDialog } from '@/components/manage-entity-config-dialog';
 import { EntityDocumentsDialog } from '@/components/entity-documents-dialog';
 import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
@@ -435,24 +434,8 @@ export default function EntitiesPage() {
                           })()}
                         </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs font-medium text-white/80">{item.name}</TableCell>
-                        <TableCell className="py-1.5 px-4">
-                          {(() => {
-                            const typeName = entityTypeName(item.type_id);
-                            const typeColor = colorForType(typeName);
-                            return (
-                              <span
-                                title={typeName}
-                                className="inline-flex px-2.5 py-1 rounded-full text-[10px] border transition-colors"
-                                style={{
-                                  color: typeColor,
-                                  backgroundColor: `${typeColor}1A`,
-                                  borderColor: `${typeColor}33`,
-                                }}
-                              >
-                                {typeName}
-                              </span>
-                            );
-                          })()}
+                        <TableCell className="py-1.5 px-4 text-xs text-white/70">
+                          {entityTypeName(item.type_id)}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {(() => {

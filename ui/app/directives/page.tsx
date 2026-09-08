@@ -272,11 +272,11 @@ export default function DirectivesPage() {
                   </td>
                   <td className="py-1.5 px-4 text-xs">
                     {directive.is_active ? (
-                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-semibold tracking-wide border bg-emerald-950/30 text-emerald-400 border-emerald-500/40">
+                      <span className="text-emerald-400 font-medium">
                         ACTIVE
                       </span>
                     ) : (
-                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-semibold tracking-wide border bg-red-950/30 text-red-400 border-red-500/40">
+                      <span className="text-red-400 font-medium">
                         INACTIVE
                       </span>
                     )}
