@@ -127,15 +127,17 @@ function ModelsPageContent() {
 
   useEffect(() => {
     fetchModels();
-    // Load all roles for display/lookup, then load available roles for the create dropdown.
-    Promise.all([
-      mentalModelsApi.listTemplateRoles(),
-      mentalModelsApi.listTemplateRoles({ available: true }),
-    ]).then(([allRoles, availableRoles]) => {
-      setTemplateRoleOptions(allRoles);
-      setAvailableTemplateRoles(availableRoles);
+    // Load all roles for display/lookup; failure here would hide role labels/scopes in the table.
+    mentalModelsApi.listTemplateRoles().then((roles) => {
+      setTemplateRoleOptions(roles);
     }).catch((err) => {
-      logger.error('Failed to load template roles', { error: err });
+      logger.error('Failed to load all template roles for display lookup', { error: err instanceof Error ? err.message : String(err) });
+    });
+    // Load only assignable roles for the create dropdown.
+    mentalModelsApi.listTemplateRoles({ available: true }).then((roles) => {
+      setAvailableTemplateRoles(roles);
+    }).catch((err) => {
+      logger.error('Failed to load available template roles for create dropdown', { error: err instanceof Error ? err.message : String(err) });
     });
 
     // Load Architxt's own entity catalogue to power [[ completion in source queries.
@@ -147,7 +149,7 @@ function ModelsPageContent() {
         type: e.type_name,
       })));
     }).catch((err) => {
-      logger.error('Failed to load entities for source-query completion', { error: err });
+      logger.error('Failed to load entities for source-query completion', { error: err instanceof Error ? err.message : String(err) });
     });
   }, []);
 
