@@ -40,8 +40,6 @@ import { ViewEntityTypeDialog } from '@/components/view-entity-type-dialog';
 import { ImportDialog, parseEntityImport } from '@/components/import-dialog';
 import { ManageEntityConfigDialog } from '@/components/manage-entity-config-dialog';
 import { EntityDocumentsDialog } from '@/components/entity-documents-dialog';
-import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
-import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import { formatEntityIdPattern } from '@/lib/entity-id-pattern';
@@ -80,8 +78,6 @@ export default function EntitiesPage() {
 
   /* ── Freeze panes state ── */
   const [freeze, setFreeze] = useState(false);
-  const [compactBadges, setCompactBadges] = useState(false);
-  const [showAllBadges, setShowAllBadges] = useState(false);
 
   /* ── Entity Types tab state ── */
   const [createTypeOpen, setCreateTypeOpen] = useState(false);
@@ -342,20 +338,6 @@ export default function EntitiesPage() {
               <div className="flex-1" />
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setShowAllBadges(!showAllBadges)}
-                  title={showAllBadges ? 'Limit to 3 badges' : 'Show all badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
-                >
-                  <BadgeExpandIcon className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => setCompactBadges(!compactBadges)}
-                  title={compactBadges ? 'Expand badges' : 'Compact badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
-                >
-                  <BadgeCompactIcon className="h-5 w-5" />
-                </button>
-                <button
                   onClick={() => setFreeze(!freeze)}
                   title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
                   className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
@@ -420,7 +402,14 @@ export default function EntitiesPage() {
                             return <span title={formatEntityIdPattern(type)}>{formatEntityIdPattern(type)}</span>;
                           })()}
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs font-medium text-white/80">{item.name}</TableCell>
+                        <TableCell className="py-1.5 px-4">
+                          <span
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium border bg-purple-800/15 text-purple-400 border-purple-700/20"
+                            title={item.name}
+                          >
+                            {item.name}
+                          </span>
+                        </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs text-white/70">
                           {entityTypeName(item.type_id)}
                         </TableCell>
@@ -476,34 +465,19 @@ export default function EntitiesPage() {
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {item.aliases.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {(showAllBadges ? item.aliases : item.aliases.slice(0, 3))?.map((a, i) => {
-                                const isHit = entitySearch.trim() && a.toLowerCase().includes(entitySearch.toLowerCase());
-                                return (
-                                  <span
-                                    key={i}
-                                    className={`${!compactBadges ? 'inline-flex truncate max-w-[120px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
-                                      isHit
-                                        ? 'bg-purple-800/30 text-purple-200 border-purple-700/40 ring-1 ring-purple-400/40'
-                                        : 'bg-purple-800/15 text-purple-400 border-purple-700/20'
-                                    }`}
-                                  >
-                                    {a}
-                                  </span>
-                                );
-                              })}
-                              {!showAllBadges && item.aliases.length > 3 && (
+                            (() => {
+                              const full = item.aliases.join(', ');
+                              const isHit = entitySearch.trim() && item.aliases.some((a) => a.toLowerCase().includes(entitySearch.toLowerCase()));
+                              const truncated = full.length > 50 ? full.slice(0, 50).replace(/,\s*[^,]*$/, '') + '…' : full;
+                              return (
                                 <span
-                                  className={`text-[10px] px-1 rounded ${
-                                    entitySearch.trim() && item.aliases.slice(3).some((a) => a.toLowerCase().includes(entitySearch.toLowerCase()))
-                                      ? 'text-purple-300 bg-purple-400/15'
-                                      : 'text-white/30'
-                                  }`}
+                                  title={full}
+                                  className={`text-[10px] ${isHit ? 'text-purple-300' : 'text-white/60'}`}
                                 >
-                                  +{item.aliases.length - 3}
+                                  {truncated}
                                 </span>
-                              )}
-                            </div>
+                              );
+                            })()
                           ) : (
                             <span className="text-white/20 text-[10px]">-</span>
                           )}
