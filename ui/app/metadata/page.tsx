@@ -308,7 +308,7 @@ export default function MetadataPage() {
                     </td>
                     <td className="py-1.5 px-4 text-xs">
                       {item.usage_count ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-400/20 text-blue-300 border border-blue-400/30">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                           {item.usage_count} document{item.usage_count !== 1 ? 's' : ''}
                         </span>
                       ) : (

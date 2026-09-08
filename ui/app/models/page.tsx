@@ -400,11 +400,11 @@ function ModelsPageContent() {
                       <TableCell className="py-1.5 px-4 font-mono text-xs">{model.id}</TableCell>
                       <TableCell className="py-1.5 px-4 text-xs">
                         {model.is_system_template ? (
-                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-slate-700/40 text-white/70 border-slate-600">
+                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                             System
                           </Badge>
                         ) : model.is_template ? (
-                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-purple-800/15 text-purple-400 border-purple-700/20">
+                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                             Template
                           </Badge>
                         ) : (
@@ -427,7 +427,7 @@ function ModelsPageContent() {
                           const roleInfo = model.template_role ? roleLookup.get(model.template_role) : null;
                           if (!roleInfo) return <span className="text-white/30">-</span>;
                           const scope = roleInfo.derivation_scope;
-                          const scopeClass = 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40';
+                          const scopeClass = 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd';
                           return (
                             <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border ${scopeClass}`}>
                               {scope.toUpperCase()}
@@ -511,15 +511,15 @@ function ModelsPageContent() {
                         {model.tags_match_mode ?? 'all_strict'}
                       </TableCell>
                       <TableCell className="py-1.5 px-4 text-xs">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-slate-700/40 text-white/80 border-slate-600">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                           {model.refresh_mode === 'delta' ? 'Delta' : 'Full'}
                         </span>
                       </TableCell>
                       <TableCell className="py-1.5 px-4 text-xs">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
                           model.refresh_after_consolidation
-                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                            : 'bg-slate-700/40 text-white/60 border-slate-600'
+                            ? 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
+                            : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
                         }`}>
                           {model.refresh_after_consolidation ? 'ON' : 'OFF'}
                         </span>
@@ -527,8 +527,8 @@ function ModelsPageContent() {
                       <TableCell className="py-1.5 px-4 text-xs">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
                           model.exclude_all_mental_models
-                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                            : 'bg-slate-700/40 text-white/60 border-slate-600'
+                            ? 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
+                            : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
                         }`}>
                           {model.exclude_all_mental_models ? 'ON' : 'OFF'}
                         </span>
