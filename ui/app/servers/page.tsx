@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, Server as ServerIcon, Activity, Loader2, CheckCircle, XCircle, RefreshCw, TableIcon, Network } from 'lucide-react';
 import { serversApi } from '@/lib/api/client';
+import { familyClass } from '@/lib/status-badge';
 import { useMultiSelect } from '@/hooks/useMultiSelect';
 import { CreateServerDialog } from '@/components/create-server-dialog';
 import { ViewServerDialog } from '@/components/view-server-dialog';
@@ -247,17 +248,16 @@ export default function ServersPage() {
                   <td className="py-1.5 px-4">
                     <div className="flex items-center gap-2">
                       {healthStatus[server.id] && (
-                        healthStatus[server.id]?.status === 'ok' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400" title={healthStatus[server.id]?.message}>
-                            <CheckCircle className="h-3.5 w-3.5" />
-                            OK
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-red-400" title={healthStatus[server.id]?.message}>
-                            <XCircle className="h-3.5 w-3.5" />
-                            Error
-                          </span>
-                        )
+                        (() => {
+                          const isOk = healthStatus[server.id]?.status === 'ok';
+                          const Icon = isOk ? CheckCircle : XCircle;
+                          return (
+                            <span className={`inline-flex items-center gap-1 text-[11px] ${isOk ? familyClass.success : familyClass.danger}`} title={healthStatus[server.id]?.message}>
+                              <Icon className="h-3.5 w-3.5" />
+                              {isOk ? 'OK' : 'Error'}
+                            </span>
+                          );
+                        })()
                       )}
                       {checkingHealth.has(server.id) && (
                         <Loader2 className="h-3.5 w-3.5 text-white/40 animate-spin" />

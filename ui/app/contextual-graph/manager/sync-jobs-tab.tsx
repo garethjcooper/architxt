@@ -11,6 +11,7 @@ import { contextualGraphApi } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { familyClass } from '@/lib/status-badge';
 import { formatDistanceToNow, format } from 'date-fns';
 import { RefreshCw, XCircle, AlertTriangle } from 'lucide-react';
 
@@ -36,26 +37,27 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  running: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  completed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  failed: 'bg-red-500/20 text-red-300 border-red-500/30',
-  cancelled: 'bg-white/10 text-white/50 border-white/10',
+const statusBadgeClass: Record<string, string> = {
+  pending: familyClass.caution,
+  running: familyClass.info,
+  completed: familyClass.success,
+  completed_with_issues: familyClass.caution,
+  failed: familyClass.danger,
+  cancelled: familyClass.neutral,
 };
 
-const STAGE_STATUS_COLORS: Record<string, string> = {
+const stageStatusClass: Record<string, string> = {
   pending: 'bg-white/20',
-  running: 'bg-blue-500 animate-pulse',
-  completed: 'bg-emerald-500',
-  completed_with_issues: 'bg-amber-500',
-  failed: 'bg-red-500',
+  running: 'bg-badge-info-fg animate-pulse',
+  completed: 'bg-badge-success-fg',
+  completed_with_issues: 'bg-badge-caution-fg',
+  failed: 'bg-badge-danger-fg',
 };
 
-const STAGE_LABEL_COLORS: Record<string, string> = {
-  failed: 'text-red-400',
-  completed_with_issues: 'text-amber-400',
-  running: 'text-blue-400',
+const stageLabelClass: Record<string, string> = {
+  failed: 'text-badge-danger-fg',
+  completed_with_issues: 'text-badge-caution-fg',
+  running: 'text-badge-info-fg',
   completed: 'text-white/40',
   pending: 'text-white/40',
 };
@@ -355,7 +357,7 @@ export function SyncJobsTab({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Badge variant="outline" className={cn('text-[9px] px-1 py-0', STATUS_COLORS[job.status] || 'bg-white/10 text-white/50')}>
+                        <Badge variant="outline" className={cn('text-[9px] px-1 py-0', statusBadgeClass[job.status] || familyClass.neutral)}>
                           {job.status}
                         </Badge>
                         {hasIssues && (
@@ -393,7 +395,7 @@ export function SyncJobsTab({
                       Cancel
                     </Button>
                   )}
-                  <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', STATUS_COLORS[selectedJob.status] || 'bg-white/10 text-white/50')}>
+                  <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', statusBadgeClass[selectedJob.status] || familyClass.neutral)}>
                     {selectedJob.status}
                   </Badge>
                 </div>
@@ -427,7 +429,7 @@ export function SyncJobsTab({
                       return (
                         <div key={stage.name} className="flex items-center justify-between rounded border border-white/5 bg-black/10 px-2 py-1">
                           <div className="flex items-center gap-2">
-                            <span className={cn('w-2 h-2 rounded-full', STAGE_STATUS_COLORS[stage.status] || 'bg-white/20')} />
+                            <span className={cn('w-2 h-2 rounded-full', stageStatusClass[stage.status] || 'bg-white/20')} />
                             <span className="text-[11px] text-white/80">{stage.label || stage.name}</span>
                             {stageIssues && <AlertTriangle className="w-3 h-3 text-amber-400" />}
                           </div>
@@ -435,7 +437,7 @@ export function SyncJobsTab({
                             {stage.issue_count > 0 && (
                               <span className="text-[10px] text-amber-400">{stage.issue_count} issue{stage.issue_count === 1 ? '' : 's'}</span>
                             )}
-                            <span className={cn('text-[10px]', STAGE_LABEL_COLORS[stage.status] || 'text-white/40')}>
+                            <span className={cn('text-[10px]', stageLabelClass[stage.status] || 'text-white/40')}>
                               {stage.status === 'completed_with_issues' ? 'completed with issues' : stage.status}
                             </span>
                           </div>

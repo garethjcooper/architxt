@@ -35,27 +35,9 @@ import { MetadataIcon } from '@/components/icons/metadata-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
 import { formatErrorSummary } from '@/lib/error-format';
+import { getStatusBadge } from '@/lib/status-badge';
 
 const logger = createLogger('DocumentsPage');
-
-// Status badge mapping — unique colours, no overlap with action buttons
-const statusColors: Record<string, string> = {
-  uploaded:              'bg-fuchsia-800/15 text-fuchsia-400 border-fuchsia-700/20',
-  ready_to_extract:      'bg-sky-800/15 text-sky-400 border-sky-700/20',
-  processing_extract:    'bg-amber-800/15 text-amber-400 border-amber-700/20',
-  request_release:       'bg-yellow-800/15 text-yellow-400 border-yellow-700/20',
-  processed_extract_success: 'bg-emerald-800/15 text-emerald-400 border-emerald-700/20',
-  processed_extract_failed:  'bg-rose-800/15 text-rose-400 border-rose-700/20',
-};
-
-const statusLabels: Record<string, string> = {
-  uploaded: 'uploaded',
-  ready_to_extract: 'ready to extract',
-  processing_extract: 'extracting',
-  request_release: 'releasing',
-  processed_extract_success: 'extracted',
-  processed_extract_failed: 'extracted - failed',
-};
 
 // Manage tab dropdown options — pure Architxt concepts
 const MANAGE_FILTERS = [
@@ -589,14 +571,14 @@ function DocumentsPageContent() {
                       >
                         <Badge
                           title={getLastExtractError(doc) || undefined}
-                          className={`text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 ${statusColors[doc.status] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}
+                          className={`${getStatusBadge(doc.status).className} text-[10px] px-2.5 py-1 border inline-flex items-center gap-1`}
                         >
                           {doc.status === 'processed_extract_failed' ? (
                             <AlertCircle className="h-3 w-3 shrink-0" />
                           ) : (
                             <ArchitxtIcon className="h-3 w-3" />
                           )}
-                          {statusLabels[doc.status] || doc.status}
+                          {getStatusBadge(doc.status).label}
                         </Badge>
                       </TableCell>
                     </TableRow>
