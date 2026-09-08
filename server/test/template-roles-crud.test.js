@@ -315,6 +315,24 @@ describe('mental model role assignment rules', () => {
     expectInUseError(second);
   });
 
+  it('allows assigning user_entity_derived to multiple models', () => {
+    const first = createMentalModel(db, {
+      mm_ext_id: 'mm-user-derived-1',
+      mm_name: 'User Derived 1',
+      mm_source_query: 'MATCH (n) RETURN n',
+      mm_template_role: 'user_entity_derived',
+    });
+    assert.equal(first.success, true, first.error);
+
+    const second = createMentalModel(db, {
+      mm_ext_id: 'mm-user-derived-2',
+      mm_name: 'User Derived 2',
+      mm_source_query: 'MATCH (n) RETURN n',
+      mm_template_role: 'user_entity_derived',
+    });
+    assert.equal(second.success, true, second.error);
+  });
+
   it('allows updating a model when mm_template_role is unchanged', () => {
     createTemplateRole(db, { role_id: 'role_a', display_name: 'Role A', derivation_scope: 'node' });
     const createResult = createMentalModel(db, {
