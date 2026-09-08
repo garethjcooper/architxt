@@ -36,6 +36,10 @@
   --badge-info-fg: oklch(0.8 0.1 250);
   --badge-info-bd: oklch(0.65 0.1 250 / 0.3);
 
+  --badge-entity-bg: oklch(0.5 0.18 300 / 0.15);
+  --badge-entity-fg: oklch(0.78 0.16 300);
+  --badge-entity-bd: oklch(0.55 0.14 300 / 0.25);
+
   --background: oklch(0.38 0 0);
   --foreground: oklch(0.92 0 0);
   --card: oklch(0.38 0 0);
@@ -183,6 +187,9 @@
   --color-badge-info-bg: var(--badge-info-bg);
   --color-badge-info-fg: var(--badge-info-fg);
   --color-badge-info-bd: var(--badge-info-bd);
+  --color-badge-entity-bg: var(--badge-entity-bg);
+  --color-badge-entity-fg: var(--badge-entity-fg);
+  --color-badge-entity-bd: var(--badge-entity-bd);
 }
 
 /* line-clamp fallback for Tailwind 4 inline */

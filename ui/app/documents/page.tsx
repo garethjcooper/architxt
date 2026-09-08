@@ -35,7 +35,7 @@ import { MetadataIcon } from '@/components/icons/metadata-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
 import { formatErrorSummary } from '@/lib/error-format';
-import { getStatusBadge } from '@/lib/status-badge';
+import { getStatusBadge, familyClass } from '@/lib/status-badge';
 
 const logger = createLogger('DocumentsPage');
 
@@ -557,7 +557,7 @@ function DocumentsPageContent() {
                         onClick={() => handleView(doc)}
                       >
                         {doc.has_entities ? (
-                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-purple-800/15 text-purple-400 border-purple-700/20">
+                          <Badge className={`${familyClass.entity} text-[10px] px-2.5 py-1 border inline-flex items-center gap-1`}>
                             <ScanSearch className="h-3 w-3" />
                             Detected
                           </Badge>

@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
 import { DerivedModelQueryPreviewDialog } from '@/components/derived-model-query-preview-dialog';
 import { SystemTemplateQueryPreviewDialog } from '@/app/contextual-graph/manager/system-template-query-preview-dialog';
+import { familyClass } from '@/lib/status-badge';
 
 const logger = createLogger('ModelsPage');
 
@@ -448,8 +449,8 @@ function ModelsPageContent() {
                                 key={e.id}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[100px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-purple-400/40 text-purple-200 border-purple-400/60 ring-1 ring-purple-400/50'
-                                    : 'bg-purple-800/15 text-purple-400 border-purple-700/20'
+                                    ? `${familyClass.entity} ring-1 ring-badge-entity-fg/50`
+                                    : familyClass.entity
                                 }`}
                                 title={`${e.entity_id} — ${e.name}`}
                               >
@@ -461,7 +462,7 @@ function ModelsPageContent() {
                             <span
                               className={`text-[10px] px-1 rounded ${
                                 search.trim() && model.entities!.slice(3).some((e) => e.name.toLowerCase().includes(search.toLowerCase()) || e.entity_id.toLowerCase().includes(search.toLowerCase()))
-                                  ? 'text-purple-300 bg-purple-400/15'
+                                  ? 'text-badge-entity-fg bg-badge-entity-bg'
                                   : 'text-white/30'
                               }`}
                             >

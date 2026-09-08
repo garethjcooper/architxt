@@ -43,6 +43,7 @@ import { EntityDocumentsDialog } from '@/components/entity-documents-dialog';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import { formatEntityIdPattern } from '@/lib/entity-id-pattern';
+import { familyClass } from '@/lib/status-badge';
 
 const logger = createLogger('EntitiesPage');
 
@@ -404,7 +405,7 @@ export default function EntitiesPage() {
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           <span
-                            className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium border bg-purple-800/15 text-purple-400 border-purple-700/20"
+                            className={`${familyClass.entity} text-[10px]`}
                             title={item.name}
                           >
                             {item.name}
@@ -472,7 +473,7 @@ export default function EntitiesPage() {
                               return (
                                 <span
                                   title={full}
-                                  className={`text-[10px] ${isHit ? 'text-purple-300' : 'text-white/60'}`}
+                                  className={`text-[10px] ${isHit ? 'text-badge-entity-fg' : 'text-white/60'}`}
                                 >
                                   {truncated}
                                 </span>

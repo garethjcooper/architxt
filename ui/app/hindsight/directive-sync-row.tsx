@@ -2,6 +2,7 @@
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { GitCompare, AlertTriangle } from 'lucide-react';
+import { familyClass } from '@/lib/status-badge';
 
 interface DirectiveDivergence {
   name_differs: boolean;
@@ -117,7 +118,7 @@ export default function DirectiveSyncRow({
             {isBankOnly && onPull && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPull(); }}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors shrink-0"
+                className={`${familyClass.entity} text-[10px] px-1.5 py-0.5 hover:opacity-80 transition-colors shrink-0`}
               >
                 Pull
               </button>

@@ -116,7 +116,7 @@ export default function SyncRow({
                 </span>
               )}
               {archHasEntities && (
-                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium bg-purple-800/15 text-purple-400 border-purple-700/20" title="Entities detected in extracted content">
+                <span className={`${familyClass.entity} text-[10px] px-1.5 py-0.5 gap-1`} title="Entities detected in extracted content">
                   <ScanSearch className="h-3 w-3" />
                   Detected
                 </span>
