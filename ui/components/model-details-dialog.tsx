@@ -164,7 +164,11 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     () => (templateRoles ?? []).find((r) => r.value === effectiveTemplateRoleId) ?? null,
     [templateRoles, effectiveTemplateRoleId]
   );
-  const roleScope = selectedTemplateRole?.derivation_scope ?? null;
+  const selectedStoredTemplateRole = useMemo(
+    () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
+    [templateRoles, model.template_role]
+  );
+  const roleScope = selectedStoredTemplateRole?.derivation_scope ?? null;
   const roleRule = roleScope ? getRoleTemplateRule(roleScope) : null;
 
   // For role-based templates, the user only edits the prefix of the name; the
