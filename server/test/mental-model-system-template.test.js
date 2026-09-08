@@ -207,16 +207,16 @@ describe('system template hygiene', () => {
     assert.deepEqual(derived, []);
   });
 
-  it('substitutes {id} alias for {entity-id} in derived user templates', () => {
+  it('substitutes {entity-id} in derived user templates', () => {
     const db = getTestDb().db;
     const derived = deriveMentalModels(
       {
         id: 1,
         is_template: true,
         template_role: 'user_entity_derived',
-        ext_id: 'derived-{id}',
+        ext_id: 'derived-{entity-id}',
         name: 'Derived {entity-name}',
-        source_query: 'Tell me about {id}',
+        source_query: 'Tell me about {entity-id}',
         refresh_after_consolidation: false,
         refresh_mode: 'full',
         exclude_all_mental_models: false,

@@ -55,9 +55,8 @@ export async function deriveEntitySummaryModel(db, node) {
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.entitySummary}`);
 
   const values = {
-    '{id}': node.id,
-    '{entity-name}': node.displayName || node.id,
     '{entity-id}': node.id,
+    '{entity-name}': node.displayName || node.id,
     '{seed-id}': node.id,
     '{seed-name}': node.displayName || node.id,
   };
@@ -85,9 +84,8 @@ export async function deriveEntityCapabilitiesModel(db, node) {
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.entityCapabilities}`);
 
   const values = {
-    '{id}': node.id,
-    '{entity-name}': node.displayName || node.id,
     '{entity-id}': node.id,
+    '{entity-name}': node.displayName || node.id,
     '{seed-id}': node.id,
     '{seed-name}': node.displayName || node.id,
   };
@@ -144,7 +142,6 @@ export async function deriveDiscoverContextModel(db, seedNode, neighbors = []) {
   if (!template) throw new Error(`Missing contextual graph template: ${CONTEXTUAL_GRAPH_ROLES.discover}`);
 
   const values = {
-    '{id}': seedNode.id,
     '{entity-id}': seedNode.id,
     '{seed-id}': seedNode.id,
     '{seed-name}': seedNode.displayName || seedNode.id,
@@ -207,7 +204,6 @@ export async function deriveContextualModelSpec(db, role, scopeType, values) {
 
 export const SCOPE_VALUES = {
   node: (target) => ({
-    '{id}': target.id,
     '{entity-id}': target.id,
     '{node-id}': target.id,
     '{entity-name}': target.displayName || target.id,
@@ -222,7 +218,6 @@ export const SCOPE_VALUES = {
     '{target-name}': targetNode.displayName || targetNode.id,
   }),
   seed: (seedNode, neighborIds = []) => ({
-    '{id}': seedNode.id,
     '{entity-id}': seedNode.id,
     '{node-id}': seedNode.id,
     '{entity-name}': seedNode.displayName || seedNode.id,

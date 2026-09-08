@@ -560,10 +560,10 @@ function backfillTemplateRoleTimestamps(db) {
  */
 export const CONTEXTUAL_GRAPH_TEMPLATES = [
   {
-    extId: 'entity-summary-{id}',
+    extId: 'entity-summary-{entity-id}',
     name: 'Entity summary: {entity-name}',
     role: 'sys_entity_summary',
-    sourceQuery: `[[{entity-name} ({id})]].
+    sourceQuery: `[[{entity-name} ({entity-id})]].
 #narrative
 Describe its core architectural role, responsibilities, and relationships to other components.
 #end`,
@@ -574,10 +574,10 @@ Describe its core architectural role, responsibilities, and relationships to oth
     tagsMatchMode: 'any',
   },
   {
-    extId: 'entity-capabilities-{id}',
+    extId: 'entity-capabilities-{entity-id}',
     name: 'Entity capabilities: {entity-name}',
     role: 'sys_entity_capabilities',
-    sourceQuery: `[[{entity-name} ({id})]].
+    sourceQuery: `[[{entity-name} ({entity-id})]].
 #table
 #table-name Capabilities
 Return the major architectural capabilities of the entity in a table with columns: name, responsibility, purpose, business_capability_mapping, evidence.

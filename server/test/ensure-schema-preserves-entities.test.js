@@ -209,7 +209,7 @@ describe('ensureSchema backfills user template roles and validates contextual pl
       const rows = db.prepare(`
         SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true'
       `).all();
-      const summary = rows.find((r) => r.mm_ext_id === 'entity-summary-{id}');
+      const summary = rows.find((r) => r.mm_ext_id === 'entity-summary-{entity-id}');
       assert.ok(summary);
       assert.equal(summary.mm_template_role, 'sys_entity_summary');
     } finally {

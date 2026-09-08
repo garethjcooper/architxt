@@ -39,9 +39,9 @@ describe('template-validation', () => {
   it('rejects unknown template roles', () => {
     const result = validateRoleBasedTemplate(db, {
       roleId: 'missing_role',
-      extId: 'x-{id}',
+      extId: 'x-{entity-id}',
       name: 'x {entity-name}',
-      sourceQuery: '{entity-name} {id}',
+      sourceQuery: '{entity-name} {entity-id}',
     });
     assert.equal(result.valid, false);
     assert.ok(result.errors[0].includes('missing_role'));
@@ -51,9 +51,9 @@ describe('template-validation', () => {
     createTemplateRole(db, { role_id: 'node_role', display_name: 'Node Role', derivation_scope: 'node' });
     const ok = validateRoleBasedTemplate(db, {
       roleId: 'node_role',
-      extId: 'node-role-{id}',
+      extId: 'node-role-{entity-id}',
       name: 'Node Role {entity-name}',
-      sourceQuery: '{entity-name} and {id}',
+      sourceQuery: '{entity-name} and {entity-id}',
     });
     assert.equal(ok.valid, true);
     assert.deepEqual(ok.errors, []);
@@ -109,7 +109,7 @@ describe('template-validation', () => {
   });
 
   it('extracts and rebuilds prefixes', () => {
-    assert.equal(extractRoleTemplatePrefix('node', 'extId', 'prefix-{id}'), 'prefix');
+    assert.equal(extractRoleTemplatePrefix('node', 'extId', 'prefix-{entity-id}'), 'prefix');
     assert.equal(extractRoleTemplatePrefix('node', 'name', 'Prefix {entity-name}'), 'Prefix');
     assert.equal(buildRoleTemplateValue('edge', 'extId', 'abc'), 'abc-{source-id}|{target-id}');
     assert.equal(buildRoleTemplateValue('seed', 'name', 'Seed'), 'Seed {seed-name}');
