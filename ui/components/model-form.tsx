@@ -171,13 +171,9 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
       setIsTemplate(true);
     }
     if (!value && isTemplate) {
-      // Switching to Generic/no-role. If the current ID/name has no generic
-      // template placeholder, turn template mode off rather than showing a red
-      // validation message for an empty normal model.
-      const hasGenericPlaceholder = /\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(`${effectiveExtId}${effectiveName}`);
-      if (!hasGenericPlaceholder) {
-        setIsTemplate(false);
-      }
+      // Switching to Generic/no-role turns off Entity Template mode by default.
+      // The user can re-enable it intentionally if they want a generic template.
+      setIsTemplate(false);
     }
   };
 
