@@ -241,9 +241,9 @@ describe('cleanupOrphanedModels', () => {
     seedCustomTemplate(db, {
       role,
       scope: 'node',
-      extId: 'custom-node-{id}',
+      extId: 'custom-node-{entity-id}',
       name: 'Custom node: {entity-name}',
-      sourceQuery: 'MATCH (n {id: "{id}"}) RETURN n',
+      sourceQuery: 'MATCH (n {id: "{entity-id}"}) RETURN n',
     });
 
     upsertNode(db, serverId, bankId, nodeId, ['grounded', 'active'], {

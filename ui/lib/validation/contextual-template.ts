@@ -10,11 +10,11 @@ interface ScopeRule {
 
 const SCOPE_RULES: Record<string, ScopeRule> = {
   node: {
-    extIdTail: '-{id}',
+    extIdTail: '-{entity-id}',
     nameTail: ' {entity-name}',
-    extIdRegex: /^(.+)-\{id\}$/,
+    extIdRegex: /^(.+)-\{entity-id\}$/,
     nameRegex: /^(.+) \{entity-name\}$/,
-    requiredQueryPlaceholders: ['{entity-name}', '{id}'],
+    requiredQueryPlaceholders: ['{entity-name}', '{entity-id}'],
   },
   edge: {
     extIdTail: '-{source-id}|{target-id}',

@@ -2,11 +2,11 @@ import { getRoleScopeMap } from '../../db/crud/template-roles.js';
 
 const SCOPE_RULES = {
   node: {
-    extIdTail: '-{id}',
+    extIdTail: '-{entity-id}',
     nameTail: ' {entity-name}',
-    extIdRegex: /^(.+)-\{id\}$/,
+    extIdRegex: /^(.+)-\{entity-id\}$/,
     nameRegex: /^(.+) \{entity-name\}$/,
-    requiredQueryPlaceholders: ['{entity-name}', '{id}'],
+    requiredQueryPlaceholders: ['{entity-name}', '{entity-id}'],
   },
   edge: {
     extIdTail: '-{source-id}|{target-id}',

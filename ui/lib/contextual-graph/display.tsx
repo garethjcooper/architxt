@@ -384,7 +384,7 @@ export function EdgeListRow({
 }
 
 export function PatchRefRow({
-  ref,
+  ref: refProp,
   active,
   onClick,
 }: {
@@ -392,9 +392,10 @@ export function PatchRefRow({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const scopeLabel = getRoleScopeLabel(ref.role);
-  const roleLabel = getRoleLabel(ref.role);
-  const type = ref.role || 'patch';
+  const { role, ext_id: extId, last_refresh_status: lastRefreshStatus } = refProp;
+  const scopeLabel = getRoleScopeLabel(role);
+  const roleLabel = getRoleLabel(role);
+  const type = role || 'patch';
   return (
     <button
       type="button"
@@ -409,20 +410,20 @@ export function PatchRefRow({
     >
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/90 truncate" title={ref.role}>{roleLabel}</span>
+          <span className="text-xs text-white/90 truncate" title={role}>{roleLabel}</span>
           <Badge className="text-[10px] h-4 px-1 bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
             {scopeLabel}
           </Badge>
-          {ref.last_refresh_status && (
+          {lastRefreshStatus && (
             <span className={cn(
               'text-[10px]',
-              ref.last_refresh_status === 'error' ? 'text-red-400' : 'text-emerald-400'
+              lastRefreshStatus === 'error' ? 'text-red-400' : 'text-emerald-400'
             )}>
-              {ref.last_refresh_status}
+              {lastRefreshStatus}
             </span>
           )}
         </div>
-        <div className="text-[10px] text-white/50 font-mono truncate">{ref.ext_id}</div>
+        <div className="text-[10px] text-white/50 font-mono truncate">{extId}</div>
       </div>
     </button>
   );

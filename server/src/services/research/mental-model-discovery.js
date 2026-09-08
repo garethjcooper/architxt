@@ -23,6 +23,7 @@ import { listEdges } from '../../db/crud/contextual-graph.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
 import { modelMatchesEntities } from '../../prompts/graph-parser.js';
 import { createLogger } from '../../utils/logger.js';
+import { substituteTemplateFields } from '../contextual-graph/template-models.js';
 
 const logger = createLogger('research-mental-model-discovery');
 
@@ -104,8 +105,8 @@ function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
       continue;
     }
 
-    // System templates have no mental_model_entities rows and use placeholders
-    // like {id}, {seed-id}, {source-id} rather than {entity-id}.
+    // System templates have no mental_model_entities rows and use placeholder
+    // substitution like contextual graph add-context.
     if (isSystemTemplateRole(model.template_role)) {
       if (model.template_role === 'sys_edge_context') {
         // Edge-context requires actual graph edges between selected entities.
@@ -123,12 +124,14 @@ function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
           if (seenPairs.has(pk)) continue;
           seenPairs.add(pk);
 
-          const extId = model.ext_id
-            .replaceAll('{source-id}', sourceId)
-            .replaceAll('{target-id}', targetId);
-          const name = model.name
-            .replaceAll('{source-name}', stripTypePrefix(sourceId))
-            .replaceAll('{target-name}', stripTypePrefix(targetId));
+          const values = {
+            '{source-id}': sourceId,
+            '{source-name}': stripTypePrefix(sourceId),
+            '{target-id}': targetId,
+            '{target-name}': stripTypePrefix(targetId),
+          };
+          const extId = substituteTemplateFields(model.ext_id, values);
+          const name = substituteTemplateFields(model.name, values);
           candidates.push({
             ...base,
             id: `${model.id}:${sourceId}|${targetId}`,
@@ -145,22 +148,14 @@ function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
       // Use the FULL type-prefixed id for ext_id placeholders; bare id for display name fallback.
       for (const entityId of entityIds) {
         const bareId = stripTypePrefix(entityId);
-        const extId = model.ext_id
-          .replaceAll('{id}', entityId)
-          .replaceAll('{entity-id}', entityId)
-          .replaceAll('{seed-id}', entityId)
-          .replaceAll('{source-id}', entityId)
-          .replaceAll('{target-id}', entityId);
-        const name = model.name
-          .replaceAll('{id}', bareId)
-          .replaceAll('{entity-name}', bareId)
-          .replaceAll('{entity-id}', bareId)
-          .replaceAll('{seed-name}', bareId)
-          .replaceAll('{seed-id}', bareId)
-          .replaceAll('{source-name}', bareId)
-          .replaceAll('{source-id}', bareId)
-          .replaceAll('{target-name}', bareId)
-          .replaceAll('{target-id}', bareId);
+        const values = {
+          '{entity-id}': entityId,
+          '{entity-name}': bareId,
+          '{seed-id}': entityId,
+          '{seed-name}': bareId,
+        };
+        const extId = substituteTemplateFields(model.ext_id, values);
+        const name = substituteTemplateFields(model.name, values);
         candidates.push({
           ...base,
           id: `${model.id}:${bareId}`,

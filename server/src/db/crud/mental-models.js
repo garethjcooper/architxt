@@ -259,10 +259,7 @@ export function substitutePlaceholders(template, entity, context = {}) {
     .replaceAll(BANK_ID_PLACEHOLDER, context.bankId ?? '')
     .replaceAll(SERVER_ID_PLACEHOLDER, context.serverId != null ? String(context.serverId) : '')
     .replaceAll(NOW_PLACEHOLDER, now.toISOString())
-    .replaceAll(DATE_PLACEHOLDER, date)
-    // {id} is a shorthand alias for {entity-id} used by system templates and
-    // user-defined contextual templates; keep it last so explicit replacements win.
-    .replaceAll('{id}', entity.entity_id ?? '');
+    .replaceAll(DATE_PLACEHOLDER, date);
 }
 
 /**

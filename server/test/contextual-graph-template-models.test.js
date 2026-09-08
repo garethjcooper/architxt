@@ -42,11 +42,11 @@ describe('contextual graph template models', () => {
     assert.ok(roles.includes('sys_discovery_context'));
 
     const summary = rows.find((r) => r.mm_template_role === 'sys_entity_summary');
-    assert.ok(summary.mm_ext_id.includes('{id}'));
+    assert.ok(summary.mm_ext_id.includes('{entity-id}'));
     assert.ok(summary.mm_name.includes('{entity-name}'));
 
     const capabilities = rows.find((r) => r.mm_template_role === 'sys_entity_capabilities');
-    assert.ok(capabilities.mm_ext_id.includes('{id}'));
+    assert.ok(capabilities.mm_ext_id.includes('{entity-id}'));
   });
 
   it('derives an entity-summary model from a node', async () => {
