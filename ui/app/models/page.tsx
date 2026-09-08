@@ -79,6 +79,7 @@ function ModelsPageContent() {
 
   const [availableEntities, setAvailableEntities] = useState<AqlEntityLike[]>([]);
   const [templateRoleOptions, setTemplateRoleOptions] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
+  const [availableTemplateRoles, setAvailableTemplateRoles] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
 
   const roleLookup = useMemo(() => {
     const map = new Map<string, { label: string; derivation_scope: string }>();
@@ -126,8 +127,13 @@ function ModelsPageContent() {
 
   useEffect(() => {
     fetchModels();
-    mentalModelsApi.listTemplateRoles({ available: true }).then((roles) => {
-      setTemplateRoleOptions(roles);
+    // Load all roles for display/lookup, then load available roles for the create dropdown.
+    Promise.all([
+      mentalModelsApi.listTemplateRoles(),
+      mentalModelsApi.listTemplateRoles({ available: true }),
+    ]).then(([allRoles, availableRoles]) => {
+      setTemplateRoleOptions(allRoles);
+      setAvailableTemplateRoles(availableRoles);
     }).catch((err) => {
       logger.error('Failed to load template roles', { error: err });
     });
@@ -603,7 +609,7 @@ function ModelsPageContent() {
             </DialogHeader>
             <ModelForm
               mode="create"
-              templateRoles={templateRoleOptions}
+              templateRoles={availableTemplateRoles}
               availableEntities={availableEntities}
               availableEdges={[]}
               onSubmit={async (data) => {
