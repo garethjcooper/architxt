@@ -44,7 +44,7 @@ import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
-import { checkEntityIdConformity, formatEntityIdPattern } from '@/lib/entity-id-pattern';
+import { formatEntityIdPattern } from '@/lib/entity-id-pattern';
 
 const logger = createLogger('EntitiesPage');
 
@@ -411,26 +411,13 @@ export default function EntitiesPage() {
                           />
                         </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs text-white/50 font-mono">{item.entity_id}</TableCell>
-                        <TableCell className="py-1.5 px-4">
+                        <TableCell className="py-1.5 px-4 text-xs font-mono text-white/70">
                           {(() => {
                             const type = entityTypes.find((t) => t.id === item.type_id);
                             if (!type?.uses_entity_id_pattern) {
                               return <span className="text-white/20 text-[10px]">-</span>;
                             }
-                            const result = checkEntityIdConformity(item.entity_id, type);
-                            const patternLabel = formatEntityIdPattern(type);
-                            return (
-                              <span
-                                title={result.message || (result.conforms ? 'Conforms to entity type pattern' : 'Does not conform to entity type pattern')}
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
-                                  result.conforms
-                                    ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
-                                    : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
-                                }`}
-                              >
-                                {patternLabel}
-                              </span>
-                            );
+                            return <span title={formatEntityIdPattern(type)}>{formatEntityIdPattern(type)}</span>;
                           })()}
                         </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs font-medium text-white/80">{item.name}</TableCell>
