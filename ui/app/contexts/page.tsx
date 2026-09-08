@@ -261,7 +261,7 @@ export default function ContextsPage() {
                   </td>
                   <td className="py-1.5 px-4 text-xs">
                     {context.usage_count ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
+                      <span className="text-white/70 text-[10px]">
                         {context.usage_count} document{context.usage_count !== 1 ? 's' : ''}
                       </span>
                     ) : (
