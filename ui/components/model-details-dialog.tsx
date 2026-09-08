@@ -560,15 +560,20 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               Name *
             </Label>
             {roleScope && roleRule ? (
-              <Input
-                id="mm-detail-name"
-                value={namePrefix}
-                disabled={isSystemTemplate}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="prefix"
-                className={inputClass}
-                style={inputFocusStyle}
-              />
+              <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+                <Input
+                  id="mm-detail-name"
+                  value={namePrefix}
+                  disabled={isSystemTemplate}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="prefix"
+                  className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                  style={inputFocusStyle}
+                />
+                <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
+                  {roleRule.nameTail}
+                </span>
+              </div>
             ) : (
               <Input
                 id="mm-detail-name"
@@ -593,9 +598,19 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-white/50 font-medium">
-            Source Query *
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-white/50 font-medium">
+              Source Query *
+            </Label>
+            {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
+              <span className="text-[10px] text-amber-400">
+                Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
+              </span>
+            )}
+            {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
+              <span className="text-[10px] text-emerald-400">All required placeholders present</span>
+            )}
+          </div>
           <AqlEditor
             id="mm-detail-source-query"
             value={sourceQuery}
