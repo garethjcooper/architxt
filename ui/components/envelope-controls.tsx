@@ -71,7 +71,7 @@ export function EnvelopeControls({
         )}
       </div>
       {showControlsToggle && controlsOpen && (
-        <div className="absolute top-full right-3 mt-1 z-30 flex flex-col gap-2 rounded-md border border-white/10 bg-[oklch(0.18_0_0)]/95 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[260px]">
+        <div className="absolute top-full right-3 mt-1 z-30 flex flex-col gap-2 rounded-md border border-white/10 bg-surface-overlay/95 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[260px]">
           {showIndex != null && onShowIndexChange != null && (
             <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
               <Switch

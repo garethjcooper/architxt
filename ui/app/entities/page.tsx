@@ -268,7 +268,7 @@ export default function EntitiesPage() {
                 const v = e.target.value;
                 setEntityTypeFilter(v === 'all' ? 'all' : Number(v));
               }}
-              className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
             >
               <option value="all">All Types</option>
               {entityTypes.map((t) => (
@@ -298,7 +298,7 @@ export default function EntitiesPage() {
             <Button
               onClick={() => setManageConfigDialogOpen(true)}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-white/20 text-white/80 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Settings2 className="h-3.5 w-3.5" />Config
             </Button>
@@ -306,7 +306,7 @@ export default function EntitiesPage() {
             <Button
               onClick={() => setEntityDocumentsOpen(true)}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-white/20 text-white/80 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText className="h-3.5 w-3.5" />Documents
             </Button>
@@ -314,19 +314,19 @@ export default function EntitiesPage() {
             <div className="flex-1" />
             <div className="w-px h-5 bg-white/10 mx-1" />
 
-            <Button onClick={() => setImportOpen(true)} title="Import" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><Download className="h-3.5 w-3.5" /></Button>
-            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+            <Button onClick={() => setImportOpen(true)} title="Import" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><Download className="h-3.5 w-3.5" /></Button>
+            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
             <Button
               onClick={openDeleteEntities}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => setCreateEntityOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
               title="Add"
             >
               <Plus className="h-4 w-4" />
@@ -335,7 +335,7 @@ export default function EntitiesPage() {
 
           {/* Table card */}
           <div className={[
-            "rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden",
+            "rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden",
             !freeze ? "max-h-[calc(100vh-240px)]" : "",
           ].filter(Boolean).join(" ")}>
             {/* Header bar */}
@@ -379,21 +379,21 @@ export default function EntitiesPage() {
                 <table className="w-full caption-bottom text-sm">
                   <TableHeader>
                     <TableRow className="border-b border-white/10">
-                      <TableHead className={["w-12 py-2 px-4", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}>
+                      <TableHead className={["w-12 py-2 px-4", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")}>
                         <Checkbox
                           checked={entityMultiAll}
                           onCheckedChange={toggleEntityMultiAll}
                         />
                       </TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entity ID</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Pattern</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Type</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Case</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Boundary</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Documents</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Aliases</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Created</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Entity ID</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Pattern</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Name</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Type</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Case</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Boundary</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Documents</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Aliases</TableHead>
+                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -405,7 +405,7 @@ export default function EntitiesPage() {
                         }`}
                         onClick={() => handleEntityClick(item)}
                       >
-                        <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${entityMulti.selected.has(item.id) ? 'bg-emerald-900/20' : 'bg-[oklch(0.23_0_0)]'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                        <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${entityMulti.selected.has(item.id) ? 'bg-emerald-900/20' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={entityMulti.selected.has(item.id)}
                             onCheckedChange={() => entityMulti.toggleSelection(item.id)}
@@ -558,18 +558,18 @@ export default function EntitiesPage() {
           <div className="flex items-center gap-2 mb-2 shrink-0">
             <div className="flex-1" />
             <div className="w-px h-5 bg-white/10 mx-1" />
-            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
             <Button
               onClick={openDeleteTypes}
               disabled={typeMulti.selected.size === 0}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => setCreateTypeOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
               title="Add"
             >
               <Plus className="h-4 w-4" />
@@ -577,7 +577,7 @@ export default function EntitiesPage() {
           </div>
 
           {/* Table card */}
-          <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0">
+          <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0">
             {/* Header bar */}
             <div className="flex items-center justify-between px-4 py-2 bg-blue-900/20 border-b border-blue-500/30 shrink-0">
               <div className="flex-1" />

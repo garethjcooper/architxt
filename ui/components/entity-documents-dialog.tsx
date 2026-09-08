@@ -78,7 +78,7 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} modal={true}>
-      <DialogContent className="sm:max-w-2xl bg-[oklch(0.23_0_0)] border-white/[0.08] text-white">
+      <DialogContent className="sm:max-w-2xl bg-surface-card border-white/[0.08] text-white">
         <DialogHeader>
           <DialogTitle className="text-base font-medium text-white">
             Related documents
@@ -102,7 +102,7 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
           ) : (
             <div className="max-h-[60vh] overflow-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-[oklch(0.23_0_0)]">
+                <TableHeader className="sticky top-0 z-10 bg-surface-card">
                   <TableRow className="border-b border-white/10 hover:bg-transparent">
                     <TableHead className="text-xs uppercase text-white/60 font-medium h-8 py-1.5 px-4 w-16">ID</TableHead>
                     <TableHead className="text-xs uppercase text-white/60 font-medium h-8 py-1.5 px-4 w-[35%]">External ID</TableHead>

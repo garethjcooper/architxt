@@ -52,7 +52,7 @@ export default function SettingsPage() {
           onClick={fetchSettings}
           disabled={loading}
           title="Refresh"
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
@@ -188,7 +188,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-white/[0.08] bg-[oklch(0.23_0_0)] overflow-hidden">
+    <div className="rounded-lg border border-white/[0.08] bg-surface-card overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
         <span className="text-white/60">{icon}</span>
         <h3 className="text-sm font-semibold text-white/90">{title}</h3>

@@ -189,7 +189,7 @@ export function DiagramControls({
   return (
     <div
       className={cn(
-        'absolute top-3 right-3 z-10 flex flex-col gap-1.5 rounded-md border border-white/10 bg-[oklch(0.18_0_0)]/85 backdrop-blur-sm px-2 py-2 shadow-lg',
+        'absolute top-3 right-3 z-10 flex flex-col gap-1.5 rounded-md border border-white/10 bg-surface-overlay/85 backdrop-blur-sm px-2 py-2 shadow-lg',
         className,
       )}
     >

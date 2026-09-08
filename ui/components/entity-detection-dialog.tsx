@@ -402,7 +402,7 @@ export function EntityDetectionDialog({
 
         <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
           {/* Sidebar — Match Review */}
-          <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+          <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-surface-overlay overflow-hidden">
             {/* Header */}
             <div className="px-3 py-2 border-b border-white/10 bg-white/[0.03] flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
@@ -649,7 +649,7 @@ export function EntityDetectionDialog({
               {existingTags.length > 0 && (
                 <Button
                   onClick={handleUndo}
-                  className="h-7 px-2.5 text-xs bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)]"
+                  className="h-7 px-2.5 text-xs bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover"
                 >
                   Remove Tags
                 </Button>
@@ -673,7 +673,7 @@ export function EntityDetectionDialog({
               <Button
                 onClick={handleScan}
                 disabled={entitiesLoading || scanning || entities.length === 0}
-                className="h-7 px-2.5 text-xs bg-[oklch(0.27_0_0)] hover:bg-[oklch(0.30_0_0)] text-white/80 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                className="h-7 px-2.5 text-xs bg-surface-hover hover:bg-[oklch(0.30_0_0)] text-white/80 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
               >
                 {scanning ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
                 Scan
@@ -682,7 +682,7 @@ export function EntityDetectionDialog({
           </div>
 
           {/* Content pane */}
-          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-surface-overlay overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 flex-shrink-0">
               <span className="text-[10px] text-white/40 font-sans">
                 {showPlainText ? 'Plain text view' : 'Highlighted entities'}

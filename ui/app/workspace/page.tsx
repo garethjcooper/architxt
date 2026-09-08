@@ -1068,7 +1068,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => setConfirmSessionDelete(true)}
               disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
               title="Delete selected session"
             >
               <Trash2 className="h-4 w-4" />
@@ -1077,7 +1077,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => void handleEditSession()}
               disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
               title="Edit selected session"
             >
               <Pencil className="h-4 w-4" />
@@ -1086,7 +1086,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => void handleCreateSession()}
               disabled={sessionActionLoading || !serverId || !bankId}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
               title="Add session"
             >
               {sessionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -1180,7 +1180,7 @@ export default function WorkspacePage() {
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} onDoubleClick={handleResizeReset} title="Drag to resize left/right columns; double-click to reset" />
 
           {/* Column 2: result viewer */}
-          <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
+          <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-card overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
             <WorkspaceResultPanel
               result={previewResult}
               title={previewTitle}
@@ -1375,7 +1375,7 @@ export default function WorkspacePage() {
 
         {pendingSection && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] p-4 w-80 shadow-lg">
+            <div className="rounded-lg border border-white/10 bg-surface-overlay p-4 w-80 shadow-lg">
               <div className="text-sm font-medium text-white/90 mb-2">Add section to page</div>
               <p className="text-xs text-white/60 mb-4">
                 “{pendingSection.title || 'Untitled section'}”

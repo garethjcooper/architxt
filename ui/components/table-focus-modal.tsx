@@ -174,8 +174,8 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
               placeholder="Table name"
             />
           </div>
-          <div className="flex-1 min-h-0 overflow-auto custom-scrollbar rounded-md border border-white/10 bg-[oklch(0.18_0_0)]">
-            <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0 sticky top-0 bg-[oklch(0.18_0_0)] z-10">
+          <div className="flex-1 min-h-0 overflow-auto custom-scrollbar rounded-md border border-white/10 bg-surface-overlay">
+            <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0 sticky top-0 bg-surface-overlay z-10">
               <span>{emptyColumns ? 'Table' : `${rows.length} row${rows.length === 1 ? '' : 's'}`}</span>
               <DropdownMenu>
                 <DropdownMenuTrigger>
@@ -197,7 +197,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
               <div className="p-4 text-sm text-white/40">No columns. Add a column to start editing.</div>
             ) : (
               <table className="w-full text-left text-[12px] border-collapse">
-                <thead className="sticky top-0 bg-[oklch(0.22_0_0)] z-10">
+                <thead className="sticky top-0 bg-surface-panel z-10">
                   <tr className="border-b border-white/20">
                     <th className="py-2 px-2 w-10"></th>
                     {columns.map((c, i) => (

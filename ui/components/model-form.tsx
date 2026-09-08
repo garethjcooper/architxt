@@ -354,7 +354,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           value={templateRole}
           disabled={mode === 'edit' || isSystemTemplate}
           onChange={(e) => handleTemplateRoleChange(e.target.value)}
-          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50"
+          className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50"
           >
           <option value="">Generic / no role</option>
           {availableRoles?.map((role) => (
@@ -373,7 +373,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             id="mm-refresh-mode"
             value={refreshMode}
             onChange={(e) => setRefreshMode(e.target.value as 'full' | 'delta')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
           >
             <option value="full">Full</option>
             <option value="delta">Delta</option>
@@ -388,7 +388,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             id="mm-tags-match-mode"
             value={tagsMatchMode}
             onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
           >
             <option value="all_strict">All Strict</option>
             <option value="any_strict">Any Strict</option>

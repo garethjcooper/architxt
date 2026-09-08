@@ -187,7 +187,7 @@ function PreviewPane({
   }, [content, handleRender]);
 
   return (
-    <div className="flex flex-col h-full rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+    <div className="flex flex-col h-full rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div
           ref={containerRef}
@@ -272,7 +272,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
   return (
     <div className={cn('flex flex-col h-full gap-3', className)}>
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>Preview</span>
             <div className="flex items-center gap-2">
@@ -293,7 +293,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
         </div>
         <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />
         <div
-          className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+          className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
           style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
         >
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">

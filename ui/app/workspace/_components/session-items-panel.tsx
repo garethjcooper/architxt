@@ -188,7 +188,7 @@ export function SessionItemsPanel({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-36 bg-[oklch(0.18_0_0)] border-white/10 text-white/90"
+                        className="w-36 bg-surface-overlay border-white/10 text-white/90"
                       >
                         <DropdownMenuItem
                           onClick={(e) => {

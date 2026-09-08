@@ -656,7 +656,7 @@ export default function ContextManagerPage() {
               className="min-w-0 flex flex-col gap-1"
               style={{ flex: leftFlex }}
             >
-              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: topFlex }}>
+              <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col" style={{ flex: topFlex }}>
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Entities</span>
                   <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
@@ -694,7 +694,7 @@ export default function ContextManagerPage() {
                 <div className="w-16 h-1 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
               </div>
 
-              <div className="min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
+              <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
                 <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Edges</span>
                   <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
@@ -729,7 +729,7 @@ export default function ContextManagerPage() {
               <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
             </div>
 
-            <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
+            <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
               {renderDetailPanel()}
             </Card>
           </div>

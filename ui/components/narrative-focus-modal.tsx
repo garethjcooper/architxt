@@ -114,7 +114,7 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
             />
           </div>
           <div className="flex-1 min-h-0 flex overflow-hidden">
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                 <span>Preview</span>
               </div>
@@ -128,7 +128,7 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
             </div>
             {!readOnly && <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />}
             <div
-              className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+              className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
               style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">

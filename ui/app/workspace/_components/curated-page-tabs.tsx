@@ -101,7 +101,7 @@ export function CuratedPageTabs({
   }, [confirmDelete, onDeleteCuratedPage]);
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/10 bg-[oklch(0.18_0_0)] min-h-10">
+    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/10 bg-surface-overlay min-h-10">
       <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto custom-scrollbar">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
@@ -153,7 +153,7 @@ export function CuratedPageTabs({
             type="button"
             onClick={() => onCloseAllViews()}
             disabled={tabs.filter((t) => t.kind === 'view' && !t.pinned).length === 0}
-            className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+            className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
             title="Close all view tabs"
           >
             <X className="h-3.5 w-3.5" />
@@ -173,7 +173,7 @@ export function CuratedPageTabs({
               }
             }
           }}
-          className="h-6 rounded-md border border-white/10 bg-[oklch(0.21_0_0)] px-1.5 text-[11px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none min-w-[6rem] max-w-[10rem]"
+          className="h-6 rounded-md border border-white/10 bg-surface-panel px-1.5 text-[11px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none min-w-[6rem] max-w-[10rem]"
         >
           <option value="">Pages...</option>
           {tabs.map((tab) => (
@@ -193,7 +193,7 @@ export function CuratedPageTabs({
           type="button"
           onClick={() => onSaveActivePage?.()}
           disabled={!activeCuratedTab || !activePageDirty}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-emerald-400 hover:bg-emerald-950/30 hover:border-emerald-500/30 disabled:opacity-30 transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-emerald-400 hover:bg-emerald-950/30 hover:border-emerald-500/30 disabled:opacity-30 transition-colors"
           title="Save active page"
         >
           <Save className="h-3.5 w-3.5" />
@@ -205,7 +205,7 @@ export function CuratedPageTabs({
             setConfirmDelete({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
           }}
           disabled={!activeCuratedTab}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
           title="Delete active page"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -217,7 +217,7 @@ export function CuratedPageTabs({
             setRenamingPage({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
           }}
           disabled={!activeCuratedTab}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
           title="Rename active page"
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -225,7 +225,7 @@ export function CuratedPageTabs({
         <button
           type="button"
           onClick={() => void handleCreate()}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
           title="Add page"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -246,7 +246,7 @@ export function CuratedPageTabs({
 
       {renamingPage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] p-4 w-80 shadow-lg">
+          <div className="rounded-lg border border-white/10 bg-surface-overlay p-4 w-80 shadow-lg">
             <div className="text-sm font-medium text-white/90 mb-2">Rename curated page</div>
             <input
               type="text"

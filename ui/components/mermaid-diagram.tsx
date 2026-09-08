@@ -80,7 +80,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
   }, [content, defaultRenderer]);
 
   return (
-    <div className={`rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden ${className}`}>
+    <div className={`rounded-md border border-white/10 bg-surface-overlay overflow-hidden ${className}`}>
       {(name || type) && (
         <div className="px-3 py-2 border-b border-white/10 bg-emerald-900/10 flex items-center justify-between gap-2">
           {name && <span className="text-sm font-medium text-emerald-300 truncate">{name}</span>}

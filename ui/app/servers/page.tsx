@@ -119,7 +119,7 @@ export default function ServersPage() {
         <Button
           onClick={() => handleCheckHealth()}
           disabled={selected.size === 0 || checkingHealth.size > 0}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-neutral-500/30 text-neutral-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-neutral-500/30 text-neutral-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {checkingHealth.size > 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
           Health
@@ -127,7 +127,7 @@ export default function ServersPage() {
 
         <Button
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
           Add Server
@@ -136,19 +136,19 @@ export default function ServersPage() {
         <div className="flex-1" />
         <div className="w-px h-5 bg-white/10 mx-1" />
 
-        <Button onClick={fetchServers} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button onClick={fetchServers} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
 
         <Button
           onClick={openDeleteConfirm}
           disabled={selected.size === 0}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Delete"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className={["rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden", !freeze ? "max-h-[calc(100vh-240px)]" : ""].filter(Boolean).join(" ")}>
+      <div className={["rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden", !freeze ? "max-h-[calc(100vh-240px)]" : ""].filter(Boolean).join(" ")}>
         {/* Grey header bar */}
         <div className="flex items-center justify-between px-4 py-2 bg-neutral-800/20 border-b border-neutral-500/30 shrink-0">
           <div className="flex-1" />
@@ -170,18 +170,18 @@ export default function ServersPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10">
-              <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+              <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={isAllSelected}
                   onCheckedChange={toggleAll}
                 />
               </th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Server ID</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Base URL</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-32", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Graph Banks</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-24", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Health</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}></th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Server ID</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Name</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Base URL</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-32", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Graph Banks</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-24", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Health</th>
+              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}></th>
             </tr>
           </thead>
           <tbody>
@@ -203,7 +203,7 @@ export default function ServersPage() {
                   }`}
                   onClick={(e) => handleServerClick(server, e)}
                 >
-                  <td className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                  <td className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selected.has(server.id)}
                       onCheckedChange={() => toggleSelection(server.id)}

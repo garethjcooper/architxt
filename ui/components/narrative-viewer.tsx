@@ -584,7 +584,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
         {showIndex && (
           <div className="contents mr-3">
             <div
-              className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+              className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
               style={{ width: sidebarWidth, flexShrink: 0 }}
             >
               <div className="group/header px-2 py-1.5 border-b border-white/10 flex items-center justify-between">
@@ -634,7 +634,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
 
         <div
           ref={markdownContainerRef}
-          className={`flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-y-auto custom-scrollbar ${
+          className={`flex-1 min-h-0 rounded-md border border-white/10 bg-surface-overlay overflow-y-auto custom-scrollbar ${
             viewMode === 'plain' ? 'py-3 pl-3 pr-5 text-[13px] leading-relaxed font-mono' : 'p-4'
           }`}
         >
