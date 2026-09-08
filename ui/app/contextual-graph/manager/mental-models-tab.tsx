@@ -556,7 +556,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           <span className="text-xs text-white/90 truncate" title={ref.role}>{roleLabel}</span>
                         </TableCell>
                         <TableCell className="py-2 px-3">
-                          <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20 w-fit">
+                          <Badge className="text-[10px] bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd w-fit">
                             {scopeBadge}
                           </Badge>
                         </TableCell>
