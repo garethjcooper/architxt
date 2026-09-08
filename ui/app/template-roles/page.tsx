@@ -286,30 +286,16 @@ export default function TemplateRolesPage() {
                         <span className="font-semibold text-white">{role.display_name}</span>
                       </td>
                       <td className="py-1.5 px-4 text-xs">
-                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border bg-emerald-950/30 text-emerald-400 border-emerald-500/40">
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                           {SCOPE_LABELS[role.derivation_scope] ?? role.derivation_scope}
                         </span>
                       </td>
                       <td className="py-1.5 px-4 text-xs text-white/60">{role.sort_order}</td>
-                      <td className="py-1.5 px-4 text-xs">
-                        {role.is_system ? (
-                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-semibold tracking-wide border bg-blue-950/30 text-blue-400 border-blue-500/40">
-                            SYSTEM
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-semibold tracking-wide border bg-white/5 text-white/70 border-white/20">
-                            CUSTOM
-                          </span>
-                        )}
+                      <td className="py-1.5 px-4 text-xs text-white/70">
+                        {role.is_system ? 'System' : 'Custom'}
                       </td>
-                      <td className="py-1.5 px-4 text-xs">
-                        {role.usage_count ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-400/20 text-blue-300 border border-blue-400/30">
-                            {role.usage_count} model{role.usage_count !== 1 ? 's' : ''}
-                          </span>
-                        ) : (
-                          <span className="text-white/30 text-xs">-</span>
-                        )}
+                      <td className="py-1.5 px-4 text-xs text-white/70">
+                        {role.usage_count ? `${role.usage_count} model${role.usage_count !== 1 ? 's' : ''}` : '-'}
                       </td>
                       <td className="py-1.5 px-4 text-xs text-white/50">
                         {formatDistanceToNow(new Date(role.created_at), { addSuffix: true })}
