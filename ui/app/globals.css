@@ -36,9 +36,9 @@
   --badge-info-fg: oklch(0.8 0.1 250);
   --badge-info-bd: oklch(0.65 0.1 250 / 0.3);
 
-  --badge-entity-bg: oklch(0.5 0.18 300 / 0.15);
-  --badge-entity-fg: oklch(0.78 0.16 300);
-  --badge-entity-bd: oklch(0.55 0.14 300 / 0.25);
+  --badge-entity-bg: oklch(0.45 0.22 300 / 0.22);
+  --badge-entity-fg: oklch(0.75 0.22 300);
+  --badge-entity-bd: oklch(0.55 0.2 300 / 0.35);
 
   --background: oklch(0.38 0 0);
   --foreground: oklch(0.92 0 0);
