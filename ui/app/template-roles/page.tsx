@@ -182,28 +182,28 @@ export default function TemplateRolesPage() {
         <Button
           onClick={fetchRoles}
           title="Refresh"
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
         <Button
           onClick={openDeleteConfirm}
           disabled={selected.size === 0}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Delete"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
         <Button
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
           title="Add"
         >
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
           <div className="flex-1" />
           <div className="flex items-center gap-2">
@@ -231,20 +231,20 @@ export default function TemplateRolesPage() {
           <table className="w-full caption-bottom text-sm">
             <thead>
               <tr className="border-b border-white/10">
-                <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={isAllSelected}
                     data-state={isIndeterminate ? 'indeterminate' : isAllSelected ? 'checked' : 'unchecked'}
                     onCheckedChange={toggleAll}
                   />
                 </th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Role ID</th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Display Name</th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Scope</th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Sort</th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Type</th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Mental Models</th>
-                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Created</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Role ID</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Display Name</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Scope</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Sort</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Type</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Mental Models</th>
+                <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Created</th>
               </tr>
             </thead>
             <tbody>
@@ -273,7 +273,7 @@ export default function TemplateRolesPage() {
                       onClick={(e) => handleRoleClick(role, e)}
                     >
                       <td
-                        className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", role.is_system ? "bg-amber-900/10" : isSelected ? "bg-emerald-900/20" : "bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}
+                        className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", role.is_system ? "bg-amber-900/10" : isSelected ? "bg-emerald-900/20" : "bg-surface-card"].filter(Boolean).join(" ")}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Checkbox

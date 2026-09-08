@@ -49,7 +49,7 @@ export function ImageReviewModal({
       onClick={onClose}
     >
       <div
-        className="bg-[oklch(0.18_0_0)] border border-white/10 rounded-lg w-[900px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-surface-overlay border border-white/10 rounded-lg w-[900px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

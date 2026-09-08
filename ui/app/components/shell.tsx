@@ -63,7 +63,7 @@ export function Shell({ children }: ShellProps) {
       {/* Top Row - Header + Top Bar */}
       <div className="flex">
         {/* Sidebar Header - aligned with top bar */}
-        <aside className={`bg-[oklch(0.22_0_0)] flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
+        <aside className={`bg-surface-panel flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
           <div className="h-[56px] flex items-center px-4 py-4">
             <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
               <ArchitxtIcon className="h-8 w-8 text-[#BABABA] shrink-0" />
@@ -86,7 +86,7 @@ export function Shell({ children }: ShellProps) {
         </aside>
 
         {/* Main Top Bar */}
-        <header className="flex-1 h-[56px] bg-[oklch(0.22_0_0)] px-6 flex items-center justify-end">
+        <header className="flex-1 h-[56px] bg-surface-panel px-6 flex items-center justify-end">
           <div className="flex items-center gap-4">
             <DaemonStatus />
             <HindsightStatus />
@@ -118,7 +118,7 @@ export function Shell({ children }: ShellProps) {
       <div className="flex flex-1 min-h-0">
         {/* Bottom Row - Navigation + Content */}
         {/* Sidebar Navigation */}
-        <aside className={`border-r border-white/10 bg-[oklch(0.22_0_0)] flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
+        <aside className={`border-r border-white/10 bg-surface-panel flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
           <div className="h-px bg-white/10" />
           
           <nav className="p-2 space-y-1 flex-1">

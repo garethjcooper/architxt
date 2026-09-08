@@ -32,7 +32,7 @@ function Panel({
   return (
     <Card
       className={cn(
-        'min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0',
+        'min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0',
         className
       )}
       style={style}

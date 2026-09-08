@@ -254,7 +254,7 @@ export function SyncJobsTab({
           <select
             value={range}
             onChange={(e) => setRange((e.target.value as DateRange) || 'today')}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
           >
             {RANGE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -266,7 +266,7 @@ export function SyncJobsTab({
           <select
             value={status ?? ''}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value || 'any'} value={opt.value}>{opt.label}</option>
@@ -310,7 +310,7 @@ export function SyncJobsTab({
             disabled={loading}
             onClick={loadJobs}
             title="Refresh"
-            className="h-8 w-8 inline-flex items-center justify-center rounded bg-[oklch(0.21_0_0)] text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
+            className="h-8 w-8 inline-flex items-center justify-center rounded bg-surface-panel text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
           >
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </button>
@@ -318,7 +318,7 @@ export function SyncJobsTab({
       </div>
 
       <div className="flex-1 min-h-0 flex mt-2 gap-2">
-        <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: 1.2 }}>
+        <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.2 }}>
           <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Sync jobs</span>
             <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
@@ -381,7 +381,7 @@ export function SyncJobsTab({
           </div>
         </Card>
 
-        <Card className="min-h-0 border-white/10 bg-[oklch(0.23_0_0)] flex flex-col overflow-hidden pt-0" style={{ flex: 1.8 }}>
+        <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.8 }}>
           {selectedJob ? (
             <div className="h-full flex flex-col overflow-hidden">
               <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">

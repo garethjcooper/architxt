@@ -374,7 +374,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
       {/* Main workspace */}
       <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+        <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-surface-overlay overflow-hidden">
           <div className="px-2 py-1.5 flex justify-end">
             <button
               onClick={() => setShowRemoved(v => !v)}
@@ -417,7 +417,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
         </div>
 
         {/* Content pane */}
-        <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-[oklch(0.18_0_0)] p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed"
+        <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-surface-overlay p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed"
              style={{ maxHeight: '100%' }}>
           {blocks.map(b => {
             if (b.deleted && !showRemoved) return null;

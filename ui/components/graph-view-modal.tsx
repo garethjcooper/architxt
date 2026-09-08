@@ -188,7 +188,7 @@ function PreviewPane({
   }, [content]);
 
   return (
-    <div className="flex flex-col h-full rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+    <div className="flex flex-col h-full rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div
           ref={containerRef}
@@ -496,12 +496,12 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
           <DialogTitle>{title || graph.name || 'Graph view'}</DialogTitle>
         </DialogHeader>
         {isEmpty ? (
-          <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-[oklch(0.18_0_0)] flex items-center justify-center text-sm text-white/40">
+          <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-surface-overlay flex items-center justify-center text-sm text-white/40">
             No graph data available.
           </div>
         ) : (
           <div className="flex-1 min-h-0 flex overflow-hidden">
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
               <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
                 <span>Preview</span>
                 <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
@@ -517,7 +517,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
             <ResizeHandle direction="vertical" onMouseDown={startColResize} title="Drag to resize panels" />
             <div
               ref={rightColumnRef}
-              className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+              className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
               style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
               <div className="flex flex-col overflow-hidden" style={{ flex: ratios.source }}>
@@ -567,7 +567,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               </div>
               <ResizeHandle direction="horizontal" onMouseDown={startUpperResize} title="Drag to resize tables panel" />
               <div
-                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
                 style={{ flex: ratios.tables }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
@@ -611,7 +611,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                           <Copy className="h-3.5 w-3.5" />
                         </span>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-[oklch(0.18_0_0)] border-white/10">
+                      <DropdownMenuContent align="end" className="bg-surface-overlay border-white/10">
                         <DropdownMenuItem
                           onClick={() =>
                             copyText(
@@ -646,7 +646,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               </div>
               <ResizeHandle direction="horizontal" onMouseDown={startLowerResize} title="Drag to resize JSON panel" />
               <div
-                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-[oklch(0.18_0_0)] overflow-hidden"
+                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
                 style={{ flex: ratios.json }}
               >
                 <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">

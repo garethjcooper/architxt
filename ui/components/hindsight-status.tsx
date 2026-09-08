@@ -105,7 +105,7 @@ export function HindsightStatus() {
       </button>
 
       {expanded && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-white/10 bg-[oklch(0.18_0_0)] shadow-xl p-4 space-y-3">
+        <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-white/10 bg-surface-overlay shadow-xl p-4 space-y-3">
           {error ? (
             <div className="text-xs text-red-400 text-center py-2">Failed to load status</div>
           ) : ops.length === 0 ? (

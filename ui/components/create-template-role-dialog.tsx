@@ -139,7 +139,7 @@ export function CreateTemplateRoleDialog({
                 id="derivation_scope"
                 value={derivationScope}
                 onChange={(e) => setDerivationScope(e.target.value as Scope)}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+                className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
               >
                 {SCOPES.map((scope) => (
                   <option key={scope} value={scope}>

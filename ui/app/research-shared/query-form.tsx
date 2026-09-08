@@ -566,7 +566,7 @@ function BudgetSelect({
         disabled={disabled}
         value={value || 'mid'}
         onChange={(e) => onChange(e.target.value as Budget)}
-        className="h-7 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2 text-[10px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+        className="h-7 rounded-md border border-white/10 bg-surface-card px-2 text-[10px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
       >
         {BUDGET_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

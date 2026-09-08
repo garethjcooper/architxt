@@ -385,7 +385,7 @@ export function ViewDocumentDialog({
                                 base.setHours(hours || 0, minutes || 0, seconds || 0, 0);
                                 setTimestamp(base.toISOString());
                               }}
-                              className="bg-[oklch(0.18_0_0)] border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 w-[90px]"
+                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 w-[90px]"
                             />
                           </div>
                           <div className="flex items-center gap-1 ml-auto">
@@ -613,7 +613,7 @@ export function ViewDocumentDialog({
             </div>
 
             {/* Tab Content */}
-            <div className="flex flex-col flex-1 rounded-lg border border-white/20 bg-[oklch(0.18_0_0)] p-3 overflow-hidden">
+            <div className="flex flex-col flex-1 rounded-lg border border-white/20 bg-surface-overlay p-3 overflow-hidden">
               {activeTab === 'content' ? (
                 /* Content Tab */
                 contentLoading ? (

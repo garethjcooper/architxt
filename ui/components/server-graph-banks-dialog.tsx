@@ -368,7 +368,7 @@ export function ServerGraphBanksDialog({
                             <select
                               value={cfg.mode}
                               onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
-                              className="h-7 w-[110px] rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2 text-xs text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                              className="h-7 w-[110px] rounded-md border border-white/10 bg-surface-card px-2 text-xs text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
                             >
                               <option value="manual">Manual</option>
                               <option value="auto">Auto</option>

@@ -560,7 +560,7 @@ export function DryRunExtractDialog({
                           side="bottom"
                           sideOffset={4}
                           anchor={contextComboRef}
-                          className="max-h-60 overflow-y-auto custom-scrollbar rounded-lg border border-white/10 bg-[oklch(0.21_0_0)] p-1 shadow-md"
+                          className="max-h-60 overflow-y-auto custom-scrollbar rounded-lg border border-white/10 bg-surface-panel p-1 shadow-md"
                           style={{ width: contextComboWidth }}
                         >
                           {contextOptions.map((c) => (
@@ -673,7 +673,7 @@ export function DryRunExtractDialog({
                         e.target.value as typeof retainExtractionMode,
                       )
                     }
-                    className="w-full h-10 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                    className="w-full h-10 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
                   >
                     <option value="bank">Bank (use bank value)</option>
                     <option value="concise">concise</option>
@@ -788,7 +788,7 @@ export function DryRunExtractDialog({
                                 );
                                 setTimestamp(base.toISOString());
                               }}
-                              className="bg-[oklch(0.18_0_0)] border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 w-[90px]"
+                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 w-[90px]"
                             />
                           </div>
                           <div className="flex items-center gap-1 ml-auto">
@@ -865,7 +865,7 @@ export function DryRunExtractDialog({
 
                   <div className="flex-1 grid grid-cols-[30%_1fr] gap-4 min-h-0">
                     {/* Left — Detected Entities */}
-                    <div className="flex flex-col min-h-0 rounded-md border border-white/10 bg-[oklch(0.21_0_0)] overflow-hidden">
+                    <div className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-panel overflow-hidden">
                       <div className="flex items-center justify-between px-2.5 py-2 border-b border-white/10 bg-emerald-950/30 shrink-0">
                         <span className="text-[11px] font-medium text-emerald-400">
                           ENTITIES
@@ -1010,7 +1010,7 @@ export function DryRunExtractDialog({
                         filteredFacts.map((fact, idx) => (
                           <div
                             key={idx}
-                            className="p-3 rounded-md border border-white/10 bg-[oklch(0.23_0_0)]"
+                            className="p-3 rounded-md border border-white/10 bg-surface-card"
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-[10px] uppercase font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
@@ -1068,7 +1068,7 @@ export function DryRunExtractDialog({
                 </span>
               </div>
 
-              <div className="flex flex-col flex-1 rounded-lg border border-white/20 bg-[oklch(0.18_0_0)] overflow-hidden">
+              <div className="flex flex-col flex-1 rounded-lg border border-white/20 bg-surface-overlay overflow-hidden">
                 {content ? (
                   <>
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 flex-shrink-0">

@@ -6,6 +6,13 @@
 
 /* Theme variables */
 :root {
+  /* Semantic surfaces */
+  --surface-page: oklch(0.17 0 0);
+  --surface-panel: oklch(0.21 0 0);
+  --surface-card: oklch(0.23 0 0);
+  --surface-hover: oklch(0.27 0 0);
+  --surface-overlay: oklch(0.18 0 0);
+
   --background: oklch(0.38 0 0);
   --foreground: oklch(0.92 0 0);
   --card: oklch(0.38 0 0);
@@ -131,6 +138,11 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
   --line-clamp-3: 3;
+  --color-surface-page: var(--surface-page);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-card: var(--surface-card);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-overlay: var(--surface-overlay);
 }
 
 /* line-clamp fallback for Tailwind 4 inline */

@@ -240,7 +240,7 @@ export function ImportDialog({
 
           {/* Preview table */}
           {(phase === 'preview' || phase === 'running') && validItems.length > 0 && (
-            <div className="flex-1 min-h-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col">
+            <div className="flex-1 min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col">
               <div className="px-3 py-1.5 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
                 <span className="text-xs font-medium text-emerald-400">
                   {phase === 'running'
@@ -250,7 +250,7 @@ export function ImportDialog({
               </div>
               <div className="flex-1 overflow-auto">
                 <table className="w-full table-fixed">
-                  <thead className="sticky top-0 bg-[oklch(0.23_0_0)] z-10">
+                  <thead className="sticky top-0 bg-surface-card z-10">
                     <tr className="border-b border-white/10">
                       {columns.map((col) => (
                         <th

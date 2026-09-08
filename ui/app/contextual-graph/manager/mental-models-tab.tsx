@@ -465,7 +465,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded bg-[oklch(0.21_0_0)] text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
+          className="h-8 w-8 rounded bg-surface-panel text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
           disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0 || selectedRefIds.size === 0}
           onClick={() => setConfirmRefreshAllOpen(true)}
           title="Refresh selected mental models"
@@ -477,7 +477,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
       <div className="flex-1 min-h-0 flex mt-2 overflow-hidden">
         {/* Table */}
         <div
-          className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
+          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col"
           style={{ width: `${100 - panelWidth}%` }}
         >
           <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
@@ -641,7 +641,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
 
         {/* Content panel */}
         <div
-          className="min-w-0 rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col"
+          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col"
           style={{ width: `${panelWidth}%` }}
         >
           <EnvelopeControls

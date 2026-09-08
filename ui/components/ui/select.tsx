@@ -33,7 +33,7 @@ function SelectPopup({ className, ...props }: React.ComponentPropsWithoutRef<typ
       <SelectUI.Positioner align="start" sideOffset={4}>
         <SelectUI.Popup
           className={cn(
-            'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[oklch(0.21_0_0)] p-1 text-white shadow-md',
+            'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-surface-panel p-1 text-white shadow-md',
             className
           )}
           {...props}

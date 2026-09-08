@@ -21,7 +21,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
         // Disabled state  
         "disabled:cursor-not-allowed disabled:opacity-50",
         // Custom background for unchecked
-        "bg-[oklch(0.23_0_0)]",
+        "bg-surface-card",
         className
       )}
       {...props}

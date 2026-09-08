@@ -69,7 +69,7 @@ export default function DocumentsPage() {
   return (
     <Suspense fallback={
       <PageShell title="Documents" subtitle="Upload and process documents." loading={true}>
-        <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08]">
+        <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08]">
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
             <span className="font-medium text-sm">Documents</span>
           </div>
@@ -348,19 +348,19 @@ function DocumentsPageContent() {
                   </button>
                 )}
               </div>
-              <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-orange-500/30 text-orange-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
-              <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-blue-500/30 text-blue-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
-              <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-violet-500/30 text-violet-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
-              <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
-              <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-emerald-500/30 text-emerald-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
+              <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-orange-500/30 text-orange-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
+              <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-blue-500/30 text-blue-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
+              <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-violet-500/30 text-violet-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
+              <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-white/20 text-white/80 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
+              <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-emerald-500/30 text-emerald-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
               <div className="flex-1" />
               <div className="w-px h-5 bg-white/10 mx-1" />
-              <Button onClick={fetchDocuments} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
-              <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
-              <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
+              <Button onClick={fetchDocuments} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+              <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
             </div>
         }
-        <div className="rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
             <div className="flex items-center gap-1">
               {MANAGE_FILTERS.map(f => (
@@ -403,28 +403,28 @@ function DocumentsPageContent() {
             <table className="w-full caption-bottom text-sm table-fixed">
               <TableHeader>
                 <TableRow className="border-b border-white/10">
-                  <TableHead className={["w-12 py-1.5 px-4", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}>
+                  <TableHead className={["w-12 py-1.5 px-4", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")}>
                     <Checkbox
                       checked={isAllSelected}
                       onCheckedChange={toggleAll}
                     />
                   </TableHead>
-                  <TableHead className={["w-12 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>ID</TableHead>
-                  <TableHead className={["w-[25%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>External ID</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Document Date</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Tags</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Context</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Metadata</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Char (K)</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entities</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Status</TableHead>
+                  <TableHead className={["w-12 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>ID</TableHead>
+                  <TableHead className={["w-[25%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>External ID</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Document Date</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Tags</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Context</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Metadata</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Char (K)</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Entities</TableHead>
+                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-b border-white/5">
-                      <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
+                      <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
@@ -453,7 +453,7 @@ function DocumentsPageContent() {
                         selected.has(doc.id) ? 'bg-emerald-900/20' : 'hover:bg-white/5'
                       }`}
                     >
-                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(doc.id) ? 'bg-emerald-900/20' : 'bg-[oklch(0.23_0_0)]'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(doc.id) ? 'bg-emerald-900/20' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selected.has(doc.id)}
                           onCheckedChange={() => toggleSelection(doc.id)}

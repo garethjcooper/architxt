@@ -153,7 +153,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
               id="ce-type"
               value={typeId}
               onChange={(e) => setTypeId(Number(e.target.value) || '')}
-              className="w-full h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
               required
             >
               <option value="">Select type…</option>

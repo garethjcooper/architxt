@@ -87,7 +87,7 @@ function ColumnCard({
   const selectedCount = extIds.filter((id) => selectedIds.has(id)).length;
 
   return (
-    <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col h-full">
+    <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col h-full">
       {/* Header */}
       <div className={`px-3 py-2 border-b border-white/10 ${colorClass}`}>
         <div className="flex items-center justify-between">
@@ -723,7 +723,7 @@ export default function HindsightPage() {
           <select
             value={selectedServerId}
             onChange={(e) => setSelectedServerId(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
           >
             <option value="">Select server...</option>
             {servers.map((s, idx) => (
@@ -738,7 +738,7 @@ export default function HindsightPage() {
             value={selectedBankId}
             onChange={(e) => setSelectedBankId(e.target.value)}
             disabled={!selectedServerId || loadingBanks || banks.length === 0}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
           >
             <option value="">{loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}</option>
             {banks.map((b, idx) => (
@@ -758,7 +758,7 @@ export default function HindsightPage() {
               setCounts(null);
               setSelectedIds(new Set());
             }}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
           >
             <option value="documents">Documents</option>
             <option value="entities">Entities</option>
@@ -801,7 +801,7 @@ export default function HindsightPage() {
       {loadingDiff && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08]">
+            <div key={i} className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08]">
               <div className="px-4 py-2 border-b border-white/10"><Skeleton className="h-4 w-24" /></div>
               {Array.from({ length: 5 }).map((_, j) => (
                 <div key={j} className="px-4 py-3 border-b border-white/5"><Skeleton className="h-3 w-full" /></div>
