@@ -6,7 +6,7 @@
  * hard-coded colour map in a page.
  */
 
-export type SemanticBadgeFamily = 'neutral' | 'success' | 'danger' | 'caution' | 'info';
+export type SemanticBadgeFamily = 'neutral' | 'success' | 'danger' | 'caution' | 'info' | 'entity';
 
 export const statusBadgeClass: Record<string, SemanticBadgeFamily> = {
   // Document pipeline
@@ -56,6 +56,8 @@ export const familyClass: Record<SemanticBadgeFamily, string> = {
     'inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd border',
   info:
     'inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-badge-info-bg text-badge-info-fg border-badge-info-bd border',
+  entity:
+    'inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd border',
 };
 
 export function getStatusBadge(status?: string | null): {

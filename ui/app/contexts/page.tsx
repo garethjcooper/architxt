@@ -17,6 +17,7 @@ import { ImportDialog, parseContextImport } from '@/components/import-dialog';
 import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
+import { familyClass } from '@/lib/status-badge';
 import type { Context } from '@/lib/types';
 
 const logger = createLogger('ContextsPage');
@@ -248,8 +249,8 @@ export default function ContextsPage() {
                       <span
                         className={`${!compactBadges ? 'inline-flex truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                           search.trim() && context.description.toLowerCase().includes(search.toLowerCase())
-                            ? 'bg-violet-400/40 text-violet-200 border-violet-400/60 ring-1 ring-violet-400/50'
-                            : 'bg-violet-400/20 text-violet-300 border-violet-400/30'
+                            ? `${familyClass.entity} ring-1 ring-badge-entity-fg/50`
+                            : familyClass.entity
                         }`}
                       >
                         {context.description}
