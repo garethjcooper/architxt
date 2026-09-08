@@ -293,13 +293,13 @@ export default function DirectivesPage() {
                               {tagsToShow.map((tag) => (
                                 <span
                                   key={tag.id}
-                                  className="inline-flex px-2 py-0.5 rounded-full text-[10px] border bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                  className="inline-flex px-2 py-0.5 rounded-full text-[10px] border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd"
                                 >
                                   {tag.name}
                                 </span>
                               ))}
                               {remaining > 0 && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border bg-amber-500/10 text-amber-400/80 border-amber-500/20">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                                   +{remaining}
                                 </span>
                               )}
