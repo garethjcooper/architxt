@@ -98,7 +98,7 @@ export default function ContextManagerPage() {
     if (!selectedServer) return;
     let cancelled = false;
     setLoadingRoles(true);
-    mentalModelsApi.listTemplateRoles()
+    mentalModelsApi.listTemplateRoles({ available: true })
       .then((roles) => {
         if (cancelled) return;
         setTemplateRoles(roles || []);

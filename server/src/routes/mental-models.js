@@ -224,7 +224,9 @@ router.get('/dimensions/standard', async (req, res) => {
  */
 router.get('/roles/template', async (req, res) => {
   const start = Date.now();
-  const rows = await listTemplateRoles(db);
+  const availableOnly = req.query.available === 'true';
+  const excludeMmId = req.query.exclude_mm_id ? Number(req.query.exclude_mm_id) : null;
+  const rows = await listTemplateRoles(db, { availableOnly, excludeMmId });
   const roles = rows
     .filter((r) => r.role)
     .map((r) => ({

@@ -126,7 +126,7 @@ function ModelsPageContent() {
 
   useEffect(() => {
     fetchModels();
-    mentalModelsApi.listTemplateRoles().then((roles) => {
+    mentalModelsApi.listTemplateRoles({ available: true }).then((roles) => {
       setTemplateRoleOptions(roles);
     }).catch((err) => {
       logger.error('Failed to load template roles', { error: err });
