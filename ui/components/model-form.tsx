@@ -83,19 +83,6 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
     return (templateRoles ?? []).filter((r) => !r.value.startsWith('sys_'));
   }, [templateRoles, mode]);
 
-  // When the user explicitly turns on Entity Template mode without a role,
-  // default to the generic user entity derived role so the model has a known
-  // derivation scope and validation rules.
-  useEffect(() => {
-    if (mode !== 'create' || isSystemTemplate) return;
-    if (isTemplate && !templateRole) {
-      const exists = availableRoles.find((r) => r.value === USER_ENTITY_DERIVED_ROLE);
-      if (exists) {
-        setTemplateRole(USER_ENTITY_DERIVED_ROLE);
-      }
-    }
-  }, [mode, isSystemTemplate, isTemplate, templateRole, availableRoles]);
-
   const selectedRole = useMemo(
     () => availableRoles.find((r) => r.value === templateRole) ?? null,
     [availableRoles, templateRole]
@@ -167,12 +154,25 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
   const handleIsTemplateChange = (v: boolean) => {
     if (isSystemTemplate || roleControlsTemplate) return;
     setIsTemplate(v);
+    if (v && !templateRole) {
+      const exists = availableRoles.find((r) => r.value === USER_ENTITY_DERIVED_ROLE);
+      if (exists) {
+        setTemplateRole(USER_ENTITY_DERIVED_ROLE);
+      }
+    }
+    if (!v) {
+      setTemplateRole('');
+    }
   };
 
   const handleTemplateRoleChange = (value: string) => {
     setTemplateRole(value);
     if (value && !isTemplate) {
       setIsTemplate(true);
+    }
+    if (!value && isTemplate) {
+      // Generic / no role selected while template mode is on — keep slider on,
+      // user explicitly chose a generic template.
     }
   };
 
