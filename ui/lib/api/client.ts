@@ -482,7 +482,13 @@ export const mentalModelsApi = {
   },
   listDimensions: () => fetchApi<string[]>('/mentalmodels/dimensions'),
   listStandardDimensions: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/dimensions/standard'),
-  listTemplateRoles: () => fetchApi<{ value: string; label: string; derivation_scope: string }[]>('/mentalmodels/roles/template'),
+  listTemplateRoles: (options?: { available?: boolean; exclude_mm_id?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.available) params.set('available', 'true');
+    if (options?.exclude_mm_id != null) params.set('exclude_mm_id', options.exclude_mm_id.toString());
+    const queryString = params.toString();
+    return fetchApi<{ value: string; label: string; derivation_scope: string }[]>(`/mentalmodels/roles/template${queryString ? '?' + queryString : ''}`);
+  },
   getSystemTemplateDefaults: () => fetchApi<{ role: string; ext_id: string; name: string; source_query: string }[]>('/mentalmodels/system-template-defaults'),
   get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
   create: (data: {

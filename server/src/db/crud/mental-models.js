@@ -596,17 +596,30 @@ const ROLE_LABELS = {
   sys_discovery_context: 'Discovery',
 };
 
-export const listTemplateRoles = (db) => {
+export const listTemplateRoles = (db, { availableOnly = false, excludeMmId = null } = {}) => {
   const result = dbExec(() => {
     const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
     if (tableExists) {
-      const rows = stmt(db, `
+      let rows = stmt(db, `
         SELECT tr_role_id AS role,
                tr_display_name AS label,
                tr_derivation_scope AS derivation_scope
         FROM template_roles
         ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_role_id ASC
       `).all();
+      if (availableOnly) {
+        // Roles already assigned to another mental model are not available for a new assignment.
+        // user_entity_derived is intentionally unlimited and always available.
+        const inUseRows = stmt(db, `
+          SELECT DISTINCT mm_template_role AS role
+          FROM ${TABLE}
+          WHERE mm_template_role IS NOT NULL
+            AND mm_template_role != 'user_entity_derived'
+            ${excludeMmId != null ? 'AND mm_id != ?' : ''}
+        `).all(...(excludeMmId != null ? [excludeMmId] : []));
+        const inUse = new Set(inUseRows.map((r) => r.role));
+        rows = rows.filter((r) => !inUse.has(r.role));
+      }
       return rows;
     }
 

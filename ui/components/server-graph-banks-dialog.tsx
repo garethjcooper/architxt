@@ -79,7 +79,7 @@ export function ServerGraphBanksDialog({
     async function loadTemplateRoles() {
       setLoadingRoles(true);
       try {
-        const roles = await mentalModelsApi.listTemplateRoles();
+        const roles = await mentalModelsApi.listTemplateRoles({ available: true });
         const seen = new Set<string>();
         setTemplateRoles(
           (roles || [])

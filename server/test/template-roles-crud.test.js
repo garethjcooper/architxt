@@ -233,6 +233,34 @@ describe('template roles CRUD', () => {
     ]);
     assert.ok(rows.every((r) => r.role && r.label && r.derivation_scope !== undefined));
   });
+
+  it('listTemplateRoles availableOnly excludes roles already assigned to another mental model', () => {
+    createTemplateRole(db, { role_id: 'assigned_role', display_name: 'Assigned', derivation_scope: 'node' });
+    createMentalModel(db, {
+      mm_ext_id: 'mm-with-assigned-role',
+      mm_name: 'Assigned Role Model',
+      mm_source_query: 'MATCH (n) RETURN n',
+      mm_template_role: 'assigned_role',
+    });
+
+    const available = listMentalModelTemplateRoles(db, { availableOnly: true });
+    assert.ok(!available.some((r) => r.role === 'assigned_role'), 'assigned role should not be available');
+    assert.ok(available.some((r) => r.role === 'user_entity_derived'), 'user_entity_derived should remain available');
+  });
+
+  it('listTemplateRoles availableOnly with excludeMmId keeps the requesting model\'s own role', () => {
+    createTemplateRole(db, { role_id: 'owned_role', display_name: 'Owned', derivation_scope: 'node' });
+    const mmResult = createMentalModel(db, {
+      mm_ext_id: 'mm-owner',
+      mm_name: 'Owner',
+      mm_source_query: 'MATCH (n) RETURN n',
+      mm_template_role: 'owned_role',
+    });
+    assert.equal(mmResult.success, true, mmResult.error);
+
+    const available = listMentalModelTemplateRoles(db, { availableOnly: true, excludeMmId: mmResult.data });
+    assert.ok(available.some((r) => r.role === 'owned_role'), 'own role should remain available for edit');
+  });
 });
 
 describe('mental model role assignment rules', () => {
