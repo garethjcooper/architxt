@@ -621,6 +621,30 @@ For each flow, describe what is transferred, how it is transferred, how often, a
   },
 ];
 
+function migrateLegacyIdPlaceholder(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
+  if (!tableExists) return 0;
+
+  // Rename the old bare {id} placeholder to the canonical {entity-id} across
+  // all templated mental-model fields. This unifies user/system/custom
+  // templates with the shared substitution vocabulary.
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query'];
+  let migrated = 0;
+  for (const col of cols) {
+    const update = db.prepare(`
+      UPDATE mental_models
+      SET ${col} = REPLACE(${col}, '{id}', '{entity-id}')
+      WHERE ${col} LIKE '%{id}%'
+    `);
+    const result = update.run();
+    migrated += result.changes;
+  }
+  if (migrated > 0) {
+    logger.info(`Migrated ${migrated} mental-model field(s) from {id} to {entity-id}`);
+  }
+  return migrated;
+}
+
 function ensureContextualGraphTemplates(db) {
   const mmTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
   const ptTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'prompt_templates'").get();
@@ -1596,12 +1620,13 @@ export function ensureSchema(db) {
     const cgTemplates = ensureContextualGraphTemplates(db);
     const templateRolesSeeded = ensureTemplateRoles(db);
     const templateRoleUniqueIndex = ensureTemplateRoleUniqueIndex(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}`);
+    const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
+    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, id placeholder migrated: ${idPlaceholderMigrated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex;
+    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
