@@ -12,6 +12,8 @@
   --surface-card: oklch(0.23 0 0);
   --surface-hover: oklch(0.27 0 0);
   --surface-overlay: oklch(0.18 0 0);
+  --surface-scrollbar-thumb: oklch(0.55 0 0);
+  --surface-scrollbar-thumb-hover: oklch(0.65 0 0);
 
   --background: oklch(0.38 0 0);
   --foreground: oklch(0.92 0 0);
@@ -143,6 +145,8 @@
   --color-surface-card: var(--surface-card);
   --color-surface-hover: var(--surface-hover);
   --color-surface-overlay: var(--surface-overlay);
+  --color-surface-scrollbar-thumb: var(--surface-scrollbar-thumb);
+  --color-surface-scrollbar-thumb-hover: var(--surface-scrollbar-thumb-hover);
 }
 
 /* line-clamp fallback for Tailwind 4 inline */
@@ -170,19 +174,19 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #404854;
+  background: var(--surface-scrollbar-thumb);
   border-radius: 4px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5a6470;
+  background: var(--surface-scrollbar-thumb-hover);
   background-clip: content-box;
 }
 
 /* For Firefox */
 * {
-  scrollbar-color: #404854 transparent;
+  scrollbar-color: var(--surface-scrollbar-thumb) transparent;
   scrollbar-width: thin;
 }
