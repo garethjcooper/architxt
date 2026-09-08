@@ -27,6 +27,8 @@ import { DerivedModelHealthDialog } from '@/components/derived-model-health-dial
 import {
   getRoleTemplateRule,
   getRoleTemplateInstructions,
+  extractRoleTemplatePrefix,
+  buildRoleTemplateValue,
   validateRoleBasedTemplate,
 } from '@/lib/validation/contextual-template';
 
@@ -131,6 +133,7 @@ function buildDerivedRows(model: MentalModel, baseConfig: BaseConfig): DerivedMe
 
 export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templateRoles, availableEntities = [], availableEdges = [] }: ModelDetailsDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [name, setName] = useState(model.name ?? '');
   const [sourceQuery, setSourceQuery] = useState(model.source_query ?? '');
   const [systemTemplateDefaults, setSystemTemplateDefaults] = useState<
     { role: string; ext_id: string; name: string; source_query: string }[] | null
@@ -164,6 +167,26 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const roleScope = selectedTemplateRole?.derivation_scope ?? null;
   const roleRule = roleScope ? getRoleTemplateRule(roleScope) : null;
 
+  // For role-based templates, the user only edits the prefix of the name; the
+  // mandatory placeholder tail is read-only. ext_id is immutable, so we only
+  // validate that it matches the expected format and derive the prefix from it.
+  const [namePrefix, setNamePrefix] = useState('');
+
+  useEffect(() => {
+    if (!roleScope) {
+      setNamePrefix('');
+      return;
+    }
+    const extPrefix = extractRoleTemplatePrefix(roleScope, 'extId', model.ext_id ?? '') ?? '';
+    const namePrefixFromModel = extractRoleTemplatePrefix(roleScope, 'name', model.name ?? '') ?? '';
+    setNamePrefix(namePrefixFromModel || extPrefix);
+  }, [roleScope, model.ext_id, model.name]);
+
+  const effectiveName = useMemo(() => {
+    if (!roleScope || !roleRule) return name;
+    return buildRoleTemplateValue(roleScope, 'name', namePrefix) ?? roleRule.nameTail;
+  }, [roleScope, roleRule, namePrefix, name]);
+
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
     showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []
   );
@@ -175,14 +198,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const baseConfig: BaseConfig = useMemo(
     () => ({
       ext_id: model.ext_id,
-      name: model.name,
+      name: effectiveName.trim() || null,
       source_query: sourceQuery.trim() || null,
       refresh_mode: refreshMode,
       refresh_after_consolidation: refreshAfterConsolidation,
       exclude_all_mental_models: excludeAll,
       max_tokens: parseMaxTokens(maxTokens, model.max_tokens ?? 2048),
     }),
-    [model.ext_id, model.name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
+    [model.ext_id, effectiveName, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
   );
 
   const derivedRef = useRef(derived);
@@ -194,6 +217,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   // When the modal opens, reset all local state from the model.
   useEffect(() => {
     if (!open || !model) return;
+    setName(model.name ?? '');
     setSourceQuery(model.source_query ?? '');
     setRefreshMode(model.refresh_mode ?? 'full');
     setRefreshAfterConsolidation(model.refresh_after_consolidation ?? false);
@@ -263,6 +287,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   const parsedMaxTokens = parseMaxTokens(maxTokens, model.max_tokens ?? 2048);
 
   const hasChanges =
+    (!isSystemTemplate && effectiveName.trim() !== (model.name ?? '').trim()) ||
     sourceQuery.trim() !== (model.source_query ?? '').trim() ||
     refreshMode !== (model.refresh_mode ?? 'full') ||
     refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false) ||
@@ -287,10 +312,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     if (!roleScope || !model.template_role) return null;
     return validateRoleBasedTemplate(roleScope, {
       extId: model.ext_id ?? '',
-      name: model.name ?? '',
+      name: effectiveName,
       sourceQuery,
     });
-  }, [roleScope, model.ext_id, model.template_role, model.name, sourceQuery]);
+  }, [roleScope, model.ext_id, model.template_role, effectiveName, sourceQuery]);
 
   const extIdFormatWarning = useMemo(() => {
     if (!roleScope || !model.template_role) return null;
@@ -322,6 +347,24 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
         source_query: substitutePlaceholders(nextBaseConfig.source_query, d.derived_entity),
       }))
     );
+  };
+
+  const handleNameChange = (value: string) => {
+    if (!roleScope) {
+      setName(value);
+      updateDerivedPlaceholders({
+        ...baseConfig,
+        name: value.trim() || null,
+      });
+      return;
+    }
+    // The role tail is immutable; only accept changes to the prefix.
+    const prefix = extractRoleTemplatePrefix(roleScope, 'name', value) ?? value;
+    setNamePrefix(prefix);
+    updateDerivedPlaceholders({
+      ...baseConfig,
+      name: buildRoleTemplateValue(roleScope, 'name', prefix) ?? null,
+    });
   };
 
   const handleSourceQueryChange = (value: string) => {
@@ -372,7 +415,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   };
 
   const handleSave = async () => {
-    if (!model.name?.trim() || !sourceQuery.trim()) {
+    if (!effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
       return;
     }
@@ -394,7 +437,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   };
 
   const executeSave = async () => {
-    if (!model.name?.trim() || !sourceQuery.trim()) {
+    if (!effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
       return;
     }
@@ -407,6 +450,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     setIsSaving(true);
     try {
       const updates: Record<string, any> = {};
+      if (!isSystemTemplate && effectiveName.trim() !== (model.name ?? '')) updates.name = effectiveName.trim();
       if (sourceQuery.trim() !== (model.source_query ?? '')) updates.source_query = sourceQuery.trim();
       if (refreshMode !== (model.refresh_mode ?? 'full')) updates.refresh_mode = refreshMode;
       if (refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false)) {
@@ -515,9 +559,27 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             <Label htmlFor="mm-detail-name" className="text-xs uppercase text-white/50 font-medium">
               Name *
             </Label>
-            <p id="mm-detail-name" className="text-sm text-white truncate">
-              {model.name || '-'}
-            </p>
+            {roleScope && roleRule ? (
+              <Input
+                id="mm-detail-name"
+                value={namePrefix}
+                disabled={isSystemTemplate}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="prefix"
+                className={inputClass}
+                style={inputFocusStyle}
+              />
+            ) : (
+              <Input
+                id="mm-detail-name"
+                value={name}
+                disabled={isSystemTemplate}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="Display name"
+                className={inputClass}
+                style={inputFocusStyle}
+              />
+            )}
             {roleTemplateValidation && !roleTemplateValidation.valid && (
               <div className="mt-1 space-y-0.5">
                 {roleTemplateValidation.errors
