@@ -47,7 +47,7 @@ function ensureMissingTables(db) {
       mm_exclude_mental_model_list TEXT,
       mm_tags_match_mode TEXT DEFAULT 'all_strict',
       mm_is_template TEXT DEFAULT 'false',
-      mm_template_role TEXT UNIQUE,
+      mm_template_role TEXT,
       mm_max_tokens INTEGER DEFAULT 2048,
       mm_viewp_description TEXT,
       mm_viewp_meta JSON,
@@ -930,6 +930,95 @@ function removeMentalModelCheckConstraints(db) {
 }
 
 /**
+ * Remove the column-level UNIQUE constraint on mental_models.mm_template_role.
+ *
+ * The unlimited 'user_entity_derived' role is meant to be assigned to many
+ * mental models (one per User derived entity type), so a blanket UNIQUE
+ * constraint is incorrect. We recreate the table without it, then rely on a
+ * partial unique index (created by ensureTemplateRoleUniqueIndex) to keep
+ * system/user role-based template roles unique at the database level.
+ */
+function removeMentalModelTemplateRoleUnique(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mental_models'").get();
+  if (!tableExists) return 0;
+
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='mental_models'").pluck().get();
+  if (typeof sql !== 'string') return 0;
+
+  const hasUnique = /mm_template_role\s+TEXT\s+UNIQUE/i.test(sql);
+  if (!hasUnique) return 0;
+
+  logger.warn('Recreating mental_models to remove mm_template_role UNIQUE constraint');
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    // Save junction rows before dropping the parent table.
+    db.exec(`DROP TABLE IF EXISTS _temp_mm_tags`);
+    db.exec(`CREATE TABLE _temp_mm_tags AS SELECT * FROM mental_model_tags`);
+    db.exec(`DROP TABLE IF EXISTS _temp_mm_entities`);
+    db.exec(`CREATE TABLE _temp_mm_entities AS SELECT * FROM mental_model_entities`);
+
+    db.exec(`CREATE TABLE mental_models_new (
+      mm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mm_ext_id TEXT NOT NULL UNIQUE,
+      mm_name TEXT,
+      mm_source_query TEXT,
+      mm_refresh_after_consolidation TEXT DEFAULT 'false',
+      mm_refresh_mode TEXT DEFAULT 'full',
+      mm_exclude_all_mental_models TEXT DEFAULT 'false',
+      mm_exclude_mental_model_list TEXT,
+      mm_tags_match_mode TEXT DEFAULT 'all_strict',
+      mm_is_template TEXT DEFAULT 'false',
+      mm_template_role TEXT,
+      mm_max_tokens INTEGER DEFAULT 2048,
+      mm_viewp_description TEXT,
+      mm_viewp_meta JSON,
+      mm_dimension TEXT,
+      mm_returns TEXT,
+      mm_concatenation TEXT,
+      mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    )`);
+
+    db.exec(`INSERT INTO mental_models_new (
+      mm_id, mm_ext_id, mm_name, mm_source_query, mm_refresh_after_consolidation,
+      mm_refresh_mode, mm_exclude_all_mental_models, mm_exclude_mental_model_list,
+      mm_tags_match_mode, mm_is_template, mm_template_role, mm_max_tokens,
+      mm_viewp_description, mm_viewp_meta, mm_dimension, mm_returns,
+      mm_concatenation, mm_created_at, mm_updated_at
+    ) SELECT
+      mm_id, mm_ext_id, mm_name, mm_source_query, mm_refresh_after_consolidation,
+      mm_refresh_mode, mm_exclude_all_mental_models, mm_exclude_mental_model_list,
+      mm_tags_match_mode, mm_is_template, mm_template_role, mm_max_tokens,
+      mm_viewp_description, mm_viewp_meta, mm_dimension,
+      CASE mm_returns WHEN 'json' THEN 'generic' WHEN 'narrative' THEN 'generic' WHEN 'graph-known' THEN 'generic' WHEN 'graph-discovery' THEN 'generic' WHEN 'graph-discovered-only' THEN 'generic' WHEN 'narrative-graph-known' THEN 'generic' WHEN 'narrative-graph-discovery' THEN 'generic' WHEN 'narrative-graph-discovered-only' THEN 'generic' ELSE mm_returns END AS mm_returns,
+      mm_concatenation, mm_created_at, mm_updated_at
+    FROM mental_models`);
+
+    db.exec(`DROP TABLE mental_models`);
+    db.exec(`ALTER TABLE mental_models_new RENAME TO mental_models`);
+
+    // Restore junction rows.
+    db.exec(`INSERT INTO mental_model_tags (tag_id, mm_id, mm_tag_created_at, mm_tag_updated_at)
+             SELECT tag_id, mm_id, mm_tag_created_at, mm_tag_updated_at FROM _temp_mm_tags`);
+    db.exec(`DROP TABLE _temp_mm_tags`);
+    db.exec(`INSERT INTO mental_model_entities (ent_id, mm_id, mm_ent_refresh_mode, mm_ent_refresh_after_consolidation, mm_ent_exclude_all_mental_models, mm_ent_max_tokens, mm_ent_created_at, mm_ent_updated_at)
+             SELECT ent_id, mm_id, mm_ent_refresh_mode, mm_ent_refresh_after_consolidation, mm_ent_exclude_all_mental_models, mm_ent_max_tokens, mm_ent_created_at, mm_ent_updated_at FROM _temp_mm_entities`);
+    db.exec(`DROP TABLE _temp_mm_entities`);
+
+    const fkCheck = db.pragma('foreign_key_check');
+    if (fkCheck && fkCheck.length > 0) {
+      logger.warn('Foreign key check found issues after removing mm_template_role UNIQUE constraint', { issues: fkCheck });
+    }
+
+    logger.info('Recreated mental_models without mm_template_role UNIQUE constraint');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
  * Remove the restrictive pt_mode CHECK constraint from prompt_templates.
  * The application validates template modes in code; the database CHECK
  * prevents adding new modes without a full schema migration, which is why
@@ -1556,24 +1645,42 @@ function ensureContextualGraphIndexes(db) {
 }
 
 /**
- * Ensure mental_models.mm_template_role is unique for non-null values.
+ * Ensure mental_models.mm_template_role is unique for non-null values, except
+ * for the unlimited 'user_entity_derived' role which may be assigned to many
+ * mental models (one per User derived entity type).
+ *
  * SQLite treats multiple NULLs as distinct, so plain (Generic/no-role) models
- * are not affected. Before adding the index, any duplicate non-null roles are
- * resolved by keeping the lowest mm_id for each role and clearing the role on
- * the rest. This allows existing dev/test databases that accidentally shared a
- * legacy role to migrate cleanly.
+ * are not affected. Before adding the index, any duplicate non-null roles other
+ * than 'user_entity_derived' are resolved by keeping the lowest mm_id for each
+ * role and clearing the role on the rest. This allows existing dev/test
+ * databases that accidentally shared a legacy role to migrate cleanly.
  */
 function ensureTemplateRoleUniqueIndex(db) {
   const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
   if (!tableExists) return false;
 
-  const existing = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name = 'idx_mental_models_template_role_unique'").get();
-  if (existing) return false;
+  const existing = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='index' AND name = 'idx_mental_models_template_role_unique'").get();
+  const isPartial = existing && existing.sql && /WHERE\s+mm_template_role\s*!=?\s*['"]user_entity_derived['"]/i.test(existing.sql);
+  if (isPartial) return false;
+
+  // Drop the old non-partial unique index if present so we can recreate it with
+  // the unlimited-role exception. Column-level UNIQUE constraints created by
+  // earlier schema versions are also backed by an index, but dropping by name
+  // only removes the explicit index; SQLite will still enforce the column
+  // constraint via its auto-generated index. Those are removed by recreating
+  // the table in removeMentalModelCheckConstraints when CHECK constraints
+  // still exist, or by the dedicated removeMentalModelTemplateRoleUnique
+  // migration below.
+  if (existing) {
+    db.exec('DROP INDEX IF EXISTS idx_mental_models_template_role_unique');
+    logger.info('Dropped old non-partial unique index on mental_models.mm_template_role');
+  }
 
   const duplicates = db.prepare(`
     SELECT mm_template_role, GROUP_CONCAT(mm_id) AS ids, GROUP_CONCAT(mm_ext_id) AS ext_ids
     FROM mental_models
     WHERE mm_template_role IS NOT NULL
+      AND mm_template_role != 'user_entity_derived'
     GROUP BY mm_template_role
     HAVING COUNT(*) > 1
   `).all();
@@ -1586,15 +1693,17 @@ function ensureTemplateRoleUniqueIndex(db) {
         SELECT MIN(mm_id)
         FROM mental_models
         WHERE mm_template_role IS NOT NULL
+          AND mm_template_role != 'user_entity_derived'
         GROUP BY mm_template_role
       )
       AND mm_template_role IS NOT NULL
+      AND mm_template_role != 'user_entity_derived'
     `).run();
     logger.warn(`Cleared duplicate mm_template_role values from ${cleared.changes} mental model row(s) to prepare unique index: ${duplicates.map((d) => `${d.mm_template_role} (ids ${d.ids})`).join('; ')}`);
   }
 
-  db.exec('CREATE UNIQUE INDEX idx_mental_models_template_role_unique ON mental_models(mm_template_role)');
-  logger.info('Created unique index on mental_models.mm_template_role');
+  db.exec("CREATE UNIQUE INDEX idx_mental_models_template_role_unique ON mental_models(mm_template_role) WHERE mm_template_role != 'user_entity_derived'");
+  logger.info('Created partial unique index on mental_models.mm_template_role (excludes user_entity_derived)');
   return true;
 }
 
@@ -1608,6 +1717,7 @@ export function ensureSchema(db) {
     const added = ensureMissingColumns(db);
     backfillTemplateRoleTimestamps(db);
     const removed = removeMentalModelCheckConstraints(db);
+    const templateRoleUniqueRemoved = removeMentalModelTemplateRoleUnique(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
     const mmReturnsMigrated = migrateMentalModelReturnsToGeneric(db);
     const curatedPagesMigrated = migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db);
@@ -1621,12 +1731,12 @@ export function ensureSchema(db) {
     const templateRolesSeeded = ensureTemplateRoles(db);
     const templateRoleUniqueIndex = ensureTemplateRoleUniqueIndex(db);
     const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, id placeholder migrated: ${idPlaceholderMigrated}`);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, id placeholder migrated: ${idPlaceholderMigrated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0;
+    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
