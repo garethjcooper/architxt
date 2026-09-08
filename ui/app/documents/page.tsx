@@ -494,8 +494,8 @@ function DocumentsPageContent() {
                           <span
                             className={`${!compactBadges ? 'inline-flex truncate max-w-full' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                               search.trim() && doc.context.description.toLowerCase().includes(search.toLowerCase())
-                                ? 'bg-violet-400/40 text-violet-200 border-violet-400/60 ring-1 ring-violet-400/50'
-                                : 'bg-violet-400/20 text-violet-300 border-violet-400/30'
+                                ? `${familyClass.entity} ring-1 ring-badge-entity-fg/50`
+                                : familyClass.entity
                             }`}
                             title={doc.context.description}
                           >
