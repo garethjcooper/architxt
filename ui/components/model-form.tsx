@@ -245,13 +245,6 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
               <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
             </div>
           )}
-          {roleTemplateValidation && roleTemplateValidation.errors.length > 0 && (
-            <div className="mt-2 space-y-0.5">
-              {roleTemplateValidation.errors.map((err, idx) => (
-                <p key={idx} className="text-[10px] text-red-400">{err}</p>
-              ))}
-            </div>
-          )}
           {genericTemplateValidation && (
             <p className="text-[10px] text-red-400 mt-0.5">{genericTemplateValidation}</p>
           )}
