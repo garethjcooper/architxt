@@ -552,11 +552,11 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               External ID
             </Label>
             {roleScope && roleRule ? (
-              <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 bg-transparent">
-                <span className="flex-1 min-w-0 flex items-center px-3 text-sm text-white font-mono truncate">
+              <div className="flex h-10 items-center rounded-lg overflow-hidden border border-white/20 bg-transparent">
+                <span className="flex-1 min-w-0 flex items-center h-10 px-3 text-sm text-white font-mono truncate">
                   {model.ext_id || '-'}
                 </span>
-                <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs font-mono whitespace-nowrap border-l border-white/10">
+                <span className="flex items-center h-10 px-3 bg-white/5 text-white/60 text-xs font-mono whitespace-nowrap border-l border-white/10">
                   {roleRule.extIdTail}
                 </span>
               </div>
@@ -571,17 +571,17 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               Name *
             </Label>
             {roleScope && roleRule ? (
-              <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+              <div className="flex h-10 items-center rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
                 <Input
                   id="mm-detail-name"
                   value={namePrefix}
                   disabled={isSystemTemplate}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="prefix"
-                  className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                  className="!h-10 !rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
                   style={inputFocusStyle}
                 />
-                <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
+                <span className="flex items-center h-10 px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
                   {roleRule.nameTail}
                 </span>
               </div>
