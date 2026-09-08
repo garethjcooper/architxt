@@ -74,27 +74,27 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
   const [maxTokensError, setMaxTokensError] = useState<string | null>(null);
   const [tagsMatchMode, setTagsMatchMode] = useState<'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'>(initial?.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(initial?.is_template ?? false);
-  const [templateRole, setTemplateRole] = useState(initial?.template_role || USER_ENTITY_DERIVED_ROLE);
+  const [templateRole, setTemplateRole] = useState(initial?.template_role || '');
   const [submitting, setSubmitting] = useState(false);
 
   // Reserved system roles cannot be minted manually; hide them from the create dropdown.
-  // For create mode, user-created entity templates default to the user_entity_derived role
-  // so the model has a known derivation scope.
   const availableRoles = useMemo(() => {
     if (mode === 'edit') return templateRoles ?? [];
     return (templateRoles ?? []).filter((r) => !r.value.startsWith('sys_'));
   }, [templateRoles, mode]);
 
+  // When the user explicitly turns on Entity Template mode without a role,
+  // default to the generic user entity derived role so the model has a known
+  // derivation scope and validation rules.
   useEffect(() => {
     if (mode !== 'create' || isSystemTemplate) return;
-    // Default new user entity templates to user_entity_derived if no role was picked.
-    if (!templateRole) {
+    if (isTemplate && !templateRole) {
       const exists = availableRoles.find((r) => r.value === USER_ENTITY_DERIVED_ROLE);
       if (exists) {
         setTemplateRole(USER_ENTITY_DERIVED_ROLE);
       }
     }
-  }, [mode, isSystemTemplate, templateRole, availableRoles]);
+  }, [mode, isSystemTemplate, isTemplate, templateRole, availableRoles]);
 
   const selectedRole = useMemo(
     () => availableRoles.find((r) => r.value === templateRole) ?? null,
@@ -134,12 +134,6 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
 
   const effectiveIsTemplate = isTemplate || !!templateRole;
   const roleControlsTemplate = !!templateRole;
-
-  useEffect(() => {
-    if (templateRole && !isTemplate) {
-      setIsTemplate(true);
-    }
-  }, [templateRole, isTemplate]);
 
   const genericTemplateValidation = useMemo(() => {
     if (!effectiveIsTemplate) return null;
