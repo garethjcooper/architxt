@@ -531,7 +531,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                   filteredRefs.map((ref) => {
                     const extId = ref.ext_id || '';
                     const roleLabel = getRoleLabel(ref.role);
-                    const scopeBadge = getDerivationScope(ref.role);
+                    const scopeBadge = getDerivationScope(ref.role, ref.scope);
                     const scopeDetail = getScopeLabel(ref, nodes, edges);
                     const op = getOperationForRow(extId);
                     const isRefreshing = Boolean(op) || refreshingIds.has(extId);

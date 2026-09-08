@@ -252,9 +252,17 @@ export function getRoleScopeLabel(role?: string): string {
 }
 
 // Clean derivation scope (NODE / EDGE / SEED) for the scope badge.
-export function getDerivationScope(role?: string): string {
-  const scope = getRoleScope(role);
-  return scope === 'NODE' || scope === 'EDGE' || scope === 'SEED' ? scope : '-';
+// Falls back to deriving from the ref's own scope object when the role is not
+// present in the template_roles table (e.g. custom/imported roles).
+export function getDerivationScope(role?: string, refScope?: ModelScope): string {
+  const roleScope = getRoleScope(role);
+  if (roleScope === 'NODE' || roleScope === 'EDGE' || roleScope === 'SEED') return roleScope;
+  if (refScope) {
+    if ('node_id' in refScope) return 'NODE';
+    if ('source_id' in refScope && 'target_id' in refScope) return 'EDGE';
+    if ('seed_id' in refScope) return 'SEED';
+  }
+  return '-';
 }
 
 // Human-readable role label from the template_roles table.
