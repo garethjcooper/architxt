@@ -36,9 +36,9 @@
   --badge-info-fg: oklch(0.8 0.1 250);
   --badge-info-bd: oklch(0.65 0.1 250 / 0.3);
 
-  --badge-context-bg: oklch(0.65 0.12 220 / 0.18);
-  --badge-context-fg: oklch(0.82 0.11 220);
-  --badge-context-bd: oklch(0.65 0.1 220 / 0.32);
+  --badge-context-bg: oklch(0.6 0.14 220 / 0.25);
+  --badge-context-fg: oklch(0.85 0.13 220);
+  --badge-context-bd: oklch(0.65 0.12 220 / 0.45);
 
   --badge-entity-bg: oklch(0.45 0.22 300 / 0.22);
   --badge-entity-fg: oklch(0.75 0.22 300);

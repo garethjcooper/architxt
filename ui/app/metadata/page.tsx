@@ -275,10 +275,10 @@ export default function MetadataPage() {
                         <span
                           className={`${!compactBadges ? 'inline-flex items-center gap-1 truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                             isSystem
-                              ? 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                              ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                               : search.trim() && item.key.toLowerCase().includes(search.toLowerCase())
-                                ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
-                                : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                                ? 'bg-badge-info-bg/80 text-badge-info-fg border-badge-info-bd ring-1 ring-badge-info-fg/50'
+                                : 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                           }`}
                         >
                           {item.key}
@@ -292,10 +292,10 @@ export default function MetadataPage() {
                         <span
                           className={`${!compactBadges ? 'inline-flex truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                             isSystem
-                              ? 'bg-accent-primary-bg/60 text-accent-primary-fg/70 border-accent-primary-bd/60'
+                              ? 'bg-badge-info-bg/60 text-badge-info-fg/70 border-badge-info-bd/60'
                               : search.trim() && item.value.toLowerCase().includes(search.toLowerCase())
-                                ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
-                                : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                                ? 'bg-badge-info-bg/80 text-badge-info-fg border-badge-info-bd ring-1 ring-badge-info-fg/50'
+                                : 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                           }`}
                         >
                           {item.value}
