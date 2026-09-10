@@ -170,7 +170,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={readOnly}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Table name"
             />
           </div>
@@ -181,7 +181,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
                 <DropdownMenuTrigger>
                   <span
                     role="button"
-                    className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                    className="p-1 rounded text-white/40 hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50 transition-colors"
                     title="Copy table"
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -208,13 +208,13 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
                             value={c}
                             onChange={(e) => handleRenameColumn(c, e.target.value)}
                             disabled={readOnly}
-                            className="flex-1 min-w-0 px-1 py-0.5 rounded bg-transparent border border-transparent hover:border-white/10 focus:border-emerald-500/50 focus:outline-none text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="flex-1 min-w-0 px-1 py-0.5 rounded bg-transparent border border-transparent hover:border-white/10 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:outline-none text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                           {!readOnly && (
                             <button
                               type="button"
                               onClick={() => handleRemoveColumn(c)}
-                              className="p-0.5 rounded text-white/30 hover:text-rose-400 hover:bg-rose-500/10"
+                              className="p-0.5 rounded text-white/30 hover:text-destructive-fg hover:bg-destructive-fg/10"
                               title="Remove column"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -233,7 +233,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
                           <button
                             type="button"
                             onClick={() => handleRemoveRow(i)}
-                            className="p-1 rounded text-white/30 hover:text-rose-400 hover:bg-rose-500/10"
+                            className="p-1 rounded text-white/30 hover:text-destructive-fg hover:bg-destructive-fg/10"
                             title="Remove row"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -247,7 +247,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
                             value={formatCell(row[c])}
                             onChange={(e) => handleCellChange(i, c, e.target.value)}
                             disabled={readOnly}
-                            className="w-full px-1 py-0.5 rounded bg-black/20 border border-transparent hover:border-white/10 focus:border-emerald-500/50 focus:outline-none text-white/70 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="w-full px-1 py-0.5 rounded bg-black/20 border border-transparent hover:border-white/10 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:outline-none text-white/70 disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                         </td>
                       ))}

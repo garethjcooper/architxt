@@ -287,7 +287,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                         const v = e.target.value;
                         setSelectedContextId(v === '' ? null : parseInt(v, 10));
                       }}
-                      className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                     >
                       <option value="">None</option>
                       {allContexts.map((ctx) => (
@@ -319,7 +319,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                               transition-colors border
                               ${active
-                                ? 'bg-orange-800/30 text-orange-400 border-orange-500/40'
+                                ? 'bg-orange-800/30 text-badge-caution-fg border-badge-caution-bd'
                                 : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/70'
                               }
                             `}
@@ -357,8 +357,8 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               transition-colors border
                               ${active
                                 ? isSystem
-                                  ? 'bg-slate-700/40 text-slate-300 border-slate-500/40'
-                                  : 'bg-blue-800/30 text-blue-400 border-blue-500/40'
+                                  ? 'bg-slate-700/40 text-badge-neutral-fg border-slate-500/40'
+                                  : 'bg-blue-800/30 text-badge-info-fg border-badge-info-bd'
                                 : isSystem
                                   ? 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60'
                                   : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/70'
@@ -385,7 +385,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 className={`
                   border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
                   transition-colors hover:bg-white/5
-                  ${items.length > 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/30'}
+                  ${items.length > 0 ? 'border-accent-secondary-bd bg-accent-primary-fg/5' : 'border-white/30'}
                 `}
               >
                 <div className="flex flex-col items-center gap-2">
@@ -412,7 +412,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                     <button
                       type="button"
                       onClick={() => setItems([])}
-                      className="text-xs text-red-400 hover:text-red-300"
+                      className="text-xs text-destructive-fg hover:text-destructive-fg"
                     >
                       Clear all
                     </button>
@@ -435,7 +435,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                           <button
                             type="button"
                             onClick={() => removeItem(item.id)}
-                            className="text-white/30 hover:text-red-400 shrink-0 p-0.5"
+                            className="text-white/30 hover:text-destructive-fg shrink-0 p-0.5"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -468,17 +468,17 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 </div>
                 <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-300 bg-emerald-500"
+                    className="h-full rounded-full transition-all duration-300 bg-accent-primary-fg"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
                 <div className="flex items-center gap-4 text-xs">
-                  <div className="flex items-center gap-1.5 text-emerald-400">
+                  <div className="flex items-center gap-1.5 text-accent-secondary-fg">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span className="font-medium">{progress.succeeded} succeeded</span>
                   </div>
                   {progress.failed > 0 && (
-                    <div className="flex items-center gap-1.5 text-red-400">
+                    <div className="flex items-center gap-1.5 text-destructive-fg">
                       <XCircle className="h-3.5 w-3.5" />
                       <span className="font-medium">{progress.failed} failed</span>
                     </div>
@@ -495,22 +495,22 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                       rounded-lg border p-3 transition-colors
                       ${
                         item.status === 'success'
-                          ? 'border-emerald-500/20 bg-emerald-500/5'
+                          ? 'border-accent-secondary-bd/50 bg-accent-primary-fg/5'
                           : item.status === 'error'
-                            ? 'border-red-500/20 bg-red-500/5'
+                            ? 'border-destructive-bd/50 bg-destructive-fg/5'
                             : item.status === 'uploading'
-                              ? 'border-amber-500/20 bg-amber-500/5'
+                              ? 'border-badge-caution-bd/50 bg-badge-caution-fg/5'
                               : 'border-white/10 bg-white/5'
                       }
                     `}
                   >
                     <div className="flex items-center gap-2">
                       {item.status === 'success' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-accent-secondary-fg shrink-0" />
                       ) : item.status === 'error' ? (
-                        <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                        <AlertCircle className="h-4 w-4 text-destructive-fg shrink-0" />
                       ) : item.status === 'uploading' ? (
-                        <Loader2 className="h-4 w-4 text-amber-400 shrink-0 animate-spin" />
+                        <Loader2 className="h-4 w-4 text-badge-caution-fg shrink-0 animate-spin" />
                       ) : (
                         <FileText className="h-4 w-4 text-white/30 shrink-0" />
                       )}
@@ -522,7 +522,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                       </span>
                     </div>
                     {item.status === 'error' && item.error && (
-                      <p className="text-xs text-red-400 mt-1 break-all">{item.error}</p>
+                      <p className="text-xs text-destructive-fg mt-1 break-all">{item.error}</p>
                     )}
                   </div>
                 ))}
@@ -536,16 +536,16 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               {/* Status header */}
               <div className="flex items-center gap-3">
                 {doneSuccess ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-900/30">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-primary-bg">
+                    <CheckCircle2 className="h-5 w-5 text-accent-secondary-fg" />
                   </div>
                 ) : doneFailed ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-900/30">
-                    <XCircle className="h-5 w-5 text-red-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive-bg">
+                    <XCircle className="h-5 w-5 text-destructive-fg" />
                   </div>
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-900/30">
-                    <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-badge-caution-bg">
+                    <AlertTriangle className="h-5 w-5 text-badge-caution-fg" />
                   </div>
                 )}
                 <div>
@@ -564,11 +564,11 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
               {/* Failure list */}
               {items.some((it) => it.status === 'error') && (
-                <div className="max-h-[140px] overflow-y-auto rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 space-y-1.5">
+                <div className="max-h-[140px] overflow-y-auto rounded-lg bg-destructive-bg border border-destructive-bd/50 p-2.5 space-y-1.5">
                   {items
                     .filter((it) => it.status === 'error')
                     .map((item) => (
-                      <div key={item.id} className="flex items-start gap-2 text-xs text-red-300">
+                      <div key={item.id} className="flex items-start gap-2 text-xs text-destructive-fg">
                         <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
                         <span className="break-all">
                           <span className="font-mono text-white/60">{item.file.name}</span>
@@ -597,7 +597,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 <Button
                   onClick={uploadAll}
                   disabled={pendingCount === 0}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-accent-primary-fg hover:bg-emerald-700 text-white"
                 >
                   {hasErrors && pendingCount === 0 ? (
                     'Retry failed'
@@ -612,7 +612,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
           {phase === 'running' && (
             <Button
               disabled
-              className="bg-emerald-600/50 text-white flex items-center gap-2 cursor-not-allowed"
+              className="bg-accent-primary-fg/50 text-white flex items-center gap-2 cursor-not-allowed"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Uploading…
@@ -624,10 +624,10 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               onClick={handleClose}
               className={`text-white flex items-center gap-2 ${
                 doneSuccess
-                  ? 'bg-emerald-600 hover:bg-emerald-500'
+                  ? 'bg-accent-primary-fg hover:bg-accent-primary-fg'
                   : doneFailed
-                    ? 'bg-red-600 hover:bg-red-500'
-                    : 'bg-amber-600 hover:bg-amber-500'
+                    ? 'bg-destructive-fg hover:bg-destructive-fg'
+                    : 'bg-badge-caution-fg hover:bg-badge-caution-fg'
               }`}
             >
               {doneSuccess ? (

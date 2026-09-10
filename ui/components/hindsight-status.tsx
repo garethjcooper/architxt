@@ -50,9 +50,9 @@ export function HindsightStatus() {
 
   // Determine indicator colour
   let indicatorColor = 'bg-white/20';
-  if (pendingCount > 0) indicatorColor = 'bg-emerald-500';
-  else if (failedCount > 0) indicatorColor = 'bg-red-500';
-  else if (completedCount > 0) indicatorColor = 'bg-emerald-500';
+  if (pendingCount > 0) indicatorColor = 'bg-accent-primary-fg';
+  else if (failedCount > 0) indicatorColor = 'bg-destructive-fg';
+  else if (completedCount > 0) indicatorColor = 'bg-accent-primary-fg';
 
   const handleToggle = () => {
     setExpanded(!expanded);
@@ -107,7 +107,7 @@ export function HindsightStatus() {
       {expanded && (
         <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-white/10 bg-surface-overlay shadow-xl p-4 space-y-3">
           {error ? (
-            <div className="text-xs text-red-400 text-center py-2">Failed to load status</div>
+            <div className="text-xs text-destructive-fg text-center py-2">Failed to load status</div>
           ) : ops.length === 0 ? (
             <div className="text-xs text-white/40 text-center py-2">No Hindsight operations</div>
           ) : (
@@ -124,7 +124,7 @@ export function HindsightStatus() {
                         </span>
                         <span className="text-white/30">→</span>
                         <span className="text-white/50 truncate">{op.pop_bank_id}</span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' : 'bg-badge-caution-bg/50 text-badge-caution-fg border-badge-caution-bd/50'}`}>
                           <Clock className="h-3 w-3" />
                           {op.pop_status}
                         </span>
@@ -137,7 +137,7 @@ export function HindsightStatus() {
                         </span>
                       </div>
                       {op.pop_error_message && (
-                        <div className="text-[10px] text-red-400 mt-1 truncate" title={op.pop_error_message}>
+                        <div className="text-[10px] text-destructive-fg mt-1 truncate" title={op.pop_error_message}>
                           {op.pop_error_message}
                         </div>
                       )}

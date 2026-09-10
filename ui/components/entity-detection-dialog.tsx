@@ -528,7 +528,7 @@ export function EntityDetectionDialog({
                                     </span>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleRemoveExistingMatch(group.id, i); }}
-                                      className="opacity-0 group-hover/match:opacity-100 text-white/30 hover:text-red-400 transition-opacity p-0.5 shrink-0 mt-0.5"
+                                      className="opacity-0 group-hover/match:opacity-100 text-white/30 hover:text-destructive-fg transition-opacity p-0.5 shrink-0 mt-0.5"
                                       title="Remove this tag"
                                     >
                                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -649,7 +649,7 @@ export function EntityDetectionDialog({
               {existingTags.length > 0 && (
                 <Button
                   onClick={handleUndo}
-                  className="h-7 px-2.5 text-xs bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover"
+                  className="h-7 px-2.5 text-xs bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover"
                 >
                   Remove Tags
                 </Button>
@@ -657,7 +657,7 @@ export function EntityDetectionDialog({
               {malformedTags.length > 0 && (
                 <Button
                   onClick={handleRepairMalformed}
-                  className="h-7 px-2.5 text-xs bg-amber-600/20 border border-amber-500/30 text-amber-400 hover:bg-amber-600/30 flex items-center gap-1"
+                  className="h-7 px-2.5 text-xs bg-badge-caution-fg/20 border border-badge-caution-bd text-badge-caution-fg hover:bg-badge-caution-fg/30 flex items-center gap-1"
                 >
                   <Wrench className="h-3 w-3" />
                   Repair {malformedTags.length} malformed
@@ -666,7 +666,7 @@ export function EntityDetectionDialog({
               <Button
                 onClick={handleApply}
                 disabled={matchGroups.length === 0 || includedMatches === 0}
-                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-7 px-2.5 text-xs bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Insert Tags
               </Button>
@@ -718,7 +718,7 @@ export function EntityDetectionDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Changes'}

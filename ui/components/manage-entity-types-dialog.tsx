@@ -265,7 +265,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
       <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-white">
-            <Layers className="h-5 w-5 text-emerald-400" />
+            <Layers className="h-5 w-5 text-accent-secondary-fg" />
             Manage Entity Types
           </DialogTitle>
         </DialogHeader>
@@ -278,7 +278,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
               type="button"
               size="sm"
               onClick={() => setShowAddForm((v) => !v)}
-              className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="inline-flex items-center gap-1 bg-accent-primary-fg hover:bg-accent-primary-fg text-white"
             >
               <Plus className="h-3.5 w-3.5" />
               {showAddForm ? 'Cancel' : 'Add Type'}
@@ -287,7 +287,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
 
           {/* Add form */}
           {showAddForm && (
-            <form onSubmit={handleAdd} className="space-y-3 rounded-lg border border-emerald-500/20 bg-emerald-900/10 p-4">
+            <form onSubmit={handleAdd} className="space-y-3 rounded-lg border border-accent-secondary-bd/50 bg-accent-primary-bg/50 p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-white/60">Type Name *</Label>
@@ -372,7 +372,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
 
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="ghost" size="sm" onClick={resetAddForm}>Close</Button>
-                <Button type="submit" size="sm" disabled={adding} className="bg-emerald-600 hover:bg-emerald-500 text-white">
+                <Button type="submit" size="sm" disabled={adding} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white">
                   {adding && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                   Create
                 </Button>
@@ -479,7 +479,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-emerald-400 hover:text-emerald-300"
+                                className="h-6 w-6 p-0 text-accent-secondary-fg hover:text-accent-primary-fg"
                                 onClick={() => handleSaveEdit(t.id)}
                                 disabled={savingEdit}
                                 title="Save"
@@ -509,7 +509,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               title={(t.case_match ?? 'insensitive') === 'sensitive' ? 'Case-sensitive match' : 'Case-insensitive match'}
                               className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${
                                 (t.case_match ?? 'insensitive') === 'sensitive'
-                                  ? 'bg-amber-800/15 text-amber-400 border-amber-700/20'
+                                  ? 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50'
                                   : 'bg-white/5 text-white/20 border-white/5'
                               }`}
                             >
@@ -521,7 +521,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               title={(t.word_boundary_match ?? 'boundaries') === 'boundaries' ? 'Whole-word match' : 'Substring match'}
                               className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${
                                 (t.word_boundary_match ?? 'boundaries') === 'boundaries'
-                                  ? 'bg-violet-800/15 text-violet-400 border-violet-700/20'
+                                  ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd/50'
                                   : 'bg-white/5 text-white/20 border-white/5'
                               }`}
                             >
@@ -529,7 +529,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                             </span>
                           </td>
                           <td className="py-2 px-3 text-center">
-                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono ${(entityCounts[t.id] || 0) > 0 ? 'bg-emerald-800/15 text-emerald-400 border border-emerald-700/20' : 'bg-white/5 text-white/30 border border-white/5'}`}>
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono ${(entityCounts[t.id] || 0) > 0 ? 'bg-badge-success-bg text-accent-secondary-fg border border-accent-primary-bd/50' : 'bg-white/5 text-white/30 border border-white/5'}`}>
                               {entityCounts[t.id] || 0}
                             </span>
                           </td>
@@ -549,7 +549,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-red-400/60 hover:text-red-400"
+                                className="h-6 w-6 p-0 text-destructive-fg/60 hover:text-destructive-fg"
                                 onClick={() => handleDelete(t.id)}
                                 disabled={deleting && deletingId === t.id}
                                 title="Delete"

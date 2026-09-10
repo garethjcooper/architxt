@@ -198,11 +198,11 @@ export function ManageDocumentConfigDialog({
                   <p className="text-sm font-medium text-white/90">Document Date</p>
                   <p className="text-xs text-white/50">{statusText}</p>
                   {impactedCount === 0 ? (
-                    <p className="text-xs text-emerald-400 mt-0.5">
+                    <p className="text-xs text-accent-secondary-fg mt-0.5">
                       All {selectedDocs.length} document{selectedDocs.length === 1 ? '' : 's'} match
                     </p>
                   ) : (
-                    <p className="text-xs text-emerald-400 mt-0.5">
+                    <p className="text-xs text-accent-secondary-fg mt-0.5">
                       Will change {impactedCount} document{impactedCount === 1 ? '' : 's'}
                     </p>
                   )}
@@ -276,7 +276,7 @@ export function ManageDocumentConfigDialog({
           <Button
             onClick={handleSave}
             disabled={loading || !enabled}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-fg hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

@@ -132,7 +132,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
     }
   };
 
-  const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2";
+  const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -153,7 +153,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
               id="ce-type"
               value={typeId}
               onChange={(e) => setTypeId(Number(e.target.value) || '')}
-              className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
               required
             >
               <option value="">Select type…</option>
@@ -186,8 +186,8 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                     title={entityIdConformity.message || ''}
                     className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
                       entityIdConformity.conforms
-                        ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
-                        : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
+                        ? 'bg-badge-success-bg text-accent-secondary-fg border-accent-secondary-bd'
+                        : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                     }`}
                   >
                     {formatEntityIdPattern(selectedType)}
@@ -198,7 +198,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                       <button
                         type="button"
                         onClick={() => setEntityId(nextEntityId)}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-emerald-800/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-800/30"
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-badge-success-bg text-accent-secondary-fg border-accent-secondary-bd hover:bg-emerald-800/30"
                       >
                         Next ID: {nextEntityId}
                       </button>
@@ -264,9 +264,9 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
             {aliases.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {aliases.map((a, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-purple-800/15 text-purple-400 border border-purple-700/20">
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-badge-entity-bg text-badge-entity-fg border border-badge-entity-bd/50">
                     {a}
-                    <button type="button" onClick={() => removeAlias(i)} className="text-purple-400/60 hover:text-purple-300">
+                    <button type="button" onClick={() => removeAlias(i)} className="text-badge-entity-fg/60 hover:text-badge-entity-fg">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -303,7 +303,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-white/70 hover:text-white hover:bg-white/5">
               Close
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <Button type="submit" disabled={isLoading} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Create
             </Button>

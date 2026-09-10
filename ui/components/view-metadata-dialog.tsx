@@ -77,7 +77,7 @@ export function ViewMetadataDialog({
           <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
             Metadata Details
             {isSystem && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/30 border border-amber-500/30 text-amber-400 text-[10px] uppercase font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-badge-caution-bg border border-badge-caution-bd text-badge-caution-fg text-[10px] uppercase font-medium">
                 <Lock className="h-3 w-3" />
                 System Preset — Read Only
               </span>
@@ -99,7 +99,7 @@ export function ViewMetadataDialog({
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="Enter key"
                 disabled={isSystem}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',
                   '--tw-ring-opacity': '0.4',
@@ -118,7 +118,7 @@ export function ViewMetadataDialog({
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="Enter value"
                 disabled={isSystem}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',
                   '--tw-ring-opacity': '0.4',
@@ -159,11 +159,11 @@ export function ViewMetadataDialog({
 
           {/* Hindsight sync warning */}
           {(metadata.usage_count ?? 0) > 0 && !isSystem && hasChanges && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-900/20 border border-amber-500/30">
-              <svg className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-badge-caution-bg border border-badge-caution-bd">
+              <svg className="h-4 w-4 text-badge-caution-fg mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <p className="text-xs text-amber-300">
+              <p className="text-xs text-badge-caution-fg">
                 This metadata is linked to {metadata.usage_count} document{metadata.usage_count !== 1 ? 's' : ''}. If any of these documents have already been synced to Hindsight, the updated key/value may cause a mismatch on the next sync.
               </p>
             </div>
@@ -182,7 +182,7 @@ export function ViewMetadataDialog({
               <Button
                 onClick={handleSave}
                 disabled={!hasChanges || isSaving}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isSaving ? 'Saving...' : 'Save Changes'}

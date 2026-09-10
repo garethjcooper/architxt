@@ -200,9 +200,9 @@ export function ManageModelTagsDialog({
           tag.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-slate-800/20 border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
+            ? 'bg-badge-neutral-bg border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
             : tag.currentState === 'common'
-              ? 'bg-orange-500/20 border-orange-500/30 text-orange-300'
+              ? 'bg-badge-caution-bg border-badge-caution-bd text-badge-caution-fg'
               : tag.currentState === 'partial'
                 ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
                 : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
@@ -242,7 +242,7 @@ export function ManageModelTagsDialog({
             placeholder="Filter by tag..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-orange-500/50 transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 

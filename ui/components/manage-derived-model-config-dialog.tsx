@@ -263,11 +263,11 @@ export function ManageDerivedModelConfigDialog({
             <p className="text-sm font-medium text-white/90">{fieldDef.label}</p>
             <p className="text-xs text-white/50">{statusText}</p>
             {impactedCount === 0 ? (
-              <p className="text-xs text-emerald-400 mt-0.5">
+              <p className="text-xs text-accent-secondary-fg mt-0.5">
                 All {derived.length} instance{derived.length === 1 ? '' : 's'} match
               </p>
             ) : (
-              <p className="text-xs text-emerald-400 mt-0.5">
+              <p className="text-xs text-accent-secondary-fg mt-0.5">
                 Will change {impactedCount} instance{impactedCount === 1 ? '' : 's'}
               </p>
             )}
@@ -286,7 +286,7 @@ export function ManageDerivedModelConfigDialog({
                     disabled={!isFieldEnabled}
                     className={`px-2.5 py-1 rounded text-xs border transition-all ${
                       active
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        ? 'bg-accent-secondary-bg border-accent-secondary-bd text-accent-primary-fg'
                         : 'bg-slate-800/50 border-slate-700 text-white/60 hover:bg-slate-700/50'
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
@@ -366,7 +366,7 @@ export function ManageDerivedModelConfigDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-fg hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Apply
           </Button>

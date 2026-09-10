@@ -38,7 +38,7 @@ const inputFocusStyle = {
 } as React.CSSProperties;
 
 const inputClass =
-  '!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2';
+  '!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle';
 
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
@@ -522,7 +522,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             </div>
             <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
             {templateValidation && (
-              <p className="text-[10px] text-red-400 mt-0.5">{templateValidation}</p>
+              <p className="text-[10px] text-destructive-fg mt-0.5">{templateValidation}</p>
             )}
           </div>
           <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} disabled={isLockedTemplate} />
@@ -540,14 +540,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
           )}
 
         {roleInstructions && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+          <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-amber-100">
             <p className="font-medium">{selectedTemplateRole?.label} format requirements</p>
             <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
           </div>
         )}
 
         {extIdFormatWarning && (
-          <p className="text-[10px] text-red-400">External ID: {extIdFormatWarning}</p>
+          <p className="text-[10px] text-destructive-fg">External ID: {extIdFormatWarning}</p>
         )}
 
         <div className="grid grid-cols-2 gap-4">
@@ -594,7 +594,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                 {roleTemplateValidation.errors
                   .filter((e) => !e.includes('External ID'))
                   .map((err, idx) => (
-                    <p key={idx} className="text-[10px] text-red-400">{err}</p>
+                    <p key={idx} className="text-[10px] text-destructive-fg">{err}</p>
                   ))}
               </div>
             )}
@@ -607,12 +607,12 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               Source Query *
             </Label>
             {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
-              <span className="text-[10px] text-amber-400">
+              <span className="text-[10px] text-badge-caution-fg">
                 Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
               </span>
             )}
             {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
-              <span className="text-[10px] text-emerald-400">All required placeholders present</span>
+              <span className="text-[10px] text-accent-secondary-fg">All required placeholders present</span>
             )}
           </div>
           <AqlEditor
@@ -637,7 +637,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               id="mm-detail-refresh-mode"
               value={refreshMode}
               onChange={(e) => handleRefreshModeChange(e.target.value as 'full' | 'delta')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
             >
               <option value="full">Full</option>
               <option value="delta">Delta</option>
@@ -651,7 +651,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               id="mm-detail-tags-match-mode"
               value={tagsMatchMode}
               onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
             >
               <option value="all_strict">All Strict</option>
               <option value="any_strict">Any Strict</option>
@@ -714,7 +714,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               style={inputFocusStyle}
             />
             {maxTokensError && (
-              <p className="text-[10px] text-red-400">{maxTokensError}</p>
+              <p className="text-[10px] text-destructive-fg">{maxTokensError}</p>
             )}
           </div>
         </div>
@@ -729,7 +729,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               {model.tags.map((t) => (
                 <span
                   key={t.id}
-                  className="px-2.5 py-1 rounded-full bg-orange-400/20 text-orange-300 text-xs border border-orange-400/30"
+                  className="px-2.5 py-1 rounded-full bg-badge-caution-bg text-badge-caution-fg text-xs border border-badge-caution-bd"
                 >
                   {t.name}
                 </span>
@@ -747,7 +747,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               {model.entities.map((e) => (
                 <span
                   key={e.id}
-                  className="px-2.5 py-1 rounded-full bg-purple-800/15 text-purple-400 text-xs border border-purple-700/20"
+                  className="px-2.5 py-1 rounded-full bg-badge-entity-bg text-badge-entity-fg text-xs border border-badge-entity-bd/50"
                 >
                   {e.entity_id} — {e.name}
                 </span>
@@ -804,7 +804,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
       <Button
         onClick={handleSave}
         disabled={!hasChanges || isSaving || !!(roleTemplateValidation && !roleTemplateValidation.valid)}
-        className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
         {isSaving ? 'Saving...' : 'Save Changes'}

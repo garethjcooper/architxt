@@ -25,7 +25,7 @@ const inputFocusStyle = {
   '--tw-ring-opacity': '0.4',
 } as React.CSSProperties;
 
-const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2";
+const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
 
 interface ModelFormProps {
   initial?: MentalModel | null;
@@ -241,13 +241,13 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           </div>
           <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
           {roleInstructions && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100 mt-2">
+            <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-amber-100 mt-2">
               <p className="font-medium">{selectedRole?.label} format requirements</p>
               <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
             </div>
           )}
           {genericTemplateValidation && (
-            <p className="text-[10px] text-red-400 mt-0.5">{genericTemplateValidation}</p>
+            <p className="text-[10px] text-destructive-fg mt-0.5">{genericTemplateValidation}</p>
           )}
           {!genericTemplateValidation && !roleScope && isTemplate && (
             <p className="text-[10px] text-white/40 mt-0.5">Generic templates also require a placeholder.</p>
@@ -325,12 +325,12 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
         <div className="flex items-center justify-between">
           <Label htmlFor="mm-source-query" className="text-xs uppercase text-white/50 font-medium">Source Query *</Label>
           {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
-            <span className="text-[10px] text-amber-400">
+            <span className="text-[10px] text-badge-caution-fg">
               Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
             </span>
           )}
           {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
-            <span className="text-[10px] text-emerald-400">All required placeholders present</span>
+            <span className="text-[10px] text-accent-secondary-fg">All required placeholders present</span>
           )}
         </div>
         <AqlEditor
@@ -354,7 +354,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           value={templateRole}
           disabled={mode === 'edit' || isSystemTemplate}
           onChange={(e) => handleTemplateRoleChange(e.target.value)}
-          className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none disabled:opacity-50"
+          className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none disabled:opacity-50"
           >
           <option value="">Generic / no role</option>
           {availableRoles?.map((role) => (
@@ -373,7 +373,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             id="mm-refresh-mode"
             value={refreshMode}
             onChange={(e) => setRefreshMode(e.target.value as 'full' | 'delta')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
           >
             <option value="full">Full</option>
             <option value="delta">Delta</option>
@@ -388,7 +388,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             id="mm-tags-match-mode"
             value={tagsMatchMode}
             onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
           >
             <option value="all_strict">All Strict</option>
             <option value="any_strict">Any Strict</option>
@@ -439,7 +439,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             style={inputFocusStyle}
           />
           {maxTokensError && (
-            <p className="text-[10px] text-red-400">{maxTokensError}</p>
+            <p className="text-[10px] text-destructive-fg">{maxTokensError}</p>
           )}
         </div>
       </div>
@@ -460,7 +460,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
 
       <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
         <Button type="button" variant="ghost" onClick={onCancel} className="text-white/70 hover:text-white hover:bg-white/5">Close</Button>
-        <Button type="submit" disabled={submitting || !canSubmit} className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+        <Button type="submit" disabled={submitting || !canSubmit} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitLabel}
         </Button>

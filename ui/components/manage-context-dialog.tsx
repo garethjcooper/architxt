@@ -206,9 +206,9 @@ export function ManageContextDialog({
           context.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-slate-800/20 border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
+            ? 'bg-badge-neutral-bg border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
             : context.currentState === 'common'
-              ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
+              ? 'bg-badge-info-bg border-badge-info-bd text-badge-info-fg'
               : context.currentState === 'partial'
                 ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
                 : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
@@ -278,7 +278,7 @@ export function ManageContextDialog({
             placeholder="Filter by context..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-violet-500/50 transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 

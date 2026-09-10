@@ -91,7 +91,7 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
         <div className="mt-4 rounded-md border border-white/[0.08] overflow-hidden">
           {loading && docs.length === 0 ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />
+              <Loader2 className="h-5 w-5 animate-spin text-accent-secondary-fg" />
             </div>
           ) : docs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-white/40">
@@ -118,7 +118,7 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
                     >
                       <TableCell className="py-1.5 px-4 text-xs font-mono text-white/70">
                         {fetchingDocId === doc.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-secondary-fg" />
                         ) : (
                           doc.id
                         )}

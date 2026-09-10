@@ -265,7 +265,7 @@ export function ManageEntityConfigDialog({
             <p className="text-xs text-white/50">{statusText}</p>
             <p className="text-[10px] text-white/40">{fieldDef.helper}</p>
             {impactedCount > 0 && (
-              <p className="text-xs text-emerald-400 mt-0.5">
+              <p className="text-xs text-accent-secondary-fg mt-0.5">
                 Will change {impactedCount} entit{impactedCount === 1 ? 'y' : 'ies'}
               </p>
             )}
@@ -278,7 +278,7 @@ export function ManageEntityConfigDialog({
               value={state.selectedValue as number}
               disabled={!isFieldEnabled}
               onChange={(e) => handleSelectToggle(fieldDef.key, Number(e.target.value))}
-              className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {entityTypes.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -297,7 +297,7 @@ export function ManageEntityConfigDialog({
                 }
                 onChange={(checked) => handleBoolToggle(fieldDef.key, checked)}
               />
-              <span className="text-xs text-emerald-400">{fieldDef.onLabel}</span>
+              <span className="text-xs text-accent-secondary-fg">{fieldDef.onLabel}</span>
             </div>
           )}
         </div>
@@ -358,11 +358,11 @@ export function ManageEntityConfigDialog({
         </div>
 
         {totalImpactedDocs > 0 && hasChanges && (
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-900/20 border border-amber-500/30">
-            <svg className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-badge-caution-bg border border-badge-caution-bd">
+            <svg className="h-4 w-4 text-badge-caution-fg mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <p className="text-xs text-amber-300">
+            <p className="text-xs text-badge-caution-fg">
               {selectedEntityIds.length === 1
                 ? `This entity is referenced in ${totalImpactedDocs} document${totalImpactedDocs !== 1 ? 's' : ''}. If any of these documents have already been synced to Hindsight, the updated entity name/ID may cause a mismatch on the next sync.`
                 : `These entities are referenced in ${totalImpactedDocs} document${totalImpactedDocs !== 1 ? 's' : ''}. If any of these documents have already been synced to Hindsight, the updated entity name/ID may cause a mismatch on the next sync.`}
@@ -381,7 +381,7 @@ export function ManageEntityConfigDialog({
           <Button
             onClick={handleSave}
             disabled={loading || !hasActiveUpdateField}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

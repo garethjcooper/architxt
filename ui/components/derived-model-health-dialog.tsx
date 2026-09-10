@@ -391,7 +391,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
   const selectedContentError = selectedExtId != null ? contentErrors[selectedExtId] || null : null;
 
   const formatPreview = (result: HealthResult | null, error: string | null): React.ReactNode => {
-    if (error) return <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">{`Error:\n${error}`}</div>;
+    if (error) return <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-destructive-bd/50 p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
     if (result.content == null) {
       return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
@@ -422,7 +422,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
         <DialogContent className="!w-[85vw] !max-w-none max-h-[85vh] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-400" />
+              <Activity className="h-5 w-5 text-badge-entity-fg" />
               Derived Instance Health
             </DialogTitle>
           </DialogHeader>
@@ -468,12 +468,12 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                         healthBadge = <Loader2 className="h-4 w-4 animate-spin text-white/50" />;
                       } else if (result) {
                         healthBadge = result.found ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd">
                             OK
                           </span>
                         ) : (
                           <span
-                            className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-red-500/15 text-red-300 border-red-500/30"
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-destructive-fg/15 text-destructive-fg border-destructive-bd"
                             title={result.error || contentError || 'Missing'}
                           >
                             Missing
@@ -490,7 +490,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                           {op.pop_status}
                         </span>
                       ) : refreshStatus === 'failed' ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-red-500/15 text-red-300 border-red-500/30">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-destructive-fg/15 text-destructive-fg border-destructive-bd">
                           refresh failed
                         </span>
                       ) : null;
@@ -504,7 +504,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                           key={d.id}
                           onClick={() => result && setSelectedExtId(extId)}
                           className={`border-b border-white/5 cursor-pointer transition-colors ${
-                            selected ? 'bg-purple-900/30' : result ? 'hover:bg-white/5' : ''
+                            selected ? 'bg-badge-entity-bg' : result ? 'hover:bg-white/5' : ''
                           }`}
                         >
                           <TableCell className="py-2 px-3 text-xs font-mono text-white/60 truncate" title={extId || '-'}>
@@ -534,7 +534,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-6 w-6 text-white/50 hover:text-purple-300 hover:bg-purple-500/10 disabled:opacity-30"
+                              className="h-6 w-6 text-white/50 hover:text-badge-entity-fg hover:bg-badge-entity-bg/50 disabled:opacity-30"
                               disabled={!selectedServerId || !selectedBankId || isRefreshing || !!op}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -561,7 +561,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               </div>
 
               {status.state === 'error' && (
-                <p className="mt-3 text-xs text-red-400">{status.message}</p>
+                <p className="mt-3 text-xs text-destructive-fg">{status.message}</p>
               )}
             </div>
 
@@ -571,7 +571,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               onDoubleClick={handleResizeReset}
               title="Drag to resize data list and response content panels; double-click to reset"
             >
-              <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+              <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-accent-primary-fg/50 transition-colors" />
             </div>
 
             <div
@@ -588,8 +588,8 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                     </span>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
                       selectedResult.found
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        : 'bg-red-500/15 text-red-300 border-red-500/30'
+                        ? 'bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd'
+                        : 'bg-destructive-fg/15 text-destructive-fg border-destructive-bd'
                     }`}>
                       {selectedResult.found ? 'Found' : 'Missing'}
                     </span>
@@ -614,14 +614,14 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               variant="outline"
               onClick={() => setConfirmRefreshAllOpen(true)}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading' || derived.length === 0}
-              className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="border-badge-entity-bd text-badge-entity-fg hover:bg-badge-entity-bg/50 hover:text-badge-entity-fg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Refresh All
             </Button>
             <Button
               onClick={handleRun}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading'}
-              className="bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-purple-600 hover:bg-badge-entity-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {status.state === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
               {status.state === 'loading' ? 'Checking...' : 'Run Check'}
@@ -648,7 +648,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             </Button>
             <Button
               onClick={handleRefreshAll}
-              className="bg-purple-600 hover:bg-purple-500 text-white"
+              className="bg-purple-600 hover:bg-badge-entity-fg text-white"
             >
               Refresh All
             </Button>

@@ -539,14 +539,14 @@ export function DryRunExtractDialog({
                       value={context}
                       onChange={(e) => setContext(e.target.value)}
                       placeholder="Optional context string"
-                      className="flex-1 min-h-0 h-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30 resize-none custom-scrollbar"
+                      className="flex-1 min-h-0 h-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle resize-none custom-scrollbar"
                     />
                     <Popover
                       open={contextPickerOpen}
                       onOpenChange={setContextPickerOpen}
                     >
                       <PopoverTrigger
-                        className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 h-full w-8 focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:border-transparent outline-none ${contextPickerOpen ? "bg-white/10" : ""}`}
+                        className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 h-full w-8 focus-visible:ring-2 focus-visible:ring-focus-ring-subtle focus-visible:border-transparent outline-none ${contextPickerOpen ? "bg-white/10" : ""}`}
                         aria-label="Pick a stored context"
                         title="Pick a stored context"
                       >
@@ -594,7 +594,7 @@ export function DryRunExtractDialog({
                     value={retainMission}
                     onChange={(e) => setRetainMission(e.target.value)}
                     placeholder="No retain mission set for this bank."
-                    className="flex-1 min-h-0 h-full w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 resize-none custom-scrollbar focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30"
+                    className="flex-1 min-h-0 h-full w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 resize-none custom-scrollbar focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle"
                   />
                 </div>
 
@@ -625,7 +625,7 @@ export function DryRunExtractDialog({
                             disabled={keys === 0}
                             className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
                               isActive
-                                ? "bg-emerald-600 text-white"
+                                ? "bg-accent-primary-fg text-white"
                                 : "text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/60"
                             }`}
                           >
@@ -673,7 +673,7 @@ export function DryRunExtractDialog({
                         e.target.value as typeof retainExtractionMode,
                       )
                     }
-                    className="w-full h-10 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                    className="w-full h-10 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                   >
                     <option value="bank">Bank (use bank value)</option>
                     <option value="concise">concise</option>
@@ -788,14 +788,14 @@ export function DryRunExtractDialog({
                                 );
                                 setTimestamp(base.toISOString());
                               }}
-                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 w-[90px]"
+                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle w-[90px]"
                             />
                           </div>
                           <div className="flex items-center gap-1 ml-auto">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                              className="text-badge-info-fg hover:text-badge-info-fg hover:bg-transparent"
                               onClick={() => setTimestamp("")}
                             >
                               Clear
@@ -803,7 +803,7 @@ export function DryRunExtractDialog({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                              className="text-badge-info-fg hover:text-badge-info-fg hover:bg-transparent"
                               onClick={() =>
                                 setTimestamp(new Date().toISOString())
                               }
@@ -831,7 +831,7 @@ export function DryRunExtractDialog({
               </div>
 
               {error && (
-                <div className="p-3 rounded bg-red-900/20 border border-red-500/30 text-red-300 text-sm flex items-start gap-2 shrink-0">
+                <div className="p-3 rounded bg-destructive-bg border border-destructive-bd text-destructive-fg text-sm flex items-start gap-2 shrink-0">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   {error}
                 </div>
@@ -867,7 +867,7 @@ export function DryRunExtractDialog({
                     {/* Left — Detected Entities */}
                     <div className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-panel overflow-hidden">
                       <div className="flex items-center justify-between px-2.5 py-2 border-b border-white/10 bg-emerald-950/30 shrink-0">
-                        <span className="text-[11px] font-medium text-emerald-400">
+                        <span className="text-[11px] font-medium text-accent-secondary-fg">
                           ENTITIES
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -899,7 +899,7 @@ export function DryRunExtractDialog({
                                 className={cn(
                                   "px-2 py-1 text-[10px] rounded transition-colors border",
                                   isActive
-                                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                                    ? "bg-accent-secondary-bg border-accent-primary-bd/50 text-accent-primary-fg"
                                     : "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5",
                                 )}
                               >
@@ -922,7 +922,7 @@ export function DryRunExtractDialog({
                               className={cn(
                                 "w-full text-left px-2 py-1.5 rounded text-xs transition-colors",
                                 selectedResultEntity === null
-                                  ? "bg-emerald-600/20 text-emerald-300"
+                                  ? "bg-accent-primary-fg/20 text-accent-primary-fg"
                                   : "text-white/70 hover:bg-white/10",
                               )}
                             >
@@ -952,7 +952,7 @@ export function DryRunExtractDialog({
                                     className={cn(
                                       "w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors",
                                       selectedResultEntity === raw
-                                        ? "bg-emerald-900/20 border-emerald-500/30"
+                                        ? "bg-accent-primary-bg border-accent-secondary-bd"
                                         : "border-white/5 bg-black/20 hover:bg-white/5",
                                     )}
                                     style={{
@@ -965,7 +965,7 @@ export function DryRunExtractDialog({
                                         className={cn(
                                           "text-xs truncate capitalize",
                                           selectedResultEntity === raw
-                                            ? "text-emerald-200"
+                                            ? "text-accent-primary-fg"
                                             : "text-white/90",
                                         )}
                                         title={label}
@@ -983,7 +983,7 @@ export function DryRunExtractDialog({
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                                       {configured && (
-                                        <span className="text-[9px] uppercase px-1 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                                        <span className="text-[9px] uppercase px-1 py-0.5 rounded border border-accent-secondary-bd bg-accent-secondary-bg/50 text-accent-secondary-fg">
                                           label
                                         </span>
                                       )}
@@ -1013,7 +1013,7 @@ export function DryRunExtractDialog({
                             className="p-3 rounded-md border border-white/10 bg-surface-card"
                           >
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-[10px] uppercase font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] uppercase font-medium text-accent-secondary-fg bg-accent-secondary-bg/50 px-1.5 py-0.5 rounded">
                                 {fact.fact_type || "fact"}
                               </span>
                               {fact.occurred_start && (
@@ -1038,7 +1038,7 @@ export function DryRunExtractDialog({
                                       "text-[10px] px-1.5 py-0.5 rounded bg-white/5",
                                       selectedResultEntity &&
                                         entity === selectedResultEntity
-                                        ? "bg-emerald-500/20 text-emerald-300"
+                                        ? "bg-accent-secondary-bg text-accent-primary-fg"
                                         : "text-white/50",
                                     )}
                                   >
@@ -1110,7 +1110,7 @@ export function DryRunExtractDialog({
           <Button
             onClick={handleRun}
             disabled={running || !canRun}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 flex items-center gap-2"
+            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 flex items-center gap-2"
           >
             {running ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1147,7 +1147,7 @@ export function DryRunExtractDialog({
                 setConfirmCloseOpen(false);
                 onOpenChange(false);
               }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white"
             >
               Close anyway
             </Button>

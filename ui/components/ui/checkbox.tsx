@@ -15,9 +15,9 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
         // Hover state
         "hover:border-white/50",
         // Focus state
-        "focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/50",
-        // Checked state - emerald/green background
-        "data-[checked]:border-emerald-500 data-[checked]:bg-emerald-500",
+        "focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle",
+        // Checked state - accent background
+        "data-[checked]:border-accent-primary-bd data-[checked]:bg-accent-primary-fg",
         // Disabled state  
         "disabled:cursor-not-allowed disabled:opacity-50",
         // Custom background for unchecked

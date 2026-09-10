@@ -20,9 +20,9 @@
   --badge-neutral-fg: oklch(0.85 0 0 / 0.75);
   --badge-neutral-bd: oklch(1 0 0 / 0.08);
 
-  --badge-success-bg: oklch(0.65 0.15 150 / 0.15);
-  --badge-success-fg: oklch(0.85 0.12 150);
-  --badge-success-bd: oklch(0.65 0.12 150 / 0.3);
+  --badge-success-bg: oklch(0.55 0.15 150 / 0.22);
+  --badge-success-fg: oklch(0.82 0.14 150);
+  --badge-success-bd: oklch(0.65 0.12 150 / 0.35);
 
   --badge-danger-bg: oklch(0.55 0.22 25 / 0.15);
   --badge-danger-fg: oklch(0.85 0.18 25);
@@ -46,6 +46,8 @@
   --accent-primary-fg: oklch(0.82 0.14 155);
   --accent-primary-bd: oklch(0.55 0.13 155 / 0.40);
   --accent-primary-bd-hover: oklch(0.55 0.13 155 / 0.55);
+  --accent-primary-solid: oklch(0.55 0.18 155);
+  --accent-primary-solid-hover: oklch(0.65 0.18 155);
 
   /* Semantic accents — toolbar toggles, count badges, active filters */
   --accent-secondary-bg: oklch(0.55 0.18 155 / 0.20);
@@ -227,6 +229,8 @@
   --color-accent-primary-fg: var(--accent-primary-fg);
   --color-accent-primary-bd: var(--accent-primary-bd);
   --color-accent-primary-bd-hover: var(--accent-primary-bd-hover);
+  --color-accent-primary-solid: var(--accent-primary-solid);
+  --color-accent-primary-solid-hover: var(--accent-primary-solid-hover);
 
   --color-accent-secondary-bg: var(--accent-secondary-bg);
   --color-accent-secondary-bg-hover: var(--accent-secondary-bg-hover);

@@ -125,7 +125,7 @@ export function DaemonStatus() {
           {isProcessing ? (
             <>
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-primary-fg"></span>
             </>
           ) : (
             <span className="inline-flex rounded-full h-2 w-2 bg-white/20"></span>
@@ -139,7 +139,7 @@ export function DaemonStatus() {
               <>
                 <span className="text-white/70 font-medium">Doc #{doc.id}</span>
                 <span className="text-white/30">•</span>
-                <span className="text-emerald-400 font-medium">{currentStageName}</span>
+                <span className="text-accent-secondary-fg font-medium">{currentStageName}</span>
                 {(() => {
                   const sub = progress?.stages?.[currentStageName]?.sub_progress;
                   if (sub?.label) return (
@@ -155,7 +155,7 @@ export function DaemonStatus() {
           {isProcessing && (
             <div className="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
               <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                className="h-full bg-accent-primary-fg rounded-full transition-all duration-500"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -175,7 +175,7 @@ export function DaemonStatus() {
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
+                  <Loader2 className="h-4 w-4 text-accent-secondary-fg animate-spin" />
                   <span className="text-sm font-medium text-white">Processing</span>
                 </div>
                 <span className="text-[11px] text-white/40">{percent}%</span>
@@ -194,7 +194,7 @@ export function DaemonStatus() {
                 )}
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-white/40">Status:</span>
-                  <span className="text-emerald-400">{doc.status}</span>
+                  <span className="text-accent-secondary-fg">{doc.status}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <Clock className="h-3 w-3 text-white/30" />
@@ -211,7 +211,7 @@ export function DaemonStatus() {
               <button
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-destructive-bg border border-destructive-bd/50 px-3 py-1.5 text-xs text-destructive-fg hover:bg-destructive-bg transition-colors disabled:opacity-50"
               >
                 {isCancelling ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -222,7 +222,7 @@ export function DaemonStatus() {
               </button>
 
               {cancelError && (
-                <div className="text-[11px] text-red-400 text-center">{cancelError}</div>
+                <div className="text-[11px] text-destructive-fg text-center">{cancelError}</div>
               )}
 
               <div className="space-y-1">
@@ -235,9 +235,9 @@ export function DaemonStatus() {
                     <div key={stageName} className="flex items-center gap-2">
                       <div className="flex-shrink-0 w-4 flex justify-center">
                         {isCompleted ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-accent-primary-fg" />
                         ) : isCurrent ? (
-                          <Loader2 className="h-3.5 w-3.5 text-emerald-400 animate-spin" />
+                          <Loader2 className="h-3.5 w-3.5 text-accent-secondary-fg animate-spin" />
                         ) : (
                           <div className="h-2 w-2 rounded-full bg-white/15" />
                         )}
@@ -246,7 +246,7 @@ export function DaemonStatus() {
                         <span
                           className={`text-xs font-medium ${
                             isCompleted
-                              ? 'text-emerald-400'
+                              ? 'text-accent-secondary-fg'
                               : isCurrent
                               ? 'text-white'
                               : 'text-white/30'
@@ -275,7 +275,7 @@ export function DaemonStatus() {
                         {isCurrent && (stage?.sub_progress?.total ?? 0) > 0 && (
                           <div className="w-24 h-0.5 bg-white/10 rounded-full mt-0.5">
                             <div
-                              className="h-full bg-emerald-500/60 rounded-full transition-all duration-300"
+                              className="h-full bg-accent-primary-fg/60 rounded-full transition-all duration-300"
                               style={{
                                 width: `${Math.round(
                                   (((stage?.sub_progress?.current ?? 0)) / (stage?.sub_progress?.total ?? 1)) * 100
