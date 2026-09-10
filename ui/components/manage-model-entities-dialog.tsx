@@ -249,7 +249,7 @@ export function ManageModelEntitiesDialog({
             placeholder="Filter by entity id, name or type..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-border-strong bg-surface-card text-foreground-default placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-border-strong bg-surface-card text-foreground-default placeholder-foreground-placeholder focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 

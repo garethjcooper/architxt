@@ -66,7 +66,7 @@ export function Shell({ children }: ShellProps) {
         <aside className={`bg-surface-panel flex flex-col transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
           <div className="h-[56px] flex items-center px-4 py-4">
             <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
-              <ArchitxtIcon className="h-8 w-8 text-[#BABABA] shrink-0" />
+              <ArchitxtIcon className="h-8 w-8 text-foreground-subtle shrink-0" />
               {!collapsed && (
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-xl tracking-tight leading-none">architxt</span>
