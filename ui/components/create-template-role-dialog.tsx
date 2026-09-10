@@ -103,10 +103,6 @@ export function CreateTemplateRoleDialog({
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
               className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
             <p className="text-[11px] text-white/40">
               Max 64 characters. The <code className="text-badge-caution-fg">sys_</code> prefix is reserved for system roles.
@@ -123,10 +119,6 @@ export function CreateTemplateRoleDialog({
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
@@ -139,7 +131,7 @@ export function CreateTemplateRoleDialog({
                 id="derivation_scope"
                 value={derivationScope}
                 onChange={(e) => setDerivationScope(e.target.value as Scope)}
-                className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
+                className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
               >
                 {SCOPES.map((scope) => (
                   <option key={scope} value={scope}>
@@ -159,10 +151,6 @@ export function CreateTemplateRoleDialog({
                 value={sortOrder}
                 onChange={(e) => setSortOrder(Number(e.target.value))}
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
               />
             </div>
           </div>
@@ -179,7 +167,7 @@ export function CreateTemplateRoleDialog({
             <Button
               onClick={handleCreate}
               disabled={!roleId.trim() || !displayName.trim() || creating}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               Create

@@ -90,10 +90,6 @@ export function CreateServerDialog({
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
@@ -108,10 +104,6 @@ export function CreateServerDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
@@ -127,10 +119,6 @@ export function CreateServerDialog({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
@@ -148,7 +136,7 @@ export function CreateServerDialog({
             <Button
               type="submit"
               disabled={!baseUrl.trim() || creating}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               Create

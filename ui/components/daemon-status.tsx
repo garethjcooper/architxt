@@ -125,7 +125,7 @@ export function DaemonStatus() {
           {isProcessing ? (
             <>
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-primary-fg"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-primary-solid"></span>
             </>
           ) : (
             <span className="inline-flex rounded-full h-2 w-2 bg-white/20"></span>
@@ -155,7 +155,7 @@ export function DaemonStatus() {
           {isProcessing && (
             <div className="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
               <div
-                className="h-full bg-accent-primary-fg rounded-full transition-all duration-500"
+                className="h-full bg-accent-primary-solid rounded-full transition-all duration-500"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -275,7 +275,7 @@ export function DaemonStatus() {
                         {isCurrent && (stage?.sub_progress?.total ?? 0) > 0 && (
                           <div className="w-24 h-0.5 bg-white/10 rounded-full mt-0.5">
                             <div
-                              className="h-full bg-accent-primary-fg/60 rounded-full transition-all duration-300"
+                              className="h-full bg-accent-primary-solid/60 rounded-full transition-all duration-300"
                               style={{
                                 width: `${Math.round(
                                   (((stage?.sub_progress?.current ?? 0)) / (stage?.sub_progress?.total ?? 1)) * 100

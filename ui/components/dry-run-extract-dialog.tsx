@@ -625,7 +625,7 @@ export function DryRunExtractDialog({
                             disabled={keys === 0}
                             className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
                               isActive
-                                ? "bg-accent-primary-fg text-white"
+                                ? "bg-accent-primary-solid text-white"
                                 : "text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/60"
                             }`}
                           >
@@ -922,7 +922,7 @@ export function DryRunExtractDialog({
                               className={cn(
                                 "w-full text-left px-2 py-1.5 rounded text-xs transition-colors",
                                 selectedResultEntity === null
-                                  ? "bg-accent-primary-fg/20 text-accent-primary-fg"
+                                  ? "bg-accent-primary-bg text-accent-primary-fg"
                                   : "text-white/70 hover:bg-white/10",
                               )}
                             >
@@ -1110,7 +1110,7 @@ export function DryRunExtractDialog({
           <Button
             onClick={handleRun}
             disabled={running || !canRun}
-            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 flex items-center gap-2"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 flex items-center gap-2"
           >
             {running ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1147,7 +1147,7 @@ export function DryRunExtractDialog({
                 setConfirmCloseOpen(false);
                 onOpenChange(false);
               }}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
             >
               Close anyway
             </Button>

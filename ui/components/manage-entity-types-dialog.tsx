@@ -278,7 +278,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
               type="button"
               size="sm"
               onClick={() => setShowAddForm((v) => !v)}
-              className="inline-flex items-center gap-1 bg-accent-primary-fg hover:bg-accent-primary-fg text-white"
+              className="inline-flex items-center gap-1 bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
             >
               <Plus className="h-3.5 w-3.5" />
               {showAddForm ? 'Cancel' : 'Add Type'}
@@ -372,7 +372,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
 
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="ghost" size="sm" onClick={resetAddForm}>Close</Button>
-                <Button type="submit" size="sm" disabled={adding} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white">
+                <Button type="submit" size="sm" disabled={adding} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white">
                   {adding && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                   Create
                 </Button>

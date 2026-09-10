@@ -594,7 +594,7 @@ export function ServerGraphBanksDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? 'Saving...' : 'Save Changes'}

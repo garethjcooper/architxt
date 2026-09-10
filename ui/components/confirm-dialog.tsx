@@ -66,7 +66,7 @@ export function ConfirmDialog({
             className={
               variant === 'destructive'
                 ? 'bg-destructive-fg text-white hover:bg-red-700'
-                : 'bg-accent-primary-fg text-white hover:bg-emerald-700'
+                : 'bg-accent-primary-solid text-white hover:bg-accent-primary-solid-hover'
             }
           >
             {confirmLabel}

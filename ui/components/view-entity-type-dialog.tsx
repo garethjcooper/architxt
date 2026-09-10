@@ -25,10 +25,6 @@ const MIN_DIGITS = 1;
 const MAX_DIGITS = 10;
 const DEFAULT_DIGITS = 3;
 
-const inputFocusStyle = {
-  '--tw-ring-color': 'rgb(52, 211, 153)',
-  '--tw-ring-opacity': '0.4',
-} as React.CSSProperties;
 
 export function ViewEntityTypeDialog({
   entityType,
@@ -170,7 +166,7 @@ export function ViewEntityTypeDialog({
                 onChange={(e) => setTypeName(e.target.value)}
                 placeholder="e.g. Application Component"
                 className={inputClass}
-                style={inputFocusStyle}
+                
               />
             </div>
 
@@ -184,7 +180,7 @@ export function ViewEntityTypeDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
                 className={inputClass}
-                style={inputFocusStyle}
+                
               />
             </div>
 
@@ -210,7 +206,7 @@ export function ViewEntityTypeDialog({
                     onChange={(e) => handlePrefixChange(e.target.value)}
                     placeholder="e.g. APP"
                     className={inputClass}
-                    style={inputFocusStyle}
+                    
                     disabled={!usesPattern}
                   />
                 </div>
@@ -238,7 +234,7 @@ export function ViewEntityTypeDialog({
                     onChange={(e) => handleDigitsChange(e.target.value)}
                     placeholder="3"
                     className={inputClass}
-                    style={inputFocusStyle}
+                    
                     disabled={!usesPattern}
                   />
                 </div>
@@ -303,7 +299,7 @@ export function ViewEntityTypeDialog({
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

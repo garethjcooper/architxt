@@ -93,7 +93,7 @@ export function DerivedModelsPanel({
             onClick={() => onHealth(derived.filter((d) => isSelected(d.id)))}
             disabled={selectionCount === 0}
             title="Check Hindsight content health"
-            className="h-7 px-2 text-xs bg-purple-600 hover:bg-badge-entity-fg text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
             <Activity className="h-3.5 w-3.5" />
             Health
@@ -102,7 +102,7 @@ export function DerivedModelsPanel({
             <Button
               onClick={() => onConfigure(derived.filter((d) => isSelected(d.id)))}
               disabled={selectionCount === 0}
-              className="h-7 px-2 text-xs bg-purple-600 hover:bg-badge-entity-fg text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               <Settings2 className="h-3.5 w-3.5" />
               Config
@@ -158,7 +158,7 @@ export function DerivedModelsPanel({
                     key={row.key}
                     onClick={() => toggleSelection(row.data.id)}
                     className={`border-b border-white/5 transition-colors cursor-pointer ${
-                      selected ? 'bg-purple-900/20' : 'hover:bg-white/5'
+                      selected ? 'bg-badge-entity-bg' : 'hover:bg-white/5'
                     }`}
                   >
                     <TableCell className="py-1.5 px-3" onClick={(e) => e.stopPropagation()}>
@@ -180,7 +180,7 @@ export function DerivedModelsPanel({
                       {d.name || '-'}
                     </TableCell>
                     <TableCell className="py-1.5 px-3 text-xs">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-slate-700/40 text-white/80 border-slate-600">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                         {d.refresh_mode === 'delta' ? 'Delta' : 'Full'}
                       </span>
                     </TableCell>
@@ -188,8 +188,8 @@ export function DerivedModelsPanel({
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
                           d.refresh_after_consolidation
-                            ? 'bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd'
-                            : 'bg-slate-700/40 text-white/60 border-slate-600'
+                            ? 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                            : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
                         }`}
                       >
                         {d.refresh_after_consolidation ? 'ON' : 'OFF'}
@@ -199,8 +199,8 @@ export function DerivedModelsPanel({
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
                           d.exclude_all_mental_models
-                            ? 'bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd'
-                            : 'bg-slate-700/40 text-white/60 border-slate-600'
+                            ? 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                            : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
                         }`}
                       >
                         {d.exclude_all_mental_models ? 'ON' : 'OFF'}

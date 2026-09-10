@@ -666,7 +666,7 @@ export function EntityDetectionDialog({
               <Button
                 onClick={handleApply}
                 disabled={matchGroups.length === 0 || includedMatches === 0}
-                className="h-7 px-2.5 text-xs bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-7 px-2.5 text-xs bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Insert Tags
               </Button>
@@ -718,7 +718,7 @@ export function EntityDetectionDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Changes'}

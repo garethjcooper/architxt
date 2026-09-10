@@ -180,10 +180,10 @@ export function BatchProgressDialog({
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   allSuccess
-                    ? 'bg-accent-primary-fg'
+                    ? 'bg-accent-primary-solid'
                     : hasFailures
                       ? 'bg-badge-caution-fg'
-                      : 'bg-accent-primary-fg'
+                      : 'bg-accent-primary-solid'
                 }`}
                 style={{ width: `${percent}%` }}
               />
@@ -229,7 +229,7 @@ export function BatchProgressDialog({
           <div className="flex justify-end">
             <Button
               onClick={onClose}
-              className="bg-accent-primary-fg text-white hover:bg-emerald-700"
+              className="bg-accent-primary-solid text-white hover:bg-accent-primary-solid-hover"
             >
               Close
             </Button>

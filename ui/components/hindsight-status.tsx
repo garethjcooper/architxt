@@ -50,9 +50,9 @@ export function HindsightStatus() {
 
   // Determine indicator colour
   let indicatorColor = 'bg-white/20';
-  if (pendingCount > 0) indicatorColor = 'bg-accent-primary-fg';
+  if (pendingCount > 0) indicatorColor = 'bg-accent-primary-solid';
   else if (failedCount > 0) indicatorColor = 'bg-destructive-fg';
-  else if (completedCount > 0) indicatorColor = 'bg-accent-primary-fg';
+  else if (completedCount > 0) indicatorColor = 'bg-accent-primary-solid';
 
   const handleToggle = () => {
     setExpanded(!expanded);
@@ -124,7 +124,7 @@ export function HindsightStatus() {
                         </span>
                         <span className="text-white/30">→</span>
                         <span className="text-white/50 truncate">{op.pop_bank_id}</span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' : 'bg-badge-caution-bg/50 text-badge-caution-fg border-badge-caution-bd/50'}`}>
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd' : 'bg-badge-caution-bg/50 text-badge-caution-fg border-badge-caution-bd/50'}`}>
                           <Clock className="h-3 w-3" />
                           {op.pop_status}
                         </span>

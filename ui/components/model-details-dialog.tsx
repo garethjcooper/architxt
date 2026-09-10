@@ -32,10 +32,6 @@ import {
   validateRoleBasedTemplate,
 } from '@/lib/validation/contextual-template';
 
-const inputFocusStyle = {
-  '--tw-ring-color': 'rgb(52, 211, 153)',
-  '--tw-ring-opacity': '0.4',
-} as React.CSSProperties;
 
 const inputClass =
   '!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle';
@@ -515,7 +511,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             <div className="flex items-center gap-2">
               <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
               {isSystemTemplate && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-700/40 text-white/70 border-slate-600">
+                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                   System template
                 </span>
               )}
@@ -540,9 +536,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
           )}
 
         {roleInstructions && (
-          <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-amber-100">
+          <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-badge-caution-fg">
             <p className="font-medium">{selectedTemplateRole?.label} format requirements</p>
-            <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
+            <p className="mt-1 text-badge-caution-fg/80">{roleInstructions}</p>
           </div>
         )}
 
@@ -564,7 +560,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               Name *
             </Label>
             {roleScope && roleRule ? (
-              <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+              <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
                 <Input
                   id="mm-detail-name"
                   value={namePrefix}
@@ -572,7 +568,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="prefix"
                   className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
-                  style={inputFocusStyle}
+                  
                 />
                 <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
                   {roleRule.nameTail}
@@ -586,7 +582,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Display name"
                 className={inputClass}
-                style={inputFocusStyle}
+                
               />
             )}
             {roleTemplateValidation && !roleTemplateValidation.valid && (
@@ -624,7 +620,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             availableEntities={availableEntities}
             availableEdges={availableEdges}
             className={inputClass}
-            style={{ ...inputFocusStyle, minHeight: '80px' }}
+            style={{ minHeight: '80px' }}
           />
         </div>
 
@@ -637,7 +633,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               id="mm-detail-refresh-mode"
               value={refreshMode}
               onChange={(e) => handleRefreshModeChange(e.target.value as 'full' | 'delta')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
+              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
             >
               <option value="full">Full</option>
               <option value="delta">Delta</option>
@@ -651,7 +647,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               id="mm-detail-tags-match-mode"
               value={tagsMatchMode}
               onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
+              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
             >
               <option value="all_strict">All Strict</option>
               <option value="any_strict">Any Strict</option>
@@ -694,7 +690,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               onChange={(e) => setExcludeList(e.target.value)}
               placeholder="Comma-separated model IDs"
               className={inputClass}
-              style={inputFocusStyle}
+              
             />
           </div>
           <div className="space-y-2">
@@ -711,7 +707,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               onChange={(e) => handleMaxTokensChange(e.target.value)}
               placeholder="2048"
               className={inputClass}
-              style={inputFocusStyle}
+              
             />
             {maxTokensError && (
               <p className="text-[10px] text-destructive-fg">{maxTokensError}</p>
@@ -804,7 +800,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
       <Button
         onClick={handleSave}
         disabled={!hasChanges || isSaving || !!(roleTemplateValidation && !roleTemplateValidation.valid)}
-        className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
         {isSaving ? 'Saving...' : 'Save Changes'}

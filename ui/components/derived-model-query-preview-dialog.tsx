@@ -169,8 +169,8 @@ export function DerivedModelQueryPreviewDialog({
                                 hasError
                                   ? 'bg-destructive-fg/15 text-destructive-fg border-destructive-bd'
                                   : hasContent
-                                  ? 'bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd'
-                                  : 'bg-slate-700/40 text-white/60 border-slate-600'
+                                  ? 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                                  : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
                               }`}
                               title={hasError ? (row.compose_error ?? undefined) : hasContent ? 'Composed query available' : 'No composed query'}
                             >
