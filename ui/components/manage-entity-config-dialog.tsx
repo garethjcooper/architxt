@@ -381,7 +381,7 @@ export function ManageEntityConfigDialog({
           <Button
             onClick={handleSave}
             disabled={loading || !hasActiveUpdateField}
-            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

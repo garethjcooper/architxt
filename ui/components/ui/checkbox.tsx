@@ -17,7 +17,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
         // Focus state
         "focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle",
         // Checked state - accent background
-        "data-[checked]:border-accent-primary-bd data-[checked]:bg-accent-primary-fg",
+        "data-[checked]:border-accent-primary-bd data-[checked]:bg-accent-primary-solid",
         // Disabled state  
         "disabled:cursor-not-allowed disabled:opacity-50",
         // Custom background for unchecked

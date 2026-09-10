@@ -48,7 +48,7 @@ interface ViewDocumentDialogProps {
 
 const statusColors: Record<string, string> = {
   uploaded:              'bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd/50',
-  ready_to_extract:      'bg-sky-800/15 text-sky-400 border-sky-700/20',
+  ready_to_extract:      'bg-badge-info-bg text-badge-info-fg border-badge-info-bd',
   processing_extract:    'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50',
   request_release:       'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50',
   processed_extract_success: 'bg-badge-success-bg text-accent-secondary-fg border-accent-primary-bd/50',
@@ -288,10 +288,6 @@ export function ViewDocumentDialog({
                   onChange={(e) => setExtId(e.target.value)}
                   placeholder="Enter external ID"
                   className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                 />
               </div>
 
@@ -423,10 +419,6 @@ export function ViewDocumentDialog({
                     onChange={(e) => setFullPath(e.target.value)}
                     placeholder="e.g. https://..."
                     className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                    style={{
-                      '--tw-ring-color': 'rgb(52, 211, 153)',
-                      '--tw-ring-opacity': '0.4',
-                    } as React.CSSProperties}
                   />
                 </div>
               </div>
@@ -469,10 +461,6 @@ export function ViewDocumentDialog({
                       }
                     }}
                     className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                    style={{
-                      '--tw-ring-color': 'rgb(52, 211, 153)',
-                      '--tw-ring-opacity': '0.4',
-                    } as React.CSSProperties}
                   />
                   <Button type="button" variant="outline" size="sm" onClick={() => {
                     const trimmed = authorInput.trim();
@@ -727,7 +715,7 @@ export function ViewDocumentDialog({
                             <div
                               className={`flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center ${
                                 entry.success
-                                  ? 'bg-accent-primary-fg/15 text-accent-secondary-fg'
+                                  ? 'bg-accent-primary-bg text-accent-primary-fg'
                                   : 'bg-destructive-fg/15 text-destructive-fg'
                               }`}
                             >
@@ -987,7 +975,7 @@ export function ViewDocumentDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Changes'}

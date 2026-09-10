@@ -357,7 +357,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               transition-colors border
                               ${active
                                 ? isSystem
-                                  ? 'bg-slate-700/40 text-badge-neutral-fg border-slate-500/40'
+                                  ? 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
                                   : 'bg-blue-800/30 text-badge-info-fg border-badge-info-bd'
                                 : isSystem
                                   ? 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60'
@@ -385,7 +385,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 className={`
                   border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
                   transition-colors hover:bg-white/5
-                  ${items.length > 0 ? 'border-accent-secondary-bd bg-accent-primary-fg/5' : 'border-white/30'}
+                  ${items.length > 0 ? 'border-accent-secondary-bd bg-accent-primary-bg/50' : 'border-white/30'}
                 `}
               >
                 <div className="flex flex-col items-center gap-2">
@@ -468,7 +468,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 </div>
                 <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-300 bg-accent-primary-fg"
+                    className="h-full rounded-full transition-all duration-300 bg-accent-primary-solid"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
@@ -495,7 +495,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                       rounded-lg border p-3 transition-colors
                       ${
                         item.status === 'success'
-                          ? 'border-accent-secondary-bd/50 bg-accent-primary-fg/5'
+                          ? 'border-accent-secondary-bd/50 bg-accent-primary-bg/50'
                           : item.status === 'error'
                             ? 'border-destructive-bd/50 bg-destructive-fg/5'
                             : item.status === 'uploading'
@@ -597,7 +597,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 <Button
                   onClick={uploadAll}
                   disabled={pendingCount === 0}
-                  className="bg-accent-primary-fg hover:bg-emerald-700 text-white"
+                  className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
                 >
                   {hasErrors && pendingCount === 0 ? (
                     'Retry failed'
@@ -612,7 +612,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
           {phase === 'running' && (
             <Button
               disabled
-              className="bg-accent-primary-fg/50 text-white flex items-center gap-2 cursor-not-allowed"
+              className="bg-accent-primary-bg/500 text-white flex items-center gap-2 cursor-not-allowed"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Uploading…
@@ -624,7 +624,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               onClick={handleClose}
               className={`text-white flex items-center gap-2 ${
                 doneSuccess
-                  ? 'bg-accent-primary-fg hover:bg-accent-primary-fg'
+                  ? 'bg-accent-primary-solid hover:bg-accent-primary-solid-hover'
                   : doneFailed
                     ? 'bg-destructive-fg hover:bg-destructive-fg'
                     : 'bg-badge-caution-fg hover:bg-badge-caution-fg'

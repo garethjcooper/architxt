@@ -468,7 +468,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                         healthBadge = <Loader2 className="h-4 w-4 animate-spin text-white/50" />;
                       } else if (result) {
                         healthBadge = result.found ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd">
                             OK
                           </span>
                         ) : (
@@ -483,7 +483,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
 
                       const statusBadge = op ? (
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-sky-500/10 text-sky-400 border-sky-500/20"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-badge-info-bg text-badge-info-fg border-badge-info-bd"
                           title={`Refresh ${op.pop_status}`}
                         >
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -571,7 +571,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               onDoubleClick={handleResizeReset}
               title="Drag to resize data list and response content panels; double-click to reset"
             >
-              <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-accent-primary-fg/50 transition-colors" />
+              <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-accent-primary-solid/50 transition-colors" />
             </div>
 
             <div
@@ -588,7 +588,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                     </span>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
                       selectedResult.found
-                        ? 'bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd'
+                        ? 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                         : 'bg-destructive-fg/15 text-destructive-fg border-destructive-bd'
                     }`}>
                       {selectedResult.found ? 'Found' : 'Missing'}
@@ -621,7 +621,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             <Button
               onClick={handleRun}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading'}
-              className="bg-purple-600 hover:bg-badge-entity-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {status.state === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
               {status.state === 'loading' ? 'Checking...' : 'Run Check'}
@@ -648,7 +648,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             </Button>
             <Button
               onClick={handleRefreshAll}
-              className="bg-purple-600 hover:bg-badge-entity-fg text-white"
+              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white"
             >
               Refresh All
             </Button>

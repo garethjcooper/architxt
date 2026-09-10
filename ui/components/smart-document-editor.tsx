@@ -432,7 +432,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                       ? 'bg-white/5 text-white/20 line-through'
                       : b.type === 'image'
                         ? 'bg-badge-caution-bg text-badge-caution-fg'
-                        : 'bg-accent-primary-fg/15 text-accent-primary-fg'
+                        : 'bg-accent-primary-bg text-accent-primary-fg'
                     : b.deleted
                       ? 'opacity-25 line-through text-white/30'
                       : b.edited
@@ -541,7 +541,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
         <Button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
         >
           {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {isSaving ? 'Saving...' : 'Save Edits'}

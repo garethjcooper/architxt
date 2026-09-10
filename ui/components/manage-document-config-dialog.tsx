@@ -253,7 +253,7 @@ export function ManageDocumentConfigDialog({
                             placeholder="HH:MM:SS"
                             value={selectedTime}
                             onChange={(e) => setTime(e.target.value)}
-                            className="w-20 bg-slate-800/50 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder:text-white/40 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400/30"
+                            className="w-20 bg-surface-card border border-white/10 rounded px-2 py-1 text-xs text-white placeholder:text-white/40 focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring-subtle"
                           />
                         </div>
                       </div>
@@ -276,7 +276,7 @@ export function ManageDocumentConfigDialog({
           <Button
             onClick={handleSave}
             disabled={loading || !enabled}
-            className="bg-accent-primary-fg hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

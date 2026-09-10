@@ -108,10 +108,6 @@ export function CreateDirectiveDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
               />
             </div>
 
@@ -127,10 +123,6 @@ export function CreateDirectiveDialog({
                 onChange={(e) => setStatement(e.target.value)}
                 rows={4}
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
               />
             </div>
 
@@ -156,10 +148,6 @@ export function CreateDirectiveDialog({
                   value={priority}
                   onChange={(e) => setPriority(parseInt(e.target.value || '0', 10))}
                   className="!w-20 !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                 />
               </div>
             </div>
@@ -178,7 +166,7 @@ export function CreateDirectiveDialog({
             <Button
               type="submit"
               disabled={creating || !name.trim() || !statement.trim()}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               {creating ? 'Creating...' : 'Create Directive'}

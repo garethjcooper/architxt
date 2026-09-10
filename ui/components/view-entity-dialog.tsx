@@ -21,10 +21,6 @@ interface Props {
   onEntityUpdated?: () => void;
 }
 
-const inputFocusStyle = {
-  '--tw-ring-color': 'rgb(52, 211, 153)',
-  '--tw-ring-opacity': '0.4',
-} as React.CSSProperties;
 
 export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEntityUpdated }: Props) {
   const [isSaving, setIsSaving] = useState(false);
@@ -164,7 +160,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter entity name"
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={inputFocusStyle}
+                
               />
             </div>
 
@@ -180,7 +176,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   onChange={(e) => setEntityId(e.target.value)}
                   placeholder="SYS-001"
                   className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                  style={inputFocusStyle}
+                  
                 />
                 {selectedType?.uses_entity_id_pattern && entityIdConformity && (
                   <div className="flex items-center justify-between mt-2 gap-2">
@@ -234,7 +230,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={inputFocusStyle}
+                
               />
             </div>
 
@@ -250,7 +246,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   placeholder="Add alias…"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAlias(); } }}
                   className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                  style={inputFocusStyle}
+                  
                 />
                 <Button type="button" variant="outline" size="sm" onClick={addAlias}>
                   Add
@@ -349,7 +345,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

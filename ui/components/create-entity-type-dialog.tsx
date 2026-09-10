@@ -125,10 +125,6 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
               onChange={(e) => setTypeName(e.target.value)}
               placeholder="e.g. Application Component"
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
               required
             />
           </div>
@@ -143,10 +139,6 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
@@ -172,10 +164,6 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
                   onChange={(e) => handlePrefixChange(e.target.value)}
                   placeholder="e.g. APP"
                   className={inputClass}
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                   disabled={!usesPattern}
                 />
               </div>
@@ -203,10 +191,6 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
                   onChange={(e) => handleDigitsChange(e.target.value)}
                   placeholder="3"
                   className={inputClass}
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                   disabled={!usesPattern}
                 />
               </div>
@@ -242,7 +226,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-white/70 hover:text-white hover:bg-white/5">
               Close
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <Button type="submit" disabled={isLoading} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Create
             </Button>

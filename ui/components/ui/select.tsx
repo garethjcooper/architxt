@@ -53,7 +53,7 @@ function SelectItem({ className, children, ...props }: React.ComponentPropsWitho
       {...props}
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-        <SelectUI.ItemIndicator className="h-2 w-2 bg-accent-primary-fg rounded-full" />
+        <SelectUI.ItemIndicator className="h-2 w-2 bg-accent-primary-solid rounded-full" />
       </span>
       <SelectUI.ItemText>{children}</SelectUI.ItemText>
     </SelectUI.Item>

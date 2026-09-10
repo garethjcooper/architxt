@@ -196,10 +196,6 @@ export function ImportDialog({
                 onChange={(e) => setRaw(e.target.value)}
                 placeholder={placeholder}
                 className="h-[160px] !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle font-mono text-xs overflow-auto leading-relaxed resize-none"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
               />
             </div>
           )}
@@ -302,7 +298,7 @@ export function ImportDialog({
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all duration-300 bg-accent-primary-fg"
+                  className="h-full rounded-full transition-all duration-300 bg-accent-primary-solid"
                   style={{ width: `${percent}%` }}
                 />
               </div>
@@ -413,7 +409,7 @@ export function ImportDialog({
                   setPhase('preview');
                 }}
                 disabled={validItems.length === 0}
-                className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 Preview Import
               </Button>
@@ -432,7 +428,7 @@ export function ImportDialog({
               <Button
                 onClick={handleRun}
                 disabled={validItems.length === 0}
-                className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 Import {validItems.length} Item{validItems.length !== 1 ? 's' : ''}
               </Button>
@@ -442,7 +438,7 @@ export function ImportDialog({
           {phase === 'running' && (
             <Button
               disabled
-              className="bg-accent-primary-fg/50 text-white flex items-center gap-2 cursor-not-allowed"
+              className="bg-accent-primary-bg/500 text-white flex items-center gap-2 cursor-not-allowed"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Importing…
@@ -454,7 +450,7 @@ export function ImportDialog({
               onClick={() => onOpenChange(false)}
               className={`text-white flex items-center gap-2 ${
                 doneSuccess
-                  ? 'bg-accent-primary-fg hover:bg-accent-primary-fg'
+                  ? 'bg-accent-primary-solid hover:bg-accent-primary-solid-hover'
                   : doneFailed
                     ? 'bg-destructive-fg hover:bg-destructive-fg'
                     : 'bg-badge-caution-fg hover:bg-badge-caution-fg'

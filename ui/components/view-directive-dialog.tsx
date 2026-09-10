@@ -97,10 +97,6 @@ export function ViewDirectiveDialog({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Directive name / id"
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
               />
             </div>
 
@@ -116,10 +112,6 @@ export function ViewDirectiveDialog({
                 placeholder="Directive statement"
                 rows={5}
                 className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
               />
             </div>
 
@@ -145,10 +137,6 @@ export function ViewDirectiveDialog({
                   value={priority}
                   onChange={(e) => setPriority(parseInt(e.target.value || '0', 10))}
                   className="!w-20 !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                 />
               </div>
             </div>
@@ -210,7 +198,7 @@ export function ViewDirectiveDialog({
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

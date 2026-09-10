@@ -174,10 +174,6 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                 onChange={(e) => setEntityId(e.target.value)}
                 placeholder="SYS-001"
                 className={inputClass}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
                 required
               />
               {selectedType?.uses_entity_id_pattern && entityIdConformity && (
@@ -217,10 +213,6 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Finance Gateway"
                 className={inputClass}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
                 required
               />
             </div>
@@ -237,10 +229,6 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
@@ -253,10 +241,6 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                 onChange={(e) => setNewAlias(e.target.value)}
                 placeholder="Add alias…"
                 className={inputClass}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAlias(); } }}
               />
               <Button type="button" variant="outline" size="sm" onClick={addAlias}>Add</Button>
@@ -303,7 +287,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-white/70 hover:text-white hover:bg-white/5">
               Close
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <Button type="submit" disabled={isLoading} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Create
             </Button>

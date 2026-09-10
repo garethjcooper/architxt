@@ -235,12 +235,12 @@ export function ManageTagsDialog({
           tag.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-badge-neutral-bg border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
+            ? 'bg-badge-neutral-bg border-white/10 text-white/40 line-through hover:bg-surface-card'
             : tag.currentState === 'common'
               ? 'bg-badge-caution-bg border-badge-caution-bd text-badge-caution-fg'
               : tag.currentState === 'partial'
-                ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
-                : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
+                ? 'bg-badge-neutral-bg border-badge-neutral-bd text-badge-neutral-fg hover:bg-badge-neutral-bg/70'
+                : 'bg-surface-card border-white/10 text-white/60 hover:bg-surface-hover hover:border-white/20'
         }`}
       >
         <span className={isRemoved ? 'line-through' : ''}>{label}</span>
@@ -278,7 +278,7 @@ export function ManageTagsDialog({
             placeholder="Filter by tag..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-surface-card text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 
@@ -365,7 +365,7 @@ export function ManageTagsDialog({
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="bg-orange-600 hover:bg-orange-700 text-white"
+            className="bg-badge-caution-fg hover:bg-badge-caution-fg/80 text-white"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

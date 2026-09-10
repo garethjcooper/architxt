@@ -20,10 +20,6 @@ import {
 const USER_ENTITY_DERIVED_ROLE = 'user_entity_derived';
 const USER_ENTITY_DERIVED_LABEL = 'User entity derived';
 
-const inputFocusStyle = {
-  '--tw-ring-color': 'rgb(52, 211, 153)',
-  '--tw-ring-opacity': '0.4',
-} as React.CSSProperties;
 
 const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
 
@@ -234,16 +230,16 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           <div className="flex items-center gap-2">
             <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
             {isSystemTemplate && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-700/40 text-white/70 border-slate-600">
+              <span className="text-[10px] px-1.5 py-0.5 rounded border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                 System template
               </span>
             )}
           </div>
           <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
           {roleInstructions && (
-            <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-amber-100 mt-2">
+            <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-badge-caution-fg mt-2">
               <p className="font-medium">{selectedRole?.label} format requirements</p>
-              <p className="mt-1 text-amber-100/80">{roleInstructions}</p>
+              <p className="mt-1 text-badge-caution-fg/80">{roleInstructions}</p>
             </div>
           )}
           {genericTemplateValidation && (
@@ -264,14 +260,14 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
         <div className="space-y-2">
           <Label htmlFor="mm-ext-id" className="text-xs uppercase text-white/50 font-medium">External ID *</Label>
           {roleRule ? (
-            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
               <Input
                 id="mm-ext-id"
                 value={extIdPrefix}
                 onChange={(e) => setExtIdPrefix(e.target.value)}
                 placeholder="prefix"
                 className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
-                style={inputFocusStyle}
+                
               />
               <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs font-mono whitespace-nowrap border-l border-white/10">
                 {roleRule.extIdTail}
@@ -284,7 +280,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
               onChange={(e) => setRawExtId(e.target.value)}
               placeholder="e.g. mental-model-001"
               className={inputClass}
-              style={inputFocusStyle}
+              
             />
           )}
           <p className="text-[10px] text-white/40 font-mono">{effectiveExtId}</p>
@@ -292,7 +288,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
         <div className="space-y-2">
           <Label htmlFor="mm-name" className="text-xs uppercase text-white/50 font-medium">Name *</Label>
           {roleRule ? (
-            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400/40">
+            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
               <Input
                 id="mm-name"
                 value={namePrefix}
@@ -300,7 +296,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
                 placeholder="prefix"
                 disabled={isSystemTemplate}
                 className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
-                style={inputFocusStyle}
+                
               />
               <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
                 {roleRule.nameTail}
@@ -314,7 +310,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
               onChange={(e) => setRawName(e.target.value)}
               placeholder="Display name"
               className={inputClass}
-              style={inputFocusStyle}
+              
             />
           )}
           <p className="text-[10px] text-white/40">{effectiveName}</p>
@@ -342,7 +338,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           availableEntities={availableEntities}
           availableEdges={availableEdges}
           className={inputClass}
-          style={{ ...inputFocusStyle, minHeight: '80px' }}
+          style={{ minHeight: '80px' }}
         />
       </div>
 
@@ -354,7 +350,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           value={templateRole}
           disabled={mode === 'edit' || isSystemTemplate}
           onChange={(e) => handleTemplateRoleChange(e.target.value)}
-          className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none disabled:opacity-50"
+          className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
           >
           <option value="">Generic / no role</option>
           {availableRoles?.map((role) => (
@@ -373,7 +369,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             id="mm-refresh-mode"
             value={refreshMode}
             onChange={(e) => setRefreshMode(e.target.value as 'full' | 'delta')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
+            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
           >
             <option value="full">Full</option>
             <option value="delta">Delta</option>
@@ -388,7 +384,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             id="mm-tags-match-mode"
             value={tagsMatchMode}
             onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-emerald-400/40 outline-none"
+            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
           >
             <option value="all_strict">All Strict</option>
             <option value="any_strict">Any Strict</option>
@@ -436,7 +432,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             }}
             placeholder="2048"
             className={inputClass}
-            style={inputFocusStyle}
+            
           />
           {maxTokensError && (
             <p className="text-[10px] text-destructive-fg">{maxTokensError}</p>
@@ -453,14 +449,14 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             onChange={(e) => setExcludeList(e.target.value)}
             placeholder="Comma-separated model IDs"
             className={inputClass}
-            style={inputFocusStyle}
+            
           />
         </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
         <Button type="button" variant="ghost" onClick={onCancel} className="text-white/70 hover:text-white hover:bg-white/5">Close</Button>
-        <Button type="submit" disabled={submitting || !canSubmit} className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+        <Button type="submit" disabled={submitting || !canSubmit} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitLabel}
         </Button>
