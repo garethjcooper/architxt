@@ -841,16 +841,16 @@ export default function HindsightPage() {
                   handlePushSelected(ids);
                 }}
                 disabled={!filteredCol1.some((d) => selectedIds.has(d.ext_id))}
-                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-blue-900/30 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50 shrink-0"
+                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-accent-secondary-bg border border-accent-secondary-bd text-accent-secondary-fg hover:bg-accent-secondary-bg transition-colors disabled:opacity-50 shrink-0"
               >
                 <Upload className="h-4 w-4" /> Push to Bank
               </Button>
             </div>
             <ColumnCard
               title="Only on architxt"
-              icon={<Server className="h-4 w-4 text-blue-400" />}
+              icon={<Server className="h-4 w-4 text-accent-secondary-fg" />}
               count={col1Filtered.pureFiltered.length}
-              colorClass="bg-blue-900/20 text-blue-300 border-blue-500/20"
+              colorClass="bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd"
               extIds={filteredCol1.map((d) => d.ext_id)}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
@@ -935,7 +935,7 @@ export default function HindsightPage() {
                     handleMakeLikeBank(ids);
                   }}
                   disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d)))}
-                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50 shrink-0"
+                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-tertiary-bg border border-accent-tertiary-bd text-accent-tertiary-fg hover:bg-accent-tertiary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Download className="h-4 w-4" /> Pull from Bank{col2PullCount > 0 ? ` (${col2PullCount})` : ''}
                   </Button>
@@ -946,7 +946,7 @@ export default function HindsightPage() {
                     handleMakeLikeArchitxt(ids);
                   }}
                   disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync')}
-                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-blue-900/30 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50 shrink-0"
+                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-secondary-bg border border-accent-secondary-bd text-accent-secondary-fg hover:bg-accent-secondary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Upload className="h-4 w-4" /> Push to Bank{col2PushCount > 0 ? ` (${col2PushCount})` : ''}
                   </Button>
@@ -1081,16 +1081,16 @@ export default function HindsightPage() {
                   handlePullSelected(ids);
                 }}
                 disabled={!filteredCol3.some((d) => selectedIds.has(d.ext_id))}
-                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50 shrink-0"
+                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-accent-tertiary-bg border border-accent-tertiary-bd text-accent-tertiary-fg hover:bg-accent-tertiary-bg transition-colors disabled:opacity-50 shrink-0"
               >
                 <Download className="h-4 w-4" /> Pull from Bank
               </Button>
             </div>
             <ColumnCard
               title="Only on Bank"
-              icon={<Database className="h-4 w-4 text-purple-400" />}
+              icon={<Database className="h-4 w-4 text-accent-tertiary-fg" />}
               count={col3Filtered.pureFiltered.length}
-              colorClass="bg-purple-900/20 text-purple-300 border-purple-500/20"
+              colorClass="bg-accent-tertiary-bg text-accent-tertiary-fg border-accent-tertiary-bd"
               extIds={filteredCol3.map((d) => d.ext_id)}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
