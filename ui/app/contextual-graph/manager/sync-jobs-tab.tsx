@@ -321,9 +321,9 @@ export function SyncJobsTab({
 
       <div className="flex-1 min-h-0 flex mt-2 gap-2">
         <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.2 }}>
-          <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+          <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Sync jobs</span>
-            <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
               {jobs.length}
             </span>
           </div>
@@ -352,7 +352,7 @@ export function SyncJobsTab({
                     }}
                     className={cn(
                       'w-full text-left rounded border px-2 py-1.5 transition-colors',
-                      active ? 'bg-emerald-900/30 border-emerald-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
+                      active ? 'bg-accent-primary-bg border-accent-primary-bd-hover' : 'bg-black/10 border-white/5 hover:bg-white/5'
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -361,7 +361,7 @@ export function SyncJobsTab({
                           {job.status}
                         </Badge>
                         {hasIssues && (
-                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-amber-500/20 text-amber-300 border-amber-500/30">
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-accent-tertiary-bg text-accent-tertiary-fg border-accent-tertiary-bd">
                             {issueCount} issue{issueCount === 1 ? '' : 's'}
                           </Badge>
                         )}
@@ -374,7 +374,7 @@ export function SyncJobsTab({
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-[10px] text-white/40">
                       <span>duration {formatDuration(job.started_at, job.finished_at)}</span>
-                      {job.error_code && <span className="text-red-400">{job.error_code}</span>}
+                      {job.error_code && <span className="text-destructive-fg">{job.error_code}</span>}
                     </div>
                   </button>
                 );
@@ -386,7 +386,7 @@ export function SyncJobsTab({
         <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.8 }}>
           {selectedJob ? (
             <div className="h-full flex flex-col overflow-hidden">
-              <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+              <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Job {selectedJob.id.slice(0, 8)}</span>
                 <div className="flex items-center gap-2">
                   {['pending', 'running'].includes(selectedJob.status) && (
@@ -431,11 +431,11 @@ export function SyncJobsTab({
                           <div className="flex items-center gap-2">
                             <span className={cn('w-2 h-2 rounded-full', stageStatusClass[stage.status] || 'bg-white/20')} />
                             <span className="text-[11px] text-white/80">{stage.label || stage.name}</span>
-                            {stageIssues && <AlertTriangle className="w-3 h-3 text-amber-400" />}
+                            {stageIssues && <AlertTriangle className="w-3 h-3 text-accent-tertiary-fg" />}
                           </div>
                           <div className="flex items-center gap-2">
                             {stage.issue_count > 0 && (
-                              <span className="text-[10px] text-amber-400">{stage.issue_count} issue{stage.issue_count === 1 ? '' : 's'}</span>
+                              <span className="text-[10px] text-accent-tertiary-fg">{stage.issue_count} issue{stage.issue_count === 1 ? '' : 's'}</span>
                             )}
                             <span className={cn('text-[10px]', stageLabelClass[stage.status] || 'text-white/40')}>
                               {stage.status === 'completed_with_issues' ? 'completed with issues' : stage.status}
@@ -448,10 +448,10 @@ export function SyncJobsTab({
                 </div>
 
                 {selectedJob.error_message && (
-                  <div className="rounded border border-red-500/20 bg-red-900/20 p-2">
-                    <div className="text-[10px] uppercase tracking-wider text-red-300 mb-1">Error</div>
+                  <div className="rounded border border-destructive-bd bg-destructive-bg p-2">
+                    <div className="text-[10px] uppercase tracking-wider text-destructive-fg mb-1">Error</div>
                     <div className="text-[11px] text-white/80">{selectedJob.error_message}</div>
-                    {selectedJob.error_code && <div className="text-[10px] text-red-300 mt-1 font-mono">{selectedJob.error_code}</div>}
+                    {selectedJob.error_code && <div className="text-[10px] text-destructive-fg mt-1 font-mono">{selectedJob.error_code}</div>}
                   </div>
                 )}
 
@@ -459,15 +459,15 @@ export function SyncJobsTab({
                   const issues = collectStageIssues(selectedJob);
                   if (issues.length === 0) return null;
                   return (
-                    <div className="rounded border border-amber-500/20 bg-amber-900/20 p-2">
-                      <div className="text-[10px] uppercase tracking-wider text-amber-300 mb-2 flex items-center gap-1.5">
+                    <div className="rounded border border-accent-tertiary-bd bg-accent-tertiary-bg p-2">
+                      <div className="text-[10px] uppercase tracking-wider text-accent-tertiary-fg mb-2 flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         Issues ({issues.length})
                       </div>
                       <div className="space-y-1 max-h-48 overflow-y-auto">
                         {issues.slice(0, 20).map((issue, idx) => (
                           <div key={idx} className="rounded bg-black/20 p-1.5">
-                            <div className="text-[10px] text-amber-300/80">
+                            <div className="text-[10px] text-accent-tertiary-fg/80">
                               {issue.label || issue.stage}
                               {issue.extId && <span className="text-white/50 ml-1 font-mono">{issue.extId}</span>}
                             </div>
@@ -479,7 +479,7 @@ export function SyncJobsTab({
                           </div>
                         ))}
                         {issues.length > 20 && (
-                          <div className="text-[10px] text-amber-300/70 italic">…and {issues.length - 20} more</div>
+                          <div className="text-[10px] text-accent-tertiary-fg/70 italic">…and {issues.length - 20} more</div>
                         )}
                       </div>
                     </div>
@@ -499,7 +499,7 @@ export function SyncJobsTab({
                     <div className="space-y-1">
                       {selectedJob.logs.map((log: any) => (
                         <div key={log.id} className="flex items-start gap-2 rounded border border-white/5 bg-black/10 px-2 py-1.5">
-                          <span className={cn('text-[9px] uppercase px-1 rounded shrink-0', log.level === 'error' ? 'bg-red-500/20 text-red-300' : log.level === 'warn' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300')}>
+                          <span className={cn('text-[9px] uppercase px-1 rounded shrink-0', log.level === 'error' ? 'bg-destructive-bg text-destructive-fg' : log.level === 'warn' ? 'bg-badge-caution-bg text-badge-caution-fg' : 'bg-badge-success-bg text-badge-success-fg')}>
                             {log.level}
                           </span>
                           <div className="flex-1 min-w-0">

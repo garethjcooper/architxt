@@ -362,7 +362,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   }, []);
 
   const formatPreview = (result: ContentResult | null, error: string | null): React.ReactNode => {
-    if (error) return <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">{`Error:\n${error}`}</div>;
+    if (error) return <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-destructive-bg rounded border border-destructive-bd p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
     if (result.content == null) {
       return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
@@ -480,9 +480,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col"
           style={{ width: `${100 - panelWidth}%` }}
         >
-          <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+          <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Mental Models</span>
-            <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
               {filteredRefs.length}
             </span>
           </div>
@@ -542,7 +542,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                         onClick={() => handleSelectRow(ref)}
                         className={cn(
                           'border-b border-white/5 cursor-pointer transition-colors',
-                          isRowSelected ? 'bg-emerald-900/30' : 'hover:bg-white/5'
+                          isRowSelected ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                         )}
                       >
                         <TableCell className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
@@ -571,20 +571,20 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                         </TableCell>
                         <TableCell className="py-2 px-3 text-xs">
                           {isRefreshing ? (
-                            <span className="inline-flex items-center gap-1 text-amber-300">
+                            <span className="inline-flex items-center gap-1 text-accent-tertiary-fg">
                               <Loader2 className="h-3 w-3 animate-spin" /> refreshing
                             </span>
                           ) : ref.last_refresh_status === 'error' ? (
-                            <span className="inline-flex items-center gap-1 text-red-400" title={ref.last_refresh_error || ''}>
+                            <span className="inline-flex items-center gap-1 text-destructive-fg" title={ref.last_refresh_error || ''}>
                               <AlertCircle className="h-3 w-3" /> error
                             </span>
                           ) : ref.last_refresh_status === 'ok' ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-400">
+                            <span className="inline-flex items-center gap-1 text-accent-primary-fg">
                               <CheckCircle2 className="h-3 w-3" /> ok
                               {ref.last_refresh_at ? ` ${formatDistanceToNow(new Date(ref.last_refresh_at), { addSuffix: true })}` : ''}
                             </span>
                           ) : ref.last_refresh_status === 'skipped' ? (
-                            <span className="inline-flex items-center gap-1 text-amber-400">⊘ skipped</span>
+                            <span className="inline-flex items-center gap-1 text-accent-tertiary-fg">⊘ skipped</span>
                           ) : (
                             <span className="text-white/40">−</span>
                           )}
@@ -636,7 +636,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           onMouseDown={handleResizeStart}
           title="Drag to resize panels"
         >
-          <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+          <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors" />
         </div>
 
         {/* Content panel */}
@@ -664,7 +664,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                 <Skeleton className="h-4 w-2/3 bg-white/10" />
               </div>
             ) : selectedContentError ? (
-              <div className="text-xs text-red-300/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-red-500/20 p-3">
+              <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-destructive-bg rounded border border-destructive-bd p-3">
                 {selectedContentError}
               </div>
             ) : plainView ? (

@@ -475,7 +475,7 @@ export default function ContextManagerPage() {
                     return (
                       <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge className="text-[10px] bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
+                          <Badge className="text-[10px] bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd">
                             {scopeLabel}
                           </Badge>
                           {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
@@ -490,13 +490,13 @@ export default function ContextManagerPage() {
                         </div>
                         <div className="flex flex-col gap-0.5 text-[10px]">
                           {ref.last_refresh_status ? (
-                            <span className={cn('font-medium', ref.last_refresh_status === 'error' ? 'text-red-400' : ref.last_refresh_status === 'skipped' ? 'text-amber-400' : 'text-emerald-400')}>
+                            <span className={cn('font-medium', ref.last_refresh_status === 'error' ? 'text-destructive-fg' : ref.last_refresh_status === 'skipped' ? 'text-badge-caution-fg' : 'text-badge-success-fg')}>
                               {ref.last_refresh_status === 'error' ? '✗' : ref.last_refresh_status === 'skipped' ? '⊘' : '✓'} refresh {ref.last_refresh_status}
                               {ref.last_refresh_at ? ` ${formatRelative(ref.last_refresh_at)}` : ''}
                             </span>
                           ) : null}
                           {ref.last_refresh_error ? (
-                            <span className="text-red-300/80 line-clamp-2" title={ref.last_refresh_error}>{ref.last_refresh_error}</span>
+                            <span className="text-destructive-fg/80 line-clamp-2" title={ref.last_refresh_error}>{ref.last_refresh_error}</span>
                           ) : null}
                         </div>
                       </div>
@@ -567,7 +567,7 @@ export default function ContextManagerPage() {
                   variant="outline"
                   className={cn(
                     'text-[10px] border-white/10',
-                    bankMode === 'auto' ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-white/50'
+                    bankMode === 'auto' ? 'bg-accent-secondary-bg text-accent-secondary-fg' : 'bg-white/5 text-white/50'
                   )}
                 >
                   {bankMode === 'auto' ? 'Auto refresh' : bankMode === 'manual' ? 'Manual refresh' : 'Unmanaged'}
@@ -603,7 +603,7 @@ export default function ContextManagerPage() {
 
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] uppercase tracking-wider text-white/40">Graph</span>
-                <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
                   {nodes.length} node{nodes.length !== 1 ? 's' : ''} / {edges.length} edge{edges.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -614,7 +614,7 @@ export default function ContextManagerPage() {
           <Button
             onClick={() => setConfirmRunSyncOpen(true)}
             disabled={!serverId || !bankId || actionLoading === 'sync-job'}
-            className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-emerald-900/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-accent-primary-bg border border-accent-primary-bd text-accent-primary-fg hover:bg-accent-primary-bg-hover transition-colors disabled:opacity-50"
           >
             {actionLoading === 'sync-job' ? (
               <RefreshCw className="h-4 w-4 animate-spin" />
@@ -645,7 +645,7 @@ export default function ContextManagerPage() {
                 className="h-8 pl-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/40"
               />
             </div>
-            <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded ml-auto">
+            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded ml-auto">
               {filteredSortedNodes.length} node{filteredSortedNodes.length !== 1 ? 's' : ''} / {filteredSortedEdges.length} edge
               {filteredSortedEdges.length !== 1 ? 's' : ''}
             </span>
@@ -657,9 +657,9 @@ export default function ContextManagerPage() {
               style={{ flex: leftFlex }}
             >
               <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col" style={{ flex: topFlex }}>
-                <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+                <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Entities</span>
-                  <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
                     {filteredSortedNodes.length}
                   </span>
                 </div>
@@ -691,13 +691,13 @@ export default function ContextManagerPage() {
                 className="h-2 shrink-0 cursor-row-resize flex items-center justify-center group"
                 title="Drag to resize top and bottom panels; double-click to reset"
               >
-                <div className="w-16 h-1 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+                <div className="w-16 h-1 rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors" />
               </div>
 
               <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
-                <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+                <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Edges</span>
-                  <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
                     {filteredSortedEdges.length}
                   </span>
                 </div>
@@ -726,7 +726,7 @@ export default function ContextManagerPage() {
               className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
               title="Drag to resize left and right panels; double-click to reset"
             >
-              <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors" />
+              <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors" />
             </div>
 
             <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
