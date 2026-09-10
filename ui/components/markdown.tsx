@@ -61,7 +61,7 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
       return <MermaidDiagram content={content} />;
     }
 
-    return <code className="bg-white/10 rounded px-1 py-0.5 text-xs" {...props}>{children}</code>;
+    return <code className="bg-markdown-code-bg rounded px-1 py-0.5 text-xs" {...props}>{children}</code>;
   };
 
   return (
@@ -80,16 +80,16 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
           h5: headingWithId,
           h6: headingWithId,
           code: renderCode,
-          pre: ({ ...props }) => <pre className="bg-white/5 rounded p-2 overflow-x-auto text-xs mb-3" {...props} />,
-          a: ({ ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
-          strong: ({ ...props }) => <strong className="font-semibold text-white" {...props} />,
-          em: ({ ...props }) => <em className="italic text-white/80" {...props} />,
+          pre: ({ ...props }) => <pre className="bg-markdown-pre-bg rounded p-2 overflow-x-auto text-xs mb-3" {...props} />,
+          a: ({ ...props }) => <a className="text-markdown-link hover:underline" {...props} />,
+          strong: ({ ...props }) => <strong className="font-semibold text-markdown-strong" {...props} />,
+          em: ({ ...props }) => <em className="italic text-foreground-default" {...props} />,
           blockquote: ({ ...props }) =>
-            <blockquote className="border-l-2 border-white/20 pl-3 italic text-white/60 mb-3" {...props} />,
+            <blockquote className="border-l-2 border-markdown-blockquote-border pl-3 italic text-foreground-muted mb-3" {...props} />,
           table: ({ ...props }) => <table className="w-full text-[12px] border-collapse mb-3" {...props} />,
-          thead: ({ ...props }) => <thead className="border-b border-white/20" {...props} />,
-          th: ({ ...props }) => <th className="text-left py-1.5 px-2 font-medium text-white/80" {...props} />,
-          td: ({ ...props }) => <td className="py-1.5 px-2 border-b border-white/10 text-white/70" {...props} />,
+          thead: ({ ...props }) => <thead className="border-b border-markdown-table-border" {...props} />,
+          th: ({ ...props }) => <th className="text-left py-1.5 px-2 font-medium text-markdown-table-head" {...props} />,
+          td: ({ ...props }) => <td className="py-1.5 px-2 border-b border-markdown-table-border text-foreground-muted" {...props} />,
         }}
       >
         {children}
