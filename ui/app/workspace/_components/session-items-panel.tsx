@@ -188,7 +188,7 @@ export function SessionItemsPanel({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-36 bg-surface-overlay border-border-default text-foreground-default"
+                        className="w-36 bg-surface-raised border-border-default text-foreground-default"
                       >
                         <DropdownMenuItem
                           onClick={(e) => {

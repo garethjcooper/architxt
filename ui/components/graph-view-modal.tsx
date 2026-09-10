@@ -611,7 +611,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                           <Copy className="h-3.5 w-3.5" />
                         </span>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-surface-overlay border-border-default">
+                      <DropdownMenuContent align="end" className="bg-surface-raised border-border-default">
                         <DropdownMenuItem
                           onClick={() =>
                             copyText(
