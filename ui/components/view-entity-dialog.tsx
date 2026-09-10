@@ -163,7 +163,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter entity name"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 style={inputFocusStyle}
               />
             </div>
@@ -179,7 +179,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   value={entityId}
                   onChange={(e) => setEntityId(e.target.value)}
                   placeholder="SYS-001"
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={inputFocusStyle}
                 />
                 {selectedType?.uses_entity_id_pattern && entityIdConformity && (
@@ -188,8 +188,8 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                       title={entityIdConformity.message || ''}
                       className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
                         entityIdConformity.conforms
-                          ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
-                          : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
+                          ? 'bg-badge-success-bg text-accent-secondary-fg border-accent-secondary-bd'
+                          : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                       }`}
                     >
                       {formatEntityIdPattern(selectedType)}
@@ -198,7 +198,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                       <button
                         type="button"
                         onClick={() => setEntityId(nextEntityId)}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-emerald-800/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-800/30"
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-badge-success-bg text-accent-secondary-fg border-accent-secondary-bd hover:bg-emerald-800/30"
                       >
                         Next ID: {nextEntityId}
                       </button>
@@ -214,7 +214,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   id="ent-type"
                   value={typeId}
                   onChange={(e) => setTypeId(Number(e.target.value) || '')}
-                  className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                  className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                 >
                   {entityTypes.map((t) => (
                     <option key={t.id} value={t.id}>{t.type_name}</option>
@@ -233,7 +233,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 style={inputFocusStyle}
               />
             </div>
@@ -249,7 +249,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   onChange={(e) => setNewAlias(e.target.value)}
                   placeholder="Add alias…"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAlias(); } }}
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={inputFocusStyle}
                 />
                 <Button type="button" variant="outline" size="sm" onClick={addAlias}>
@@ -259,9 +259,9 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
               {aliases.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {aliases.map((a, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-purple-800/15 text-purple-400 border border-purple-700/20">
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-badge-entity-bg text-badge-entity-fg border border-badge-entity-bd/50">
                       {a}
-                      <button type="button" onClick={() => removeAlias(i)} className="text-purple-400/60 hover:text-purple-300">
+                      <button type="button" onClick={() => removeAlias(i)} className="text-badge-entity-fg/60 hover:text-badge-entity-fg">
                         <X className="h-3 w-3" />
                       </button>
                     </span>
@@ -327,11 +327,11 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
 
           {/* Hindsight sync warning */}
           {(entity.usage_count ?? 0) > 0 && hasChanges && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-900/20 border border-amber-500/30">
-              <svg className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-badge-caution-bg border border-badge-caution-bd">
+              <svg className="h-4 w-4 text-badge-caution-fg mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <p className="text-xs text-amber-300">
+              <p className="text-xs text-badge-caution-fg">
                 This entity is referenced in {entity.usage_count} document{entity.usage_count !== 1 ? 's' : ''}. If any of these documents have already been synced to Hindsight, the updated entity name/ID may cause a mismatch on the next sync.
               </p>
             </div>
@@ -349,7 +349,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

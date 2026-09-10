@@ -207,12 +207,12 @@ export function ManageModelEntitiesDialog({
           entity.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-purple-800/5 text-purple-400/40 border-purple-700/10 line-through hover:bg-purple-800/10'
+            ? 'bg-purple-800/5 text-badge-entity-fg/40 border-purple-700/10 line-through hover:bg-purple-800/10'
             : entity.currentState === 'common'
-              ? 'bg-purple-800/15 text-purple-400 border-purple-700/20'
+              ? 'bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd/50'
               : entity.currentState === 'partial'
-                ? 'bg-purple-800/10 text-purple-400/90 border-purple-700/15 border-dashed hover:bg-purple-800/20'
-                : 'bg-purple-800/10 text-purple-400/80 border-purple-700/15 hover:bg-purple-800/25 hover:border-purple-700/30'
+                ? 'bg-purple-800/10 text-badge-entity-fg/90 border-purple-700/15 border-dashed hover:bg-badge-entity-bg'
+                : 'bg-purple-800/10 text-badge-entity-fg/80 border-purple-700/15 hover:bg-purple-800/25 hover:border-purple-700/30'
         }`}
       >
         <span className={isRemoved ? 'line-through' : 'truncate'}>{label}</span>
@@ -249,7 +249,7 @@ export function ManageModelEntitiesDialog({
             placeholder="Filter by entity id, name or type..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 
@@ -315,7 +315,7 @@ export function ManageModelEntitiesDialog({
           <Button variant="ghost" onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/5">
             Close
           </Button>
-          <Button onClick={handleSave} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button onClick={handleSave} disabled={loading} className="bg-accent-primary-fg hover:bg-emerald-700 text-white">
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>

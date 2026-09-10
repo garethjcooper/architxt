@@ -47,14 +47,14 @@ interface ViewDocumentDialogProps {
 }
 
 const statusColors: Record<string, string> = {
-  uploaded:              'bg-fuchsia-800/15 text-fuchsia-400 border-fuchsia-700/20',
+  uploaded:              'bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd/50',
   ready_to_extract:      'bg-sky-800/15 text-sky-400 border-sky-700/20',
-  processing_extract:    'bg-amber-800/15 text-amber-400 border-amber-700/20',
-  request_release:       'bg-yellow-800/15 text-yellow-400 border-yellow-700/20',
-  processed_extract_success: 'bg-emerald-800/15 text-emerald-400 border-emerald-700/20',
-  processed_extract_failed:  'bg-rose-800/15 text-rose-400 border-rose-700/20',
-  publishing:            'bg-orange-800/15 text-orange-400 border-orange-700/20',
-  published:             'bg-emerald-800/15 text-emerald-400 border-emerald-700/20',
+  processing_extract:    'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50',
+  request_release:       'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50',
+  processed_extract_success: 'bg-badge-success-bg text-accent-secondary-fg border-accent-primary-bd/50',
+  processed_extract_failed:  'bg-badge-danger-bg text-destructive-fg border-destructive-bd/50',
+  publishing:            'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50',
+  published:             'bg-badge-success-bg text-accent-secondary-fg border-accent-primary-bd/50',
 };
 
 const statusLabels: Record<string, string> = {
@@ -269,7 +269,7 @@ export function ViewDocumentDialog({
             {/* Status Badge */}
             <div className="flex items-center gap-3">
               <span className="text-sm text-white/70">Status:</span>
-              <Badge className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${statusColors[document.status] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}>
+              <Badge className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${statusColors[document.status] || 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'}`}>
                 <ArchitxtIcon className="h-3 w-3" />
                 {statusLabels[document.status] || document.status}
               </Badge>
@@ -287,7 +287,7 @@ export function ViewDocumentDialog({
                   value={extId}
                   onChange={(e) => setExtId(e.target.value)}
                   placeholder="Enter external ID"
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={{
                     '--tw-ring-color': 'rgb(52, 211, 153)',
                     '--tw-ring-opacity': '0.4',
@@ -385,14 +385,14 @@ export function ViewDocumentDialog({
                                 base.setHours(hours || 0, minutes || 0, seconds || 0, 0);
                                 setTimestamp(base.toISOString());
                               }}
-                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 w-[90px]"
+                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle w-[90px]"
                             />
                           </div>
                           <div className="flex items-center gap-1 ml-auto">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                              className="text-badge-info-fg hover:text-badge-info-fg hover:bg-transparent"
                               onClick={() => setTimestamp('')}
                             >
                               Clear
@@ -400,7 +400,7 @@ export function ViewDocumentDialog({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                              className="text-badge-info-fg hover:text-badge-info-fg hover:bg-transparent"
                               onClick={() => setTimestamp(new Date().toISOString())}
                             >
                               Now
@@ -422,7 +422,7 @@ export function ViewDocumentDialog({
                     value={fullPath}
                     onChange={(e) => setFullPath(e.target.value)}
                     placeholder="e.g. https://..."
-                    className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                    className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                     style={{
                       '--tw-ring-color': 'rgb(52, 211, 153)',
                       '--tw-ring-opacity': '0.4',
@@ -440,13 +440,13 @@ export function ViewDocumentDialog({
                   {authors.map((a, i) => (
                     <span
                       key={i}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-purple-800/15 text-purple-400 border border-purple-700/20"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-badge-entity-bg text-badge-entity-fg border border-badge-entity-bd/50"
                     >
                       {a}
                       <button
                         type="button"
                         onClick={() => setAuthors((prev) => prev.filter((_, idx) => idx !== i))}
-                        className="text-purple-400/60 hover:text-purple-300"
+                        className="text-badge-entity-fg/60 hover:text-badge-entity-fg"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -468,7 +468,7 @@ export function ViewDocumentDialog({
                         }
                       }
                     }}
-                    className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                    className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                     style={{
                       '--tw-ring-color': 'rgb(52, 211, 153)',
                       '--tw-ring-opacity': '0.4',
@@ -518,7 +518,7 @@ export function ViewDocumentDialog({
               <div>
                 <p className="text-xs uppercase text-white/50 font-medium mb-2">Context</p>
                 {document.context_id ? (
-                  <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-xs border border-violet-500/30">
+                  <span className="px-2 py-0.5 rounded-full bg-badge-info-bg text-badge-info-fg text-xs border border-badge-info-bd">
                     {contexts.find(c => c.id === document.context_id)?.description || `ID ${document.context_id}`}
                   </span>
                 ) : (
@@ -534,7 +534,7 @@ export function ViewDocumentDialog({
                     {document.tags.map((tag) => (
                       <span
                         key={tag.id}
-                        className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 text-xs border border-orange-500/30"
+                        className="px-2 py-0.5 rounded-full bg-badge-caution-bg text-badge-caution-fg text-xs border border-badge-caution-bd"
                       >
                         {tag.name}
                       </span>
@@ -553,7 +553,7 @@ export function ViewDocumentDialog({
                     {document.metadata.map((m) => (
                       <span
                         key={m.id}
-                        className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-xs border border-blue-500/30"
+                        className="px-2 py-0.5 rounded-full bg-badge-info-bg text-badge-info-fg text-xs border border-badge-info-bd"
                       >
                         {m.value !== undefined && m.value !== null ? `${m.key}=${m.value}` : m.key}
                       </span>
@@ -668,7 +668,7 @@ export function ViewDocumentDialog({
                         key={m.id}
                         className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${
                           m.expanded
-                            ? 'bg-amber-900/10 border-amber-500/20'
+                            ? 'bg-badge-caution-bg/50 border-badge-caution-bd/50'
                             : 'bg-white/[0.03] border-white/10'
                         }`}
                       >
@@ -680,18 +680,18 @@ export function ViewDocumentDialog({
                         </span>
                         <div className="flex items-start gap-1.5 shrink-0">
                           {m.expanded && (
-                            <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/20 text-[10px] px-1.5 py-0">
+                            <Badge className="bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50 text-[10px] px-1.5 py-0">
                               <Sparkles className="h-3 w-3 mr-1" />
                               Computed
                             </Badge>
                           )}
                           {m.generated_by === 'user' && (
-                            <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/20 text-[10px] px-1.5 py-0">
+                            <Badge className="bg-badge-info-bg text-badge-info-fg border-badge-info-bd/50 text-[10px] px-1.5 py-0">
                               User
                             </Badge>
                           )}
                           {m.generated_by === 'import' && (
-                            <Badge className="bg-purple-500/15 text-purple-400 border-purple-500/20 text-[10px] px-1.5 py-0">
+                            <Badge className="bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd/50 text-[10px] px-1.5 py-0">
                               Import
                             </Badge>
                           )}
@@ -727,8 +727,8 @@ export function ViewDocumentDialog({
                             <div
                               className={`flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center ${
                                 entry.success
-                                  ? 'bg-green-500/15 text-green-400'
-                                  : 'bg-red-500/15 text-red-400'
+                                  ? 'bg-accent-primary-fg/15 text-accent-secondary-fg'
+                                  : 'bg-destructive-fg/15 text-destructive-fg'
                               }`}
                             >
                               {entry.success ? (
@@ -769,10 +769,10 @@ export function ViewDocumentDialog({
                           {isExpanded && hasMetrics && (
                             <div className="px-3 pb-3 pt-1 border-t border-white/[0.04] space-y-3">
                               {entry.error && (
-                                <div className="rounded bg-red-500/10 border border-red-500/20 px-2.5 py-2">
+                                <div className="rounded bg-destructive-bg border border-destructive-bd/50 px-2.5 py-2">
                                   <div className="flex items-start gap-2">
-                                    <AlertCircle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" />
-                                    <p className="text-xs text-red-200/80 leading-relaxed whitespace-pre-wrap">
+                                    <AlertCircle className="h-3.5 w-3.5 text-destructive-fg mt-0.5 shrink-0" />
+                                    <p className="text-xs text-destructive-fg/80 leading-relaxed whitespace-pre-wrap">
                                       {formatErrorValue(entry.error)}
                                     </p>
                                   </div>
@@ -805,7 +805,7 @@ export function ViewDocumentDialog({
                                               )}
                                             </div>
                                             {detail.error && (
-                                              <p className="text-[11px] text-red-300/80 leading-relaxed whitespace-pre-wrap">{formatErrorValue(detail.error)}</p>
+                                              <p className="text-[11px] text-destructive-fg/80 leading-relaxed whitespace-pre-wrap">{formatErrorValue(detail.error)}</p>
                                             )}
                                             {detail.metrics?.doclingStatus && (
                                               <MetricBadge label="status" value={String(detail.metrics.doclingStatus)} />
@@ -881,7 +881,7 @@ export function ViewDocumentDialog({
                                           <MetricBadge label="docling status" value={String(stageMetrics.doclingStatus)} />
                                         )}
                                         {Array.isArray(stageMetrics.doclingErrors) && stageMetrics.doclingErrors.map((err: any, eIdx: number) => (
-                                          <span key={eIdx} className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] text-red-300/80">
+                                          <span key={eIdx} className="inline-flex items-center gap-1 rounded bg-destructive-bg px-2 py-0.5 text-[11px] text-destructive-fg/80">
                                             docling: {formatErrorValue(err)}
                                           </span>
                                         ))}
@@ -987,7 +987,7 @@ export function ViewDocumentDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Changes'}

@@ -137,17 +137,17 @@ export function BatchProgressDialog({
           <div className="flex items-center gap-3">
             {done ? (
               allSuccess ? (
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-900/30">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-primary-bg">
+                  <CheckCircle2 className="h-5 w-5 text-accent-secondary-fg" />
                 </div>
               ) : (
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-900/30">
-                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-badge-caution-bg">
+                  <AlertTriangle className="h-5 w-5 text-badge-caution-fg" />
                 </div>
               )
             ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-900/30">
-                <Loader2 className="h-5 w-5 text-emerald-400 animate-spin" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-primary-bg">
+                <Loader2 className="h-5 w-5 text-accent-secondary-fg animate-spin" />
               </div>
             )}
             <div>
@@ -180,10 +180,10 @@ export function BatchProgressDialog({
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   allSuccess
-                    ? 'bg-emerald-500'
+                    ? 'bg-accent-primary-fg'
                     : hasFailures
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-500'
+                      ? 'bg-badge-caution-fg'
+                      : 'bg-accent-primary-fg'
                 }`}
                 style={{ width: `${percent}%` }}
               />
@@ -192,12 +192,12 @@ export function BatchProgressDialog({
 
           {/* Stats row */}
           <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1.5 text-emerald-400">
+            <div className="flex items-center gap-1.5 text-accent-secondary-fg">
               <CheckCircle2 className="h-3.5 w-3.5" />
               <span className="font-medium">{completed} succeeded</span>
             </div>
             {failed > 0 && (
-              <div className="flex items-center gap-1.5 text-red-400">
+              <div className="flex items-center gap-1.5 text-destructive-fg">
                 <XCircle className="h-3.5 w-3.5" />
                 <span className="font-medium">{failed} failed</span>
               </div>
@@ -206,13 +206,13 @@ export function BatchProgressDialog({
 
           {/* Error list */}
           {done && hasFailures && (
-            <div className="max-h-40 overflow-y-auto rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 space-y-1.5">
+            <div className="max-h-40 overflow-y-auto rounded-lg bg-destructive-bg border border-destructive-bd/50 p-2.5 space-y-1.5">
               {results
                 .filter((r) => !r.success)
                 .map((r, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-2 text-xs text-red-300"
+                    className="flex items-start gap-2 text-xs text-destructive-fg"
                   >
                     <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
                     <span className="break-all">
@@ -229,7 +229,7 @@ export function BatchProgressDialog({
           <div className="flex justify-end">
             <Button
               onClick={onClose}
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              className="bg-accent-primary-fg text-white hover:bg-emerald-700"
             >
               Close
             </Button>

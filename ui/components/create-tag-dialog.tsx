@@ -82,7 +82,7 @@ export function CreateTagDialog({
               placeholder="Enter tag name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               style={{
                 '--tw-ring-color': 'rgb(52, 211, 153)',
                 '--tw-ring-opacity': '0.4',
@@ -103,7 +103,7 @@ export function CreateTagDialog({
             <Button
               onClick={handleCreate}
               disabled={!name.trim() || creating}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               Create

@@ -104,7 +104,7 @@ export function DerivedModelQueryPreviewDialog({
       <DialogContent className="!w-[85vw] !max-w-none max-h-[85vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
-            <MessageSquareText className="h-5 w-5 text-purple-400" />
+            <MessageSquareText className="h-5 w-5 text-badge-entity-fg" />
             Provisioning Query Preview
           </DialogTitle>
         </DialogHeader>
@@ -123,7 +123,7 @@ export function DerivedModelQueryPreviewDialog({
                   Loading composed queries...
                 </div>
               ) : status.state === 'error' ? (
-                <div className="h-full flex items-center justify-center text-sm text-red-400">
+                <div className="h-full flex items-center justify-center text-sm text-destructive-fg">
                   {status.message}
                 </div>
               ) : rows.length === 0 ? (
@@ -151,7 +151,7 @@ export function DerivedModelQueryPreviewDialog({
                           key={row.id}
                           onClick={() => setSelectedId(row.id)}
                           className={`border-b border-white/5 cursor-pointer transition-colors ${
-                            selected ? 'bg-purple-900/30' : 'hover:bg-white/5'
+                            selected ? 'bg-badge-entity-bg' : 'hover:bg-white/5'
                           }`}
                         >
                           <TableCell className="py-2 px-3 text-xs text-white/80 truncate" title={row.name || '-'}>
@@ -167,9 +167,9 @@ export function DerivedModelQueryPreviewDialog({
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
                                 hasError
-                                  ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                                  ? 'bg-destructive-fg/15 text-destructive-fg border-destructive-bd'
                                   : hasContent
-                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  ? 'bg-accent-primary-fg/15 text-accent-primary-fg border-accent-secondary-bd'
                                   : 'bg-slate-700/40 text-white/60 border-slate-600'
                               }`}
                               title={hasError ? (row.compose_error ?? undefined) : hasContent ? 'Composed query available' : 'No composed query'}
@@ -203,8 +203,8 @@ export function DerivedModelQueryPreviewDialog({
                 </div>
               ) : selectedRow?.compose_error ? (
                 <div className="h-full flex flex-col gap-2">
-                  <span className="text-xs font-medium text-red-300">Composition failed</span>
-                  <pre className="text-xs font-mono text-red-300/80 whitespace-pre-wrap break-all">
+                  <span className="text-xs font-medium text-destructive-fg">Composition failed</span>
+                  <pre className="text-xs font-mono text-destructive-fg/80 whitespace-pre-wrap break-all">
                     {selectedRow.compose_error}
                   </pre>
                 </div>

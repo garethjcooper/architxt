@@ -109,7 +109,7 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               disabled={readOnly}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Narrative name"
             />
           </div>
@@ -136,7 +136,7 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
                 <button
                   type="button"
                   onClick={() => copyText(draftContent, 'Markdown')}
-                  className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                  className="p-1 rounded text-white/40 hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50 transition-colors"
                   title="Copy markdown source"
                 >
                   <Copy className="h-3.5 w-3.5" />

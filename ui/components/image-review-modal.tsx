@@ -110,8 +110,8 @@ export function ImageReviewModal({
             }}
             className={`px-3 py-1.5 rounded text-sm flex items-center gap-1.5 transition-colors ${
               isDeleted
-                ? 'text-emerald-400 hover:bg-emerald-500/10'
-                : 'text-red-400 hover:bg-red-500/10'
+                ? 'text-accent-secondary-fg hover:bg-accent-secondary-bg/50'
+                : 'text-destructive-fg hover:bg-destructive-bg'
             }`}
           >
             {isDeleted ? (

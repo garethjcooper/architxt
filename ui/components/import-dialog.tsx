@@ -156,7 +156,7 @@ export function ImportDialog({
         {/* ── Header ───────────────────────── */}
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
-            <Download className="h-5 w-5 text-emerald-400" />
+            <Download className="h-5 w-5 text-accent-secondary-fg" />
             {title}
           </DialogTitle>
           {description && (
@@ -174,7 +174,7 @@ export function ImportDialog({
                 <Label className="text-xs uppercase text-white/50 font-medium">
                   Paste CSV or Drop File
                 </Label>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
+                <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs text-accent-secondary-fg hover:text-accent-primary-fg transition-colors">
                   <FileUp className="h-3.5 w-3.5" />
                   <span>Upload file</span>
                   <input
@@ -195,7 +195,7 @@ export function ImportDialog({
                 value={raw}
                 onChange={(e) => setRaw(e.target.value)}
                 placeholder={placeholder}
-                className="h-[160px] !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2 font-mono text-xs overflow-auto leading-relaxed resize-none"
+                className="h-[160px] !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle font-mono text-xs overflow-auto leading-relaxed resize-none"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',
                   '--tw-ring-opacity': '0.4',
@@ -207,12 +207,12 @@ export function ImportDialog({
           {/* Parse status */}
           {(phase === 'input' || phase === 'preview') && parsed.length > 0 && (
             <div className="shrink-0 flex items-center gap-4 text-xs">
-              <div className="flex items-center gap-1.5 text-emerald-400">
+              <div className="flex items-center gap-1.5 text-accent-secondary-fg">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span className="font-medium">{validItems.length} valid</span>
               </div>
               {invalidItems.length > 0 && (
-                <div className="flex items-center gap-1.5 text-red-400">
+                <div className="flex items-center gap-1.5 text-destructive-fg">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   <span className="font-medium">{invalidItems.length} invalid</span>
                 </div>
@@ -222,9 +222,9 @@ export function ImportDialog({
 
           {/* Error band */}
           {(phase === 'input' || phase === 'preview') && invalidItems.length > 0 && (
-            <div className="shrink-0 max-h-[100px] overflow-y-auto rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 space-y-1.5">
+            <div className="shrink-0 max-h-[100px] overflow-y-auto rounded-lg bg-destructive-bg border border-destructive-bd/50 p-2.5 space-y-1.5">
               {invalidItems.slice(0, 10).map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-red-300">
+                <div key={i} className="flex items-start gap-2 text-xs text-destructive-fg">
                   <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                   <span className="break-all">
                     <span className="font-mono text-white/60">{item.raw}</span>
@@ -241,8 +241,8 @@ export function ImportDialog({
           {/* Preview table */}
           {(phase === 'preview' || phase === 'running') && validItems.length > 0 && (
             <div className="flex-1 min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col">
-              <div className="px-3 py-1.5 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
-                <span className="text-xs font-medium text-emerald-400">
+              <div className="px-3 py-1.5 bg-accent-primary-bg border-b border-accent-secondary-bd shrink-0">
+                <span className="text-xs font-medium text-accent-secondary-fg">
                   {phase === 'running'
                     ? `Importing ${progress.current} of ${progress.total}…`
                     : `Preview — ${validItems.length} items to import`}
@@ -302,17 +302,17 @@ export function ImportDialog({
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all duration-300 bg-emerald-500"
+                  className="h-full rounded-full transition-all duration-300 bg-accent-primary-fg"
                   style={{ width: `${percent}%` }}
                 />
               </div>
               <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5 text-emerald-400">
+                <div className="flex items-center gap-1.5 text-accent-secondary-fg">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   <span className="font-medium">{progress.succeeded} succeeded</span>
                 </div>
                 {progress.failed > 0 && (
-                  <div className="flex items-center gap-1.5 text-red-400">
+                  <div className="flex items-center gap-1.5 text-destructive-fg">
                     <XCircle className="h-3.5 w-3.5" />
                     <span className="font-medium">{progress.failed} failed</span>
                   </div>
@@ -327,16 +327,16 @@ export function ImportDialog({
               {/* Status header */}
               <div className="flex items-center gap-3">
                 {doneSuccess ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-900/30">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-primary-bg">
+                    <CheckCircle2 className="h-5 w-5 text-accent-secondary-fg" />
                   </div>
                 ) : doneFailed ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-900/30">
-                    <XCircle className="h-5 w-5 text-red-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive-bg">
+                    <XCircle className="h-5 w-5 text-destructive-fg" />
                   </div>
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-900/30">
-                    <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-badge-caution-bg">
+                    <AlertTriangle className="h-5 w-5 text-badge-caution-fg" />
                   </div>
                 )}
                 <div>
@@ -355,11 +355,11 @@ export function ImportDialog({
 
               {/* Failure list */}
               {results.some((r) => !r.success) && (
-                <div className="max-h-[140px] overflow-y-auto rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 space-y-1.5">
+                <div className="max-h-[140px] overflow-y-auto rounded-lg bg-destructive-bg border border-destructive-bd/50 p-2.5 space-y-1.5">
                   {results
                     .filter((r) => !r.success)
                     .map((r, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-red-300">
+                      <div key={i} className="flex items-start gap-2 text-xs text-destructive-fg">
                         <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
                         <span className="break-all">
                           <span className="font-mono text-white/60">
@@ -382,7 +382,7 @@ export function ImportDialog({
                       navigator.clipboard.writeText(raw);
                       toast.success('CSV copied to clipboard');
                     }}
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="text-[10px] text-accent-secondary-fg hover:text-accent-primary-fg transition-colors"
                   >
                     Copy
                   </button>
@@ -413,7 +413,7 @@ export function ImportDialog({
                   setPhase('preview');
                 }}
                 disabled={validItems.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 Preview Import
               </Button>
@@ -432,7 +432,7 @@ export function ImportDialog({
               <Button
                 onClick={handleRun}
                 disabled={validItems.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 Import {validItems.length} Item{validItems.length !== 1 ? 's' : ''}
               </Button>
@@ -442,7 +442,7 @@ export function ImportDialog({
           {phase === 'running' && (
             <Button
               disabled
-              className="bg-emerald-600/50 text-white flex items-center gap-2 cursor-not-allowed"
+              className="bg-accent-primary-fg/50 text-white flex items-center gap-2 cursor-not-allowed"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Importing…
@@ -454,10 +454,10 @@ export function ImportDialog({
               onClick={() => onOpenChange(false)}
               className={`text-white flex items-center gap-2 ${
                 doneSuccess
-                  ? 'bg-emerald-600 hover:bg-emerald-500'
+                  ? 'bg-accent-primary-fg hover:bg-accent-primary-fg'
                   : doneFailed
-                    ? 'bg-red-600 hover:bg-red-500'
-                    : 'bg-amber-600 hover:bg-amber-500'
+                    ? 'bg-destructive-fg hover:bg-destructive-fg'
+                    : 'bg-badge-caution-fg hover:bg-badge-caution-fg'
               }`}
             >
               {doneSuccess ? (

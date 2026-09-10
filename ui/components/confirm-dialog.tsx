@@ -38,8 +38,8 @@ export function ConfirmDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             {variant === 'destructive' && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-900/30">
-                <AlertTriangle className="h-5 w-5 text-red-400" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive-bg">
+                <AlertTriangle className="h-5 w-5 text-destructive-fg" />
               </div>
             )}
             <div>
@@ -65,8 +65,8 @@ export function ConfirmDialog({
             }}
             className={
               variant === 'destructive'
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                ? 'bg-destructive-fg text-white hover:bg-red-700'
+                : 'bg-accent-primary-fg text-white hover:bg-emerald-700'
             }
           >
             {confirmLabel}

@@ -53,7 +53,7 @@ export function DiagramFocusModal({ open, onOpenChange, name: initialName, conte
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               disabled={readOnly}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-emerald-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Diagram name"
             />
           </div>

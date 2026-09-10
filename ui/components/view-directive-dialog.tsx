@@ -96,7 +96,7 @@ export function ViewDirectiveDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Directive name / id"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',
                   '--tw-ring-opacity': '0.4',
@@ -115,7 +115,7 @@ export function ViewDirectiveDialog({
                 onChange={(e) => setStatement(e.target.value)}
                 placeholder="Directive statement"
                 rows={5}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',
                   '--tw-ring-opacity': '0.4',
@@ -144,7 +144,7 @@ export function ViewDirectiveDialog({
                   type="number"
                   value={priority}
                   onChange={(e) => setPriority(parseInt(e.target.value || '0', 10))}
-                  className="!w-20 !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                  className="!w-20 !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={{
                     '--tw-ring-color': 'rgb(52, 211, 153)',
                     '--tw-ring-opacity': '0.4',
@@ -163,7 +163,7 @@ export function ViewDirectiveDialog({
                   {directive.tags.map((t) => (
                     <span
                       key={t.id}
-                      className="px-2.5 py-1 rounded-full bg-orange-400/20 text-orange-300 text-xs border border-orange-400/30"
+                      className="px-2.5 py-1 rounded-full bg-badge-caution-bg text-badge-caution-fg text-xs border border-badge-caution-bd"
                     >
                       {t.name}
                     </span>
@@ -210,7 +210,7 @@ export function ViewDirectiveDialog({
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

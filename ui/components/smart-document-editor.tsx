@@ -362,10 +362,10 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
         <p className="text-[11px] text-white/40">
           {blocks.length - removedCount} of {blocks.length} blocks visible
           {removedCount > 0 && (
-            <span className="text-amber-400"> ({removedCount} removed · {removedChars.toLocaleString()} chars)</span>
+            <span className="text-badge-caution-fg"> ({removedCount} removed · {removedChars.toLocaleString()} chars)</span>
           )}
           {editedCount > 0 && (
-            <span className="text-blue-400 ml-1">({editedCount} edited)</span>
+            <span className="text-badge-info-fg ml-1">({editedCount} edited)</span>
           )}
           <span className="text-white/25 ml-1">· {totalChars.toLocaleString()} chars retained</span>
         </p>
@@ -380,7 +380,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
               onClick={() => setShowRemoved(v => !v)}
               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                 showRemoved
-                  ? 'border-amber-500/30 text-amber-400 hover:border-amber-500/50'
+                  ? 'border-badge-caution-bd text-badge-caution-fg hover:border-amber-500/50'
                   : 'border-white/10 text-white/40 hover:text-white/60'
               }`}
             >
@@ -431,16 +431,16 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                     ? b.deleted
                       ? 'bg-white/5 text-white/20 line-through'
                       : b.type === 'image'
-                        ? 'bg-amber-500/15 text-amber-300'
-                        : 'bg-emerald-500/15 text-emerald-300'
+                        ? 'bg-badge-caution-bg text-badge-caution-fg'
+                        : 'bg-accent-primary-fg/15 text-accent-primary-fg'
                     : b.deleted
                       ? 'opacity-25 line-through text-white/30'
                       : b.edited
-                        ? 'text-white/90 border-l-2 border-blue-500/40 pl-1'
+                        ? 'text-white/90 border-l-2 border-badge-info-bd pl-1'
                         : b.type === 'heading'
-                          ? 'text-emerald-400 font-semibold'
+                          ? 'text-accent-secondary-fg font-semibold'
                           : b.type === 'image'
-                            ? 'text-amber-400/80 italic'
+                            ? 'text-badge-caution-fg/80 italic'
                             : 'text-white/80'
                 }`}
                 onClick={!isEditing ? () => {
@@ -492,7 +492,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                               e.stopPropagation();
                               setBlocks(prev => prev.map(bb => bb.id === b.id ? { ...bb, edited: undefined } : bb));
                             }}
-                            className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-white/30 hover:text-blue-400 hover:bg-blue-500/10 transition-opacity"
+                            className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-white/30 hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-opacity"
                             title="Revert to original"
                           >
                             <Undo2 className="h-3 w-3" />
@@ -511,7 +511,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                           setActiveBlockId(b.id);
                           setActiveRangeIds(new Set([b.id]));
                           }}
-                          className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-white/30 hover:text-blue-400 hover:bg-blue-500/10 transition-opacity"
+                          className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-white/30 hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-opacity"
                           title="Edit block"
                         >
                           <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -541,7 +541,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
         <Button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
         >
           {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {isSaving ? 'Saving...' : 'Save Edits'}
@@ -586,12 +586,12 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
       className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] transition-colors ${
         isActive
           ? block.type === 'image'
-            ? `bg-amber-500/20 text-amber-300 ${isDeleted ? 'line-through' : ''}`
+            ? `bg-badge-caution-fg/20 text-badge-caution-fg ${isDeleted ? 'line-through' : ''}`
             : block.type === 'code'
-              ? `bg-blue-500/20 text-blue-300 ${isDeleted ? 'line-through' : ''}`
+              ? `bg-badge-info-bg text-badge-info-fg ${isDeleted ? 'line-through' : ''}`
               : block.type === 'table'
-                ? `bg-emerald-500/20 text-emerald-300 ${isDeleted ? 'line-through' : ''}`
-                : `bg-emerald-500/20 text-emerald-300 ${isDeleted ? 'line-through' : ''}`
+                ? `bg-accent-secondary-bg text-accent-primary-fg ${isDeleted ? 'line-through' : ''}`
+                : `bg-accent-secondary-bg text-accent-primary-fg ${isDeleted ? 'line-through' : ''}`
           : isDeleted
             ? 'text-white/30 line-through'
             : 'text-white/60 hover:bg-white/5 hover:text-white/90'
@@ -605,25 +605,25 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
               {'#'.repeat(block.level!)}&nbsp;
             </span>
             <span className="truncate">{block.title}</span>
-            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
+            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : block.type === 'code' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <Code className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-blue-400/50'}`} />
-            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-blue-400/70'}`}>{block.title}</span>
-            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
+            <Code className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-badge-info-fg/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-badge-info-fg/70'}`}>{block.title}</span>
+            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : block.type === 'table' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <Table className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-emerald-400/50'}`} />
-            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-emerald-400/70'}`}>Table</span>
-            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
+            <Table className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-accent-secondary-fg/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-accent-secondary-fg/70'}`}>Table</span>
+            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : block.type === 'image' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <Image className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-amber-400/50'}`} />
-            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-amber-400/70'}`}>[IMAGE:{block.title}]</span>
-            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-blue-500/60 flex-shrink-0" title="Edited" />}
+            <Image className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-badge-caution-fg/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-badge-caution-fg/70'}`}>[IMAGE:{block.title}]</span>
+            {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : null}
       </button>
@@ -631,7 +631,7 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
         {block.type === 'image' && onPreview && (
           <button
             onClick={(e) => { e.stopPropagation(); onPreview(); }}
-            className="p-0.5 rounded text-white/40 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+            className="p-0.5 rounded text-white/40 hover:text-badge-caution-fg hover:bg-badge-caution-bg/50 transition-colors"
             title="Preview image"
           >
             <Eye className="h-3 w-3" />
@@ -640,7 +640,7 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
         {isEdited && onRevertEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onRevertEdit(); }}
-            className="p-0.5 rounded text-white/40 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+            className="p-0.5 rounded text-white/40 hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-colors"
             title="Revert edit"
           >
             <Undo2 className="h-3 w-3" />
@@ -650,8 +650,8 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
           onClick={(e) => { e.stopPropagation(); onToggleDelete(); }}
           className={`p-0.5 rounded transition-colors ${
             isDeleted
-              ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-              : 'text-white/40 hover:text-red-400 hover:bg-red-500/20'
+              ? 'text-accent-secondary-fg hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50'
+              : 'text-white/40 hover:text-destructive-fg hover:bg-destructive-bg'
           }`}
           title={isDeleted ? 'Restore' : block.type === 'heading' ? 'Remove section' : 'Remove image'}
         >
@@ -686,7 +686,7 @@ function BlockEditor({ value, onChange, onSave, onCancel }: BlockEditorProps) {
           if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); onSave(); }
           if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
         }}
-        className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-[13px] text-white/90 font-mono leading-relaxed resize-none focus:outline-none focus:border-blue-500/50"
+        className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-[13px] text-white/90 font-mono leading-relaxed resize-none focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle"
         rows={Math.min(10, value.split('\n').length + 1)}
         spellCheck={false}
       />
@@ -699,7 +699,7 @@ function BlockEditor({ value, onChange, onSave, onCancel }: BlockEditorProps) {
         </button>
         <button
           onClick={onSave}
-          className="text-[10px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+          className="text-[10px] px-2 py-0.5 rounded bg-badge-info-fg/20 text-badge-info-fg hover:bg-badge-info-fg/30 transition-colors"
         >
           Ctrl+Enter to save
         </button>

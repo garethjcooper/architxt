@@ -89,7 +89,7 @@ export function ViewContextDialog({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Enter description"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 style={{
                   '--tw-ring-color': 'rgb(52, 211, 153)',
                   '--tw-ring-opacity': '0.4',
@@ -130,11 +130,11 @@ export function ViewContextDialog({
 
           {/* Hindsight sync warning */}
           {(context.usage_count ?? 0) > 0 && hasChanges && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-900/20 border border-amber-500/30">
-              <svg className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-badge-caution-bg border border-badge-caution-bd">
+              <svg className="h-4 w-4 text-badge-caution-fg mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <p className="text-xs text-amber-300">
+              <p className="text-xs text-badge-caution-fg">
                 This context is assigned to {context.usage_count} document{context.usage_count !== 1 ? 's' : ''}. If any of these documents have already been synced to Hindsight, the updated description may cause a mismatch on the next sync.
               </p>
             </div>
@@ -152,7 +152,7 @@ export function ViewContextDialog({
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

@@ -234,9 +234,9 @@ export function ManageMetadataDialog({
           meta.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-slate-800/20 border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
+            ? 'bg-badge-neutral-bg border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
             : meta.currentState === 'common'
-              ? 'bg-blue-500/20 border-blue-500/30 text-blue-300'
+              ? 'bg-badge-info-bg border-badge-info-bd text-badge-info-fg'
               : meta.currentState === 'partial'
                 ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
                 : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
@@ -276,7 +276,7 @@ export function ManageMetadataDialog({
             placeholder="Filter by key or value..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-blue-500/50 transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 
@@ -364,7 +364,7 @@ export function ManageMetadataDialog({
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-badge-info-fg hover:bg-blue-700 text-white"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

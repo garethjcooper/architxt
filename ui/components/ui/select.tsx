@@ -16,7 +16,7 @@ const SelectTrigger = React.forwardRef<
   <SelectUI.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+      'flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-subtle focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
     {...props}
@@ -53,7 +53,7 @@ function SelectItem({ className, children, ...props }: React.ComponentPropsWitho
       {...props}
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-        <SelectUI.ItemIndicator className="h-2 w-2 bg-emerald-500 rounded-full" />
+        <SelectUI.ItemIndicator className="h-2 w-2 bg-accent-primary-fg rounded-full" />
       </span>
       <SelectUI.ItemText>{children}</SelectUI.ItemText>
     </SelectUI.Item>

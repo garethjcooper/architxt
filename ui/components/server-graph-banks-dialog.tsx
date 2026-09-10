@@ -312,7 +312,7 @@ export function ServerGraphBanksDialog({
         <DialogContent className="sm:max-w-2xl max-h-[90vh]">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
-              <Network className="h-5 w-5 text-emerald-400" />
+              <Network className="h-5 w-5 text-accent-secondary-fg" />
               Graph Banks — {server.name || server.base_url}
             </DialogTitle>
           </DialogHeader>
@@ -368,7 +368,7 @@ export function ServerGraphBanksDialog({
                             <select
                               value={cfg.mode}
                               onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
-                              className="h-7 w-[110px] rounded-md border border-white/10 bg-surface-card px-2 text-xs text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                              className="h-7 w-[110px] rounded-md border border-white/10 bg-surface-card px-2 text-xs text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                             >
                               <option value="manual">Manual</option>
                               <option value="auto">Auto</option>
@@ -410,7 +410,7 @@ export function ServerGraphBanksDialog({
                     {enabled && isExpanded && (
                       <div className="px-4 pb-4 space-y-4 border-t border-white/10">
                         {needsWarning && (
-                          <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 p-2.5 text-amber-200 text-xs">
+                          <div className="mt-3 flex items-start gap-2 rounded-md bg-badge-caution-bg/50 border border-badge-caution-bd p-2.5 text-badge-caution-fg text-xs">
                             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                             <span>
                               Auto-sync with no restrictions can provision many mental models. Set import limits and deploy caps below.
@@ -529,7 +529,7 @@ export function ServerGraphBanksDialog({
                               size="sm"
                               disabled={cleaning[bank.bank_id]}
                               onClick={() => handleCleanBank(bank.bank_id, true, false)}
-                              className="h-7 text-[11px] text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                              className="h-7 text-[11px] text-badge-caution-fg hover:text-badge-caution-fg hover:bg-badge-caution-bg/50"
                             >
                               {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                               Dry-run clean
@@ -543,7 +543,7 @@ export function ServerGraphBanksDialog({
                                   handleCleanBank(bank.bank_id, false, false);
                                 }
                               }}
-                              className="h-7 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              className="h-7 text-[11px] text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
                             >
                               {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
                               Clean models
@@ -557,7 +557,7 @@ export function ServerGraphBanksDialog({
                                   handleCleanBank(bank.bank_id, false, true);
                                 }
                               }}
-                              className="h-7 text-[11px] text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                              className="h-7 text-[11px] text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
                             >
                               {cleaning[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
                               Clean everything
@@ -567,7 +567,7 @@ export function ServerGraphBanksDialog({
                               size="sm"
                               disabled={clearingAll[bank.bank_id]}
                               onClick={() => setConfirmClearBankId(bank.bank_id)}
-                              className="h-7 text-[11px] text-red-600 hover:text-red-500 hover:bg-red-500/10"
+                              className="h-7 text-[11px] text-red-600 hover:text-destructive-fg hover:bg-destructive-bg"
                             >
                               {clearingAll[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bomb className="h-3 w-3 mr-1" />}
                               Clear all mental models
@@ -594,7 +594,7 @@ export function ServerGraphBanksDialog({
           <Button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-accent-primary-fg hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? 'Saving...' : 'Save Changes'}
