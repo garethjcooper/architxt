@@ -100,8 +100,8 @@ export function CuratedPageTabs({
     setConfirmDelete(null);
   }, [confirmDelete, onDeleteCuratedPage]);
 
-  return (
-    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/10 bg-surface-overlay min-h-10">
+  const tabList = (
+    <>
       <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto custom-scrollbar">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
@@ -274,6 +274,12 @@ export function CuratedPageTabs({
           </div>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <div className="flex items-center gap-1 px-2 h-10 border-b border-white/10 bg-surface-overlay">
+      {tabList}
     </div>
   );
 }

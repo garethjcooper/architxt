@@ -526,7 +526,7 @@ export function QueryForm(props: QueryFormProps) {
         <Button
           type="submit"
           disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : queryMode === 'templates' ? !queryOptions.templates?.selections?.length : queryMode === 'prebuilt' ? false : !query.trim())}
-          className="flex-1"
+          className="flex-1 bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-100 disabled:bg-accent-primary-solid/40 disabled:text-white/70"
           size="sm"
         >
           {isRunning ? 'Running…' : (

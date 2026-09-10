@@ -46,6 +46,7 @@ export function ReflectQueryPanel({
             <Switch
               checked={showOptions}
               onCheckedChange={setShowOptions}
+              size="sm"
               aria-label="Show query options"
             />
             <span>Options</span>
