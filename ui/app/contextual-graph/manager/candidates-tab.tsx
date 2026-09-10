@@ -97,7 +97,7 @@ export function CandidatesTab({
           <option value="nodes">Nodes</option>
           <option value="edges">Edges</option>
         </select>
-        <span className="text-xs font-mono text-amber-400 bg-black/30 border border-amber-500/30 px-2 py-0.5 rounded ml-auto">
+        <span className="text-xs font-mono text-accent-tertiary-fg bg-black/30 border border-accent-tertiary-bd px-2 py-0.5 rounded ml-auto">
           {filteredNodes.length} node{filteredNodes.length !== 1 ? 's' : ''} / {filteredEdges.length} edge
           {filteredEdges.length !== 1 ? 's' : ''}
         </span>
@@ -107,9 +107,9 @@ export function CandidatesTab({
         <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col flex-1">
           {showNodes && (
             <>
-              <div className="h-10 px-3 border-b border-white/10 bg-amber-900/20 text-amber-300 flex items-center justify-between shrink-0">
+              <div className="h-10 px-3 border-b border-white/10 bg-accent-tertiary-bg text-accent-tertiary-fg flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Discovered nodes</span>
-                <span className="text-xs font-mono text-amber-400 bg-black/30 border border-amber-500/30 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-tertiary-fg bg-black/30 border border-accent-tertiary-bd px-2 py-0.5 rounded">
                   {filteredNodes.length}
                 </span>
               </div>
@@ -133,7 +133,7 @@ export function CandidatesTab({
                         onClick={() => onSelectNode(node.id)}
                         className={cn(
                           'w-full rounded border bg-black/10 px-1.5 py-1 text-left transition-colors',
-                          active ? 'border-amber-500/50 bg-amber-900/30' : 'border-white/5 hover:bg-white/5'
+                          active ? 'border-accent-tertiary-bd bg-accent-tertiary-bg' : 'border-white/5 hover:bg-white/5'
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -163,9 +163,9 @@ export function CandidatesTab({
           {showEdges && (
             <>
               {showNodes && <div className="h-px bg-white/10" />}
-              <div className="h-10 px-3 border-b border-white/10 bg-amber-900/20 text-amber-300 flex items-center justify-between shrink-0">
+              <div className="h-10 px-3 border-b border-white/10 bg-accent-tertiary-bg text-accent-tertiary-fg flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Discovered edges</span>
-                <span className="text-xs font-mono text-amber-400 bg-black/30 border border-amber-500/30 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-tertiary-fg bg-black/30 border border-accent-tertiary-bd px-2 py-0.5 rounded">
                   {filteredEdges.length}
                 </span>
               </div>
@@ -190,7 +190,7 @@ export function CandidatesTab({
                         onClick={() => onSelectEdge(edge.id)}
                         className={cn(
                           'w-full text-left rounded border px-1.5 py-1 transition-colors',
-                          active ? 'bg-amber-900/30 border-amber-500/50' : 'bg-black/10 border-white/5 hover:bg-white/5'
+                          active ? 'bg-accent-tertiary-bg border-accent-tertiary-bd' : 'bg-black/10 border-white/5 hover:bg-white/5'
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">

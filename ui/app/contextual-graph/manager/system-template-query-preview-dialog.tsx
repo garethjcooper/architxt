@@ -62,8 +62,8 @@ export function SystemTemplateQueryPreviewDialog({
                 </div>
               ) : composeError ? (
                 <div className="h-full flex flex-col gap-2">
-                  <span className="text-xs font-medium text-red-300">Composition failed</span>
-                  <pre className="text-xs font-mono text-red-300/80 whitespace-pre-wrap break-all">
+                  <span className="text-xs font-medium text-destructive-fg">Composition failed</span>
+                  <pre className="text-xs font-mono text-destructive-fg/80 whitespace-pre-wrap break-all">
                     {composeError}
                   </pre>
                 </div>
