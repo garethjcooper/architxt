@@ -52,7 +52,7 @@ export default function DocumentsPage() {
     <Suspense fallback={
       <PageShell title="Documents" subtitle="Upload and process documents." loading={true}>
         <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08]">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg">
             <span className="font-medium text-sm">Documents</span>
           </div>
           <div className="py-8 text-center text-white/70">Loading...</div>
@@ -319,7 +319,7 @@ function DocumentsPageContent() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search id, filename, date, context, tags, metadata…"
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {search && (
                   <button
@@ -330,26 +330,26 @@ function DocumentsPageContent() {
                   </button>
                 )}
               </div>
-              <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-orange-500/30 text-orange-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
-              <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-blue-500/30 text-blue-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
-              <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-violet-500/30 text-violet-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
+              <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
+              <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
+              <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
               <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-white/20 text-white/80 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
-              <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-emerald-500/30 text-emerald-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
+              <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
               <div className="flex-1" />
               <div className="w-px h-5 bg-white/10 mx-1" />
               <Button onClick={fetchDocuments} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
-              <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
               <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
             </div>
         }
         <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg">
             <div className="flex items-center gap-1">
               {MANAGE_FILTERS.map(f => (
                     <button
                       key={f.value}
                       onClick={() => setManageFilter(f.value)}
-                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${manageFilter === f.value ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${manageFilter === f.value ? 'bg-accent-secondary-bg border-accent-secondary-bd text-accent-secondary-fg' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
                     >
                       {f.label}
                     </button>
@@ -359,25 +359,25 @@ function DocumentsPageContent() {
                 <button
                   onClick={() => setShowAllBadges(!showAllBadges)}
                   title={showAllBadges ? 'Limit to 3 badges' : 'Show all badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
                 >
                   <BadgeExpandIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setCompactBadges(!compactBadges)}
                   title={compactBadges ? 'Expand badges' : 'Compact badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
                 >
                   <BadgeCompactIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setFreeze(!freeze)}
                   title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-                  className={["inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors", freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors", freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
                 >
                   <TableIcon className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">{filteredDocuments.length} ({selected.size})</span>
+                <span className="text-xs font-mono text-accent-secondary-fg bg-black/30 border border-accent-secondary-bd px-2 py-0.5 rounded">{filteredDocuments.length} ({selected.size})</span>
               </div>
             </div>
 
@@ -432,10 +432,10 @@ function DocumentsPageContent() {
                     <TableRow
                       key={doc.id}
                       className={`border-b border-white/5 transition-colors ${
-                        selected.has(doc.id) ? 'bg-emerald-900/20' : 'hover:bg-white/5'
+                        selected.has(doc.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                       }`}
                     >
-                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(doc.id) ? 'bg-emerald-900/20' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(doc.id) ? 'bg-accent-primary-bg' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selected.has(doc.id)}
                           onCheckedChange={() => toggleSelection(doc.id)}
@@ -461,8 +461,8 @@ function DocumentsPageContent() {
                                 key={t.id}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[100px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-orange-400/40 text-orange-200 border-orange-400/60 ring-1 ring-orange-400/50'
-                                    : 'bg-orange-400/20 text-orange-300 border-orange-400/30'
+                                    ? 'bg-destructive-bg-hover text-destructive-fg border-destructive-bd ring-1 ring-destructive-fg/50'
+                                    : 'bg-destructive-bg text-destructive-fg border-destructive-bd'
                                 }`}
                                 title={t.name}
                               >
@@ -474,7 +474,7 @@ function DocumentsPageContent() {
                             <span
                               className={`text-[10px] px-1 rounded ${
                                 search.trim() && doc.tags!.slice(3).some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-                                  ? 'text-orange-300 bg-orange-400/15'
+                                  ? 'text-destructive-fg bg-destructive-bg'
                                   : 'text-white/30'
                               }`}
                             >
@@ -520,8 +520,8 @@ function DocumentsPageContent() {
                                 key={m.key}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[120px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-blue-400/40 text-blue-200 border-blue-400/60 ring-1 ring-blue-400/50'
-                                    : 'bg-blue-400/20 text-blue-300 border-blue-400/30'
+                                    ? 'bg-accent-secondary-bg-hover text-accent-secondary-fg border-accent-secondary-bd ring-1 ring-accent-secondary-fg/50'
+                                    : 'bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd'
                                 }`}
                                 title={label}
                               >
@@ -536,7 +536,7 @@ function DocumentsPageContent() {
                                   const q = search.toLowerCase();
                                   return m.key.toLowerCase().includes(q) || (m.value && m.value.toLowerCase().includes(q));
                                 })
-                                  ? 'text-blue-300 bg-blue-400/15'
+                                  ? 'text-accent-secondary-fg bg-accent-secondary-bg'
                                   : 'text-white/30'
                               }`}
                             >

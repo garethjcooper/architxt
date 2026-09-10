@@ -108,7 +108,7 @@ export default function MentalModelSyncRow({
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono text-white/60 truncate" title={ext_id}>{ext_id}</span>
             {arch?.is_derived && (
-              <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-indigo-500/10 text-indigo-300 border-indigo-500/20 shrink-0" title="Derived from template">
+              <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-info-bg text-badge-info-fg border-badge-info-bd shrink-0" title="Derived from template">
                 <Sparkles className="h-3 w-3" />
                 derived
               </span>

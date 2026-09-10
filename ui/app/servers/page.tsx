@@ -120,7 +120,7 @@ export default function ServersPage() {
         <Button
           onClick={() => handleCheckHealth()}
           disabled={selected.size === 0 || checkingHealth.size > 0}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-neutral-500/30 text-neutral-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {checkingHealth.size > 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
           Health
@@ -151,17 +151,17 @@ export default function ServersPage() {
 
       <div className={["rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden", !freeze ? "max-h-[calc(100vh-240px)]" : ""].filter(Boolean).join(" ")}>
         {/* Grey header bar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-neutral-800/20 border-b border-neutral-500/30 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFreeze(!freeze)}
               title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-neutral-500/20 text-neutral-400 border border-neutral-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <TableIcon className="h-3.5 w-3.5" />
             </button>
-            <span className="text-xs font-mono text-neutral-400 bg-black/30 border border-neutral-500/30 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-secondary-fg bg-black/30 border border-accent-secondary-bd px-2 py-0.5 rounded">
               {servers.length} ({selected.size})
             </span>
           </div>
@@ -200,7 +200,7 @@ export default function ServersPage() {
                 <tr
                   key={server.id}
                   className={`border-b border-white/5 transition-colors cursor-pointer ${
-                    selected.has(server.id) ? 'bg-neutral-800/20' : 'hover:bg-white/5'
+                    selected.has(server.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                   }`}
                   onClick={(e) => handleServerClick(server, e)}
                 >
@@ -213,7 +213,7 @@ export default function ServersPage() {
                   <td className="py-1.5 px-4 text-xs text-white/50 font-mono">{server.id}</td>
                   <td className="py-1.5 px-4 text-xs">
                     {server.name ? (
-                      <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] bg-neutral-500/20 text-neutral-300 border border-neutral-500/30">
+                      <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd">
                         {server.name}
                       </span>
                     ) : (
@@ -235,7 +235,7 @@ export default function ServersPage() {
                               "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border",
                               cfg.mode === 'auto'
                                 ? 'bg-badge-success-bg text-badge-success-fg border-badge-success-bd'
-                                : 'bg-neutral-500/10 text-neutral-300 border-neutral-500/30',
+                                : 'bg-accent-secondary-bg/50 text-accent-secondary-fg border-accent-secondary-bd/50',
                             ].join(' ')}
                             title={cfg.mode === 'auto' ? `Auto sync${cfg.refresh_interval ? ` (${cfg.refresh_interval})` : ''}` : 'Manual only'}
                           >
