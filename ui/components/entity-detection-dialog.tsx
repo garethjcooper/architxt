@@ -22,7 +22,7 @@ import {
   EntityTaggedContent,
 } from './entity-tagged-content';
 import { loadFormatRegistry } from '@/lib/entity-tag-format';
-import { colorForType } from '@/components/research-canvas';
+import { colorForType } from '@/lib/graph/render-utils';
 
 interface EntityDetectionDialogProps {
   documentId: number;
