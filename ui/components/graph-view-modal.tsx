@@ -682,6 +682,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               size="sm"
               onClick={handleApply}
               disabled={!includeDiagram && !includeTables}
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Apply
             </Button>
