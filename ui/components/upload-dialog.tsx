@@ -319,7 +319,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                               transition-colors border
                               ${active
-                                ? 'bg-orange-800/30 text-badge-caution-fg border-badge-caution-bd'
+                                ? 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                                 : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/70'
                               }
                             `}
@@ -358,7 +358,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               ${active
                                 ? isSystem
                                   ? 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
-                                  : 'bg-blue-800/30 text-badge-info-fg border-badge-info-bd'
+                                  : 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                                 : isSystem
                                   ? 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60'
                                   : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/70'
@@ -368,7 +368,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                             {active && <span>✓</span>}
                             <span className="font-mono text-[10px]">{meta.key}</span>
                             {meta.value && <span className="text-white/40">={meta.value}</span>}
-                            {isSystem && <span className="text-[9px] text-slate-500 ml-0.5">(system)</span>}
+                            {isSystem && <span className="text-[9px] text-badge-neutral-fg/60 ml-0.5">(system)</span>}
                           </button>
                         );
                       })}

@@ -82,8 +82,8 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
   return (
     <div className={`rounded-md border border-white/10 bg-surface-overlay overflow-hidden ${className}`}>
       {(name || type) && (
-        <div className="px-3 py-2 border-b border-white/10 bg-emerald-900/10 flex items-center justify-between gap-2">
-          {name && <span className="text-sm font-medium text-emerald-300 truncate">{name}</span>}
+        <div className="px-3 py-2 border-b border-white/10 bg-accent-primary-bg flex items-center justify-between gap-2">
+          {name && <span className="text-sm font-medium text-accent-primary-fg truncate">{name}</span>}
           {type && (
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/30 text-white/60 whitespace-nowrap">
               {type}
@@ -93,7 +93,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
       )}
       <div className="p-3 overflow-x-auto">
         {error ? (
-          <div className="text-xs text-red-300/90 font-mono whitespace-pre-wrap">{error}</div>
+          <div className="text-xs text-destructive-fg/90 font-mono whitespace-pre-wrap">{error}</div>
         ) : svg ? (
           <div ref={containerRef} dangerouslySetInnerHTML={{ __html: svg }} className="mermaid-diagram" />
         ) : (

@@ -198,7 +198,7 @@ function PreviewPane({
         >
           {error ? (
             <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
-              <div className="max-w-full rounded-md border border-rose-500/30 bg-rose-950/60 backdrop-blur-sm px-3 py-2 text-xs text-rose-200/90 font-mono whitespace-pre-wrap shadow-lg">
+              <div className="max-w-full rounded-md border border-destructive-bd bg-destructive-bg backdrop-blur-sm px-3 py-2 text-xs text-destructive-fg font-mono whitespace-pre-wrap shadow-lg">
                 {error}
               </div>
             </div>
@@ -430,8 +430,8 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
     cn(
       'px-2 py-1 rounded text-[10px] border transition-colors',
       active
-        ? 'bg-emerald-600/30 border-emerald-500/50 text-emerald-200'
-        : 'bg-black/20 border-white/10 text-white/60 hover:text-white/90 hover:bg-white/5',
+        ? 'bg-accent-primary-bg border-accent-primary-bd text-accent-primary-fg'
+        : 'bg-surface-overlay border-border-default text-foreground-muted hover:text-foreground-default hover:bg-surface-panel',
     );
 
   const handleApply = useCallback(() => {
@@ -532,7 +532,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                             type="text"
                             value={diagramName}
                             onChange={(e) => setDiagramName(e.target.value)}
-                            className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-48"
+                            className="px-2 py-1 rounded bg-input-bg border border-input-bd text-[11px] text-input-fg focus:outline-none focus:border-accent-primary-solid focus:ring-1 focus:ring-accent-primary-solid w-48"
                             placeholder="Diagram name"
                           />
                         )}
@@ -581,14 +581,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                               type="text"
                               value={nodeTableName}
                               onChange={(e) => setNodeTableName(e.target.value)}
-                              className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
+                              className="px-2 py-1 rounded bg-input-bg border border-input-bd text-[11px] text-input-fg focus:outline-none focus:border-accent-primary-solid focus:ring-1 focus:ring-accent-primary-solid w-28"
                               placeholder="Nodes name"
                             />
                             <input
                               type="text"
                               value={edgeTableName}
                               onChange={(e) => setEdgeTableName(e.target.value)}
-                              className="px-2 py-1 rounded bg-black/30 border border-white/10 text-[11px] text-white/80 focus:outline-none focus:border-emerald-500/50 w-28"
+                              className="px-2 py-1 rounded bg-input-bg border border-input-bd text-[11px] text-input-fg focus:outline-none focus:border-accent-primary-solid focus:ring-1 focus:ring-accent-primary-solid w-28"
                               placeholder="Edges name"
                             />
                           </div>

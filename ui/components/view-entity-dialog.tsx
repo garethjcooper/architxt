@@ -194,7 +194,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                       <button
                         type="button"
                         onClick={() => setEntityId(nextEntityId)}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-badge-success-bg text-accent-secondary-fg border-accent-secondary-bd hover:bg-emerald-800/30"
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-badge-success-bg text-badge-success-fg border-badge-success-bd hover:bg-badge-success-bg-hover"
                       >
                         Next ID: {nextEntityId}
                       </button>

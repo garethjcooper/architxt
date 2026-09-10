@@ -380,7 +380,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
               onClick={() => setShowRemoved(v => !v)}
               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                 showRemoved
-                  ? 'border-badge-caution-bd text-badge-caution-fg hover:border-amber-500/50'
+                  ? 'border-badge-caution-bd text-badge-caution-fg hover:border-badge-caution-bd-hover'
                   : 'border-white/10 text-white/40 hover:text-white/60'
               }`}
             >

@@ -207,12 +207,12 @@ export function ManageModelEntitiesDialog({
           entity.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-purple-800/5 text-badge-entity-fg/40 border-purple-700/10 line-through hover:bg-purple-800/10'
+            ? 'bg-badge-entity-bg/40 text-badge-entity-fg/40 border-badge-entity-bd/30 line-through hover:bg-badge-entity-bg/60'
             : entity.currentState === 'common'
               ? 'bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd/50'
               : entity.currentState === 'partial'
-                ? 'bg-purple-800/10 text-badge-entity-fg/90 border-purple-700/15 border-dashed hover:bg-badge-entity-bg'
-                : 'bg-purple-800/10 text-badge-entity-fg/80 border-purple-700/15 hover:bg-purple-800/25 hover:border-purple-700/30'
+                ? 'bg-badge-entity-bg/70 text-badge-entity-fg/90 border-badge-entity-bd/40 border-dashed hover:bg-badge-entity-bg'
+                : 'bg-badge-entity-bg/60 text-badge-entity-fg/80 border-badge-entity-bd/40 hover:bg-badge-entity-bg hover:border-badge-entity-bd'
         }`}
       >
         <span className={isRemoved ? 'line-through' : 'truncate'}>{label}</span>

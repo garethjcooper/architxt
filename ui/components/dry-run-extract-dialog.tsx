@@ -866,8 +866,8 @@ export function DryRunExtractDialog({
                   <div className="flex-1 grid grid-cols-[30%_1fr] gap-4 min-h-0">
                     {/* Left — Detected Entities */}
                     <div className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-panel overflow-hidden">
-                      <div className="flex items-center justify-between px-2.5 py-2 border-b border-white/10 bg-emerald-950/30 shrink-0">
-                        <span className="text-[11px] font-medium text-accent-secondary-fg">
+                      <div className="flex items-center justify-between px-2.5 py-2 border-b border-white/10 bg-accent-primary-bg shrink-0">
+                        <span className="text-[11px] font-medium text-accent-primary-fg">
                           ENTITIES
                         </span>
                         <div className="flex items-center gap-1.5">

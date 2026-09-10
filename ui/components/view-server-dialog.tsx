@@ -153,7 +153,7 @@ export function ViewServerDialog({
                         "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border",
                         cfg.mode === 'auto'
                           ? 'bg-accent-secondary-bg/50 text-accent-secondary-fg border-accent-secondary-bd'
-                          : 'bg-neutral-500/10 text-badge-neutral-fg border-badge-neutral-bd',
+                          : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd',
                       ].join(' ')}
                       title={cfg.mode === 'auto' ? `Auto sync${cfg.refresh_interval ? ` (${cfg.refresh_interval})` : ''}` : 'Manual only'}
                     >

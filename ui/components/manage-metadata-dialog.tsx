@@ -364,7 +364,7 @@ export function ManageMetadataDialog({
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="bg-badge-info-fg hover:bg-blue-700 text-white"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
