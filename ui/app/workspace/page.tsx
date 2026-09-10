@@ -1068,7 +1068,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => setConfirmSessionDelete(true)}
               disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
               title="Delete selected session"
             >
               <Trash2 className="h-4 w-4" />
@@ -1336,7 +1336,7 @@ export default function WorkspacePage() {
                   value={newSessionTitle}
                   onChange={(e) => setNewSessionTitle(e.target.value)}
                   placeholder="Workspace session"
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
+                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={{
                     '--tw-ring-color': 'rgb(52, 211, 153)',
                     '--tw-ring-opacity': '0.4',
@@ -1363,7 +1363,7 @@ export default function WorkspacePage() {
                 <Button
                   onClick={() => void handleCreateSessionConfirm()}
                   disabled={sessionActionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="bg-accent-primary-bd-hover hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {sessionActionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingSession ? 'Save' : 'Create'}

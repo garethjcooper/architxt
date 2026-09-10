@@ -121,7 +121,7 @@ export function SessionItemsPanel({
                   key={step.id}
                   className={`rounded border overflow-hidden transition-colors ${
                     isActive
-                      ? 'bg-emerald-900/30 border-emerald-500/30'
+                      ? 'bg-accent-primary-bg border-accent-primary-bd'
                       : 'bg-black/20 border-white/5 hover:bg-white/5'
                   }`}
                 >
@@ -154,10 +154,10 @@ export function SessionItemsPanel({
                             <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
                           )}
                           {step.status === 'running' && (
-                            <span className="text-amber-300 animate-pulse">● running</span>
+                            <span className="text-accent-tertiary-fg animate-pulse">● running</span>
                           )}
                           {step.status === 'failed' && (
-                            <span className="text-red-400">● failed</span>
+                            <span className="text-destructive-fg">● failed</span>
                           )}
                         </span>
                       </div>
@@ -225,7 +225,7 @@ export function SessionItemsPanel({
                           <Info className="h-3 w-3 mr-2" /> Provenance
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-rose-400 focus:text-rose-400 focus:bg-rose-950/30"
+                          className="text-destructive-fg focus:text-destructive-fg focus:bg-destructive-bg"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteStep(step.id);

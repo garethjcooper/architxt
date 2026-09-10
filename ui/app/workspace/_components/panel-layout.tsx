@@ -5,12 +5,12 @@ import { cn } from '@/lib/utils';
 
 function PanelHeader({ title, count, actions }: { title: string; count?: number; actions?: React.ReactNode }) {
   return (
-    <div className="h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0 overflow-hidden">
+    <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0 overflow-hidden">
       <div className="text-xs font-medium truncate">{title}</div>
       <div className="flex items-center gap-2 shrink-0">
         {actions}
         {count !== undefined && (
-          <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+          <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
             {count}
           </span>
         )}
@@ -81,7 +81,7 @@ function ResizeHandle({
     >
       <div
         className={cn(
-          'rounded-full bg-white/20 group-hover:bg-emerald-500/50 transition-colors',
+          'rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors',
           isHorizontal ? 'w-16 h-1' : 'w-1 h-16'
         )}
       />
