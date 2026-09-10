@@ -29,6 +29,7 @@ import { MetadataIcon } from '@/components/icons/metadata-icon';
 import { DirectiveIcon } from '@/components/icons/directive-icon';
 import { DaemonStatus } from '@/components/daemon-status';
 import { HindsightStatus } from '@/components/hindsight-status';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { useVersion } from '@/lib/use-version';
 import { useServerEnv } from '@/lib/use-server-env';
 
@@ -88,6 +89,7 @@ export function Shell({ children }: ShellProps) {
         {/* Main Top Bar */}
         <header className="flex-1 h-[56px] bg-surface-panel px-6 flex items-center justify-end">
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <DaemonStatus />
             <HindsightStatus />
 
@@ -160,7 +162,7 @@ export function Shell({ children }: ShellProps) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 px-6 py-2.5 bg-[oklch(0.17_0_0)] min-w-0 flex flex-col min-h-0 overflow-y-auto">
+        <main className="flex-1 px-6 py-2.5 bg-surface-page min-w-0 flex flex-col min-h-0 overflow-y-auto">
           {children}
         </main>
       </div>
