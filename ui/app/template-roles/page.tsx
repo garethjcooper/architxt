@@ -166,7 +166,7 @@ export default function TemplateRolesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search role id, name, scope…"
-            className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+            className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
           />
           {search && (
             <button
@@ -204,24 +204,24 @@ export default function TemplateRolesPage() {
       </div>
 
       <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCompactBadges(!compactBadges)}
               title={compactBadges ? 'Expand badges' : 'Compact badges'}
-              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <BadgeCompactIcon className="h-5 w-5" />
             </button>
             <button
               onClick={() => setFreeze(!freeze)}
               title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <TableIcon className="h-3.5 w-3.5" />
             </button>
-            <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
               {filteredRoles.length} ({selected.size})
             </span>
           </div>
@@ -265,15 +265,15 @@ export default function TemplateRolesPage() {
                       key={role.role_id}
                       className={`border-b border-white/5 transition-colors cursor-pointer ${
                         role.is_system
-                          ? 'bg-amber-900/10 hover:bg-amber-900/15'
+                          ? 'bg-accent-primary-bg hover:bg-accent-primary-bg-hover'
                           : isSelected
-                            ? 'bg-emerald-900/20'
+                            ? 'bg-accent-primary-bg'
                             : 'hover:bg-white/5'
                       }`}
                       onClick={(e) => handleRoleClick(role, e)}
                     >
                       <td
-                        className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", role.is_system ? "bg-amber-900/10" : isSelected ? "bg-emerald-900/20" : "bg-surface-card"].filter(Boolean).join(" ")}
+                        className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", role.is_system ? "bg-accent-primary-bg/50" : isSelected ? "bg-accent-primary-bg" : "bg-surface-card"].filter(Boolean).join(" ")}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Checkbox

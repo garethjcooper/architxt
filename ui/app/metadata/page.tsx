@@ -164,7 +164,7 @@ export default function MetadataPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search key, value, source, id…"
-            className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+            className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
           />
           {search && (
             <button
@@ -197,25 +197,25 @@ export default function MetadataPage() {
       </div>
 
       <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
-        {/* Blue header bar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-blue-900/20 border-b border-blue-500/30 shrink-0">
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCompactBadges(!compactBadges)}
               title={compactBadges ? 'Expand badges' : 'Compact badges'}
-              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-blue-500/20 text-blue-400 border border-blue-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <BadgeCompactIcon className="h-5 w-5" />
             </button>
             <button
               onClick={() => setFreeze(!freeze)}
               title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-blue-500/20 text-blue-400 border border-blue-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <TableIcon className="h-3.5 w-3.5" />
             </button>
-            <span className="text-xs font-mono text-blue-400 bg-black/30 border border-blue-500/30 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
               {filteredMetadata.length} ({selected.size})
             </span>
           </div>
@@ -256,14 +256,12 @@ export default function MetadataPage() {
                     key={item.id}
                     className={`border-b border-white/5 transition-colors cursor-pointer ${
                       isSystem
-                        ? 'bg-amber-900/10 hover:bg-amber-900/15'
-                        : selected.has(item.id)
-                          ? 'bg-blue-900/20'
-                          : 'hover:bg-white/5'
+                        ? 'bg-accent-primary-bg hover:bg-accent-primary-bg-hover'
+                        : selected.has(item.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                     }`}
                     onClick={(e) => handleMetadataClick(item, e)}
                   >
-                    <td className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", isSystem ? "bg-amber-900/10" : (selected.has(item.id) ? "bg-blue-900/20" : "bg-surface-card")].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                    <td className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", isSystem ? "bg-accent-primary-bg/50" : (selected.has(item.id) ? "bg-accent-primary-bg" : "bg-surface-card")].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selected.has(item.id)}
                         onCheckedChange={() => {
@@ -277,10 +275,10 @@ export default function MetadataPage() {
                         <span
                           className={`${!compactBadges ? 'inline-flex items-center gap-1 truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                             isSystem
-                              ? 'bg-amber-900/30 text-amber-300 border-amber-500/30'
+                              ? 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                               : search.trim() && item.key.toLowerCase().includes(search.toLowerCase())
-                                ? 'bg-blue-400/40 text-blue-200 border-blue-400/60 ring-1 ring-blue-400/50'
-                                : 'bg-blue-400/20 text-blue-300 border-blue-400/30'
+                                ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
+                                : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                           }`}
                         >
                           {item.key}
@@ -294,10 +292,10 @@ export default function MetadataPage() {
                         <span
                           className={`${!compactBadges ? 'inline-flex truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                             isSystem
-                              ? 'bg-amber-900/20 text-amber-300/70 border-amber-500/20'
+                              ? 'bg-accent-primary-bg/60 text-accent-primary-fg/70 border-accent-primary-bd/60'
                               : search.trim() && item.value.toLowerCase().includes(search.toLowerCase())
-                                ? 'bg-blue-400/40 text-blue-200 border-blue-400/60 ring-1 ring-blue-400/50'
-                                : 'bg-blue-400/20 text-blue-300 border-blue-400/30'
+                                ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
+                                : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                           }`}
                         >
                           {item.value}
