@@ -247,8 +247,8 @@ export default function TagsPage() {
                       <span
                         className={`${!compactBadges ? 'inline-flex truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                           search.trim() && tag.name.toLowerCase().includes(search.toLowerCase())
-                            ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
-                            : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                            ? 'bg-badge-caution-bg/80 text-badge-caution-fg border-badge-caution-bd ring-1 ring-badge-caution-fg/50'
+                            : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                         }`}
                       >
                         {tag.name}
