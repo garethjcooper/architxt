@@ -44,7 +44,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="flex items-center gap-1 text-[10px] text-white/50 hover:text-emerald-300 transition-colors"
+      className="flex items-center gap-1 text-[10px] text-white/50 hover:text-accent-primary-fg transition-colors"
       title="Copy to clipboard"
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -55,7 +55,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 
 function CallRow({ call, index }: { call: ResearchStepCall; index: number }) {
   const [expanded, setExpanded] = useState(false);
-  const statusColor = call.status === 'success' ? 'text-emerald-400' : 'text-red-400';
+  const statusColor = call.status === 'success' ? 'text-diff-match-fg' : 'text-destructive-fg';
 
   return (
     <div className="border border-white/10 rounded bg-black/20">
@@ -93,8 +93,8 @@ function CallRow({ call, index }: { call: ResearchStepCall; index: number }) {
             <div className={`text-right ${statusColor}`}>{call.status}</div>
           </div>
           {call.error && (
-            <div className="rounded bg-red-900/20 border border-red-500/20 px-2 py-1">
-              <div className="text-[10px] text-red-400 font-medium">Error</div>
+            <div className="rounded bg-destructive-bg border border-destructive-bd px-2 py-1">
+              <div className="text-[10px] text-destructive-fg font-medium">Error</div>
               <div className="text-[11px] text-white/70 whitespace-pre-wrap">{call.error}</div>
               {call.code && (
                 <div className="text-[10px] text-white/40 font-mono mt-0.5">{call.code}</div>
@@ -211,7 +211,7 @@ function StepProvenance({ step }: { step: ResearchStepSummary | null }) {
                   <td className="px-2 py-1 text-white/50 font-mono align-top w-1/3">{key}</td>
                   <td className="px-2 py-1 text-white/80 align-top">
                     {typeof value === 'boolean' ? (
-                      <span className={value ? 'text-emerald-400' : 'text-white/40'}>{value ? 'true' : 'false'}</span>
+                      <span className={value ? 'text-diff-match-fg' : 'text-white/40'}>{value ? 'true' : 'false'}</span>
                     ) : (
                       <span className="font-mono">{formatValue(value)}</span>
                     )}

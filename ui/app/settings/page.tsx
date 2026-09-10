@@ -236,14 +236,14 @@ function StatusBadge({ value }: { value: boolean | string | '—' }) {
   const isOff = value === false || value === 'false' || value === '—';
   if (isOn) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-800/15 text-emerald-400 border border-emerald-700/20">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-badge-success-bg text-badge-success-fg border border-badge-success-bd">
         Enabled
       </span>
     );
   }
   if (isOff) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-800/15 text-red-400 border border-red-700/20">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-destructive-bg text-destructive-fg border border-destructive-bd">
         Disabled
       </span>
     );
