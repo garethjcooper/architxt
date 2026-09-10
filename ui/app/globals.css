@@ -117,6 +117,57 @@
   --progress-from: oklch(0.55 0.18 155);
   --progress-to: oklch(0.75 0.20 155);
 
+  /* Content syntax colors (code / AQL / diagram editor) */
+  --syntax-text: oklch(0.92 0 0);
+  --syntax-keyword: oklch(0.75 0.17 255);
+  --syntax-string: oklch(0.82 0.15 155);
+  --syntax-comment: oklch(0.55 0 0);
+  --syntax-function: oklch(0.75 0.15 195);
+  --syntax-number: oklch(0.80 0.14 75);
+  --syntax-operator: oklch(0.75 0.10 85);
+  --syntax-punctuation: oklch(0.65 0 0);
+  --syntax-variable: oklch(0.85 0.05 220);
+
+  /* AQL directive marker colors */
+  --aql-directive: oklch(0.65 0 0);
+  --aql-directive-sub: oklch(0.55 0 0);
+
+  /* Narrative content colors */
+  --narrative-text: oklch(0.80 0 0);
+  --narrative-heading: oklch(0.82 0.12 155);
+  --narrative-image: oklch(0.78 0.12 85);
+  --narrative-code: oklch(0.75 0.12 255);
+  --narrative-table: oklch(0.82 0.12 155);
+  --narrative-edited: oklch(0.88 0 0);
+  --narrative-edited-bd: oklch(0.65 0.18 255 / 0.4);
+  --narrative-active-bg: oklch(0.55 0.18 155 / 0.18);
+  --narrative-active-fg: oklch(0.82 0.14 155);
+  --narrative-deleted: oklch(0.55 0 0);
+  --narrative-focus-add: oklch(0.80 0.14 300);
+
+  /* Markdown content colors */
+  --markdown-link: oklch(0.70 0.18 255);
+  --markdown-link-hover: oklch(0.78 0.18 255);
+  --markdown-code-bg: oklch(1 0 0 / 10%);
+  --markdown-blockquote-border: oklch(1 0 0 / 20%);
+  --markdown-pre-bg: oklch(1 0 0 / 5%);
+  --markdown-strong: oklch(0.92 0 0);
+  --markdown-table-head: oklch(0.65 0 0);
+  --markdown-table-border: oklch(1 0 0 / 10%);
+
+  /* Diagram chrome colors */
+  --diagram-node-default: oklch(0.55 0 0);
+  --diagram-node-entity: oklch(0.55 0.18 155);
+  --diagram-edge-default: oklch(0.65 0 0);
+  --diagram-edge-synthesize: oklch(0.60 0.20 280);
+  --diagram-edge-mental-calls: oklch(0.65 0.18 180);
+  --diagram-edge-mental-depends: oklch(0.70 0.15 75);
+  --diagram-edge-mental-sends: oklch(0.65 0.14 300);
+  --diagram-edge-mental-reads: oklch(0.70 0.12 155);
+  --diagram-edge-mental-writes: oklch(0.70 0.12 25);
+  --diagram-edge-mental-default: oklch(0.65 0.18 255);
+  --diagram-text: oklch(0.75 0 0);
+
   /* Destructive/error surfaces */
   --destructive-bg: oklch(0.55 0.22 25 / 0.15);
   --destructive-bg-hover: oklch(0.55 0.22 25 / 0.25);
@@ -321,6 +372,51 @@
 
   --color-progress-from: var(--progress-from);
   --color-progress-to: var(--progress-to);
+
+  --color-syntax-text: var(--syntax-text);
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-comment: var(--syntax-comment);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-operator: var(--syntax-operator);
+  --color-syntax-punctuation: var(--syntax-punctuation);
+  --color-syntax-variable: var(--syntax-variable);
+  --color-aql-directive: var(--aql-directive);
+  --color-aql-directive-sub: var(--aql-directive-sub);
+
+  --color-narrative-text: var(--narrative-text);
+  --color-narrative-heading: var(--narrative-heading);
+  --color-narrative-image: var(--narrative-image);
+  --color-narrative-code: var(--narrative-code);
+  --color-narrative-table: var(--narrative-table);
+  --color-narrative-edited: var(--narrative-edited);
+  --color-narrative-edited-bd: var(--narrative-edited-bd);
+  --color-narrative-active-bg: var(--narrative-active-bg);
+  --color-narrative-active-fg: var(--narrative-active-fg);
+  --color-narrative-deleted: var(--narrative-deleted);
+  --color-narrative-focus-add: var(--narrative-focus-add);
+
+  --color-markdown-link: var(--markdown-link);
+  --color-markdown-link-hover: var(--markdown-link-hover);
+  --color-markdown-code-bg: var(--markdown-code-bg);
+  --color-markdown-blockquote-border: var(--markdown-blockquote-border);
+  --color-markdown-pre-bg: var(--markdown-pre-bg);
+  --color-markdown-strong: var(--markdown-strong);
+  --color-markdown-table-head: var(--markdown-table-head);
+  --color-markdown-table-border: var(--markdown-table-border);
+
+  --color-diagram-node-default: var(--diagram-node-default);
+  --color-diagram-node-entity: var(--diagram-node-entity);
+  --color-diagram-edge-default: var(--diagram-edge-default);
+  --color-diagram-edge-synthesize: var(--diagram-edge-synthesize);
+  --color-diagram-edge-mental-calls: var(--diagram-edge-mental-calls);
+  --color-diagram-edge-mental-depends: var(--diagram-edge-mental-depends);
+  --color-diagram-edge-mental-sends: var(--diagram-edge-mental-sends);
+  --color-diagram-edge-mental-reads: var(--diagram-edge-mental-reads);
+  --color-diagram-edge-mental-writes: var(--diagram-edge-mental-writes);
+  --color-diagram-edge-mental-default: var(--diagram-edge-mental-default);
+  --color-diagram-text: var(--diagram-text);
 
   --color-destructive-bg: var(--destructive-bg);
   --color-destructive-bg-hover: var(--destructive-bg-hover);
