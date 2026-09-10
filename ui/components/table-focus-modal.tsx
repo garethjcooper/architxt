@@ -273,7 +273,13 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
             {readOnly ? 'Close' : 'Cancel'}
           </Button>
           {!readOnly && (
-            <Button type="button" size="sm" onClick={handleApply} disabled={emptyColumns}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleApply}
+              disabled={emptyColumns}
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Apply
             </Button>
           )}

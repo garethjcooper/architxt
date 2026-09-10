@@ -72,7 +72,14 @@ export function DiagramFocusModal({ open, onOpenChange, name: initialName, conte
               {readOnly ? 'Close' : 'Cancel'}
             </Button>
             {!readOnly && (
-              <Button type="button" size="sm" onClick={handleApply} disabled={!!error} title={error ? 'Fix the diagram error before applying' : 'Apply changes'}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleApply}
+                disabled={!!error}
+                title={error ? 'Fix the diagram error before applying' : 'Apply changes'}
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Apply
               </Button>
             )}
