@@ -461,8 +461,8 @@ function DocumentsPageContent() {
                                 key={t.id}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[100px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-destructive-bg-hover text-destructive-fg border-destructive-bd ring-1 ring-destructive-fg/50'
-                                    : 'bg-destructive-bg text-destructive-fg border-destructive-bd'
+                                    ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
+                                    : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                                 }`}
                                 title={t.name}
                               >
@@ -474,7 +474,7 @@ function DocumentsPageContent() {
                             <span
                               className={`text-[10px] px-1 rounded ${
                                 search.trim() && doc.tags!.slice(3).some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-                                  ? 'text-destructive-fg bg-destructive-bg'
+                                  ? 'text-accent-primary-fg bg-accent-primary-bg'
                                   : 'text-white/30'
                               }`}
                             >
@@ -520,8 +520,8 @@ function DocumentsPageContent() {
                                 key={m.key}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[120px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-accent-secondary-bg-hover text-accent-secondary-fg border-accent-secondary-bd ring-1 ring-accent-secondary-fg/50'
-                                    : 'bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd'
+                                    ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
+                                    : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                                 }`}
                                 title={label}
                               >
@@ -536,7 +536,7 @@ function DocumentsPageContent() {
                                   const q = search.toLowerCase();
                                   return m.key.toLowerCase().includes(q) || (m.value && m.value.toLowerCase().includes(q));
                                 })
-                                  ? 'text-accent-secondary-fg bg-accent-secondary-bg'
+                                  ? 'text-accent-primary-fg bg-accent-primary-bg'
                                   : 'text-white/30'
                               }`}
                             >
