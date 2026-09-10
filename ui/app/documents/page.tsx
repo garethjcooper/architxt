@@ -461,8 +461,8 @@ function DocumentsPageContent() {
                                 key={t.id}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[100px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
-                                    : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                                    ? 'bg-badge-caution-bg/80 text-badge-caution-fg border-badge-caution-bd ring-1 ring-badge-caution-fg/50'
+                                    : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                                 }`}
                                 title={t.name}
                               >
@@ -474,7 +474,7 @@ function DocumentsPageContent() {
                             <span
                               className={`text-[10px] px-1 rounded ${
                                 search.trim() && doc.tags!.slice(3).some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-                                  ? 'text-accent-primary-fg bg-accent-primary-bg'
+                                  ? 'text-badge-caution-fg bg-badge-caution-bg'
                                   : 'text-white/30'
                               }`}
                             >
@@ -494,8 +494,8 @@ function DocumentsPageContent() {
                           <span
                             className={`${!compactBadges ? 'inline-flex truncate max-w-full' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                               search.trim() && doc.context.description.toLowerCase().includes(search.toLowerCase())
-                                ? `${familyClass.entity} ring-1 ring-badge-entity-fg/50`
-                                : familyClass.entity
+                                ? 'bg-badge-context-bg text-badge-context-fg border-badge-context-bd ring-1 ring-badge-context-fg/50'
+                                : 'bg-badge-context-bg text-badge-context-fg border-badge-context-bd'
                             }`}
                             title={doc.context.description}
                           >
@@ -520,8 +520,8 @@ function DocumentsPageContent() {
                                 key={m.key}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[120px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
-                                    : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
+                                    ? 'bg-badge-info-bg/80 text-badge-info-fg border-badge-info-bd ring-1 ring-badge-info-fg/50'
+                                    : 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                                 }`}
                                 title={label}
                               >
@@ -536,7 +536,7 @@ function DocumentsPageContent() {
                                   const q = search.toLowerCase();
                                   return m.key.toLowerCase().includes(q) || (m.value && m.value.toLowerCase().includes(q));
                                 })
-                                  ? 'text-accent-primary-fg bg-accent-primary-bg'
+                                  ? 'text-badge-info-fg bg-badge-info-bg'
                                   : 'text-white/30'
                               }`}
                             >

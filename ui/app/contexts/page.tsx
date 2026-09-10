@@ -249,8 +249,8 @@ export default function ContextsPage() {
                       <span
                         className={`${!compactBadges ? 'inline-flex truncate max-w-[150px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                           search.trim() && context.description.toLowerCase().includes(search.toLowerCase())
-                            ? `${familyClass.entity} ring-1 ring-badge-entity-fg/50`
-                            : familyClass.entity
+                            ? 'bg-badge-context-bg text-badge-context-fg border-badge-context-bd ring-1 ring-badge-context-fg/50'
+                            : 'bg-badge-context-bg text-badge-context-fg border-badge-context-bd'
                         }`}
                       >
                         {context.description}
