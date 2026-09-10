@@ -30,7 +30,7 @@ export function SystemTemplateQueryPreviewDialog({
       <DialogContent className="!w-[70vw] !max-w-none max-h-[80vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
-            <MessageSquareText className="h-5 w-5 text-purple-400" />
+            <MessageSquareText className="h-5 w-5 text-accent-tertiary-fg" />
             Composed Query Preview
           </DialogTitle>
         </DialogHeader>
