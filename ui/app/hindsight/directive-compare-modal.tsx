@@ -95,21 +95,21 @@ export default function DirectiveCompareModal({
               key={field.key}
               className={`rounded border ${
                 field.differs
-                  ? 'border-red-500/20 bg-red-900/10'
-                  : 'border-emerald-500/20 bg-emerald-900/10'
+                  ? 'border-diff-differ-bd bg-diff-differ-bg'
+                  : 'border-diff-match-bd bg-diff-match-bg'
               }`}
             >
               {/* Field header */}
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
                 {field.differs ? (
-                  <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+                  <AlertCircle className="h-3.5 w-3.5 text-diff-differ-fg" />
                 ) : (
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <Check className="h-3.5 w-3.5 text-diff-match-fg" />
                 )}
-                <span className={`text-xs font-medium ${field.differs ? 'text-red-300' : 'text-emerald-300'}`}>
+                <span className={`text-xs font-medium ${field.differs ? 'text-diff-differ-fg' : 'text-diff-match-fg'}`}>
                   {field.label}
                 </span>
-                <span className={`text-[10px] ml-auto ${field.differs ? 'text-red-400/60' : 'text-emerald-400/60'}`}>
+                <span className={`text-[10px] ml-auto ${field.differs ? 'text-diff-differ-fg/60' : 'text-diff-match-fg/60'}`}>
                   {field.differs ? 'Different' : 'Same'}
                 </span>
               </div>
