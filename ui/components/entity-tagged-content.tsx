@@ -107,7 +107,7 @@ export function EntityTaggedContent({
               data-tag-start={seg.start}
               data-highlight-match={isHighlighted ? '' : undefined}
               className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-sans bg-badge-entity-bg text-badge-entity-fg border border-badge-entity-bd mx-0.5 transition-all ${
-                isHighlighted ? 'ring-2 ring-yellow-400/60 bg-yellow-400/20' : ''
+                isHighlighted ? 'ring-2 ring-accent-tertiary-bd bg-accent-tertiary-bg' : ''
               }`}
               title={seg.id ? `id: ${seg.id}` : undefined}
             >
