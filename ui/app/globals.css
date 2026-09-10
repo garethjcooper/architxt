@@ -55,6 +55,12 @@
   --accent-secondary-fg: oklch(0.80 0.16 155);
   --accent-secondary-bd: oklch(0.60 0.15 155 / 0.40);
 
+  /* Semantic accents — tertiary status surfaces (warnings, issues, skipped) */
+  --accent-tertiary-bg: oklch(0.55 0.12 85 / 0.15);
+  --accent-tertiary-bg-hover: oklch(0.55 0.12 85 / 0.25);
+  --accent-tertiary-fg: oklch(0.82 0.12 85);
+  --accent-tertiary-bd: oklch(0.60 0.10 85 / 0.35);
+
   /* Hindsight diff/sync comparison colors */
   --diff-match-bg: oklch(0.55 0.18 150 / 0.15);
   --diff-match-fg: oklch(0.85 0.12 150);
@@ -236,6 +242,11 @@
   --color-accent-secondary-bg-hover: var(--accent-secondary-bg-hover);
   --color-accent-secondary-fg: var(--accent-secondary-fg);
   --color-accent-secondary-bd: var(--accent-secondary-bd);
+
+  --color-accent-tertiary-bg: var(--accent-tertiary-bg);
+  --color-accent-tertiary-bg-hover: var(--accent-tertiary-bg-hover);
+  --color-accent-tertiary-fg: var(--accent-tertiary-fg);
+  --color-accent-tertiary-bd: var(--accent-tertiary-bd);
 
   --color-diff-match-bg: var(--diff-match-bg);
   --color-diff-match-fg: var(--diff-match-fg);
