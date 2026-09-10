@@ -256,7 +256,7 @@ export function SyncJobsTab({
           <select
             value={range}
             onChange={(e) => setRange((e.target.value as DateRange) || 'today')}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             {RANGE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -268,7 +268,7 @@ export function SyncJobsTab({
           <select
             value={status ?? ''}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value || 'any'} value={opt.value}>{opt.label}</option>

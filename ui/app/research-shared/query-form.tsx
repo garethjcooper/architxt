@@ -566,7 +566,7 @@ function BudgetSelect({
         disabled={disabled}
         value={value || 'mid'}
         onChange={(e) => onChange(e.target.value as Budget)}
-        className="h-7 rounded-md border border-white/10 bg-surface-card px-2 text-[10px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+        className="h-7 rounded-md border border-white/10 bg-surface-card px-2 text-[10px] text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
       >
         {BUDGET_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -601,7 +601,7 @@ function MaxTokensInput({
           const parsed = parseInt(e.target.value, 10);
           onChange(Number.isNaN(parsed) ? 0 : parsed);
         }}
-        className="bg-black/20 border border-white/10 rounded text-[10px] text-white px-1.5 py-1 outline-none focus:border-emerald-500 disabled:opacity-50"
+        className="bg-black/20 border border-white/10 rounded text-[10px] text-white px-1.5 py-1 outline-none focus:border-focus-ring disabled:opacity-50"
       />
     </div>
   );
