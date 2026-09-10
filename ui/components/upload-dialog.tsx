@@ -368,7 +368,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                             {active && <span>✓</span>}
                             <span className="font-mono text-[10px]">{meta.key}</span>
                             {meta.value && <span className="text-foreground-subtle">={meta.value}</span>}
-                            {isSystem && <span className="text-[9px] text-badge-neutral-fg/60 ml-0.5">(system)</span>}
+                            {isSystem && <span className="text-[9px] text-badge-neutral-fg ml-0.5">(system)</span>}
                           </button>
                         );
                       })}
