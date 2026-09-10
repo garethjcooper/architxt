@@ -42,7 +42,7 @@ export function ServerBankSelectors({
           value={selectedServerId}
           onChange={(e) => setSelectedServerId(e.target.value)}
           disabled={disabled || servers.length === 0}
-          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
         >
           <option value="">Select server...</option>
           {servers.map((s, idx) => (
@@ -59,7 +59,7 @@ export function ServerBankSelectors({
           value={selectedBankId}
           onChange={(e) => setSelectedBankId(e.target.value)}
           disabled={disabled || !selectedServerId || loadingBanks || banks.length === 0}
-          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
         >
           <option value="">
             {loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}

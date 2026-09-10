@@ -173,7 +173,7 @@ export function CuratedPageTabs({
               }
             }
           }}
-          className="h-6 rounded-md border border-white/10 bg-surface-panel px-1.5 text-[11px] text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none min-w-[6rem] max-w-[10rem]"
+          className="h-6 rounded-md border border-white/10 bg-surface-panel px-1.5 text-[11px] text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none min-w-[6rem] max-w-[10rem]"
         >
           <option value="">Pages...</option>
           {tabs.map((tab) => (
@@ -260,7 +260,7 @@ export function CuratedPageTabs({
                   setRenamingPage(null);
                 }
               }}
-              className="w-full px-2 py-1.5 mb-4 rounded bg-black/30 border border-white/10 text-xs text-white/90 placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50"
+              className="w-full px-2 py-1.5 mb-4 rounded bg-black/30 border border-white/10 text-xs text-white/90 placeholder:text-white/30 focus:outline-none focus:border-focus-ring/80"
               autoFocus
             />
             <div className="flex justify-end gap-2">
