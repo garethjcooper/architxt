@@ -141,7 +141,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Entity Details
           </DialogTitle>
         </DialogHeader>
@@ -151,7 +151,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
           <div className="space-y-4">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="ent-name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="ent-name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Name
               </Label>
               <Input
@@ -159,7 +159,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter entity name"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 
               />
             </div>
@@ -167,7 +167,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
             {/* Entity ID + Type */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="ent-eid" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="ent-eid" className="text-xs uppercase text-foreground-subtle font-medium">
                   Entity ID
                 </Label>
                 <Input
@@ -175,7 +175,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   value={entityId}
                   onChange={(e) => setEntityId(e.target.value)}
                   placeholder="SYS-001"
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                  className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   
                 />
                 {selectedType?.uses_entity_id_pattern && entityIdConformity && (
@@ -203,14 +203,14 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ent-type" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="ent-type" className="text-xs uppercase text-foreground-subtle font-medium">
                   Type
                 </Label>
                 <select
                   id="ent-type"
                   value={typeId}
                   onChange={(e) => setTypeId(Number(e.target.value) || '')}
-                  className="w-full h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                  className="w-full h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                 >
                   {entityTypes.map((t) => (
                     <option key={t.id} value={t.id}>{t.type_name}</option>
@@ -221,7 +221,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="ent-desc" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="ent-desc" className="text-xs uppercase text-foreground-subtle font-medium">
                 Description
               </Label>
               <Input
@@ -229,14 +229,14 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 
               />
             </div>
 
             {/* Aliases */}
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-white/50 font-medium">
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">
                 Aliases
               </Label>
               <div className="flex gap-2">
@@ -245,7 +245,7 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
                   onChange={(e) => setNewAlias(e.target.value)}
                   placeholder="Add alias…"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAlias(); } }}
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                  className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   
                 />
                 <Button type="button" variant="outline" size="sm" onClick={addAlias}>
@@ -269,8 +269,8 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
             {/* Case Match Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-xs uppercase text-white/50 font-medium">Case-Sensitive Match</Label>
-                <p className="text-[10px] text-white/40">OFF = insensitive, ON = exact case</p>
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">Case-Sensitive Match</Label>
+                <p className="text-[10px] text-foreground-subtle">OFF = insensitive, ON = exact case</p>
               </div>
               <CaseMatchToggle
                 checked={caseSensitive}
@@ -281,8 +281,8 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
             {/* Word Boundary Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
-                <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match</p>
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">Respect Word Boundaries</Label>
+                <p className="text-[10px] text-foreground-subtle">OFF = substring match, ON = whole-word match</p>
               </div>
               <CaseMatchToggle
                 checked={wordBoundaries}
@@ -292,30 +292,30 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
           </div>
 
           {/* Read-only Metadata */}
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border-default">
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">ID</p>
-              <p className="text-sm text-white font-mono">{entity.id}</p>
+              <p className="text-xs uppercase text-foreground-subtle font-medium">ID</p>
+              <p className="text-sm text-foreground-default font-mono">{entity.id}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Generated By</p>
-              <p className="text-sm text-white font-mono">{entity.generated_by}</p>
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Generated By</p>
+              <p className="text-sm text-foreground-default font-mono">{entity.generated_by}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Documents</p>
-              <p className="text-sm text-white font-mono">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Documents</p>
+              <p className="text-sm text-foreground-default font-mono">
                 {entity.usage_count ? `${entity.usage_count} document${entity.usage_count !== 1 ? 's' : ''}` : 'None'}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(entity.created_at), { addSuffix: true })}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(entity.updated_at), { addSuffix: true })}
               </p>
             </div>
@@ -334,18 +334,18 @@ export function ViewEntityDialog({ open, onOpenChange, entity, entityTypes, onEn
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

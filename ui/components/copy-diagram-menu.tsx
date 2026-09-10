@@ -19,7 +19,7 @@ export function CopyDiagramMenu({ source }: CopyDiagramMenuProps) {
       <DropdownMenuTrigger>
         <span
           role="button"
-          className="p-1 rounded text-white/40 hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50 transition-colors"
+          className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50 transition-colors"
           title="Copy diagram"
         >
           <Copy className="h-3.5 w-3.5" />

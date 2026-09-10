@@ -155,12 +155,12 @@ export function ImportDialog({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* ── Header ───────────────────────── */}
         <DialogHeader className="shrink-0">
-          <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+          <DialogTitle className="text-xl font-semibold text-foreground-default flex items-center gap-2">
             <Download className="h-5 w-5 text-accent-secondary-fg" />
             {title}
           </DialogTitle>
           {description && (
-            <p className="text-sm text-white/60 mt-1">{description}</p>
+            <p className="text-sm text-foreground-faint mt-1">{description}</p>
           )}
         </DialogHeader>
 
@@ -171,7 +171,7 @@ export function ImportDialog({
           {(phase === 'input' || phase === 'preview') && (
             <div className="shrink-0 flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase text-white/50 font-medium">
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">
                   Paste CSV or Drop File
                 </Label>
                 <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs text-accent-secondary-fg hover:text-accent-primary-fg transition-colors">
@@ -195,7 +195,7 @@ export function ImportDialog({
                 value={raw}
                 onChange={(e) => setRaw(e.target.value)}
                 placeholder={placeholder}
-                className="h-[160px] !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle font-mono text-xs overflow-auto leading-relaxed resize-none"
+                className="h-[160px] !rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle font-mono text-xs overflow-auto leading-relaxed resize-none"
               />
             </div>
           )}
@@ -223,20 +223,20 @@ export function ImportDialog({
                 <div key={i} className="flex items-start gap-2 text-xs text-destructive-fg">
                   <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                   <span className="break-all">
-                    <span className="font-mono text-white/60">{item.raw}</span>
+                    <span className="font-mono text-foreground-faint">{item.raw}</span>
                     {item.error && <span className="ml-1">— {item.error}</span>}
                   </span>
                 </div>
               ))}
               {invalidItems.length > 10 && (
-                <p className="text-xs text-white/40">+ {invalidItems.length - 10} more errors</p>
+                <p className="text-xs text-foreground-subtle">+ {invalidItems.length - 10} more errors</p>
               )}
             </div>
           )}
 
           {/* Preview table */}
           {(phase === 'preview' || phase === 'running') && validItems.length > 0 && (
-            <div className="flex-1 min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col">
+            <div className="flex-1 min-h-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col">
               <div className="px-3 py-1.5 bg-accent-primary-bg border-b border-accent-secondary-bd shrink-0">
                 <span className="text-xs font-medium text-accent-secondary-fg">
                   {phase === 'running'
@@ -247,11 +247,11 @@ export function ImportDialog({
               <div className="flex-1 overflow-auto">
                 <table className="w-full table-fixed">
                   <thead className="sticky top-0 bg-surface-card z-10">
-                    <tr className="border-b border-white/10">
+                    <tr className="border-b border-border-default">
                       {columns.map((col) => (
                         <th
                           key={col.key}
-                          className="text-[10px] uppercase text-white/50 font-medium py-1.5 px-3 text-left"
+                          className="text-[10px] uppercase text-foreground-subtle font-medium py-1.5 px-3 text-left"
                           style={{ width: col.width }}
                         >
                           {col.label}
@@ -261,16 +261,16 @@ export function ImportDialog({
                   </thead>
                   <tbody>
                     {validItems.slice(0, 50).map((item, idx) => (
-                      <tr key={idx} className="border-b border-white/5">
+                      <tr key={idx} className="border-b border-border-subtle">
                         {columns.map((col) => (
                           <td
                             key={col.key}
-                            className="py-1 px-3 text-xs text-white/70 truncate"
+                            className="py-1 px-3 text-xs text-foreground-faint truncate"
                             style={{ maxWidth: col.width || '160px' }}
                             title={item.data[col.key] !== undefined ? String(item.data[col.key]) : ''}
                           >
                             {item.data[col.key] !== undefined ? String(item.data[col.key]) : (
-                              <span className="text-white/20">-</span>
+                              <span className="text-foreground-placeholder">-</span>
                             )}
                           </td>
                         ))}
@@ -278,7 +278,7 @@ export function ImportDialog({
                     ))}
                     {validItems.length > 50 && (
                       <tr>
-                        <td colSpan={columns.length} className="py-2 px-3 text-xs text-white/40 text-center">
+                        <td colSpan={columns.length} className="py-2 px-3 text-xs text-foreground-subtle text-center">
                           + {validItems.length - 50} more items
                         </td>
                       </tr>
@@ -292,11 +292,11 @@ export function ImportDialog({
           {/* Running progress bar */}
           {phase === 'running' && (
             <div className="shrink-0 space-y-1.5">
-              <div className="flex justify-between text-xs text-white/60">
+              <div className="flex justify-between text-xs text-foreground-faint">
                 <span>Processing {progress.current} of {progress.total}…</span>
                 <span className="font-mono">{progress.current}/{progress.total}</span>
               </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-2 bg-surface-panel rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300 bg-accent-primary-solid"
                   style={{ width: `${percent}%` }}
@@ -336,14 +336,14 @@ export function ImportDialog({
                   </div>
                 )}
                 <div>
-                  <p className="text-sm font-medium text-white">
+                  <p className="text-sm font-medium text-foreground-default">
                     {doneSuccess
                       ? 'Import Complete'
                       : doneFailed
                         ? 'Import Failed'
                         : 'Import Partial'}
                   </p>
-                  <p className="text-xs text-white/60">
+                  <p className="text-xs text-foreground-faint">
                     {progress.succeeded} succeeded · {progress.failed} failed · {progress.total} total
                   </p>
                 </div>
@@ -358,7 +358,7 @@ export function ImportDialog({
                       <div key={i} className="flex items-start gap-2 text-xs text-destructive-fg">
                         <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
                         <span className="break-all">
-                          <span className="font-mono text-white/60">
+                          <span className="font-mono text-foreground-faint">
                             {columns[0] && r.item.data[columns[0].key] !== undefined
                               ? String(r.item.data[columns[0].key])
                               : r.item.raw}
@@ -370,9 +370,9 @@ export function ImportDialog({
                 </div>
               )}
               {/* Original CSV — copyable for fixing */}
-              <div className="rounded-lg border border-white/10 overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/10">
-                  <span className="text-[10px] uppercase text-white/50 font-medium">Original CSV</span>
+              <div className="rounded-lg border border-border-default overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-surface-card border-b border-border-default">
+                  <span className="text-[10px] uppercase text-foreground-subtle font-medium">Original CSV</span>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(raw);
@@ -383,20 +383,20 @@ export function ImportDialog({
                     Copy
                   </button>
                 </div>
-                <pre className="max-h-[160px] overflow-auto p-3 text-[10px] font-mono text-white/60 whitespace-pre-wrap leading-relaxed">{raw}</pre>
+                <pre className="max-h-[160px] overflow-auto p-3 text-[10px] font-mono text-foreground-faint whitespace-pre-wrap leading-relaxed">{raw}</pre>
               </div>
             </div>
           )}
         </div>
 
         {/* ── Footer buttons ───────────────── */}
-        <div className="shrink-0 flex justify-end gap-3 pt-4 border-t border-white/10">
+        <div className="shrink-0 flex justify-end gap-3 pt-4 border-t border-border-default">
           {phase === 'input' && (
             <>
               <Button
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
-                className="text-white/70 hover:text-white hover:bg-white/5"
+                className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
               >
                 Close
               </Button>
@@ -409,7 +409,7 @@ export function ImportDialog({
                   setPhase('preview');
                 }}
                 disabled={validItems.length === 0}
-                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 Preview Import
               </Button>
@@ -421,14 +421,14 @@ export function ImportDialog({
               <Button
                 variant="ghost"
                 onClick={() => setPhase('input')}
-                className="text-white/70 hover:text-white hover:bg-white/5"
+                className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
               >
                 Back
               </Button>
               <Button
                 onClick={handleRun}
                 disabled={validItems.length === 0}
-                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 Import {validItems.length} Item{validItems.length !== 1 ? 's' : ''}
               </Button>
@@ -438,7 +438,7 @@ export function ImportDialog({
           {phase === 'running' && (
             <Button
               disabled
-              className="bg-accent-primary-bg/500 text-white flex items-center gap-2 cursor-not-allowed"
+              className="bg-accent-primary-bg/500 text-foreground-default flex items-center gap-2 cursor-not-allowed"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Importing…
@@ -448,7 +448,7 @@ export function ImportDialog({
           {phase === 'done' && (
             <Button
               onClick={() => onOpenChange(false)}
-              className={`text-white flex items-center gap-2 ${
+              className={`text-foreground-default flex items-center gap-2 ${
                 doneSuccess
                   ? 'bg-accent-primary-solid hover:bg-accent-primary-solid-hover'
                   : doneFailed

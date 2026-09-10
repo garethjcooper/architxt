@@ -159,26 +159,26 @@ export default function MetadataPage() {
       <div className="flex items-center gap-2 mb-2">
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search key, value, source, id…"
-            className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
+            className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
             >
               <X className="h-3 w-3" />
             </button>
           )}
         </div>
         <div className="flex-1" />
-        <div className="w-px h-5 bg-white/10 mx-1" />
-        <Button onClick={() => setImportOpen(true)} title="Import" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><Download className="h-3.5 w-3.5" /></Button>
-        <Button onClick={fetchMetadata} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <div className="w-px h-5 bg-surface-panel mx-1" />
+        <Button onClick={() => setImportOpen(true)} title="Import" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><Download className="h-3.5 w-3.5" /></Button>
+        <Button onClick={fetchMetadata} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
         <Button
           onClick={openDeleteConfirm}
           disabled={deletableSelectedCount === 0}
@@ -189,14 +189,14 @@ export default function MetadataPage() {
         </Button>
         <Button
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
           title="Add"
         >
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="rounded-md bg-surface-card border border-on-dark/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header bar */}
         <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
           <div className="flex-1" />
@@ -204,18 +204,18 @@ export default function MetadataPage() {
             <button
               onClick={() => setCompactBadges(!compactBadges)}
               title={compactBadges ? 'Expand badges' : 'Compact badges'}
-              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-foreground-subtle hover:text-foreground-faint border border-transparent"].join(" ")}
             >
               <BadgeCompactIcon className="h-5 w-5" />
             </button>
             <button
               onClick={() => setFreeze(!freeze)}
               title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-foreground-subtle hover:text-foreground-faint border border-transparent"].join(" ")}
             >
               <TableIcon className="h-3.5 w-3.5" />
             </button>
-            <span className="text-xs font-mono text-accent-secondary-fg bg-black/30 border border-accent-secondary-bd px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-secondary-fg bg-surface-inset border border-accent-secondary-bd px-2 py-0.5 rounded">
               {filteredMetadata.length} ({selected.size})
             </span>
           </div>
@@ -224,24 +224,24 @@ export default function MetadataPage() {
         <div className={["flex-1 overflow-auto", !freeze ? "min-h-0" : ""].filter(Boolean).join(" ")}>
         <table className="w-full caption-bottom text-sm">
           <thead>
-            <tr className="border-b border-white/10">
-              <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-white/5"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+            <tr className="border-b border-border-default">
+              <th className={["w-12 py-2 px-4 text-left", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-border-subtle"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={isAllSelected}
                   onCheckedChange={toggleAll}
                 />
               </th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Key</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Value</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Documents</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Source</th>
-              <th className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Created</th>
+              <th className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Key</th>
+              <th className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Value</th>
+              <th className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Documents</th>
+              <th className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Source</th>
+              <th className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Created</th>
             </tr>
           </thead>
           <tbody>
             {displayMetadata.length === 0 && !loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-white/70">
+                <td colSpan={6} className="text-center py-8 text-foreground-faint">
                   <div className="flex flex-col items-center gap-2">
                     <DatabaseIcon className="h-8 w-8 opacity-50" />
                     <p>No metadata entries found.</p>
@@ -254,14 +254,14 @@ export default function MetadataPage() {
                 return (
                   <tr
                     key={item.id}
-                    className={`border-b border-white/5 transition-colors cursor-pointer ${
+                    className={`border-b border-border-subtle transition-colors cursor-pointer ${
                       isSystem
                         ? 'bg-accent-primary-bg hover:bg-accent-primary-bg-hover'
-                        : selected.has(item.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
+                        : selected.has(item.id) ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
                     }`}
                     onClick={(e) => handleMetadataClick(item, e)}
                   >
-                    <td className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-white/5", isSystem ? "bg-accent-primary-bg/50" : (selected.has(item.id) ? "bg-accent-primary-bg" : "bg-surface-card")].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                    <td className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-border-subtle", isSystem ? "bg-accent-primary-bg/50" : (selected.has(item.id) ? "bg-accent-primary-bg" : "bg-surface-card")].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selected.has(item.id)}
                         onCheckedChange={() => {
@@ -284,7 +284,7 @@ export default function MetadataPage() {
                           {item.key}
                         </span>
                       ) : (
-                        <span className="text-white/30 text-xs">-</span>
+                        <span className="text-foreground-placeholder text-xs">-</span>
                       )}
                     </td>
                     <td className="py-1.5 px-4 text-xs">
@@ -301,20 +301,20 @@ export default function MetadataPage() {
                           {item.value}
                         </span>
                       ) : (
-                        <span className="text-white/30 text-xs">-</span>
+                        <span className="text-foreground-placeholder text-xs">-</span>
                       )}
                     </td>
                     <td className="py-1.5 px-4 text-xs">
                       {item.usage_count ? (
-                        <span className="text-white/70 text-[10px]">
+                        <span className="text-foreground-faint text-[10px]">
                           {item.usage_count} document{item.usage_count !== 1 ? 's' : ''}
                         </span>
                       ) : (
-                        <span className="text-white/30 text-xs">-</span>
+                        <span className="text-foreground-placeholder text-xs">-</span>
                       )}
                     </td>
-                    <td className="py-1.5 px-4 text-xs text-white/50">{item.generated_by}</td>
-                    <td className="py-1.5 px-4 text-xs text-white/50">
+                    <td className="py-1.5 px-4 text-xs text-foreground-subtle">{item.generated_by}</td>
+                    <td className="py-1.5 px-4 text-xs text-foreground-subtle">
                       {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                     </td>
                   </tr>

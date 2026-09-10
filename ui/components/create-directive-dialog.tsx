@@ -90,7 +90,7 @@ export function CreateDirectiveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Create Directive
           </DialogTitle>
         </DialogHeader>
@@ -99,7 +99,7 @@ export function CreateDirectiveDialog({
           <div className="space-y-6 py-4">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="directive-name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="directive-name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Name *
               </Label>
               <Input
@@ -107,13 +107,13 @@ export function CreateDirectiveDialog({
                 placeholder="Enter directive name / id"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
 
             {/* Statement */}
             <div className="space-y-2">
-              <Label htmlFor="directive-statement" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="directive-statement" className="text-xs uppercase text-foreground-subtle font-medium">
                 Statement *
               </Label>
               <Textarea
@@ -122,7 +122,7 @@ export function CreateDirectiveDialog({
                 value={statement}
                 onChange={(e) => setStatement(e.target.value)}
                 rows={4}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
 
@@ -134,12 +134,12 @@ export function CreateDirectiveDialog({
                   checked={isActive}
                   onCheckedChange={setIsActive}
                 />
-                <Label htmlFor="directive-active" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="directive-active" className="text-xs uppercase text-foreground-subtle font-medium">
                   Active
                 </Label>
               </div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="directive-priority" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="directive-priority" className="text-xs uppercase text-foreground-subtle font-medium">
                   Priority
                 </Label>
                 <Input
@@ -147,26 +147,26 @@ export function CreateDirectiveDialog({
                   type="number"
                   value={priority}
                   onChange={(e) => setPriority(parseInt(e.target.value || '0', 10))}
-                  className="!w-20 !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                  className="!w-20 !rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 />
               </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={creating || !name.trim() || !statement.trim()}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               {creating ? 'Creating...' : 'Create Directive'}

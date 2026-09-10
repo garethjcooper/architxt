@@ -189,7 +189,7 @@ export function DiagramControls({
   return (
     <div
       className={cn(
-        'absolute top-3 right-3 z-10 flex flex-col gap-1.5 rounded-md border border-white/10 bg-surface-overlay/85 backdrop-blur-sm px-2 py-2 shadow-lg',
+        'absolute top-3 right-3 z-10 flex flex-col gap-1.5 rounded-md border border-border-default bg-surface-overlay/85 backdrop-blur-sm px-2 py-2 shadow-lg',
         className,
       )}
     >
@@ -240,7 +240,7 @@ export function DiagramControls({
         <GripHorizontal className="h-3 w-3" />
       </Button>
       {isReady && (
-        <div className="pt-1 border-t border-white/10 flex items-center justify-center gap-1 text-[9px] text-white/50">
+        <div className="pt-1 border-t border-border-default flex items-center justify-center gap-1 text-[9px] text-foreground-subtle">
           <span>{Math.round(scale * 100)}%</span>
         </div>
       )}

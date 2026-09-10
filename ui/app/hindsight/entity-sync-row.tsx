@@ -81,7 +81,7 @@ export default function EntitySyncRow({
   onCompare,
 }: EntitySyncRowProps) {
   return (
-    <div className={`px-3 py-2 border-b border-white/5 hover:bg-white/5 transition-colors ${isSelected ? 'bg-white/[0.04]' : ''}`}>
+    <div className={`px-3 py-2 border-b border-border-subtle hover:bg-surface-card transition-colors ${isSelected ? 'bg-on-dark/[0.04]' : ''}`}>
       <div className="flex items-start gap-2">
         {showCheckbox && (
           <div className="pt-0.5 shrink-0">
@@ -94,20 +94,20 @@ export default function EntitySyncRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-white/60 truncate" title={ext_id}>{ext_id}</span>
+            <span className="text-xs font-mono text-foreground-faint truncate" title={ext_id}>{ext_id}</span>
           </div>
 
           <div className="flex items-center gap-3 mt-1 text-[11px]">
             {arch && (
-              <span className="text-white/40 flex-1 truncate" title={arch.description || undefined}>
-                architxt: <span className="text-white/60">{arch.count} values</span>
-                {arch.description && <span className="text-white/20 ml-1">• {arch.description}</span>}
+              <span className="text-foreground-subtle flex-1 truncate" title={arch.description || undefined}>
+                architxt: <span className="text-foreground-faint">{arch.count} values</span>
+                {arch.description && <span className="text-foreground-placeholder ml-1">• {arch.description}</span>}
               </span>
             )}
             {hindsight && (
-              <span className="text-white/40 flex-1 truncate" title={hindsight.description || undefined}>
-                Bank: <span className="text-white/60">{hindsight.count} values</span>
-                {hindsight.description && <span className="text-white/20 ml-1">• {hindsight.description}</span>}
+              <span className="text-foreground-subtle flex-1 truncate" title={hindsight.description || undefined}>
+                Bank: <span className="text-foreground-faint">{hindsight.count} values</span>
+                {hindsight.description && <span className="text-foreground-placeholder ml-1">• {hindsight.description}</span>}
               </span>
             )}
           </div>
@@ -117,7 +117,7 @@ export default function EntitySyncRow({
             {showCompare && divergence && (
               <button
                 onClick={(e) => { e.stopPropagation(); onCompare?.(); }}
-                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors shrink-0 mt-1"
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface-card border border-border-default text-foreground-subtle hover:bg-surface-panel hover:text-foreground-muted transition-colors shrink-0 mt-1"
                 title="Compare"
               >
                 <GitCompare className="h-3 w-3" />

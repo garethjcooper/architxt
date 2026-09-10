@@ -49,7 +49,7 @@ export function HindsightStatus() {
   const hasActive = ops.length > 0;
 
   // Determine indicator colour
-  let indicatorColor = 'bg-white/20';
+  let indicatorColor = 'bg-surface-strong';
   if (pendingCount > 0) indicatorColor = 'bg-accent-primary-solid';
   else if (failedCount > 0) indicatorColor = 'bg-destructive-fg';
   else if (completedCount > 0) indicatorColor = 'bg-accent-primary-solid';
@@ -62,7 +62,7 @@ export function HindsightStatus() {
     <div className="relative">
       <button
         onClick={handleToggle}
-        className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/10 px-3 py-1.5 hover:bg-white/[0.06] transition-colors"
+        className="flex items-center gap-2 rounded-lg bg-on-dark/[0.03] border border-border-default px-3 py-1.5 hover:bg-on-dark/[0.06] transition-colors"
       >
         <span className="relative flex h-2 w-2">
           {pendingCount > 0 ? (
@@ -77,10 +77,10 @@ export function HindsightStatus() {
 
         <div className="flex flex-col items-start min-w-0">
           <div className="flex items-center gap-1.5 text-xs">
-            <HindsightIcon className="h-3 w-3 text-white/40" />
+            <HindsightIcon className="h-3 w-3 text-foreground-subtle" />
             {hasActive ? (
               <>
-                <span className="text-white/70 font-medium">
+                <span className="text-foreground-faint font-medium">
                   {pendingCount > 0
                     ? `${pendingCount} pending`
                     : failedCount > 0
@@ -88,49 +88,49 @@ export function HindsightStatus() {
                     : `${completedCount} done`}
                 </span>
                 {ops.length > 1 && (
-                  <span className="text-white/30">• {ops.length} total</span>
+                  <span className="text-foreground-placeholder">• {ops.length} total</span>
                 )}
               </>
             ) : (
-              <span className="text-white/50">Hindsight idle</span>
+              <span className="text-foreground-subtle">Hindsight idle</span>
             )}
           </div>
         </div>
 
         {expanded ? (
-          <ChevronUp className="h-3.5 w-3.5 text-white/40 ml-1" />
+          <ChevronUp className="h-3.5 w-3.5 text-foreground-subtle ml-1" />
         ) : (
-          <ChevronDown className="h-3.5 w-3.5 text-white/40 ml-1" />
+          <ChevronDown className="h-3.5 w-3.5 text-foreground-subtle ml-1" />
         )}
       </button>
 
       {expanded && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-white/10 bg-surface-overlay shadow-xl p-4 space-y-3">
+        <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-border-default bg-surface-overlay shadow-xl p-4 space-y-3">
           {error ? (
             <div className="text-xs text-destructive-fg text-center py-2">Failed to load status</div>
           ) : ops.length === 0 ? (
-            <div className="text-xs text-white/40 text-center py-2">No Hindsight operations</div>
+            <div className="text-xs text-foreground-subtle text-center py-2">No Hindsight operations</div>
           ) : (
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {ops.map((op) => (
                   <div
                     key={op.pop_id}
-                    className="flex items-start gap-2 rounded-lg bg-white/[0.03] p-2.5"
+                    className="flex items-start gap-2 rounded-lg bg-on-dark/[0.03] p-2.5"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-white/70 font-mono truncate">
+                        <span className="text-foreground-faint font-mono truncate">
                           {op.pop_ext_id || `doc-${op.pop_doc_id}`}
                         </span>
-                        <span className="text-white/30">→</span>
-                        <span className="text-white/50 truncate">{op.pop_bank_id}</span>
+                        <span className="text-foreground-placeholder">→</span>
+                        <span className="text-foreground-subtle truncate">{op.pop_bank_id}</span>
                         <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd' : 'bg-badge-caution-bg/50 text-badge-caution-fg border-badge-caution-bd/50'}`}>
                           <Clock className="h-3 w-3" />
                           {op.pop_status}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-white/30">
+                        <span className="text-[10px] text-foreground-placeholder">
                           {formatDistanceToNow(new Date(op.pop_created_at), {
                             addSuffix: true,
                           })}

@@ -26,7 +26,7 @@ export function SmartEditDialog({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="!w-[85vw] !max-w-none h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">Smart Edit</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-foreground-default">Smart Edit</DialogTitle>
         </DialogHeader>
         <SmartDocumentEditor
           documentId={documentId}

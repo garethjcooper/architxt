@@ -147,14 +147,14 @@ function hasStructuredEnvelope(entry: HindsightContentResult | undefined): boole
 function renderModelContent(entry: HindsightContentResult | undefined): React.ReactNode {
   if (!entry) {
     return (
-      <div className="h-24 flex items-center justify-center text-xs text-white/40">
+      <div className="h-24 flex items-center justify-center text-xs text-foreground-subtle">
         No content available.
       </div>
     );
   }
   if (entry.found === false) {
     return (
-      <div className="h-24 flex items-center justify-center text-xs text-white/40">
+      <div className="h-24 flex items-center justify-center text-xs text-foreground-subtle">
         Model content not found.
       </div>
     );

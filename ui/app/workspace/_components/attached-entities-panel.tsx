@@ -197,8 +197,8 @@ export function AttachedEntitiesPanel({
         <div className="absolute inset-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
             {entityIds.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-white/40 text-sm px-6 text-center gap-3">
-                <div className="flex items-center gap-2 text-white/50">
+              <div className="h-full flex flex-col items-center justify-center text-foreground-subtle text-sm px-6 text-center gap-3">
+                <div className="flex items-center gap-2 text-foreground-subtle">
                   <FileText className="w-5 h-5" />
                   <span>Contextual data</span>
                 </div>
@@ -207,10 +207,10 @@ export function AttachedEntitiesPanel({
                 </p>
               </div>
             ) : loading ? (
-              <div className="h-full flex items-center justify-center text-white/40 text-xs">Loading entity info…</div>
+              <div className="h-full flex items-center justify-center text-foreground-subtle text-xs">Loading entity info…</div>
             ) : entityInfoMap ? (
               visibleRows.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-white/40 text-xs px-6 text-center gap-2">
+                <div className="h-full flex flex-col items-center justify-center text-foreground-subtle text-xs px-6 text-center gap-2">
                   <p>No contextual models attached yet.</p>
                 </div>
               ) : (
@@ -222,33 +222,33 @@ export function AttachedEntitiesPanel({
                   return (
                     <div
                       key={entityId}
-                      className="rounded border border-white/5 bg-black/20 overflow-hidden"
+                      className="rounded border border-border-subtle bg-surface-inset overflow-hidden"
                     >
                       <button
                         type="button"
                         onClick={() => onToggleExpand(entityId)}
-                        className="w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
+                        className="w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-surface-card transition-colors"
                         title={expanded ? 'Collapse' : 'Expand'}
                         style={{ borderLeftColor: color, borderLeftWidth: 3 }}
                       >
                         {expanded ? (
-                          <ChevronUp className={cn('w-4 h-4 text-white/40 shrink-0')} />
+                          <ChevronUp className={cn('w-4 h-4 text-foreground-subtle shrink-0')} />
                         ) : (
-                          <ChevronDown className={cn('w-4 h-4 text-white/40 shrink-0')} />
+                          <ChevronDown className={cn('w-4 h-4 text-foreground-subtle shrink-0')} />
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs text-white/90 truncate">
+                          <div className="text-xs text-foreground-default truncate">
                             {displayName}
                           </div>
-                          <div className="text-[10px] text-white/50 font-mono truncate">{entityId}</div>
+                          <div className="text-[10px] text-foreground-subtle font-mono truncate">{entityId}</div>
                         </div>
-                        <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded border border-white/10 bg-white/5">
+                        <span className="text-[10px] text-foreground-subtle px-1.5 py-0.5 rounded border border-border-default bg-surface-card">
                           {items.length}
                         </span>
                       </button>
 
                       {expanded && hasItems && (
-                        <div className="border-t border-white/10 px-1 py-1 space-y-0.5">
+                        <div className="border-t border-border-default px-1 py-1 space-y-0.5">
                           {items.map((item) => {
                             const isSelected = selectedModel?.entityId === entityId && selectedModel?.extId === item.extId;
                             return (
@@ -256,7 +256,7 @@ export function AttachedEntitiesPanel({
                                 key={item.key}
                                 className={cn(
                                   'flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
-                                  isSelected ? 'bg-accent-primary-bg text-accent-primary-fg' : 'text-white/70 hover:bg-white/5'
+                                  isSelected ? 'bg-accent-primary-bg text-accent-primary-fg' : 'text-foreground-faint hover:bg-surface-card'
                                 )}
                               >
                                 <button
@@ -265,7 +265,7 @@ export function AttachedEntitiesPanel({
                                   className="flex-1 text-left flex items-center gap-2 min-w-0"
                                   title={`${item.category}: ${item.label}`}
                                 >
-                                  <span className="text-[9px] uppercase tracking-wider text-white/40 shrink-0">
+                                  <span className="text-[9px] uppercase tracking-wider text-foreground-subtle shrink-0">
                                     {item.category}
                                   </span>
                                   {item.roleLabel && (
@@ -277,7 +277,7 @@ export function AttachedEntitiesPanel({
                                 </button>
                                 {item.edgeCount !== undefined && item.edgeCount > 0 && (
                                   <span
-                                    className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
+                                    className="text-[9px] text-foreground-subtle px-1 py-0.5 rounded border border-border-default bg-surface-card shrink-0"
                                     title={`${item.edgeCount} physical edge${item.edgeCount === 1 ? '' : 's'} in this edge context`}
                                   >
                                     {item.edgeCount} edge{item.edgeCount === 1 ? '' : 's'}
@@ -289,7 +289,7 @@ export function AttachedEntitiesPanel({
                                     e.stopPropagation();
                                     onSelectModel(entityId, item, true);
                                   }}
-                                  className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 ml-1"
+                                  className="shrink-0 h-5 w-5 inline-flex items-center justify-center rounded text-foreground-subtle hover:text-foreground-default hover:bg-surface-panel ml-1"
                                   title="Open in new tab"
                                 >
                                   <ExternalLink className="h-3 w-3" />

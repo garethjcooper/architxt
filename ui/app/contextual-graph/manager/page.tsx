@@ -429,7 +429,7 @@ export default function ContextManagerPage() {
   const renderDetailPanel = () => {
     if (!selectedItem) {
       return (
-        <div className="h-full flex flex-col items-center justify-center text-white/50 text-sm px-6 text-center">
+        <div className="h-full flex flex-col items-center justify-center text-foreground-subtle text-sm px-6 text-center">
           <p>Select an entity or edge from the left to view its contextual graph data.</p>
         </div>
       );
@@ -447,17 +447,17 @@ export default function ContextManagerPage() {
     return (
       <div className="h-full overflow-y-auto p-4 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-white/90">{title}</h2>
-          <div className="text-xs text-white/50 font-mono">{subtitle}</div>
+          <h2 className="text-lg font-semibold text-foreground-default">{title}</h2>
+          <div className="text-xs text-foreground-subtle font-mono">{subtitle}</div>
           <div className="flex flex-wrap gap-2 mt-2">
             {isNode ? (
               selectedItem.labels.map((label: string) => (
-                <Badge key={label} variant="outline" className="text-[10px] border-white/10 text-white/60">
+                <Badge key={label} variant="outline" className="text-[10px] border-border-default text-foreground-faint">
                   {label}
                 </Badge>
               ))
             ) : (
-              <Badge variant="outline" className="text-[10px] border-white/10 text-white/60">
+              <Badge variant="outline" className="text-[10px] border-border-default text-foreground-faint">
                 {selectedItem.type || 'edge'}
               </Badge>
             )}
@@ -466,24 +466,24 @@ export default function ContextManagerPage() {
 
         <Section title="Mental model refs">
           {modelRefs.length === 0 ? (
-            <span className="text-white/50 italic">No mental-model refs attached.</span>
+            <span className="text-foreground-subtle italic">No mental-model refs attached.</span>
           ) : (
             <div className="space-y-2">
                   {modelRefs.map((ref, i) => {
                     const roleLabel = getRoleLabel(ref.role);
                     const scopeLabel = getRoleScopeLabel(ref.role);
                     return (
-                      <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-white/5 bg-black/10 p-2 space-y-1">
+                      <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-border-subtle bg-overlay p-2 space-y-1">
                         <div className="flex items-center gap-2">
                           <Badge className="text-[10px] bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd">
                             {scopeLabel}
                           </Badge>
-                          {ref.ext_id && <span className="text-[10px] font-mono text-white/50 truncate" title={ref.ext_id}>{ref.ext_id}</span>}
+                          {ref.ext_id && <span className="text-[10px] font-mono text-foreground-subtle truncate" title={ref.ext_id}>{ref.ext_id}</span>}
                         </div>
-                        <div className="text-[10px] text-white/70 truncate" title={ref.role || 'model'}>
-                          <span className="text-white/40">Template Role:</span> {roleLabel}
+                        <div className="text-[10px] text-foreground-faint truncate" title={ref.role || 'model'}>
+                          <span className="text-foreground-subtle">Template Role:</span> {roleLabel}
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[10px] text-white/50">
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-foreground-subtle">
                           {ref.attached_at && <span>attached {formatRelative(ref.attached_at)}</span>}
                           {ref.fetched_at && <span>fetched {formatRelative(ref.fetched_at)}</span>}
                           {ref.content_hash && <span className="font-mono col-span-2">hash {ref.content_hash}</span>}
@@ -508,7 +508,7 @@ export default function ContextManagerPage() {
 
         <Section title="Provenance">
           {Object.keys(provenance).length === 0 ? (
-            <span className="text-white/50 italic">No provenance recorded.</span>
+            <span className="text-foreground-subtle italic">No provenance recorded.</span>
           ) : (
             <div className="space-y-2">
               {Object.entries(provenance).map(([key, value]) => (
@@ -520,7 +520,7 @@ export default function ContextManagerPage() {
 
         <Section title="Stored data">
           {Object.keys(rawStored).length === 0 ? (
-            <span className="text-white/50 italic">No stored data.</span>
+            <span className="text-foreground-subtle italic">No stored data.</span>
           ) : (
             <div className="space-y-2">
               {Object.entries(rawStored).map(([key, value]) => (
@@ -546,7 +546,7 @@ export default function ContextManagerPage() {
     <PageShell
       title="Context Patches"
     >
-      <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-white/10">
+      <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-border-default">
         <div className="flex items-center gap-3 flex-wrap">
           <ServerBankSelectors
             servers={servers}
@@ -562,48 +562,48 @@ export default function ContextManagerPage() {
           {bankId && (
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wider text-white/40">Config</span>
+                <span className="text-[10px] uppercase tracking-wider text-foreground-subtle">Config</span>
                 <Badge
                   variant="outline"
                   className={cn(
-                    'text-[10px] border-white/10',
-                    bankMode === 'auto' ? 'bg-accent-secondary-bg text-accent-secondary-fg' : 'bg-white/5 text-white/50'
+                    'text-[10px] border-border-default',
+                    bankMode === 'auto' ? 'bg-accent-secondary-bg text-accent-secondary-fg' : 'bg-surface-card text-foreground-subtle'
                   )}
                 >
                   {bankMode === 'auto' ? 'Auto refresh' : bankMode === 'manual' ? 'Manual refresh' : 'Unmanaged'}
                 </Badge>
                 {typeof topKNodes === 'number' && (
-                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                  <Badge variant="outline" className="text-[10px] border-border-default text-foreground-subtle">
                     Import top {topKNodes} nodes
                   </Badge>
                 )}
                 {typeof maxModelsPerRun === 'number' && (
-                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">
+                  <Badge variant="outline" className="text-[10px] border-border-default text-foreground-subtle">
                     Deploy max {maxModelsPerRun}
                   </Badge>
                 )}
               </div>
 
-              <div className="w-px h-4 bg-white/10" />
+              <div className="w-px h-4 bg-surface-panel" />
 
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wider text-white/40">Model Types</span>
+                <span className="text-[10px] uppercase tracking-wider text-foreground-subtle">Model Types</span>
                 {allowedModelTypes.length > 0 ? (
                   allowedModelTypes.map((type: string) => (
-                    <Badge key={type} variant="outline" className="text-[10px] border-white/10 text-white/50">
+                    <Badge key={type} variant="outline" className="text-[10px] border-border-default text-foreground-subtle">
                       {modelTypeLabelMap.get(type) || type}
                     </Badge>
                   ))
                 ) : (
-                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">All types</Badge>
+                  <Badge variant="outline" className="text-[10px] border-border-default text-foreground-subtle">All types</Badge>
                 )}
               </div>
 
-              <div className="w-px h-4 bg-white/10" />
+              <div className="w-px h-4 bg-surface-panel" />
 
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wider text-white/40">Graph</span>
-                <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
+                <span className="text-[10px] uppercase tracking-wider text-foreground-subtle">Graph</span>
+                <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
                   {nodes.length} node{nodes.length !== 1 ? 's' : ''} / {edges.length} edge{edges.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -625,7 +625,7 @@ export default function ContextManagerPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 shrink-0">
+        <div className="flex items-center justify-between gap-3 border-b border-border-default pb-2 shrink-0">
           <TabsList variant="line">
             <TabsTrigger value="graph">Graph</TabsTrigger>
             <TabsTrigger value="candidates">Candidates</TabsTrigger>
@@ -635,17 +635,17 @@ export default function ContextManagerPage() {
         </div>
 
         <TabsContent value="graph" className="flex flex-col flex-1 min-h-0 mt-0">
-          <div className="flex items-center gap-3 pb-2 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3 pb-2 border-b border-border-default shrink-0">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
               <Input
                 value={graphSearch}
                 onChange={(e) => setGraphSearch(e.target.value)}
                 placeholder="Search entities and edges..."
-                className="h-8 pl-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                className="h-8 pl-8 text-xs bg-surface-card border-border-default text-foreground-default placeholder:text-foreground-subtle"
               />
             </div>
-            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded ml-auto">
+            <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded ml-auto">
               {filteredSortedNodes.length} node{filteredSortedNodes.length !== 1 ? 's' : ''} / {filteredSortedEdges.length} edge
               {filteredSortedEdges.length !== 1 ? 's' : ''}
             </span>
@@ -656,22 +656,22 @@ export default function ContextManagerPage() {
               className="min-w-0 flex flex-col gap-1"
               style={{ flex: leftFlex }}
             >
-              <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col" style={{ flex: topFlex }}>
-                <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
+              <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col" style={{ flex: topFlex }}>
+                <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Entities</span>
-                  <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
                     {filteredSortedNodes.length}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
                   {graphLoading ? (
                     <div className="p-3 space-y-2">
-                      <Skeleton className="h-10 w-full bg-white/10" />
-                      <Skeleton className="h-10 w-full bg-white/10" />
-                      <Skeleton className="h-10 w-full bg-white/10" />
+                      <Skeleton className="h-10 w-full bg-surface-panel" />
+                      <Skeleton className="h-10 w-full bg-surface-panel" />
+                      <Skeleton className="h-10 w-full bg-surface-panel" />
                     </div>
                   ) : filteredSortedNodes.length === 0 ? (
-                    <div className="text-[11px] text-white/40 px-2 py-3">No grounded entities loaded.</div>
+                    <div className="text-[11px] text-foreground-subtle px-2 py-3">No grounded entities loaded.</div>
                   ) : (
                     filteredSortedNodes.map((node) => (
                       <EntityListRow
@@ -691,19 +691,19 @@ export default function ContextManagerPage() {
                 className="h-2 shrink-0 cursor-row-resize flex items-center justify-center group"
                 title="Drag to resize top and bottom panels; double-click to reset"
               >
-                <div className="w-16 h-1 rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors" />
+                <div className="w-16 h-1 rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors" />
               </div>
 
-              <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
-                <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
+              <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col" style={{ flex: bottomFlex }}>
+                <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
                   <span className="font-medium text-sm">Edges</span>
-                  <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
                     {filteredSortedEdges.length}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
                   {groupedEdgeRows.length === 0 && (
-                    <div className="text-[11px] text-white/40 px-2 py-3">No grounded edges loaded.</div>
+                    <div className="text-[11px] text-foreground-subtle px-2 py-3">No grounded edges loaded.</div>
                   )}
                   {groupedEdgeRows.map(({ edge, count, key, isGroup }) => (
                     <EdgeListRow
@@ -726,10 +726,10 @@ export default function ContextManagerPage() {
               className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
               title="Drag to resize left and right panels; double-click to reset"
             >
-              <div className="w-1 h-16 rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors" />
+              <div className="w-1 h-16 rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors" />
             </div>
 
-            <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
+            <Card className="min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: rightFlex }}>
               {renderDetailPanel()}
             </Card>
           </div>

@@ -164,24 +164,24 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
         </DialogHeader>
         <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
           <div className="shrink-0 flex items-center gap-2">
-            <span className="text-xs text-white/60">Name:</span>
+            <span className="text-xs text-foreground-faint">Name:</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={readOnly}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-surface-inset border border-border-default text-[12px] text-foreground-muted focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Table name"
             />
           </div>
-          <div className="flex-1 min-h-0 overflow-auto custom-scrollbar rounded-md border border-white/10 bg-surface-overlay">
-            <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0 sticky top-0 bg-surface-overlay z-10">
+          <div className="flex-1 min-h-0 overflow-auto custom-scrollbar rounded-md border border-border-default bg-surface-overlay">
+            <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0 sticky top-0 bg-surface-overlay z-10">
               <span>{emptyColumns ? 'Table' : `${rows.length} row${rows.length === 1 ? '' : 's'}`}</span>
               <DropdownMenu>
                 <DropdownMenuTrigger>
                   <span
                     role="button"
-                    className="p-1 rounded text-white/40 hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50 transition-colors"
+                    className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50 transition-colors"
                     title="Copy table"
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -194,27 +194,27 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
               </DropdownMenu>
             </div>
             {emptyColumns ? (
-              <div className="p-4 text-sm text-white/40">No columns. Add a column to start editing.</div>
+              <div className="p-4 text-sm text-foreground-subtle">No columns. Add a column to start editing.</div>
             ) : (
               <table className="w-full text-left text-[12px] border-collapse">
                 <thead className="sticky top-0 bg-surface-panel z-10">
-                  <tr className="border-b border-white/20">
+                  <tr className="border-b border-border-strong">
                     <th className="py-2 px-2 w-10"></th>
                     {columns.map((c, i) => (
-                      <th key={i} className="py-2 px-2 font-semibold text-white/80 min-w-[8rem]">
+                      <th key={i} className="py-2 px-2 font-semibold text-foreground-muted min-w-[8rem]">
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
                             value={c}
                             onChange={(e) => handleRenameColumn(c, e.target.value)}
                             disabled={readOnly}
-                            className="flex-1 min-w-0 px-1 py-0.5 rounded bg-transparent border border-transparent hover:border-white/10 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:outline-none text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="flex-1 min-w-0 px-1 py-0.5 rounded bg-transparent border border-transparent hover:border-border-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:outline-none text-foreground-muted disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                           {!readOnly && (
                             <button
                               type="button"
                               onClick={() => handleRemoveColumn(c)}
-                              className="p-0.5 rounded text-white/30 hover:text-destructive-fg hover:bg-destructive-fg/10"
+                              className="p-0.5 rounded text-foreground-placeholder hover:text-destructive-fg hover:bg-destructive-fg/10"
                               title="Remove column"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -227,13 +227,13 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
                 </thead>
                 <tbody>
                   {rows.map((row, i) => (
-                    <tr key={i} className="border-b border-white/10">
+                    <tr key={i} className="border-b border-border-default">
                       <td className="py-1 px-2 align-middle">
                         {!readOnly && (
                           <button
                             type="button"
                             onClick={() => handleRemoveRow(i)}
-                            className="p-1 rounded text-white/30 hover:text-destructive-fg hover:bg-destructive-fg/10"
+                            className="p-1 rounded text-foreground-placeholder hover:text-destructive-fg hover:bg-destructive-fg/10"
                             title="Remove row"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -247,7 +247,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
                             value={formatCell(row[c])}
                             onChange={(e) => handleCellChange(i, c, e.target.value)}
                             disabled={readOnly}
-                            className="w-full px-1 py-0.5 rounded bg-black/20 border border-transparent hover:border-white/10 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:outline-none text-white/70 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="w-full px-1 py-0.5 rounded bg-surface-inset border border-transparent hover:border-border-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:outline-none text-foreground-faint disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                         </td>
                       ))}
@@ -278,7 +278,7 @@ export function TableFocusModal({ open, onOpenChange, table, onApply, readOnly =
               size="sm"
               onClick={handleApply}
               disabled={emptyColumns}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Apply
             </Button>

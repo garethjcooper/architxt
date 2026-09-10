@@ -87,27 +87,27 @@ function ColumnCard({
   const selectedCount = extIds.filter((id) => selectedIds.has(id)).length;
 
   return (
-    <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col h-full">
+    <div className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col h-full">
       {/* Header */}
-      <div className={`px-3 py-2 border-b border-white/10 ${colorClass}`}>
+      <div className={`px-3 py-2 border-b border-border-default ${colorClass}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {icon}
             <span className="font-medium text-sm">{title}</span>
             {headerExtra && <div className="ml-1">{headerExtra}</div>}
           </div>
-          <span className="text-xs font-mono bg-black/30 px-2 py-0.5 rounded">{count} ({selectedCount})</span>
+          <span className="text-xs font-mono bg-surface-inset px-2 py-0.5 rounded">{count} ({selectedCount})</span>
         </div>
       </div>
 
       {/* Select-all bar */}
       {showSelectAll && (
-        <div className="px-3 py-1.5 border-b border-white/5 flex items-center gap-2 bg-white/[0.02]">
+        <div className="px-3 py-1.5 border-b border-border-subtle flex items-center gap-2 bg-on-dark/[0.02]">
           <Checkbox
             checked={allSelected}
             onCheckedChange={(checked) => onSelectAll(extIds, checked === true)}
           />
-          <span className="text-[10px] text-white/40">{allSelected ? 'Deselect all' : 'Select all'}</span>
+          <span className="text-[10px] text-foreground-subtle">{allSelected ? 'Deselect all' : 'Select all'}</span>
         </div>
       )}
 
@@ -717,13 +717,13 @@ export default function HindsightPage() {
       loading={loadingServers}
     >
       {/* Controls */}
-      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border-default">
         <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-white/40" />
+          <Server className="h-4 w-4 text-foreground-subtle" />
           <select
             value={selectedServerId}
             onChange={(e) => setSelectedServerId(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             <option value="">Select server...</option>
             {servers.map((s, idx) => (
@@ -733,12 +733,12 @@ export default function HindsightPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-white/40" />
+          <Database className="h-4 w-4 text-foreground-subtle" />
           <select
             value={selectedBankId}
             onChange={(e) => setSelectedBankId(e.target.value)}
             disabled={!selectedServerId || loadingBanks || banks.length === 0}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
           >
             <option value="">{loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}</option>
             {banks.map((b, idx) => (
@@ -749,7 +749,7 @@ export default function HindsightPage() {
 
         {/* Object selector */}
         <div className="flex items-center gap-2">
-          <GitCompare className="h-4 w-4 text-white/40" />
+          <GitCompare className="h-4 w-4 text-foreground-subtle" />
           <select
             value={selectedObject}
             onChange={(e) => {
@@ -758,7 +758,7 @@ export default function HindsightPage() {
               setCounts(null);
               setSelectedIds(new Set());
             }}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             <option value="documents">Documents</option>
             <option value="entities">Entities</option>
@@ -777,7 +777,7 @@ export default function HindsightPage() {
         </Button>
 
         {counts && (
-          <span className="text-xs text-white/40">{counts.total} total</span>
+          <span className="text-xs text-foreground-subtle">{counts.total} total</span>
         )}
       </div>
 
@@ -791,7 +791,7 @@ export default function HindsightPage() {
 
       {/* Empty state */}
       {!diffResult && !loadingDiff && (
-        <div className="text-center py-16 text-white/30">
+        <div className="text-center py-16 text-foreground-placeholder">
           <ArrowRightLeft className="h-12 w-12 mx-auto mb-3 opacity-40" />
           <p className="text-sm">Select a server and bank, then click Fetch {selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'} to start the comparison.</p>
         </div>
@@ -801,10 +801,10 @@ export default function HindsightPage() {
       {loadingDiff && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08]">
-              <div className="px-4 py-2 border-b border-white/10"><Skeleton className="h-4 w-24" /></div>
+            <div key={i} className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08]">
+              <div className="px-4 py-2 border-b border-border-default"><Skeleton className="h-4 w-24" /></div>
               {Array.from({ length: 5 }).map((_, j) => (
-                <div key={j} className="px-4 py-3 border-b border-white/5"><Skeleton className="h-3 w-full" /></div>
+                <div key={j} className="px-4 py-3 border-b border-border-subtle"><Skeleton className="h-3 w-full" /></div>
               ))}
             </div>
           ))}
@@ -818,17 +818,17 @@ export default function HindsightPage() {
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={searchCol1}
                   onChange={(e) => setSearchCol1(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol1 && (
                   <button
                     onClick={() => setSearchCol1('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -856,7 +856,7 @@ export default function HindsightPage() {
               onSelectAll={selectAll}
             >
               {filteredCol1.length === 0 ? (
-                <div className="px-3 py-6 text-center text-white/30 text-xs">{emptyCol1Text}</div>
+                <div className="px-3 py-6 text-center text-foreground-placeholder text-xs">{emptyCol1Text}</div>
               ) : (
                 isEntityMode ? (
                   filteredCol1.map((item) => (
@@ -911,17 +911,17 @@ export default function HindsightPage() {
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={searchCol2}
                   onChange={(e) => setSearchCol2(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol2 && (
                   <button
                     onClick={() => setSearchCol2('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -970,7 +970,7 @@ export default function HindsightPage() {
                       className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                         col2Filter === f
                           ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
-                          : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                          : 'bg-surface-card border-border-default text-foreground-subtle hover:bg-surface-panel'
                       }`}
                     >
                       {f === 'out_of_sync' ? 'Out of Sync' : f === 'in_sync' ? 'In Sync' : 'All'}
@@ -980,7 +980,7 @@ export default function HindsightPage() {
               }
             >
               {filteredCol2.length === 0 ? (
-                <div className="px-3 py-6 text-center text-white/30 text-xs">
+                <div className="px-3 py-6 text-center text-foreground-placeholder text-xs">
                   {emptyCol2Text}
                 </div>
               ) : (
@@ -1058,17 +1058,17 @@ export default function HindsightPage() {
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={searchCol3}
                   onChange={(e) => setSearchCol3(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol3 && (
                   <button
                     onClick={() => setSearchCol3('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -1096,7 +1096,7 @@ export default function HindsightPage() {
               onSelectAll={selectAll}
             >
               {filteredCol3.length === 0 ? (
-                <div className="px-3 py-6 text-center text-white/30 text-xs">{emptyCol3Text}</div>
+                <div className="px-3 py-6 text-center text-foreground-placeholder text-xs">{emptyCol3Text}</div>
               ) : isEntityMode ? (
                 filteredCol3.map((item) => (
                   <EntitySyncRow

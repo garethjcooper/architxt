@@ -234,12 +234,12 @@ export function ManageMetadataDialog({
           meta.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-badge-neutral-bg border-white/10 text-white/40 line-through hover:bg-surface-card'
+            ? 'bg-badge-neutral-bg border-border-default text-foreground-subtle line-through hover:bg-surface-card'
             : meta.currentState === 'common'
               ? 'bg-badge-info-bg border-badge-info-bd text-badge-info-fg'
               : meta.currentState === 'partial'
                 ? 'bg-badge-neutral-bg border-badge-neutral-bd text-badge-neutral-fg hover:bg-badge-neutral-bg/70'
-                : 'bg-surface-card border-white/10 text-white/60 hover:bg-surface-hover hover:border-white/20'
+                : 'bg-surface-card border-border-default text-foreground-faint hover:bg-surface-hover hover:border-border-strong'
         }`}
       >
         <span className={isRemoved ? 'line-through' : ''}>{displayLabel}</span>
@@ -263,108 +263,108 @@ export function ManageMetadataDialog({
       <DialogContent className="!w-[50vw] !max-w-none max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Metadata</DialogTitle>
-          <p className="text-sm text-white/60 mt-2">
+          <p className="text-sm text-foreground-faint mt-2">
             {selectedDocIds.length} document{selectedDocIds.length !== 1 ? 's' : ''} selected
           </p>
         </DialogHeader>
 
         {/* Search Box */}
         <div className="relative">
-          <Braces className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+          <Braces className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-foreground-subtle pointer-events-none" />
           <input
             type="text"
             placeholder="Filter by key or value..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-surface-card text-white placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-border-strong bg-surface-card text-foreground-default placeholder-white/50 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 
         <div className="space-y-6 overflow-y-auto flex-1">
           {/* On All Documents */}
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">On All Documents</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">On All Documents</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading metadata...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading metadata...</p>
               ) : commonMetadata.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {commonMetadata.map(renderPill)}
                 </div>
               ) : (
-                <p className="text-xs text-white/40 italic">No metadata on all documents</p>
+                <p className="text-xs text-foreground-subtle italic">No metadata on all documents</p>
               )}
             </div>
           </div>
 
           {/* On Some Documents */}
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">On Some Documents</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">On Some Documents</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading metadata...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading metadata...</p>
               ) : partialMetadata.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {partialMetadata.map(renderPill)}
                 </div>
               ) : (
-                <p className="text-xs text-white/40 italic">No metadata on some documents</p>
+                <p className="text-xs text-foreground-subtle italic">No metadata on some documents</p>
               )}
             </div>
           </div>
 
           {/* Marked for Removal */}
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">Marked for Removal</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">Marked for Removal</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading metadata...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading metadata...</p>
               ) : removedMetadata.length > 0 ? (
                 <div className="flex flex-wrap gap-2 opacity-60">
                   {removedMetadata.map(renderPill)}
                 </div>
               ) : (
-                <p className="text-xs text-white/40 italic">No metadata marked for removal</p>
+                <p className="text-xs text-foreground-subtle italic">No metadata marked for removal</p>
               )}
             </div>
           </div>
 
           {/* Available to Add */}
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">Available to Add</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">Available to Add</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading metadata...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading metadata...</p>
               ) : availableMetadata.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {availableMetadata.map(renderPill)}
                 </div>
               ) : (
-                <p className="text-xs text-white/40 italic">All metadata is assigned</p>
+                <p className="text-xs text-foreground-subtle italic">All metadata is assigned</p>
               )}
             </div>
           </div>
 
           {metadata.length === 0 && !loading && (
-            <div className="text-center text-white/50 py-8">
+            <div className="text-center text-foreground-subtle py-8">
               No metadata available
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-6 border-t border-white/10">
+        <div className="flex justify-end gap-2 pt-6 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

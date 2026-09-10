@@ -122,14 +122,14 @@ export function SessionItemsPanel({
                   className={`rounded border overflow-hidden transition-colors ${
                     isActive
                       ? 'bg-accent-primary-bg border-accent-primary-bd'
-                      : 'bg-black/20 border-white/5 hover:bg-white/5'
+                      : 'bg-surface-inset border-border-subtle hover:bg-surface-card'
                   }`}
                 >
                   <div className="flex items-center gap-2 px-2 py-1.5 min-h-[2.8125rem]">
                     <button
                       type="button"
                       onClick={() => toggleExpanded(step.id)}
-                      className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 ${
+                      className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-foreground-subtle hover:text-foreground-default hover:bg-surface-panel ${
                         !canExpand ? 'invisible' : ''
                       }`}
                       title={isExpanded ? 'Collapse query' : 'Expand query'}
@@ -148,10 +148,10 @@ export function SessionItemsPanel({
                       className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
                       title={query || 'Untitled query'}
                     >
-                      <div className="flex items-center justify-between text-xs text-white/90">
+                      <div className="flex items-center justify-between text-xs text-foreground-default">
                         <span className="truncate flex items-center gap-2 min-w-0">
                           {createdAt && (
-                            <span className="text-[10px] text-white/40 whitespace-nowrap">{createdAt}</span>
+                            <span className="text-[10px] text-foreground-subtle whitespace-nowrap">{createdAt}</span>
                           )}
                           {step.status === 'running' && (
                             <span className="text-accent-tertiary-fg animate-pulse">● running</span>
@@ -161,7 +161,7 @@ export function SessionItemsPanel({
                           )}
                         </span>
                       </div>
-                      <div className="text-[10px] text-white/50 font-mono truncate">
+                      <div className="text-[10px] text-foreground-subtle font-mono truncate">
                         <AqlView query={previewQuery} compact className="text-[10px] leading-tight" />
                       </div>
                     </button>
@@ -169,7 +169,7 @@ export function SessionItemsPanel({
                     <button
                       type="button"
                       onClick={() => onSelectStep(step, true)}
-                      className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10"
+                      className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-foreground-subtle hover:text-foreground-default hover:bg-surface-panel"
                       title="Open in new tab"
                     >
                       <ExternalLink className="h-3 w-3" />
@@ -178,7 +178,7 @@ export function SessionItemsPanel({
                     <DropdownMenu>
                       <DropdownMenuTrigger>
                         <span
-                          className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/10 cursor-pointer"
+                          className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-foreground-subtle hover:text-foreground-default hover:bg-surface-panel cursor-pointer"
                           onClick={(e) => e.stopPropagation()}
                           aria-label="Query actions"
                           role="button"
@@ -188,7 +188,7 @@ export function SessionItemsPanel({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-36 bg-surface-overlay border-white/10 text-white/90"
+                        className="w-36 bg-surface-overlay border-border-default text-foreground-default"
                       >
                         <DropdownMenuItem
                           onClick={(e) => {
@@ -238,8 +238,8 @@ export function SessionItemsPanel({
                   </div>
 
                   {isExpanded && canExpand && (
-                    <div className="px-2 pb-2 border-t border-white/5">
-                      <div className="pt-2 text-[10px] text-white/50 font-mono">
+                    <div className="px-2 pb-2 border-t border-border-subtle">
+                      <div className="pt-2 text-[10px] text-foreground-subtle font-mono">
                         <AqlView
                           query={remainder}
                           className="text-[10px] leading-tight whitespace-pre-wrap"
@@ -252,12 +252,12 @@ export function SessionItemsPanel({
             })}
 
             {items.length === 0 && !loading && (
-              <div className="text-white/40 text-xs px-3 py-2">
+              <div className="text-foreground-subtle text-xs px-3 py-2">
                 No workspace items yet. Run Reflect to add results.
               </div>
             )}
             {loading && items.length === 0 && (
-              <div className="text-white/40 text-xs px-3 py-2">Loading session items…</div>
+              <div className="text-foreground-subtle text-xs px-3 py-2">Loading session items…</div>
             )}
           </div>
         </div>

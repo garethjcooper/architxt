@@ -34,7 +34,7 @@ import {
 
 
 const inputClass =
-  '!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle';
+  '!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle';
 
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
@@ -509,14 +509,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Entity Template</Label>
               {isSystemTemplate && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                   System template
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
+            <p className="text-[10px] text-foreground-subtle">Derive one mental model per related entity</p>
             {templateValidation && (
               <p className="text-[10px] text-destructive-fg mt-0.5">{templateValidation}</p>
             )}
@@ -526,10 +526,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
 
           {isTemplate && (
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-template-role" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-template-role" className="text-xs uppercase text-foreground-subtle font-medium">
               Template Role
             </Label>
-            <p id="mm-detail-template-role" className="text-sm text-white font-mono truncate">
+            <p id="mm-detail-template-role" className="text-sm text-foreground-default font-mono truncate">
               {selectedTemplateRole?.label || getRoleLabel(effectiveTemplateRoleId || undefined) || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
             </p>
           </div>
@@ -548,29 +548,29 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-ext-id" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-ext-id" className="text-xs uppercase text-foreground-subtle font-medium">
               External ID
             </Label>
-            <p id="mm-detail-ext-id" className="text-sm text-white font-mono truncate">
+            <p id="mm-detail-ext-id" className="text-sm text-foreground-default font-mono truncate">
               {model.ext_id || '-'}
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-name" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-name" className="text-xs uppercase text-foreground-subtle font-medium">
               Name *
             </Label>
             {roleScope && roleRule ? (
-              <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
+              <div className="flex items-stretch rounded-lg overflow-hidden border border-border-strong focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
                 <Input
                   id="mm-detail-name"
                   value={namePrefix}
                   disabled={isSystemTemplate}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="prefix"
-                  className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                  className="!rounded-none !border-0 !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle flex-1 min-w-0"
                   
                 />
-                <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
+                <span className="inline-flex items-center px-3 bg-surface-card text-foreground-faint text-xs whitespace-nowrap border-l border-border-default">
                   {roleRule.nameTail}
                 </span>
               </div>
@@ -599,7 +599,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-foreground-subtle font-medium">
               Source Query *
             </Label>
             {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
@@ -626,28 +626,28 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-refresh-mode" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-refresh-mode" className="text-xs uppercase text-foreground-subtle font-medium">
               Refresh Mode
             </Label>
             <select
               id="mm-detail-refresh-mode"
               value={refreshMode}
               onChange={(e) => handleRefreshModeChange(e.target.value as 'full' | 'delta')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
+              className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
             >
               <option value="full">Full</option>
               <option value="delta">Delta</option>
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-tags-match-mode" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-tags-match-mode" className="text-xs uppercase text-foreground-subtle font-medium">
               Tags Match
             </Label>
             <select
               id="mm-detail-tags-match-mode"
               value={tagsMatchMode}
               onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
+              className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
             >
               <option value="all_strict">All Strict</option>
               <option value="any_strict">Any Strict</option>
@@ -655,25 +655,25 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               <option value="any">Any</option>
               <option value="exact">Exact</option>
             </select>
-            <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
+            <p className="text-[10px] text-foreground-subtle">How tags on this model must match document tags</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between border border-border-default rounded-lg p-3">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Refresh after consolidation</Label>
-              <p className="text-[10px] text-white/40">Run a refresh once consolidation completes</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Refresh after consolidation</Label>
+              <p className="text-[10px] text-foreground-subtle">Run a refresh once consolidation completes</p>
             </div>
             <Switch
               checked={refreshAfterConsolidation}
               onCheckedChange={handleRefreshAfterConsolidationChange}
             />
           </div>
-          <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between border border-border-default rounded-lg p-3">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Exclude All Mental Models</Label>
-              <p className="text-[10px] text-white/40">Hide every other mental model from this one</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Exclude All Mental Models</Label>
+              <p className="text-[10px] text-foreground-subtle">Hide every other mental model from this one</p>
             </div>
             <Switch checked={excludeAll} onCheckedChange={handleExcludeAllChange} />
           </div>
@@ -681,7 +681,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-exclude-list" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-exclude-list" className="text-xs uppercase text-foreground-subtle font-medium">
               Exclude List
             </Label>
             <Input
@@ -694,7 +694,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-max-tokens" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-max-tokens" className="text-xs uppercase text-foreground-subtle font-medium">
               Max Tokens
             </Label>
             <Input
@@ -717,9 +717,9 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
       </div>
 
       {/* Read-only Metadata */}
-      <div className="space-y-4 pt-2 border-t border-white/10 shrink-0">
+      <div className="space-y-4 pt-2 border-t border-border-default shrink-0">
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-white/50 font-medium">Tags</Label>
+          <Label className="text-xs uppercase text-foreground-subtle font-medium">Tags</Label>
           {model.tags?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {model.tags.map((t) => (
@@ -732,12 +732,12 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/40 italic">-</p>
+            <p className="text-sm text-foreground-subtle italic">-</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-white/50 font-medium">Entities</Label>
+          <Label className="text-xs uppercase text-foreground-subtle font-medium">Entities</Label>
           {model.entities?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {model.entities.map((e) => (
@@ -750,24 +750,24 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/40 italic">-</p>
+            <p className="text-sm text-foreground-subtle italic">-</p>
           )}
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
-            <p className="text-xs uppercase text-white/50 font-medium">ID</p>
-            <p className="text-sm text-white font-mono">{model.id}</p>
+            <p className="text-xs uppercase text-foreground-subtle font-medium">ID</p>
+            <p className="text-sm text-foreground-default font-mono">{model.id}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-            <p className="text-sm text-white/70">
+            <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+            <p className="text-sm text-foreground-faint">
               {formatDistanceToNow(new Date(model.created_at), { addSuffix: true })}
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-            <p className="text-sm text-white/70">
+            <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+            <p className="text-sm text-foreground-faint">
               {formatDistanceToNow(new Date(model.updated_at), { addSuffix: true })}
             </p>
           </div>
@@ -777,14 +777,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
   );
 
   const actionBar = (
-    <div className="shrink-0 px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+    <div className="shrink-0 px-6 py-4 border-t border-border-default flex justify-end gap-3">
       {isSystemTemplate && (
         <Button
           type="button"
           variant="outline"
           onClick={handleResetSourceQuery}
           disabled={!systemTemplateDefaults}
-          className="text-white/80 border-white/20 hover:bg-white/10 hover:text-white flex items-center gap-2 mr-auto"
+          className="text-foreground-muted border-border-strong hover:bg-surface-panel hover:text-foreground-default flex items-center gap-2 mr-auto"
         >
           <RotateCcw className="h-4 w-4" />
           Reset query to default
@@ -793,14 +793,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
       <Button
         variant="ghost"
         onClick={() => onOpenChange(false)}
-        className="text-white/70 hover:text-white hover:bg-white/5"
+        className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
       >
         Close
       </Button>
       <Button
         onClick={handleSave}
         disabled={!hasChanges || isSaving || !!(roleTemplateValidation && !roleTemplateValidation.valid)}
-        className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
         {isSaving ? 'Saving...' : 'Save Changes'}
@@ -822,7 +822,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
           } max-h-[85vh] overflow-hidden p-0 flex flex-col`}
         >
           <DialogHeader className="shrink-0 px-6 pt-6">
-            <DialogTitle className="text-xl font-semibold text-white">Mental Model Details</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-foreground-default">Mental Model Details</DialogTitle>
           </DialogHeader>
 
           {showDerivedPanel ? (
@@ -830,8 +830,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
               <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
                 <div className="w-1/2 min-w-[480px] p-4 flex flex-col gap-4 overflow-hidden">
-                  <div className="shrink-0 border border-white/10 rounded-lg p-3 bg-white/[0.02]">
-                    <p className="text-xs uppercase text-white/50 font-medium">
+                  <div className="shrink-0 border border-border-default rounded-lg p-3 bg-on-dark/[0.02]">
+                    <p className="text-xs uppercase text-foreground-subtle font-medium">
                       Derived instances inherit the template configuration above.
                     </p>
                   </div>
@@ -839,7 +839,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                   <DerivedModelsPanel
                     model={model}
                     derived={derived}
-                    className="flex-1 border border-white/10 rounded-md overflow-hidden"
+                    className="flex-1 border border-border-default rounded-md overflow-hidden"
                     onConfigure={(selected) => {
                       setSelectedDerived(selected);
                       setDerivedConfigOpen(true);

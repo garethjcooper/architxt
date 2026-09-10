@@ -30,14 +30,14 @@ export function CaseMatchToggle({ checked, onChange, className }: CaseMatchToggl
       <div
         className={cn(
           "relative w-10 h-5 rounded-full transition-colors duration-200",
-          "bg-white/10 peer-checked:bg-accent-primary-solid"
+          "bg-surface-panel peer-checked:bg-accent-primary-solid"
         )}
       >
         <div
           className={cn(
             "absolute top-[2px] left-[2px] w-4 h-4 rounded-full",
-            "bg-zinc-800 transition-all duration-200",
-            checked && "translate-x-5 bg-zinc-900"
+            "bg-surface-inset transition-all duration-200",
+            checked && "translate-x-5 bg-surface-raised"
           )}
         />
       </div>

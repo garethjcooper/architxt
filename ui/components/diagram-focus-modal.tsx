@@ -47,13 +47,13 @@ export function DiagramFocusModal({ open, onOpenChange, name: initialName, conte
         </DialogHeader>
         <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
           <div className="shrink-0 flex items-center gap-2">
-            <span className="text-xs text-white/60">Name:</span>
+            <span className="text-xs text-foreground-faint">Name:</span>
             <input
               type="text"
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               disabled={readOnly}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-black/30 border border-white/10 text-[12px] text-white/80 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-surface-inset border border-border-default text-[12px] text-foreground-muted focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Diagram name"
             />
           </div>
@@ -78,7 +78,7 @@ export function DiagramFocusModal({ open, onOpenChange, name: initialName, conte
                 onClick={handleApply}
                 disabled={!!error}
                 title={error ? 'Fix the diagram error before applying' : 'Apply changes'}
-                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Apply
               </Button>

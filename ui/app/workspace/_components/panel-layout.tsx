@@ -5,12 +5,12 @@ import { cn } from '@/lib/utils';
 
 function PanelHeader({ title, count, actions }: { title: string; count?: number; actions?: React.ReactNode }) {
   return (
-    <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0 overflow-hidden">
+    <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0 overflow-hidden">
       <div className="text-xs font-medium truncate">{title}</div>
       <div className="flex items-center gap-2 shrink-0">
         {actions}
         {count !== undefined && (
-          <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
+          <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
             {count}
           </span>
         )}
@@ -32,7 +32,7 @@ function Panel({
   return (
     <Card
       className={cn(
-        'min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0',
+        'min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden pt-0',
         className
       )}
       style={style}
@@ -81,7 +81,7 @@ function ResizeHandle({
     >
       <div
         className={cn(
-          'rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors',
+          'rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors',
           isHorizontal ? 'w-16 h-1' : 'w-1 h-16'
         )}
       />

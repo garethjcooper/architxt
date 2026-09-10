@@ -50,7 +50,7 @@ export function EnvelopeControls({
   const [controlsOpen, setControlsOpen] = useState(false);
 
   return (
-    <div className="relative h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
+    <div className="relative h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
       <div className="min-w-0 flex-1 text-xs font-medium truncate pr-3">{headerTitle ?? title}</div>
       <div className="flex items-center gap-2 shrink-0">
         {count !== undefined && (
@@ -60,7 +60,7 @@ export function EnvelopeControls({
         )}
         {extraHeaderItems}
         {showControlsToggle && (
-          <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-[10px] text-foreground-faint cursor-pointer select-none">
             <Switch
               checked={controlsOpen}
               onCheckedChange={(checked) => setControlsOpen(Boolean(checked))}
@@ -71,9 +71,9 @@ export function EnvelopeControls({
         )}
       </div>
       {showControlsToggle && controlsOpen && (
-        <div className="absolute top-full right-3 mt-1 z-30 flex flex-col gap-2 rounded-md border border-white/10 bg-surface-overlay/95 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[260px]">
+        <div className="absolute top-full right-3 mt-1 z-30 flex flex-col gap-2 rounded-md border border-border-default bg-surface-overlay/95 backdrop-blur-sm px-3 py-2 shadow-lg max-w-[260px]">
           {showIndex != null && onShowIndexChange != null && (
-            <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+            <label className="flex items-center gap-1.5 text-[10px] text-foreground-faint cursor-pointer select-none">
               <Switch
                 checked={showIndex}
                 onCheckedChange={(checked) => onShowIndexChange(Boolean(checked))}
@@ -82,7 +82,7 @@ export function EnvelopeControls({
               Show index
             </label>
           )}
-          <label className="flex items-center gap-1.5 text-[10px] text-white/70 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-[10px] text-foreground-faint cursor-pointer select-none">
             <Switch
               checked={plain}
               onCheckedChange={(checked) => onPlainChange(Boolean(checked))}
@@ -90,7 +90,7 @@ export function EnvelopeControls({
             />
             Plain text
           </label>
-          <div className="h-px bg-white/10" />
+          <div className="h-px bg-surface-panel" />
           {structuredItems?.graph && (
             <StructuredControlRow
               icon={<Network className="h-3 w-3" />}
@@ -116,12 +116,12 @@ export function EnvelopeControls({
             />
           )}
           {(structuredItems?.graph || structuredItems?.tables || structuredItems?.diagrams) && (
-            <div className="h-px bg-white/10" />
+            <div className="h-px bg-surface-panel" />
           )}
           <button
             type="button"
             onClick={onCopyText}
-            className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-accent-primary-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-[10px] text-foreground-faint hover:text-accent-primary-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Copy className="h-3 w-3" />
             Copy text
@@ -129,7 +129,7 @@ export function EnvelopeControls({
           <button
             type="button"
             onClick={onSaveMd}
-            className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-accent-primary-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-[10px] text-foreground-faint hover:text-accent-primary-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-3 w-3" />
             Save .md
@@ -152,7 +152,7 @@ function StructuredControlRow({
   onAdd?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 text-[10px] text-white/70">
+    <div className="flex items-center justify-between gap-2 text-[10px] text-foreground-faint">
       <div className="flex items-center gap-1.5 min-w-0">
         {icon}
         <span className="truncate">{label}</span>
@@ -161,7 +161,7 @@ function StructuredControlRow({
         <button
           type="button"
           onClick={onCopy}
-          className="p-1 rounded hover:text-accent-primary-fg hover:bg-white/10 transition-colors"
+          className="p-1 rounded hover:text-accent-primary-fg hover:bg-surface-panel transition-colors"
           title="Copy"
           aria-label={`Copy ${label}`}
         >
@@ -171,7 +171,7 @@ function StructuredControlRow({
           <button
             type="button"
             onClick={onAdd}
-            className="p-1 rounded hover:text-accent-primary-fg hover:bg-white/10 transition-colors"
+            className="p-1 rounded hover:text-accent-primary-fg hover:bg-surface-panel transition-colors"
             title="Add to page"
             aria-label={`Add ${label} to page`}
           >

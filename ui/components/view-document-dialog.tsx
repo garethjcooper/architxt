@@ -75,9 +75,9 @@ function formatDuration(ms: number): string {
 
 function MetricBadge({ label, value }: { label: string; value: string | number }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-0.5 text-[11px] text-white/60">
-      <span className="text-white/40">{label}:</span>
-      <span className="text-white/70 font-mono">{value}</span>
+    <span className="inline-flex items-center gap-1 rounded bg-surface-card px-2 py-0.5 text-[11px] text-foreground-faint">
+      <span className="text-foreground-subtle">{label}:</span>
+      <span className="text-foreground-faint font-mono">{value}</span>
     </span>
   );
 }
@@ -258,7 +258,7 @@ export function ViewDocumentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!w-[85vw] !max-w-none h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Document Details
           </DialogTitle>
         </DialogHeader>
@@ -268,7 +268,7 @@ export function ViewDocumentDialog({
           <div className="space-y-6 overflow-y-auto custom-scrollbar min-h-0">
             {/* Status Badge */}
             <div className="flex items-center gap-3">
-              <span className="text-sm text-white/70">Status:</span>
+              <span className="text-sm text-foreground-faint">Status:</span>
               <Badge className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${statusColors[document.status] || 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'}`}>
                 <ArchitxtIcon className="h-3 w-3" />
                 {statusLabels[document.status] || document.status}
@@ -279,7 +279,7 @@ export function ViewDocumentDialog({
             <div className="space-y-4">
               {/* External ID */}
               <div className="space-y-2">
-                <Label htmlFor="ext-id" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="ext-id" className="text-xs uppercase text-foreground-subtle font-medium">
                   External ID
                 </Label>
                 <Input
@@ -287,7 +287,7 @@ export function ViewDocumentDialog({
                   value={extId}
                   onChange={(e) => setExtId(e.target.value)}
                   placeholder="Enter external ID"
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                  className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 />
               </div>
 
@@ -295,18 +295,18 @@ export function ViewDocumentDialog({
               <div className="flex gap-4">
                 {/* Document Date */}
                 <div className="space-y-2 shrink-0 w-[240px]">
-                  <Label className="text-xs uppercase text-white/50 font-medium">Document Date</Label>
+                  <Label className="text-xs uppercase text-foreground-subtle font-medium">Document Date</Label>
                   <Popover>
                     <PopoverTrigger>
                       <div
                         className={cn(
-                          "w-full justify-start text-left font-normal cursor-pointer inline-flex items-center rounded-lg border border-white/20 bg-transparent px-3 py-2 text-white hover:bg-white/5 transition-colors",
-                          !timestamp && "text-white/40"
+                          "w-full justify-start text-left font-normal cursor-pointer inline-flex items-center rounded-lg border border-border-strong bg-transparent px-3 py-2 text-foreground-default hover:bg-surface-card transition-colors",
+                          !timestamp && "text-foreground-subtle"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4 text-white/50 shrink-0" />
+                        <CalendarIcon className="mr-2 h-4 w-4 text-foreground-subtle shrink-0" />
                         {timestamp ? (
-                          <span className="text-white">{(() => {
+                          <span className="text-foreground-default">{(() => {
                             try {
                               const d = parseISO(timestamp);
                               if (isNaN(d.getTime())) throw new Error('invalid');
@@ -320,7 +320,7 @@ export function ViewDocumentDialog({
                         )}
                       </div>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-white/20">
+                    <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-border-strong">
                       <div className="p-3">
                         <Calendar
                           mode="single"
@@ -350,12 +350,12 @@ export function ViewDocumentDialog({
                               setTimestamp(result.toISOString());
                             }
                           }}
-                          className="text-white"
+                          className="text-foreground-default"
                         />
                         {/* Time inputs */}
-                        <div className="flex items-center gap-2 px-2 pt-2 border-t border-white/10">
+                        <div className="flex items-center gap-2 px-2 pt-2 border-t border-border-default">
                           <div className="flex items-center gap-1.5">
-                            <label className="text-[11px] text-white/40 uppercase">Time</label>
+                            <label className="text-[11px] text-foreground-subtle uppercase">Time</label>
                             <input
                               type="text"
                               pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}"
@@ -381,7 +381,7 @@ export function ViewDocumentDialog({
                                 base.setHours(hours || 0, minutes || 0, seconds || 0, 0);
                                 setTimestamp(base.toISOString());
                               }}
-                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle w-[90px]"
+                              className="bg-surface-overlay border border-border-default rounded px-2 py-1 text-xs text-foreground-default focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle w-[90px]"
                             />
                           </div>
                           <div className="flex items-center gap-1 ml-auto">
@@ -410,7 +410,7 @@ export function ViewDocumentDialog({
 
                 {/* Full Path */}
                 <div className="space-y-2 flex-1">
-                  <Label htmlFor="full-path" className="text-xs uppercase text-white/50 font-medium">
+                  <Label htmlFor="full-path" className="text-xs uppercase text-foreground-subtle font-medium">
                     Full Path
                   </Label>
                   <Input
@@ -418,7 +418,7 @@ export function ViewDocumentDialog({
                     value={fullPath}
                     onChange={(e) => setFullPath(e.target.value)}
                     placeholder="e.g. https://..."
-                    className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                    className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   />
                 </div>
               </div>
@@ -426,7 +426,7 @@ export function ViewDocumentDialog({
 
             {/* Authors */}
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-white/50 font-medium">Authors</Label>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Authors</Label>
               <div className="flex gap-2 items-start">
                 <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
                   {authors.map((a, i) => (
@@ -460,7 +460,7 @@ export function ViewDocumentDialog({
                         }
                       }
                     }}
-                    className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                    className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   />
                   <Button type="button" variant="outline" size="sm" onClick={() => {
                     const trimmed = authorInput.trim();
@@ -474,20 +474,20 @@ export function ViewDocumentDialog({
                 </div>
               </div>
             </div>
-            <div className="space-y-3 pt-2 border-t border-white/10">
+            <div className="space-y-3 pt-2 border-t border-border-default">
               {/* Row 1: ID, Generated By, Created */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <p className="text-xs uppercase text-white/50 font-medium">Document ID</p>
-                  <p className="text-sm text-white font-mono">{document.id}</p>
+                  <p className="text-xs uppercase text-foreground-subtle font-medium">Document ID</p>
+                  <p className="text-sm text-foreground-default font-mono">{document.id}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs uppercase text-white/50 font-medium">Generated By</p>
-                  <p className="text-sm text-white font-mono">{document.generated_by}</p>
+                  <p className="text-xs uppercase text-foreground-subtle font-medium">Generated By</p>
+                  <p className="text-sm text-foreground-default font-mono">{document.generated_by}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-                  <p className="text-sm text-white/70">
+                  <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+                  <p className="text-sm text-foreground-faint">
                     {formatDistanceToNow(new Date(document.created_at), { addSuffix: true })}
                   </p>
                 </div>
@@ -495,28 +495,28 @@ export function ViewDocumentDialog({
 
               {/* Row 2: Filename — full width */}
               <div className="space-y-1">
-                <p className="text-xs uppercase text-white/50 font-medium">Filename</p>
-                <p className="text-sm text-white font-mono break-all">{document.filename || '-'}</p>
+                <p className="text-xs uppercase text-foreground-subtle font-medium">Filename</p>
+                <p className="text-sm text-foreground-default font-mono break-all">{document.filename || '-'}</p>
               </div>
             </div>
 
             {/* Tags, Context & Metadata */}
-            <div className="space-y-3 pt-2 border-t border-white/10">
+            <div className="space-y-3 pt-2 border-t border-border-default">
               {/* Context */}
               <div>
-                <p className="text-xs uppercase text-white/50 font-medium mb-2">Context</p>
+                <p className="text-xs uppercase text-foreground-subtle font-medium mb-2">Context</p>
                 {document.context_id ? (
                   <span className="px-2 py-0.5 rounded-full bg-badge-context-bg text-badge-context-fg text-xs border border-badge-context-bd">
                     {contexts.find(c => c.id === document.context_id)?.description || `ID ${document.context_id}`}
                   </span>
                 ) : (
-                  <span className="text-sm text-white/40 italic">-</span>
+                  <span className="text-sm text-foreground-subtle italic">-</span>
                 )}
               </div>
 
               {/* Tags */}
               <div>
-                <p className="text-xs uppercase text-white/50 font-medium mb-2">Tags</p>
+                <p className="text-xs uppercase text-foreground-subtle font-medium mb-2">Tags</p>
                 {document.tags && document.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {document.tags.map((tag) => (
@@ -529,13 +529,13 @@ export function ViewDocumentDialog({
                     ))}
                   </div>
                 ) : (
-                  <span className="text-sm text-white/40 italic">-</span>
+                  <span className="text-sm text-foreground-subtle italic">-</span>
                 )}
               </div>
 
               {/* Metadata */}
               <div>
-                <p className="text-xs uppercase text-white/50 font-medium mb-2">Metadata</p>
+                <p className="text-xs uppercase text-foreground-subtle font-medium mb-2">Metadata</p>
                 {document.metadata && document.metadata.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {document.metadata.map((m) => (
@@ -548,7 +548,7 @@ export function ViewDocumentDialog({
                     ))}
                   </div>
                 ) : (
-                  <span className="text-sm text-white/40 italic">-</span>
+                  <span className="text-sm text-foreground-subtle italic">-</span>
                 )}
               </div>
             </div>
@@ -557,13 +557,13 @@ export function ViewDocumentDialog({
           {/* Right Column — Tabs + Content */}
           <div className="flex flex-col gap-2 min-h-0 overflow-hidden">
             {/* Tab Bar */}
-            <div className="flex gap-1 rounded-lg bg-white/5 p-1">
+            <div className="flex gap-1 rounded-lg bg-surface-card p-1">
               <button
                 onClick={() => setActiveTab('content')}
                 className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === 'content'
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/50 hover:text-white/70'
+                    ? 'bg-surface-panel text-foreground-default'
+                    : 'text-foreground-subtle hover:text-foreground-faint'
                 }`}
               >
                 Document Content
@@ -572,13 +572,13 @@ export function ViewDocumentDialog({
                 onClick={() => setActiveTab('expandedMetadata')}
                 className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === 'expandedMetadata'
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/50 hover:text-white/70'
+                    ? 'bg-surface-panel text-foreground-default'
+                    : 'text-foreground-subtle hover:text-foreground-faint'
                 }`}
               >
                 Expanded Metadata
                 {metadata && metadata.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
+                  <span className="ml-1.5 rounded-full bg-surface-panel px-1.5 py-0.5 text-[10px] text-foreground-faint">
                     {metadata.length}
                   </span>
                 )}
@@ -587,13 +587,13 @@ export function ViewDocumentDialog({
                 onClick={() => setActiveTab('history')}
                 className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === 'history'
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/50 hover:text-white/70'
+                    ? 'bg-surface-panel text-foreground-default'
+                    : 'text-foreground-subtle hover:text-foreground-faint'
                 }`}
               >
                 Processing History
                 {history && history.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
+                  <span className="ml-1.5 rounded-full bg-surface-panel px-1.5 py-0.5 text-[10px] text-foreground-faint">
                     {history.length}
                   </span>
                 )}
@@ -601,37 +601,37 @@ export function ViewDocumentDialog({
             </div>
 
             {/* Tab Content */}
-            <div className="flex flex-col flex-1 rounded-lg border border-white/20 bg-surface-overlay p-3 overflow-hidden">
+            <div className="flex flex-col flex-1 rounded-lg border border-border-strong bg-surface-overlay p-3 overflow-hidden">
               {activeTab === 'content' ? (
                 /* Content Tab */
                 contentLoading ? (
                   <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-5 w-5 text-white/40 animate-spin" />
-                    <span className="ml-2 text-sm text-white/40">Loading content...</span>
+                    <Loader2 className="h-5 w-5 text-foreground-subtle animate-spin" />
+                    <span className="ml-2 text-sm text-foreground-subtle">Loading content...</span>
                   </div>
                 ) : content ? (
                   <div className="flex flex-col h-full overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 flex-shrink-0">
-                      <span className="text-[10px] text-white/40 font-sans">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-default flex-shrink-0">
+                      <span className="text-[10px] text-foreground-subtle font-sans">
                         {showPlainText ? 'Plain text view' : 'Highlighted entities'}
                       </span>
                       <button
                         onClick={() => setShowPlainText((v) => !v)}
-                        className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/50 hover:text-white/80 hover:border-white/20 transition-colors font-sans"
+                        className="text-[10px] px-2 py-0.5 rounded border border-border-default text-foreground-subtle hover:text-foreground-muted hover:border-border-strong transition-colors font-sans"
                       >
                         {showPlainText ? 'Show Tags' : 'Show Plain'}
                       </button>
                     </div>
                     <div className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
                       {showPlainText ? (
-                        <pre className="whitespace-pre-wrap text-white/80">{content}</pre>
+                        <pre className="whitespace-pre-wrap text-foreground-muted">{content}</pre>
                       ) : (
                         <EntityTaggedContent content={content} />
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-white/40">
+                  <div className="flex flex-col items-center justify-center h-full text-foreground-subtle">
                     <FileText className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm">No content available</p>
                     <p className="text-xs mt-1">Content appears after extraction</p>
@@ -641,11 +641,11 @@ export function ViewDocumentDialog({
                 /* Expanded Metadata Tab */
                 metadataLoading ? (
                   <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-5 w-5 text-white/40 animate-spin" />
-                    <span className="ml-2 text-sm text-white/40">Loading metadata...</span>
+                    <Loader2 className="h-5 w-5 text-foreground-subtle animate-spin" />
+                    <span className="ml-2 text-sm text-foreground-subtle">Loading metadata...</span>
                   </div>
                 ) : metadata.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-white/40">
+                  <div className="flex flex-col items-center justify-center h-full text-foreground-subtle">
                     <FileText className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm">No metadata available</p>
                   </div>
@@ -657,13 +657,13 @@ export function ViewDocumentDialog({
                         className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${
                           m.expanded
                             ? 'bg-badge-caution-bg/50 border-badge-caution-bd/50'
-                            : 'bg-white/[0.03] border-white/10'
+                            : 'bg-on-dark/[0.03] border-border-default'
                         }`}
                       >
-                        <span className="text-xs font-mono text-white/60 shrink-0 w-40 truncate">
+                        <span className="text-xs font-mono text-foreground-faint shrink-0 w-40 truncate">
                           {m.key}
                         </span>
-                        <span className="text-xs text-white/80 flex-1 min-w-0 whitespace-normal break-words">
+                        <span className="text-xs text-foreground-muted flex-1 min-w-0 whitespace-normal break-words">
                           {m.value ?? '-'}
                         </span>
                         <div className="flex items-start gap-1.5 shrink-0">
@@ -692,8 +692,8 @@ export function ViewDocumentDialog({
                 /* History Tab */
                 historyLoading ? (
                   <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-5 w-5 text-white/40 animate-spin" />
-                    <span className="ml-2 text-sm text-white/40">Loading history...</span>
+                    <Loader2 className="h-5 w-5 text-foreground-subtle animate-spin" />
+                    <span className="ml-2 text-sm text-foreground-subtle">Loading history...</span>
                   </div>
                 ) : history && history.length > 0 ? (
                   <div className="h-full overflow-y-auto custom-scrollbar space-y-3 pr-1">
@@ -704,12 +704,12 @@ export function ViewDocumentDialog({
                       return (
                         <div
                           key={idx}
-                          className="rounded-lg bg-white/[0.03] border border-white/10 overflow-hidden"
+                          className="rounded-lg bg-on-dark/[0.03] border border-border-default overflow-hidden"
                         >
                           {/* Header row */}
                           <button
                             onClick={() => setExpandedHistoryIdx(isExpanded ? null : idx)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.02] transition-colors"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-on-dark/[0.02] transition-colors"
                           >
                             {/* Success / Failure icon */}
                             <div
@@ -728,13 +728,13 @@ export function ViewDocumentDialog({
 
                             {/* Transition */}
                             <div className="flex-1 min-w-0 flex items-center gap-2 text-xs">
-                              <span className="text-white/50 font-mono truncate">{entry.from}</span>
-                              <ArrowRight className="h-3 w-3 text-white/30 flex-shrink-0" />
-                              <span className="text-white/50 font-mono truncate">{entry.to}</span>
+                              <span className="text-foreground-subtle font-mono truncate">{entry.from}</span>
+                              <ArrowRight className="h-3 w-3 text-foreground-placeholder flex-shrink-0" />
+                              <span className="text-foreground-subtle font-mono truncate">{entry.to}</span>
                             </div>
 
                             {/* Timestamp */}
-                            <div className="flex items-center gap-1 text-[11px] text-white/40 flex-shrink-0">
+                            <div className="flex items-center gap-1 text-[11px] text-foreground-subtle flex-shrink-0">
                               <Clock className="h-3 w-3" />
                               <span>
                                 {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
@@ -743,7 +743,7 @@ export function ViewDocumentDialog({
 
                             {/* Expand chevron */}
                             {hasMetrics && (
-                              <div className="flex-shrink-0 text-white/30">
+                              <div className="flex-shrink-0 text-foreground-placeholder">
                                 {isExpanded ? (
                                   <ChevronUp className="h-4 w-4" />
                                 ) : (
@@ -755,7 +755,7 @@ export function ViewDocumentDialog({
 
                           {/* Expanded metrics */}
                           {isExpanded && hasMetrics && (
-                            <div className="px-3 pb-3 pt-1 border-t border-white/[0.04] space-y-3">
+                            <div className="px-3 pb-3 pt-1 border-t border-on-dark/[0.04] space-y-3">
                               {entry.error && (
                                 <div className="rounded bg-destructive-bg border border-destructive-bd/50 px-2.5 py-2">
                                   <div className="flex items-start gap-2">
@@ -768,7 +768,7 @@ export function ViewDocumentDialog({
                               )}
 
                               {entry.reason && !entry.error && (
-                                <div className="text-xs text-white/40 italic">
+                                <div className="text-xs text-foreground-subtle italic">
                                   Reason: {formatErrorValue(entry.reason)}
                                 </div>
                               )}
@@ -778,18 +778,18 @@ export function ViewDocumentDialog({
                                   {stageKey === 'errorDetails' && Array.isArray(stageMetrics) ? (
                                     <>
                                       <div className="flex items-center gap-2">
-                                        <ChevronRight className="h-3 w-3 text-white/20" />
-                                        <span className="text-[11px] uppercase font-medium text-white/40">
+                                        <ChevronRight className="h-3 w-3 text-foreground-placeholder" />
+                                        <span className="text-[11px] uppercase font-medium text-foreground-subtle">
                                           Error Details
                                         </span>
                                       </div>
                                       <div className="ml-5 space-y-2">
                                         {stageMetrics.map((detail: any, dIdx: number) => (
-                                          <div key={dIdx} className="rounded bg-white/[0.03] border border-white/[0.06] px-2 py-1.5 space-y-1">
+                                          <div key={dIdx} className="rounded bg-on-dark/[0.03] border border-on-dark/[0.06] px-2 py-1.5 space-y-1">
                                             <div className="flex items-center gap-2">
-                                              <span className="text-[11px] uppercase font-medium text-white/50">{detail.stage || 'unknown'}</span>
+                                              <span className="text-[11px] uppercase font-medium text-foreground-subtle">{detail.stage || 'unknown'}</span>
                                               {detail.metrics?.durationMs !== undefined && (
-                                                <span className="text-[11px] text-white/30">{formatDuration(detail.metrics.durationMs)}</span>
+                                                <span className="text-[11px] text-foreground-placeholder">{formatDuration(detail.metrics.durationMs)}</span>
                                               )}
                                             </div>
                                             {detail.error && (
@@ -801,7 +801,7 @@ export function ViewDocumentDialog({
                                             {Array.isArray(detail.metrics?.doclingErrors) && detail.metrics.doclingErrors.length > 0 && (
                                               <div className="flex flex-col gap-0.5">
                                                 {detail.metrics.doclingErrors.map((err: any, eIdx: number) => (
-                                                  <span key={eIdx} className="text-[11px] text-white/50 leading-relaxed">• {formatErrorValue(err)}</span>
+                                                  <span key={eIdx} className="text-[11px] text-foreground-subtle leading-relaxed">• {formatErrorValue(err)}</span>
                                                 ))}
                                               </div>
                                             )}
@@ -812,12 +812,12 @@ export function ViewDocumentDialog({
                                   ) : (
                                     <>
                                       <div className="flex items-center gap-2">
-                                        <ChevronRight className="h-3 w-3 text-white/20" />
-                                        <span className="text-[11px] uppercase font-medium text-white/40">
+                                        <ChevronRight className="h-3 w-3 text-foreground-placeholder" />
+                                        <span className="text-[11px] uppercase font-medium text-foreground-subtle">
                                           {stageKey}
                                         </span>
                                         {stageMetrics.durationMs !== undefined && (
-                                          <span className="text-[11px] text-white/30">
+                                          <span className="text-[11px] text-foreground-placeholder">
                                             {formatDuration(stageMetrics.durationMs)}
                                           </span>
                                         )}
@@ -885,7 +885,7 @@ export function ViewDocumentDialog({
                     })}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-white/40">
+                  <div className="flex flex-col items-center justify-center h-full text-foreground-subtle">
                     <Clock className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm">No processing history</p>
                     <p className="text-xs mt-1">History appears after pipeline runs</p>
@@ -897,21 +897,21 @@ export function ViewDocumentDialog({
             {/* Bottom info bar */}
             {activeTab === 'expandedMetadata' && metadata && metadata.length > 0 && (
               <div className="flex justify-between items-center">
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-foreground-subtle">
                   {metadata.length} tag{metadata.length !== 1 ? 's' : ''}
                 </p>
-                <p className="text-xs text-white/30">
+                <p className="text-xs text-foreground-placeholder">
                   {metadata.filter(m => m.expanded).length} computed
                 </p>
               </div>
             )}
             {activeTab === 'content' && (
               <div className="flex justify-between items-center">
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-foreground-subtle">
                   {content ? `${content.length.toLocaleString()} chars` : ''}
                 </p>
                 {content && (
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-foreground-subtle">
                     {(() => {
                       const tokens = Math.round(content.length / 4 / 1000) * 1000;
                       return `~${tokens.toLocaleString()} tokens`;
@@ -919,7 +919,7 @@ export function ViewDocumentDialog({
                   </p>
                 )}
                 {contentHash && (
-                  <p className="text-xs text-white/30 font-mono truncate max-w-[200px]" title={contentHash}>
+                  <p className="text-xs text-foreground-placeholder font-mono truncate max-w-[200px]" title={contentHash}>
                     {contentHash.slice(0, 8)}...{contentHash.slice(-8)}
                   </p>
                 )}
@@ -927,10 +927,10 @@ export function ViewDocumentDialog({
             )}
             {activeTab === 'history' && history && history.length > 0 && (
               <div className="flex justify-between items-center">
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-foreground-subtle">
                   {history.length} run{history.length !== 1 ? 's' : ''}
                 </p>
-                <p className="text-xs text-white/30">
+                <p className="text-xs text-foreground-placeholder">
                   {history.filter(h => h.success).length} succeeded, {history.filter(h => !h.success).length} failed
                 </p>
               </div>
@@ -939,11 +939,11 @@ export function ViewDocumentDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+        <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={() => setDryRunOpen(true)}
-            className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card flex items-center gap-2"
           >
             <HindsightIcon className="h-4 w-4" />
             Dry-Run
@@ -951,7 +951,7 @@ export function ViewDocumentDialog({
           <Button
             variant="ghost"
             onClick={() => setEntityDetectionOpen(true)}
-            className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card flex items-center gap-2"
           >
             <ArchitxtIcon className="h-4 w-4" />
             Entities
@@ -959,7 +959,7 @@ export function ViewDocumentDialog({
           <Button
             variant="ghost"
             onClick={() => setSmartEditOpen(true)}
-            className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card flex items-center gap-2"
           >
             <ArchitxtIcon className="h-4 w-4" />
             Smart Edit
@@ -968,14 +968,14 @@ export function ViewDocumentDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Changes'}

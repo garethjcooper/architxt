@@ -283,7 +283,7 @@ export function ManageModelConfigDialog({
     return (
       <div
         key={fieldDef.key}
-        className={`flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02] transition-opacity ${
+        className={`flex items-center justify-between py-3 px-3 rounded border border-border-default bg-on-dark/[0.02] transition-opacity ${
           isFieldEnabled ? '' : 'opacity-50'
         }`}
       >
@@ -293,10 +293,10 @@ export function ManageModelConfigDialog({
             onCheckedChange={(checked) => toggleFieldEnabled(fieldDef, checked === true)}
             className="shrink-0"
           />
-          <Settings2 className={`w-4 h-4 shrink-0 ${isFieldEnabled ? 'text-white/40' : 'text-white/20'}`} />
+          <Settings2 className={`w-4 h-4 shrink-0 ${isFieldEnabled ? 'text-foreground-subtle' : 'text-foreground-placeholder'}`} />
           <div>
-            <p className="text-sm font-medium text-white/90">{fieldDef.label}</p>
-            <p className="text-xs text-white/50">{statusText}</p>
+            <p className="text-sm font-medium text-foreground-default">{fieldDef.label}</p>
+            <p className="text-xs text-foreground-subtle">{statusText}</p>
             {impactedCount === 0 ? (
               <p className="text-xs text-accent-secondary-fg mt-0.5">
                 All {selectedModels.length} model{selectedModels.length === 1 ? '' : 's'} match
@@ -322,7 +322,7 @@ export function ManageModelConfigDialog({
                     className={`px-2.5 py-1 rounded text-xs border transition-all ${
                       active
                         ? 'bg-accent-secondary-bg border-accent-secondary-bd text-accent-primary-fg'
-                        : 'bg-surface-card border-white/10 text-white/60 hover:bg-surface-hover'
+                        : 'bg-surface-card border-border-default text-foreground-faint hover:bg-surface-hover'
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     {option.label}
@@ -342,7 +342,7 @@ export function ManageModelConfigDialog({
                 const value = e.target.value === '' ? fieldDef.defaultValue : Number(e.target.value);
                 handleToggle(fieldDef, value);
               }}
-              className="w-24 h-8 text-xs bg-surface-card border-white/10 text-white placeholder:text-white/40 focus:border-focus-ring focus:ring-focus-ring-subtle disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-24 h-8 text-xs bg-surface-card border-border-default text-foreground-default placeholder:text-foreground-subtle focus:border-focus-ring focus:ring-focus-ring-subtle disabled:opacity-40 disabled:cursor-not-allowed"
             />
           ) : (
             <Switch
@@ -381,18 +381,18 @@ export function ManageModelConfigDialog({
       <DialogContent className="!w-[25vw] !max-w-none max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Model Configuration</DialogTitle>
-          <p className="text-sm text-white/60 mt-2">
+          <p className="text-sm text-foreground-faint mt-2">
             {selectedModelIds.length} mental model(s) selected
           </p>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 py-2 px-3 rounded border border-white/10 bg-white/[0.03]">
+        <div className="flex items-center gap-2 py-2 px-3 rounded border border-border-default bg-on-dark/[0.03]">
           <Checkbox
             id="select-all-config"
             checked={allEnabled}
             onCheckedChange={(checked) => toggleAllEnabled(checked === true)}
           />
-          <label htmlFor="select-all-config" className="text-xs text-white/70 cursor-pointer select-none">
+          <label htmlFor="select-all-config" className="text-xs text-foreground-faint cursor-pointer select-none">
             Select / deselect all fields
           </label>
         </div>
@@ -401,18 +401,18 @@ export function ManageModelConfigDialog({
           {FIELDS.map((fieldDef) => renderFieldRow(fieldDef))}
         </div>
 
-        <div className="flex justify-end gap-2 pt-6 border-t border-white/10">
+        <div className="flex justify-end gap-2 pt-6 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>
           <Button
             onClick={handleSave}
             disabled={loading || !hasActiveUpdateField}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

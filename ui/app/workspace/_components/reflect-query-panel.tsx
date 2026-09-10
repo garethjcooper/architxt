@@ -42,7 +42,7 @@ export function ReflectQueryPanel({
       <PanelHeader
         title="Reflect"
         actions={
-          <label className="flex items-center gap-2 text-[10px] text-white/70 cursor-pointer">
+          <label className="flex items-center gap-2 text-[10px] text-foreground-faint cursor-pointer">
             <Switch
               checked={showOptions}
               onCheckedChange={setShowOptions}
