@@ -50,11 +50,11 @@ export function EnvelopeControls({
   const [controlsOpen, setControlsOpen] = useState(false);
 
   return (
-    <div className="relative h-10 px-3 border-b border-white/10 bg-emerald-900/20 text-emerald-300 flex items-center justify-between shrink-0">
+    <div className="relative h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
       <div className="min-w-0 flex-1 text-xs font-medium truncate pr-3">{headerTitle ?? title}</div>
       <div className="flex items-center gap-2 shrink-0">
         {count !== undefined && (
-          <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-white/20 text-emerald-200/80">
+          <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-accent-primary-bd text-accent-primary-fg/80">
             {count}
           </Badge>
         )}
@@ -121,7 +121,7 @@ export function EnvelopeControls({
           <button
             type="button"
             onClick={onCopyText}
-            className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-accent-primary-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Copy className="h-3 w-3" />
             Copy text
@@ -129,7 +129,7 @@ export function EnvelopeControls({
           <button
             type="button"
             onClick={onSaveMd}
-            className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-[10px] text-white/70 hover:text-accent-primary-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-3 w-3" />
             Save .md
@@ -161,7 +161,7 @@ function StructuredControlRow({
         <button
           type="button"
           onClick={onCopy}
-          className="p-1 rounded hover:text-emerald-300 hover:bg-white/10 transition-colors"
+          className="p-1 rounded hover:text-accent-primary-fg hover:bg-white/10 transition-colors"
           title="Copy"
           aria-label={`Copy ${label}`}
         >
@@ -171,7 +171,7 @@ function StructuredControlRow({
           <button
             type="button"
             onClick={onAdd}
-            className="p-1 rounded hover:text-emerald-300 hover:bg-white/10 transition-colors"
+            className="p-1 rounded hover:text-accent-primary-fg hover:bg-white/10 transition-colors"
             title="Add to page"
             aria-label={`Add ${label} to page`}
           >
