@@ -308,7 +308,7 @@ export function ManageModelTagsDialog({
           <Button variant="ghost" onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/5">
             Close
           </Button>
-          <Button onClick={handleSave} disabled={loading} className="bg-badge-caution-fg hover:bg-badge-caution-fg/80 text-white">
+          <Button onClick={handleSave} disabled={loading} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white">
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
