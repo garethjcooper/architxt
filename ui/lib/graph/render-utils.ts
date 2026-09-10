@@ -22,21 +22,21 @@ export type { GraphNode, GraphEdge, GraphCanvas };
 export type GraphLayout = 'fcose' | 'avsdf' | 'cose' | 'dagre' | 'breadthfirst' | 'concentric' | 'circle';
 
 const TYPE_PALETTE = [
-  '#E06C75', // red
-  '#98C379', // green
-  '#E5C07B', // yellow
-  '#61AFEF', // blue
-  '#C678DD', // purple
-  '#56B6C2', // cyan
-  '#D19A66', // orange
-  '#F0A0A0', // pink
-  '#9CDCFE', // light blue
-  '#B5CEA8', // light green
-  '#CE9178', // tan
-  '#4EC9B0', // teal
-  '#FFEB3B', // bright yellow
-  '#FF9800', // amber
-  '#00BCD4', // sky
+  'var(--color-diagram-edge-mental-writes)', // red
+  'var(--color-diagram-node-entity)', // green
+  'var(--color-accent-tertiary-fg)', // yellow
+  'var(--color-syntax-keyword)', // blue
+  'var(--color-diagram-edge-synthesize)', // purple
+  'var(--color-syntax-function)', // cyan
+  'var(--color-accent-tertiary-fg)', // orange
+  'var(--color-diagram-edge-mental-writes)', // pink
+  'var(--color-syntax-keyword)', // light blue
+  'var(--color-diagram-node-entity)', // light green
+  'var(--color-accent-tertiary-fg)', // tan
+  'var(--color-syntax-function)', // teal
+  'var(--color-accent-tertiary-fg)', // bright yellow
+  'var(--color-diagram-edge-mental-depends)', // amber
+  'var(--color-syntax-function)', // sky
 ];
 
 function hashString(str: string): number {
@@ -49,23 +49,23 @@ function hashString(str: string): number {
 }
 
 export function colorForType(type?: string | null): string {
-  if (!type) return '#64748b';
+  if (!type) return 'var(--color-aql-directive-sub)';
   return TYPE_PALETTE[hashString(type) % TYPE_PALETTE.length];
 }
 
 export function colorForEdge(edge?: { source?: string | null; type?: string | null }): string {
   const source = edge?.source;
   const rel = edge?.type;
-  if (source === 'synthesize') return '#8b5cf6';
+  if (source === 'synthesize') return 'var(--color-diagram-edge-synthesize)';
   if (source === 'mental_model') {
-    if (rel === 'calls') return '#64d2c8';
-    if (rel === 'depends_on') return '#d2a078';
-    if (rel === 'sends') return '#b496d2';
-    if (rel === 'reads') return '#96bea0';
-    if (rel === 'writes') return '#dc8c96';
-    return '#42a5f5';
+    if (rel === 'calls') return 'var(--color-diagram-edge-mental-calls)';
+    if (rel === 'depends_on') return 'var(--color-diagram-edge-mental-depends)';
+    if (rel === 'sends') return 'var(--color-diagram-edge-mental-sends)';
+    if (rel === 'reads') return 'var(--color-diagram-edge-mental-reads)';
+    if (rel === 'writes') return 'var(--color-diagram-edge-mental-writes)';
+    return 'var(--color-diagram-edge-mental-default)';
   }
-  return 'rgba(255,255,255,0.12)';
+  return 'var(--color-border-subtle)';
 }
 
 export function mapTypeName(type?: string | null): string {
