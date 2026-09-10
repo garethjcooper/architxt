@@ -1,6 +1,6 @@
 'use client';
 
-import { truncateLabel, colorForType } from '@/components/research-canvas';
+import { truncateLabel, colorForType } from '@/lib/graph/render-utils';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
 
 export interface GraphToMermaidOptions {

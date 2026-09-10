@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import { colorForType } from "@/components/research-canvas";
+import { colorForType } from '@/lib/graph/render-utils';
 import {
   ServerBankSelectors,
   SelectorServer,
