@@ -90,7 +90,7 @@ const mermaidTheme = EditorView.theme({
     fontSize: '12px',
     lineHeight: '1.5',
     backgroundColor: 'transparent',
-    color: '#e5e7eb',
+    color: 'var(--syntax-text)',
   },
   '.cm-scroller': {
     overflow: 'auto',
@@ -100,30 +100,30 @@ const mermaidTheme = EditorView.theme({
     width: '100%',
     minWidth: '0',
     padding: '6px 8px',
-    caretColor: 'white',
+    caretColor: 'var(--focus-ring)',
   },
   '.cm-line': {
     whiteSpace: 'pre-wrap',
   },
   '.cm-cursor': {
-    borderLeftColor: 'white',
+    borderLeftColor: 'var(--focus-ring)',
   },
   '.cm-selectionBackground': {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'var(--accent-primary-bg)',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'var(--surface-subtle)',
   },
   '.cm-gutters': {
     display: 'none',
   },
   '.cm-placeholder': {
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'var(--syntax-comment)',
   },
-  '.mmd-keyword': { color: '#93c5fd', fontWeight: 500 },
-  '.mmd-edge': { color: '#f472b6' },
-  '.mmd-string': { color: '#a7f3d0' },
-  '.mmd-comment': { color: '#6b7280' },
+  '.mmd-keyword': { color: 'var(--syntax-keyword)', fontWeight: 500 },
+  '.mmd-edge': { color: 'var(--syntax-function)' },
+  '.mmd-string': { color: 'var(--syntax-string)' },
+  '.mmd-comment': { color: 'var(--syntax-comment)' },
 });
 
 function PreviewPane({
@@ -187,7 +187,7 @@ function PreviewPane({
   }, [content, handleRender]);
 
   return (
-    <div className="flex flex-col h-full rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
+    <div className="flex flex-col h-full rounded-md border border-border-default bg-surface-overlay overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div
           ref={containerRef}
@@ -212,7 +212,7 @@ function PreviewPane({
               )}
             />
           ) : !error ? (
-            <div className="text-xs text-white/40">Rendering diagram…</div>
+            <div className="text-xs text-foreground-placeholder">Rendering diagram…</div>
           ) : null}
         </div>
         {!error && svg && <DiagramControls targetRef={containerRef} fitToPage={fitToPage} onFitToPageChange={onFitToPageChange} />}
@@ -272,8 +272,8 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
   return (
     <div className={cn('flex flex-col h-full gap-3', className)}>
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
-          <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden">
+          <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-muted flex items-center justify-between shrink-0">
             <span>Preview</span>
             <div className="flex items-center gap-2">
               {lastError && <span className="text-destructive-fg/80 text-[10px]">Parse error</span>}
@@ -293,10 +293,10 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
         </div>
         <ResizeHandle direction="vertical" onMouseDown={startResize} title="Drag to resize panels" />
         <div
-          className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
+          className="min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden"
           style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
         >
-          <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+          <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-muted flex items-center justify-between shrink-0">
             <span>{readOnly ? 'Diagram source (read-only)' : 'Diagram source'}</span>
             <CopyDiagramMenu source={content} />
           </div>

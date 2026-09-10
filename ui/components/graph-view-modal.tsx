@@ -105,7 +105,7 @@ const mermaidTheme = EditorView.theme({
     fontSize: '12px',
     lineHeight: '1.5',
     backgroundColor: 'transparent',
-    color: '#e5e7eb',
+    color: 'var(--syntax-text)',
   },
   '.cm-scroller': {
     overflow: 'auto',
@@ -115,30 +115,30 @@ const mermaidTheme = EditorView.theme({
     width: '100%',
     minWidth: '0',
     padding: '6px 8px',
-    caretColor: 'white',
+    caretColor: 'var(--focus-ring)',
   },
   '.cm-line': {
     whiteSpace: 'pre-wrap',
   },
   '.cm-cursor': {
-    borderLeftColor: 'white',
+    borderLeftColor: 'var(--focus-ring)',
   },
   '.cm-selectionBackground': {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'var(--accent-primary-bg)',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'var(--surface-subtle)',
   },
   '.cm-gutters': {
     display: 'none',
   },
   '.cm-placeholder': {
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'var(--syntax-comment)',
   },
-  '.mmd-keyword': { color: '#93c5fd', fontWeight: 500 },
-  '.mmd-edge': { color: '#f472b6' },
-  '.mmd-string': { color: '#a7f3d0' },
-  '.mmd-comment': { color: '#6b7280' },
+  '.mmd-keyword': { color: 'var(--syntax-keyword)', fontWeight: 500 },
+  '.mmd-edge': { color: 'var(--syntax-function)' },
+  '.mmd-string': { color: 'var(--syntax-string)' },
+  '.mmd-comment': { color: 'var(--syntax-comment)' },
 });
 
 interface PaneRatios {
