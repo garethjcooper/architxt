@@ -402,9 +402,9 @@ export function EntityDetectionDialog({
 
         <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
           {/* Sidebar — Match Review */}
-          <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-border-default bg-surface-overlay overflow-hidden">
+          <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-border-default bg-surface-raised overflow-hidden">
             {/* Header */}
-            <div className="px-3 py-2 border-b border-border-default bg-on-dark/[0.03] flex-shrink-0">
+            <div className="px-3 py-2 border-b border-border-default bg-surface-card flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-foreground-faint shrink-0">
                   {entities.length} entities loaded
@@ -476,7 +476,7 @@ export function EntityDetectionDialog({
                       return (
                         <div
                           key={group.id}
-                          className="group flex flex-col gap-1 rounded border bg-overlay px-2 py-1.5 text-left transition-colors cursor-pointer border-border-subtle hover:bg-surface-card"
+                          className="group flex flex-col gap-1 rounded border bg-surface-card px-2 py-1.5 text-left transition-colors cursor-pointer border-border-subtle hover:bg-surface-hover"
                           style={{ borderLeftColor: typeColor, borderLeftWidth: 3 }}
                           onClick={() => toggleGroupExpanded(`existing-${group.id}`)}
                         >
@@ -518,7 +518,7 @@ export function EntityDetectionDialog({
                                 return (
                                   <div
                                     key={i}
-                                    className="group/match rounded border border-on-dark/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-foreground-faint cursor-pointer hover:border-border-default hover:bg-[oklch(0.19_0_0)] transition-colors"
+                                    className="group/match rounded border border-border-subtle bg-surface-inset px-2 py-1.5 flex items-start gap-2 text-[11px] text-foreground-faint cursor-pointer hover:border-border-default hover:bg-surface-hover transition-colors"
                                     onClick={(e) => { e.stopPropagation(); handleScrollToExistingMatch(group.id, i); }}
                                   >
                                     <span className="break-all leading-relaxed line-clamp-3">
@@ -564,7 +564,7 @@ export function EntityDetectionDialog({
                     ).map((group) => (
                       <div
                         key={group.id}
-                        className="group flex items-start gap-2 rounded border bg-overlay px-2 py-1.5 text-left transition-colors cursor-pointer border-border-subtle hover:bg-surface-card"
+                        className="group flex items-start gap-2 rounded border bg-surface-card px-2 py-1.5 text-left transition-colors cursor-pointer border-border-subtle hover:bg-surface-hover"
                         style={{ borderLeftColor: colorForType(group.entityType), borderLeftWidth: 3 }}
                         onClick={() => toggleGroupExpanded(group.id)}
                       >
@@ -617,7 +617,7 @@ export function EntityDetectionDialog({
                                 return (
                                   <div
                                     key={matchId}
-                                    className="group/match rounded border border-on-dark/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-foreground-faint cursor-pointer hover:border-border-default hover:bg-[oklch(0.19_0_0)] transition-colors"
+                                    className="group/match rounded border border-border-subtle bg-surface-inset px-2 py-1.5 flex items-start gap-2 text-[11px] text-foreground-faint cursor-pointer hover:border-border-default hover:bg-surface-hover transition-colors"
                                     onClick={(e) => { e.stopPropagation(); handleScrollToMatch(group.id, i); }}
                                   >
                                     <Checkbox
@@ -657,7 +657,7 @@ export function EntityDetectionDialog({
               {malformedTags.length > 0 && (
                 <Button
                   onClick={handleRepairMalformed}
-                  className="h-7 px-2.5 text-xs bg-badge-caution-fg/20 border border-badge-caution-bd text-badge-caution-fg hover:bg-badge-caution-fg/30 flex items-center gap-1"
+                  className="h-7 px-2.5 text-xs bg-badge-caution-bg border border-badge-caution-bd text-badge-caution-fg hover:bg-badge-caution-bg-hover flex items-center gap-1"
                 >
                   <Wrench className="h-3 w-3" />
                   Repair {malformedTags.length} malformed
@@ -673,7 +673,7 @@ export function EntityDetectionDialog({
               <Button
                 onClick={handleScan}
                 disabled={entitiesLoading || scanning || entities.length === 0}
-                className="h-7 px-2.5 text-xs bg-surface-hover hover:bg-[oklch(0.30_0_0)] text-foreground-muted border border-border-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                className="h-7 px-2.5 text-xs bg-surface-hover hover:bg-surface-panel text-foreground-muted border border-border-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
               >
                 {scanning ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
                 Scan
@@ -682,7 +682,7 @@ export function EntityDetectionDialog({
           </div>
 
           {/* Content pane */}
-          <div className="flex-1 min-h-0 rounded-lg border border-border-default bg-surface-overlay overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 rounded-lg border border-border-default bg-surface-raised overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-default flex-shrink-0">
               <span className="text-[10px] text-foreground-subtle font-sans">
                 {showPlainText ? 'Plain text view' : 'Highlighted entities'}
