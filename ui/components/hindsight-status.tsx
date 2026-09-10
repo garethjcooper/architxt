@@ -105,7 +105,7 @@ export function HindsightStatus() {
       </button>
 
       {expanded && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-border-default bg-surface-overlay shadow-xl p-4 space-y-3">
+        <div className="absolute top-full left-0 mt-2 z-50 w-80 rounded-xl border border-border-default bg-surface-raised shadow-xl p-4 space-y-3">
           {error ? (
             <div className="text-xs text-destructive-fg text-center py-2">Failed to load status</div>
           ) : ops.length === 0 ? (
@@ -115,7 +115,7 @@ export function HindsightStatus() {
               {ops.map((op) => (
                   <div
                     key={op.pop_id}
-                    className="flex items-start gap-2 rounded-lg bg-on-dark/[0.03] p-2.5"
+                    className="flex items-start gap-2 rounded-lg bg-surface-card p-2.5"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-xs">
@@ -124,7 +124,7 @@ export function HindsightStatus() {
                         </span>
                         <span className="text-foreground-placeholder">→</span>
                         <span className="text-foreground-subtle truncate">{op.pop_bank_id}</span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd' : 'bg-badge-caution-bg/50 text-badge-caution-fg border-badge-caution-bd/50'}`}>
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd' : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'}`}>
                           <Clock className="h-3 w-3" />
                           {op.pop_status}
                         </span>
