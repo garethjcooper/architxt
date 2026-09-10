@@ -8,21 +8,21 @@ import {
 } from '@architxt/aql';
 
 const BLOCK_COLORS: Record<string, string> = {
-  diagram: '#94a3b8',
-  table: '#94a3b8',
-  graph: '#94a3b8',
-  narrative: '#94a3b8',
+  diagram: 'var(--color-aql-directive)',
+  table: 'var(--color-aql-directive)',
+  graph: 'var(--color-aql-directive)',
+  narrative: 'var(--color-aql-directive)',
 };
 
 const SUB_COLORS: Record<string, string> = {
-  'diagram-name': '#64748b',
-  'diagram-type': '#64748b',
-  'table-name': '#64748b',
-  end: '#94a3b8',
+  'diagram-name': 'var(--color-aql-directive-sub)',
+  'diagram-type': 'var(--color-aql-directive-sub)',
+  'table-name': 'var(--color-aql-directive-sub)',
+  end: 'var(--color-aql-directive)',
 };
 
 export function directiveColor(keyword: string): string {
-  return BLOCK_COLORS[keyword] || SUB_COLORS[keyword] || '#9ca3af';
+  return BLOCK_COLORS[keyword] || SUB_COLORS[keyword] || 'var(--color-aql-directive)';
 }
 
 export interface AqlReferenceResolver {
@@ -49,7 +49,7 @@ function ReferenceToken({
   resolver?: AqlReferenceResolver;
 }) {
   const resolved = resolver?.(reference) || { label: reference.label || reference.raw };
-  const color = resolved.color || '#fbbf24';
+  const color = resolved.color || 'var(--color-syntax-number)';
 
   // Render the raw reference string exactly so the highlight layer stays in 1:1
   // character alignment with the transparent textarea.
@@ -93,7 +93,7 @@ function DirectiveToken({
       title={raw}
     >
       #{keyword}
-      {value ? <span style={{ color: '#e5e7eb', fontWeight: 500 }}> {value}</span> : null}
+      {value ? <span style={{ color: 'var(--color-syntax-text)', fontWeight: 500 }}> {value}</span> : null}
     </span>
   );
 }
@@ -195,7 +195,7 @@ export function AqlTokenList({
             return <ReferenceToken key={i} reference={token.reference!} resolver={resolveReference} />;
           case 'text':
             return (
-              <span key={i} className="text-[#e5e7eb] whitespace-pre-wrap">
+              <span key={i} className="text-syntax-text whitespace-pre-wrap">
                 {token.text}
               </span>
             );
@@ -226,7 +226,7 @@ export function renderAqlToHtml(
         const color = directiveColor(token.matchingKeyword || token.keyword!);
         const raw = token.value ? `#${token.keyword} ${token.value}` : `#${token.keyword}`;
         const valueSpan = token.value
-          ? ` <span style="color:#e5e7eb;font-weight:500">${escapeHtml(token.value)}</span>`
+          ? ` <span style="color:var(--color-syntax-text);font-weight:500">${escapeHtml(token.value)}</span>`
           : '';
         html += `<span contenteditable="false" class="aql-token aql-directive whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(raw)}" title="${escapeHtml(raw)}">${escapeHtml(`#${token.keyword}`)}${valueSpan}</span>`;
         break;
@@ -234,7 +234,7 @@ export function renderAqlToHtml(
       case 'reference': {
         const ref = token.reference!;
         const resolved = resolveReference?.(ref) || { label: ref.label || ref.raw };
-        const color = resolved.color || '#fbbf24';
+        const color = resolved.color || 'var(--color-syntax-number)';
         // Render the raw reference string exactly so the highlight layer matches
         // the transparent textarea character-for-character.
         html += `<span contenteditable="false" class="aql-token aql-reference whitespace-pre-wrap" style="color:${color}" data-token-raw="${encodeURIComponent(ref.raw)}" title="${escapeHtml(ref.raw)}">${escapeHtml(ref.raw)}</span>`;

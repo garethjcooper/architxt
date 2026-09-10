@@ -113,7 +113,7 @@ const aqlTheme = EditorView.theme({
     fontSize: '12px',
     lineHeight: '1.5',
     backgroundColor: 'transparent',
-    color: '#e5e7eb',
+    color: 'var(--syntax-text)',
   },
   '.cm-scroller': {
     overflow: 'auto',
@@ -123,79 +123,79 @@ const aqlTheme = EditorView.theme({
     width: '100%',
     minWidth: '0',
     padding: '6px 8px',
-    caretColor: 'white',
+    caretColor: 'var(--focus-ring)',
   },
   '.cm-line': {
     whiteSpace: 'pre-wrap',
   },
   '.cm-cursor': {
-    borderLeftColor: 'white',
+    borderLeftColor: 'var(--focus-ring)',
   },
   '.cm-selectionBackground': {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'var(--accent-primary-bg)',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'var(--surface-subtle)',
   },
   '.cm-gutters': {
     display: 'none',
   },
   '.cm-placeholder': {
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'var(--syntax-comment)',
   },
-  '.aql-directive': { color: '#94a3b8', fontWeight: 500 },
-  '.aql-directive-sub': { color: '#64748b', fontWeight: 500 },
-  '.aql-reference': { color: '#fbbf24' },
+  '.aql-directive': { color: 'var(--color-aql-directive)', fontWeight: 500 },
+  '.aql-directive-sub': { color: 'var(--color-aql-directive-sub)', fontWeight: 500 },
+  '.aql-reference': { color: 'var(--syntax-number)' },
   '.cm-tooltip': {
-    backgroundColor: '#1e293b',
-    border: '1px solid rgba(255,255,255,0.2)',
+    backgroundColor: 'var(--surface-panel)',
+    border: '1px solid var(--border-strong)',
     borderRadius: '6px',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
+    boxShadow: '0 4px 6px -1px var(--overlay-strong)',
   },
   '.cm-tooltip.cm-tooltip-autocomplete': {
     padding: '4px 0',
   },
   '.cm-tooltip-autocomplete ul li': {
     padding: '4px 10px',
-    color: '#e5e7eb',
+    color: 'var(--syntax-text)',
   },
   '.cm-tooltip-autocomplete ul li[aria-selected]': {
-    backgroundColor: 'rgba(52, 211, 153, 0.2)',
-    color: '#34d399',
+    backgroundColor: 'var(--accent-primary-bg)',
+    color: 'var(--accent-primary-fg)',
   },
   '.cm-completionIcon': {
-    color: '#94a3b8',
+    color: 'var(--syntax-punctuation)',
   },
   '.cm-diagnostic': {
-    color: '#e5e7eb',
+    color: 'var(--syntax-text)',
   },
   '.cm-diagnosticText': {
-    color: '#e5e7eb',
+    color: 'var(--syntax-text)',
   },
   '.cm-diagnostic-error': {
-    color: '#f87171',
+    color: 'var(--destructive-fg)',
   },
   '.cm-lintRange': {
     backgroundImage: 'none',
   },
   '.cm-lintRange-error': {
-    backgroundColor: 'rgba(248, 113, 113, 0.15)',
-    borderBottom: '1px dashed #f87171',
+    backgroundColor: 'var(--destructive-bg)',
+    borderBottom: '1px dashed var(--destructive-fg)',
   },
   '.cm-lintRange-warning': {
-    backgroundColor: 'rgba(250, 204, 21, 0.15)',
-    borderBottom: '1px dashed #facc15',
+    backgroundColor: 'var(--badge-caution-bg)',
+    borderBottom: '1px dashed var(--badge-caution-fg)',
   },
   '.cm-lintMarker': {
-    color: '#f87171',
+    color: 'var(--destructive-fg)',
   },
   '.cm-panel.cm-lintPanel': {
-    backgroundColor: '#1e293b',
-    borderTop: '1px solid rgba(255,255,255,0.2)',
+    backgroundColor: 'var(--surface-panel)',
+    borderTop: '1px solid var(--border-strong)',
   },
   '.cm-lintPanel .cm-diagnostic': {
     padding: '4px 8px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    borderBottom: '1px solid var(--border-default)',
   },
 });
 

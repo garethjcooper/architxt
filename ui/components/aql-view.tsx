@@ -29,13 +29,13 @@ export function AqlView({ query, className, compact, resolveReference }: AqlView
   return (
     <div
       className={cn(
-        'font-mono text-sm leading-relaxed text-white/80',
+        'font-mono text-sm leading-relaxed text-syntax-text',
         compact && 'truncate whitespace-nowrap',
         className,
       )}
     >
       {tokens.length === 0 ? (
-        <span className="text-white/40">Empty query</span>
+        <span className="text-syntax-comment">Empty query</span>
       ) : (
         <AqlTokenList tokens={tokens} resolveReference={resolveReference} />
       )}
