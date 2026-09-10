@@ -116,7 +116,7 @@ export default function DirectiveCompareModal({
 
               {/* Side-by-side values (only when different) */}
               {field.differs && (
-                <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
+                <div className="grid grid-cols-2 gap-0 divide-x divide-border-subtle">
                   <div className="px-3 py-2">
                     <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">architxt</div>
                     <div className="text-[11px] text-foreground-faint break-all leading-relaxed">{field.archVal}</div>

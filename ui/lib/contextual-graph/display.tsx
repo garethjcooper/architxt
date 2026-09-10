@@ -8,15 +8,15 @@ import { Badge } from '@/components/ui/badge';
 import { mentalModelsApi } from '@/lib/api/client';
 
 const TYPE_PALETTE = [
-  '#E06C75', // red
-  '#98C379', // green
-  '#E5C07B', // yellow
-  '#61AFEF', // blue
-  '#C678DD', // purple
-  '#56B6C2', // cyan
-  '#FFEB3B', // bright yellow
-  '#FF9800', // amber
-  '#00BCD4', // sky
+  'var(--color-diagram-edge-mental-writes)', // red
+  'var(--color-diagram-node-entity)', // green
+  'var(--color-accent-tertiary-fg)', // yellow
+  'var(--color-syntax-keyword)', // blue
+  'var(--color-diagram-edge-synthesize)', // purple
+  'var(--color-syntax-function)', // cyan
+  'var(--color-accent-tertiary-fg)', // bright yellow
+  'var(--color-diagram-edge-mental-depends)', // amber
+  'var(--color-syntax-function)', // sky
 ];
 
 function hashString(str: string): number {
@@ -29,7 +29,7 @@ function hashString(str: string): number {
 }
 
 export function colorForType(type?: string | null): string {
-  if (!type) return '#64748b';
+  if (!type) return 'var(--color-aql-directive-sub)';
   return TYPE_PALETTE[hashString(type) % TYPE_PALETTE.length];
 }
 
@@ -159,17 +159,17 @@ export function formatRelative(value?: string | null): string {
 }
 
 export function renderValue(value: unknown): React.ReactNode {
-  if (value === undefined || value === null) return <span className="text-white/40 italic">null</span>;
+  if (value === undefined || value === null) return <span className="text-foreground-subtle italic">null</span>;
   if (typeof value === 'string') {
     return value.trim().length === 0
-      ? <span className="text-white/40 italic">empty</span>
-      : <p className="whitespace-pre-wrap text-white/80">{value}</p>;
+      ? <span className="text-foreground-subtle italic">empty</span>
+      : <p className="whitespace-pre-wrap text-foreground-default">{value}</p>;
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
-    return <span className="font-mono text-white/80">{String(value)}</span>;
+    return <span className="font-mono text-foreground-default">{String(value)}</span>;
   }
   return (
-    <pre className="text-[11px] text-white/70 bg-black/20 rounded p-1.5 overflow-x-auto">
+    <pre className="text-[11px] text-foreground-muted bg-surface-inset rounded p-1.5 overflow-x-auto">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -178,14 +178,14 @@ export function renderValue(value: unknown): React.ReactNode {
 export function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded border border-white/5 bg-overlay overflow-hidden">
+    <div className="rounded border border-border-subtle bg-overlay overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-white/5 transition-colors"
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-overlay-strong transition-colors"
       >
-        {open ? <ChevronDown className="w-3.5 h-3.5 text-white/50" /> : <ChevronRight className="w-3.5 h-3.5 text-white/50" />}
-        <span className="text-[11px] font-medium text-white/80">{title}</span>
+        {open ? <ChevronDown className="w-3.5 h-3.5 text-foreground-faint" /> : <ChevronRight className="w-3.5 h-3.5 text-foreground-faint" />}
+        <span className="text-[11px] font-medium text-foreground-muted">{title}</span>
       </button>
       {open && <div className="px-2.5 pb-2.5 pt-1 space-y-2">{children}</div>}
     </div>
@@ -195,7 +195,7 @@ export function Section({ title, children, defaultOpen = true }: { title: string
 export function PropertyRow({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-foreground-faint mb-0.5">{label}</div>
       {renderValue(value)}
     </div>
   );
@@ -329,14 +329,14 @@ export function EntityListRow({
       className={cn(
         'w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
         active
-          ? 'border-white/10 bg-white/10'
-          : 'border-white/5 bg-black/20 hover:bg-white/5'
+          ? 'border-border-strong bg-surface-hover'
+          : 'border-border-subtle bg-surface-inset hover:bg-surface-hover'
       )}
       style={{ borderLeftColor: colorForType(node.type), borderLeftWidth: 3 }}
     >
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-        <div className="text-xs text-white/90 truncate">{node.label}</div>
-        <div className="text-[10px] text-white/50 font-mono truncate">{typeLine}</div>
+        <div className="text-xs text-foreground-default truncate">{node.label}</div>
+        <div className="text-[10px] text-foreground-faint font-mono truncate">{typeLine}</div>
       </div>
     </button>
   );
@@ -368,22 +368,22 @@ export function EdgeListRow({
       className={cn(
         'w-full flex items-start gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
         active
-          ? 'border-white/10 bg-white/10'
-          : 'border-white/5 bg-black/20 hover:bg-white/5'
+          ? 'border-border-strong bg-surface-hover'
+          : 'border-border-subtle bg-surface-inset hover:bg-surface-hover'
       )}
       style={{ borderLeftColor: colorForType(edge.type || 'edge'), borderLeftWidth: 3 }}
     >
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-        <div className="text-xs text-white/90 truncate">
-          {sourceDisplay} <span className="text-white/40">→</span> {targetDisplay}
+        <div className="text-xs text-foreground-default truncate">
+          {sourceDisplay} <span className="text-foreground-faint">→</span> {targetDisplay}
         </div>
-        <div className="text-[10px] text-white/50 font-mono truncate">
+        <div className="text-[10px] text-foreground-faint font-mono truncate">
           {description || secondary}
         </div>
       </div>
       {edgeContextCount !== undefined && edgeContextCount > 0 && (
         <span
-          className="text-[9px] text-white/50 px-1 py-0.5 rounded border border-white/10 bg-white/5 shrink-0"
+          className="text-[9px] text-foreground-faint px-1 py-0.5 rounded border border-border-default bg-surface-subtle shrink-0"
           title={`${edgeContextCount} physical edge${edgeContextCount === 1 ? '' : 's'} in this edge context`}
         >
           {edgeContextCount} edge{edgeContextCount === 1 ? '' : 's'}
@@ -413,27 +413,27 @@ export function PatchRefRow({
       className={cn(
         'w-full flex items-start gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors',
         active
-          ? 'border-white/10 bg-white/10'
-          : 'border-white/5 bg-black/20 hover:bg-white/5'
+          ? 'border-border-strong bg-surface-hover'
+          : 'border-border-subtle bg-surface-inset hover:bg-surface-hover'
       )}
       style={{ borderLeftColor: colorForType(type), borderLeftWidth: 3 }}
     >
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/90 truncate" title={role}>{roleLabel}</span>
-          <Badge className="text-[10px] h-4 px-1 bg-emerald-900/30 text-emerald-300 border-emerald-500/20">
+          <span className="text-xs text-foreground-default truncate" title={role}>{roleLabel}</span>
+          <Badge className="text-[10px] h-4 px-1 bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd">
             {scopeLabel}
           </Badge>
           {lastRefreshStatus && (
             <span className={cn(
               'text-[10px]',
-              lastRefreshStatus === 'error' ? 'text-red-400' : 'text-emerald-400'
+              lastRefreshStatus === 'error' ? 'text-destructive-fg' : 'text-accent-primary-fg'
             )}>
               {lastRefreshStatus}
             </span>
           )}
         </div>
-        <div className="text-[10px] text-white/50 font-mono truncate">{extId}</div>
+        <div className="text-[10px] text-foreground-faint font-mono truncate">{extId}</div>
       </div>
     </button>
   );

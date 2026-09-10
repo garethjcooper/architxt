@@ -129,7 +129,7 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
 
                   {/* Side-by-side values */}
                   {!field.same && (
-                    <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
+                    <div className="grid grid-cols-2 gap-0 divide-x divide-border-subtle">
                       <div className="px-3 py-2">
                         <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">architxt</div>
                         <div className="text-[11px] text-foreground-faint break-all leading-relaxed">

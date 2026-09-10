@@ -123,7 +123,7 @@ export default function EntityCompareModal({
                 <span className="text-xs font-medium text-diff-differ-fg">Name Mismatches</span>
                 <span className="text-[10px] ml-auto text-diff-differ-fg/60">{divergence.name_mismatches!.length}</span>
               </div>
-              <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
+              <div className="grid grid-cols-2 gap-0 divide-x divide-border-subtle">
                 <div className="px-3 py-2">
                   <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">architxt</div>
                   <div className="space-y-1">

@@ -1338,7 +1338,7 @@ export default function WorkspacePage() {
                   placeholder="Workspace session"
                   className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
+                    '--tw-ring-color': 'var(--focus-ring)',
                     '--tw-ring-opacity': '0.4',
                   } as React.CSSProperties}
                   onKeyDown={(e) => {
