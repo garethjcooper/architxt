@@ -81,7 +81,7 @@ export function EntityTaggedContent({
         {before != null && <span>{before}</span>}
         <span
           data-highlight-match
-          className="bg-yellow-400/30 text-badge-caution-fg rounded px-0.5 transition-all"
+          className="bg-badge-caution-bg/60 text-badge-caution-fg rounded px-0.5 transition-all"
         >
           {highlighted}
         </span>

@@ -567,7 +567,7 @@ export function ServerGraphBanksDialog({
                               size="sm"
                               disabled={clearingAll[bank.bank_id]}
                               onClick={() => setConfirmClearBankId(bank.bank_id)}
-                              className="h-7 text-[11px] text-red-600 hover:text-destructive-fg hover:bg-destructive-bg"
+                              className="h-7 text-[11px] text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
                             >
                               {clearingAll[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bomb className="h-3 w-3 mr-1" />}
                               Clear all mental models

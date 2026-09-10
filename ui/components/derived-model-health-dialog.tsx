@@ -391,7 +391,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
   const selectedContentError = selectedExtId != null ? contentErrors[selectedExtId] || null : null;
 
   const formatPreview = (result: HealthResult | null, error: string | null): React.ReactNode => {
-    if (error) return <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-red-950/20 rounded border border-destructive-bd/50 p-3">{`Error:\n${error}`}</div>;
+    if (error) return <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-destructive-bg/40 rounded border border-destructive-bd/50 p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
     if (result.content == null) {
       return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;

@@ -523,7 +523,7 @@ export function EntityDetectionDialog({
                                   >
                                     <span className="break-all leading-relaxed line-clamp-3">
                                       {before}
-                                      <span className="text-purple-500 font-semibold">{match.text}</span>
+                                      <span className="text-badge-entity-fg font-semibold">{match.text}</span>
                                       {after}
                                     </span>
                                     <button
@@ -628,7 +628,7 @@ export function EntityDetectionDialog({
                                     />
                                     <span className="break-all leading-relaxed line-clamp-3">
                                       {before}
-                                      <span className="font-semibold text-purple-500">{group.matchedText}</span>
+                                      <span className="font-semibold text-badge-entity-fg">{group.matchedText}</span>
                                       {after}
                                     </span>
                                   </div>

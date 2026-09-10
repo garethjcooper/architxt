@@ -198,7 +198,7 @@ function PreviewPane({
         >
           {error ? (
             <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
-              <div className="max-w-full rounded-md border border-rose-500/30 bg-rose-950/60 backdrop-blur-sm px-3 py-2 text-xs text-rose-200/90 font-mono whitespace-pre-wrap shadow-lg">
+              <div className="max-w-full rounded-md border border-destructive-bd bg-destructive-bg backdrop-blur-sm px-3 py-2 text-xs text-destructive-fg font-mono whitespace-pre-wrap shadow-lg">
                 {error}
               </div>
             </div>
@@ -276,7 +276,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
           <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
             <span>Preview</span>
             <div className="flex items-center gap-2">
-              {lastError && <span className="text-rose-300/80 text-[10px]">Parse error</span>}
+              {lastError && <span className="text-destructive-fg/80 text-[10px]">Parse error</span>}
             </div>
           </div>
           <div className="flex-1 min-h-0 p-2 overflow-hidden">

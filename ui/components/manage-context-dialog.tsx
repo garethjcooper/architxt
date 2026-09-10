@@ -365,7 +365,7 @@ export function ManageContextDialog({
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="bg-violet-600 hover:bg-violet-700 text-white"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
