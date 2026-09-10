@@ -1375,7 +1375,7 @@ export default function WorkspacePage() {
 
         {pendingSection && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong">
-            <div className="rounded-lg border border-border-default bg-surface-overlay p-4 w-80 shadow-lg">
+            <div className="rounded-lg border border-border-default bg-surface-raised p-4 w-80 shadow-lg">
               <div className="text-sm font-medium text-foreground-default mb-2">Add section to page</div>
               <p className="text-xs text-foreground-faint mb-4">
                 “{pendingSection.title || 'Untitled section'}”
