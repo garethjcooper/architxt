@@ -170,7 +170,7 @@ export function DaemonStatus() {
       </button>
 
       {expanded && (
-        <div className="absolute top-full right-0 mt-2 z-50 w-80 rounded-xl border border-border-default bg-surface-overlay shadow-xl p-4 space-y-3">
+        <div className="absolute top-full right-0 mt-2 z-50 w-80 rounded-xl border border-border-default bg-surface-raised shadow-xl p-4 space-y-3">
           {isProcessing && progress && doc ? (
             <>
               <div className="flex items-center justify-between">
@@ -181,7 +181,7 @@ export function DaemonStatus() {
                 <span className="text-[11px] text-foreground-subtle">{percent}%</span>
               </div>
 
-              <div className="rounded-lg bg-on-dark/[0.03] p-2.5 space-y-1">
+              <div className="rounded-lg bg-surface-card p-2.5 space-y-1">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-foreground-subtle">Document:</span>
                   <span className="text-foreground-faint font-mono">#{doc.id}</span>
