@@ -208,7 +208,7 @@ export function ManageContextDialog({
           isRemoved
             ? 'bg-badge-neutral-bg border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
             : context.currentState === 'common'
-              ? 'bg-badge-info-bg border-badge-info-bd text-badge-info-fg'
+              ? 'bg-badge-context-bg border-badge-context-bd text-badge-context-fg'
               : context.currentState === 'partial'
                 ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
                 : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'

@@ -518,7 +518,7 @@ export function ViewDocumentDialog({
               <div>
                 <p className="text-xs uppercase text-white/50 font-medium mb-2">Context</p>
                 {document.context_id ? (
-                  <span className="px-2 py-0.5 rounded-full bg-badge-info-bg text-badge-info-fg text-xs border border-badge-info-bd">
+                  <span className="px-2 py-0.5 rounded-full bg-badge-context-bg text-badge-context-fg text-xs border border-badge-context-bd">
                     {contexts.find(c => c.id === document.context_id)?.description || `ID ${document.context_id}`}
                   </span>
                 ) : (
