@@ -97,18 +97,18 @@ export default function EntityCompareModal({
               key={field.label}
               className={`rounded border ${
                 field.differs
-                  ? 'border-red-500/20 bg-red-900/10'
-                  : 'border-emerald-500/20 bg-emerald-900/10'
+                  ? 'border-diff-differ-bd bg-diff-differ-bg'
+                  : 'border-diff-match-bd bg-diff-match-bg'
               }`}
             >
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
                 <span
-                  className={`h-2 w-2 rounded-full ${field.differs ? 'bg-red-400' : 'bg-emerald-400'}`}
+                  className={`h-2 w-2 rounded-full ${field.differs ? 'bg-diff-differ-fg' : 'bg-diff-match-fg'}`}
                 />
-                <span className={`text-xs font-medium ${field.differs ? 'text-red-300' : 'text-emerald-300'}`}>
+                <span className={`text-xs font-medium ${field.differs ? 'text-diff-differ-fg' : 'text-diff-match-fg'}`}>
                   {field.label}
                 </span>
-                <span className={`text-[10px] ml-auto ${field.differs ? 'text-red-400/60' : 'text-emerald-400/60'}`}>
+                <span className={`text-[10px] ml-auto ${field.differs ? 'text-diff-differ-fg/60' : 'text-diff-match-fg/60'}`}>
                   {field.differs ? 'Different' : 'Same'}
                 </span>
               </div>
@@ -117,11 +117,11 @@ export default function EntityCompareModal({
 
           {/* Name mismatches */}
           {hasMismatches && (
-            <div className="rounded border border-red-500/20 bg-red-900/10">
+            <div className="rounded border border-diff-differ-bd bg-diff-differ-bg">
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
-                <span className="h-2 w-2 rounded-full bg-red-400" />
-                <span className="text-xs font-medium text-red-300">Name Mismatches</span>
-                <span className="text-[10px] ml-auto text-red-400/60">{divergence.name_mismatches!.length}</span>
+                <span className="h-2 w-2 rounded-full bg-diff-differ-fg" />
+                <span className="text-xs font-medium text-diff-differ-fg">Name Mismatches</span>
+                <span className="text-[10px] ml-auto text-diff-differ-fg/60">{divergence.name_mismatches!.length}</span>
               </div>
               <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
                 <div className="px-3 py-2">
@@ -150,11 +150,11 @@ export default function EntityCompareModal({
 
           {/* Missing in architxt */}
           {(divergence.missing_in_arch || []).length > 0 && (
-            <div className="rounded border border-red-500/20 bg-red-900/10">
+            <div className="rounded border border-diff-differ-bd bg-diff-differ-bg">
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
-                <span className="h-2 w-2 rounded-full bg-red-400" />
-                <span className="text-xs font-medium text-red-300">Missing on architxt</span>
-                <span className="text-[10px] ml-auto text-red-400/60">{divergence.missing_in_arch!.length}</span>
+                <span className="h-2 w-2 rounded-full bg-diff-differ-fg" />
+                <span className="text-xs font-medium text-diff-differ-fg">Missing on architxt</span>
+                <span className="text-[10px] ml-auto text-diff-differ-fg/60">{divergence.missing_in_arch!.length}</span>
               </div>
               <div className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
@@ -168,11 +168,11 @@ export default function EntityCompareModal({
 
           {/* Missing in Hindsight */}
           {(divergence.missing_in_hind || []).length > 0 && (
-            <div className="rounded border border-red-500/20 bg-red-900/10">
+            <div className="rounded border border-diff-differ-bd bg-diff-differ-bg">
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
-                <span className="h-2 w-2 rounded-full bg-red-400" />
-                <span className="text-xs font-medium text-red-300">Missing on Bank</span>
-                <span className="text-[10px] ml-auto text-red-400/60">{divergence.missing_in_hind!.length}</span>
+                <span className="h-2 w-2 rounded-full bg-diff-differ-fg" />
+                <span className="text-xs font-medium text-diff-differ-fg">Missing on Bank</span>
+                <span className="text-[10px] ml-auto text-diff-differ-fg/60">{divergence.missing_in_hind!.length}</span>
               </div>
               <div className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
@@ -186,11 +186,11 @@ export default function EntityCompareModal({
 
           {/* Orphan names */}
           {hasOrphans && (
-            <div className="rounded border border-red-500/20 bg-red-900/10">
+            <div className="rounded border border-diff-differ-bd bg-diff-differ-bg">
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
-                <span className="h-2 w-2 rounded-full bg-red-400" />
-                <span className="text-xs font-medium text-red-300">Orphan Names</span>
-                <span className="text-[10px] ml-auto text-red-400/60">{divergence.orphan_names!.length}</span>
+                <span className="h-2 w-2 rounded-full bg-diff-differ-fg" />
+                <span className="text-xs font-medium text-diff-differ-fg">Orphan Names</span>
+                <span className="text-[10px] ml-auto text-diff-differ-fg/60">{divergence.orphan_names!.length}</span>
               </div>
               <div className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">

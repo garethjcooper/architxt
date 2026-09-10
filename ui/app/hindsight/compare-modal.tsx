@@ -108,21 +108,21 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
                   key={field.name}
                   className={`rounded border ${
                     field.same
-                      ? 'border-emerald-500/20 bg-emerald-900/10'
-                      : 'border-red-500/20 bg-red-900/10'
+                      ? 'border-diff-match-bd bg-diff-match-bg'
+                      : 'border-diff-differ-bd bg-diff-differ-bg'
                   }`}
                 >
                   {/* Field header */}
                   <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
                     {field.same ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <Check className="h-3.5 w-3.5 text-diff-match-fg" />
                     ) : (
-                      <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+                      <AlertCircle className="h-3.5 w-3.5 text-diff-differ-fg" />
                     )}
-                    <span className={`text-xs font-medium ${field.same ? 'text-emerald-300' : 'text-red-300'}`}>
+                    <span className={`text-xs font-medium ${field.same ? 'text-diff-match-fg' : 'text-diff-differ-fg'}`}>
                       {FIELD_LABELS[field.name] || field.name}
                     </span>
-                    <span className={`text-[10px] ml-auto ${field.same ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
+                    <span className={`text-[10px] ml-auto ${field.same ? 'text-diff-match-fg/60' : 'text-diff-differ-fg/60'}`}>
                       {field.same ? 'Same' : 'Different'}
                     </span>
                   </div>

@@ -63,11 +63,11 @@ function MentalModelDivergenceBadges({
         const differs = (divergence as any)[f.key];
         const color = differs
           ? f.pullable
-            ? 'bg-red-500/15 text-red-300 border-red-500/25'
-            : 'bg-transparent text-red-300 border-red-500/50'
+            ? 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
+            : 'bg-transparent text-diff-differ-fg border-diff-differ-bd'
           : f.pullable
-            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
-            : 'bg-transparent text-emerald-300 border-emerald-500/50';
+            ? 'bg-diff-match-bg text-diff-match-fg border-diff-match-bd'
+            : 'bg-transparent text-diff-match-fg border-diff-match-bd';
         return (
           <span key={f.label} className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${color}`}>
             {f.label}

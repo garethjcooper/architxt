@@ -66,8 +66,8 @@ function DivergenceBadges({ divergence }: { divergence?: Divergence }) {
     <div className="flex flex-wrap gap-1 mt-1.5">
       {fields.map((f) => {
         const color = f.differs
-          ? 'bg-red-500/15 text-red-300 border-red-500/25'
-          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25';
+          ? 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
+          : 'bg-diff-match-bg text-diff-match-fg border-diff-match-bd';
         return (
           <span key={f.label} className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${color}`}>
             {f.label}

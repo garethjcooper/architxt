@@ -723,7 +723,7 @@ export default function HindsightPage() {
           <select
             value={selectedServerId}
             onChange={(e) => setSelectedServerId(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             <option value="">Select server...</option>
             {servers.map((s, idx) => (
@@ -738,7 +738,7 @@ export default function HindsightPage() {
             value={selectedBankId}
             onChange={(e) => setSelectedBankId(e.target.value)}
             disabled={!selectedServerId || loadingBanks || banks.length === 0}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
           >
             <option value="">{loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}</option>
             {banks.map((b, idx) => (
@@ -758,7 +758,7 @@ export default function HindsightPage() {
               setCounts(null);
               setSelectedIds(new Set());
             }}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             <option value="documents">Documents</option>
             <option value="entities">Entities</option>
@@ -770,7 +770,7 @@ export default function HindsightPage() {
         <Button
           onClick={fetchDiff}
           disabled={loadingDiff || !selectedServerId || !selectedBankId}
-          className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-emerald-900/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-accent-primary-bg border border-accent-primary-bd text-accent-primary-fg hover:bg-accent-primary-bg-hover transition-colors disabled:opacity-50"
         >
           {loadingDiff ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
           {loadingDiff ? 'Fetching...' : `Fetch ${selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'}`}
@@ -783,7 +783,7 @@ export default function HindsightPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 rounded bg-red-900/20 border border-red-500/30 text-red-300 text-sm flex items-center gap-2">
+        <div className="mb-4 p-3 rounded bg-destructive-bg border border-destructive-bd text-destructive-fg text-sm flex items-center gap-2">
           <AlertCircle className="h-4 w-4" />
           {error}
         </div>
@@ -823,7 +823,7 @@ export default function HindsightPage() {
                   value={searchCol1}
                   onChange={(e) => setSearchCol1(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol1 && (
                   <button
@@ -916,7 +916,7 @@ export default function HindsightPage() {
                   value={searchCol2}
                   onChange={(e) => setSearchCol2(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol2 && (
                   <button
@@ -954,9 +954,9 @@ export default function HindsightPage() {
             </div>
             <ColumnCard
               title="On Both"
-              icon={<ArrowRightLeft className="h-4 w-4 text-emerald-400" />}
+              icon={<ArrowRightLeft className="h-4 w-4 text-diff-match-fg" />}
               count={col2Filtered.pureFiltered.length}
-              colorClass="bg-emerald-900/20 text-emerald-300 border-emerald-500/20"
+              colorClass="bg-diff-match-bg text-diff-match-fg border-diff-match-bd"
               extIds={filteredCol2.filter((d) => d.syncStatus === 'out_of_sync').map((d) => d.ext_id)}
               showSelectAll={col2Filter === 'out_of_sync' || col2Filter === 'all'}
               selectedIds={selectedIds}
@@ -969,7 +969,7 @@ export default function HindsightPage() {
                       onClick={() => setCol2Filter(f)}
                       className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                         col2Filter === f
-                          ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
+                          ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
                           : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
                       }`}
                     >
@@ -1063,7 +1063,7 @@ export default function HindsightPage() {
                   value={searchCol3}
                   onChange={(e) => setSearchCol3(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol3 && (
                   <button
