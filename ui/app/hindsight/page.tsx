@@ -848,9 +848,9 @@ export default function HindsightPage() {
             </div>
             <ColumnCard
               title="Only on architxt"
-              icon={<Server className="h-4 w-4 text-accent-secondary-fg" />}
+              icon={<Server className="h-4 w-4 text-accent-primary-fg" />}
               count={col1Filtered.pureFiltered.length}
-              colorClass="bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd"
+              colorClass="bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
               extIds={filteredCol1.map((d) => d.ext_id)}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
@@ -954,9 +954,9 @@ export default function HindsightPage() {
             </div>
             <ColumnCard
               title="On Both"
-              icon={<ArrowRightLeft className="h-4 w-4 text-diff-match-fg" />}
+              icon={<ArrowRightLeft className="h-4 w-4 text-accent-primary-fg" />}
               count={col2Filtered.pureFiltered.length}
-              colorClass="bg-diff-match-bg text-diff-match-fg border-diff-match-bd"
+              colorClass="bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
               extIds={filteredCol2.filter((d) => d.syncStatus === 'out_of_sync').map((d) => d.ext_id)}
               showSelectAll={col2Filter === 'out_of_sync' || col2Filter === 'all'}
               selectedIds={selectedIds}
@@ -1088,9 +1088,9 @@ export default function HindsightPage() {
             </div>
             <ColumnCard
               title="Only on Bank"
-              icon={<Database className="h-4 w-4 text-accent-tertiary-fg" />}
+              icon={<Database className="h-4 w-4 text-accent-primary-fg" />}
               count={col3Filtered.pureFiltered.length}
-              colorClass="bg-accent-tertiary-bg text-accent-tertiary-fg border-accent-tertiary-bd"
+              colorClass="bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
               extIds={filteredCol3.map((d) => d.ext_id)}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
