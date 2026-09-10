@@ -249,7 +249,7 @@ function StatusBadge({ value }: { value: boolean | string | '—' }) {
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800/15 text-slate-400 border border-slate-700/20">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
       {String(value)}
     </span>
   );

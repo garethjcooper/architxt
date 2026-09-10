@@ -188,25 +188,25 @@ export default function DirectivesPage() {
             <button
               onClick={() => setShowAllBadges(!showAllBadges)}
               title={showAllBadges ? 'Limit to 3 badges' : 'Show all badges'}
-              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <BadgeExpandIcon className="h-5 w-5" />
             </button>
             <button
               onClick={() => setCompactBadges(!compactBadges)}
               title={compactBadges ? 'Expand badges' : 'Compact badges'}
-              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <BadgeCompactIcon className="h-5 w-5" />
             </button>
             <button
               onClick={() => setFreeze(!freeze)}
               title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+              className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
             >
               <TableIcon className="h-3.5 w-3.5" />
             </button>
-            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">{filteredDirectives.length} ({selected.size})</span>
+            <span className="text-xs font-mono text-accent-secondary-fg bg-black/30 border border-accent-secondary-bd px-2 py-0.5 rounded">{filteredDirectives.length} ({selected.size})</span>
           </div>
         </div>
 
