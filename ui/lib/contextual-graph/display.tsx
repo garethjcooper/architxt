@@ -248,7 +248,9 @@ function roleIsEdgeLike(role?: string): boolean {
 // roles; use getDerivationScope() when only NODE/EDGE/SEED/PATCH is needed.
 export function getRoleScopeLabel(role?: string): string {
   if (!role) return 'PATCH';
-  return getRoleScope(role).toUpperCase() || role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
+  const scope = getRoleScope(role);
+  if (scope) return scope.toUpperCase();
+  return role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
 }
 
 // Clean derivation scope (NODE / EDGE / SEED) for the scope badge.
