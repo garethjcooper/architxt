@@ -37,12 +37,12 @@ export function ServerBankSelectors({
   return (
     <div className="flex items-center gap-3 px-3 py-2 shrink-0">
       <div className="flex items-center gap-2">
-        <Server className="h-4 w-4 text-white/40" />
+        <Server className="h-4 w-4 text-foreground-subtle" />
         <select
           value={selectedServerId}
           onChange={(e) => setSelectedServerId(e.target.value)}
           disabled={disabled || servers.length === 0}
-          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
+          className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
         >
           <option value="">Select server...</option>
           {servers.map((s, idx) => (
@@ -54,12 +54,12 @@ export function ServerBankSelectors({
       </div>
 
       <div className="flex items-center gap-2">
-        <Database className="h-4 w-4 text-white/40" />
+        <Database className="h-4 w-4 text-foreground-subtle" />
         <select
           value={selectedBankId}
           onChange={(e) => setSelectedBankId(e.target.value)}
           disabled={disabled || !selectedServerId || loadingBanks || banks.length === 0}
-          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
+          className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
         >
           <option value="">
             {loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}

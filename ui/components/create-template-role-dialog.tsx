@@ -87,14 +87,14 @@ export function CreateTemplateRoleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Create Template Role
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           <div className="space-y-2">
-            <Label htmlFor="role_id" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="role_id" className="text-xs uppercase text-foreground-subtle font-medium">
               Role ID *
             </Label>
             <Input
@@ -102,15 +102,15 @@ export function CreateTemplateRoleDialog({
               placeholder="my_custom_role"
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
-              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+              className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
             />
-            <p className="text-[11px] text-white/40">
+            <p className="text-[11px] text-foreground-subtle">
               Max 64 characters. The <code className="text-badge-caution-fg">sys_</code> prefix is reserved for system roles.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="display_name" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="display_name" className="text-xs uppercase text-foreground-subtle font-medium">
               Display Name *
             </Label>
             <Input
@@ -118,20 +118,20 @@ export function CreateTemplateRoleDialog({
               placeholder="My custom role"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+              className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="derivation_scope" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="derivation_scope" className="text-xs uppercase text-foreground-subtle font-medium">
                 Derivation Scope *
               </Label>
               <select
                 id="derivation_scope"
                 value={derivationScope}
                 onChange={(e) => setDerivationScope(e.target.value as Scope)}
-                className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
+                className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
               >
                 {SCOPES.map((scope) => (
                   <option key={scope} value={scope}>
@@ -142,7 +142,7 @@ export function CreateTemplateRoleDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sort_order" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="sort_order" className="text-xs uppercase text-foreground-subtle font-medium">
                 Sort Order
               </Label>
               <Input
@@ -150,24 +150,24 @@ export function CreateTemplateRoleDialog({
                 type="number"
                 value={sortOrder}
                 onChange={(e) => setSortOrder(Number(e.target.value))}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={creating}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleCreate}
               disabled={!roleId.trim() || !displayName.trim() || creating}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               Create

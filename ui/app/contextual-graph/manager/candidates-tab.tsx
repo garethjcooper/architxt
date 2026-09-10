@@ -78,49 +78,49 @@ export function CandidatesTab({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-3 pb-2 border-b border-white/10 shrink-0">
+      <div className="flex items-center gap-3 pb-2 border-b border-border-default shrink-0">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search candidates..."
-            className="h-8 pl-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/40"
+            className="h-8 pl-8 text-xs bg-surface-card border-border-default text-foreground-default placeholder:text-foreground-subtle"
           />
         </div>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value as CandidateFilter)}
-          className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+          className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
         >
           <option value="all">All</option>
           <option value="nodes">Nodes</option>
           <option value="edges">Edges</option>
         </select>
-        <span className="text-xs font-mono text-accent-tertiary-fg bg-black/30 border border-accent-tertiary-bd px-2 py-0.5 rounded ml-auto">
+        <span className="text-xs font-mono text-accent-tertiary-fg bg-surface-inset border border-accent-tertiary-bd px-2 py-0.5 rounded ml-auto">
           {filteredNodes.length} node{filteredNodes.length !== 1 ? 's' : ''} / {filteredEdges.length} edge
           {filteredEdges.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       <div className="flex-1 min-h-0 flex mt-2 gap-2">
-        <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col flex-1">
+        <div className="min-h-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col flex-1">
           {showNodes && (
             <>
-              <div className="h-10 px-3 border-b border-white/10 bg-accent-tertiary-bg text-accent-tertiary-fg flex items-center justify-between shrink-0">
+              <div className="h-10 px-3 border-b border-border-default bg-accent-tertiary-bg text-accent-tertiary-fg flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Discovered nodes</span>
-                <span className="text-xs font-mono text-accent-tertiary-fg bg-black/30 border border-accent-tertiary-bd px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-tertiary-fg bg-surface-inset border border-accent-tertiary-bd px-2 py-0.5 rounded">
                   {filteredNodes.length}
                 </span>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
                 {loading ? (
                   <div className="p-3 space-y-2">
-                    <Skeleton className="h-10 w-full bg-white/10" />
-                    <Skeleton className="h-10 w-full bg-white/10" />
+                    <Skeleton className="h-10 w-full bg-surface-panel" />
+                    <Skeleton className="h-10 w-full bg-surface-panel" />
                   </div>
                 ) : filteredNodes.length === 0 ? (
-                  <div className="text-[11px] text-white/40 px-2 py-3">No discovered nodes.</div>
+                  <div className="text-[11px] text-foreground-subtle px-2 py-3">No discovered nodes.</div>
                 ) : (
                   filteredNodes.map((node) => {
                     const active = selectedNodeId === node.id;
@@ -132,21 +132,21 @@ export function CandidatesTab({
                         type="button"
                         onClick={() => onSelectNode(node.id)}
                         className={cn(
-                          'w-full rounded border bg-black/10 px-1.5 py-1 text-left transition-colors',
-                          active ? 'border-accent-tertiary-bd bg-accent-tertiary-bg' : 'border-white/5 hover:bg-white/5'
+                          'w-full rounded border bg-overlay px-1.5 py-1 text-left transition-colors',
+                          active ? 'border-accent-tertiary-bd bg-accent-tertiary-bg' : 'border-border-subtle hover:bg-surface-card'
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex flex-col gap-0 min-w-0">
-                            <div className="text-xs text-white/90 truncate">{node.label}</div>
-                            <div className="text-[10px] text-white/40 truncate">{typeLine}</div>
+                            <div className="text-xs text-foreground-default truncate">{node.label}</div>
+                            <div className="text-[10px] text-foreground-subtle truncate">{typeLine}</div>
                           </div>
-                          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
+                          <span className="text-[10px] text-foreground-placeholder shrink-0">{formatRelative(lastRefreshed)}</span>
                         </div>
                         {node.modelRefs.length > 0 && (
                           <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {node.modelRefs.map((ref, i) => (
-                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
                                 {getRoleScopeLabel(ref.role)}
                               </Badge>
                             ))}
@@ -162,21 +162,21 @@ export function CandidatesTab({
 
           {showEdges && (
             <>
-              {showNodes && <div className="h-px bg-white/10" />}
-              <div className="h-10 px-3 border-b border-white/10 bg-accent-tertiary-bg text-accent-tertiary-fg flex items-center justify-between shrink-0">
+              {showNodes && <div className="h-px bg-surface-panel" />}
+              <div className="h-10 px-3 border-b border-border-default bg-accent-tertiary-bg text-accent-tertiary-fg flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Discovered edges</span>
-                <span className="text-xs font-mono text-accent-tertiary-fg bg-black/30 border border-accent-tertiary-bd px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-tertiary-fg bg-surface-inset border border-accent-tertiary-bd px-2 py-0.5 rounded">
                   {filteredEdges.length}
                 </span>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
                 {loading ? (
                   <div className="p-3 space-y-2">
-                    <Skeleton className="h-10 w-full bg-white/10" />
-                    <Skeleton className="h-10 w-full bg-white/10" />
+                    <Skeleton className="h-10 w-full bg-surface-panel" />
+                    <Skeleton className="h-10 w-full bg-surface-panel" />
                   </div>
                 ) : filteredEdges.length === 0 ? (
-                  <div className="text-[11px] text-white/40 px-2 py-3">No discovered edges.</div>
+                  <div className="text-[11px] text-foreground-subtle px-2 py-3">No discovered edges.</div>
                 ) : (
                   filteredEdges.map((edge) => {
                     const active = selectedEdgeId === edge.id;
@@ -190,22 +190,22 @@ export function CandidatesTab({
                         onClick={() => onSelectEdge(edge.id)}
                         className={cn(
                           'w-full text-left rounded border px-1.5 py-1 transition-colors',
-                          active ? 'bg-accent-tertiary-bg border-accent-tertiary-bd' : 'bg-black/10 border-white/5 hover:bg-white/5'
+                          active ? 'bg-accent-tertiary-bg border-accent-tertiary-bd' : 'bg-overlay border-border-subtle hover:bg-surface-card'
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="text-xs text-white/90 truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
-                            <div className="text-[10px] text-white/40 truncate">
+                            <div className="text-xs text-foreground-default truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
+                            <div className="text-[10px] text-foreground-subtle truncate">
                               {source?.label || edge.source_id} → {target?.label || edge.target_id}
                             </div>
                           </div>
-                          <span className="text-[10px] text-white/30 shrink-0">{formatRelative(lastRefreshed)}</span>
+                          <span className="text-[10px] text-foreground-placeholder shrink-0">{formatRelative(lastRefreshed)}</span>
                         </div>
                         {edge.modelRefs.length > 0 && (
                           <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {edge.modelRefs.map((ref, i) => (
-                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-white/10 text-white/50">
+                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
                                 {getRoleScopeLabel(ref.role)}
                               </Badge>
                             ))}

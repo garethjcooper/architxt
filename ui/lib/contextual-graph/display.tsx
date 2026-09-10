@@ -178,7 +178,7 @@ export function renderValue(value: unknown): React.ReactNode {
 export function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded border border-white/5 bg-black/10 overflow-hidden">
+    <div className="rounded border border-white/5 bg-overlay overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}

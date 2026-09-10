@@ -495,7 +495,7 @@ export function DryRunExtractDialog({
       <Dialog open={open} onOpenChange={requestClose}>
         <DialogContent className="!w-[85vw] !max-w-none h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-white">
+            <DialogTitle className="text-xl font-semibold text-foreground-default">
               Dry-Run Extraction
             </DialogTitle>
           </DialogHeader>
@@ -525,7 +525,7 @@ export function DryRunExtractDialog({
                 <div className="flex flex-col gap-1.5 h-full">
                   <Label
                     htmlFor="dryrun-context"
-                    className="text-xs uppercase text-white/50 font-medium shrink-0"
+                    className="text-xs uppercase text-foreground-subtle font-medium shrink-0"
                   >
                     Context
                   </Label>
@@ -539,19 +539,19 @@ export function DryRunExtractDialog({
                       value={context}
                       onChange={(e) => setContext(e.target.value)}
                       placeholder="Optional context string"
-                      className="flex-1 min-h-0 h-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle resize-none custom-scrollbar"
+                      className="flex-1 min-h-0 h-full rounded-lg border border-border-default bg-transparent px-3 py-2 text-sm text-foreground-default placeholder:text-foreground-subtle focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle resize-none custom-scrollbar"
                     />
                     <Popover
                       open={contextPickerOpen}
                       onOpenChange={setContextPickerOpen}
                     >
                       <PopoverTrigger
-                        className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 h-full w-8 focus-visible:ring-2 focus-visible:ring-focus-ring-subtle focus-visible:border-transparent outline-none ${contextPickerOpen ? "bg-white/10" : ""}`}
+                        className={`group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-border-default bg-surface-card hover:bg-surface-panel h-full w-8 focus-visible:ring-2 focus-visible:ring-focus-ring-subtle focus-visible:border-transparent outline-none ${contextPickerOpen ? "bg-surface-panel" : ""}`}
                         aria-label="Pick a stored context"
                         title="Pick a stored context"
                       >
                         <ChevronDown
-                          className={`h-4 w-4 text-white/70 transition-transform ${contextPickerOpen ? "rotate-180" : ""}`}
+                          className={`h-4 w-4 text-foreground-faint transition-transform ${contextPickerOpen ? "rotate-180" : ""}`}
                         />
                       </PopoverTrigger>
                       {contextOptions.length > 0 && (
@@ -560,7 +560,7 @@ export function DryRunExtractDialog({
                           side="bottom"
                           sideOffset={4}
                           anchor={contextComboRef}
-                          className="max-h-60 overflow-y-auto custom-scrollbar rounded-lg border border-white/10 bg-surface-panel p-1 shadow-md"
+                          className="max-h-60 overflow-y-auto custom-scrollbar rounded-lg border border-border-default bg-surface-panel p-1 shadow-md"
                           style={{ width: contextComboWidth }}
                         >
                           {contextOptions.map((c) => (
@@ -571,7 +571,7 @@ export function DryRunExtractDialog({
                                 setContext(c.description);
                                 setContextPickerOpen(false);
                               }}
-                              className="w-full text-left px-3 py-2 text-sm text-white/80 rounded hover:bg-white/10 focus:bg-white/10 focus:outline-none truncate"
+                              className="w-full text-left px-3 py-2 text-sm text-foreground-muted rounded hover:bg-surface-panel focus:bg-surface-panel focus:outline-none truncate"
                               title={c.description}
                             >
                               {c.description}
@@ -587,23 +587,23 @@ export function DryRunExtractDialog({
               {/* Middle: Retain Mission + Entity Labels */}
               <div className="flex flex-row gap-[18px] flex-1 min-h-0 overflow-hidden">
                 <div className="flex flex-col gap-1.5 w-[70%] min-h-0">
-                  <span className="text-xs uppercase text-white/50 font-medium shrink-0">
+                  <span className="text-xs uppercase text-foreground-subtle font-medium shrink-0">
                     Retain Mission
                   </span>
                   <textarea
                     value={retainMission}
                     onChange={(e) => setRetainMission(e.target.value)}
                     placeholder="No retain mission set for this bank."
-                    className="flex-1 min-h-0 h-full w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/40 resize-none custom-scrollbar focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle"
+                    className="flex-1 min-h-0 h-full w-full rounded-lg border border-border-default bg-transparent px-3 py-2 text-sm text-foreground-default placeholder:text-foreground-subtle resize-none custom-scrollbar focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5 flex-1 min-h-0">
-                  <span className="block text-xs uppercase text-white/50 font-medium">
+                  <span className="block text-xs uppercase text-foreground-subtle font-medium">
                     Entity Labels
                   </span>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <div className="inline-flex rounded-lg border border-white/10 p-0.5 bg-white/5">
+                    <div className="inline-flex rounded-lg border border-border-default p-0.5 bg-surface-card">
                       {(["bank", "architxt"] as const).map((source) => {
                         const labels =
                           source === "bank"
@@ -625,8 +625,8 @@ export function DryRunExtractDialog({
                             disabled={keys === 0}
                             className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
                               isActive
-                                ? "bg-accent-primary-solid text-white"
-                                : "text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/60"
+                                ? "bg-accent-primary-solid text-foreground-default"
+                                : "text-foreground-faint hover:text-foreground-default hover:bg-surface-panel disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-foreground-faint"
                             }`}
                           >
                             {source === "bank" &&
@@ -642,12 +642,12 @@ export function DryRunExtractDialog({
                       })}
                     </div>
                     {loadingBankLabels && (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground-subtle" />
                     )}
                   </div>
                   <label
                     htmlFor={freeFormSwitchId}
-                    className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none"
+                    className="flex items-center gap-2 text-xs text-foreground-faint cursor-pointer select-none"
                   >
                     <Switch
                       id={freeFormSwitchId}
@@ -663,7 +663,7 @@ export function DryRunExtractDialog({
               {/* Right: Extraction Mode + Document Date */}
               <div className="flex flex-col gap-2 w-56 shrink-0 min-h-0 overflow-hidden">
                 <div className="space-y-1.5">
-                  <Label className="text-xs uppercase text-white/50 font-medium">
+                  <Label className="text-xs uppercase text-foreground-subtle font-medium">
                     Extraction Mode
                   </Label>
                   <select
@@ -673,7 +673,7 @@ export function DryRunExtractDialog({
                         e.target.value as typeof retainExtractionMode,
                       )
                     }
-                    className="w-full h-10 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                    className="w-full h-10 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                   >
                     <option value="bank">Bank (use bank value)</option>
                     <option value="concise">concise</option>
@@ -682,20 +682,20 @@ export function DryRunExtractDialog({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs uppercase text-white/50 font-medium">
+                  <Label className="text-xs uppercase text-foreground-subtle font-medium">
                     Document Date
                   </Label>
                   <Popover>
                     <PopoverTrigger>
                       <div
                         className={cn(
-                          "w-full justify-start text-left font-normal cursor-pointer inline-flex items-center rounded-lg border border-white/20 bg-transparent px-3 py-2 text-white hover:bg-white/5 transition-colors text-sm",
-                          !timestamp && "text-white/40",
+                          "w-full justify-start text-left font-normal cursor-pointer inline-flex items-center rounded-lg border border-border-strong bg-transparent px-3 py-2 text-foreground-default hover:bg-surface-card transition-colors text-sm",
+                          !timestamp && "text-foreground-subtle",
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4 text-white/50 shrink-0" />
+                        <CalendarIcon className="mr-2 h-4 w-4 text-foreground-subtle shrink-0" />
                         {timestamp ? (
-                          <span className="text-white">
+                          <span className="text-foreground-default">
                             {(() => {
                               try {
                                 const d = parseISO(timestamp);
@@ -712,7 +712,7 @@ export function DryRunExtractDialog({
                         )}
                       </div>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-white/20">
+                    <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-border-strong">
                       <div className="p-3">
                         <Calendar
                           mode="single"
@@ -746,12 +746,12 @@ export function DryRunExtractDialog({
                               setTimestamp(result.toISOString());
                             }
                           }}
-                          className="text-white"
+                          className="text-foreground-default"
                         />
                         {/* Time inputs */}
-                        <div className="flex items-center gap-2 px-2 pt-2 border-t border-white/10">
+                        <div className="flex items-center gap-2 px-2 pt-2 border-t border-border-default">
                           <div className="flex items-center gap-1.5">
-                            <label className="text-[11px] text-white/40 uppercase">
+                            <label className="text-[11px] text-foreground-subtle uppercase">
                               Time
                             </label>
                             <input
@@ -788,7 +788,7 @@ export function DryRunExtractDialog({
                                 );
                                 setTimestamp(base.toISOString());
                               }}
-                              className="bg-surface-overlay border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle w-[90px]"
+                              className="bg-surface-overlay border border-border-default rounded px-2 py-1 text-xs text-foreground-default focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle w-[90px]"
                             />
                           </div>
                           <div className="flex items-center gap-1 ml-auto">
@@ -820,13 +820,13 @@ export function DryRunExtractDialog({
             </div>
           </div>
 
-          <div className="border-t border-white/10 shrink-0" />
+          <div className="border-t border-border-default shrink-0" />
 
           {/* Lower grid: Extracted Facts + Mission/Content */}
           <div className="grid grid-cols-2 gap-6 overflow-hidden flex-1 min-h-0">
             {/* Left — Extracted Facts */}
             <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-hidden">
-              <div className="flex items-center gap-2 text-sm text-white/70 shrink-0">
+              <div className="flex items-center gap-2 text-sm text-foreground-faint shrink-0">
                 Extracted Facts
               </div>
 
@@ -838,13 +838,13 @@ export function DryRunExtractDialog({
               )}
 
               {!results && !error && !running && (
-                <div className="flex-1 flex items-center justify-center text-white/30 text-sm">
+                <div className="flex-1 flex items-center justify-center text-foreground-placeholder text-sm">
                   Click Run Dry-Run to preview extraction results.
                 </div>
               )}
 
               {running && (
-                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-white/40">
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-foreground-subtle">
                   <Loader2 className="h-6 w-6 animate-spin" />
                   <span className="text-sm">Calling Hindsight...</span>
                 </div>
@@ -852,12 +852,12 @@ export function DryRunExtractDialog({
 
               {results && (
                 <div className="flex-1 flex flex-col gap-3 overflow-hidden">
-                  <div className="flex items-center gap-3 text-xs text-white/50 shrink-0">
-                    <span className="bg-white/5 px-2 py-1 rounded">
+                  <div className="flex items-center gap-3 text-xs text-foreground-subtle shrink-0">
+                    <span className="bg-surface-card px-2 py-1 rounded">
                       {results.facts?.length ?? 0} facts
                     </span>
                     {results.usage && (
-                      <span className="bg-white/5 px-2 py-1 rounded">
+                      <span className="bg-surface-card px-2 py-1 rounded">
                         {results.usage.total_tokens ?? 0} tokens
                       </span>
                     )}
@@ -865,8 +865,8 @@ export function DryRunExtractDialog({
 
                   <div className="flex-1 grid grid-cols-[30%_1fr] gap-4 min-h-0">
                     {/* Left — Detected Entities */}
-                    <div className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-panel overflow-hidden">
-                      <div className="flex items-center justify-between px-2.5 py-2 border-b border-white/10 bg-accent-primary-bg shrink-0">
+                    <div className="flex flex-col min-h-0 rounded-md border border-border-default bg-surface-panel overflow-hidden">
+                      <div className="flex items-center justify-between px-2.5 py-2 border-b border-border-default bg-accent-primary-bg shrink-0">
                         <span className="text-[11px] font-medium text-accent-primary-fg">
                           ENTITIES
                         </span>
@@ -900,7 +900,7 @@ export function DryRunExtractDialog({
                                   "px-2 py-1 text-[10px] rounded transition-colors border",
                                   isActive
                                     ? "bg-accent-secondary-bg border-accent-primary-bd/50 text-accent-primary-fg"
-                                    : "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5",
+                                    : "border-border-default text-foreground-subtle hover:text-foreground-muted hover:bg-surface-card",
                                 )}
                               >
                                 {b.label} ({b.count})
@@ -911,7 +911,7 @@ export function DryRunExtractDialog({
                       </div>
                       <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
                         {filteredResultEntities.length === 0 ? (
-                          <div className="text-white/30 text-xs px-1.5 py-2">
+                          <div className="text-foreground-placeholder text-xs px-1.5 py-2">
                             No entities found.
                           </div>
                         ) : (
@@ -923,7 +923,7 @@ export function DryRunExtractDialog({
                                 "w-full text-left px-2 py-1.5 rounded text-xs transition-colors",
                                 selectedResultEntity === null
                                   ? "bg-accent-primary-bg text-accent-primary-fg"
-                                  : "text-white/70 hover:bg-white/10",
+                                  : "text-foreground-faint hover:bg-surface-panel",
                               )}
                             >
                               All facts
@@ -953,7 +953,7 @@ export function DryRunExtractDialog({
                                       "w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors",
                                       selectedResultEntity === raw
                                         ? "bg-accent-primary-bg border-accent-secondary-bd"
-                                        : "border-white/5 bg-black/20 hover:bg-white/5",
+                                        : "border-border-subtle bg-surface-inset hover:bg-surface-card",
                                     )}
                                     style={{
                                       borderLeftColor: typeColor,
@@ -966,7 +966,7 @@ export function DryRunExtractDialog({
                                           "text-xs truncate capitalize",
                                           selectedResultEntity === raw
                                             ? "text-accent-primary-fg"
-                                            : "text-white/90",
+                                            : "text-foreground-default",
                                         )}
                                         title={label}
                                       >
@@ -974,7 +974,7 @@ export function DryRunExtractDialog({
                                       </div>
                                       {type && (
                                         <div
-                                          className="text-[10px] text-white/50 font-mono truncate"
+                                          className="text-[10px] text-foreground-subtle font-mono truncate"
                                           title={qualifiedId}
                                         >
                                           {qualifiedId}
@@ -987,7 +987,7 @@ export function DryRunExtractDialog({
                                           label
                                         </span>
                                       )}
-                                      <span className="text-[10px] text-white/40 font-mono">
+                                      <span className="text-[10px] text-foreground-subtle font-mono">
                                         {factCount}
                                       </span>
                                     </div>
@@ -1003,21 +1003,21 @@ export function DryRunExtractDialog({
                     {/* Right — Fact Cards */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 min-h-0">
                       {filteredFacts.length === 0 ? (
-                        <div className="text-white/30 text-sm">
+                        <div className="text-foreground-placeholder text-sm">
                           No facts for this selection.
                         </div>
                       ) : (
                         filteredFacts.map((fact, idx) => (
                           <div
                             key={idx}
-                            className="p-3 rounded-md border border-white/10 bg-surface-card"
+                            className="p-3 rounded-md border border-border-default bg-surface-card"
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-[10px] uppercase font-medium text-accent-secondary-fg bg-accent-secondary-bg/50 px-1.5 py-0.5 rounded">
                                 {fact.fact_type || "fact"}
                               </span>
                               {fact.occurred_start && (
-                                <span className="text-[10px] text-white/40">
+                                <span className="text-[10px] text-foreground-subtle">
                                   {fact.occurred_start}
                                   {fact.occurred_end &&
                                   fact.occurred_end !== fact.occurred_start
@@ -1026,7 +1026,7 @@ export function DryRunExtractDialog({
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-white/80 mb-2">
+                            <p className="text-sm text-foreground-muted mb-2">
                               {fact.text}
                             </p>
                             {(fact.entities ?? []).length > 0 && (
@@ -1035,11 +1035,11 @@ export function DryRunExtractDialog({
                                   <span
                                     key={eIdx}
                                     className={cn(
-                                      "text-[10px] px-1.5 py-0.5 rounded bg-white/5",
+                                      "text-[10px] px-1.5 py-0.5 rounded bg-surface-card",
                                       selectedResultEntity &&
                                         entity === selectedResultEntity
                                         ? "bg-accent-secondary-bg text-accent-primary-fg"
-                                        : "text-white/50",
+                                        : "text-foreground-subtle",
                                     )}
                                   >
                                     {entity}
@@ -1060,32 +1060,32 @@ export function DryRunExtractDialog({
             <div className="flex flex-col gap-3 min-h-0 overflow-hidden">
               {/* Content */}
               <div className="flex items-center justify-between">
-                <span className="text-xs uppercase text-white/50 font-medium">
+                <span className="text-xs uppercase text-foreground-subtle font-medium">
                   Content
                 </span>
-                <span className="text-[10px] text-white/30">
+                <span className="text-[10px] text-foreground-placeholder">
                   {content.length} chars
                 </span>
               </div>
 
-              <div className="flex flex-col flex-1 rounded-lg border border-white/20 bg-surface-overlay overflow-hidden">
+              <div className="flex flex-col flex-1 rounded-lg border border-border-strong bg-surface-overlay overflow-hidden">
                 {content ? (
                   <>
-                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 flex-shrink-0">
-                      <span className="text-[10px] text-white/40 font-sans">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-default flex-shrink-0">
+                      <span className="text-[10px] text-foreground-subtle font-sans">
                         Document content
                       </span>
                     </div>
                     <textarea
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      className="flex-1 p-3 bg-transparent text-white/80 font-mono text-[13px] leading-relaxed resize-none outline-none custom-scrollbar"
+                      className="flex-1 p-3 bg-transparent text-foreground-muted font-mono text-[13px] leading-relaxed resize-none outline-none custom-scrollbar"
                       placeholder="Paste or type the content to preview extraction against..."
                       spellCheck={false}
                     />
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-white/40">
+                  <div className="flex flex-col items-center justify-center h-full text-foreground-subtle">
                     <FileText className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm">No content available</p>
                     <p className="text-xs mt-1">
@@ -1098,11 +1098,11 @@ export function DryRunExtractDialog({
           </div>
         </div>
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-white/10 shrink-0">
+        <div className="flex justify-end gap-3 pt-4 border-t border-border-default shrink-0">
           <Button
             variant="ghost"
             onClick={requestClose}
-            className="text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card flex items-center gap-2"
           >
             <X className="h-4 w-4" />
             Close
@@ -1110,7 +1110,7 @@ export function DryRunExtractDialog({
           <Button
             onClick={handleRun}
             disabled={running || !canRun}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 flex items-center gap-2"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 flex items-center gap-2"
           >
             {running ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1126,11 +1126,11 @@ export function DryRunExtractDialog({
       <Dialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
         <DialogContent className="!w-auto max-w-md" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle className="text-base font-semibold text-white">
+            <DialogTitle className="text-base font-semibold text-foreground-default">
               Close while running?
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-white/70">
+          <p className="text-sm text-foreground-faint">
             A dry-run is currently in progress. Closing will not cancel the
             Hindsight request, but you will lose the in-progress results preview.
           </p>
@@ -1138,7 +1138,7 @@ export function DryRunExtractDialog({
             <Button
               variant="ghost"
               onClick={() => setConfirmCloseOpen(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Keep running
             </Button>
@@ -1147,7 +1147,7 @@ export function DryRunExtractDialog({
                 setConfirmCloseOpen(false);
                 onOpenChange(false);
               }}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
             >
               Close anyway
             </Button>

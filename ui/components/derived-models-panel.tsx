@@ -70,7 +70,7 @@ export function DerivedModelsPanel({
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="px-3 py-2 border-b border-white/10 bg-badge-entity-bg/50 flex items-center justify-between gap-2">
+      <div className="px-3 py-2 border-b border-border-default bg-badge-entity-bg/50 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-badge-entity-fg">Derived Instances</h3>
           <p className="text-[10px] text-badge-entity-fg/70">
@@ -80,20 +80,20 @@ export function DerivedModelsPanel({
         </div>
         <div className="flex items-center gap-2">
           <div className="relative w-48">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40 pointer-events-none" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-subtle pointer-events-none" />
             <Input
               type="search"
               placeholder="Search instances..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-7 pl-8 pr-2 bg-black/20 border-white/10 text-white/80 placeholder:text-white/40 text-xs"
+              className="h-7 pl-8 pr-2 bg-surface-inset border-border-default text-foreground-muted placeholder:text-foreground-subtle text-xs"
             />
           </div>
           <Button
             onClick={() => onHealth(derived.filter((d) => isSelected(d.id)))}
             disabled={selectionCount === 0}
             title="Check Hindsight content health"
-            className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
             <Activity className="h-3.5 w-3.5" />
             Health
@@ -102,7 +102,7 @@ export function DerivedModelsPanel({
             <Button
               onClick={() => onConfigure(derived.filter((d) => isSelected(d.id)))}
               disabled={selectionCount === 0}
-              className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               <Settings2 className="h-3.5 w-3.5" />
               Config
@@ -114,23 +114,23 @@ export function DerivedModelsPanel({
       <div className="flex-1 overflow-auto">
         <Table className="w-full caption-bottom text-sm table-fixed">
           <TableHeader>
-            <TableRow className="border-b border-white/10 hover:bg-transparent">
+            <TableRow className="border-b border-border-default hover:bg-transparent">
               <TableHead className="w-8 py-1.5 px-3">
                 <Checkbox checked={isAllVisibleSelected} data-indeterminate={isSomeVisibleSelected || undefined} onCheckedChange={toggleAllVisible} />
               </TableHead>
-              <TableHead className="w-[22%] text-xs uppercase text-white/60 font-medium py-1.5 px-3">ID</TableHead>
-              <TableHead className="w-[20%] text-xs uppercase text-white/60 font-medium py-1.5 px-3">Name</TableHead>
-              <TableHead className="w-16 text-xs uppercase text-white/60 font-medium py-1.5 px-3">Refresh</TableHead>
-              <TableHead className="w-14 text-xs uppercase text-white/60 font-medium py-1.5 px-3">After</TableHead>
-              <TableHead className="w-14 text-xs uppercase text-white/60 font-medium py-1.5 px-3">Exclude</TableHead>
-              <TableHead className="w-16 text-xs uppercase text-white/60 font-medium py-1.5 px-3">Tokens</TableHead>
-              <TableHead className="text-xs uppercase text-white/60 font-medium py-1.5 px-3">Entity</TableHead>
+              <TableHead className="w-[22%] text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">ID</TableHead>
+              <TableHead className="w-[20%] text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">Name</TableHead>
+              <TableHead className="w-16 text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">Refresh</TableHead>
+              <TableHead className="w-14 text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">After</TableHead>
+              <TableHead className="w-14 text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">Exclude</TableHead>
+              <TableHead className="w-16 text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">Tokens</TableHead>
+              <TableHead className="text-xs uppercase text-foreground-faint font-medium py-1.5 px-3">Entity</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i} className="border-b border-white/5">
+                <TableRow key={i} className="border-b border-border-subtle">
                   <TableCell className="py-1.5 px-3"><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell className="py-1.5 px-3"><Skeleton className="h-4 w-16" /></TableCell>
                   <TableCell className="py-1.5 px-3"><Skeleton className="h-4 w-20" /></TableCell>
@@ -143,7 +143,7 @@ export function DerivedModelsPanel({
               ))
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-xs text-white/50">
+                <TableCell colSpan={8} className="text-center py-8 text-xs text-foreground-subtle">
                   {search.trim() ? 'No derived instances match your search.' : 'No derived instances. Add entities to this template to generate them.'}
                 </TableCell>
               </TableRow>
@@ -157,8 +157,8 @@ export function DerivedModelsPanel({
                   <TableRow
                     key={row.key}
                     onClick={() => toggleSelection(row.data.id)}
-                    className={`border-b border-white/5 transition-colors cursor-pointer ${
-                      selected ? 'bg-badge-entity-bg' : 'hover:bg-white/5'
+                    className={`border-b border-border-subtle transition-colors cursor-pointer ${
+                      selected ? 'bg-badge-entity-bg' : 'hover:bg-surface-card'
                     }`}
                   >
                     <TableCell className="py-1.5 px-3" onClick={(e) => e.stopPropagation()}>
@@ -174,7 +174,7 @@ export function DerivedModelsPanel({
                       {d.ext_id || entity.entity_id}
                     </TableCell>
                     <TableCell
-                      className="py-1.5 px-3 text-xs text-white/80 truncate"
+                      className="py-1.5 px-3 text-xs text-foreground-muted truncate"
                       title={d.name || '-'}
                     >
                       {d.name || '-'}
@@ -207,12 +207,12 @@ export function DerivedModelsPanel({
                       </span>
                     </TableCell>
                     <TableCell className="py-1.5 px-3 text-xs">
-                      <span className="text-white/60">
+                      <span className="text-foreground-faint">
                         {d.max_tokens}
                       </span>
                     </TableCell>
                     <TableCell
-                      className="py-1.5 px-3 text-xs text-white/60 truncate"
+                      className="py-1.5 px-3 text-xs text-foreground-faint truncate"
                       title={`${entity.entity_id} — ${entity.name}`}
                     >
                       {entity.entity_id} — {entity.name}

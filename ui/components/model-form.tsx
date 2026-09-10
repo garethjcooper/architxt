@@ -21,7 +21,7 @@ const USER_ENTITY_DERIVED_ROLE = 'user_entity_derived';
 const USER_ENTITY_DERIVED_LABEL = 'User entity derived';
 
 
-const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
+const inputClass = "!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
 
 interface ModelFormProps {
   initial?: MentalModel | null;
@@ -228,14 +228,14 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
-            <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
+            <Label className="text-xs uppercase text-foreground-subtle font-medium">Entity Template</Label>
             {isSystemTemplate && (
               <span className="text-[10px] px-1.5 py-0.5 rounded border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
                 System template
               </span>
             )}
           </div>
-          <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
+          <p className="text-[10px] text-foreground-subtle">Derive one mental model per related entity</p>
           {roleInstructions && (
             <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-badge-caution-fg mt-2">
               <p className="font-medium">{selectedRole?.label} format requirements</p>
@@ -246,7 +246,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             <p className="text-[10px] text-destructive-fg mt-0.5">{genericTemplateValidation}</p>
           )}
           {!genericTemplateValidation && !roleScope && isTemplate && (
-            <p className="text-[10px] text-white/40 mt-0.5">Generic templates also require a placeholder.</p>
+            <p className="text-[10px] text-foreground-subtle mt-0.5">Generic templates also require a placeholder.</p>
           )}
         </div>
         <Switch
@@ -258,18 +258,18 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="mm-ext-id" className="text-xs uppercase text-white/50 font-medium">External ID *</Label>
+          <Label htmlFor="mm-ext-id" className="text-xs uppercase text-foreground-subtle font-medium">External ID *</Label>
           {roleRule ? (
-            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
+            <div className="flex items-stretch rounded-lg overflow-hidden border border-border-strong focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
               <Input
                 id="mm-ext-id"
                 value={extIdPrefix}
                 onChange={(e) => setExtIdPrefix(e.target.value)}
                 placeholder="prefix"
-                className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                className="!rounded-none !border-0 !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle flex-1 min-w-0"
                 
               />
-              <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs font-mono whitespace-nowrap border-l border-white/10">
+              <span className="inline-flex items-center px-3 bg-surface-card text-foreground-faint text-xs font-mono whitespace-nowrap border-l border-border-default">
                 {roleRule.extIdTail}
               </span>
             </div>
@@ -283,22 +283,22 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
               
             />
           )}
-          <p className="text-[10px] text-white/40 font-mono">{effectiveExtId}</p>
+          <p className="text-[10px] text-foreground-subtle font-mono">{effectiveExtId}</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="mm-name" className="text-xs uppercase text-white/50 font-medium">Name *</Label>
+          <Label htmlFor="mm-name" className="text-xs uppercase text-foreground-subtle font-medium">Name *</Label>
           {roleRule ? (
-            <div className="flex items-stretch rounded-lg overflow-hidden border border-white/20 focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
+            <div className="flex items-stretch rounded-lg overflow-hidden border border-border-strong focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
               <Input
                 id="mm-name"
                 value={namePrefix}
                 onChange={(e) => setNamePrefix(e.target.value)}
                 placeholder="prefix"
                 disabled={isSystemTemplate}
-                className="!rounded-none !border-0 !bg-transparent !text-white !placeholder:text-white/40 flex-1 min-w-0"
+                className="!rounded-none !border-0 !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle flex-1 min-w-0"
                 
               />
-              <span className="inline-flex items-center px-3 bg-white/5 text-white/60 text-xs whitespace-nowrap border-l border-white/10">
+              <span className="inline-flex items-center px-3 bg-surface-card text-foreground-faint text-xs whitespace-nowrap border-l border-border-default">
                 {roleRule.nameTail}
               </span>
             </div>
@@ -313,13 +313,13 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
               
             />
           )}
-          <p className="text-[10px] text-white/40">{effectiveName}</p>
+          <p className="text-[10px] text-foreground-subtle">{effectiveName}</p>
         </div>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="mm-source-query" className="text-xs uppercase text-white/50 font-medium">Source Query *</Label>
+          <Label htmlFor="mm-source-query" className="text-xs uppercase text-foreground-subtle font-medium">Source Query *</Label>
           {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
             <span className="text-[10px] text-badge-caution-fg">
               Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
@@ -344,13 +344,13 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="mm-template-role" className="text-xs uppercase text-white/50 font-medium">Template Role</Label>
+          <Label htmlFor="mm-template-role" className="text-xs uppercase text-foreground-subtle font-medium">Template Role</Label>
           <select
           id="mm-template-role"
           value={templateRole}
           disabled={mode === 'edit' || isSystemTemplate}
           onChange={(e) => handleTemplateRoleChange(e.target.value)}
-          className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
+          className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
           >
           <option value="">Generic / no role</option>
           {availableRoles?.map((role) => (
@@ -359,17 +359,17 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             </option>
           ))}
           </select>
-          <p className="text-[10px] text-white/40">
+          <p className="text-[10px] text-foreground-subtle">
           {mode === 'edit' ? 'Role is immutable after creation.' : 'Assigns derivation scope and contextual behavior. Reserved system roles are hidden because they cannot be created manually.'}
           </p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="mm-refresh-mode" className="text-xs uppercase text-white/50 font-medium">Refresh Mode</Label>
+          <Label htmlFor="mm-refresh-mode" className="text-xs uppercase text-foreground-subtle font-medium">Refresh Mode</Label>
           <select
             id="mm-refresh-mode"
             value={refreshMode}
             onChange={(e) => setRefreshMode(e.target.value as 'full' | 'delta')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
+            className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
           >
             <option value="full">Full</option>
             <option value="delta">Delta</option>
@@ -379,12 +379,12 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="mm-tags-match-mode" className="text-xs uppercase text-white/50 font-medium">Tags Match</Label>
+          <Label htmlFor="mm-tags-match-mode" className="text-xs uppercase text-foreground-subtle font-medium">Tags Match</Label>
           <select
             id="mm-tags-match-mode"
             value={tagsMatchMode}
             onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-            className="w-full h-10 rounded-lg border border-white/20 bg-surface-card px-3 text-sm text-white focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
+            className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
           >
             <option value="all_strict">All Strict</option>
             <option value="any_strict">Any Strict</option>
@@ -392,12 +392,12 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             <option value="any">Any</option>
             <option value="exact">Exact</option>
           </select>
-          <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
+          <p className="text-[10px] text-foreground-subtle">How tags on this model must match document tags</p>
         </div>
-        <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
+        <div className="flex items-center justify-between border border-border-default rounded-lg p-3">
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase text-white/50 font-medium">Refresh after consolidation</Label>
-            <p className="text-[10px] text-white/40">Run a refresh once consolidation completes</p>
+            <Label className="text-xs uppercase text-foreground-subtle font-medium">Refresh after consolidation</Label>
+            <p className="text-[10px] text-foreground-subtle">Run a refresh once consolidation completes</p>
           </div>
           <Switch
             checked={refreshAfterConsolidation}
@@ -407,10 +407,10 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
+        <div className="flex items-center justify-between border border-border-default rounded-lg p-3">
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase text-white/50 font-medium">Exclude All Mental Models</Label>
-            <p className="text-[10px] text-white/40">Hide every other mental model from this one</p>
+            <Label className="text-xs uppercase text-foreground-subtle font-medium">Exclude All Mental Models</Label>
+            <p className="text-[10px] text-foreground-subtle">Hide every other mental model from this one</p>
           </div>
           <Switch
             checked={excludeAll}
@@ -418,7 +418,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="mm-max-tokens" className="text-xs uppercase text-white/50 font-medium">Max Tokens</Label>
+          <Label htmlFor="mm-max-tokens" className="text-xs uppercase text-foreground-subtle font-medium">Max Tokens</Label>
           <Input
             id="mm-max-tokens"
             type="number"
@@ -442,7 +442,7 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
 
       <div className="grid grid-cols-1 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="mm-exclude-list" className="text-xs uppercase text-white/50 font-medium">Exclude List</Label>
+          <Label htmlFor="mm-exclude-list" className="text-xs uppercase text-foreground-subtle font-medium">Exclude List</Label>
           <Input
             id="mm-exclude-list"
             value={excludeList}
@@ -454,9 +454,9 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-        <Button type="button" variant="ghost" onClick={onCancel} className="text-white/70 hover:text-white hover:bg-white/5">Close</Button>
-        <Button type="submit" disabled={submitting || !canSubmit} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+      <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
+        <Button type="button" variant="ghost" onClick={onCancel} className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card">Close</Button>
+        <Button type="submit" disabled={submitting || !canSubmit} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitLabel}
         </Button>

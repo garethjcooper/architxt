@@ -339,8 +339,8 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
 
   if (contentLoading) {
     return (
-      <div className="flex items-center justify-center flex-1 text-white/40">
-        <Loader2 className="h-5 w-5 text-white/40 animate-spin" />
+      <div className="flex items-center justify-center flex-1 text-foreground-subtle">
+        <Loader2 className="h-5 w-5 text-foreground-subtle animate-spin" />
         <span className="ml-2 text-sm">Loading content...</span>
       </div>
     );
@@ -348,7 +348,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
 
   if (!content) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 text-white/40">
+      <div className="flex flex-col items-center justify-center flex-1 text-foreground-subtle">
         <FileText className="h-8 w-8 mb-2 opacity-50" />
         <p className="text-sm">No content available</p>
       </div>
@@ -359,7 +359,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
     <div className="flex flex-col flex-1 min-h-0 gap-2">
       {/* Stats */}
       <div className="flex justify-between items-center px-1">
-        <p className="text-[11px] text-white/40">
+        <p className="text-[11px] text-foreground-subtle">
           {blocks.length - removedCount} of {blocks.length} blocks visible
           {removedCount > 0 && (
             <span className="text-badge-caution-fg"> ({removedCount} removed · {removedChars.toLocaleString()} chars)</span>
@@ -367,21 +367,21 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
           {editedCount > 0 && (
             <span className="text-badge-info-fg ml-1">({editedCount} edited)</span>
           )}
-          <span className="text-white/25 ml-1">· {totalChars.toLocaleString()} chars retained</span>
+          <span className="text-foreground-placeholder ml-1">· {totalChars.toLocaleString()} chars retained</span>
         </p>
       </div>
 
       {/* Main workspace */}
       <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-surface-overlay overflow-hidden">
+        <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-border-default bg-surface-overlay overflow-hidden">
           <div className="px-2 py-1.5 flex justify-end">
             <button
               onClick={() => setShowRemoved(v => !v)}
               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                 showRemoved
                   ? 'border-badge-caution-bd text-badge-caution-fg hover:border-badge-caution-bd-hover'
-                  : 'border-white/10 text-white/40 hover:text-white/60'
+                  : 'border-border-default text-foreground-subtle hover:text-foreground-faint'
               }`}
             >
               {showRemoved ? 'Hide removed' : 'Show removed'}
@@ -389,7 +389,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-2 space-y-0.5">
             {structuralBlocks.length === 0 ? (
-              <p className="text-xs text-white/30 italic p-2">No headings or images found</p>
+              <p className="text-xs text-foreground-placeholder italic p-2">No headings or images found</p>
             ) : (
               structuralBlocks.map((b, idx) => {
                 if (b.deleted && !showRemoved) return null;
@@ -417,7 +417,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
         </div>
 
         {/* Content pane */}
-        <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-surface-overlay p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed"
+        <div className="flex-1 min-h-0 rounded-lg border border-border-default bg-surface-overlay p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed"
              style={{ maxHeight: '100%' }}>
           {blocks.map(b => {
             if (b.deleted && !showRemoved) return null;
@@ -429,19 +429,19 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                 className={`group/row block whitespace-pre-wrap transition-colors rounded px-0.5 ${
                   activeRangeIds.has(b.id)
                     ? b.deleted
-                      ? 'bg-white/5 text-white/20 line-through'
+                      ? 'bg-surface-card text-foreground-placeholder line-through'
                       : b.type === 'image'
                         ? 'bg-badge-caution-bg text-badge-caution-fg'
                         : 'bg-accent-primary-bg text-accent-primary-fg'
                     : b.deleted
-                      ? 'opacity-25 line-through text-white/30'
+                      ? 'opacity-25 line-through text-foreground-placeholder'
                       : b.edited
-                        ? 'text-white/90 border-l-2 border-badge-info-bd pl-1'
+                        ? 'text-foreground-default border-l-2 border-badge-info-bd pl-1'
                         : b.type === 'heading'
                           ? 'text-accent-secondary-fg font-semibold'
                           : b.type === 'image'
                             ? 'text-badge-caution-fg/80 italic'
-                            : 'text-white/80'
+                            : 'text-foreground-muted'
                 }`}
                 onClick={!isEditing ? () => {
                   let sectionId = b.id;
@@ -492,7 +492,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                               e.stopPropagation();
                               setBlocks(prev => prev.map(bb => bb.id === b.id ? { ...bb, edited: undefined } : bb));
                             }}
-                            className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-white/30 hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-opacity"
+                            className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-foreground-placeholder hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-opacity"
                             title="Revert to original"
                           >
                             <Undo2 className="h-3 w-3" />
@@ -511,7 +511,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
                           setActiveBlockId(b.id);
                           setActiveRangeIds(new Set([b.id]));
                           }}
-                          className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-white/30 hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-opacity"
+                          className="opacity-0 group-hover/row:opacity-100 p-0.5 rounded text-foreground-placeholder hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-opacity"
                           title="Edit block"
                         >
                           <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -530,18 +530,18 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
       </div>
 
       {/* Actions bar */}
-      <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+      <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
         <Button
           variant="ghost"
           onClick={handleDiscard}
-          className="text-white/60 hover:text-white hover:bg-white/5"
+          className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
         >
           Close
         </Button>
         <Button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
         >
           {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {isSaving ? 'Saving...' : 'Save Edits'}
@@ -593,15 +593,15 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
                 ? `bg-accent-secondary-bg text-accent-primary-fg ${isDeleted ? 'line-through' : ''}`
                 : `bg-accent-secondary-bg text-accent-primary-fg ${isDeleted ? 'line-through' : ''}`
           : isDeleted
-            ? 'text-white/30 line-through'
-            : 'text-white/60 hover:bg-white/5 hover:text-white/90'
+            ? 'text-foreground-placeholder line-through'
+            : 'text-foreground-faint hover:bg-surface-card hover:text-foreground-default'
       }`}
       style={{ paddingLeft: `${0.5 + indent * 0.75}rem` }}
     >
       <button onClick={onClick} className="flex items-center gap-1.5 flex-1 min-w-0 text-left">
         {block.type === 'heading' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-white/30 flex-shrink-0 select-none">
+            <span className="text-foreground-placeholder flex-shrink-0 select-none">
               {'#'.repeat(block.level!)}&nbsp;
             </span>
             <span className="truncate">{block.title}</span>
@@ -609,20 +609,20 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
           </div>
         ) : block.type === 'code' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <Code className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-badge-info-fg/50'}`} />
-            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-badge-info-fg/70'}`}>{block.title}</span>
+            <Code className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-foreground-default/15' : 'text-badge-info-fg/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-foreground-placeholder' : 'text-badge-info-fg/70'}`}>{block.title}</span>
             {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : block.type === 'table' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <Table className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-accent-secondary-fg/50'}`} />
-            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-accent-secondary-fg/70'}`}>Table</span>
+            <Table className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-foreground-default/15' : 'text-accent-secondary-fg/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-foreground-placeholder' : 'text-accent-secondary-fg/70'}`}>Table</span>
             {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : block.type === 'image' ? (
           <div className="flex items-center gap-1.5 min-w-0">
-            <Image className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-white/15' : 'text-badge-caution-fg/50'}`} />
-            <span className={`truncate ${isDeleted ? 'text-white/20' : 'text-badge-caution-fg/70'}`}>[IMAGE:{block.title}]</span>
+            <Image className={`h-3 w-3 flex-shrink-0 ${isDeleted ? 'text-foreground-default/15' : 'text-badge-caution-fg/50'}`} />
+            <span className={`truncate ${isDeleted ? 'text-foreground-placeholder' : 'text-badge-caution-fg/70'}`}>[IMAGE:{block.title}]</span>
             {isEdited && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-badge-info-fg/60 flex-shrink-0" title="Edited" />}
           </div>
         ) : null}
@@ -631,7 +631,7 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
         {block.type === 'image' && onPreview && (
           <button
             onClick={(e) => { e.stopPropagation(); onPreview(); }}
-            className="p-0.5 rounded text-white/40 hover:text-badge-caution-fg hover:bg-badge-caution-bg/50 transition-colors"
+            className="p-0.5 rounded text-foreground-subtle hover:text-badge-caution-fg hover:bg-badge-caution-bg/50 transition-colors"
             title="Preview image"
           >
             <Eye className="h-3 w-3" />
@@ -640,7 +640,7 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
         {isEdited && onRevertEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onRevertEdit(); }}
-            className="p-0.5 rounded text-white/40 hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-colors"
+            className="p-0.5 rounded text-foreground-subtle hover:text-badge-info-fg hover:bg-badge-info-bg/50 transition-colors"
             title="Revert edit"
           >
             <Undo2 className="h-3 w-3" />
@@ -651,7 +651,7 @@ function SidebarRow({ block, indent, isActive, onClick, onToggleDelete, onPrevie
           className={`p-0.5 rounded transition-colors ${
             isDeleted
               ? 'text-accent-secondary-fg hover:text-accent-primary-fg hover:bg-accent-secondary-bg/50'
-              : 'text-white/40 hover:text-destructive-fg hover:bg-destructive-bg'
+              : 'text-foreground-subtle hover:text-destructive-fg hover:bg-destructive-bg'
           }`}
           title={isDeleted ? 'Restore' : block.type === 'heading' ? 'Remove section' : 'Remove image'}
         >
@@ -686,14 +686,14 @@ function BlockEditor({ value, onChange, onSave, onCancel }: BlockEditorProps) {
           if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); onSave(); }
           if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
         }}
-        className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-[13px] text-white/90 font-mono leading-relaxed resize-none focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle"
+        className="w-full bg-surface-inset border border-border-default rounded px-2 py-1 text-[13px] text-foreground-default font-mono leading-relaxed resize-none focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle"
         rows={Math.min(10, value.split('\n').length + 1)}
         spellCheck={false}
       />
       <div className="flex justify-end gap-1.5">
         <button
           onClick={onCancel}
-          className="text-[10px] px-2 py-0.5 rounded text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+          className="text-[10px] px-2 py-0.5 rounded text-foreground-subtle hover:text-foreground-faint hover:bg-surface-card transition-colors"
         >
           Cancel
         </button>

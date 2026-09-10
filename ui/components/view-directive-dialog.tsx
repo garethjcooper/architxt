@@ -79,7 +79,7 @@ export function ViewDirectiveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Directive Details
           </DialogTitle>
         </DialogHeader>
@@ -88,7 +88,7 @@ export function ViewDirectiveDialog({
           <div className="space-y-4">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="view-directive-name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="view-directive-name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Name
               </Label>
               <Input
@@ -96,13 +96,13 @@ export function ViewDirectiveDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Directive name / id"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
 
             {/* Statement */}
             <div className="space-y-2">
-              <Label htmlFor="view-directive-statement" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="view-directive-statement" className="text-xs uppercase text-foreground-subtle font-medium">
                 Statement
               </Label>
               <Textarea
@@ -111,7 +111,7 @@ export function ViewDirectiveDialog({
                 onChange={(e) => setStatement(e.target.value)}
                 placeholder="Directive statement"
                 rows={5}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
 
@@ -123,12 +123,12 @@ export function ViewDirectiveDialog({
                   checked={isActive}
                   onCheckedChange={setIsActive}
                 />
-                <Label htmlFor="view-directive-active" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="view-directive-active" className="text-xs uppercase text-foreground-subtle font-medium">
                   Active
                 </Label>
               </div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="view-directive-priority" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="view-directive-priority" className="text-xs uppercase text-foreground-subtle font-medium">
                   Priority
                 </Label>
                 <Input
@@ -136,16 +136,16 @@ export function ViewDirectiveDialog({
                   type="number"
                   value={priority}
                   onChange={(e) => setPriority(parseInt(e.target.value || '0', 10))}
-                  className="!w-20 !rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                  className="!w-20 !rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                 />
               </div>
             </div>
           </div>
 
           {/* Read-only metadata */}
-          <div className="space-y-4 pt-2 border-t border-white/10">
+          <div className="space-y-4 pt-2 border-t border-border-default">
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-white/50 font-medium">Tags</Label>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Tags</Label>
               {directive.tags?.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {directive.tags.map((t) => (
@@ -158,28 +158,28 @@ export function ViewDirectiveDialog({
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-white/40 italic">-</p>
+                <p className="text-sm text-foreground-subtle italic">-</p>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <p className="text-xs uppercase text-white/50 font-medium">Directive ID</p>
-                <p className="text-sm text-white font-mono">{directive.id}</p>
+                <p className="text-xs uppercase text-foreground-subtle font-medium">Directive ID</p>
+                <p className="text-sm text-foreground-default font-mono">{directive.id}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs uppercase text-white/50 font-medium">Generated By</p>
-                <p className="text-sm text-white font-mono">{directive.generated_by}</p>
+                <p className="text-xs uppercase text-foreground-subtle font-medium">Generated By</p>
+                <p className="text-sm text-foreground-default font-mono">{directive.generated_by}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-                <p className="text-sm text-white/70">
+                <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+                <p className="text-sm text-foreground-faint">
                   {formatDistanceToNow(new Date(directive.created_at), { addSuffix: true })}
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-                <p className="text-sm text-white/70">
+                <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+                <p className="text-sm text-foreground-faint">
                   {formatDistanceToNow(new Date(directive.updated_at), { addSuffix: true })}
                 </p>
               </div>
@@ -187,18 +187,18 @@ export function ViewDirectiveDialog({
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

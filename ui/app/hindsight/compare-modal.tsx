@@ -72,17 +72,17 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-surface-panel border border-white/10 rounded-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong backdrop-blur-sm">
+      <div className="relative w-full max-w-2xl mx-4 bg-surface-panel border border-border-default rounded-lg shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border-default">
           <div>
-            <h3 className="text-sm font-semibold text-white/90">Document Comparison</h3>
-            <p className="text-[11px] text-white/40 font-mono mt-0.5">{documentId}</p>
+            <h3 className="text-sm font-semibold text-foreground-default">Document Comparison</h3>
+            <p className="text-[11px] text-foreground-subtle font-mono mt-0.5">{documentId}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-md text-foreground-subtle hover:text-foreground-muted hover:bg-surface-card transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -91,14 +91,14 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
         {/* Content */}
         <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">
           {loading && (
-            <div className="flex items-center gap-3 py-8 text-white/40">
+            <div className="flex items-center gap-3 py-8 text-foreground-subtle">
               <Loader2 className="h-5 w-5 animate-spin" />
               <span className="text-sm">Fetching detailed comparison...</span>
             </div>
           )}
 
           {!loading && !result && (
-            <div className="py-8 text-center text-white/30 text-sm">Failed to load comparison</div>
+            <div className="py-8 text-center text-foreground-placeholder text-sm">Failed to load comparison</div>
           )}
 
           {result && (
@@ -113,7 +113,7 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
                   }`}
                 >
                   {/* Field header */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle">
                     {field.same ? (
                       <Check className="h-3.5 w-3.5 text-diff-match-fg" />
                     ) : (
@@ -131,14 +131,14 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
                   {!field.same && (
                     <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
                       <div className="px-3 py-2">
-                        <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">architxt</div>
-                        <div className="text-[11px] text-white/60 break-all leading-relaxed">
+                        <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">architxt</div>
+                        <div className="text-[11px] text-foreground-faint break-all leading-relaxed">
                           {formatValue(field.architxt)}
                         </div>
                       </div>
                       <div className="px-3 py-2">
-                        <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Hindsight</div>
-                        <div className="text-[11px] text-white/60 break-all leading-relaxed">
+                        <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">Hindsight</div>
+                        <div className="text-[11px] text-foreground-faint break-all leading-relaxed">
                           {formatValue(field.hindsight)}
                         </div>
                       </div>
@@ -147,7 +147,7 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
 
                   {field.same && (
                     <div className="px-3 py-2">
-                      <div className="text-[11px] text-white/50 break-all leading-relaxed">
+                      <div className="text-[11px] text-foreground-subtle break-all leading-relaxed">
                         {formatValue(field.architxt)}
                       </div>
                     </div>
@@ -159,10 +159,10 @@ export default function CompareModal({ isOpen, onClose, serverId, bankId, docume
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/10 flex justify-end">
+        <div className="px-5 py-3 border-t border-border-default flex justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded text-xs font-medium bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white/90 transition-colors"
+            className="px-3 py-1.5 rounded text-xs font-medium bg-surface-card border border-border-default text-foreground-faint hover:bg-surface-panel hover:text-foreground-default transition-colors"
           >
             Close
           </button>

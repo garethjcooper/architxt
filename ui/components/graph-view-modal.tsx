@@ -188,7 +188,7 @@ function PreviewPane({
   }, [content]);
 
   return (
-    <div className="flex flex-col h-full rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
+    <div className="flex flex-col h-full rounded-md border border-border-default bg-surface-overlay overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div
           ref={containerRef}
@@ -209,7 +209,7 @@ function PreviewPane({
               className="mermaid-diagram"
             />
           ) : !error ? (
-            <div className="text-xs text-white/40">Rendering diagram…</div>
+            <div className="text-xs text-foreground-subtle">Rendering diagram…</div>
           ) : null}
         </div>
         {!error && svg && (
@@ -496,15 +496,15 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
           <DialogTitle>{title || graph.name || 'Graph view'}</DialogTitle>
         </DialogHeader>
         {isEmpty ? (
-          <div className="flex-1 min-h-0 rounded-md border border-white/10 bg-surface-overlay flex items-center justify-center text-sm text-white/40">
+          <div className="flex-1 min-h-0 rounded-md border border-border-default bg-surface-overlay flex items-center justify-center text-sm text-foreground-subtle">
             No graph data available.
           </div>
         ) : (
           <div className="flex-1 min-h-0 flex overflow-hidden">
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden">
-              <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden">
+              <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0">
                 <span>Preview</span>
-                <span className="text-[10px] text-white/40">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
+                <span className="text-[10px] text-foreground-subtle">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
               </div>
               <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
                 <PreviewPane
@@ -517,11 +517,11 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
             <ResizeHandle direction="vertical" onMouseDown={startColResize} title="Drag to resize panels" />
             <div
               ref={rightColumnRef}
-              className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
+              className="min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden"
               style={{ flexBasis: `${sourceWidth}%`, minWidth: '16rem', maxWidth: '80%' }}
             >
               <div className="flex flex-col overflow-hidden" style={{ flex: ratios.source }}>
-                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0">
                   <span>Mermaid source</span>
                   <div className="flex items-center gap-2">
                     <CopyDiagramMenu source={source} />
@@ -567,10 +567,10 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               </div>
               <ResizeHandle direction="horizontal" onMouseDown={startUpperResize} title="Drag to resize tables panel" />
               <div
-                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
+                className="min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden"
                 style={{ flex: ratios.tables }}
               >
-                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0">
                   <span>Node/edge tables</span>
                   <div className="flex items-center gap-2">
                     {!readOnly && (
@@ -605,13 +605,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                     <DropdownMenu>
                       <DropdownMenuTrigger>
                         <span
-                          className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
+                          className="p-1 rounded hover:bg-surface-panel text-foreground-faint hover:text-foreground-default transition-colors cursor-pointer"
                           title="Copy tables"
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </span>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-surface-overlay border-white/10">
+                      <DropdownMenuContent align="end" className="bg-surface-overlay border-border-default">
                         <DropdownMenuItem
                           onClick={() =>
                             copyText(
@@ -619,7 +619,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                               'Tables JSON',
                             )
                           }
-                          className="text-xs text-white/80 focus:bg-white/10 focus:text-white cursor-pointer"
+                          className="text-xs text-foreground-muted focus:bg-surface-panel focus:text-foreground-default cursor-pointer"
                         >
                           <FileJson className="h-3.5 w-3.5 mr-2" />
                           Copy as JSON
@@ -631,7 +631,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                               'Tables CSV',
                             )
                           }
-                          className="text-xs text-white/80 focus:bg-white/10 focus:text-white cursor-pointer"
+                          className="text-xs text-foreground-muted focus:bg-surface-panel focus:text-foreground-default cursor-pointer"
                         >
                           <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
                           Copy as CSV
@@ -646,15 +646,15 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               </div>
               <ResizeHandle direction="horizontal" onMouseDown={startLowerResize} title="Drag to resize JSON panel" />
               <div
-                className="min-h-0 flex flex-col rounded-md border border-white/10 bg-surface-overlay overflow-hidden"
+                className="min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden"
                 style={{ flex: ratios.json }}
               >
-                <div className="px-3 py-2 border-b border-white/10 text-xs font-medium text-white/70 flex items-center justify-between shrink-0">
+                <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0">
                   <span>Graph JSON</span>
                   <button
                     type="button"
                     onClick={() => copyText(graphJson, 'Graph JSON')}
-                    className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                    className="p-1 rounded hover:bg-surface-panel text-foreground-faint hover:text-foreground-default transition-colors"
                     title="Copy graph JSON"
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -682,7 +682,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
               size="sm"
               onClick={handleApply}
               disabled={!includeDiagram && !includeTables}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Apply
             </Button>

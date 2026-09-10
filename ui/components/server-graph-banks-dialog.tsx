@@ -311,24 +311,24 @@ export function ServerGraphBanksDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh]">
           <DialogHeader className="shrink-0">
-            <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+            <DialogTitle className="text-xl font-semibold text-foreground-default flex items-center gap-2">
               <Network className="h-5 w-5 text-accent-secondary-fg" />
               Graph Banks — {server.name || server.base_url}
             </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-4 pr-1">
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-foreground-faint">
               Choose which banks are managed by the contextual graph. Manual banks appear in the Context Manager but never auto-sync. Auto banks sync on a refresh interval when the sync daemon is enabled.
             </p>
 
             {loadingBanks ? (
-              <div className="flex items-center justify-center py-8 text-white/50">
+              <div className="flex items-center justify-center py-8 text-foreground-subtle">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />
                 Loading banks...
               </div>
             ) : banks.length === 0 ? (
-              <div className="text-center py-6 text-white/50 text-sm">
+              <div className="text-center py-6 text-foreground-subtle text-sm">
                 No banks found on this server.
               </div>
             ) : (
@@ -345,7 +345,7 @@ export function ServerGraphBanksDialog({
                 return (
                   <div
                     key={bank.bank_id}
-                    className="rounded-lg border border-white/10 bg-white/[0.03] overflow-hidden"
+                    className="rounded-lg border border-border-default bg-on-dark/[0.03] overflow-hidden"
                   >
                     <div className="flex items-center gap-3 p-3">
                       <Checkbox
@@ -353,10 +353,10 @@ export function ServerGraphBanksDialog({
                         onCheckedChange={() => toggleBank(bank.bank_id)}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
+                        <p className="text-sm font-medium text-foreground-default truncate">
                           {bank.name || bank.bank_id}
                         </p>
-                        <p className="text-xs text-white/40 font-mono truncate">
+                        <p className="text-xs text-foreground-subtle font-mono truncate">
                           {bank.bank_id}
                         </p>
                       </div>
@@ -364,11 +364,11 @@ export function ServerGraphBanksDialog({
                       {enabled && (
                         <>
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-white/50 whitespace-nowrap">Mode</Label>
+                            <Label className="text-xs text-foreground-subtle whitespace-nowrap">Mode</Label>
                             <select
                               value={cfg.mode}
                               onChange={(e) => setMode(bank.bank_id, e.target.value as 'manual' | 'auto')}
-                              className="h-7 w-[110px] rounded-md border border-white/10 bg-surface-card px-2 text-xs text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                              className="h-7 w-[110px] rounded-md border border-border-default bg-surface-card px-2 text-xs text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                             >
                               <option value="manual">Manual</option>
                               <option value="auto">Auto</option>
@@ -377,12 +377,12 @@ export function ServerGraphBanksDialog({
 
                           {cfg.mode === 'auto' && (
                             <div className="flex items-center gap-2">
-                              <Label className="text-xs text-white/50 whitespace-nowrap">Interval</Label>
+                              <Label className="text-xs text-foreground-subtle whitespace-nowrap">Interval</Label>
                               <Input
                                 value={cfg.refresh_interval || ''}
                                 onChange={(e) => setInterval(bank.bank_id, e.target.value)}
                                 placeholder="10m"
-                                className="h-8 w-20 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                                className="h-8 w-20 !text-xs !rounded-md !border-border-strong !bg-transparent !text-foreground-default"
                               />
                             </div>
                           )}
@@ -394,7 +394,7 @@ export function ServerGraphBanksDialog({
                                 [bank.bank_id]: !prev[bank.bank_id],
                               }))
                             }
-                            className="inline-flex items-center justify-center h-7 w-7 rounded text-white/50 hover:text-white hover:bg-white/5"
+                            className="inline-flex items-center justify-center h-7 w-7 rounded text-foreground-subtle hover:text-foreground-default hover:bg-surface-card"
                             title="Restrictions"
                           >
                             {isExpanded ? (
@@ -408,7 +408,7 @@ export function ServerGraphBanksDialog({
                     </div>
 
                     {enabled && isExpanded && (
-                      <div className="px-4 pb-4 space-y-4 border-t border-white/10">
+                      <div className="px-4 pb-4 space-y-4 border-t border-border-default">
                         {needsWarning && (
                           <div className="mt-3 flex items-start gap-2 rounded-md bg-badge-caution-bg/50 border border-badge-caution-bd p-2.5 text-badge-caution-fg text-xs">
                             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -420,9 +420,9 @@ export function ServerGraphBanksDialog({
 
                         <div className="grid grid-cols-2 gap-4 pt-2">
                           <div className="space-y-2">
-                            <p className="text-xs font-medium text-white/80 uppercase tracking-wide">Import limits</p>
+                            <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide">Import limits</p>
                             <div>
-                              <Label className="text-xs text-white/50">Top K nodes</Label>
+                              <Label className="text-xs text-foreground-subtle">Top K nodes</Label>
                               <Input
                                 type="number"
                                 min={1}
@@ -435,11 +435,11 @@ export function ServerGraphBanksDialog({
                                   )
                                 }
                                 placeholder="100"
-                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                                className="h-8 !text-xs !rounded-md !border-border-strong !bg-transparent !text-foreground-default"
                               />
                             </div>
                             <div>
-                              <Label className="text-xs text-white/50">Min edge weight</Label>
+                              <Label className="text-xs text-foreground-subtle">Min edge weight</Label>
                               <Input
                                 type="number"
                                 min={0}
@@ -453,37 +453,37 @@ export function ServerGraphBanksDialog({
                                   )
                                 }
                                 placeholder="0"
-                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                                className="h-8 !text-xs !rounded-md !border-border-strong !bg-transparent !text-foreground-default"
                               />
                             </div>
                             <div>
-                              <Label className="text-xs text-white/50">Include patterns (comma-separated regex)</Label>
+                              <Label className="text-xs text-foreground-subtle">Include patterns (comma-separated regex)</Label>
                               <Input
                                 value={(importR.include_patterns || []).join(', ')}
                                 onChange={(e) =>
                                   setImportRestriction(bank.bank_id, 'include_patterns', parsePatternCsv(e.target.value))
                                 }
                                 placeholder="e.g. ^API:, Service"
-                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                                className="h-8 !text-xs !rounded-md !border-border-strong !bg-transparent !text-foreground-default"
                               />
                             </div>
                             <div>
-                              <Label className="text-xs text-white/50">Exclude patterns (comma-separated regex)</Label>
+                              <Label className="text-xs text-foreground-subtle">Exclude patterns (comma-separated regex)</Label>
                               <Input
                                 value={(importR.exclude_patterns || []).join(', ')}
                                 onChange={(e) =>
                                   setImportRestriction(bank.bank_id, 'exclude_patterns', parsePatternCsv(e.target.value))
                                 }
                                 placeholder="e.g. temp-, noise"
-                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                                className="h-8 !text-xs !rounded-md !border-border-strong !bg-transparent !text-foreground-default"
                               />
                             </div>
                           </div>
 
                           <div className="space-y-2">
-                            <p className="text-xs font-medium text-white/80 uppercase tracking-wide">Deploy limits</p>
+                            <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide">Deploy limits</p>
                             <div>
-                              <Label className="text-xs text-white/50">Max models per run</Label>
+                              <Label className="text-xs text-foreground-subtle">Max models per run</Label>
                               <Input
                                 type="number"
                                 min={1}
@@ -496,16 +496,16 @@ export function ServerGraphBanksDialog({
                                   )
                                 }
                                 placeholder="50"
-                                className="h-8 !text-xs !rounded-md !border-white/20 !bg-transparent !text-white"
+                                className="h-8 !text-xs !rounded-md !border-border-strong !bg-transparent !text-foreground-default"
                               />
                             </div>
                             <div>
-                              <Label className="text-xs text-white/50">Model types</Label>
+                              <Label className="text-xs text-foreground-subtle">Model types</Label>
                               <div className="flex flex-wrap gap-2 mt-1.5">
                                 {templateRoles.map((role) => (
                                   <label
                                     key={role.role_id}
-                                    className="inline-flex items-center gap-1.5 text-xs text-white/70 cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 text-xs text-foreground-faint cursor-pointer"
                                   >
                                     <Checkbox
                                       checked={(deploy.allowed_model_types || []).includes(role.role_id)}
@@ -519,8 +519,8 @@ export function ServerGraphBanksDialog({
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                          <div className="text-xs text-white/40">
+                        <div className="flex items-center justify-between pt-2 border-t border-border-default">
+                          <div className="text-xs text-foreground-subtle">
                             Auto defaults: top 100 nodes, no model types deployed.
                           </div>
                           <div className="flex items-center gap-2">
@@ -587,14 +587,14 @@ export function ServerGraphBanksDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? 'Saving...' : 'Save Changes'}

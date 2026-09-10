@@ -89,7 +89,7 @@ export function ViewTemplateRoleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+          <DialogTitle className="text-xl font-semibold text-foreground-default flex items-center gap-2">
             Template Role Details
             {isSystem && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-badge-caution-bg border border-badge-caution-bd text-badge-caution-fg text-[10px] uppercase font-medium">
@@ -103,7 +103,7 @@ export function ViewTemplateRoleDialog({
         <div className="space-y-6 py-4">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="display_name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="display_name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Display Name
               </Label>
               <Input
@@ -112,13 +112,13 @@ export function ViewTemplateRoleDialog({
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Enter display name"
                 disabled={isSystem}
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-50 disabled:cursor-not-allowed"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="derivation_scope" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="derivation_scope" className="text-xs uppercase text-foreground-subtle font-medium">
                   Derivation Scope
                 </Label>
                 <Select
@@ -126,7 +126,7 @@ export function ViewTemplateRoleDialog({
                   onValueChange={(v) => setDerivationScope(v as Scope)}
                   disabled={isSystem}
                 >
-                  <SelectTrigger id="derivation_scope" className="!rounded-lg !border !border-white/20 !bg-transparent !text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                  <SelectTrigger id="derivation_scope" className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed">
                     <SelectValue placeholder="Scope" />
                   </SelectTrigger>
                   <SelectPopup>
@@ -140,7 +140,7 @@ export function ViewTemplateRoleDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sort_order" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="sort_order" className="text-xs uppercase text-foreground-subtle font-medium">
                   Sort Order
                 </Label>
                 <Input
@@ -149,36 +149,36 @@ export function ViewTemplateRoleDialog({
                   value={sortOrder}
                   onChange={(e) => setSortOrder(Number(e.target.value))}
                   disabled={isSystem}
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border-default">
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Role ID</p>
-              <p className="text-sm text-white font-mono">{role.role_id}</p>
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Role ID</p>
+              <p className="text-sm text-foreground-default font-mono">{role.role_id}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Type</p>
-              <p className="text-sm text-white font-mono">{role.is_system ? 'system' : 'custom'}</p>
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Type</p>
+              <p className="text-sm text-foreground-default font-mono">{role.is_system ? 'system' : 'custom'}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Mental Models</p>
-              <p className="text-sm text-white font-mono">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Mental Models</p>
+              <p className="text-sm text-foreground-default font-mono">
                 {role.usage_count ? `${role.usage_count} model${role.usage_count !== 1 ? 's' : ''}` : 'None'}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(role.created_at), { addSuffix: true })}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(role.updated_at), { addSuffix: true })}
               </p>
             </div>
@@ -195,11 +195,11 @@ export function ViewTemplateRoleDialog({
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
@@ -207,7 +207,7 @@ export function ViewTemplateRoleDialog({
               <Button
                 onClick={handleSave}
                 disabled={!hasChanges || isSaving}
-                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isSaving ? 'Saving...' : 'Save Changes'}

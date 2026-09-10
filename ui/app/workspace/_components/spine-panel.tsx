@@ -21,7 +21,7 @@ export function SpinePanel({ entities, search, onSearchChange }: SpinePanelProps
               placeholder="Filter entities..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-8 text-xs bg-black/20 border-white/10 mb-2"
+              className="h-8 text-xs bg-surface-inset border-border-default mb-2"
             />
             <div className="space-y-1 opacity-60">
               {entities.map((entity) => (

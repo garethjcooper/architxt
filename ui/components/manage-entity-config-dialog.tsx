@@ -249,7 +249,7 @@ export function ManageEntityConfigDialog({
     return (
       <div
         key={fieldDef.key}
-        className={`flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02] transition-opacity ${
+        className={`flex items-center justify-between py-3 px-3 rounded border border-border-default bg-on-dark/[0.02] transition-opacity ${
           isFieldEnabled ? '' : 'opacity-50'
         }`}
       >
@@ -259,11 +259,11 @@ export function ManageEntityConfigDialog({
             onCheckedChange={(checked) => toggleFieldEnabled(fieldDef.key, checked === true)}
             className="shrink-0"
           />
-          <Settings2 className={`w-4 h-4 shrink-0 ${isFieldEnabled ? 'text-white/40' : 'text-white/20'}`} />
+          <Settings2 className={`w-4 h-4 shrink-0 ${isFieldEnabled ? 'text-foreground-subtle' : 'text-foreground-placeholder'}`} />
           <div>
-            <Label className="text-sm font-medium text-white/90">{fieldDef.label}</Label>
-            <p className="text-xs text-white/50">{statusText}</p>
-            <p className="text-[10px] text-white/40">{fieldDef.helper}</p>
+            <Label className="text-sm font-medium text-foreground-default">{fieldDef.label}</Label>
+            <p className="text-xs text-foreground-subtle">{statusText}</p>
+            <p className="text-[10px] text-foreground-subtle">{fieldDef.helper}</p>
             {impactedCount > 0 && (
               <p className="text-xs text-accent-secondary-fg mt-0.5">
                 Will change {impactedCount} entit{impactedCount === 1 ? 'y' : 'ies'}
@@ -278,7 +278,7 @@ export function ManageEntityConfigDialog({
               value={state.selectedValue as number}
               disabled={!isFieldEnabled}
               onChange={(e) => handleSelectToggle(fieldDef.key, Number(e.target.value))}
-              className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {entityTypes.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -288,7 +288,7 @@ export function ManageEntityConfigDialog({
             </select>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-white/50">{fieldDef.offLabel}</span>
+              <span className="text-xs text-foreground-subtle">{fieldDef.offLabel}</span>
               <CaseMatchToggle
                 checked={
                   fieldDef.key === 'case_match'
@@ -336,19 +336,19 @@ export function ManageEntityConfigDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">Manage Entity Configuration</DialogTitle>
-          <p className="text-sm text-white/60 mt-2">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">Manage Entity Configuration</DialogTitle>
+          <p className="text-sm text-foreground-faint mt-2">
             {selectedEntityIds.length} entit{selectedEntityIds.length === 1 ? 'y' : 'ies'} selected
           </p>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 py-2 px-3 rounded border border-white/10 bg-white/[0.03]">
+        <div className="flex items-center gap-2 py-2 px-3 rounded border border-border-default bg-on-dark/[0.03]">
           <Checkbox
             id="select-all-config"
             checked={allEnabled}
             onCheckedChange={(checked) => toggleAllEnabled(checked === true)}
           />
-          <label htmlFor="select-all-config" className="text-xs text-white/70 cursor-pointer select-none">
+          <label htmlFor="select-all-config" className="text-xs text-foreground-faint cursor-pointer select-none">
             Select / deselect all fields
           </label>
         </div>
@@ -370,18 +370,18 @@ export function ManageEntityConfigDialog({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
+        <div className="flex justify-end gap-2 pt-4 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>
           <Button
             onClick={handleSave}
             disabled={loading || !hasActiveUpdateField}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

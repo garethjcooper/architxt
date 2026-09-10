@@ -29,34 +29,34 @@ export function SystemTemplateQueryPreviewDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="!w-[70vw] !max-w-none max-h-[80vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+          <DialogTitle className="text-lg font-semibold text-foreground-default flex items-center gap-2">
             <MessageSquareText className="h-5 w-5 text-accent-tertiary-fg" />
             Composed Query Preview
           </DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 py-2 text-xs text-white/50 space-y-1">
+        <div className="px-6 py-2 text-xs text-foreground-subtle space-y-1">
           <div>
-            <span className="text-white/40">Role:</span>{' '}
-            <span className="font-mono text-white/70">{role}</span>
+            <span className="text-foreground-subtle">Role:</span>{' '}
+            <span className="font-mono text-foreground-faint">{role}</span>
           </div>
           <div>
-            <span className="text-white/40">External ID:</span>{' '}
-            <span className="font-mono text-white/70">{extId}</span>
+            <span className="text-foreground-subtle">External ID:</span>{' '}
+            <span className="font-mono text-foreground-faint">{extId}</span>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6 py-3">
-          <div className="flex-1 flex flex-col border border-white/10 rounded-md overflow-hidden bg-black/20">
-            <div className="px-3 py-2 border-b border-white/10 bg-white/[0.03] flex items-center justify-between">
-              <span className="text-xs uppercase text-white/60 font-medium">Composed Query</span>
-              <span className="text-[10px] text-white/40 tabular-nums">
+          <div className="flex-1 flex flex-col border border-border-default rounded-md overflow-hidden bg-surface-inset">
+            <div className="px-3 py-2 border-b border-border-default bg-on-dark/[0.03] flex items-center justify-between">
+              <span className="text-xs uppercase text-foreground-faint font-medium">Composed Query</span>
+              <span className="text-[10px] text-foreground-subtle tabular-nums">
                 {composedQuery?.length?.toLocaleString() ?? 0} chars
               </span>
             </div>
             <div className="flex-1 overflow-auto p-3">
               {loading ? (
-                <div className="h-full flex items-center justify-center gap-2 text-sm text-white/60">
+                <div className="h-full flex items-center justify-center gap-2 text-sm text-foreground-faint">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Composing query...
                 </div>
@@ -68,11 +68,11 @@ export function SystemTemplateQueryPreviewDialog({
                   </pre>
                 </div>
               ) : composedQuery ? (
-                <pre className="text-xs font-mono text-white/80 whitespace-pre-wrap break-all">
+                <pre className="text-xs font-mono text-foreground-muted whitespace-pre-wrap break-all">
                   {composedQuery}
                 </pre>
               ) : (
-                <div className="h-full flex items-center justify-center text-sm text-white/50">
+                <div className="h-full flex items-center justify-center text-sm text-foreground-subtle">
                   No composed query available.
                 </div>
               )}
@@ -80,11 +80,11 @@ export function SystemTemplateQueryPreviewDialog({
           </div>
         </div>
 
-        <div className="shrink-0 px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+        <div className="shrink-0 px-6 py-4 border-t border-border-default flex justify-end gap-3">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>

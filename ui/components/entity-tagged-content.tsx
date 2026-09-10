@@ -29,7 +29,7 @@ export function EntityTaggedContent({
   }, [highlightRange]);
 
   if (!content) {
-    return <p className="text-white/30 italic">No content available</p>;
+    return <p className="text-foreground-placeholder italic">No content available</p>;
   }
 
   // Check active format to know whether to show name chip
@@ -49,7 +49,7 @@ export function EntityTaggedContent({
   ) => {
     if (!highlightRange) {
       return (
-        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-white/80">
+        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-foreground-muted">
           {text}
         </span>
       );
@@ -61,7 +61,7 @@ export function EntityTaggedContent({
     if (hStart >= hEnd) {
       // No overlap
       return (
-        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-white/80">
+        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-foreground-muted">
           {text}
         </span>
       );
@@ -77,7 +77,7 @@ export function EntityTaggedContent({
     const after = afterLen > 0 ? text.slice(beforeLen + highlightLen) : null;
 
     return (
-      <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-white/80">
+      <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-foreground-muted">
         {before != null && <span>{before}</span>}
         <span
           data-highlight-match

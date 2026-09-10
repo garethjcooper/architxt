@@ -397,35 +397,35 @@ export function EntityDetectionDialog({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="!w-[85vw] !max-w-none h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">Entity Detection</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-foreground-default">Entity Detection</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-1 min-h-0 gap-3 overflow-hidden">
           {/* Sidebar — Match Review */}
-          <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-white/10 bg-surface-overlay overflow-hidden">
+          <div className="w-[29rem] flex-shrink-0 flex flex-col min-h-0 rounded-lg border border-border-default bg-surface-overlay overflow-hidden">
             {/* Header */}
-            <div className="px-3 py-2 border-b border-white/10 bg-white/[0.03] flex-shrink-0">
+            <div className="px-3 py-2 border-b border-border-default bg-on-dark/[0.03] flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-white/60 shrink-0">
+                <span className="text-xs text-foreground-faint shrink-0">
                   {entities.length} entities loaded
                 </span>
                 <div className="relative flex-1 max-w-[14rem]">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-white/30" />
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-foreground-placeholder" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search entities..."
-                    className="w-full h-7 pl-7 pr-2 rounded-md bg-white/5 border border-white/10 text-xs text-white/80 placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                    className="w-full h-7 pl-7 pr-2 rounded-md bg-surface-card border border-border-default text-xs text-foreground-muted placeholder:text-foreground-placeholder focus:outline-none focus:border-border-strong"
                   />
                 </div>
               </div>
               {matchGroups.length > 0 && (
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px] text-white/40">
+                  <span className="text-[10px] text-foreground-subtle">
                     {includedMatches} of {totalMatches} new matches
                   </span>
-                  <span className="text-[10px] text-white/40">
+                  <span className="text-[10px] text-foreground-subtle">
                     {includedGroupsCount} of {matchGroups.length} groups
                   </span>
                 </div>
@@ -437,25 +437,25 @@ export function EntityDetectionDialog({
               onValueChange={(v) => setActiveSidebarTab(v as 'existing' | 'found')}
               className="flex-1 min-h-0 overflow-hidden"
             >
-              <TabsList className="w-full m-1 bg-white/5 rounded-lg h-9" variant="default">
+              <TabsList className="w-full m-1 bg-surface-card rounded-lg h-9" variant="default">
                 <TabsTrigger
                   value="existing"
-                  className="flex-1 text-xs font-medium text-white/50 data-active:bg-white/10 data-active:text-white rounded-md"
+                  className="flex-1 text-xs font-medium text-foreground-subtle data-active:bg-surface-panel data-active:text-foreground-default rounded-md"
                 >
                   Existing
                   {validExistingTagCount > 0 && (
-                    <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-white/60">
+                    <span className="ml-1.5 rounded-full bg-surface-panel px-1.5 py-0 text-[10px] text-foreground-faint">
                       {validExistingTagCount}
                     </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="found"
-                  className="flex-1 text-xs font-medium text-white/50 data-active:bg-white/10 data-active:text-white rounded-md"
+                  className="flex-1 text-xs font-medium text-foreground-subtle data-active:bg-surface-panel data-active:text-foreground-default rounded-md"
                 >
                   Found
                   {matchGroups.length > 0 && (
-                    <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-white/60">
+                    <span className="ml-1.5 rounded-full bg-surface-panel px-1.5 py-0 text-[10px] text-foreground-faint">
                       {totalMatches}
                     </span>
                   )}
@@ -464,7 +464,7 @@ export function EntityDetectionDialog({
 
               <TabsContent value="existing" className="flex-1 min-h-0 overflow-hidden flex flex-col p-0 m-0" keepMounted>
                 {existingTagGroups.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center text-white/30 text-xs italic p-4">
+                  <div className="flex-1 flex items-center justify-center text-foreground-placeholder text-xs italic p-4">
                     No existing entity tags
                   </div>
                 ) : (
@@ -476,21 +476,21 @@ export function EntityDetectionDialog({
                       return (
                         <div
                           key={group.id}
-                          className="group flex flex-col gap-1 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors cursor-pointer border-white/5 hover:bg-white/5"
+                          className="group flex flex-col gap-1 rounded border bg-overlay px-2 py-1.5 text-left transition-colors cursor-pointer border-border-subtle hover:bg-surface-card"
                           style={{ borderLeftColor: typeColor, borderLeftWidth: 3 }}
                           onClick={() => toggleGroupExpanded(`existing-${group.id}`)}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="text-xs text-white/90 truncate">{group.entityName.length > 80 ? `${group.entityName.slice(0, 80)}…` : group.entityName}</div>
+                              <div className="text-xs text-foreground-default truncate">{group.entityName.length > 80 ? `${group.entityName.slice(0, 80)}…` : group.entityName}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[10px] text-white/40 shrink-0">
+                              <span className="text-[10px] text-foreground-subtle shrink-0">
                                 {group.matches.length} occurrence{group.matches.length !== 1 ? 's' : ''}
                               </span>
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(`existing-${group.id}`); }}
-                                className="text-[10px] text-white/30 hover:text-white/60 flex items-center gap-0.5"
+                                className="text-[10px] text-foreground-placeholder hover:text-foreground-faint flex items-center gap-0.5"
                               >
                                 {expandedGroups.has(`existing-${group.id}`) ? (
                                   <>
@@ -505,7 +505,7 @@ export function EntityDetectionDialog({
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-white/40 truncate pr-2">{formatExistingTag(group)}</span>
+                            <span className="text-[10px] text-foreground-subtle truncate pr-2">{formatExistingTag(group)}</span>
                           </div>
 
                           {expandedGroups.has(`existing-${group.id}`) && (
@@ -518,7 +518,7 @@ export function EntityDetectionDialog({
                                 return (
                                   <div
                                     key={i}
-                                    className="group/match rounded border border-white/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-white/60 cursor-pointer hover:border-white/10 hover:bg-[oklch(0.19_0_0)] transition-colors"
+                                    className="group/match rounded border border-on-dark/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-foreground-faint cursor-pointer hover:border-border-default hover:bg-[oklch(0.19_0_0)] transition-colors"
                                     onClick={(e) => { e.stopPropagation(); handleScrollToExistingMatch(group.id, i); }}
                                   >
                                     <span className="break-all leading-relaxed line-clamp-3">
@@ -528,7 +528,7 @@ export function EntityDetectionDialog({
                                     </span>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleRemoveExistingMatch(group.id, i); }}
-                                      className="opacity-0 group-hover/match:opacity-100 text-white/30 hover:text-destructive-fg transition-opacity p-0.5 shrink-0 mt-0.5"
+                                      className="opacity-0 group-hover/match:opacity-100 text-foreground-placeholder hover:text-destructive-fg transition-opacity p-0.5 shrink-0 mt-0.5"
                                       title="Remove this tag"
                                     >
                                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -550,12 +550,12 @@ export function EntityDetectionDialog({
               <TabsContent value="found" className="flex-1 min-h-0 overflow-hidden flex flex-col p-0 m-0" keepMounted>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
                   {entitiesLoading && matchGroups.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-white/30">
+                    <div className="flex items-center justify-center h-full text-foreground-placeholder">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       <span className="text-xs">Loading entities...</span>
                     </div>
                   ) : matchGroups.length === 0 ? (
-                    <p className="text-xs text-white/30 italic p-2 text-center">
+                    <p className="text-xs text-foreground-placeholder italic p-2 text-center">
                       {scanning ? 'Scanning...' : 'Click Scan to find entity matches'}
                     </p>
                   ) : (
@@ -564,7 +564,7 @@ export function EntityDetectionDialog({
                     ).map((group) => (
                       <div
                         key={group.id}
-                        className="group flex items-start gap-2 rounded border bg-black/10 px-2 py-1.5 text-left transition-colors cursor-pointer border-white/5 hover:bg-white/5"
+                        className="group flex items-start gap-2 rounded border bg-overlay px-2 py-1.5 text-left transition-colors cursor-pointer border-border-subtle hover:bg-surface-card"
                         style={{ borderLeftColor: colorForType(group.entityType), borderLeftWidth: 3 }}
                         onClick={() => toggleGroupExpanded(group.id)}
                       >
@@ -577,15 +577,15 @@ export function EntityDetectionDialog({
                         <div className="flex-1 min-w-0 flex flex-col gap-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="text-xs text-white/90 truncate">{group.entityName.length > 80 ? `${group.entityName.slice(0, 80)}…` : group.entityName}</div>
+                              <div className="text-xs text-foreground-default truncate">{group.entityName.length > 80 ? `${group.entityName.slice(0, 80)}…` : group.entityName}</div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[10px] text-white/40 shrink-0">
+                              <span className="text-[10px] text-foreground-subtle shrink-0">
                                 {group.matches.length} occurrence{group.matches.length !== 1 ? 's' : ''}
                               </span>
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(group.id); }}
-                                className="text-[10px] text-white/30 hover:text-white/60 flex items-center gap-0.5"
+                                className="text-[10px] text-foreground-placeholder hover:text-foreground-faint flex items-center gap-0.5"
                               >
                                 {expandedGroups.has(group.id) ? (
                                   <>
@@ -600,7 +600,7 @@ export function EntityDetectionDialog({
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-white/40 truncate pr-2">
+                            <span className="text-[10px] text-foreground-subtle truncate pr-2">
                               {group.entityType && group.entityId ? `${group.entityType}:${group.entityId}` : group.entityId}
                             </span>
                           </div>
@@ -617,7 +617,7 @@ export function EntityDetectionDialog({
                                 return (
                                   <div
                                     key={matchId}
-                                    className="group/match rounded border border-white/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-white/60 cursor-pointer hover:border-white/10 hover:bg-[oklch(0.19_0_0)] transition-colors"
+                                    className="group/match rounded border border-on-dark/[0.06] bg-[oklch(0.17_0_0)] px-2 py-1.5 flex items-start gap-2 text-[11px] text-foreground-faint cursor-pointer hover:border-border-default hover:bg-[oklch(0.19_0_0)] transition-colors"
                                     onClick={(e) => { e.stopPropagation(); handleScrollToMatch(group.id, i); }}
                                   >
                                     <Checkbox
@@ -645,7 +645,7 @@ export function EntityDetectionDialog({
             </Tabs>
 
             {/* Footer */}
-            <div className="px-3 py-2 border-t border-white/10 flex items-center justify-end gap-2 flex-shrink-0">
+            <div className="px-3 py-2 border-t border-border-default flex items-center justify-end gap-2 flex-shrink-0">
               {existingTags.length > 0 && (
                 <Button
                   onClick={handleUndo}
@@ -666,14 +666,14 @@ export function EntityDetectionDialog({
               <Button
                 onClick={handleApply}
                 disabled={matchGroups.length === 0 || includedMatches === 0}
-                className="h-7 px-2.5 text-xs bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-7 px-2.5 text-xs bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Insert Tags
               </Button>
               <Button
                 onClick={handleScan}
                 disabled={entitiesLoading || scanning || entities.length === 0}
-                className="h-7 px-2.5 text-xs bg-surface-hover hover:bg-[oklch(0.30_0_0)] text-white/80 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                className="h-7 px-2.5 text-xs bg-surface-hover hover:bg-[oklch(0.30_0_0)] text-foreground-muted border border-border-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
               >
                 {scanning ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanSearch className="h-3 w-3" />}
                 Scan
@@ -682,15 +682,15 @@ export function EntityDetectionDialog({
           </div>
 
           {/* Content pane */}
-          <div className="flex-1 min-h-0 rounded-lg border border-white/10 bg-surface-overlay overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 flex-shrink-0">
-              <span className="text-[10px] text-white/40 font-sans">
+          <div className="flex-1 min-h-0 rounded-lg border border-border-default bg-surface-overlay overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-default flex-shrink-0">
+              <span className="text-[10px] text-foreground-subtle font-sans">
                 {showPlainText ? 'Plain text view' : 'Highlighted entities'}
               </span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowPlainText((v) => !v)}
-                  className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/50 hover:text-white/80 hover:border-white/20 transition-colors font-sans"
+                  className="text-[10px] px-2 py-0.5 rounded border border-border-default text-foreground-subtle hover:text-foreground-muted hover:border-border-strong transition-colors font-sans"
                 >
                   {showPlainText ? 'Show Tags' : 'Show Plain'}
                 </button>
@@ -698,7 +698,7 @@ export function EntityDetectionDialog({
             </div>
             <div className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
               {showPlainText ? (
-                <pre className="whitespace-pre-wrap text-white/80">{workingContent}</pre>
+                <pre className="whitespace-pre-wrap text-foreground-muted">{workingContent}</pre>
               ) : (
                 <EntityTaggedContent content={workingContent} highlightRange={highlightRange} />
               )}
@@ -707,18 +707,18 @@ export function EntityDetectionDialog({
         </div>
 
         {/* Actions bar */}
-        <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+        <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/60 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Changes'}

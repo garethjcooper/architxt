@@ -394,12 +394,12 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
     if (error) return <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-destructive-bg/40 rounded border border-destructive-bd/50 p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
     if (result.content == null) {
-      return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
+      return <div className="h-full flex items-center justify-center text-xs text-foreground-subtle">No content available</div>;
     }
     // Show raw content as plain text for instance health checks so that malformed
     // Mermaid or other structured payloads do not break the preview.
     return (
-      <div className="h-full overflow-auto p-3 text-xs text-white/80 font-mono whitespace-pre-wrap">
+      <div className="h-full overflow-auto p-3 text-xs text-foreground-muted font-mono whitespace-pre-wrap">
         {formatPreviewText(result, error)}
       </div>
     );
@@ -421,13 +421,13 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="!w-[85vw] !max-w-none max-h-[85vh] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="shrink-0 px-6 pt-6">
-            <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+            <DialogTitle className="text-lg font-semibold text-foreground-default flex items-center gap-2">
               <Activity className="h-5 w-5 text-badge-entity-fg" />
               Derived Instance Health
             </DialogTitle>
           </DialogHeader>
 
-          <div className="px-6 py-3 border-b border-white/10">
+          <div className="px-6 py-3 border-b border-border-default">
             <ServerBankSelectors
               servers={servers}
               selectedServerId={selectedServerId}
@@ -445,13 +445,13 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               <div className="flex-1 overflow-auto">
                 <Table className="w-full caption-bottom text-sm table-fixed">
                   <TableHeader>
-                    <TableRow className="border-b border-white/10 hover:bg-transparent">
-                      <TableHead className="w-[30%] text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
-                      <TableHead className="w-[22%] text-xs uppercase text-white/60 font-medium py-2 px-3">Entity</TableHead>
-                      <TableHead className="w-[12%] text-xs uppercase text-white/60 font-medium py-2 px-3">Health</TableHead>
-                      <TableHead className="w-[12%] text-xs uppercase text-white/60 font-medium py-2 px-3">Chars</TableHead>
-                      <TableHead className="w-[14%] text-xs uppercase text-white/60 font-medium py-2 px-3">Status</TableHead>
-                      <TableHead className="w-[10%] text-xs uppercase text-white/60 font-medium py-2 px-3 text-right">Refresh</TableHead>
+                    <TableRow className="border-b border-border-default hover:bg-transparent">
+                      <TableHead className="w-[30%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">External ID</TableHead>
+                      <TableHead className="w-[22%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Entity</TableHead>
+                      <TableHead className="w-[12%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Health</TableHead>
+                      <TableHead className="w-[12%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Chars</TableHead>
+                      <TableHead className="w-[14%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Status</TableHead>
+                      <TableHead className="w-[10%] text-xs uppercase text-foreground-faint font-medium py-2 px-3 text-right">Refresh</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -463,9 +463,9 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                       const op = getOperationForRow(extId || undefined);
                       const refreshStatus = getLatestRefreshStatus(extId || undefined);
 
-                      let healthBadge: React.ReactNode = <span className="text-white/40">-</span>;
+                      let healthBadge: React.ReactNode = <span className="text-foreground-subtle">-</span>;
                       if (status.state === 'loading') {
-                        healthBadge = <Loader2 className="h-4 w-4 animate-spin text-white/50" />;
+                        healthBadge = <Loader2 className="h-4 w-4 animate-spin text-foreground-subtle" />;
                       } else if (result) {
                         healthBadge = result.found ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd">
@@ -503,14 +503,14 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                         <TableRow
                           key={d.id}
                           onClick={() => result && setSelectedExtId(extId)}
-                          className={`border-b border-white/5 cursor-pointer transition-colors ${
-                            selected ? 'bg-badge-entity-bg' : result ? 'hover:bg-white/5' : ''
+                          className={`border-b border-border-subtle cursor-pointer transition-colors ${
+                            selected ? 'bg-badge-entity-bg' : result ? 'hover:bg-surface-card' : ''
                           }`}
                         >
-                          <TableCell className="py-2 px-3 text-xs font-mono text-white/60 truncate" title={extId || '-'}>
+                          <TableCell className="py-2 px-3 text-xs font-mono text-foreground-faint truncate" title={extId || '-'}>
                             {extId || '-'}
                           </TableCell>
-                          <TableCell className="py-2 px-3 text-xs text-white/60 truncate" title={`${d.derived_entity?.entity_id} — ${d.derived_entity?.name}`}>
+                          <TableCell className="py-2 px-3 text-xs text-foreground-faint truncate" title={`${d.derived_entity?.entity_id} — ${d.derived_entity?.name}`}>
                             {d.derived_entity?.entity_id} — {d.derived_entity?.name}
                           </TableCell>
                           <TableCell className="py-2 px-3">
@@ -520,7 +520,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                           </TableCell>
                           <TableCell className="py-2 px-3">
                             {result && (
-                              <span className="text-[10px] text-white/50 tabular-nums" title={`${previewLength.toLocaleString()} characters`}>
+                              <span className="text-[10px] text-foreground-subtle tabular-nums" title={`${previewLength.toLocaleString()} characters`}>
                                 {previewLength.toLocaleString()}
                               </span>
                             )}
@@ -534,7 +534,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-6 w-6 text-white/50 hover:text-badge-entity-fg hover:bg-badge-entity-bg/50 disabled:opacity-30"
+                              className="h-6 w-6 text-foreground-subtle hover:text-badge-entity-fg hover:bg-badge-entity-bg/50 disabled:opacity-30"
                               disabled={!selectedServerId || !selectedBankId || isRefreshing || !!op}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -571,19 +571,19 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               onDoubleClick={handleResizeReset}
               title="Drag to resize data list and response content panels; double-click to reset"
             >
-              <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-accent-primary-solid/50 transition-colors" />
+              <div className="h-14 w-0.5 rounded-full bg-surface-strong group-hover:bg-accent-primary-solid/50 transition-colors" />
             </div>
 
             <div
               ref={rightPanelContainerRef}
-              className="flex flex-col border border-white/10 rounded-md overflow-hidden bg-black/20"
+              className="flex flex-col border border-border-default rounded-md overflow-hidden bg-surface-inset"
               style={{ width: `${rightPanelWidth}%`, minWidth: 320 }}
             >
-              <div className="px-3 py-2 border-b border-white/10 bg-white/[0.03] flex items-center justify-between">
-                <span className="text-xs uppercase text-white/60 font-medium">Response Content</span>
+              <div className="px-3 py-2 border-b border-border-default bg-on-dark/[0.03] flex items-center justify-between">
+                <span className="text-xs uppercase text-foreground-faint font-medium">Response Content</span>
                 {selectedResult && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-white/40" title={`${selectedPreviewText.length.toLocaleString()} characters`}>
+                    <span className="text-[10px] text-foreground-subtle" title={`${selectedPreviewText.length.toLocaleString()} characters`}>
                       {selectedPreviewText.length.toLocaleString()} chars
                     </span>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
@@ -602,11 +602,11 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             </div>
           </div>
 
-          <div className="shrink-0 px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+          <div className="shrink-0 px-6 py-4 border-t border-border-default flex justify-end gap-3">
             <Button
               variant="ghost"
               onClick={onClose}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
@@ -621,7 +621,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             <Button
               onClick={handleRun}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading'}
-              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {status.state === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
               {status.state === 'loading' ? 'Checking...' : 'Run Check'}
@@ -633,22 +633,22 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
       <Dialog open={confirmRefreshAllOpen} onOpenChange={setConfirmRefreshAllOpen}>
         <DialogContent className="!w-auto max-w-md" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle className="text-base font-semibold text-white">Refresh all mental models?</DialogTitle>
+            <DialogTitle className="text-base font-semibold text-foreground-default">Refresh all mental models?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-white/70">
+          <p className="text-sm text-foreground-faint">
             This will queue a Hindsight refresh for {refreshAllEligibleCount} model{refreshAllEligibleCount === 1 ? '' : 's'}.
           </p>
           <div className="flex justify-end gap-3 mt-4">
             <Button
               variant="ghost"
               onClick={() => setConfirmRefreshAllOpen(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Cancel
             </Button>
             <Button
               onClick={handleRefreshAll}
-              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-white"
+              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default"
             >
               Refresh All
             </Button>

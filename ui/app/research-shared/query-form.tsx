@@ -198,21 +198,21 @@ export function QueryForm(props: QueryFormProps) {
               placeholder={QUERY_PLACEHOLDERS[queryMode]}
               availableEntities={availableEntities}
               availableEdges={availableEdges}
-              className="flex-1 min-h-0 w-full rounded-lg border border-white/20 bg-transparent"
+              className="flex-1 min-h-0 w-full rounded-lg border border-border-strong bg-transparent"
             />
           </div>
         )}
 
         {queryMode === 'prebuilt' && availableTemplateRoles.length > 0 && (
           <div className="flex flex-1 min-h-0 gap-2 w-full">
-            <div className={`w-1/3 min-h-0 flex flex-col border-r border-white/10 pr-2 ${isRunning ? 'opacity-50' : ''}`}>
-              <div className="text-[10px] text-white/70 font-medium mb-1">Entities</div>
+            <div className={`w-1/3 min-h-0 flex flex-col border-r border-border-default pr-2 ${isRunning ? 'opacity-50' : ''}`}>
+              <div className="text-[10px] text-foreground-faint font-medium mb-1">Entities</div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
                 {(() => {
                   const selectedIds = queryOptions.prebuilt?.selectedEntities || [];
                   if (selectedIds.length === 0) {
                     return (
-                      <div className="text-[10px] text-white/40 italic">
+                      <div className="text-[10px] text-foreground-subtle italic">
                         Double-click an entity in the Entities panel to add it here.
                       </div>
                     );
@@ -228,12 +228,12 @@ export function QueryForm(props: QueryFormProps) {
                       return (
                         <div
                           key={entity.id}
-                          className="flex items-center gap-2 rounded border border-white/5 bg-black/20 px-2 py-1.5 min-h-[2.8125rem]"
+                          className="flex items-center gap-2 rounded border border-border-subtle bg-surface-inset px-2 py-1.5 min-h-[2.8125rem]"
                           style={{ borderLeftColor: colorForType(entity.type || undefined), borderLeftWidth: 3 }}
                         >
                           <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
-                            <div className="text-xs text-white/90 truncate">{display}</div>
-                            <div className="text-[10px] text-white/50 font-mono truncate">{qualified}</div>
+                            <div className="text-xs text-foreground-default truncate">{display}</div>
+                            <div className="text-[10px] text-foreground-subtle font-mono truncate">{qualified}</div>
                           </div>
                           <button
                             type="button"
@@ -247,7 +247,7 @@ export function QueryForm(props: QueryFormProps) {
                                 },
                               }));
                             }}
-                            className={`shrink-0 text-white/50 hover:text-destructive-fg text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            className={`shrink-0 text-foreground-subtle hover:text-destructive-fg text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                             aria-label={`Remove ${display} from prebuilt lookup`}
                             title="Remove"
                           >
@@ -260,14 +260,14 @@ export function QueryForm(props: QueryFormProps) {
               </div>
             </div>
             <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-              <div className="text-[10px] text-white/70 font-medium mb-1">Model types</div>
+              <div className="text-[10px] text-foreground-faint font-medium mb-1">Model types</div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
                 {availableTemplateRoles.map(({ value, label }) => {
                   const selected = selectedTemplateRoles.includes(value);
                   return (
                     <label
                       key={value}
-                      className={`flex items-center gap-2 text-[10px] text-white/80 ${isRunning ? 'cursor-not-allowed' : 'hover:text-white cursor-pointer'}`}
+                      className={`flex items-center gap-2 text-[10px] text-foreground-muted ${isRunning ? 'cursor-not-allowed' : 'hover:text-foreground-default cursor-pointer'}`}
                     >
                       <Checkbox
                         disabled={isRunning}
@@ -290,8 +290,8 @@ export function QueryForm(props: QueryFormProps) {
         )}
 
         {(queryMode === 'recall' || queryMode === 'reflect' || queryMode === 'synthesize') && showOptions && (
-          <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-            <div className="text-[10px] text-white/70 font-medium mb-1">Options</div>
+          <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-border-default pl-2 ${isRunning ? 'opacity-50' : ''}`}>
+            <div className="text-[10px] text-foreground-faint font-medium mb-1">Options</div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
               {queryMode === 'recall' && (
                 <RecallOptions options={queryOptions.recall} onChange={(recall) => setQueryOptions((prev) => ({ ...prev, recall }))} disabled={isRunning} />
@@ -307,7 +307,7 @@ export function QueryForm(props: QueryFormProps) {
         )}
 
         {queryMode === 'models' && availableMentalModels.length > 0 && (
-          <div className={`w-full shrink-0 flex flex-col min-h-0 border-l border-white/10 pl-2 ${isRunning ? 'opacity-50' : ''}`}>
+          <div className={`w-full shrink-0 flex flex-col min-h-0 border-l border-border-default pl-2 ${isRunning ? 'opacity-50' : ''}`}>
             <div className="flex-1 min-h-0 overflow-y-auto px-1 py-1 space-y-1">
               {availableMentalModels.map((model) => {
                 const selections = queryOptions.models?.selections || [];
@@ -326,7 +326,7 @@ export function QueryForm(props: QueryFormProps) {
                     className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
                       selected
                         ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
-                        : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
+                        : 'bg-surface-inset border-border-subtle text-foreground-default hover:bg-surface-card'
                     } ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     title={model.name || model.ext_id || String(model.id)}
                   >
@@ -337,10 +337,10 @@ export function QueryForm(props: QueryFormProps) {
                       aria-label={`Select mental model ${model.name || model.ext_id}`}
                     />
                     <div className="flex-1 text-left min-w-0 flex flex-col gap-0.5">
-                      <div className="flex items-center justify-between text-xs text-white/90">
+                      <div className="flex items-center justify-between text-xs text-foreground-default">
                         <span className="truncate">{model.name || model.ext_id || `Model #${model.id}`}</span>
                       </div>
-                      <div className="text-[10px] text-white/50 font-mono truncate">
+                      <div className="text-[10px] text-foreground-subtle font-mono truncate">
                         {model.ext_id || `model:${model.id}`}
                       </div>
                     </div>
@@ -353,14 +353,14 @@ export function QueryForm(props: QueryFormProps) {
 
         {queryMode === 'templates' && (
           <div className="flex flex-1 min-h-0 gap-2 w-full">
-            <div className={`w-1/3 min-h-0 flex flex-col border-r border-white/10 pr-2 ${isRunning ? 'opacity-50' : ''}`}>
-              <div className="text-[10px] text-white/70 font-medium mb-1">Entities</div>
+            <div className={`w-1/3 min-h-0 flex flex-col border-r border-border-default pr-2 ${isRunning ? 'opacity-50' : ''}`}>
+              <div className="text-[10px] text-foreground-faint font-medium mb-1">Entities</div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
                 {(() => {
                   const selectedIds = queryOptions.templates?.selectedEntities || [];
                   if (selectedIds.length === 0) {
                     return (
-                      <div className="text-[10px] text-white/40 italic">
+                      <div className="text-[10px] text-foreground-subtle italic">
                         Double-click an entity in the Entities panel to add it here.
                       </div>
                     );
@@ -376,12 +376,12 @@ export function QueryForm(props: QueryFormProps) {
                       return (
                         <div
                           key={entity.id}
-                          className="flex items-center gap-2 rounded border border-white/5 bg-black/20 px-2 py-1.5 min-h-[2.8125rem]"
+                          className="flex items-center gap-2 rounded border border-border-subtle bg-surface-inset px-2 py-1.5 min-h-[2.8125rem]"
                           style={{ borderLeftColor: colorForType(entity.type || undefined), borderLeftWidth: 3 }}
                         >
                           <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
-                            <div className="text-xs text-white/90 truncate">{display}</div>
-                            <div className="text-[10px] text-white/50 font-mono truncate">{qualified}</div>
+                            <div className="text-xs text-foreground-default truncate">{display}</div>
+                            <div className="text-[10px] text-foreground-subtle font-mono truncate">{qualified}</div>
                           </div>
                           <button
                             type="button"
@@ -396,7 +396,7 @@ export function QueryForm(props: QueryFormProps) {
                                 },
                               }));
                             }}
-                            className={`shrink-0 text-white/50 hover:text-destructive-fg text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            className={`shrink-0 text-foreground-subtle hover:text-destructive-fg text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                             aria-label={`Remove ${display} from template lookup`}
                             title="Remove"
                           >
@@ -409,15 +409,15 @@ export function QueryForm(props: QueryFormProps) {
               </div>
             </div>
             <div className={`flex-1 min-h-0 flex flex-col pl-2 ${isRunning ? 'opacity-50' : ''}`}>
-              <div className="text-[10px] text-white/70 font-medium mb-1">Eligible Templates</div>
+              <div className="text-[10px] text-foreground-faint font-medium mb-1">Eligible Templates</div>
               {eligibleLoading && (
-                <div className="text-[10px] text-white/40 italic">Loading eligible templates…</div>
+                <div className="text-[10px] text-foreground-subtle italic">Loading eligible templates…</div>
               )}
               {eligibleError && (
                 <div className="text-[10px] text-destructive-fg italic">{eligibleError}</div>
               )}
               {!eligibleLoading && !eligibleError && eligibleTemplates.length === 0 && (
-                <div className="text-[10px] text-white/40 italic">
+                <div className="text-[10px] text-foreground-subtle italic">
                   {queryOptions.templates?.selectedEntities?.length
                     ? 'No templates match the selected entities.'
                     : 'Double-click an entity in the Entities panel to see eligible templates.'}
@@ -475,15 +475,15 @@ export function QueryForm(props: QueryFormProps) {
                             ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
                             : partiallySelected
                               ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg/80'
-                              : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
+                              : 'bg-surface-inset border-border-subtle text-foreground-default hover:bg-surface-card'
                         } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                         title={template.ext_id}
                       >
                         <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
-                          <div className="text-xs text-white/90 truncate">{template.name || template.ext_id}</div>
-                          <div className="text-[10px] text-white/50 font-mono truncate">{template.ext_id}</div>
+                          <div className="text-xs text-foreground-default truncate">{template.name || template.ext_id}</div>
+                          <div className="text-[10px] text-foreground-subtle font-mono truncate">{template.ext_id}</div>
                         </div>
-                        <span className="shrink-0 text-[10px] text-white/60">
+                        <span className="shrink-0 text-[10px] text-foreground-faint">
                           {scopeEntities.length} in scope
                         </span>
                       </button>
@@ -497,22 +497,22 @@ export function QueryForm(props: QueryFormProps) {
       </div>
 
         {queryMode === 'synthesize' && (
-          <div className="shrink-0 flex flex-col gap-1 border-t border-white/10 pt-2">
+          <div className="shrink-0 flex flex-col gap-1 border-t border-border-default pt-2">
             <div className="flex items-center justify-between px-0.5">
-              <span className="text-[10px] text-white/70 font-medium">Synthesize source steps</span>
-              <span className="text-[10px] text-white/50">{sourceSteps.length} selected</span>
+              <span className="text-[10px] text-foreground-faint font-medium">Synthesize source steps</span>
+              <span className="text-[10px] text-foreground-subtle">{sourceSteps.length} selected</span>
             </div>
-            <div className="h-[3.5rem] overflow-y-auto rounded border border-white/10 bg-black/20 px-2 py-1 space-y-1">
+            <div className="h-[3.5rem] overflow-y-auto rounded border border-border-default bg-surface-inset px-2 py-1 space-y-1">
               {sourceSteps.length === 0 ? (
-                <div className="text-[10px] text-white/40 italic">No steps selected. In step mode the active step is used; in merge mode the checked steps are used.</div>
+                <div className="text-[10px] text-foreground-subtle italic">No steps selected. In step mode the active step is used; in merge mode the checked steps are used.</div>
               ) : (
                 sourceSteps.map((step, idx) => (
-                  <div key={step.id} className="flex items-center gap-1.5 text-[10px] text-white/80">
-                    <span className="px-1 rounded border border-white/10 bg-white/5 text-white/60 uppercase tracking-wide shrink-0">
+                  <div key={step.id} className="flex items-center gap-1.5 text-[10px] text-foreground-muted">
+                    <span className="px-1 rounded border border-border-default bg-surface-card text-foreground-faint uppercase tracking-wide shrink-0">
                       {step.action_type || 'discover'}
                     </span>
                     <span className="truncate">
-                      <span className="text-white/50 mr-1">#{idx + 1}</span>
+                      <span className="text-foreground-subtle mr-1">#{idx + 1}</span>
                       {step.intent_text || 'Untitled query'}
                     </span>
                   </div>
@@ -526,7 +526,7 @@ export function QueryForm(props: QueryFormProps) {
         <Button
           type="submit"
           disabled={isRunning || loading || (queryMode === 'models' ? !queryOptions.models?.selections?.length : queryMode === 'templates' ? !queryOptions.templates?.selections?.length : queryMode === 'prebuilt' ? false : !query.trim())}
-          className="flex-1 bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-100 disabled:bg-accent-primary-solid/40 disabled:text-white/70"
+          className="flex-1 bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-100 disabled:bg-accent-primary-solid/40 disabled:text-foreground-faint"
           size="sm"
         >
           {isRunning ? 'Running…' : (
@@ -561,12 +561,12 @@ function BudgetSelect({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] text-white/60">Budget</span>
+      <span className="text-[10px] text-foreground-faint">Budget</span>
       <select
         disabled={disabled}
         value={value || 'mid'}
         onChange={(e) => onChange(e.target.value as Budget)}
-        className="h-7 rounded-md border border-white/10 bg-surface-card px-2 text-[10px] text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
+        className="h-7 rounded-md border border-border-default bg-surface-card px-2 text-[10px] text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
       >
         {BUDGET_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -589,7 +589,7 @@ function MaxTokensInput({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] text-white/60">Max tokens</span>
+      <span className="text-[10px] text-foreground-faint">Max tokens</span>
       <input
         type="number"
         min={1}
@@ -601,7 +601,7 @@ function MaxTokensInput({
           const parsed = parseInt(e.target.value, 10);
           onChange(Number.isNaN(parsed) ? 0 : parsed);
         }}
-        className="bg-black/20 border border-white/10 rounded text-[10px] text-white px-1.5 py-1 outline-none focus:border-focus-ring disabled:opacity-50"
+        className="bg-surface-inset border border-border-default rounded text-[10px] text-foreground-default px-1.5 py-1 outline-none focus:border-focus-ring disabled:opacity-50"
       />
     </div>
   );
@@ -619,7 +619,7 @@ function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <label className={`flex items-center gap-1.5 text-[10px] text-white/80 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+    <label className={`flex items-center gap-1.5 text-[10px] text-foreground-muted ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
       <Switch disabled={disabled} checked={!!checked} onCheckedChange={onChange} />
       <span>{label}</span>
     </label>
@@ -639,10 +639,10 @@ function RecallOptions({
   return (
     <div className="space-y-2">
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] text-white/60">Fact types</span>
+        <span className="text-[10px] text-foreground-faint">Fact types</span>
         <div className="space-y-1">
           {FACT_TYPES.map((t) => (
-            <label key={t} className={`flex items-center gap-1.5 text-[10px] text-white/80 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <label key={t} className={`flex items-center gap-1.5 text-[10px] text-foreground-muted ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <Checkbox
                 disabled={disabled}
                 checked={types.includes(t)}
@@ -679,10 +679,10 @@ function ReflectOptions({
   return (
     <div className="space-y-2">
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] text-white/60">Fact types</span>
+        <span className="text-[10px] text-foreground-faint">Fact types</span>
         <div className="space-y-1">
           {FACT_TYPES.map((t) => (
-            <label key={t} className={`flex items-center gap-1.5 text-[10px] text-white/80 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <label key={t} className={`flex items-center gap-1.5 text-[10px] text-foreground-muted ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <Checkbox
                 disabled={disabled}
                 checked={factTypes.includes(t)}

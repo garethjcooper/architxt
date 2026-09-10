@@ -11,9 +11,9 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
       data-slot="checkbox"
       className={cn(
         // Unchecked state or base
-        "peer relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-white/30 transition-colors outline-none cursor-pointer",
+        "peer relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-border-on-dark transition-colors outline-none cursor-pointer",
         // Hover state
-        "hover:border-white/50",
+        "hover:border-on-dark/50",
         // Focus state
         "focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle",
         // Checked state - accent background
@@ -30,7 +30,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
         data-slot="checkbox-indicator"
         className="grid place-content-center text-current transition-none"
       >
-        <CheckIcon className="h-3.5 w-3.5 text-white" />
+        <CheckIcon className="h-3.5 w-3.5 text-foreground-default" />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   )

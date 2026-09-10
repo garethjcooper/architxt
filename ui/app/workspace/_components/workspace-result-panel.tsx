@@ -102,7 +102,7 @@ export function WorkspaceResultPanel({
           />
         )}
         {tabs}
-        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-white/40">
+        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-foreground-subtle">
           {isRunning ? 'Running query…' : 'Select a step or model to view its content.'}
         </div>
       </div>
@@ -131,7 +131,7 @@ export function WorkspaceResultPanel({
   return (
     <div className="relative h-full">
       {isRunning && (
-        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-accent-primary-bg backdrop-blur-sm px-2.5 py-1 text-[10px] text-accent-primary-fg/80 shadow-sm">
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full border border-border-default bg-accent-primary-bg backdrop-blur-sm px-2.5 py-1 text-[10px] text-accent-primary-fg/80 shadow-sm">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-primary-fg animate-pulse" />
           Running query…
         </div>

@@ -176,7 +176,7 @@ export function ManageDocumentConfigDialog({
       <DialogContent className="!w-[25vw] !max-w-none max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Document Configuration</DialogTitle>
-          <p className="text-sm text-white/60 mt-2">
+          <p className="text-sm text-foreground-faint mt-2">
             {selectedDocIds.length} document(s) selected
           </p>
         </DialogHeader>
@@ -184,7 +184,7 @@ export function ManageDocumentConfigDialog({
         <div className="space-y-3 flex-1 py-2">
           {state && (
             <div
-              className={`flex items-center justify-between py-3 px-3 rounded border border-white/10 bg-white/[0.02] transition-opacity ${
+              className={`flex items-center justify-between py-3 px-3 rounded border border-border-default bg-on-dark/[0.02] transition-opacity ${
                 enabled ? '' : 'opacity-50'
               }`}
             >
@@ -195,8 +195,8 @@ export function ManageDocumentConfigDialog({
                   className="shrink-0"
                 />
                 <div>
-                  <p className="text-sm font-medium text-white/90">Document Date</p>
-                  <p className="text-xs text-white/50">{statusText}</p>
+                  <p className="text-sm font-medium text-foreground-default">Document Date</p>
+                  <p className="text-xs text-foreground-subtle">{statusText}</p>
                   {impactedCount === 0 ? (
                     <p className="text-xs text-accent-secondary-fg mt-0.5">
                       All {selectedDocs.length} document{selectedDocs.length === 1 ? '' : 's'} match
@@ -214,13 +214,13 @@ export function ManageDocumentConfigDialog({
                   <PopoverTrigger className="inline-flex">
                     <div
                       className={cn(
-                        'inline-flex items-center justify-start gap-2 rounded-lg border border-white/20 bg-transparent px-3 py-2 text-left text-white hover:bg-white/5 transition-colors',
-                        !timestamp && 'text-white/40'
+                        'inline-flex items-center justify-start gap-2 rounded-lg border border-border-strong bg-transparent px-3 py-2 text-left text-foreground-default hover:bg-surface-card transition-colors',
+                        !timestamp && 'text-foreground-subtle'
                       )}
                     >
-                      <CalendarIcon className="h-4 w-4 text-white/50 shrink-0" />
+                      <CalendarIcon className="h-4 w-4 text-foreground-subtle shrink-0" />
                       {timestamp ? (
-                        <span className="text-white">
+                        <span className="text-foreground-default">
                           {(() => {
                             try {
                               const d = parseISO(timestamp);
@@ -236,24 +236,24 @@ export function ManageDocumentConfigDialog({
                       )}
                     </div>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-white/20">
+                  <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-border-strong">
                     <div className="p-3">
                       <Calendar
                         mode="single"
                         selected={selectedDate}
                         onSelect={setDate}
-                        className="text-white"
+                        className="text-foreground-default"
                       />
-                      <div className="flex items-center gap-2 px-2 pt-2 border-t border-white/10">
+                      <div className="flex items-center gap-2 px-2 pt-2 border-t border-border-default">
                         <div className="flex items-center gap-1.5">
-                          <Label className="text-[11px] text-white/40 uppercase">Time</Label>
+                          <Label className="text-[11px] text-foreground-subtle uppercase">Time</Label>
                           <input
                             type="text"
                             pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}"
                             placeholder="HH:MM:SS"
                             value={selectedTime}
                             onChange={(e) => setTime(e.target.value)}
-                            className="w-20 bg-surface-card border border-white/10 rounded px-2 py-1 text-xs text-white placeholder:text-white/40 focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring-subtle"
+                            className="w-20 bg-surface-card border border-border-default rounded px-2 py-1 text-xs text-foreground-default placeholder:text-foreground-subtle focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring-subtle"
                           />
                         </div>
                       </div>
@@ -265,18 +265,18 @@ export function ManageDocumentConfigDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-6 border-t border-white/10">
+        <div className="flex justify-end gap-2 pt-6 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>
           <Button
             onClick={handleSave}
             disabled={loading || !enabled}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

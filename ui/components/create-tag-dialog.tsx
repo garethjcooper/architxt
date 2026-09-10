@@ -66,7 +66,7 @@ export function CreateTagDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Create Tag
           </DialogTitle>
         </DialogHeader>
@@ -74,7 +74,7 @@ export function CreateTagDialog({
         <div className="space-y-6 py-4">
           {/* Name */}
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="name" className="text-xs uppercase text-foreground-subtle font-medium">
               Name *
             </Label>
             <Input
@@ -82,24 +82,24 @@ export function CreateTagDialog({
               placeholder="Enter tag name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+              className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={creating}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleCreate}
               disabled={!name.trim() || creating}
-              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}
               Create

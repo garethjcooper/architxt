@@ -365,7 +365,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     if (error) return <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-destructive-bg rounded border border-destructive-bd p-3">{`Error:\n${error}`}</div>;
     if (!result) return '';
     if (result.content == null) {
-      return <div className="h-full flex items-center justify-center text-xs text-white/50">No content available</div>;
+      return <div className="h-full flex items-center justify-center text-xs text-foreground-subtle">No content available</div>;
     }
     // Always render through the standard envelope viewer. Plain text/non-envelope
     // content is wrapped as a narrative-only envelope by the helper below.
@@ -449,23 +449,23 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
 
   return (
     <div ref={containerRef} className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2 shrink-0">
+      <div className="flex items-center justify-between gap-2 border-b border-border-default pb-2 shrink-0">
         <div className="flex items-center gap-2">
           <div className="relative w-64">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40 pointer-events-none" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-subtle pointer-events-none" />
             <Input
               type="search"
               placeholder="Search by ext id or role..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 pr-2 bg-black/20 border-white/10 text-white/80 placeholder:text-white/40 text-xs"
+              className="h-8 pl-8 pr-2 bg-surface-inset border-border-default text-foreground-muted placeholder:text-foreground-subtle text-xs"
             />
           </div>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded bg-surface-panel text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
+          className="h-8 w-8 rounded bg-surface-panel text-foreground-faint hover:text-foreground-default hover:bg-surface-panel disabled:opacity-30 transition-colors"
           disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0 || selectedRefIds.size === 0}
           onClick={() => setConfirmRefreshAllOpen(true)}
           title="Refresh selected mental models"
@@ -477,19 +477,19 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
       <div className="flex-1 min-h-0 flex mt-2 overflow-hidden">
         {/* Table */}
         <div
-          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col"
+          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col"
           style={{ width: `${100 - panelWidth}%` }}
         >
-          <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
+          <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Mental Models</span>
-            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
               {filteredRefs.length}
             </span>
           </div>
           <div className="flex-1 min-h-0 overflow-auto p-0">
             <Table className="w-full caption-bottom text-sm">
               <TableHeader>
-                <TableRow className="border-b border-white/10 hover:bg-transparent">
+                <TableRow className="border-b border-border-default hover:bg-transparent">
                   <TableHead className="w-8 py-2 px-2">
                     <Checkbox
                       checked={isAllVisibleRefsSelected}
@@ -498,19 +498,19 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                       aria-label="Select all visible mental models"
                     />
                   </TableHead>
-                  <TableHead className="w-[16%] text-xs uppercase text-white/60 font-medium py-2 px-3">Template Role</TableHead>
-                  <TableHead className="w-[8%] text-xs uppercase text-white/60 font-medium py-2 px-3">Scope</TableHead>
-                  <TableHead className="w-[16%] text-xs uppercase text-white/60 font-medium py-2 px-3">Target</TableHead>
-                  <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-3">External ID</TableHead>
-                  <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Fetched</TableHead>
-                  <TableHead className="w-28 text-xs uppercase text-white/60 font-medium py-2 px-3">Refresh state</TableHead>
-                  <TableHead className="w-10 text-xs uppercase text-white/60 font-medium py-2 px-3"></TableHead>
+                  <TableHead className="w-[16%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Template Role</TableHead>
+                  <TableHead className="w-[8%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Scope</TableHead>
+                  <TableHead className="w-[16%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Target</TableHead>
+                  <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-3">External ID</TableHead>
+                  <TableHead className="w-28 text-xs uppercase text-foreground-faint font-medium py-2 px-3">Fetched</TableHead>
+                  <TableHead className="w-28 text-xs uppercase text-foreground-faint font-medium py-2 px-3">Refresh state</TableHead>
+                  <TableHead className="w-10 text-xs uppercase text-foreground-faint font-medium py-2 px-3"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && filteredRefs.length === 0 ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i} className="border-b border-white/5">
+                    <TableRow key={i} className="border-b border-border-subtle">
                       <TableCell className="py-2 px-2"><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-10" /></TableCell>
@@ -523,7 +523,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                   ))
                 ) : filteredRefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-xs text-white/50">
+                    <TableCell colSpan={8} className="text-center py-8 text-xs text-foreground-subtle">
                       {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
                     </TableCell>
                   </TableRow>
@@ -541,8 +541,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                         key={extId || `${ref.role}-${Math.random()}`}
                         onClick={() => handleSelectRow(ref)}
                         className={cn(
-                          'border-b border-white/5 cursor-pointer transition-colors',
-                          isRowSelected ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
+                          'border-b border-border-subtle cursor-pointer transition-colors',
+                          isRowSelected ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
                         )}
                       >
                         <TableCell className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
@@ -553,20 +553,20 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           />
                         </TableCell>
                         <TableCell className="py-2 px-3">
-                          <span className="text-xs text-white/90 truncate" title={ref.role}>{roleLabel}</span>
+                          <span className="text-xs text-foreground-default truncate" title={ref.role}>{roleLabel}</span>
                         </TableCell>
                         <TableCell className="py-2 px-3">
                           <Badge className="text-[10px] bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd w-fit">
                             {scopeBadge}
                           </Badge>
                         </TableCell>
-                        <TableCell className="py-2 px-3 text-xs text-white/70 truncate" title={scopeDetail}>
+                        <TableCell className="py-2 px-3 text-xs text-foreground-faint truncate" title={scopeDetail}>
                           {scopeDetail}
                         </TableCell>
-                        <TableCell className="py-2 px-3 font-mono text-xs text-white/80 truncate" title={extId || '-'}>
+                        <TableCell className="py-2 px-3 font-mono text-xs text-foreground-muted truncate" title={extId || '-'}>
                           {extId || '-'}
                         </TableCell>
-                        <TableCell className="py-2 px-3 text-xs text-white/60">
+                        <TableCell className="py-2 px-3 text-xs text-foreground-faint">
                           {ref.fetched_at ? formatDistanceToNow(new Date(ref.fetched_at), { addSuffix: true }) : 'never'}
                         </TableCell>
                         <TableCell className="py-2 px-3 text-xs">
@@ -586,7 +586,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           ) : ref.last_refresh_status === 'skipped' ? (
                             <span className="inline-flex items-center gap-1 text-accent-tertiary-fg">⊘ skipped</span>
                           ) : (
-                            <span className="text-white/40">−</span>
+                            <span className="text-foreground-subtle">−</span>
                           )}
                         </TableCell>
                         <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
@@ -636,12 +636,12 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           onMouseDown={handleResizeStart}
           title="Drag to resize panels"
         >
-          <div className="h-14 w-0.5 rounded-full bg-white/20 group-hover:bg-accent-primary-bd-hover transition-colors" />
+          <div className="h-14 w-0.5 rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors" />
         </div>
 
         {/* Content panel */}
         <div
-          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col"
+          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col"
           style={{ width: `${panelWidth}%` }}
         >
           <EnvelopeControls
@@ -655,20 +655,20 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
 
           <div className="flex-1 min-h-0 overflow-auto p-3">
             {!selectedExtId ? (
-              <div className="h-full flex items-center justify-center text-xs text-white/50">Select a mental model to view its fetched content.</div>
+              <div className="h-full flex items-center justify-center text-xs text-foreground-subtle">Select a mental model to view its fetched content.</div>
             ) : loading && !selectedContent ? (
               <div className="space-y-2 p-2">
-                <Skeleton className="h-4 w-3/4 bg-white/10" />
-                <Skeleton className="h-4 w-1/2 bg-white/10" />
-                <Skeleton className="h-4 w-5/6 bg-white/10" />
-                <Skeleton className="h-4 w-2/3 bg-white/10" />
+                <Skeleton className="h-4 w-3/4 bg-surface-panel" />
+                <Skeleton className="h-4 w-1/2 bg-surface-panel" />
+                <Skeleton className="h-4 w-5/6 bg-surface-panel" />
+                <Skeleton className="h-4 w-2/3 bg-surface-panel" />
               </div>
             ) : selectedContentError ? (
               <div className="text-xs text-destructive-fg/90 whitespace-pre-wrap font-mono bg-destructive-bg rounded border border-destructive-bd p-3">
                 {selectedContentError}
               </div>
             ) : plainView ? (
-              <pre className="text-xs text-white/80 font-mono whitespace-pre-wrap">
+              <pre className="text-xs text-foreground-muted font-mono whitespace-pre-wrap">
                 {formatPreviewText(selectedContent, selectedContentError)}
               </pre>
             ) : (

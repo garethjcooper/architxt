@@ -1068,7 +1068,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => setConfirmSessionDelete(true)}
               disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
               title="Delete selected session"
             >
               <Trash2 className="h-4 w-4" />
@@ -1077,7 +1077,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => void handleEditSession()}
               disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-foreground-faint hover:bg-surface-panel hover:text-foreground-default disabled:opacity-30 transition-colors"
               title="Edit selected session"
             >
               <Pencil className="h-4 w-4" />
@@ -1086,7 +1086,7 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => void handleCreateSession()}
               disabled={sessionActionLoading || !serverId || !bankId}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-foreground-faint hover:bg-surface-panel hover:text-foreground-default disabled:opacity-30 transition-colors"
               title="Add session"
             >
               {sessionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -1157,7 +1157,7 @@ export default function WorkspacePage() {
                     <Panel className="flex-1 min-h-0">
                       <PanelHeader title="Contextual data" />
                       <PanelContent className="p-3">
-                        <div className="text-white/40 text-xs">Select a server and bank to load contextual data.</div>
+                        <div className="text-foreground-subtle text-xs">Select a server and bank to load contextual data.</div>
                       </PanelContent>
                     </Panel>
                   </div>
@@ -1168,7 +1168,7 @@ export default function WorkspacePage() {
                     <Panel className="flex-1 min-h-0">
                       <PanelHeader title="Session items" />
                       <PanelContent className="p-3">
-                        <div className="text-white/40 text-xs">Select a server and bank to load sessions.</div>
+                        <div className="text-foreground-subtle text-xs">Select a server and bank to load sessions.</div>
                       </PanelContent>
                     </Panel>
                   </div>
@@ -1180,7 +1180,7 @@ export default function WorkspacePage() {
           <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} onDoubleClick={handleResizeReset} title="Drag to resize left/right columns; double-click to reset" />
 
           {/* Column 2: result viewer */}
-          <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-white/10 bg-surface-card overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
+          <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-border-default bg-surface-card overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
             <WorkspaceResultPanel
               result={previewResult}
               title={previewTitle}
@@ -1324,11 +1324,11 @@ export default function WorkspacePage() {
         }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold text-white">{editingSession ? 'Edit Session' : 'Create Session'}</DialogTitle>
+              <DialogTitle className="text-xl font-semibold text-foreground-default">{editingSession ? 'Edit Session' : 'Create Session'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-6 py-4">
               <div className="space-y-2">
-                <Label htmlFor="session-title" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="session-title" className="text-xs uppercase text-foreground-subtle font-medium">
                   Session name
                 </Label>
                 <Input
@@ -1336,7 +1336,7 @@ export default function WorkspacePage() {
                   value={newSessionTitle}
                   onChange={(e) => setNewSessionTitle(e.target.value)}
                   placeholder="Workspace session"
-                  className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                  className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
                   style={{
                     '--tw-ring-color': 'rgb(52, 211, 153)',
                     '--tw-ring-opacity': '0.4',
@@ -1349,21 +1349,21 @@ export default function WorkspacePage() {
                   }}
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
                 <Button
                   variant="ghost"
                   onClick={() => {
                     setCreateSessionOpen(false);
                     setEditingSession(false);
                   }}
-                  className="text-white/70 hover:text-white hover:bg-white/5"
+                  className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => void handleCreateSessionConfirm()}
                   disabled={sessionActionLoading}
-                  className="bg-accent-primary-bd-hover hover:bg-accent-primary-fg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="bg-accent-primary-bd-hover hover:bg-accent-primary-fg text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {sessionActionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingSession ? 'Save' : 'Create'}
@@ -1374,15 +1374,15 @@ export default function WorkspacePage() {
         </Dialog>
 
         {pendingSection && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="rounded-lg border border-white/10 bg-surface-overlay p-4 w-80 shadow-lg">
-              <div className="text-sm font-medium text-white/90 mb-2">Add section to page</div>
-              <p className="text-xs text-white/60 mb-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong">
+            <div className="rounded-lg border border-border-default bg-surface-overlay p-4 w-80 shadow-lg">
+              <div className="text-sm font-medium text-foreground-default mb-2">Add section to page</div>
+              <p className="text-xs text-foreground-faint mb-4">
                 “{pendingSection.title || 'Untitled section'}”
               </p>
               <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto mb-4">
                 {workspaceSession.curatedPages.length === 0 && (
-                  <div className="text-xs text-white/40">No curated pages yet. Create one from the Pages menu.</div>
+                  <div className="text-xs text-foreground-subtle">No curated pages yet. Create one from the Pages menu.</div>
                 )}
                 {workspaceSession.curatedPages.map((page) => (
                   <button
@@ -1392,7 +1392,7 @@ export default function WorkspacePage() {
                       void handleApplyCopyEvent(page.id, pendingSection.events);
                       setPendingSection(null);
                     }}
-                    className="text-left text-xs px-2 py-1.5 rounded border border-white/10 bg-black/20 text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                    className="text-left text-xs px-2 py-1.5 rounded border border-border-default bg-surface-inset text-foreground-faint hover:bg-surface-card hover:text-foreground-default transition-colors"
                   >
                     {page.intent_text || `Page ${page.id}`}
                   </button>

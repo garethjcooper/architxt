@@ -153,7 +153,7 @@ export function BatchProgressDialog({
             <div>
               <DialogTitle>{title}</DialogTitle>
               {description && (
-                <p className="text-sm text-white/70 mt-1">{description}</p>
+                <p className="text-sm text-foreground-faint mt-1">{description}</p>
               )}
             </div>
           </div>
@@ -162,7 +162,7 @@ export function BatchProgressDialog({
         <div className="space-y-4 py-2">
           {/* Progress bar */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-white/60">
+            <div className="flex justify-between text-xs text-foreground-faint">
               <span>
                 {running
                   ? `Processing ${handled + 1} of ${total}…`
@@ -176,7 +176,7 @@ export function BatchProgressDialog({
                 {handled}/{total}
               </span>
             </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-2 bg-surface-panel rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   allSuccess
@@ -216,7 +216,7 @@ export function BatchProgressDialog({
                   >
                     <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
                     <span className="break-all">
-                      <span className="font-mono text-white/60">{r.id}</span>
+                      <span className="font-mono text-foreground-faint">{r.id}</span>
                       {r.error && <span className="ml-1">— {r.error}</span>}
                     </span>
                   </div>
@@ -229,7 +229,7 @@ export function BatchProgressDialog({
           <div className="flex justify-end">
             <Button
               onClick={onClose}
-              className="bg-accent-primary-solid text-white hover:bg-accent-primary-solid-hover"
+              className="bg-accent-primary-solid text-foreground-default hover:bg-accent-primary-solid-hover"
             >
               Close
             </Button>

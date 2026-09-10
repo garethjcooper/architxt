@@ -16,7 +16,7 @@ const SelectTrigger = React.forwardRef<
   <SelectUI.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-subtle focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+      'flex h-10 w-full items-center justify-between rounded-md border border-border-default bg-surface-card px-3 py-2 text-sm placeholder:text-foreground-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-subtle focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
     {...props}
@@ -33,7 +33,7 @@ function SelectPopup({ className, ...props }: React.ComponentPropsWithoutRef<typ
       <SelectUI.Positioner align="start" sideOffset={4}>
         <SelectUI.Popup
           className={cn(
-            'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-surface-panel p-1 text-white shadow-md',
+            'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-border-default bg-surface-panel p-1 text-foreground-default shadow-md',
             className
           )}
           {...props}
@@ -47,7 +47,7 @@ function SelectItem({ className, children, ...props }: React.ComponentPropsWitho
   return (
     <SelectUI.Item
       className={cn(
-        'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-white/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-white/10',
+        'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-surface-panel data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-surface-panel',
         className
       )}
       {...props}
@@ -61,7 +61,7 @@ function SelectItem({ className, children, ...props }: React.ComponentPropsWitho
 }
 
 function SelectSeparator({ className, ...props }: React.ComponentPropsWithoutRef<typeof SelectUI.Separator>) {
-  return <SelectUI.Separator className={cn('-mx-1 my-1 h-px bg-white/10', className)} {...props} />;
+  return <SelectUI.Separator className={cn('-mx-1 my-1 h-px bg-surface-panel', className)} {...props} />;
 }
 
 export {

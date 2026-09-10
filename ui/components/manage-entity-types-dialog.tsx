@@ -250,12 +250,12 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   };
 
   const renderPatternPreview = (t: EntityType) => {
-    if (!t.uses_entity_id_pattern) return <span className="text-white/20">-</span>;
+    if (!t.uses_entity_id_pattern) return <span className="text-foreground-placeholder">-</span>;
     const digits = t.min_id_digits ?? DEFAULT_DIGITS;
     const placeholder = '0'.repeat(Math.min(digits, 6));
     const sep = t.id_separator === '-' ? '-' : '';
     const text = `${t.id_format_prefix || ''}${sep}${placeholder}`;
-    return <span title={`${digits} digit(s)`} className="text-white/60 text-xs">{text}</span>;
+    return <span title={`${digits} digit(s)`} className="text-foreground-faint text-xs">{text}</span>;
   };
 
   const disabledClass = "opacity-50 pointer-events-none";
@@ -264,7 +264,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-white">
+          <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-foreground-default">
             <Layers className="h-5 w-5 text-accent-secondary-fg" />
             Manage Entity Types
           </DialogTitle>
@@ -273,12 +273,12 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
         <div className="space-y-4 py-2">
           {/* Header bar */}
           <div className="flex items-center justify-between">
-            <span className="text-xs text-white/50">{types.length} type(s)</span>
+            <span className="text-xs text-foreground-subtle">{types.length} type(s)</span>
             <Button
               type="button"
               size="sm"
               onClick={() => setShowAddForm((v) => !v)}
-              className="inline-flex items-center gap-1 bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white"
+              className="inline-flex items-center gap-1 bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
             >
               <Plus className="h-3.5 w-3.5" />
               {showAddForm ? 'Cancel' : 'Add Type'}
@@ -290,7 +290,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
             <form onSubmit={handleAdd} className="space-y-3 rounded-lg border border-accent-secondary-bd/50 bg-accent-primary-bg/50 p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-white/60">Type Name *</Label>
+                  <Label className="text-xs text-foreground-faint">Type Name *</Label>
                   <Input
                     value={addTypeName}
                     onChange={(e) => setAddTypeName(e.target.value)}
@@ -300,7 +300,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-white/60">Description</Label>
+                  <Label className="text-xs text-foreground-faint">Description</Label>
                   <Input
                     value={addDescription}
                     onChange={(e) => setAddDescription(e.target.value)}
@@ -312,8 +312,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label className="text-xs text-white/60">Use Entity Id Pattern</Label>
-                  <p className="text-[10px] text-white/40">Generate formatted ids like PREFIX-001</p>
+                  <Label className="text-xs text-foreground-faint">Use Entity Id Pattern</Label>
+                  <p className="text-[10px] text-foreground-subtle">Generate formatted ids like PREFIX-001</p>
                 </div>
                 <Switch checked={addUsesPattern} onCheckedChange={(v) => setAddUsesPattern(v)} />
               </div>
@@ -321,7 +321,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
               <div className={`space-y-2 transition-opacity ${!addUsesPattern ? disabledClass : ''}`}>
                 <div className="flex gap-3 items-start">
                   <div className="flex-1 space-y-1 min-w-0">
-                    <Label className="text-xs text-white/60">Id Format Prefix *</Label>
+                    <Label className="text-xs text-foreground-faint">Id Format Prefix *</Label>
                     <Input
                       value={addIdFormatPrefix}
                       onChange={(e) => handlePrefixChange(setAddIdFormatPrefix)(e.target.value)}
@@ -331,7 +331,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                     />
                   </div>
                   <div className="w-20 space-y-1">
-                    <Label className="text-xs text-white/60">Separator *</Label>
+                    <Label className="text-xs text-foreground-faint">Separator *</Label>
                     <EntityTypeIdSeparatorSelect
                       value={addIdSeparator}
                       onChange={setAddIdSeparator}
@@ -339,7 +339,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                     />
                   </div>
                   <div className="w-24 space-y-1">
-                    <Label className="text-xs text-white/60">Digits *</Label>
+                    <Label className="text-xs text-foreground-faint">Digits *</Label>
                     <Input
                       type="number"
                       min={MIN_DIGITS}
@@ -352,18 +352,18 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-white/40">Alphanumeric prefix; separator; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
+                <p className="text-[10px] text-foreground-subtle">Alphanumeric prefix; separator; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-white/60">Case-Sensitive</Label>
+                  <Label className="text-xs text-foreground-faint">Case-Sensitive</Label>
                   <div className="flex items-center h-8">
                     <CaseMatchToggle checked={addCaseSensitive} onChange={setAddCaseSensitive} />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-white/60">Word Boundaries</Label>
+                  <Label className="text-xs text-foreground-faint">Word Boundaries</Label>
                   <div className="flex items-center h-8">
                     <CaseMatchToggle checked={addWordBoundaries} onChange={setAddWordBoundaries} />
                   </div>
@@ -372,7 +372,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
 
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="ghost" size="sm" onClick={resetAddForm}>Close</Button>
-                <Button type="submit" size="sm" disabled={adding} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-white">
+                <Button type="submit" size="sm" disabled={adding} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default">
                   {adding && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                   Create
                 </Button>
@@ -381,23 +381,23 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
           )}
 
           {/* Types table */}
-          <div className="rounded-md overflow-hidden border border-white/[0.08]">
+          <div className="rounded-md overflow-hidden border border-on-dark/[0.08]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 bg-white/5">
-                  <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Type Name</th>
-                  <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Description</th>
-                  <th className="text-left py-2 px-3 text-xs uppercase text-white/50 font-medium">Pattern</th>
-                  <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Case</th>
-                  <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Boundary</th>
-                  <th className="text-center py-2 px-3 text-xs uppercase text-white/50 font-medium w-12">Entities</th>
-                  <th className="text-right py-2 px-3 text-xs uppercase text-white/50 font-medium w-24">Actions</th>
+                <tr className="border-b border-border-default bg-surface-card">
+                  <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">Type Name</th>
+                  <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">Description</th>
+                  <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">Pattern</th>
+                  <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Case</th>
+                  <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Boundary</th>
+                  <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Entities</th>
+                  <th className="text-right py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {types.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-white/50">
+                    <td colSpan={7} className="text-center py-8 text-foreground-subtle">
                       <div className="flex flex-col items-center gap-2">
                         <Layers className="h-6 w-6 opacity-40" />
                         <p>No entity types found.</p>
@@ -406,7 +406,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                   </tr>
                 ) : (
                   types.map((t) => (
-                    <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <tr key={t.id} className="border-b border-border-subtle hover:bg-surface-card transition-colors">
                       {editingId === t.id ? (
                         <>
                           <td className="py-2 px-3">
@@ -432,7 +432,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                           <td className="py-2 px-3">
                             <div className={`space-y-2 ${!editUsesPattern ? disabledClass : ''}`}>
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-white/50">Use pattern</span>
+                                <span className="text-[10px] text-foreground-subtle">Use pattern</span>
                                 <Switch checked={editUsesPattern} onCheckedChange={(v) => setEditUsesPattern(v)} size="sm" />
                               </div>
                               <div className="flex gap-2 items-start">
@@ -472,7 +472,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               <CaseMatchToggle checked={editWordBoundaries} onChange={setEditWordBoundaries} />
                             </div>
                           </td>
-                          <td className="py-2 px-3 text-center text-xs text-white/40">{entityCounts[t.id] || 0}</td>
+                          <td className="py-2 px-3 text-center text-xs text-foreground-subtle">{entityCounts[t.id] || 0}</td>
                           <td className="py-2 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
@@ -490,7 +490,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-white/40 hover:text-white/70"
+                                className="h-6 w-6 p-0 text-foreground-subtle hover:text-foreground-faint"
                                 onClick={cancelEdit}
                                 title="Cancel"
                               >
@@ -501,8 +501,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                         </>
                       ) : (
                         <>
-                          <td className="py-2 px-3 text-white/80 font-medium">{t.type_name}</td>
-                          <td className="py-2 px-3 text-white/50 text-xs">{t.description || <span className="text-white/20">-</span>}</td>
+                          <td className="py-2 px-3 text-foreground-muted font-medium">{t.type_name}</td>
+                          <td className="py-2 px-3 text-foreground-subtle text-xs">{t.description || <span className="text-foreground-placeholder">-</span>}</td>
                           <td className="py-2 px-3">{renderPatternPreview(t)}</td>
                           <td className="py-2 px-3 text-center">
                             <span
@@ -510,7 +510,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${
                                 (t.case_match ?? 'insensitive') === 'sensitive'
                                   ? 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50'
-                                  : 'bg-white/5 text-white/20 border-white/5'
+                                  : 'bg-surface-card text-foreground-placeholder border-border-subtle'
                               }`}
                             >
                               {(t.case_match ?? 'insensitive') === 'sensitive' ? 'Aa' : 'aa'}
@@ -522,14 +522,14 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${
                                 (t.word_boundary_match ?? 'boundaries') === 'boundaries'
                                   ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd/50'
-                                  : 'bg-white/5 text-white/20 border-white/5'
+                                  : 'bg-surface-card text-foreground-placeholder border-border-subtle'
                               }`}
                             >
                               {WORD_BOUNDARY_LABELS[(t.word_boundary_match ?? 'boundaries')]}
                             </span>
                           </td>
                           <td className="py-2 px-3 text-center">
-                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono ${(entityCounts[t.id] || 0) > 0 ? 'bg-badge-success-bg text-accent-secondary-fg border border-accent-primary-bd/50' : 'bg-white/5 text-white/30 border border-white/5'}`}>
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono ${(entityCounts[t.id] || 0) > 0 ? 'bg-badge-success-bg text-accent-secondary-fg border border-accent-primary-bd/50' : 'bg-surface-card text-foreground-placeholder border border-border-subtle'}`}>
                               {entityCounts[t.id] || 0}
                             </span>
                           </td>
@@ -539,7 +539,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-white/40 hover:text-white/70"
+                                className="h-6 w-6 p-0 text-foreground-subtle hover:text-foreground-faint"
                                 onClick={() => startEdit(t)}
                                 title="Edit"
                               >

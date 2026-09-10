@@ -47,7 +47,7 @@ const statusBadgeClass: Record<string, string> = {
 };
 
 const stageStatusClass: Record<string, string> = {
-  pending: 'bg-white/20',
+  pending: 'bg-surface-strong',
   running: 'bg-badge-info-fg animate-pulse',
   completed: 'bg-badge-success-fg',
   completed_with_issues: 'bg-badge-caution-fg',
@@ -58,8 +58,8 @@ const stageLabelClass: Record<string, string> = {
   failed: 'text-badge-danger-fg',
   completed_with_issues: 'text-badge-caution-fg',
   running: 'text-badge-info-fg',
-  completed: 'text-white/40',
-  pending: 'text-white/40',
+  completed: 'text-foreground-subtle',
+  pending: 'text-foreground-subtle',
 };
 
 function getIssueCount(job: any): number {
@@ -251,12 +251,12 @@ export function SyncJobsTab({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border-default pb-2 shrink-0">
         <div className="flex items-center gap-2">
           <select
             value={range}
             onChange={(e) => setRange((e.target.value as DateRange) || 'today')}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             {RANGE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -268,7 +268,7 @@ export function SyncJobsTab({
           <select
             value={status ?? ''}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value || 'any'} value={opt.value}>{opt.label}</option>
@@ -282,14 +282,14 @@ export function SyncJobsTab({
               type="date"
               value={customSince}
               onChange={(e) => setCustomSince(e.target.value)}
-              className="h-8 rounded border border-white/10 bg-white/5 px-2 text-xs text-white"
+              className="h-8 rounded border border-border-default bg-surface-card px-2 text-xs text-foreground-default"
             />
-            <span className="text-white/40">→</span>
+            <span className="text-foreground-subtle">→</span>
             <input
               type="date"
               value={customUntil}
               onChange={(e) => setCustomUntil(e.target.value)}
-              className="h-8 rounded border border-white/10 bg-white/5 px-2 text-xs text-white"
+              className="h-8 rounded border border-border-default bg-surface-card px-2 text-xs text-foreground-default"
             />
           </div>
         )}
@@ -302,17 +302,17 @@ export function SyncJobsTab({
               onCheckedChange={setAutoRefresh}
               id="sync-auto-refresh"
             />
-            <label htmlFor="sync-auto-refresh" className="text-[11px] text-white/60 cursor-pointer select-none">
+            <label htmlFor="sync-auto-refresh" className="text-[11px] text-foreground-faint cursor-pointer select-none">
               Auto-refresh
             </label>
           </div>
-          <div className="w-px h-5 bg-white/10" />
+          <div className="w-px h-5 bg-surface-panel" />
           <button
             type="button"
             disabled={loading}
             onClick={loadJobs}
             title="Refresh"
-            className="h-8 w-8 inline-flex items-center justify-center rounded bg-surface-panel text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
+            className="h-8 w-8 inline-flex items-center justify-center rounded bg-surface-panel text-foreground-faint hover:text-foreground-default hover:bg-surface-panel disabled:opacity-30 transition-colors"
           >
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </button>
@@ -320,22 +320,22 @@ export function SyncJobsTab({
       </div>
 
       <div className="flex-1 min-h-0 flex mt-2 gap-2">
-        <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.2 }}>
-          <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
+        <Card className="min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.2 }}>
+          <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Sync jobs</span>
-            <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
               {jobs.length}
             </span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
             {loading ? (
               <div className="p-3 space-y-2">
-                <Skeleton className="h-10 w-full bg-white/10" />
-                <Skeleton className="h-10 w-full bg-white/10" />
-                <Skeleton className="h-10 w-full bg-white/10" />
+                <Skeleton className="h-10 w-full bg-surface-panel" />
+                <Skeleton className="h-10 w-full bg-surface-panel" />
+                <Skeleton className="h-10 w-full bg-surface-panel" />
               </div>
             ) : jobs.length === 0 ? (
-              <div className="text-[11px] text-white/40 px-2 py-3">No sync jobs match the current filters.</div>
+              <div className="text-[11px] text-foreground-subtle px-2 py-3">No sync jobs match the current filters.</div>
             ) : (
               jobs.map((job) => {
                 const active = selectedJob?.id === job.id;
@@ -352,7 +352,7 @@ export function SyncJobsTab({
                     }}
                     className={cn(
                       'w-full text-left rounded border px-2 py-1.5 transition-colors',
-                      active ? 'bg-accent-primary-bg border-accent-primary-bd-hover' : 'bg-black/10 border-white/5 hover:bg-white/5'
+                      active ? 'bg-accent-primary-bg border-accent-primary-bd-hover' : 'bg-overlay border-border-subtle hover:bg-surface-card'
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -365,14 +365,14 @@ export function SyncJobsTab({
                             {issueCount} issue{issueCount === 1 ? '' : 's'}
                           </Badge>
                         )}
-                        <span className="text-[10px] font-mono text-white/50 truncate">{job.id.slice(0, 8)}</span>
+                        <span className="text-[10px] font-mono text-foreground-subtle truncate">{job.id.slice(0, 8)}</span>
                       </div>
-                      <span className="text-[10px] text-white/40 shrink-0">{formatDistanceToNow(new Date(job.created_at), { addSuffix: true })}</span>
+                      <span className="text-[10px] text-foreground-subtle shrink-0">{formatDistanceToNow(new Date(job.created_at), { addSuffix: true })}</span>
                     </div>
-                    <div className="text-[11px] text-white/80 mt-1 truncate">
+                    <div className="text-[11px] text-foreground-muted mt-1 truncate">
                       {servers.find((s) => s.id === job.server_id)?.name || `Server ${job.server_id}`} → {job.bank_id}
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-[10px] text-white/40">
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-foreground-subtle">
                       <span>duration {formatDuration(job.started_at, job.finished_at)}</span>
                       {job.error_code && <span className="text-destructive-fg">{job.error_code}</span>}
                     </div>
@@ -383,10 +383,10 @@ export function SyncJobsTab({
           </div>
         </Card>
 
-        <Card className="min-h-0 border-white/10 bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.8 }}>
+        <Card className="min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden pt-0" style={{ flex: 1.8 }}>
           {selectedJob ? (
             <div className="h-full flex flex-col overflow-hidden">
-              <div className="h-10 px-3 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
+              <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
                 <span className="font-medium text-sm">Job {selectedJob.id.slice(0, 8)}</span>
                 <div className="flex items-center gap-2">
                   {['pending', 'running'].includes(selectedJob.status) && (
@@ -404,53 +404,53 @@ export function SyncJobsTab({
               <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3 text-[11px]">
                   <div>
-                    <div className="text-white/40 uppercase tracking-wider text-[10px]">Server</div>
-                    <div className="text-white/80">{servers.find((s) => s.id === selectedJob.server_id)?.name || `Server ${selectedJob.server_id}`}</div>
+                    <div className="text-foreground-subtle uppercase tracking-wider text-[10px]">Server</div>
+                    <div className="text-foreground-muted">{servers.find((s) => s.id === selectedJob.server_id)?.name || `Server ${selectedJob.server_id}`}</div>
                   </div>
                   <div>
-                    <div className="text-white/40 uppercase tracking-wider text-[10px]">Bank</div>
-                    <div className="text-white/80 font-mono">{selectedJob.bank_id}</div>
+                    <div className="text-foreground-subtle uppercase tracking-wider text-[10px]">Bank</div>
+                    <div className="text-foreground-muted font-mono">{selectedJob.bank_id}</div>
                   </div>
                   <div>
-                    <div className="text-white/40 uppercase tracking-wider text-[10px]">Created</div>
-                    <div className="text-white/80">{format(new Date(selectedJob.created_at), 'yyyy-MM-dd HH:mm:ss')}</div>
+                    <div className="text-foreground-subtle uppercase tracking-wider text-[10px]">Created</div>
+                    <div className="text-foreground-muted">{format(new Date(selectedJob.created_at), 'yyyy-MM-dd HH:mm:ss')}</div>
                   </div>
                   <div>
-                    <div className="text-white/40 uppercase tracking-wider text-[10px]">Duration</div>
-                    <div className="text-white/80">{formatDuration(selectedJob.started_at, selectedJob.finished_at)}</div>
+                    <div className="text-foreground-subtle uppercase tracking-wider text-[10px]">Duration</div>
+                    <div className="text-foreground-muted">{formatDuration(selectedJob.started_at, selectedJob.finished_at)}</div>
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-white/40 mb-2">Stages</div>
+                  <div className="text-[10px] uppercase tracking-wider text-foreground-subtle mb-2">Stages</div>
                   <div className="space-y-1">
                     {selectedJob.stages?.map((stage: any) => {
                       const stageIssues = stage.issue_count > 0 || stage.status === 'completed_with_issues';
                       return (
-                        <div key={stage.name} className="flex items-center justify-between rounded border border-white/5 bg-black/10 px-2 py-1">
+                        <div key={stage.name} className="flex items-center justify-between rounded border border-border-subtle bg-overlay px-2 py-1">
                           <div className="flex items-center gap-2">
-                            <span className={cn('w-2 h-2 rounded-full', stageStatusClass[stage.status] || 'bg-white/20')} />
-                            <span className="text-[11px] text-white/80">{stage.label || stage.name}</span>
+                            <span className={cn('w-2 h-2 rounded-full', stageStatusClass[stage.status] || 'bg-surface-strong')} />
+                            <span className="text-[11px] text-foreground-muted">{stage.label || stage.name}</span>
                             {stageIssues && <AlertTriangle className="w-3 h-3 text-accent-tertiary-fg" />}
                           </div>
                           <div className="flex items-center gap-2">
                             {stage.issue_count > 0 && (
                               <span className="text-[10px] text-accent-tertiary-fg">{stage.issue_count} issue{stage.issue_count === 1 ? '' : 's'}</span>
                             )}
-                            <span className={cn('text-[10px]', stageLabelClass[stage.status] || 'text-white/40')}>
+                            <span className={cn('text-[10px]', stageLabelClass[stage.status] || 'text-foreground-subtle')}>
                               {stage.status === 'completed_with_issues' ? 'completed with issues' : stage.status}
                             </span>
                           </div>
                         </div>
                       );
-                    }) || <span className="text-white/40 italic">No stage data.</span>}
+                    }) || <span className="text-foreground-subtle italic">No stage data.</span>}
                   </div>
                 </div>
 
                 {selectedJob.error_message && (
                   <div className="rounded border border-destructive-bd bg-destructive-bg p-2">
                     <div className="text-[10px] uppercase tracking-wider text-destructive-fg mb-1">Error</div>
-                    <div className="text-[11px] text-white/80">{selectedJob.error_message}</div>
+                    <div className="text-[11px] text-foreground-muted">{selectedJob.error_message}</div>
                     {selectedJob.error_code && <div className="text-[10px] text-destructive-fg mt-1 font-mono">{selectedJob.error_code}</div>}
                   </div>
                 )}
@@ -466,14 +466,14 @@ export function SyncJobsTab({
                       </div>
                       <div className="space-y-1 max-h-48 overflow-y-auto">
                         {issues.slice(0, 20).map((issue, idx) => (
-                          <div key={idx} className="rounded bg-black/20 p-1.5">
+                          <div key={idx} className="rounded bg-surface-inset p-1.5">
                             <div className="text-[10px] text-accent-tertiary-fg/80">
                               {issue.label || issue.stage}
-                              {issue.extId && <span className="text-white/50 ml-1 font-mono">{issue.extId}</span>}
+                              {issue.extId && <span className="text-foreground-subtle ml-1 font-mono">{issue.extId}</span>}
                             </div>
                             <ul className="mt-1 space-y-0.5">
                               {issue.messages.slice(0, 3).map((msg, mIdx) => (
-                                <li key={mIdx} className="text-[11px] text-white/70">{msg}</li>
+                                <li key={mIdx} className="text-[11px] text-foreground-faint">{msg}</li>
                               ))}
                             </ul>
                           </div>
@@ -487,26 +487,26 @@ export function SyncJobsTab({
                 })()}
 
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-white/40 mb-2">Logs</div>
+                  <div className="text-[10px] uppercase tracking-wider text-foreground-subtle mb-2">Logs</div>
                   {logsLoading ? (
                     <div className="space-y-2">
-                      <Skeleton className="h-6 w-full bg-white/10" />
-                      <Skeleton className="h-6 w-full bg-white/10" />
+                      <Skeleton className="h-6 w-full bg-surface-panel" />
+                      <Skeleton className="h-6 w-full bg-surface-panel" />
                     </div>
                   ) : selectedJob.logs?.length === 0 ? (
-                    <span className="text-white/40 italic text-[11px]">No logs captured yet.</span>
+                    <span className="text-foreground-subtle italic text-[11px]">No logs captured yet.</span>
                   ) : (
                     <div className="space-y-1">
                       {selectedJob.logs.map((log: any) => (
-                        <div key={log.id} className="flex items-start gap-2 rounded border border-white/5 bg-black/10 px-2 py-1.5">
+                        <div key={log.id} className="flex items-start gap-2 rounded border border-border-subtle bg-overlay px-2 py-1.5">
                           <span className={cn('text-[9px] uppercase px-1 rounded shrink-0', log.level === 'error' ? 'bg-destructive-bg text-destructive-fg' : log.level === 'warn' ? 'bg-badge-caution-bg text-badge-caution-fg' : 'bg-badge-success-bg text-badge-success-fg')}>
                             {log.level}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-[10px] text-white/40">{format(new Date(log.created_at), 'HH:mm:ss')} {log.stage ? `· ${log.stage}` : ''}</div>
-                            <div className="text-[11px] text-white/80">{log.message}</div>
+                            <div className="text-[10px] text-foreground-subtle">{format(new Date(log.created_at), 'HH:mm:ss')} {log.stage ? `· ${log.stage}` : ''}</div>
+                            <div className="text-[11px] text-foreground-muted">{log.message}</div>
                             {log.details && (
-                              <pre className="mt-1 text-[10px] text-white/50 bg-black/20 rounded p-1 overflow-x-auto">
+                              <pre className="mt-1 text-[10px] text-foreground-subtle bg-surface-inset rounded p-1 overflow-x-auto">
                                 {JSON.stringify(log.details, null, 2)}
                               </pre>
                             )}
@@ -519,7 +519,7 @@ export function SyncJobsTab({
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-white/50 text-sm px-6 text-center">
+            <div className="h-full flex flex-col items-center justify-center text-foreground-subtle text-sm px-6 text-center">
               <p>Select a sync job from the left to view its stages, logs, and issues.</p>
             </div>
           )}

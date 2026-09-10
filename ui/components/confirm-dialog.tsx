@@ -54,7 +54,7 @@ export function ConfirmDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+            className="border-border-strong text-foreground-default hover:bg-surface-panel hover:text-foreground-default"
           >
             {cancelLabel}
           </Button>
@@ -65,8 +65,8 @@ export function ConfirmDialog({
             }}
             className={
              variant === 'destructive'
-               ? 'bg-destructive-fg text-white hover:bg-destructive-fg/80'
-               : 'bg-accent-primary-solid text-white hover:bg-accent-primary-solid-hover'
+               ? 'bg-destructive-fg text-foreground-default hover:bg-destructive-fg/80'
+               : 'bg-accent-primary-solid text-foreground-default hover:bg-accent-primary-solid-hover'
             }
           >
             {confirmLabel}
