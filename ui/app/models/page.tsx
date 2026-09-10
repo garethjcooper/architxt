@@ -296,7 +296,7 @@ function ModelsPageContent() {
             <div className="flex-1" />
             <div className="w-px h-5 bg-white/10 mx-1" />
             <Button onClick={fetchModels} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
-            <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
+            <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
             <Button onClick={() => setCreateDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-white/10 text-white hover:bg-surface-hover transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
           </div>
         }
@@ -598,7 +598,7 @@ function ModelsPageContent() {
             <p className="text-sm text-white/70 mb-6">Are you sure you want to delete {selected.size} mental model(s)? This action cannot be undone.</p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)} className="text-white/70 hover:text-white hover:bg-white/5">Cancel</Button>
-              <Button onClick={handleDeleteSelectedConfirmed} className="bg-red-600 hover:bg-red-700 text-white">Delete</Button>
+              <Button onClick={handleDeleteSelectedConfirmed} className="bg-destructive-fg hover:bg-destructive-fg/80 text-white">Delete</Button>
             </div>
           </div>
         </div>

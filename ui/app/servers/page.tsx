@@ -142,7 +142,7 @@ export default function ServersPage() {
         <Button
           onClick={openDeleteConfirm}
           disabled={selected.size === 0}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Delete"
         >
           <Trash2 className="h-4 w-4" />
@@ -234,7 +234,7 @@ export default function ServersPage() {
                             className={[
                               "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border",
                               cfg.mode === 'auto'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                ? 'bg-badge-success-bg text-badge-success-fg border-badge-success-bd'
                                 : 'bg-neutral-500/10 text-neutral-300 border-neutral-500/30',
                             ].join(' ')}
                             title={cfg.mode === 'auto' ? `Auto sync${cfg.refresh_interval ? ` (${cfg.refresh_interval})` : ''}` : 'Manual only'}

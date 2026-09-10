@@ -247,7 +247,7 @@ export function QueryForm(props: QueryFormProps) {
                                 },
                               }));
                             }}
-                            className={`shrink-0 text-white/50 hover:text-red-400 text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            className={`shrink-0 text-white/50 hover:text-destructive-fg text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                             aria-label={`Remove ${display} from prebuilt lookup`}
                             title="Remove"
                           >
@@ -325,7 +325,7 @@ export function QueryForm(props: QueryFormProps) {
                     }}
                     className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
                       selected
-                        ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
+                        ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
                         : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
                     } ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     title={model.name || model.ext_id || String(model.id)}
@@ -396,7 +396,7 @@ export function QueryForm(props: QueryFormProps) {
                                 },
                               }));
                             }}
-                            className={`shrink-0 text-white/50 hover:text-red-400 text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            className={`shrink-0 text-white/50 hover:text-destructive-fg text-xs px-1 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                             aria-label={`Remove ${display} from template lookup`}
                             title="Remove"
                           >
@@ -414,7 +414,7 @@ export function QueryForm(props: QueryFormProps) {
                 <div className="text-[10px] text-white/40 italic">Loading eligible templates…</div>
               )}
               {eligibleError && (
-                <div className="text-[10px] text-red-400 italic">{eligibleError}</div>
+                <div className="text-[10px] text-destructive-fg italic">{eligibleError}</div>
               )}
               {!eligibleLoading && !eligibleError && eligibleTemplates.length === 0 && (
                 <div className="text-[10px] text-white/40 italic">
@@ -472,9 +472,9 @@ export function QueryForm(props: QueryFormProps) {
                         }}
                         className={`w-full flex items-center justify-between gap-2 rounded border px-2 py-1.5 min-h-[2.8125rem] text-left transition-colors ${
                           allSelected
-                            ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-200'
+                            ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
                             : partiallySelected
-                              ? 'bg-emerald-900/10 border-emerald-500/20 text-emerald-200/80'
+                              ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg/80'
                               : 'bg-black/20 border-white/5 text-white/90 hover:bg-white/5'
                         } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                         title={template.ext_id}

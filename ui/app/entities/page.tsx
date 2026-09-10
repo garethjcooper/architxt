@@ -315,7 +315,7 @@ export default function EntitiesPage() {
             <Button
               onClick={openDeleteEntities}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />
@@ -507,7 +507,7 @@ export default function EntitiesPage() {
             <Button
               onClick={openDeleteTypes}
               disabled={typeMulti.selected.size === 0}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-red-500/30 text-red-400 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />
