@@ -78,7 +78,7 @@ export function WorkspaceResultPanel({
           />
         )}
         {tabs}
-        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-red-300/90 whitespace-pre-wrap p-4">
+        <div className="flex-1 min-h-0 flex items-center justify-center text-xs text-destructive-fg/90 whitespace-pre-wrap p-4">
           {error}
         </div>
       </div>
@@ -131,8 +131,8 @@ export function WorkspaceResultPanel({
   return (
     <div className="relative h-full">
       {isRunning && (
-        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-emerald-900/40 backdrop-blur-sm px-2.5 py-1 text-[10px] text-emerald-200/80 shadow-sm">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-accent-primary-bg backdrop-blur-sm px-2.5 py-1 text-[10px] text-accent-primary-fg/80 shadow-sm">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-primary-fg animate-pulse" />
           Running query…
         </div>
       )}

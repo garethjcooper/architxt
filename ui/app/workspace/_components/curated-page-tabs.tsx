@@ -113,14 +113,14 @@ export function CuratedPageTabs({
               className={cn(
                 'group/tab relative flex items-center gap-1.5 pr-7 pl-2 py-1 rounded border text-[11px] cursor-pointer shrink-0 select-none transition-colors max-w-[18rem]',
                 isActive
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                  ? 'bg-accent-primary-bg border-accent-primary-bd text-accent-primary-fg'
                   : 'bg-black/20 border-white/5 text-white/60 hover:bg-white/5 hover:text-white/80'
               )}
             >
               <span
                 className={cn(
                   'absolute left-0 top-1 bottom-1 w-[3px] rounded-l shrink-0',
-                  isCurated ? 'bg-emerald-400' : 'bg-white/30'
+                  isCurated ? 'bg-accent-primary-fg' : 'bg-white/30'
                 )}
               />
               <span className={cn('truncate min-w-0', tab.kind === 'curated' && tab.dirty && 'italic pr-1')} title={tab.label}>
@@ -193,7 +193,7 @@ export function CuratedPageTabs({
           type="button"
           onClick={() => onSaveActivePage?.()}
           disabled={!activeCuratedTab || !activePageDirty}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-emerald-400 hover:bg-emerald-950/30 hover:border-emerald-500/30 disabled:opacity-30 transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-accent-primary-fg hover:bg-accent-primary-bg-hover hover:border-accent-primary-bd disabled:opacity-30 transition-colors"
           title="Save active page"
         >
           <Save className="h-3.5 w-3.5" />
@@ -205,7 +205,7 @@ export function CuratedPageTabs({
             setConfirmDelete({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
           }}
           disabled={!activeCuratedTab}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-rose-400 hover:bg-rose-950/30 hover:border-rose-500/30 disabled:opacity-30 transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-white/10 text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
           title="Delete active page"
         >
           <Trash2 className="h-3.5 w-3.5" />

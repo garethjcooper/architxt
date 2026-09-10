@@ -499,7 +499,7 @@ export function CuratedPageEditor({
                         openDiagramFocus(b);
                       }
                     }}
-                    className="p-1 rounded text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                    className="p-1 rounded text-white/40 hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                     title={isGraph ? 'Focus graph' : isTable ? 'Focus table' : isNarrative || isText ? 'Focus narrative' : 'Focus diagram'}
                   >
                     <Eye className="h-3 w-3" />
@@ -517,8 +517,8 @@ export function CuratedPageEditor({
                   }}
                   className={`p-1 rounded transition-colors ${
                     isDeleted
-                      ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-                      : 'text-white/40 hover:text-rose-400 hover:bg-rose-500/10'
+                      ? 'text-accent-primary-fg hover:text-accent-primary-fg hover:bg-accent-primary-bg'
+                      : 'text-white/40 hover:text-destructive-fg hover:bg-destructive-bg'
                   }`}
                   title={isDeleted ? 'Restore' : 'Remove'}
                 >

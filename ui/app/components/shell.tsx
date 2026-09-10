@@ -103,7 +103,7 @@ export function Shell({ children }: ShellProps) {
               <span>GitHub</span>
             </a>
             <span
-              className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border bg-green-800/15 text-green-400 border-green-700/20"
+              className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border bg-badge-success-bg text-badge-success-fg border-badge-success-bd"
               title="Server environment"
             >
               {serverEnv}
@@ -113,7 +113,7 @@ export function Shell({ children }: ShellProps) {
       </div>
 
       {/* Edge-to-edge green gradient separator */}
-      <div className="h-[3px] w-full bg-gradient-to-r from-emerald-700 via-green-500 to-green-400"></div>
+      <div className="h-[3px] w-full bg-gradient-to-r from-accent-primary-bd via-accent-primary-fg to-accent-primary-fg"></div>
 
       <div className="flex flex-1 min-h-0">
         {/* Bottom Row - Navigation + Content */}
@@ -130,7 +130,7 @@ export function Shell({ children }: ShellProps) {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors mx-1 ${
                     isActive 
-                      ? 'bg-gradient-to-r from-emerald-700 to-green-400 text-white' 
+                      ? 'bg-gradient-to-r from-accent-primary-bd to-accent-primary-fg text-white' 
                       : 'text-white/70 hover:text-white hover:bg-white/10'
                   } ${collapsed ? 'justify-center px-2' : ''}`}
                   title={collapsed ? item.label : undefined}

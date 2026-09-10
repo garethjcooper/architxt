@@ -72,7 +72,7 @@ export function PageShell({
                   onClick={() => onTabChange(tab.value)}
                   className={`py-3 w-[120px] text-sm transition-colors text-center border-b-2 ${
                     activeTab === tab.value
-                      ? 'text-emerald-500 border-emerald-500 font-bold'
+                      ? 'text-accent-primary-fg border-accent-primary-bd font-bold'
                       : 'text-white/70 hover:text-white border-transparent font-medium'
                   }`}
                 >

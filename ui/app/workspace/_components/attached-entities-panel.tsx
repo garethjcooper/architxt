@@ -256,7 +256,7 @@ export function AttachedEntitiesPanel({
                                 key={item.key}
                                 className={cn(
                                   'flex items-center gap-2 rounded px-2 py-1.5 text-[11px] transition-colors',
-                                  isSelected ? 'bg-emerald-500/15 text-emerald-200' : 'text-white/70 hover:bg-white/5'
+                                  isSelected ? 'bg-accent-primary-bg text-accent-primary-fg' : 'text-white/70 hover:bg-white/5'
                                 )}
                               >
                                 <button
@@ -269,7 +269,7 @@ export function AttachedEntitiesPanel({
                                     {item.category}
                                   </span>
                                   {item.roleLabel && (
-                                    <span className="text-[9px] uppercase tracking-wider text-emerald-400/80 shrink-0">
+                                    <span className="text-[9px] uppercase tracking-wider text-accent-primary-fg/80 shrink-0">
                                       {item.roleLabel}
                                     </span>
                                   )}
