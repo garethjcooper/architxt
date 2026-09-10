@@ -1,6 +1,7 @@
 'use client';
 
-import { cn } from "@/lib/utils";
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 interface CaseMatchToggleProps {
   checked: boolean;
@@ -9,38 +10,15 @@ interface CaseMatchToggleProps {
 }
 
 /**
- * Emerald-styled toggle switch for case_match setting.
- * OFF = insensitive (dim track, dark knob)
- * ON  = sensitive (emerald track, dark knob on right)
+ * Toggle switch backed by the shared Switch primitive so entity-type
+ * and entity forms render case/word toggles identically to other switches.
  */
 export function CaseMatchToggle({ checked, onChange, className }: CaseMatchToggleProps) {
   return (
-    <label
-      className={cn(
-        "relative inline-flex items-center cursor-pointer select-none",
-        className
-      )}
-    >
-      <input
-        type="checkbox"
-        className="sr-only peer"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <div
-        className={cn(
-          "relative w-10 h-5 rounded-full transition-colors duration-200",
-          "bg-surface-panel peer-checked:bg-accent-primary-solid"
-        )}
-      >
-        <div
-          className={cn(
-            "absolute top-[2px] left-[2px] w-4 h-4 rounded-full",
-            "bg-surface-inset transition-all duration-200",
-            checked && "translate-x-5 bg-surface-raised"
-          )}
-        />
-      </div>
-    </label>
+    <Switch
+      checked={checked}
+      onCheckedChange={onChange}
+      className={cn(className)}
+    />
   );
 }
