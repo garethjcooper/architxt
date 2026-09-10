@@ -264,7 +264,7 @@ export default function EntitiesPage() {
                 const v = e.target.value;
                 setEntityTypeFilter(v === 'all' ? 'all' : Number(v));
               }}
-              className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="h-8 rounded-md border border-white/10 bg-surface-card px-2.5 text-sm text-white/80 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
             >
               <option value="all">All Types</option>
               {entityTypes.map((t) => (
@@ -279,7 +279,7 @@ export default function EntitiesPage() {
                 value={entitySearch}
                 onChange={(e) => setEntitySearch(e.target.value)}
                 placeholder="Search name, id, aliases, type…"
-                className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
               />
               {entitySearch && (
                 <button
@@ -335,17 +335,17 @@ export default function EntitiesPage() {
             !freeze ? "max-h-[calc(100vh-240px)]" : "",
           ].filter(Boolean).join(" ")}>
             {/* Header bar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
               <div className="flex-1" />
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setFreeze(!freeze)}
                   title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-                  className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
                 >
                   <TableIcon className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
                   {filteredEntities.length} ({entityMulti.selected.size})
                 </span>
               </div>
@@ -383,11 +383,11 @@ export default function EntitiesPage() {
                       <TableRow
                         key={item.id}
                         className={`border-b border-white/5 transition-colors cursor-pointer ${
-                          entityMulti.selected.has(item.id) ? 'bg-emerald-900/20' : 'hover:bg-white/5'
+                          entityMulti.selected.has(item.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                         }`}
                         onClick={() => handleEntityClick(item)}
                       >
-                        <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${entityMulti.selected.has(item.id) ? 'bg-emerald-900/20' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                        <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${entityMulti.selected.has(item.id) ? 'bg-accent-primary-bg' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={entityMulti.selected.has(item.id)}
                             onCheckedChange={() => entityMulti.toggleSelection(item.id)}
@@ -425,9 +425,9 @@ export default function EntitiesPage() {
                                 title={differs ? `Entity override — entity type: case-${typeValue}` : `Case-${isSensitive ? 'sensitive' : 'insensitive'} match`}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   isSensitive
-                                    ? 'bg-amber-800/15 text-amber-400 border-amber-700/20'
+                                    ? 'bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd'
                                     : 'bg-white/5 text-white/40 border-white/10'
-                                } ${differs ? 'ring-1 ring-amber-400/40' : ''}`}
+                                } ${differs ? 'ring-1 ring-accent-secondary-fg/40' : ''}`}
                               >
                                 {isSensitive ? 'Aa' : 'aa'}
                               </span>
@@ -446,9 +446,9 @@ export default function EntitiesPage() {
                                 title={differs ? `Entity override — entity type: ${typeLabel}` : `${hasBoundaries ? 'Whole-word' : 'No boundaries'} match`}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   !hasBoundaries
-                                    ? 'bg-rose-800/15 text-rose-400 border-rose-700/20'
+                                    ? 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
                                     : 'bg-white/5 text-white/40 border-white/10'
-                                } ${differs ? 'ring-1 ring-amber-400/40' : ''}`}
+                                } ${differs ? 'ring-1 ring-diff-differ-fg/40' : ''}`}
                               >
                                 {hasBoundaries ? '∂' : '∞'}
                               </span>
@@ -524,9 +524,9 @@ export default function EntitiesPage() {
           {/* Table card */}
           <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0">
             {/* Header bar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-blue-900/20 border-b border-blue-500/30 shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
               <div className="flex-1" />
-              <span className="text-xs font-mono text-blue-400 bg-black/30 border border-blue-500/30 px-2 py-0.5 rounded">
+              <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">
                 {entityTypes.length} ({typeMulti.selected.size})
               </span>
             </div>
@@ -561,7 +561,7 @@ export default function EntitiesPage() {
                       <TableRow
                         key={type.id}
                         className={`border-b border-white/5 transition-colors cursor-pointer ${
-                          typeMulti.selected.has(type.id) ? 'bg-blue-900/20' : 'hover:bg-white/5'
+                          typeMulti.selected.has(type.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                         }`}
                         onClick={(e) => handleTypeClick(type, e)}
                       >
@@ -586,7 +586,7 @@ export default function EntitiesPage() {
                               return (
                                 <span
                                   title={`${placeholder.length} digit(s)`}
-                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border bg-emerald-800/15 text-emerald-400 border-emerald-700/20"
+                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
                                 >
                                   {type.id_format_prefix || ''}{sep}{placeholder}
                                 </span>
@@ -604,7 +604,7 @@ export default function EntitiesPage() {
                                 title={isSensitive ? 'Case-sensitive match (default for entities of this type)' : 'Case-insensitive match (default for entities of this type)'}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   isSensitive
-                                    ? 'bg-amber-800/15 text-amber-400 border-amber-700/20'
+                                    ? 'bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd'
                                     : 'bg-white/5 text-white/20 border-white/5'
                                 }`}
                               >
@@ -622,7 +622,7 @@ export default function EntitiesPage() {
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   hasBoundaries
                                     ? 'bg-white/5 text-white/20 border-white/5'
-                                    : 'bg-rose-800/15 text-rose-400 border-rose-700/20'
+                                    : 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
                                 }`}
                               >
                                 {hasBoundaries ? '∂' : '∞'}

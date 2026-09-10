@@ -44,7 +44,7 @@ export default function ModelsPage() {
     <Suspense fallback={
       <PageShell title="Mental Models" loading={true}>
         <div className="rounded-md overflow-hidden bg-surface-card border border-white/[0.08]">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg">
             <span className="font-medium text-sm">Mental Models</span>
           </div>
           <div className="py-8 text-center text-white/70">Loading...</div>
@@ -279,7 +279,7 @@ function ModelsPageContent() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search id, ext id, name, source query, tags, entities…"
-                className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
               />
               {search && (
                 <button
@@ -290,8 +290,8 @@ function ModelsPageContent() {
                 </button>
               )}
             </div>
-            <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-orange-500/30 text-orange-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
-            <Button onClick={() => setManageEntitiesDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-emerald-500/30 text-emerald-300 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><EntityIcon className="h-3.5 w-3.5" />Entities</Button>
+            <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-primary-bd text-accent-primary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
+            <Button onClick={() => setManageEntitiesDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-primary-bd text-accent-primary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><EntityIcon className="h-3.5 w-3.5" />Entities</Button>
             <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-white/20 text-white/80 hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
             <div className="flex-1" />
             <div className="w-px h-5 bg-white/10 mx-1" />
@@ -301,30 +301,30 @@ function ModelsPageContent() {
           </div>
         }
         <div className="rounded-md bg-surface-card border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex items-center justify-end px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
+          <div className="flex items-center justify-end px-3 py-2 border-b border-white/10 bg-accent-primary-bg text-accent-primary-fg">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAllBadges(!showAllBadges)}
                 title={showAllBadges ? 'Limit to 3 badges' : 'Show all badges'}
-                className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
               >
                 <BadgeExpandIcon className="h-5 w-5" />
               </button>
               <button
                 onClick={() => setCompactBadges(!compactBadges)}
                 title={compactBadges ? 'Expand badges' : 'Compact badges'}
-                className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
               >
                 <BadgeCompactIcon className="h-5 w-5" />
               </button>
               <button
                 onClick={() => setFreeze(!freeze)}
                 title={freeze ? 'Unfreeze panes' : 'Freeze panes'}
-                className={["inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors", freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                className={["inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors", freeze ? "bg-accent-primary-bg text-accent-primary-fg border border-accent-primary-bd" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
               >
                 <TableIcon className="h-3.5 w-3.5" />
               </button>
-              <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">{filteredModels.length} ({selected.size})</span>
+              <span className="text-xs font-mono text-accent-primary-fg bg-black/30 border border-accent-primary-bd px-2 py-0.5 rounded">{filteredModels.length} ({selected.size})</span>
             </div>
           </div>
 
@@ -389,10 +389,10 @@ function ModelsPageContent() {
                       key={model.id}
                       onClick={() => handleRowClick(model)}
                       className={`border-b border-white/5 transition-colors cursor-pointer ${
-                        selected.has(model.id) ? 'bg-emerald-900/20' : 'hover:bg-white/5'
+                        selected.has(model.id) ? 'bg-accent-primary-bg' : 'hover:bg-white/5'
                       }`}
                     >
-                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(model.id) ? 'bg-emerald-900/20' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(model.id) ? 'bg-accent-primary-bg' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selected.has(model.id)}
                           onCheckedChange={() => toggleSelection(model.id)}
@@ -483,8 +483,8 @@ function ModelsPageContent() {
                                 key={t.id}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[100px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-orange-400/40 text-orange-200 border-orange-400/60 ring-1 ring-orange-400/50'
-                                    : 'bg-orange-400/20 text-orange-300 border-orange-400/30'
+                                    ? 'bg-accent-primary-bg/80 text-accent-primary-fg border-accent-primary-bd ring-1 ring-accent-primary-fg/50'
+                                    : 'bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd'
                                 }`}
                                 title={t.name}
                               >
@@ -496,7 +496,7 @@ function ModelsPageContent() {
                             <span
                               className={`text-[10px] px-1 rounded ${
                                 search.trim() && model.tags!.slice(3).some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-                                  ? 'text-orange-300 bg-orange-400/15'
+                                  ? 'text-accent-primary-fg bg-accent-primary-bg/60'
                                   : 'text-white/30'
                               }`}
                             >
