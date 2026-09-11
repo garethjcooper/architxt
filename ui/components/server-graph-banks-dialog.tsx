@@ -124,7 +124,15 @@ export function ServerGraphBanksDialog({
       }
       return {
         ...prev,
-        [bankId]: { bank_id: bankId, mode: 'manual' as const },
+        [bankId]: {
+          bank_id: bankId,
+          mode: 'manual' as const,
+          restriction: {
+            deploy: {
+              allowed_model_types: Object.values(LEGACY_MODEL_TYPE_TO_ROLE),
+            },
+          },
+        },
       };
     });
   };
