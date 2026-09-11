@@ -9,6 +9,7 @@ import type { GraphNode, GraphEdge } from '@/lib/api/client';
 import mermaid from 'mermaid';
 import { DiagramControls } from '@/components/diagram-controls';
 import { Markdown } from '@/components/markdown';
+import { maybeInitializeMermaid, ensureMermaidInitialized } from '@/lib/mermaid-init';
 import {
   Dialog,
   DialogContent,
@@ -161,6 +162,7 @@ function PreviewPane({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    ensureMermaidInitialized();
     let cancelled = false;
     const render = async () => {
       const source = content.trim();
