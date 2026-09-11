@@ -1,6 +1,6 @@
 {
   "name": "@architxt/aql",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Architxt Query Language parser and renderer for architxt server and UI",
   "type": "module",
   "main": "./src/index.js",
