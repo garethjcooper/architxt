@@ -25,12 +25,6 @@ export interface ModelItem {
   edgeCount: number;
 }
 
-function countModelEdges(contentCache: Record<string, ModelContentCacheEntry> | undefined, extId: string): number | undefined {
-  const cached = contentCache?.[extId];
-  if (!cached || cached.loading || cached.envelope === undefined) return undefined;
-  return cached.envelope?.graph?.edges?.length ?? 0;
-}
-
 export interface AttachedEntitiesPanelProps {
   entityIds: string[];
   entityInfoMap: Record<string, EntityInfo> | null;
@@ -143,7 +137,7 @@ function getEntityModelItems(
       roleLabel: firstRefRole ? getRoleLabel(firstRefRole, labelMap) : undefined,
       title,
       extId,
-      edgeCount: countModelEdges(contentCache, extId) ?? contexts.length,
+      edgeCount: contexts.length,
     });
   });
 
