@@ -2,8 +2,9 @@ import { stmt } from '../cache.js';
 import { dbExec } from '../utils/db-helpers.js';
 import { createLogger } from '../utils/logger.js';
 import { listEdges } from '../db/crud/contextual-graph.js';
-import { deriveMentalModels, isSystemTemplateRole } from '../db/crud/mental-models.js';
+import { deriveMentalModels } from '../db/crud/mental-models.js';
 import { getRoleScopeMap, isContextualGraphRole } from '../db/crud/template-roles.js';
+import { getContextualGraphTemplate, SCOPE_VALUES, substituteTemplateFields } from './contextual-graph/template-models.js';
 import { getMentalModel } from '../services/hindsight/mental-models.js';
 
 const logger = createLogger('entity-info');
@@ -151,6 +152,72 @@ function extractContextualRefs(properties, knownRoleIds) {
       last_refresh_at: ref.last_refresh_at || null,
       last_refresh_error: ref.last_refresh_error || null,
     }));
+}
+
+/**
+ * Build a target-like object from a graph node and optional catalog entity.
+ */
+function targetFromGraphNode(node, catalog) {
+  const displayName = node?.properties?.display_name || catalog?.name || node?.id || '';
+  return {
+    id: node?.id || '',
+    displayName,
+  };
+}
+
+/**
+ * Derive the display name for a contextual-graph model ref from its template.
+ *
+ * This uses the same substitution path as deriveContextualModelSpec so that
+ * system and user-created contextual template roles produce consistent names.
+ */
+function deriveContextualRefName(db, ref, graphNodeById, catalogByEntityId, templateCache) {
+  const scope = ref.scope || {};
+  const role = ref.role;
+  if (!role) return null;
+
+  let template = templateCache.get(role);
+  if (template === undefined) {
+    const result = getContextualGraphTemplate(db, role);
+    template = result?.success ? result.data : null;
+    templateCache.set(role, template);
+  }
+  if (!template || typeof template.name !== 'string') return null;
+
+  const scopeType = scope.source_id && scope.target_id ? 'edge'
+    : scope.seed_id ? 'seed'
+    : 'node';
+
+  let values;
+  if (scopeType === 'edge') {
+    const sourceNode = graphNodeById.get(scope.source_id);
+    const targetNode = graphNodeById.get(scope.target_id);
+    const sourceLocalId = parseEntityId(scope.source_id).localId;
+    const targetLocalId = parseEntityId(scope.target_id).localId;
+    const sourceCatalog = sourceLocalId ? catalogByEntityId.get(sourceLocalId) : null;
+    const targetCatalog = targetLocalId ? catalogByEntityId.get(targetLocalId) : null;
+    values = SCOPE_VALUES.edge(
+      targetFromGraphNode(sourceNode, sourceCatalog),
+      targetFromGraphNode(targetNode, targetCatalog),
+    );
+  } else if (scopeType === 'seed') {
+    const seedNode = graphNodeById.get(scope.seed_id);
+    const seedLocalId = parseEntityId(scope.seed_id).localId;
+    const seedCatalog = seedLocalId ? catalogByEntityId.get(seedLocalId) : null;
+    values = SCOPE_VALUES.seed(targetFromGraphNode(seedNode, seedCatalog));
+  } else {
+    const node = graphNodeById.get(scope.node_id);
+    const localId = parseEntityId(scope.node_id).localId;
+    const catalog = localId ? catalogByEntityId.get(localId) : null;
+    values = SCOPE_VALUES.node(targetFromGraphNode(node, catalog));
+  }
+
+  try {
+    return substituteTemplateFields(template.name, values);
+  } catch (err) {
+    logger.warn('Failed to derive contextual ref name', { role, ext_id: ref.ext_id, error: err.message });
+    return null;
+  }
 }
 
 /**
@@ -411,8 +478,11 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
 
     for (const model of mentalModels) {
       if (model.is_template) {
-        // Skip system templates; their instances are surfaced via contextual_refs.
-        if (isSystemTemplateRole(model.template_role)) continue;
+        // Contextual-graph template roles (system + user-defined) are never
+        // derived from mental_model_entities; add-context renders their instances
+        // directly from the working graph. Skip them here so we don't create
+        // stale local rows whose mm_name shadows the derived display name.
+        if (isContextualGraphRole(model.template_role)) continue;
 
         for (const entity of model.entities) {
           const derived = deriveInstancesForEntity(model, entity, db, serverId, bankId);
@@ -544,22 +614,62 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       });
     }
 
-    // Enrich all contextual refs with the real mental-model display name.
+    // Enrich all model refs with display names. Derived/plain models still get
+    // theirs from the local mental_models table. Contextual-graph refs derive
+    // their name from the template + graph entity so user-created template
+    // roles are handled the same way as system template roles.
+
+    // Make sure graph nodes for edge/seed scopes are available for name derivation.
+    const scopeNodeIds = new Set();
+    for (const id of Object.keys(entities)) {
+      for (const ref of entities[id].contextual_refs) {
+        const scope = ref.scope || {};
+        if (scope.node_id) scopeNodeIds.add(scope.node_id);
+        if (scope.seed_id) scopeNodeIds.add(scope.seed_id);
+      }
+      for (const ctx of entities[id].edge_contexts) {
+        for (const ref of ctx.refs || []) {
+          const scope = ref.scope || {};
+          if (scope.source_id) scopeNodeIds.add(scope.source_id);
+          if (scope.target_id) scopeNodeIds.add(scope.target_id);
+        }
+      }
+    }
+    const scopeNodeIdsToLoad = Array.from(scopeNodeIds).filter((id) => !graphNodeById.has(id));
+    if (scopeNodeIdsToLoad.length > 0) {
+      const scopeNodesResult = loadGraphNodes(db, serverId, bankId, scopeNodeIdsToLoad);
+      if (scopeNodesResult.success) {
+        for (const node of scopeNodesResult.data) {
+          graphNodeById.set(node.id, node);
+        }
+      }
+    }
+
     const namesResult = loadMentalModelNamesByExtIds(db, Array.from(allExtIds));
     if (!namesResult.success) {
       return { success: false, error: namesResult.error, code: namesResult.code };
     }
     const extIdToName = namesResult.data;
+
+    const templateCache = new Map();
     for (const id of Object.keys(entities)) {
       for (const ref of entities[id].contextual_refs) {
         if (ref.ext_id && extIdToName.has(ref.ext_id)) {
           ref.name = extIdToName.get(ref.ext_id);
+        }
+        const derivedName = deriveContextualRefName(db, ref, graphNodeById, catalogByEntityId, templateCache);
+        if (derivedName) {
+          ref.name = derivedName;
         }
       }
       for (const ctx of entities[id].edge_contexts) {
         for (const ref of ctx.refs || []) {
           if (ref.ext_id && extIdToName.has(ref.ext_id)) {
             ref.name = extIdToName.get(ref.ext_id);
+          }
+          const derivedName = deriveContextualRefName(db, ref, graphNodeById, catalogByEntityId, templateCache);
+          if (derivedName) {
+            ref.name = derivedName;
           }
         }
       }
