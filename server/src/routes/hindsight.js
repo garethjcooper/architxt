@@ -55,6 +55,7 @@ import {
   DEFAULT_TAGS_MATCH_MODE,
   normaliseMaxTokens,
 } from '../db/crud/mental-models.js';
+import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import { listDirectivesForDiff } from '../db/crud/directives.js';
 import { extractModelRefsFromDb } from '../services/contextual-graph/refresh-patches.js';
 import { deriveSpecsForRefs } from '../services/contextual-graph/specs.js';
@@ -550,13 +551,26 @@ router.get('/diff', async (req, res) => {
         if (isManagedBank) {
           const refsByExtId = extractModelRefsFromDb(db, serverId, bankId);
           const specs = await deriveSpecsForRefs(db, serverId, bankId, refsByExtId);
-          for (const { extId, spec } of specs || []) {
+          const composeInputs = specs.map(({ spec }) => ({ role: spec.role, source_query: spec.source_query }));
+          const composedResults = await composeMentalModelPromptBatch(db, composeInputs);
+          for (let i = 0; i < specs.length; i += 1) {
+            const { extId, spec } = specs[i];
             if (!extId || !spec) continue;
+            const composed = composedResults[i];
+            if (!composed?.composed_query) {
+              logger.warn('Failed to compose contextual mental model prompt for diff', {
+                extId,
+                role: spec.role,
+                error: composed?.compose_error,
+              });
+              continue;
+            }
             contextualByExtId.set(extId, {
               ...spec,
+              ext_id: extId,
               is_derived: false,
               is_contextual: true,
-              composed_query: spec.source_query,
+              composed_query: composed.composed_query,
               response_schema: UNIFIED_RESPONSE_SCHEMA,
             });
           }
