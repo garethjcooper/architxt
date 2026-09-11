@@ -1,7 +1,7 @@
 'use client';
 
 import { Checkbox } from '@/components/ui/checkbox';
-import { GitCompare, Sparkles } from 'lucide-react';
+import { GitCompare } from 'lucide-react';
 
 interface MentalModelDivergence {
   name_differs: boolean;
@@ -119,7 +119,6 @@ export default function MentalModelSyncRow({
               )}
               {arch?.is_derived && (
                 <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-info-bg text-badge-info-fg border-badge-info-bd shrink-0" title="Derived from template">
-                  <Sparkles className="h-3 w-3" />
                   derived
                 </span>
               )}
