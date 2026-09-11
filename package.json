@@ -1,6 +1,6 @@
 {
   "name": "architxt",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "architxt: Document processing pipeline with web UI",
   "engines": {
     "node": ">=22.0.0"
