@@ -599,14 +599,6 @@ export default function ContextManagerPage() {
                 )}
               </div>
 
-              <div className="w-px h-4 bg-surface-panel" />
-
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wider text-foreground-subtle">Graph</span>
-                <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
-                  {nodes.length} node{nodes.length !== 1 ? 's' : ''} / {edges.length} edge{edges.length !== 1 ? 's' : ''}
-                </span>
-              </div>
             </div>
           )}
         </div>
