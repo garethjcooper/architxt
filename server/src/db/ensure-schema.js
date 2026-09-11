@@ -1254,6 +1254,19 @@ function ensureMissingColumns(db) {
       ]
     },
     {
+      table: 'contextual_graph_jobs',
+      columns: [
+        {
+          name: 'cgj_logs',
+          ddl: "ALTER TABLE contextual_graph_jobs ADD COLUMN cgj_logs JSON NOT NULL DEFAULT '[]'"
+        },
+        {
+          name: 'cgj_updated_at',
+          ddl: 'ALTER TABLE contextual_graph_jobs ADD COLUMN cgj_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL'
+        }
+      ]
+    },
+    {
       table: 'template_roles',
       columns: [
         {
