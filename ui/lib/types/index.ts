@@ -184,6 +184,7 @@ export interface MentalModel {
   is_template: boolean;
   template_role?: string | null;
   is_system_template: boolean;
+  is_contextual_graph_role?: boolean;
   tags: Tag[];
   entities: Entity[];
   created_at: string;

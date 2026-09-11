@@ -5,7 +5,7 @@ import { getOrCreateTagByName } from './tags.js';
 import { createLogger } from '../../utils/logger.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
 import { validateRoleBasedTemplate } from '../../services/contextual-graph/template-validation.js';
-import { getRoleScopeMap } from './template-roles.js';
+import { getRoleScopeMap, isContextualGraphRole } from './template-roles.js';
 
 const logger = createLogger('mental-models-crud');
 
@@ -78,6 +78,21 @@ function builtInTemplateRoleGuard(role, action) {
 export function getMentalModelSystemTemplateGuard(db, id, action) {
   const role = getMentalModelTemplateRole(db, id);
   return systemTemplateGuard(role, action);
+}
+
+/** Guard entity mutations on any contextual-graph template role. */
+function contextualGraphEntityGuard(role) {
+  if (!isContextualGraphRole(role)) return { blocked: false };
+  return {
+    blocked: true,
+    error: 'Contextual graph template roles cannot have attached entities.',
+    code: 'CONTEXTUAL_TEMPLATE_NO_ENTITIES',
+  };
+}
+
+function getMentalModelContextualGraphEntityGuard(db, id) {
+  const role = getMentalModelTemplateRole(db, id);
+  return contextualGraphEntityGuard(role);
 }
 
 export const deleteMentalModel = (db, id) => dbExec(() => {
@@ -932,6 +947,12 @@ export const addMentalModelEntity = (db, mmId, entId) => dbExec(() => {
     err.code = guard.code;
     throw err;
   }
+  const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+  if (contextualGuard.blocked) {
+    const err = new Error(contextualGuard.error);
+    err.code = contextualGuard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const template = getMentalModelTemplateValues(db, mId);
 
@@ -992,6 +1013,12 @@ export const updateMentalModelEntityOverrides = (db, mmId, entId, overrides) => 
   if (guard.blocked) {
     const err = new Error(guard.error);
     err.code = guard.code;
+    throw err;
+  }
+  const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+  if (contextualGuard.blocked) {
+    const err = new Error(contextualGuard.error);
+    err.code = contextualGuard.code;
     throw err;
   }
   const eId = requireInt('ent_id', entId);
@@ -1087,6 +1114,12 @@ export const deleteMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() =
     err.code = guard.code;
     throw err;
   }
+  const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+  if (contextualGuard.blocked) {
+    const err = new Error(contextualGuard.error);
+    err.code = contextualGuard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const sql = `UPDATE mental_model_entities SET mm_ent_refresh_mode = NULL, mm_ent_refresh_after_consolidation = NULL, mm_ent_exclude_all_mental_models = NULL, mm_ent_max_tokens = NULL, mm_ent_updated_at = CURRENT_TIMESTAMP WHERE mm_id = ? AND ent_id = ?`;
   const result = stmt(db, sql).run(mId, eId);
@@ -1104,6 +1137,12 @@ export const clearMentalModelEntityOverrides = (db, mmId) => dbExec(() => {
     err.code = guard.code;
     throw err;
   }
+  const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+  if (contextualGuard.blocked) {
+    const err = new Error(contextualGuard.error);
+    err.code = contextualGuard.code;
+    throw err;
+  }
   const sql = `UPDATE mental_model_entities SET mm_ent_refresh_mode = NULL, mm_ent_refresh_after_consolidation = NULL, mm_ent_exclude_all_mental_models = NULL, mm_ent_max_tokens = NULL, mm_ent_updated_at = CURRENT_TIMESTAMP WHERE mm_id = ?`;
   const result = stmt(db, sql).run(mId);
   return { cleared: result.changes };
@@ -1118,6 +1157,12 @@ export const batchUpdateMentalModelEntityOverrides = (db, mmId, entityIds, overr
   if (guard.blocked) {
     const err = new Error(guard.error);
     err.code = guard.code;
+    throw err;
+  }
+  const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+  if (contextualGuard.blocked) {
+    const err = new Error(contextualGuard.error);
+    err.code = contextualGuard.code;
     throw err;
   }
   if (!Array.isArray(entityIds) || entityIds.length === 0) {
@@ -1147,6 +1192,12 @@ export const removeMentalModelEntity = (db, mmId, entId) => dbExec(() => {
   if (guard.blocked) {
     const err = new Error(guard.error);
     err.code = guard.code;
+    throw err;
+  }
+  const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+  if (contextualGuard.blocked) {
+    const err = new Error(contextualGuard.error);
+    err.code = contextualGuard.code;
     throw err;
   }
   const eId = requireInt('ent_id', entId);
@@ -1208,6 +1259,12 @@ export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitie
     if (guard.blocked) {
       const err = new Error(guard.error);
       err.code = guard.code;
+      throw err;
+    }
+    const contextualGuard = getMentalModelContextualGraphEntityGuard(db, mId);
+    if (contextualGuard.blocked) {
+      const err = new Error(contextualGuard.error);
+      err.code = contextualGuard.code;
       throw err;
     }
   }
