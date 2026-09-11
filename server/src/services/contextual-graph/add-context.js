@@ -67,8 +67,9 @@ export async function addContext(
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
 
   // Normalize allowed_model_types to role IDs. Accept legacy slugs and raw role IDs.
+  // An empty array is treated as "no roles allowed", not "all roles allowed".
   let allowedRoleIds;
-  if (Array.isArray(options.allowed_model_types) && options.allowed_model_types.length > 0) {
+  if (Array.isArray(options.allowed_model_types)) {
     allowedRoleIds = new Set(
       options.allowed_model_types
         .map((t) => MODEL_TYPE_TO_ROLE[t] || (configuredRoleIds.has(t) ? t : null))
@@ -76,6 +77,8 @@ export async function addContext(
         .filter((role) => isContextualGraphRole(role)),
     );
   } else {
+    // Treat undefined/null as "all configured roles" for back-compat with callers
+    // that do not pass the option at all. Explicit empty array means none.
     allowedRoleIds = new Set(configuredRoleIds);
   }
 
