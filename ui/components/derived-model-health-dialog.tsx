@@ -614,13 +614,14 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               variant="outline"
               onClick={() => setConfirmRefreshAllOpen(true)}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading' || derived.length === 0}
+              className="border-badge-success-bd text-badge-success-fg hover:bg-badge-success-bg/40 hover:text-badge-success-fg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Refresh All
             </Button>
             <Button
               onClick={handleRun}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading'}
-              className="flex items-center gap-2"
+              className="bg-badge-success-bg text-badge-success-fg border border-badge-success-bd hover:bg-badge-success-bg/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {status.state === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
               {status.state === 'loading' ? 'Checking...' : 'Run Check'}
@@ -647,6 +648,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             </Button>
             <Button
               onClick={handleRefreshAll}
+              className="bg-badge-success-bg text-badge-success-fg border border-badge-success-bd hover:bg-badge-success-bg/80"
             >
               Refresh All
             </Button>
