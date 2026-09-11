@@ -1,6 +1,6 @@
 import { createLogger } from '../../utils/logger.js';
 import { CONTEXTUAL_GRAPH_ROLES } from './template-models.js';
-import { getTemplateRoleIds, ROLE_TO_MODEL_TYPE } from '../../db/crud/template-roles.js';
+import { getTemplateRoleIds, ROLE_TO_MODEL_TYPE, isContextualGraphRole } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-model-refs');
 
@@ -74,7 +74,7 @@ function extractRefObjectsFromProperties(db, properties, options = {}) {
     for (const ref of provenance.model_refs) {
       if (ref && typeof ref.ext_id === 'string' && ref.ext_id) {
         const role = ref.role;
-        if (!role || !KNOWN_ROLES.has(role)) continue;
+        if (!role || !KNOWN_ROLES.has(role) || !isContextualGraphRole(role)) continue;
         refs.push({ role, ext_id: ref.ext_id, scope: ref.scope });
       }
     }

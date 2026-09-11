@@ -5,6 +5,7 @@ import { contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { createLogger } from '../../utils/logger.js';
 import { stripModelRefsFromProperties } from './graph-model-refs.js';
+import { isContextualGraphRole } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-refresh-patches');
 
@@ -149,6 +150,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
     const refs = node.properties?.provenance?.model_refs || [];
     for (const ref of refs) {
       if (!ref?.ext_id || !ref?.role) continue;
+      if (!isContextualGraphRole(ref.role)) continue;
       byExtId.set(ref.ext_id, { type: 'node', id: node.cgn_id, ref, node });
     }
   }
@@ -159,6 +161,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
     const refs = edge.cge_properties?.provenance?.model_refs || [];
     for (const ref of refs) {
       if (!ref?.ext_id || !ref?.role) continue;
+      if (!isContextualGraphRole(ref.role)) continue;
       byExtId.set(ref.ext_id, { type: 'edge', id: edge.cge_id, ref, edge });
     }
   }

@@ -4,7 +4,7 @@ import {
   deriveContextualModelSpec,
   SCOPE_VALUES,
 } from './template-models.js';
-import { getRoleScopeMap } from '../../db/crud/template-roles.js';
+import { getRoleScopeMap, isContextualGraphRole } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-specs');
 
@@ -36,6 +36,11 @@ function nodeIsActive(labels) {
 export async function deriveSpecForRef(db, serverId, bankId, ref) {
   if (!ref?.role) {
     logger.warn('Cannot derive spec for ref with missing role', { ref });
+    return null;
+  }
+
+  if (!isContextualGraphRole(ref.role)) {
+    logger.debug('Skipping non-contextual-graph role in ref derivation', { role: ref.role });
     return null;
   }
 

@@ -99,6 +99,15 @@ export function isBuiltInTemplateRole(roleId) {
 }
 
 /**
+ * Returns true for roles that may participate in contextual-graph patches.
+ * user_entity_derived is a built-in role for entity-derived mental models in
+ * the main mental-model list, not for contextual graph working-graph patches.
+ */
+export function isContextualGraphRole(roleId) {
+  return roleId !== 'user_entity_derived';
+}
+
+/**
  * Validate role_id constraints.
  * No pattern is enforced, but role_id is capped at 64 chars and the
  * sys_ prefix is reserved for seeded system roles.
