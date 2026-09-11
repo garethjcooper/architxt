@@ -56,6 +56,10 @@ import {
   normaliseMaxTokens,
 } from '../db/crud/mental-models.js';
 import { listDirectivesForDiff } from '../db/crud/directives.js';
+import { extractModelRefsFromDb } from '../services/contextual-graph/refresh-patches.js';
+import { deriveSpecsForRefs } from '../services/contextual-graph/specs.js';
+import { getManagedBanks } from '../services/contextual-graph/server-bank-config.js';
+import { getServer } from '../db/crud/servers.js';
 
 const logger = createLogger('hindsight-route');
 const router = Router();
@@ -534,20 +538,59 @@ router.get('/diff', async (req, res) => {
 
       const allArchExtIds = new Set([...plainByExtId.keys(), ...derivedByExtId.keys()]);
 
+      // 4. Build virtual candidates for any contextual mental models that the
+      // contextual-graph service has provisioned for this server+bank. They are
+      // not stored as plain/template rows, so without this step they appear in
+      // "Only on Hindsight". Mark them so the UI can badge them as contextual.
+      let contextualByExtId = new Map();
+      try {
+        const serverResult = getServer(db, serverId);
+        const managedBanks = serverResult?.success ? getManagedBanks(serverResult.data) : [];
+        const isManagedBank = managedBanks.some((b) => b.bank_id === bankId);
+        if (isManagedBank) {
+          const refsByExtId = extractModelRefsFromDb(db, serverId, bankId);
+          const specs = await deriveSpecsForRefs(db, serverId, bankId, refsByExtId);
+          for (const { extId, spec } of specs || []) {
+            if (!extId || !spec) continue;
+            contextualByExtId.set(extId, {
+              ...spec,
+              is_derived: false,
+              is_contextual: true,
+              composed_query: spec.source_query,
+              response_schema: UNIFIED_RESPONSE_SCHEMA,
+            });
+          }
+        }
+      } catch (contextualErr) {
+        logger.warn('Failed to build contextual mental model candidates for diff', {
+          serverId,
+          bankId,
+          error: contextualErr.message,
+        });
+        contextualByExtId = new Map();
+      }
+
+      for (const [extId, candidate] of contextualByExtId) {
+        if (!allArchExtIds.has(extId)) {
+          allArchExtIds.add(extId);
+        }
+      }
+
       for (const extId of allArchExtIds) {
         const hind = hindMap.get(extId);
+        const plainArch = plainByExtId.get(extId);
+        const derivedArch = derivedByExtId.get(extId);
+        const contextualArch = contextualByExtId.get(extId);
+        const arch = plainArch || derivedArch || contextualArch;
 
         if (!hind) {
           onlyArchitxt.push({
             ext_id: extId,
-            arch: summaryMode ? { ext_id: extId, is_derived: plainByExtId.get(extId)?.is_derived ?? false }
-              : (plainByExtId.get(extId) || derivedByExtId.get(extId)),
+            arch: summaryMode ? { ext_id: extId, is_derived: arch?.is_derived ?? false, is_contextual: !!contextualArch }
+              : arch,
           });
           continue;
         }
-
-        const plainArch = plainByExtId.get(extId);
-        const derivedArch = derivedByExtId.get(extId);
 
         if (plainArch) {
           const divergence = buildMentalModelDivergence(plainArch, hind);
@@ -568,6 +611,22 @@ router.get('/diff', async (req, res) => {
           const row = {
             ext_id: extId,
             arch: summaryMode ? { ext_id: extId, is_derived: true } : derivedArch,
+            hindsight: summaryMode ? { ext_id: extId } : hind,
+            divergence,
+          };
+          if (anyDiffers) {
+            different.push(row);
+          } else {
+            same.push(row);
+          }
+        }
+
+        if (contextualArch && !plainArch && !derivedArch) {
+          const divergence = buildMentalModelDivergence(contextualArch, hind);
+          const anyDiffers = Object.values(divergence).some(Boolean);
+          const row = {
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, is_derived: false, is_contextual: true } : contextualArch,
             hindsight: summaryMode ? { ext_id: extId } : hind,
             divergence,
           };

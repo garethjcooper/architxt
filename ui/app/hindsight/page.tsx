@@ -460,6 +460,11 @@ export default function HindsightPage() {
         return [];
       }
 
+      const isContextual = row.arch?.is_contextual === true;
+      if (isContextual) {
+        return [];
+      }
+
       return [
         {
           ext_id: extId,
