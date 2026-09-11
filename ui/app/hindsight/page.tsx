@@ -1083,6 +1083,7 @@ export default function HindsightPage() {
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                       showCheckbox={item.syncStatus === 'out_of_sync'}
+                      showStatusBadge={false}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setCompareId(item.ext_id)}
                       pendingStatus={getPendingStatus(item.ext_id)}

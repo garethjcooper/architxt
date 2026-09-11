@@ -46,6 +46,7 @@ interface SyncRowProps {
   isSelected: boolean;
   onSelect: (checked: boolean) => void;
   showCheckbox?: boolean;
+  showStatusBadge?: boolean;
   showCompare?: boolean;
   onCompare?: () => void;
   pendingStatus?: string | null;
@@ -90,6 +91,7 @@ export default function SyncRow({
   isSelected,
   onSelect,
   showCheckbox = true,
+  showStatusBadge = true,
   showCompare,
   onCompare,
   pendingStatus,
@@ -110,7 +112,7 @@ export default function SyncRow({
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono text-foreground-faint truncate" title={ext_id}>{ext_id}</span>
             <div className="flex items-center gap-1.5 shrink-0">
-              {archStatus && archStatus !== 'processed_extract_success' && (
+              {archStatus && showStatusBadge && (
                 <span className={getStatusBadge(archStatus).className}>
                   {getStatusBadge(archStatus).label}
                 </span>
