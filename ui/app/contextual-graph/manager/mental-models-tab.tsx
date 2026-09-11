@@ -16,7 +16,7 @@ import { EnvelopeViewer } from '@/components/envelope-viewer';
 import { mentalModelContentToStepSummary } from '@/app/workspace/_components/model-content-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
-import { isContextualRole, getRoleScopeLabel, getRoleLabel, getDerivationScope, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
+import { getRoleScopeLabel, getRoleLabel, getDerivationScope, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
@@ -318,8 +318,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
 
   const handleQuery = useCallback(async (ref: ModelRef) => {
     const role = ref.role;
-    if (!role || !isContextualRole(role)) {
-      toast.error('Query preview is only available for system-template roles');
+    const extId = ref.ext_id;
+    if (!role) {
+      toast.error('Query preview is not available for this model');
       return;
     }
     setQueryDialogRef(ref);
@@ -328,16 +329,18 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     setQueryError(null);
     try {
       const all = await mentalModelsApi.list({ limit: 1000 });
-      const template = all.find((m) => m.template_role === role || (m.is_system_template && m.ext_id === role));
-      if (!template) {
-        throw new Error(`No local system template found for role "${role}"`);
+      // Prefer the actual attached mental model, then fall back to its system template role.
+      const model = all.find((m) => extId && m.ext_id === extId)
+        || all.find((m) => m.template_role === role || (m.is_system_template && m.ext_id === role));
+      if (!model) {
+        throw new Error(`No mental model found for role "${role}"`);
       }
       const res = await mentalModelsApi.composePreview([
         {
           role,
           template_role: role,
           returns: role,
-          source_query: template.source_query || '',
+          source_query: model.source_query || '',
         },
       ]);
       const row = res.results[0];
@@ -604,21 +607,19 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                             >
                               <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
                             </Button>
-                            {(isContextualRole(ref.role) || !!roleScopeMap[ref.role || '']) && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                disabled={!extId}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuery(ref);
-                                }}
-                                title="Preview composed query"
-                              >
-                                <MessageSquareText className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              disabled={!extId}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuery(ref);
+                              }}
+                              title="Preview composed query"
+                            >
+                              <MessageSquareText className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
