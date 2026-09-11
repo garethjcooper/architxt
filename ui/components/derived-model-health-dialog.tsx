@@ -341,13 +341,13 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
 
     const nextActive = new Set(
       pendingOps
-        .filter((op) => op.pop_action === 'refresh' && !isTerminalStatus(op.pop_status))
+        .filter((op) => op.pop_action === 'mental_model_refresh' && !isTerminalStatus(op.pop_status))
         .map((op) => op.pop_operation_id),
     );
 
     const justCompleted = pendingOps.filter(
       (op) =>
-        op.pop_action === 'refresh' &&
+        op.pop_action === 'mental_model_refresh' &&
         op.pop_status === 'completed' &&
         activeRefreshIdsRef.current.has(op.pop_operation_id),
     );
@@ -372,16 +372,16 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
 
   const getOperationForRow = (extId?: string) => {
     if (!extId) return null;
-    // most recent non-terminal refresh op for this ext_id
+    // most recent non-terminal mental_model_refresh op for this ext_id
     return pendingOps
-      .filter((op) => op.pop_ext_id === extId && op.pop_action === 'refresh' && !isTerminalStatus(op.pop_status))
+      .filter((op) => op.pop_ext_id === extId && op.pop_action === 'mental_model_refresh' && !isTerminalStatus(op.pop_status))
       .sort((a, b) => new Date(b.pop_updated_at).getTime() - new Date(a.pop_updated_at).getTime())[0];
   };
 
   const getLatestRefreshStatus = (extId?: string): string | null => {
     if (!extId) return null;
     const latest = pendingOps
-      .filter((op) => op.pop_ext_id === extId && op.pop_action === 'refresh')
+      .filter((op) => op.pop_ext_id === extId && op.pop_action === 'mental_model_refresh')
       .sort((a, b) => new Date(b.pop_updated_at).getTime() - new Date(a.pop_updated_at).getTime())[0];
     return latest ? latest.pop_status : null;
   };
