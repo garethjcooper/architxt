@@ -21,6 +21,7 @@ interface MentalModelValues {
   name?: string | null;
   source_query?: string | null;
   is_derived?: boolean;
+  is_contextual?: boolean;
   derived_entity?: { mm_id: number; id: number };
 }
 
@@ -107,12 +108,22 @@ export default function MentalModelSyncRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono text-foreground-faint truncate" title={ext_id}>{ext_id}</span>
-            {arch?.is_derived && (
-              <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-info-bg text-badge-info-fg border-badge-info-bd shrink-0" title="Derived from template">
-                <Sparkles className="h-3 w-3" />
-                derived
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {arch?.is_contextual && (
+                <span
+                  className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-success-bg text-badge-success-fg border-badge-success-bd"
+                  title="Auto-managed by contextual graph"
+                >
+                  contextual
+                </span>
+              )}
+              {arch?.is_derived && (
+                <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-info-bg text-badge-info-fg border-badge-info-bd shrink-0" title="Derived from template">
+                  <Sparkles className="h-3 w-3" />
+                  derived
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-3 mt-1 text-[11px]">
