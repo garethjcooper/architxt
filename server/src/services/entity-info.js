@@ -109,12 +109,29 @@ function loadGraphNodes(db, serverId, bankId, entityIds) {
 }
 
 /**
+ * Batch-fetch mental-model display names by external id.
+ * Returns a Map keyed by ext_id.
+ */
+function loadMentalModelNamesByExtIds(db, extIds) {
+  return dbExec(() => {
+    if (!extIds || extIds.length === 0) return new Map();
+    const placeholders = extIds.map(() => '?').join(',');
+    const sql = `SELECT mm_ext_id, mm_name FROM mental_models WHERE mm_ext_id IN (${placeholders})`;
+    const rows = stmt(db, sql).all(...extIds);
+    const map = new Map();
+    for (const r of rows) {
+      map.set(r.mm_ext_id, r.mm_name || r.mm_ext_id);
+    }
+    return map;
+  });
+}
+
+/**
  * Extract model refs from a node/edge properties object, keeping only refs
  * whose role is a known template role. Returns full ref objects including
  * role/ext_id/scope.
  */
 function extractContextualRefs(properties, knownRoleIds) {
-  if (!properties || typeof properties !== 'object') return [];
   const provenance = properties.provenance;
   if (!provenance || typeof provenance !== 'object') return [];
   const refs = provenance.model_refs;
@@ -125,6 +142,7 @@ function extractContextualRefs(properties, knownRoleIds) {
     .map((ref) => ({
       role: ref.role,
       ext_id: ref.ext_id,
+      name: null,
       scope: ref.scope || null,
       attached_at: ref.attached_at || null,
       fetched_at: ref.fetched_at || null,
@@ -491,6 +509,10 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       const contextualRefs = graphNode ? extractContextualRefs(graphNode.properties, knownRoleIds) : [];
       const attachedContextualRoles = new Set(contextualRefs.map((r) => r.role));
 
+      for (const ref of contextualRefs) {
+        if (ref.ext_id) allExtIds.add(ref.ext_id);
+      }
+
       const rawDerivedModels = derivedByEntityId.get(catalogEntityId) || [];
       const derivedModels = rawDerivedModels.filter((m) => {
         // Standard user entity derived models are always surfaced.
@@ -520,6 +542,27 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
         plainModels,
         edgeContexts: entityEdgeContexts,
       });
+    }
+
+    // Enrich all contextual refs with the real mental-model display name.
+    const namesResult = loadMentalModelNamesByExtIds(db, Array.from(allExtIds));
+    if (!namesResult.success) {
+      return { success: false, error: namesResult.error, code: namesResult.code };
+    }
+    const extIdToName = namesResult.data;
+    for (const id of Object.keys(entities)) {
+      for (const ref of entities[id].contextual_refs) {
+        if (ref.ext_id && extIdToName.has(ref.ext_id)) {
+          ref.name = extIdToName.get(ref.ext_id);
+        }
+      }
+      for (const ctx of entities[id].edge_contexts) {
+        for (const ref of ctx.refs || []) {
+          if (ref.ext_id && extIdToName.has(ref.ext_id)) {
+            ref.name = extIdToName.get(ref.ext_id);
+          }
+        }
+      }
     }
 
     const result = {

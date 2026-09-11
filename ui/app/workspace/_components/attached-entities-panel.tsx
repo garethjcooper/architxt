@@ -62,7 +62,7 @@ function getEntityModelItems(
     if (!ref.ext_id) return;
     const rolePrefix = ref.role.replace(/^sys_/, '').replace(/_/g, '-') + '-';
     const entityId = ref.ext_id.startsWith(rolePrefix) ? ref.ext_id.slice(rolePrefix.length) : ref.ext_id;
-    const title = resolveName(entityId);
+    const title = ref.name || resolveName(entityId);
     items.push({
       key: `ctx-${ref.role}-${ref.ext_id || i}`,
       scopeLabel: getRoleScopeLabel(ref.role),
