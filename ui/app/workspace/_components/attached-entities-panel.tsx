@@ -1,22 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/lib/graph/render-utils';
 
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
-import { MODEL_TAB_LABELS } from './model-content-utils';
 import { type EntityInfo, type Entity } from '@/lib/api/client';
 import { type DisplayNode, getRoleScopeLabel, getRoleLabel, loadRoleScopeMap } from '@/lib/contextual-graph/display';
 import { type ModelContentCacheEntry } from './model-content-utils';
 
 export interface ModelItem {
   key: string;
-  label: string;
-  extId: string;
-  category: string;
+  scopeLabel: string;
   roleLabel?: string;
+  title: string;
+  extId: string;
   edgeCount: number;
 }
 
@@ -58,42 +57,44 @@ function getEntityModelItems(
 
   const items: ModelItem[] = [];
 
+  // Attached contextual model refs on the graph node.
   info.contextual_refs.forEach((ref, i) => {
     if (!ref.ext_id) return;
-    const roleLabel = getRoleLabel(ref.role);
     const rolePrefix = ref.role.replace(/^sys_/, '').replace(/_/g, '-') + '-';
     const entityId = ref.ext_id.startsWith(rolePrefix) ? ref.ext_id.slice(rolePrefix.length) : ref.ext_id;
-    const label = resolveName(entityId);
+    const title = resolveName(entityId);
     items.push({
       key: `ctx-${ref.role}-${ref.ext_id || i}`,
-      label,
-      extId: ref.ext_id,
-      category: roleLabel,
+      scopeLabel: getRoleScopeLabel(ref.role),
       roleLabel: getRoleLabel(ref.role),
+      title,
+      extId: ref.ext_id,
       edgeCount: 0,
     });
   });
 
+  // Template-derived mental models linked to the catalog entity.
   info.derived_models.forEach((m) => {
     const extId = m.ext_id || String(m.id);
     items.push({
       key: `derived-${m.id || extId}`,
-      label: m.name || extId,
-      extId,
-      category: MODEL_TAB_LABELS.derived_models,
+      scopeLabel: m.template_role ? getRoleScopeLabel(m.template_role) : 'DERIVED',
       roleLabel: m.template_role ? getRoleLabel(m.template_role) : undefined,
+      title: m.name || extId,
+      extId,
       edgeCount: 0,
     });
   });
 
+  // Plain mental models linked to the catalog entity.
   info.plain_models.forEach((m) => {
     const extId = m.ext_id || String(m.id);
     items.push({
       key: `plain-${m.id || extId}`,
-      label: m.name || extId,
-      extId,
-      category: MODEL_TAB_LABELS.plain_models,
+      scopeLabel: 'PLAIN',
       roleLabel: m.template_role ? getRoleLabel(m.template_role) : undefined,
+      title: m.name || extId,
+      extId,
       edgeCount: 0,
     });
   });
@@ -112,27 +113,27 @@ function getEntityModelItems(
   edgeContextsByExtId.forEach((contexts, extId) => {
     const hindsightCtx = contexts.find((c) => c.origin === 'hindsight');
 
-    let label: string;
+    let title: string;
     if (hindsightCtx) {
       const sourceLabel = resolveName(hindsightCtx.source_id);
       const targetLabel = resolveName(hindsightCtx.target_id);
-      label = `${sourceLabel} → ${targetLabel}`;
+      title = `${sourceLabel} → ${targetLabel}`;
     } else {
       const scopePart = extId.startsWith('edge-ctx-') ? extId.slice('edge-ctx-'.length) : extId;
       const [sourceId, targetId] = scopePart.split('|');
       const sourceLabel = sourceId ? resolveName(sourceId) : extId;
       const targetLabel = targetId ? resolveName(targetId) : '';
-      label = targetLabel ? `${sourceLabel} → ${targetLabel}` : sourceLabel;
+      title = targetLabel ? `${sourceLabel} → ${targetLabel}` : sourceLabel;
     }
 
     const firstRefRole = contexts[0]?.refs[0]?.role;
 
     items.push({
       key: `edge-${extId}`,
-      label,
-      extId,
-      category: MODEL_TAB_LABELS.edge_contexts,
+      scopeLabel: 'EDGE',
       roleLabel: firstRefRole ? getRoleLabel(firstRefRole) : undefined,
+      title,
+      extId,
       edgeCount: countModelEdges(contentCache, extId) ?? contexts.length,
     });
   });
@@ -263,17 +264,17 @@ export function AttachedEntitiesPanel({
                                   type="button"
                                   onClick={() => onSelectModel(entityId, item)}
                                   className="flex-1 text-left flex items-center gap-2 min-w-0"
-                                  title={`${item.category}: ${item.label}`}
+                                  title={`${item.scopeLabel} · ${item.roleLabel || '-'} · ${item.title}`}
                                 >
                                   <span className="text-[9px] uppercase tracking-wider text-foreground-subtle shrink-0">
-                                    {item.category}
+                                    {item.scopeLabel}
                                   </span>
                                   {item.roleLabel && (
                                     <span className="text-[9px] uppercase tracking-wider text-accent-primary-fg/80 shrink-0">
                                       {item.roleLabel}
                                     </span>
                                   )}
-                                  <span className="truncate min-w-0 flex-1">{item.label}</span>
+                                  <span className="truncate min-w-0 flex-1">{item.title}</span>
                                 </button>
                                 {item.edgeCount !== undefined && item.edgeCount > 0 && (
                                   <span

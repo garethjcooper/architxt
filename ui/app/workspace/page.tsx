@@ -923,13 +923,13 @@ export default function WorkspacePage() {
   }, [activeTabId, tabs, tabViews, loadModelContent]);
 
   const selectEntityModel = useCallback((entityId: string, item: ModelItem, openInNewTab = false) => {
-    const view: SelectedView = { kind: 'model', entityId, extId: item.extId, name: item.label };
+    const view: SelectedView = { kind: 'model', entityId, extId: item.extId, name: item.title };
     setSelectedView(view);
     void loadModelContent(item.extId);
 
     if (openInNewTab) {
       const id = `view-model-${item.extId}`;
-      const label = item.label || item.extId;
+      const label = item.title || item.extId;
       setTabs((prev) => {
         if (prev.some((t) => t.id === id)) return prev;
         return [...prev, { id, kind: 'view', label: label.slice(0, 40), sourceId: item.extId }];
@@ -937,7 +937,7 @@ export default function WorkspacePage() {
       setTabViews((prev) => ({ ...prev, [id]: view }));
       setActiveTabId(id);
     } else {
-      updateAnchorTab(item.label || item.extId);
+      updateAnchorTab(item.title || item.extId);
       setTabViews((prev) => ({ ...prev, [ANCHOR_TAB_ID]: view }));
       setActiveTabId(ANCHOR_TAB_ID);
     }
