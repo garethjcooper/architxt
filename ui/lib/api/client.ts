@@ -981,6 +981,7 @@ export interface EntityInfoCatalog {
 export interface EntityInfoContextualRef {
   role: string;
   ext_id: string;
+  name: string | null;
   scope: Record<string, unknown> | null;
   attached_at: string | null;
   fetched_at: string | null;
