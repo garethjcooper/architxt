@@ -1024,6 +1024,7 @@ export interface EntityInfoEdgeContext {
   edge_id: string;
   edge_type: string | null;
   origin: 'hindsight' | 'derived';
+  is_grounded?: boolean;
   scope: { source_id: string; target_id: string } | null;
   refs: EntityInfoContextualRef[];
 }
