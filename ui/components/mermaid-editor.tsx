@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { DiagramControls } from '@/components/diagram-controls';
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 import { CopyDiagramMenu } from '@/components/copy-diagram-menu';
+import { maybeInitializeMermaid, ensureMermaidInitialized } from '@/lib/mermaid-init';
 
 export interface MermaidEditorProps {
   /** Raw Mermaid source (without fence markers). */
@@ -156,6 +157,7 @@ function PreviewPane({
   );
 
   useEffect(() => {
+    ensureMermaidInitialized();
     let cancelled = false;
     const render = async () => {
       const source = content.trim();

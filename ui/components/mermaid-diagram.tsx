@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
+import { ensureMermaidInitialized } from '@/lib/mermaid-init';
 
 export interface MermaidDiagramProps {
   /** Raw Mermaid source (without fence markers). */
@@ -16,31 +17,8 @@ export interface MermaidDiagramProps {
   defaultRenderer?: 'dagre' | 'elk';
 }
 
-let lastRenderer: 'dagre' | 'elk' | undefined;
-
-function initializeMermaid(renderer?: 'dagre' | 'elk') {
-  const config: any = {
-    startOnLoad: false,
-    theme: 'dark',
-    securityLevel: 'strict',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    suppressErrorRendering: true,
-  };
-  if (renderer) {
-    config.flowchart = { defaultRenderer: renderer };
-  }
-  mermaid.initialize(config);
-  lastRenderer = renderer;
-}
-
-function maybeInitializeMermaid(renderer?: 'dagre' | 'elk') {
-  if (lastRenderer !== renderer) {
-    initializeMermaid(renderer);
-  }
-}
-
 /**
- * Render a Mermaid diagram from raw source in a dark-themed container.
+ * Render a Mermaid diagram from raw source, following the app color mode.
  * Errors are displayed inline so malformed model output is easy to spot.
  */
 export function MermaidDiagram({ content, className = '', name, type, defaultRenderer }: MermaidDiagramProps) {
@@ -49,7 +27,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    maybeInitializeMermaid(defaultRenderer);
+    ensureMermaidInitialized(defaultRenderer);
     let cancelled = false;
 
     const render = async () => {
