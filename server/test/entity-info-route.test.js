@@ -244,6 +244,22 @@ describe('POST /api/v1/entities/info', () => {
     assert.ok(systemTemplateRow, 'seeded sys_entity_summary template should exist');
     seedMentalModelEntity(db, systemTemplateRow.mm_id, entId);
 
+    // The risk_profile derived model must be backed by an actual model ref on
+    // the graph node — derived user templates are not surfaced unless attached.
+    seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
+      display_name: 'Payment Service',
+      provenance: {
+        model_refs: [
+          {
+            role: 'risk_profile',
+            ext_id: 'user-template-risk-SVC-005',
+            scope: 'node',
+            attached_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+    });
+
     const res = await makeRequest(app, {
       server_id: serverId,
       bank_id: bankId,
@@ -270,6 +286,76 @@ describe('POST /api/v1/entities/info', () => {
     const derivedKeys = Object.keys(info.derived_models[0]).sort();
     const plainKeys = Object.keys(info.plain_models[0]).sort();
     assert.deepEqual(derivedKeys, plainKeys);
+  });
+
+  it('keeps user_entity_derived models even when not attached to the graph node', async () => {
+    const app = makeApp({ db });
+    const typeId = seedEntityType(db, 'Service', 'SVC');
+    const entId = seedEntity(db, typeId, 'SVC-005', 'Payment Service');
+
+    const templateId = seedMentalModel(db, {
+      ext_id: 'user-entity-derived-{entity-id}',
+      name: 'Derived test {entity-name}',
+      is_template: true,
+      template_role: 'user_entity_derived',
+      returns: 'narrative',
+      source_query: 'Tell me about {entity-id}',
+    });
+    seedMentalModelEntity(db, templateId, entId);
+
+    seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
+      display_name: 'Payment Service',
+      provenance: { model_refs: [] },
+    });
+
+    const res = await makeRequest(app, {
+      server_id: serverId,
+      bank_id: bankId,
+      entity_ids: ['svc:SVC-005'],
+    });
+
+    assert.equal(res.status, 200);
+    const info = res.body.entities['svc:SVC-005'];
+    assert.equal(info.derived_models.length, 1);
+    assert.equal(info.derived_models[0].template_role, 'user_entity_derived');
+    assert.equal(info.derived_models[0].ext_id, 'user-entity-derived-SVC-005');
+  });
+
+  it('hides contextual template-role derived models when the role is not attached to the graph node', async () => {
+    const app = makeApp({ db });
+    const typeId = seedEntityType(db, 'Service', 'SVC');
+    const entId = seedEntity(db, typeId, 'SVC-005', 'Payment Service');
+
+    db.prepare(`
+      INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run('software_tech_stack', 'Software Tech Stack', 'node', 20);
+
+    const templateId = seedMentalModel(db, {
+      ext_id: 'software-stack-{entity-id}',
+      name: 'Software stack {entity-name}',
+      is_template: true,
+      template_role: 'software_tech_stack',
+      returns: 'table',
+      source_query: 'Software stack for {entity-id}',
+    });
+    seedMentalModelEntity(db, templateId, entId);
+
+    // No model ref for software_tech_stack on the graph node.
+    seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
+      display_name: 'Payment Service',
+      provenance: { model_refs: [] },
+    });
+
+    const res = await makeRequest(app, {
+      server_id: serverId,
+      bank_id: bankId,
+      entity_ids: ['svc:SVC-005'],
+    });
+
+    assert.equal(res.status, 200);
+    const info = res.body.entities['svc:SVC-005'];
+    assert.equal(info.derived_models.length, 0);
   });
 
   it('returns edge contexts between any two requested entities', async () => {
