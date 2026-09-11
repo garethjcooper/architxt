@@ -114,7 +114,10 @@ function ModelsPageContent() {
 
   const { selected, toggleSelection, toggleAll, clearSelection } = useMultiSelect(filteredModels);
   const hasSelectedContextualGraphModel = useMemo(() => {
-    return Array.from(selected).some((id) => models.find((m) => m.id === id)?.is_contextual_graph_role);
+    return Array.from(selected).some((id) => {
+      const model = models.find((m) => m.id === id);
+      return !!model?.template_role && model.is_contextual_graph_role;
+    });
   }, [selected, models]);
 
   const displayModels = useMemo(() => {

@@ -55,8 +55,8 @@ const router = Router();
 /* ═════════════ Helper: contextual-graph entity guard ═════════════ */
 async function requireNonContextualTemplateRole(db, res, mmId, path, start) {
   const existing = await getMentalModelWithRelations(db, mmId);
-  const role = existing?.success ? existing.data.template_role : null;
-  if (isContextualGraphRole(role)) {
+  const role = existing?.success ? existing.data.mm_template_role : null;
+  if (role && isContextualGraphRole(role)) {
     const duration = Date.now() - start;
     sendResponse({
       res, status: 400,
@@ -110,7 +110,7 @@ const toApiMentalModel = (dbRow) => ({
   is_template: dbRow.mm_is_template === 'true',
   template_role: dbRow.mm_template_role ?? null,
   is_system_template: isSystemTemplateRole(dbRow.mm_template_role),
-  is_contextual_graph_role: isContextualGraphRole(dbRow.mm_template_role),
+  is_contextual_graph_role: !!dbRow.mm_template_role && isContextualGraphRole(dbRow.mm_template_role),
   tags: dbRow.mm_tags || [],
   entities: (dbRow.mm_entities || []).map((e) => ({
     ...e,
