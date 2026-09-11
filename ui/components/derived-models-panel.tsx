@@ -70,10 +70,10 @@ export function DerivedModelsPanel({
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="px-3 py-2 border-b border-border-default bg-badge-entity-bg/50 flex items-center justify-between gap-2">
+      <div className="px-3 py-2 border-b border-border-default bg-badge-success-bg/40 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-badge-entity-fg">Derived Instances</h3>
-          <p className="text-[10px] text-badge-entity-fg/70">
+          <h3 className="text-sm font-semibold text-badge-success-fg">Derived Instances</h3>
+          <p className="text-[10px] text-badge-success-fg/80">
             {selectionCount > 0 ? `${selectionCount} selected · ` : ''}
             {derived.length} total{search.trim() ? ` · ${filteredDerived.length} shown` : ''}
           </p>
@@ -93,7 +93,9 @@ export function DerivedModelsPanel({
             onClick={() => onHealth(derived.filter((d) => isSelected(d.id)))}
             disabled={selectionCount === 0}
             title="Check Hindsight content health"
-            className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            variant="secondary"
+            size="sm"
+            className="h-7 px-2 text-xs inline-flex items-center gap-1.5"
           >
             <Activity className="h-3.5 w-3.5" />
             Health
@@ -102,7 +104,9 @@ export function DerivedModelsPanel({
             <Button
               onClick={() => onConfigure(derived.filter((d) => isSelected(d.id)))}
               disabled={selectionCount === 0}
-              className="h-7 px-2 text-xs bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              variant="secondary"
+              size="sm"
+              className="h-7 px-2 text-xs inline-flex items-center gap-1.5"
             >
               <Settings2 className="h-3.5 w-3.5" />
               Config
