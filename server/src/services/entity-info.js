@@ -351,12 +351,14 @@ async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntity
         // scoped entities, inflating counts in the workspace panel.
         if (edge.cge_source_id === entityId || edge.cge_target_id === entityId) {
           const isHindsightEdge = edge.cge_id.startsWith('hindsight-');
+          const isGroundedEdge = edge.cge_properties?.labels?.includes('grounded');
           byEntityId.get(entityId).push({
             source_id: edge.cge_source_id,
             target_id: edge.cge_target_id,
             edge_id: edge.cge_id,
             edge_type: edge.cge_type,
             origin: isHindsightEdge ? 'hindsight' : 'derived',
+            is_grounded: isGroundedEdge,
             scope: { source_id: scopeSource, target_id: scopeTarget },
             refs: [ref],
           });
