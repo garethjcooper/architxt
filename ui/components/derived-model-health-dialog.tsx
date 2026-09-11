@@ -422,7 +422,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
         <DialogContent className="!w-[85vw] !max-w-none max-h-[85vh] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle className="text-lg font-semibold text-foreground-default flex items-center gap-2">
-              <Activity className="h-5 w-5 text-badge-entity-fg" />
+              <Activity className="h-5 w-5 text-badge-success-fg" />
               Derived Instance Health
             </DialogTitle>
           </DialogHeader>
@@ -504,7 +504,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                           key={d.id}
                           onClick={() => result && setSelectedExtId(extId)}
                           className={`border-b border-border-subtle cursor-pointer transition-colors ${
-                            selected ? 'bg-badge-entity-bg' : result ? 'hover:bg-surface-card' : ''
+                            selected ? 'bg-badge-success-bg' : result ? 'hover:bg-surface-card' : ''
                           }`}
                         >
                           <TableCell className="py-2 px-3 text-xs font-mono text-foreground-faint truncate" title={extId || '-'}>
@@ -534,7 +534,7 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-6 w-6 text-foreground-subtle hover:text-badge-entity-fg hover:bg-badge-entity-bg/50 disabled:opacity-30"
+                              className="h-6 w-6 text-foreground-subtle hover:text-badge-success-fg hover:bg-badge-success-bg/50 disabled:opacity-30"
                               disabled={!selectedServerId || !selectedBankId || isRefreshing || !!op}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -614,14 +614,13 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
               variant="outline"
               onClick={() => setConfirmRefreshAllOpen(true)}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading' || derived.length === 0}
-              className="border-badge-entity-bd text-badge-entity-fg hover:bg-badge-entity-bg/50 hover:text-badge-entity-fg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Refresh All
             </Button>
             <Button
               onClick={handleRun}
               disabled={!selectedServerId || !selectedBankId || status.state === 'loading'}
-              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="flex items-center gap-2"
             >
               {status.state === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
               {status.state === 'loading' ? 'Checking...' : 'Run Check'}
@@ -648,7 +647,6 @@ export function DerivedModelHealthDialog({ isOpen, onClose, derived }: DerivedMo
             </Button>
             <Button
               onClick={handleRefreshAll}
-              className="bg-badge-entity-fg hover:bg-badge-entity-fg/80 text-foreground-default"
             >
               Refresh All
             </Button>
