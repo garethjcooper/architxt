@@ -82,7 +82,7 @@ export function getMentalModelSystemTemplateGuard(db, id, action) {
 
 /** Guard entity mutations on any contextual-graph template role. */
 function contextualGraphEntityGuard(role) {
-  if (!isContextualGraphRole(role)) return { blocked: false };
+  if (!role || !isContextualGraphRole(role)) return { blocked: false };
   return {
     blocked: true,
     error: 'Contextual graph template roles cannot have attached entities.',

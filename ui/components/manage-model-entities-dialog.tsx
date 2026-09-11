@@ -162,8 +162,9 @@ export function ManageModelEntitiesDialog({
       toast.success(`Updated entities for ${selectedModelIds.length} mental model(s)`);
       onEntitiesUpdated();
       onClose();
-    } catch (err) {
-      toast.error('Failed to update entities');
+    } catch (err: any) {
+      const message = err?.message || 'Failed to update entities';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
