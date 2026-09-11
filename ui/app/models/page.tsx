@@ -113,6 +113,10 @@ function ModelsPageContent() {
   }, [models, search, roleLookup]);
 
   const { selected, toggleSelection, toggleAll, clearSelection } = useMultiSelect(filteredModels);
+  const hasSelectedContextualGraphModel = useMemo(() => {
+    return Array.from(selected).some((id) => models.find((m) => m.id === id)?.is_contextual_graph_role);
+  }, [selected, models]);
+
   const displayModels = useMemo(() => {
     if (!search.trim()) return filteredModels;
     const visibleIds = new Set(filteredModels.map((item) => item.id));
@@ -291,7 +295,7 @@ function ModelsPageContent() {
               )}
             </div>
             <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-primary-bd text-accent-primary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
-            <Button onClick={() => setManageEntitiesDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-primary-bd text-accent-primary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><EntityIcon className="h-3.5 w-3.5" />Entities</Button>
+            <Button onClick={() => setManageEntitiesDialogOpen(true)} disabled={selected.size === 0 || hasSelectedContextualGraphModel} title={hasSelectedContextualGraphModel ? 'Entities cannot be attached to contextual graph template roles' : undefined} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-primary-bd text-accent-primary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><EntityIcon className="h-3.5 w-3.5" />Entities</Button>
             <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-border-strong text-foreground-muted hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
             <div className="flex-1" />
             <div className="w-px h-5 bg-surface-panel mx-1" />
