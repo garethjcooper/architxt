@@ -7,7 +7,7 @@ import {
   CONTEXTUAL_GRAPH_ROLES,
 } from './template-models.js';
 import { deployMentalModelBatch } from './deploy-models.js';
-import { getRoleScopeMap, MODEL_TYPE_TO_ROLE } from '../../db/crud/template-roles.js';
+import { getRoleScopeMap, MODEL_TYPE_TO_ROLE, isContextualGraphRole } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-add-context');
 
@@ -59,7 +59,9 @@ export async function addContext(
   }
 
   const scopeMap = getRoleScopeMap(db);
-  const configuredRoleIds = new Set(scopeMap.keys());
+  const configuredRoleIds = new Set(
+    [...scopeMap.keys()].filter((role) => isContextualGraphRole(role)),
+  );
 
   const importSkeleton = options.import_skeleton !== false;
   const neighborhood = { ...DEFAULT_NEIGHBORHOOD, ...options.neighborhood };
@@ -70,7 +72,8 @@ export async function addContext(
     allowedRoleIds = new Set(
       options.allowed_model_types
         .map((t) => MODEL_TYPE_TO_ROLE[t] || (configuredRoleIds.has(t) ? t : null))
-        .filter(Boolean),
+        .filter(Boolean)
+        .filter((role) => isContextualGraphRole(role)),
     );
   } else {
     allowedRoleIds = new Set(configuredRoleIds);
