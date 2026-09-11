@@ -486,7 +486,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Mental Models</span>
             <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
-              {filteredRefs.length}
+              {filteredRefs.length} ({selectedRefIds.size})
             </span>
           </div>
           <div className="flex-1 min-h-0 overflow-auto p-0">
