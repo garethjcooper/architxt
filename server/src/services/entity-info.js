@@ -3,7 +3,7 @@ import { dbExec } from '../utils/db-helpers.js';
 import { createLogger } from '../utils/logger.js';
 import { listEdges } from '../db/crud/contextual-graph.js';
 import { deriveMentalModels, isSystemTemplateRole } from '../db/crud/mental-models.js';
-import { getRoleScopeMap } from '../db/crud/template-roles.js';
+import { getRoleScopeMap, isContextualGraphRole } from '../db/crud/template-roles.js';
 import { getMentalModel } from '../services/hindsight/mental-models.js';
 
 const logger = createLogger('entity-info');
@@ -487,11 +487,20 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
       const catalog = requestedToCatalog.get(id) || null;
       const localId = parseEntityId(id).localId;
 
-      const contextualRefs = graphNode ? extractContextualRefs(graphNode.properties, knownRoleIds) : [];
-      for (const ref of contextualRefs) allExtIds.add(ref.ext_id);
-
       const catalogEntityId = catalog?.entity_id || localId;
-      const derivedModels = derivedByEntityId.get(catalogEntityId) || [];
+      const contextualRefs = graphNode ? extractContextualRefs(graphNode.properties, knownRoleIds) : [];
+      const attachedContextualRoles = new Set(contextualRefs.map((r) => r.role));
+
+      const rawDerivedModels = derivedByEntityId.get(catalogEntityId) || [];
+      const derivedModels = rawDerivedModels.filter((m) => {
+        // Standard user entity derived models are always surfaced.
+        if (!m.template_role || m.template_role === 'user_entity_derived') return true;
+        // Contextual-graph template-role models (system + custom) are only
+        // surfaced when the graph node actually carries a model ref for that role.
+        if (isContextualGraphRole(m.template_role)) return attachedContextualRoles.has(m.template_role);
+        return true;
+      });
+
       const plainModels = plainByEntityId.get(catalogEntityId) || [];
       for (const m of derivedModels) allExtIds.add(m.ext_id);
       for (const m of plainModels) allExtIds.add(m.ext_id);
