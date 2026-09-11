@@ -34,6 +34,14 @@ import DirectiveSyncRow from './directive-sync-row';
 
 const logger = createLogger('HindsightPage');
 
+// Mental models that are auto-managed (derived from templates or provisioned by
+// the contextual graph) should not be pushable/pulled from this sync page.
+const isUnactionableMentalModel = (row: any) =>
+  row?.arch?.is_derived === true ||
+  row?.hindsight?.is_derived === true ||
+  row?.arch?.is_contextual === true ||
+  row?.hindsight?.is_contextual === true;
+
 
 interface DiffResult {
   same: { ext_id: string; arch: any; hindsight: any; divergence?: any }[];
@@ -161,6 +169,29 @@ export default function HindsightPage() {
     setSelectedIds(new Set());
   }, [col2Filter]);
 
+  // Derived and contextual mental models are auto-managed; don't let them stay
+  // selected after a diff refresh, because they can't be pushed or pulled.
+  useEffect(() => {
+    if (!diffResult) return;
+    const allRows = [
+      ...(diffResult.same || []),
+      ...(diffResult.different || []),
+      ...(diffResult.only_architxt || []),
+      ...(diffResult.only_hindsight || []),
+    ];
+    const unactionableIds = new Set(
+      allRows.filter(isUnactionableMentalModel).map((d) => d.ext_id)
+    );
+    setSelectedIds((prev) => {
+      if ([...prev].every((id) => !unactionableIds.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of unactionableIds) {
+        next.delete(id);
+      }
+      return next;
+    });
+  }, [diffResult]);
+
   // Poll pending operations every 5 seconds when a server+bank is selected
   useEffect(() => {
     if (!selectedServerId || !selectedBankId) {
@@ -267,10 +298,13 @@ export default function HindsightPage() {
     return op ? op.pop_status : null;
   };
 
-  // ── Derived mental model detection ─────────────────────────────────
+  // ── Derived / contextual mental model detection ─────────────────────
 
-  const isDerivedMentalModel = (row: any) =>
-    row?.arch?.is_derived === true || row?.hindsight?.is_derived === true;
+  const isUnactionableMentalModel = (row: any) =>
+    row?.arch?.is_derived === true ||
+    row?.hindsight?.is_derived === true ||
+    row?.arch?.is_contextual === true ||
+    row?.hindsight?.is_contextual === true;
 
   // ── Selection helpers ───────────────────────────────────────────────
 
@@ -703,10 +737,10 @@ export default function HindsightPage() {
   const filteredCol3 = col3Filtered.merged;
 
   const col2PullCount = filteredCol2.filter(
-    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d))
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d))
   ).length;
   const col2PushCount = filteredCol2.filter(
-    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync'
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d))
   ).length;
 
   return (
@@ -939,7 +973,7 @@ export default function HindsightPage() {
                     if (ids.length === 0) return;
                     handleMakeLikeBank(ids);
                   }}
-                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d)))}
+                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d)))}
                   className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-tertiary-bg border border-accent-tertiary-bd text-accent-tertiary-fg hover:bg-accent-tertiary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Download className="h-4 w-4" /> Pull from Bank{col2PullCount > 0 ? ` (${col2PullCount})` : ''}
@@ -950,7 +984,7 @@ export default function HindsightPage() {
                     if (ids.length === 0) return;
                     handleMakeLikeArchitxt(ids);
                   }}
-                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync')}
+                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d)))}
                   className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-secondary-bg border border-accent-secondary-bd text-accent-secondary-fg hover:bg-accent-secondary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Upload className="h-4 w-4" /> Push to Bank{col2PushCount > 0 ? ` (${col2PushCount})` : ''}
@@ -1014,7 +1048,7 @@ export default function HindsightPage() {
                       divergence={item.divergence}
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
-                      showCheckbox={item.syncStatus === 'out_of_sync'}
+                      showCheckbox={item.syncStatus === 'out_of_sync' && !isUnactionableMentalModel(item)}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setMentalCompareId(item.ext_id)}
                     />
