@@ -111,7 +111,7 @@ export default function MentalModelSyncRow({
             <div className="flex items-center gap-1.5 shrink-0">
               {arch?.is_contextual && (
                 <span
-                  className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-success-bg text-badge-success-fg border-badge-success-bd"
+                  className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-info-bg text-badge-info-fg border-badge-info-bd"
                   title="Auto-managed by contextual graph"
                 >
                   contextual
