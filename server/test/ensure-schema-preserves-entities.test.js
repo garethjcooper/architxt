@@ -117,17 +117,16 @@ function seedOldSchema(db) {
   `);
 
   // Seed the built-in templates so ensureSchema has them for FK reference.
+  // Also include the contextual-graph templates that the migration expects.
   db.exec(`
     INSERT INTO prompt_templates
       (pt_name, pt_mode, pt_description, pt_body, pt_fragments, pt_variables, pt_is_builtin)
     VALUES
-      ('narrative', 'narrative', 'Narrative-only output.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('graph-known', 'graph-known', 'Graph known.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('graph-discovery', 'graph-discovery', 'Graph discovery.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-known', 'narrative-graph-known', 'Narrative + graph known.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-discovery', 'narrative-graph-discovery', 'Narrative + graph discovery.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('graph-discovered-only', 'graph-discovered-only', 'Graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
-      ('narrative-graph-discovered-only', 'narrative-graph-discovered-only', 'Narrative + graph discovered only.', '...', '[]', '["ARCHITXT_TOPIC"]', 1)
+      ('generic', 'generic', 'Generic output.', '...', '[]', '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]', 1),
+      ('sys_entity_summary', 'sys_entity_summary', 'Entity summary.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('sys_entity_capabilities', 'sys_entity_capabilities', 'Entity capabilities.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('sys_edge_context', 'sys_edge_context', 'Edge context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1),
+      ('sys_discovery_context', 'sys_discovery_context', 'Discovery context.', '...', '[]', '["ARCHITXT_TOPIC"]', 1)
   `);
 
   // Create a mental model with one entity linked to it.
@@ -170,7 +169,78 @@ describe('ensureSchema preserves mental_model_entities across CHECK constraint r
 
       // The parent model must still exist with the returns mapped to a valid template name.
       const model = db.prepare('SELECT mm_returns FROM mental_models WHERE mm_id = ?').get(mmId);
-      assert.equal(model.mm_returns, 'narrative');
+      assert.equal(model.mm_returns, 'generic');
+    } finally {
+      closeAndDelete({ db, file });
+    }
+  });
+});
+
+describe('ensureSchema backfills user template roles and validates contextual placeholders', () => {
+  it('does not auto-backfill legacy user templates to avoid violating the unique role constraint', () => {
+    const { db, file } = tempDb();
+    try {
+      seedOldSchema(db);
+
+      // Insert a legacy user template without a role.
+      db.prepare(`
+        INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_returns)
+        VALUES ('user-template-{entity-id}', 'User Template {entity-name}', 'Query for {entity-type}', 'true', 'narrative')
+      `).run();
+
+      ensureSchema(db);
+
+      const row = db.prepare(`
+        SELECT mm_template_role, mm_ext_id FROM mental_models WHERE mm_ext_id = ?
+      `).get('user-template-{entity-id}');
+      assert.equal(row.mm_template_role, null);
+    } finally {
+      closeAndDelete({ db, file });
+    }
+  });
+
+  it('replaces legacy system template rows with canonical v36 rows', () => {
+    const { db, file } = tempDb();
+    try {
+      seedOldSchema(db);
+      ensureSchema(db);
+
+      // The system templates should have their new reserved roles.
+      const rows = db.prepare(`
+        SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true'
+      `).all();
+      const summary = rows.find((r) => r.mm_ext_id === 'entity-summary-{entity-id}');
+      assert.ok(summary);
+      assert.equal(summary.mm_template_role, 'sys_entity_summary');
+    } finally {
+      closeAndDelete({ db, file });
+    }
+  });
+
+  it('replaces stale contextual-graph templates with the canonical ones', () => {
+    const { db, file } = tempDb();
+    try {
+      seedOldSchema(db);
+
+      // Add the role column manually so we can seed a stale template before
+      // ensureSchema seeds the canonical templates and enforces uniqueness.
+      db.exec(`ALTER TABLE mental_models ADD COLUMN mm_template_role TEXT`);
+
+      // Insert a stale discover template that predates the deterministic ext_id.
+      // Use a legacy returns value that the old CHECK constraint allows.
+      db.prepare(`
+        INSERT INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_returns, mm_dimension, mm_max_tokens)
+        VALUES ('discover-a-com:COM-001-{batch}', 'Old discover template', 'Old query', 'true', 'sys_discovery_context', 'narrative', 'sys_discovery_context', 4096)
+      `).run();
+
+      // Re-run migration: it should delete the stale row and upsert the canonical one.
+      ensureSchema(db);
+
+      const rows = db.prepare(`
+        SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = 'true' AND mm_template_role = 'sys_discovery_context'
+      `).all();
+      assert.equal(rows.length, 1, 'stale discover template was not cleaned up');
+      assert.equal(rows[0].mm_ext_id, 'discover-{seed-id}');
     } finally {
       closeAndDelete({ db, file });
     }

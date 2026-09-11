@@ -6,24 +6,23 @@ import path from 'node:path';
 import { ensureSchema } from '../src/db/ensure-schema.js';
 import { handleReflect } from '../src/services/research/handlers/reflect.js';
 
-const REFLECT_TEXT_WITH_GRAPH = `Here is the analysis.
-
-## ARCHITXT-GRAPH-DATA
-
-\`\`\`json
-{
-  "nodes": [
-    {"id": "a", "name": "Alpha"},
-    {"id": "b", "name": "Beta"}
-  ],
-  "edges": [
-    {"from": "a", "to": "b", "type": "calls", "label": "links to"}
-  ]
+function buildEnvelope({ narrative = '', narrative_name = '', nodes = [], edges = [] } = {}) {
+  const narratives = narrative ? [{ narrative_name, narrative }] : [];
+  return { narratives, graph: { nodes, edges }, tables: [], diagrams: [] };
 }
-\`\`\`
-`;
 
-const REFLECT_TEXT_NO_GRAPH = `Just a plain text response with no graph data.`;
+const REFLECT_STRUCT_WITH_GRAPH = buildEnvelope({
+  narrative: 'Here is the analysis.',
+  nodes: [
+    { id: 'a', name: 'Alpha' },
+    { id: 'b', name: 'Beta' },
+  ],
+  edges: [
+    { from: 'a', to: 'b', type: 'calls', label: 'links to' },
+  ],
+});
+
+const REFLECT_STRUCT_NO_GRAPH = buildEnvelope({ narrative: 'Just a plain text response with no graph data.', nodes: [], edges: [] });
 
 function createTestDb() {
   const file = path.join(process.cwd(), `tmp/test-reflect-handler-${Date.now()}.db`);
@@ -52,17 +51,16 @@ describe('reflect handler', () => {
     cleanupTestDb(db, file);
   });
 
-  function makeReflectFn(text) {
+  function makeReflectFn(structuredOutput) {
     return async () => ({
       success: true,
-      data: { text },
+      data: { structured_output: structuredOutput },
     });
   }
 
-  it('extracts graph from ARCHITXT-GRAPH-DATA section when present', async () => {
+  it('extracts graph from contextual envelope when present', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
-      reflectFn: makeReflectFn(REFLECT_TEXT_WITH_GRAPH),
-      output_mode: 'narrative+graph',
+      reflectFn: makeReflectFn(REFLECT_STRUCT_WITH_GRAPH),
     }, db);
 
     assert.equal(result.success, true);
@@ -71,83 +69,149 @@ describe('reflect handler', () => {
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
     assert.equal(result.graph.nodes[0].id, 'a');
-    assert.equal(result.graph.nodes[0].source, 'mental_model');
+    assert.equal(result.graph.nodes[0].name, 'Alpha');
   });
 
-  it('returns empty graph when no ARCHITXT-GRAPH-DATA section is present', async () => {
+  it('returns empty graph when envelope graph is empty', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
-      reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
-      output_mode: 'narrative+graph',
+      reflectFn: makeReflectFn(REFLECT_STRUCT_NO_GRAPH),
     }, db);
 
     assert.equal(result.success, true);
     assert.ok(result.graph);
     assert.equal(result.graph.nodes.length, 0);
     assert.equal(result.graph.edges.length, 0);
+    assert.ok(result.narratives[0]?.narrative.includes('Just a plain text response with no graph data.'));
   });
 
-  it('composes the narrative template by default', async () => {
+  it('composes the generic template by default and requests a structured response schema', async () => {
+    let capturedBody = null;
+    const reflectFn = async (body) => {
+      capturedBody = body;
+      return { success: true, data: { text: 'ok', structured_output: { narratives: [{ narrative_name: '', narrative: 'ok' }], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
+    };
+
+    await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
+
+    assert.ok(capturedBody);
+    assert.ok(capturedBody.query.includes('test query'));
+    assert.ok(!capturedBody.query.includes('{{ARCHITXT_TOPIC}}'));
+    assert.ok(capturedBody.query.includes('## Topic'));
+    assert.deepEqual(capturedBody.response_schema, (await import('../src/services/contextual-graph/unified-response-schema.js')).UNIFIED_RESPONSE_SCHEMA);
+  });
+
+  it('injects section focus variables when provided', async () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
-      return { success: true, data: { text: 'ok' } };
+      return { success: true, data: { structured_output: { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
-    await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative' }, db);
+    await handleReflect(1, 'bank', 'test query', {
+      reflectFn,
+      section_focus: { graph: 'CRM, ERP' },
+    }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('test query'));
-    assert.ok(!capturedQuery.includes('{{ARCHITXT_TOPIC}}'));
-    assert.ok(!capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('- CRM, ERP'));
   });
 
-  it('composes the narrative-graph-known template when output_mode is narrative+graph', async () => {
+  it('returns narrative and graph for generic template', async () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
-      return { success: true, data: { text: 'ok' } };
+      return { success: true, data: { structured_output: REFLECT_STRUCT_WITH_GRAPH } };
     };
 
-    await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative+graph' }, db);
+    const result = await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
-  });
-
-  it('composes the narrative-graph-discovery template when output_mode is narrative+graph and allow_discovery is true', async () => {
-    let capturedQuery = null;
-    const reflectFn = async (body) => {
-      capturedQuery = body.query;
-      return { success: true, data: { text: 'ok' } };
-    };
-
-    await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'narrative+graph', allow_discovery: true }, db);
-
-    assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
-    assert.ok(capturedQuery.includes('found:'));
-  });
-
-  it('composes the graph-known template when output_mode is graph-only', async () => {
-    let capturedQuery = null;
-    const reflectFn = async (body) => {
-      capturedQuery = body.query;
-      return { success: true, data: { text: REFLECT_TEXT_WITH_GRAPH } };
-    };
-
-    const result = await handleReflect(1, 'bank', 'test query', { reflectFn, output_mode: 'graph-only' }, db);
-
-    assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('ARCHITXT-GRAPH-DATA'));
+    assert.ok(capturedQuery.includes('## Topic'));
     assert.equal(result.success, true);
-    assert.equal(result.narrative, '');
+    assert.equal(result.narratives[0]?.narrative, 'Here is the analysis.');
     assert.equal(result.graph.nodes.length, 2);
+  });
+
+  it('succeeds with empty narrative when diagrams are returned', async () => {
+    const reflectFn = async (body) => ({
+      success: true,
+      data: {
+        structured_output: {
+          narratives: [],
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [{
+            name: 'ICMS and Singleview Dataflow',
+            type: 'erDiagram',
+            content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+          }],
+        },
+      },
+    });
+
+    const result = await handleReflect(1, 'bank', 'test1 (erDiagram)', {
+      reflectFn,
+      section_focus: { diagram: [{ name: 'test1', type: 'erDiagram', content: 'show the relationship...' }] },
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.equal(result.narratives.length, 0);
+    assert.equal(result.diagrams.length, 1);
+    assert.equal(result.diagrams[0].type, 'erDiagram');
+  });
+
+  it('still requires narrative when narrative section was requested', async () => {
+    const reflectFn = async (body) => ({
+      success: true,
+      data: {
+        structured_output: {
+          narratives: [],
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [],
+        },
+      },
+    });
+
+    const result = await handleReflect(1, 'bank', 'test query', {
+      reflectFn,
+      section_focus: { narrative: 'explain impact' },
+    }, db);
+
+    assert.equal(result.success, false);
+    assert.equal(result.code, 'INVALID_REFLECT_RESPONSE');
+  });
+
+  it('scrubs returned narrative when narrative was not requested', async () => {
+    const reflectFn = async (body) => ({
+      success: true,
+      data: {
+        structured_output: {
+          narrative: 'The model should not have written this.',
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [{
+            name: 'ICMS and Singleview Dataflow',
+            type: 'erDiagram',
+            content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+          }],
+        },
+      },
+    });
+
+    const result = await handleReflect(1, 'bank', 'test1 (erDiagram)', {
+      reflectFn,
+      section_focus: { diagram: [{ name: 'test1', type: 'erDiagram', content: 'show the relationship...' }] },
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.ok(!result.narratives[0]?.narrative.includes('The model should not have written this.'));
+    assert.equal(result.diagrams.length, 1);
   });
 
   it('fails fast without db', async () => {
     const result = await handleReflect(1, 'bank', 'test query', {
-      reflectFn: makeReflectFn(REFLECT_TEXT_NO_GRAPH),
-      output_mode: 'narrative+graph',
+      reflectFn: makeReflectFn(REFLECT_STRUCT_NO_GRAPH),
     });
 
     assert.equal(result.success, false);

@@ -62,9 +62,9 @@ function formatValue(val: any): string {
 function ComposeErrorBanner({ error }: { error?: string | null }) {
   if (!error) return null;
   return (
-    <div className="px-3 py-2 border-b border-red-500/10 bg-red-900/20">
-      <div className="text-[10px] text-red-300 font-medium">Compose error (architxt)</div>
-      <div className="text-[11px] text-red-200/70 break-all leading-relaxed">{error}</div>
+    <div className="px-3 py-2 border-b border-diff-differ-bd bg-diff-differ-bg">
+      <div className="text-[10px] text-diff-differ-fg font-medium">Compose error (architxt)</div>
+      <div className="text-[11px] text-diff-differ-fg/70 break-all leading-relaxed">{error}</div>
     </div>
   );
 }
@@ -96,17 +96,17 @@ export default function MentalModelCompareModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-[oklch(0.21_0_0)] border border-white/10 rounded-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong backdrop-blur-sm">
+      <div className="relative w-full max-w-2xl mx-4 bg-surface-panel border border-border-default rounded-lg shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border-default">
           <div>
-            <h3 className="text-sm font-semibold text-white/90">Mental Model Comparison</h3>
-            <p className="text-[11px] text-white/40 font-mono mt-0.5">{ext_id}</p>
+            <h3 className="text-sm font-semibold text-foreground-default">Mental Model Comparison</h3>
+            <p className="text-[11px] text-foreground-subtle font-mono mt-0.5">{ext_id}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-md text-foreground-subtle hover:text-foreground-muted hover:bg-surface-card transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -119,38 +119,38 @@ export default function MentalModelCompareModal({
               key={field.key}
               className={`rounded border ${
                 field.differs
-                  ? 'border-red-500/20 bg-red-900/10'
-                  : 'border-emerald-500/20 bg-emerald-900/10'
+                  ? 'border-diff-differ-bd bg-diff-differ-bg'
+                  : 'border-diff-match-bd bg-diff-match-bg'
               }`}
             >
               {/* Field header */}
-              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5">
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle">
                 {field.differs ? (
-                  <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+                  <AlertCircle className="h-3.5 w-3.5 text-diff-differ-fg" />
                 ) : (
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <Check className="h-3.5 w-3.5 text-diff-match-fg" />
                 )}
-                <span className={`text-xs font-medium ${field.differs ? 'text-red-300' : 'text-emerald-300'}`}>
+                <span className={`text-xs font-medium ${field.differs ? 'text-diff-differ-fg' : 'text-diff-match-fg'}`}>
                   {field.label}
                 </span>
-                <span className={`text-[10px] ml-auto ${field.differs ? 'text-red-400/60' : 'text-emerald-400/60'}`}>
+                <span className={`text-[10px] ml-auto ${field.differs ? 'text-diff-differ-fg/60' : 'text-diff-match-fg/60'}`}>
                   {field.differs ? 'Different' : 'Same'}
                 </span>
               </div>
 
               {/* Side-by-side values (only when different) */}
               {field.differs && (
-                <div className="grid grid-cols-2 gap-0 divide-x divide-white/5">
+                <div className="grid grid-cols-2 gap-0 divide-x divide-border-subtle">
                   <div className="px-3 py-2">
-                    <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">architxt</div>
+                    <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">architxt</div>
                     {field.key === 'source_query_differs' && arch?.compose_error && (
                       <ComposeErrorBanner error={arch.compose_error} />
                     )}
-                    <div className="text-[11px] text-white/60 break-all leading-relaxed">{field.archVal}</div>
+                    <div className="text-[11px] text-foreground-faint break-all leading-relaxed">{field.archVal}</div>
                   </div>
                   <div className="px-3 py-2">
-                    <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Hindsight</div>
-                    <div className="text-[11px] text-white/60 break-all leading-relaxed">{field.hindVal}</div>
+                    <div className="text-[10px] text-foreground-placeholder uppercase tracking-wider mb-1">Hindsight</div>
+                    <div className="text-[11px] text-foreground-faint break-all leading-relaxed">{field.hindVal}</div>
                   </div>
                 </div>
               )}
@@ -161,7 +161,7 @@ export default function MentalModelCompareModal({
                   {field.key === 'source_query_differs' && arch?.compose_error && (
                     <ComposeErrorBanner error={arch.compose_error} />
                   )}
-                  <div className="text-[11px] text-white/50 break-all leading-relaxed">{field.archVal}</div>
+                  <div className="text-[11px] text-foreground-subtle break-all leading-relaxed">{field.archVal}</div>
                 </div>
               )}
             </div>
@@ -169,10 +169,10 @@ export default function MentalModelCompareModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/10 flex justify-end">
+        <div className="px-5 py-3 border-t border-border-default flex justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded text-xs font-medium bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white/90 transition-colors"
+            className="px-3 py-1.5 rounded text-xs font-medium bg-surface-card border border-border-default text-foreground-faint hover:bg-surface-panel hover:text-foreground-default transition-colors"
           >
             Close
           </button>

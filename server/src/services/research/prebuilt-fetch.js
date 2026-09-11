@@ -5,7 +5,7 @@
  * discovered results into the shape expected by the prebuilt handler.
  */
 
-import { discoverMentalModelsByDimensions } from './mental-model-discovery.js';
+import { discoverMentalModelsByRoles } from './mental-model-discovery.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt-fetch');
@@ -15,7 +15,7 @@ const logger = createLogger('research-prebuilt-fetch');
  * @param {number} serverId
  * @param {string} bankId
  * @param {Object} options
- * @param {string} [options.dimension='interface']
+ * @param {string} [options.role='sys_entity_summary']
  * @param {string[]} [options.entityIds=[]]
  * @returns {Promise<{
  *   success: boolean,
@@ -33,12 +33,12 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
     return { success: false, error: 'server_id and bank_id are required', code: 'MISSING_PARAMS' };
   }
 
-  const dimension = options.dimension || 'interface';
+  const role = options.role || 'sys_entity_summary';
   const entityIds = Array.isArray(options.entityIds) ? options.entityIds : [];
 
-  const discovery = await discoverMentalModelsByDimensions(db, serverId, bankId, {
+  const discovery = await discoverMentalModelsByRoles(db, serverId, bankId, {
     entities: entityIds,
-    dimensions: [dimension],
+    roles: [role],
     timeoutMs: options.timeoutMs,
   });
 
@@ -46,12 +46,12 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
     return { success: false, error: discovery.error, code: discovery.code };
   }
 
-  const dimensionResult = discovery.dimensions[dimension];
-  if (!dimensionResult) {
-    return { success: false, error: `Dimension '${dimension}' not found in discovery result`, code: 'DIMENSION_MISSING' };
+  const roleResult = discovery.roles[role];
+  if (!roleResult) {
+    return { success: false, error: `Role '${role}' not found in discovery result`, code: 'ROLE_MISSING' };
   }
 
-  const result = dimensionResult.result || {};
+  const result = roleResult.result || {};
   const appliedEntityIds = new Set();
 
   if (result.graph) {
@@ -60,9 +60,10 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
       if (graphText.includes(id)) appliedEntityIds.add(id);
     }
   }
-  if (result.narrative) {
+  if (result.narratives && result.narratives.length > 0) {
+    const narrativeText = result.narratives.map((n) => n.narrative).join('\n');
     for (const id of entityIds) {
-      if (result.narrative.includes(id)) appliedEntityIds.add(id);
+      if (narrativeText.includes(id)) appliedEntityIds.add(id);
     }
   }
 
@@ -71,9 +72,9 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
     : [];
 
   logger.info('Merged prebuilt mental models', {
-    dimension,
-    foundCount: dimensionResult.found_count,
-    missingCount: dimensionResult.missing_count,
+    role,
+    foundCount: roleResult.found_count,
+    missingCount: roleResult.missing_count,
     nodeCount: result.graph?.nodes?.length ?? 0,
     edgeCount: result.graph?.edges?.length ?? 0,
     appliedCount: appliedEntityIds.size,
@@ -83,7 +84,7 @@ export async function fetchPrebuiltMentalModels(db, serverId, bankId, options = 
   return {
     success: true,
     graph: result.graph || { nodes: [], edges: [] },
-    narrative: result.narrative || '',
+    narratives: result.narratives || [],
     appliedEntityIds: Array.from(appliedEntityIds),
     missingEntityIds,
     errors: result.errors || [],

@@ -272,14 +272,14 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
           {phase === 'select' && (
             <>
               {/* Shared Context & Tags */}
-              <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
+              <div className="rounded-lg border border-border-default bg-surface-card p-3 space-y-3">
                 {/* Context selector */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-white/60 flex items-center gap-1.5">
+                  <Label className="text-xs text-foreground-faint flex items-center gap-1.5">
                     <FolderOpen className="h-3 w-3" /> Context (applies to all)
                   </Label>
                   {prefsLoading ? (
-                    <div className="h-8 bg-white/5 rounded animate-pulse" />
+                    <div className="h-8 bg-surface-card rounded animate-pulse" />
                   ) : (
                     <select
                       value={selectedContextId ?? ''}
@@ -287,7 +287,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                         const v = e.target.value;
                         setSelectedContextId(v === '' ? null : parseInt(v, 10));
                       }}
-                      className="w-full h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      className="w-full h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                     >
                       <option value="">None</option>
                       {allContexts.map((ctx) => (
@@ -299,13 +299,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
                 {/* Tag selector */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-white/60 flex items-center gap-1.5">
+                  <Label className="text-xs text-foreground-faint flex items-center gap-1.5">
                     <Tag className="h-3 w-3" /> Tags (applies to all)
                   </Label>
                   {prefsLoading ? (
-                    <div className="h-6 bg-white/5 rounded animate-pulse" />
+                    <div className="h-6 bg-surface-card rounded animate-pulse" />
                   ) : allTags.length === 0 ? (
-                    <p className="text-xs text-white/40 italic">No tags available</p>
+                    <p className="text-xs text-foreground-subtle italic">No tags available</p>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {allTags.map((tag) => {
@@ -319,8 +319,8 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                               transition-colors border
                               ${active
-                                ? 'bg-orange-800/30 text-orange-400 border-orange-500/40'
-                                : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/70'
+                                ? 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
+                                : 'bg-surface-card text-foreground-subtle border-border-default hover:bg-surface-panel hover:text-foreground-faint'
                               }
                             `}
                           >
@@ -335,13 +335,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
                 {/* Metadata selector */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-white/60 flex items-center gap-1.5">
+                  <Label className="text-xs text-foreground-faint flex items-center gap-1.5">
                     <ScrollText className="h-3 w-3" /> Metadata (applies to all)
                   </Label>
                   {prefsLoading ? (
-                    <div className="h-6 bg-white/5 rounded animate-pulse" />
+                    <div className="h-6 bg-surface-card rounded animate-pulse" />
                   ) : allMetadata.length === 0 ? (
-                    <p className="text-xs text-white/40 italic">No metadata available</p>
+                    <p className="text-xs text-foreground-subtle italic">No metadata available</p>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {allMetadata.map((meta) => {
@@ -357,18 +357,18 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                               transition-colors border
                               ${active
                                 ? isSystem
-                                  ? 'bg-slate-700/40 text-slate-300 border-slate-500/40'
-                                  : 'bg-blue-800/30 text-blue-400 border-blue-500/40'
+                                  ? 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd'
+                                  : 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                                 : isSystem
-                                  ? 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60'
-                                  : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/70'
+                                  ? 'bg-surface-card text-foreground-subtle border-border-default hover:bg-surface-panel hover:text-foreground-faint'
+                                  : 'bg-surface-card text-foreground-subtle border-border-default hover:bg-surface-panel hover:text-foreground-faint'
                               }
                             `}
                           >
                             {active && <span>✓</span>}
                             <span className="font-mono text-[10px]">{meta.key}</span>
-                            {meta.value && <span className="text-white/40">={meta.value}</span>}
-                            {isSystem && <span className="text-[9px] text-slate-500 ml-0.5">(system)</span>}
+                            {meta.value && <span className="text-foreground-subtle">={meta.value}</span>}
+                            {isSystem && <span className="text-[9px] text-badge-neutral-fg ml-0.5">(system)</span>}
                           </button>
                         );
                       })}
@@ -384,14 +384,14 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 onClick={() => inputRef.current?.click()}
                 className={`
                   border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
-                  transition-colors hover:bg-white/5
-                  ${items.length > 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/30'}
+                  transition-colors hover:bg-surface-card
+                  ${items.length > 0 ? 'border-accent-secondary-bd bg-accent-primary-bg/50' : 'border-border-on-dark'}
                 `}
               >
                 <div className="flex flex-col items-center gap-2">
-                  <Upload className="h-8 w-8 text-white/70" />
-                  <p className="font-medium text-white text-sm">Drag & drop files here, or click to select</p>
-                  <p className="text-xs text-white/50">Multiple files supported</p>
+                  <Upload className="h-8 w-8 text-foreground-faint" />
+                  <p className="font-medium text-foreground-default text-sm">Drag & drop files here, or click to select</p>
+                  <p className="text-xs text-foreground-subtle">Multiple files supported</p>
                 </div>
                 <input
                   ref={inputRef}
@@ -406,13 +406,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               {items.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-white/60 uppercase tracking-wider">
+                    <Label className="text-xs text-foreground-faint uppercase tracking-wider">
                       {items.length} file{items.length !== 1 ? 's' : ''} selected
                     </Label>
                     <button
                       type="button"
                       onClick={() => setItems([])}
-                      className="text-xs text-red-400 hover:text-red-300"
+                      className="text-xs text-destructive-fg hover:text-destructive-fg"
                     >
                       Clear all
                     </button>
@@ -422,31 +422,31 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                     {items.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2"
+                        className="rounded-lg border border-border-default bg-surface-card p-3 space-y-2"
                       >
                         <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-white/50 shrink-0" />
-                          <span className="text-sm font-medium text-white truncate flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-foreground-subtle shrink-0" />
+                          <span className="text-sm font-medium text-foreground-default truncate flex-1 min-w-0">
                             {item.file.name}
                           </span>
-                          <span className="text-xs text-white/40 shrink-0">
+                          <span className="text-xs text-foreground-subtle shrink-0">
                             {(item.file.size / 1024).toFixed(0)} KB
                           </span>
                           <button
                             type="button"
                             onClick={() => removeItem(item.id)}
-                            className="text-white/30 hover:text-red-400 shrink-0 p-0.5"
+                            className="text-foreground-placeholder hover:text-destructive-fg shrink-0 p-0.5"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/40 shrink-0">ID:</span>
+                          <span className="text-xs text-foreground-subtle shrink-0">ID:</span>
                           <Input
                             value={item.extId}
                             onChange={(e) => updateExtId(item.id, e.target.value)}
                             placeholder="External ID"
-                            className="h-7 text-xs bg-black/20 border-white/10"
+                            className="h-7 text-xs bg-surface-inset border-border-default"
                           />
                         </div>
                       </div>
@@ -462,23 +462,23 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
             <div className="space-y-4">
               {/* Progress bar */}
               <div className="space-y-1.5">
-                <div className="flex justify-between text-xs text-white/60">
+                <div className="flex justify-between text-xs text-foreground-faint">
                   <span>Uploading {progress.current} of {progress.total}…</span>
                   <span className="font-mono">{progress.current}/{progress.total}</span>
                 </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-2 bg-surface-panel rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-300 bg-emerald-500"
+                    className="h-full rounded-full transition-all duration-300 bg-accent-primary-solid"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
                 <div className="flex items-center gap-4 text-xs">
-                  <div className="flex items-center gap-1.5 text-emerald-400">
+                  <div className="flex items-center gap-1.5 text-accent-secondary-fg">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span className="font-medium">{progress.succeeded} succeeded</span>
                   </div>
                   {progress.failed > 0 && (
-                    <div className="flex items-center gap-1.5 text-red-400">
+                    <div className="flex items-center gap-1.5 text-destructive-fg">
                       <XCircle className="h-3.5 w-3.5" />
                       <span className="font-medium">{progress.failed} failed</span>
                     </div>
@@ -495,34 +495,34 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                       rounded-lg border p-3 transition-colors
                       ${
                         item.status === 'success'
-                          ? 'border-emerald-500/20 bg-emerald-500/5'
+                          ? 'border-accent-secondary-bd/50 bg-accent-primary-bg/50'
                           : item.status === 'error'
-                            ? 'border-red-500/20 bg-red-500/5'
+                            ? 'border-destructive-bd/50 bg-destructive-fg/5'
                             : item.status === 'uploading'
-                              ? 'border-amber-500/20 bg-amber-500/5'
-                              : 'border-white/10 bg-white/5'
+                              ? 'border-badge-caution-bd/50 bg-badge-caution-fg/5'
+                              : 'border-border-default bg-surface-card'
                       }
                     `}
                   >
                     <div className="flex items-center gap-2">
                       {item.status === 'success' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-accent-secondary-fg shrink-0" />
                       ) : item.status === 'error' ? (
-                        <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                        <AlertCircle className="h-4 w-4 text-destructive-fg shrink-0" />
                       ) : item.status === 'uploading' ? (
-                        <Loader2 className="h-4 w-4 text-amber-400 shrink-0 animate-spin" />
+                        <Loader2 className="h-4 w-4 text-badge-caution-fg shrink-0 animate-spin" />
                       ) : (
-                        <FileText className="h-4 w-4 text-white/30 shrink-0" />
+                        <FileText className="h-4 w-4 text-foreground-placeholder shrink-0" />
                       )}
-                      <span className="text-sm text-white truncate flex-1 min-w-0">
+                      <span className="text-sm text-foreground-default truncate flex-1 min-w-0">
                         {item.file.name}
                       </span>
-                      <span className="text-xs text-white/40 shrink-0">
+                      <span className="text-xs text-foreground-subtle shrink-0">
                         {(item.file.size / 1024).toFixed(0)} KB
                       </span>
                     </div>
                     {item.status === 'error' && item.error && (
-                      <p className="text-xs text-red-400 mt-1 break-all">{item.error}</p>
+                      <p className="text-xs text-destructive-fg mt-1 break-all">{item.error}</p>
                     )}
                   </div>
                 ))}
@@ -536,27 +536,27 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               {/* Status header */}
               <div className="flex items-center gap-3">
                 {doneSuccess ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-900/30">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-primary-bg">
+                    <CheckCircle2 className="h-5 w-5 text-accent-secondary-fg" />
                   </div>
                 ) : doneFailed ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-900/30">
-                    <XCircle className="h-5 w-5 text-red-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive-bg">
+                    <XCircle className="h-5 w-5 text-destructive-fg" />
                   </div>
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-900/30">
-                    <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-badge-caution-bg">
+                    <AlertTriangle className="h-5 w-5 text-badge-caution-fg" />
                   </div>
                 )}
                 <div>
-                  <p className="text-sm font-medium text-white">
+                  <p className="text-sm font-medium text-foreground-default">
                     {doneSuccess
                       ? 'Upload Complete'
                       : doneFailed
                         ? 'Upload Failed'
                         : 'Upload Partial'}
                   </p>
-                  <p className="text-xs text-white/60">
+                  <p className="text-xs text-foreground-faint">
                     {progress.succeeded} succeeded · {progress.failed} failed · {progress.total} total
                   </p>
                 </div>
@@ -564,14 +564,14 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
               {/* Failure list */}
               {items.some((it) => it.status === 'error') && (
-                <div className="max-h-[140px] overflow-y-auto rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 space-y-1.5">
+                <div className="max-h-[140px] overflow-y-auto rounded-lg bg-destructive-bg border border-destructive-bd/50 p-2.5 space-y-1.5">
                   {items
                     .filter((it) => it.status === 'error')
                     .map((item) => (
-                      <div key={item.id} className="flex items-start gap-2 text-xs text-red-300">
+                      <div key={item.id} className="flex items-start gap-2 text-xs text-destructive-fg">
                         <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
                         <span className="break-all">
-                          <span className="font-mono text-white/60">{item.file.name}</span>
+                          <span className="font-mono text-foreground-faint">{item.file.name}</span>
                           {item.error && <span className="ml-1">— {item.error}</span>}
                         </span>
                       </div>
@@ -583,13 +583,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
         </div>
 
         {/* ═══════════════ FOOTER ═══════════════ */}
-        <div className="shrink-0 flex justify-end gap-3 pt-2 border-t border-white/10">
+        <div className="shrink-0 flex justify-end gap-3 pt-2 border-t border-border-default">
           {phase === 'select' && (
             <>
               <Button
                 variant="outline"
                 onClick={handleClose}
-                className="border-white/30 text-white hover:bg-white/5"
+                className="border-border-on-dark text-foreground-default hover:bg-surface-card"
               >
                 Close
               </Button>
@@ -597,7 +597,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 <Button
                   onClick={uploadAll}
                   disabled={pendingCount === 0}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
                 >
                   {hasErrors && pendingCount === 0 ? (
                     'Retry failed'
@@ -612,7 +612,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
           {phase === 'running' && (
             <Button
               disabled
-              className="bg-emerald-600/50 text-white flex items-center gap-2 cursor-not-allowed"
+              className="bg-accent-primary-bg/500 text-foreground-default flex items-center gap-2 cursor-not-allowed"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Uploading…
@@ -622,12 +622,12 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
           {phase === 'done' && (
             <Button
               onClick={handleClose}
-              className={`text-white flex items-center gap-2 ${
+              className={`text-foreground-default flex items-center gap-2 ${
                 doneSuccess
-                  ? 'bg-emerald-600 hover:bg-emerald-500'
+                  ? 'bg-accent-primary-solid hover:bg-accent-primary-solid-hover'
                   : doneFailed
-                    ? 'bg-red-600 hover:bg-red-500'
-                    : 'bg-amber-600 hover:bg-amber-500'
+                    ? 'bg-destructive-fg hover:bg-destructive-fg'
+                    : 'bg-badge-caution-fg hover:bg-badge-caution-fg'
               }`}
             >
               {doneSuccess ? (

@@ -16,24 +16,70 @@ import {
   listStepsForSession,
   getStep,
   deleteStepWithSession,
-  listSessionsByBank,
+  listSessionsByServerBank,
   updateSession,
   deleteSessionWithSteps,
+  createSessionPage,
+  updateCuratedPage,
 } from '../db/crud/research.js';
 
-import { discoverMentalModelsByDimensions, listEligibleMentalModels } from '../services/research/mental-model-discovery.js';
+import { discoverMentalModelsByRoles } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
+import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
-import { createPendingOperation } from '../db/crud/pending-operations.js';
-import { parseGraphResponse } from '../prompts/parse-graph-response.js';
+import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
+import { normalizeEnvelopeForApi } from '../services/contextual-graph/normalize-model-output.js';
+import { parseJsonString } from '../prompts/graph-parser.js';
+
+/**
+ * Extract the first balanced JSON object/array from a string that may contain
+ * trailing garbage after the JSON. This is stricter than the regex-based loose
+ * extractor and avoids over-matching when trailing text also contains braces.
+ */
+function extractBalancedJson(text) {
+  if (typeof text !== 'string' || !text.trim()) return null;
+  const start = text.search(/[\{\[]/);
+  if (start === -1) return null;
+  const opener = text[start];
+  const closer = opener === '{' ? '}' : ']';
+  let depth = 1;
+  let inString = false;
+  let escapeNext = false;
+  for (let i = start + 1; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+      } else if (ch === '\\') {
+        escapeNext = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === opener) {
+      depth += 1;
+    } else if (ch === closer) {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(start, i + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+import { loadEntityCatalog } from '../prompts/entity-catalog.js';
+import { parseSectionDirectives } from '../prompts/section-directives.js';
 
 const logger = createLogger('research-route');
 const router = Router();
 
 async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, errorMessage = null } = {}) {
   return updateStep(db, stepId, {
-    rstep_canvas_state: snapshot.rstep_canvas_state,
-    rstep_synthesis: snapshot.rstep_synthesis,
     rstep_calls: snapshot.rstep_calls,
     rstep_status: keepFailed ? 'failed' : snapshot.rstep_status,
     rstep_error_message: keepFailed ? errorMessage : snapshot.rstep_error_message,
@@ -43,17 +89,17 @@ async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, er
 
 async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   const parameters = step.rstep_parameters || {};
-  const dimensions = parameters.dimensions || [];
+  const roles = parameters.roles || [];
   const selections = step.rstep_selections || [];
   const entities = selections
     .filter((s) => s.kind === 'entity')
     .map((s) => (s.id ? String(s.id) : undefined))
     .filter(Boolean);
 
-  if (!entities.length || !dimensions.length) {
+  if (!entities.length || !roles.length) {
     await updateStep(db, step.rstep_id, {
       rstep_status: 'failed',
-      rstep_error_message: 'Prebuilt step is missing entities or dimensions',
+      rstep_error_message: 'Prebuilt step is missing entities or roles',
       rstep_calls: [],
       rstep_tool_calls_used: 0,
     });
@@ -61,9 +107,9 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   }
 
   const prebuiltStart = Date.now();
-  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, dimensions });
+  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, roles });
   const prebuiltDuration = Date.now() - prebuiltStart;
-  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, dimensions };
+  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, roles };
   const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
 
   const buildPrebuiltCall = (status, extra = {}) => ({
@@ -87,24 +133,28 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
   }
 
   const mergedGraph = { nodes: [], edges: [] };
+  const mergedTables = [];
+  const mergedDiagrams = [];
   const narratives = [];
-  for (const dim of result.dimensions || []) {
-    const found = (dim.entities || [])
+  for (const roleResult of result.roles || []) {
+    const found = (roleResult.entities || [])
       .filter((e) => e.found)
       .map((e) => e.entity);
-    const modelNames = (dim.entities || [])
+    const modelNames = (roleResult.entities || [])
       .flatMap((e) => (e.model_results || []).filter((m) => m.found).map((m) => m.name))
       .filter((v, i, a) => a.indexOf(v) === i);
-    const lines = [`## ${dim.dimension}`, ''];
-    if (dim.result?.narrative) {
-      lines.push(dim.result.narrative);
+    const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
+    const lines = [`## ${roleLabel}`, ''];
+    const roleNarratives = roleResult.result?.narratives;
+    if (roleNarratives && roleNarratives.length > 0) {
+      lines.push(roleNarratives.map((n) => n.narrative).join('\n\n'));
     } else {
       lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
       lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
     }
     narratives.push(lines.join('\n'));
 
-    const jsonResult = dim.result?.json_result;
+    const jsonResult = roleResult.result?.json_result;
     if (jsonResult) {
       const graphs = Array.isArray(jsonResult) ? jsonResult : [jsonResult];
       for (const g of graphs) {
@@ -120,21 +170,31 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
         }
       }
     }
+    if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
+      mergedTables.push(...roleResult.result.tables);
+    }
+    if (roleResult.result?.diagrams && roleResult.result.diagrams.length > 0) {
+      mergedDiagrams.push(...roleResult.result.diagrams);
+    }
   }
 
-  const foundCount = (result.dimensions || []).reduce((sum, d) => sum + (d.found_count || 0), 0);
-  const missingCount = (result.dimensions || []).reduce((sum, d) => sum + (d.missing_count || 0), 0);
+  const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
+  const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
   await updateStep(db, step.rstep_id, {
-    rstep_canvas_state: { graph: mergedGraph },
-    rstep_synthesis: { narrative: narratives.join('\n\n') },
+    rstep_envelope: {
+      narratives: narratives.map((body) => ({ narrative_name: '', narrative: body })),
+      graph: mergedGraph,
+      tables: mergedTables,
+      diagrams: mergedDiagrams,
+    },
     rstep_status: 'completed',
     rstep_error_message: null,
     rstep_tool_calls_used: 1,
     rstep_calls: [
       buildPrebuiltCall('success', {
         response_summary: {
-          dimensions: (result.dimensions || []).map((d) => d.dimension),
+          roles: (result.roles || []).map((r) => r.role),
           entity_count: entities.length,
           found_count: foundCount,
           missing_count: missingCount,
@@ -148,49 +208,68 @@ const toApiSession = (dbRow) => ({
   id: dbRow.rs_id,
   title: dbRow.rs_title,
   description: dbRow.rs_description,
+  server_id: dbRow.rs_server_id,
   bank_id: dbRow.rs_bank_id,
   viewpoint_ids: dbRow.rs_viewpoint_ids,
+  scope_entity_ids: dbRow.rs_scope_entity_ids,
   status: dbRow.rs_status,
   current_step_id: dbRow.rs_current_step_id,
   created_at: dbRow.rs_created_at,
   updated_at: dbRow.rs_updated_at,
 });
 
-const toApiStepSummary = (dbRow) => ({
-  id: dbRow.rstep_id,
-  session_id: dbRow.rs_id,
-  parent_step_id: dbRow.rstep_parent_step_id,
-  intent_text: dbRow.rstep_intent_text,
-  action_type: dbRow.rstep_action_type,
-  parameters: dbRow.rstep_parameters,
-  created_at: dbRow.rstep_created_at,
-  selections: dbRow.rstep_selections,
-  viewpoint_ids: dbRow.rstep_viewpoint_ids,
-  canvas: dbRow.rstep_canvas_state,
-  synthesis: dbRow.rstep_synthesis,
-  tool_calls_used: dbRow.rstep_tool_calls_used,
-  calls: dbRow.rstep_calls,
-  status: dbRow.rstep_status || 'completed',
-  error_message: dbRow.rstep_error_message || null,
-});
+function toApiEnvelope(dbRow) {
+  const canonical = dbRow.rstep_envelope;
+  if (canonical && typeof canonical === 'object' && Array.isArray(canonical.narratives)) {
+    return normalizeEnvelopeForApi(canonical);
+  }
+  return normalizeEnvelopeForApi({
+    narratives: [],
+    graph: { name: '', nodes: [], edges: [] },
+    tables: [],
+    diagrams: [],
+  });
+}
 
-const toApiStep = (dbRow) => ({
-  id: dbRow.rstep_id,
-  session_id: dbRow.rs_id,
-  parent_step_id: dbRow.rstep_parent_step_id,
-  intent_text: dbRow.rstep_intent_text,
-  action_type: dbRow.rstep_action_type,
-  parameters: dbRow.rstep_parameters,
-  selections: dbRow.rstep_selections,
-  viewpoint_ids: dbRow.rstep_viewpoint_ids,
-  canvas: dbRow.rstep_canvas_state,
-  synthesis: dbRow.rstep_synthesis,
-  tool_calls_used: dbRow.rstep_tool_calls_used,
-  calls: dbRow.rstep_calls,
-  status: dbRow.rstep_status || 'completed',
-  error_message: dbRow.rstep_error_message || null,
-  created_at: dbRow.rstep_created_at,
-});
+const toApiStepSummary = (dbRow) => {
+  return {
+    id: dbRow.rstep_id,
+    session_id: dbRow.rs_id,
+    parent_step_id: dbRow.rstep_parent_step_id,
+    intent_text: dbRow.rstep_intent_text,
+    raw_query: dbRow.rstep_raw_query || null,
+    action_type: dbRow.rstep_action_type,
+    parameters: dbRow.rstep_parameters,
+    created_at: dbRow.rstep_created_at,
+    selections: dbRow.rstep_selections,
+    viewpoint_ids: dbRow.rstep_viewpoint_ids,
+    envelope: toApiEnvelope(dbRow),
+    tool_calls_used: dbRow.rstep_tool_calls_used,
+    calls: dbRow.rstep_calls,
+    status: dbRow.rstep_status || 'completed',
+    error_message: dbRow.rstep_error_message || null,
+  };
+};
+
+const toApiStep = (dbRow) => {
+  return {
+    id: dbRow.rstep_id,
+    session_id: dbRow.rs_id,
+    parent_step_id: dbRow.rstep_parent_step_id,
+    intent_text: dbRow.rstep_intent_text,
+    raw_query: dbRow.rstep_raw_query || null,
+    action_type: dbRow.rstep_action_type,
+    parameters: dbRow.rstep_parameters,
+    selections: dbRow.rstep_selections,
+    viewpoint_ids: dbRow.rstep_viewpoint_ids,
+    envelope: toApiEnvelope(dbRow),
+    tool_calls_used: dbRow.rstep_tool_calls_used,
+    calls: dbRow.rstep_calls,
+    status: dbRow.rstep_status || 'completed',
+    error_message: dbRow.rstep_error_message || null,
+    created_at: dbRow.rstep_created_at,
+  };
+};
 
 /**
  * @openapi
@@ -220,7 +299,7 @@ const toApiStep = (dbRow) => ({
  *                 type: string
  *               query_depth:
  *                 type: string
- *                 enum: [prebuilt, recall, reflect, synthesize, models]
+ *                 enum: [prebuilt, recall, reflect, synthesize, models, templates]
  *                 default: prebuilt
  *               selections:
  *                 type: array
@@ -278,7 +357,7 @@ router.post('/discover', async (req, res) => {
       include_source_facts,
       tags,
       tags_match,
-      template,
+      section_focus,
     } = req.body;
 
     if (!bank_id || typeof bank_id !== 'string') {
@@ -312,7 +391,7 @@ router.post('/discover', async (req, res) => {
       ...(tags !== undefined && { tags }),
       ...(tags_match !== undefined && { tags_match }),
       ...(selections !== undefined && { selections }),
-      ...(template !== undefined && { template }),
+      ...(section_focus !== undefined && { section_focus }),
     };
 
     // Normalize Reflect provenance so every recorded step has a complete,
@@ -322,13 +401,7 @@ router.post('/discover', async (req, res) => {
       handlerOptions.max_tokens = handlerOptions.max_tokens ?? 4096;
       handlerOptions.fact_types = handlerOptions.fact_types ?? ['world', 'observation'];
       handlerOptions.exclude_mental_models = handlerOptions.exclude_mental_models ?? false;
-      handlerOptions.template = handlerOptions.template ?? 'narrative-graph-known';
       handlerOptions.include_source_facts = handlerOptions.include_source_facts ?? false;
-    }
-
-    // Normalize Synthesize provenance to match Reflect.
-    if (effectiveDepth === 'synthesize') {
-      handlerOptions.template = handlerOptions.template ?? 'narrative-graph-known';
     }
 
     // Get or create session.
@@ -362,12 +435,11 @@ router.post('/discover', async (req, res) => {
       rs_id: rsId,
       rstep_parent_step_id: parentStepId,
       rstep_intent_text: intent_text,
+      rstep_raw_query: req.body.raw_query || intent_text,
       rstep_selections: selections || [],
       rstep_action_type: effectiveDepth,
       rstep_parameters: handlerOptions,
       rstep_viewpoint_ids: viewpoint_ids,
-      rstep_canvas_state: {},
-      rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
       rstep_error_message: null,
@@ -433,7 +505,7 @@ router.post('/discover', async (req, res) => {
  * @openapi
  * /research/eligible-mental-models:
  *   post:
- *     summary: List eligible derived mental models without querying Hindsight
+ *     summary: List eligible derived mental models across dimensions (legacy dimension-based discovery)
  *     tags: [Research]
  *     requestBody:
  *       required: true
@@ -454,29 +526,62 @@ router.post('/discover', async (req, res) => {
  *         description: Database error
  */
 router.post('/eligible-mental-models', async (req, res) => {
+  sendResponse({ res, status: 410, error: 'Eligible mental models by dimensions is deprecated. Use /research/prebuilt or /research/eligible-template-models.', code: 'DEPRECATED', logger, method: 'POST', path: '/research/eligible-mental-models', duration: 0 });
+});
+
+/**
+ * @openapi
+ * /research/eligible-template-models:
+ *   post:
+ *     summary: List eligible template-derived mental models for selected entities
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [entities]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               entities: { type: array, items: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Per-template matched entity list with derived ext_ids
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Database error
+ */
+router.post('/eligible-template-models', async (req, res) => {
   const start = Date.now();
   try {
-    const { entities, dimensions } = req.body;
+    const { server_id, bank_id, entities } = req.body;
 
+    if (!server_id || typeof server_id !== 'number') {
+      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+      return;
+    }
+    if (!bank_id || typeof bank_id !== 'string') {
+      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
+      return;
+    }
     if (!Array.isArray(entities) || entities.length === 0) {
-      sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
-      return;
-    }
-    if (!Array.isArray(dimensions) || dimensions.length === 0) {
-      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
+      sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
       return;
     }
 
-    const result = await listEligibleMentalModels(db, { entities, dimensions });
+    const result = findEligibleTemplateModels(db, { entities, bankId: bank_id, serverId: server_id });
     if (!result.success) {
-      sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
+      sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
       return;
     }
 
-    sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
   } catch (err) {
-    logger.error('Research eligible-mental-models route error', { error: err.message, stack: err.stack });
-    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/eligible-mental-models', duration: Date.now() - start });
+    logger.error('Research eligible-template-models route error', { error: err.message, stack: err.stack });
+    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/eligible-template-models', duration: Date.now() - start });
   }
 });
 
@@ -492,18 +597,18 @@ router.post('/eligible-mental-models', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [server_id, bank_id, entities, dimensions]
+ *             required: [server_id, bank_id, entities, roles]
  *             properties:
  *               server_id: { type: integer }
  *               bank_id: { type: string }
  *               entities: { type: array, items: { type: string } }
- *               dimensions: { type: array, items: { type: string } }
+ *               roles: { type: array, items: { type: string } }
  *               session_id:
  *                 type: integer
  *                 nullable: true
  *     responses:
  *       200:
- *         description: Per-dimension entity results with merged narrative/graph output
+ *         description: Per-role entity results with merged narrative/graph output
  *       400:
  *         description: Invalid input
  *       500:
@@ -512,7 +617,7 @@ router.post('/eligible-mental-models', async (req, res) => {
 router.post('/prebuilt', async (req, res) => {
   const start = Date.now();
   try {
-    const { server_id, bank_id, entities, dimensions, session_id } = req.body;
+    const { server_id, bank_id, entities, roles, session_id } = req.body;
 
     if (!server_id || typeof server_id !== 'number') {
       sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
@@ -526,8 +631,8 @@ router.post('/prebuilt', async (req, res) => {
       sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
       return;
     }
-    if (!Array.isArray(dimensions) || dimensions.length === 0) {
-      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
+    if (!Array.isArray(roles) || roles.length === 0) {
+      sendResponse({ res, status: 400, error: 'roles must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
       return;
     }
 
@@ -562,12 +667,11 @@ router.post('/prebuilt', async (req, res) => {
       rs_id: rsId,
       rstep_parent_step_id: parentStepId,
       rstep_intent_text: intentText,
+      rstep_raw_query: req.body.raw_query || intentText,
       rstep_selections: entities.map((id) => ({ id, kind: 'entity' })),
       rstep_action_type: 'prebuilt',
-      rstep_parameters: { dimensions },
+      rstep_parameters: { roles },
       rstep_viewpoint_ids: [],
-      rstep_canvas_state: {},
-      rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
       rstep_error_message: null,
@@ -588,9 +692,9 @@ router.post('/prebuilt', async (req, res) => {
     }
 
     const prebuiltStart = Date.now();
-    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, dimensions });
+    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, roles });
     const prebuiltDuration = Date.now() - prebuiltStart;
-    const prebuiltRequestBody = { server_id, bank_id, entities, dimensions, session_id: rsId };
+    const prebuiltRequestBody = { server_id, bank_id, entities, roles, session_id: rsId };
     const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
 
     const buildPrebuiltCall = (status, extra = {}) => ({
@@ -620,33 +724,37 @@ router.post('/prebuilt', async (req, res) => {
 
     // Derive a merged canvas/synthesis for the step so it works in the trail.
     const mergedGraph = { nodes: [], edges: [] };
+    const mergedTables = [];
+    const mergedDiagrams = [];
     const narratives = [];
     const parseErrors = [];
-    for (const dim of result.dimensions || []) {
-      const found = (dim.entities || [])
+    for (const roleResult of result.roles || []) {
+      const found = (roleResult.entities || [])
         .filter((e) => e.found)
         .map((e) => e.entity);
-      const modelNames = (dim.entities || [])
+      const modelNames = (roleResult.entities || [])
         .flatMap((e) => (e.model_results || []).filter((m) => m.found).map((m) => m.name))
         .filter((v, i, a) => a.indexOf(v) === i);
-      const lines = [`## ${dim.dimension}`, ''];
-      if (dim.result?.narrative) {
-        lines.push(dim.result.narrative);
+      const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
+      const lines = [`## ${roleLabel}`, ''];
+      const roleNarratives = roleResult.result?.narratives;
+      if (roleNarratives && roleNarratives.length > 0) {
+        lines.push(roleNarratives.map((n) => n.narrative).join('\n\n'));
       } else {
         lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
         lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
       }
-      if (dim.result?.errors && dim.result.errors.length > 0) {
+      if (roleResult.result?.errors && roleResult.result.errors.length > 0) {
         lines.push('');
         lines.push('Errors:');
-        for (const err of dim.result.errors) {
+        for (const err of roleResult.result.errors) {
           lines.push(`- ${err.model}: ${err.error}`);
         }
-        parseErrors.push(...dim.result.errors);
+        parseErrors.push(...roleResult.result.errors);
       }
       narratives.push(lines.join('\n'));
 
-      const jsonResult = dim.result?.json_result;
+      const jsonResult = roleResult.result?.json_result;
       if (jsonResult) {
         const graphs = Array.isArray(jsonResult) ? jsonResult : [jsonResult];
         for (const g of graphs) {
@@ -662,21 +770,31 @@ router.post('/prebuilt', async (req, res) => {
           }
         }
       }
+      if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
+        mergedTables.push(...roleResult.result.tables);
+      }
+      if (roleResult.result?.diagrams && roleResult.result.diagrams.length > 0) {
+        mergedDiagrams.push(...roleResult.result.diagrams);
+      }
     }
 
-    const foundCount = (result.dimensions || []).reduce((sum, d) => sum + (d.found_count || 0), 0);
-    const missingCount = (result.dimensions || []).reduce((sum, d) => sum + (d.missing_count || 0), 0);
+    const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
+    const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
 
     await updateStep(db, stepId, {
-      rstep_canvas_state: { graph: mergedGraph },
-      rstep_synthesis: { narrative: narratives.join('\n\n') },
+      rstep_envelope: {
+        narratives: narratives.map((body) => ({ narrative_name: '', narrative: body })),
+        graph: mergedGraph,
+        tables: mergedTables,
+        diagrams: mergedDiagrams,
+      },
       rstep_status: 'completed',
       rstep_error_message: parseErrors.length > 0 ? `Some mental models could not be parsed. ${parseErrors.map((e) => `${e.model}: ${e.error}`).join('; ')}` : null,
       rstep_tool_calls_used: 1,
       rstep_calls: [
         buildPrebuiltCall('success', {
           response_summary: {
-            dimensions: (result.dimensions || []).map((d) => d.dimension),
+            roles: (result.roles || []).map((r) => r.role),
             entity_count: entities.length,
             found_count: foundCount,
             missing_count: missingCount,
@@ -748,7 +866,7 @@ router.post('/prebuilt/oneshot', async (req, res) => {
       return;
     }
 
-    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, dimensions });
+    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, roles });
     if (!result.success) {
       sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/prebuilt/oneshot', duration: Date.now() - start });
       return;
@@ -773,7 +891,7 @@ router.post('/prebuilt/oneshot', async (req, res) => {
  * @openapi
  * /research/mental-models:
  *   post:
- *     summary: Discover mental models for entities across dimensions
+ *     summary: Discover mental models for entities across template roles
  *     tags: [Research]
  *     requestBody:
  *       required: true
@@ -781,15 +899,15 @@ router.post('/prebuilt/oneshot', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [server_id, bank_id, entities, dimensions]
+ *             required: [server_id, bank_id, entities, roles]
  *             properties:
  *               server_id: { type: integer }
  *               bank_id: { type: string }
  *               entities: { type: array, items: { type: string } }
- *               dimensions: { type: array, items: { type: string } }
+ *               roles: { type: array, items: { type: string } }
  *     responses:
  *       200:
- *         description: Per-dimension candidate list with found/missing status
+ *         description: Per-role candidate list with found/missing status
  *       400:
  *         description: Invalid input
  *       500:
@@ -798,7 +916,7 @@ router.post('/prebuilt/oneshot', async (req, res) => {
 router.post('/mental-models', async (req, res) => {
   const start = Date.now();
   try {
-    const { server_id, bank_id, entities, dimensions } = req.body;
+    const { server_id, bank_id, entities, roles } = req.body;
 
     if (!server_id || typeof server_id !== 'number') {
       sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
@@ -812,12 +930,12 @@ router.post('/mental-models', async (req, res) => {
       sendResponse({ res, status: 400, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
       return;
     }
-    if (!Array.isArray(dimensions) || dimensions.length === 0) {
-      sendResponse({ res, status: 400, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
+    if (!Array.isArray(roles) || roles.length === 0) {
+      sendResponse({ res, status: 400, error: 'roles must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
       return;
     }
 
-    const result = await discoverMentalModelsByDimensions(db, server_id, bank_id, { entities, dimensions });
+    const result = await discoverMentalModelsByRoles(db, server_id, bank_id, { entities, roles });
     if (!result.success) {
       sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
       return;
@@ -887,7 +1005,7 @@ router.post('/mental-models/health', async (req, res) => {
       }
 
       const hindsightResult = await getHindsightMentalModel(server_id, bank_id, extId, {
-        detail: 'content',
+        detail: 'full',
         timeoutMs: 15000,
       });
 
@@ -899,51 +1017,29 @@ router.post('/mental-models/health', async (req, res) => {
         };
       }
 
-      const content = hindsightResult.mentalModel.content ?? null;
-      if (!content) {
+      const content = hindsightResult.mentalModel.reflect_response?.structured_output ?? null;
+      if (!content || typeof content !== 'object') {
         return {
           ext_id: extId,
           healthy: false,
           found: true,
           content: null,
           content_length: 0,
-          error: 'Mental-model content is empty',
+          error: 'Mental-model reflect_response.structured_output is empty or missing',
         };
       }
 
-      if (returns === 'narrative') {
-        const { narrative } = parseGraphResponse(content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
-        return {
-          ext_id: extId,
-          healthy: narrative.length > 0,
-          found: true,
-          content,
-          content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
-          parsed: { narrative },
-          narrative_length: narrative.length,
-          graph_present: false,
-          error: narrative.length > 0 ? undefined : 'Narrative content is empty',
-        };
-      }
-
-      const { narrative, graph, error: graphError } = parseGraphResponse(content, {
-        mode: returns.startsWith('narrative-graph') ? returns : 'graph-known',
-        expectGraph: true,
-        defaultSource: 'mental_model',
-      });
-      const healthy = graphError == null;
+      const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
+      const healthy = Array.isArray(graph.nodes) && graph.nodes.length > 0;
       return {
         ext_id: extId,
         healthy,
         found: true,
-        content,
-        content_length: typeof content === 'string' ? content.length : JSON.stringify(content).length,
-        parsed: healthy ? { graph } : undefined,
-        narrative_length: narrative.length,
+        content_length: JSON.stringify(content).length,
         graph_present: healthy,
-        node_count: graph?.nodes.length ?? 0,
-        edge_count: graph?.edges.length ?? 0,
-        error: graphError,
+        node_count: graph?.nodes?.length ?? 0,
+        edge_count: graph?.edges?.length ?? 0,
+        error: healthy ? null : 'Mental-model structured output has no graph nodes',
       };
     }));
 
@@ -1006,25 +1102,17 @@ router.post('/mental-models/refresh', async (req, res) => {
       return res.status(502).json({ error: refreshResult.error, code: 'REFRESH_FAILED' });
     }
 
-    const createResult = createPendingOperation(db, {
-      pop_operation_id: refreshResult.operationId,
-      pop_server_id: serverId,
-      pop_bank_id: bankId,
-      pop_ext_id: extId,
-      pop_action: 'refresh',
-      pop_status: refreshResult.status || 'pending',
-    });
-
-    if (!createResult.success) {
-      logger.error('Failed to create pending operation for mental-model refresh', { serverId, bankId, extId, error: createResult.error });
-      return res.status(500).json({ error: createResult.error, code: 'TRACKING_ERROR' });
+    // refreshHindsightMentalModel already creates the pending_operations row;
+    // reuse its pop_id instead of creating a duplicate.
+    if (!refreshResult.popId) {
+      logger.warn('Mental-model refresh succeeded but pending operation was not tracked', { serverId, bankId, extId, operationId: refreshResult.operationId });
     }
 
-    logger.info('Mental-model refresh queued', { serverId, bankId, extId, operationId: refreshResult.operationId, popId: createResult.data });
+    logger.info('Mental-model refresh queued', { serverId, bankId, extId, operationId: refreshResult.operationId, popId: refreshResult.popId });
     sendResponse({
       res,
       status: 200,
-      data: { operation_id: refreshResult.operationId, pop_id: createResult.data, status: refreshResult.status },
+      data: { operation_id: refreshResult.operationId, pop_id: refreshResult.popId || null, status: refreshResult.status },
       logger,
       method: 'POST',
       path: '/research/mental-models/refresh',
@@ -1032,6 +1120,158 @@ router.post('/mental-models/refresh', async (req, res) => {
     });
   } catch (err) {
     logger.error('Research mental-models refresh failed', { serverId, bankId, extId, error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * @openapi
+ * /research/mental-models/content:
+ *   get:
+ *     summary: Fetch raw Hindsight mental-model content
+ *     description: |
+ *       Returns the latest content for a Hindsight mental model ext_id. The raw
+ *       content is returned for inspection, along with a normalized envelope
+ *       suitable for rendering with the contextual-graph viewer.
+ *     tags: [Research]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: ext_id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Content retrieved
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Model not found in Hindsight
+ *       502:
+ *         description: Hindsight server error
+ */
+router.get('/mental-models/content', async (req, res) => {
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.query.bank_id;
+  const extId = req.query.ext_id;
+  const start = Date.now();
+
+  if (!serverId || !bankId || !extId) {
+    return res.status(400).json({ error: 'server_id, bank_id, and ext_id are required', code: 'VALIDATION_ERROR' });
+  }
+
+  try {
+    logger.info('Research mental-models content request', { serverId, bankId, extId });
+    const result = await getHindsightMentalModel(serverId, bankId, extId, { detail: 'full' });
+    if (!result.success) {
+      const status = result.code === 'NOT_FOUND' ? 404 : 502;
+      return res.status(status).json({ error: result.error, code: result.code || 'FETCH_FAILED' });
+    }
+
+    const model = result.mentalModel || {};
+    const structuredOutput = model.reflect_response?.structured_output ?? null;
+
+    let rawContent;
+    let parsedContent = null;
+    let parseError = null;
+
+    if (structuredOutput && typeof structuredOutput === 'object' && !Array.isArray(structuredOutput)) {
+      rawContent = JSON.stringify(structuredOutput);
+      parsedContent = structuredOutput;
+    } else {
+      rawContent = model.content ?? null;
+      if (typeof rawContent === 'string' && rawContent.trim()) {
+        try {
+          parsedContent = JSON.parse(rawContent);
+        } catch (err) {
+          parseError = err.message;
+          // Some stored mental-model content is the valid JSON envelope followed
+          // by extra LLM text (e.g. trailing prose after the closing brace). Fall
+          // back to the loose JSON extractors that pull the first balanced {...}
+          // or [...] payload and ignore surrounding/markdown content.
+          parsedContent = parseJsonString(rawContent) || extractBalancedJson(rawContent);
+        }
+      } else if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
+        parsedContent = rawContent;
+      }
+    }
+
+    const catalogEntities = await loadEntityCatalog(db);
+    const knownCatalog = new Map(catalogEntities.map((e) => [e.id, e]));
+
+    const envelope = parsedContent
+      ? toEnvelope(parsedContent, { knownCatalog, activity: 'mental-model', mode: 'generic', preserveParallelEdges: true })
+      : {
+          narratives: [],
+          graph: { name: '', nodes: [], edges: [] },
+          tables: [],
+          diagrams: [],
+        };
+
+    const hasRawData = parsedContent
+      && ((Array.isArray(parsedContent.graph?.nodes) && parsedContent.graph.nodes.length > 0)
+        || (Array.isArray(parsedContent.graph?.edges) && parsedContent.graph.edges.length > 0)
+        || (Array.isArray(parsedContent.tables) && parsedContent.tables.length > 0)
+        || (Array.isArray(parsedContent.diagrams) && parsedContent.diagrams.length > 0)
+        || (Array.isArray(parsedContent.narratives) && parsedContent.narratives.some((n) => typeof n.narrative === 'string' && n.narrative.trim().length > 0)));
+
+    const hasEnvelopeData = (envelope.graph?.nodes?.length ?? 0) > 0
+      || (envelope.graph?.edges?.length ?? 0) > 0
+      || (envelope.tables?.length ?? 0) > 0
+      || (envelope.diagrams?.length ?? 0) > 0
+      || envelope.narratives?.some((n) => n.narrative?.trim().length > 0);
+
+    if (parseError && hasRawData) {
+      logger.warn('Mental-model content required loose JSON extraction', {
+        extId,
+        parseError,
+        rawContentLength: typeof rawContent === 'string' ? rawContent.length : null,
+      });
+    }
+
+    if (hasRawData && !hasEnvelopeData) {
+      logger.warn('Mental-model content normalization produced an empty envelope despite raw structured content', {
+        extId,
+        rawGraphNodeCount: Array.isArray(parsedContent?.graph?.nodes) ? parsedContent.graph.nodes.length : null,
+        rawGraphEdgeCount: Array.isArray(parsedContent?.graph?.edges) ? parsedContent.graph.edges.length : null,
+        knownCatalogSize: knownCatalog.size,
+      });
+    }
+
+    logger.info('Research mental-models content response', {
+      extId,
+      rawContentType: typeof rawContent,
+      parsedContentType: parsedContent != null ? typeof parsedContent : null,
+      envelopeNodes: envelope.graph?.nodes?.length ?? 0,
+      envelopeEdges: envelope.graph?.edges?.length ?? 0,
+      usedLooseExtraction: parseError != null && parsedContent != null,
+    });
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        ext_id: extId,
+        found: true,
+        content: rawContent,
+        content_hash: model.content_hash ?? null,
+        updated_at: model.updated_at ?? null,
+        envelope,
+      },
+      logger,
+      method: 'GET',
+      path: '/research/mental-models/content',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research mental-models content fetch failed', { serverId, bankId, extId, error: err.message, stack: err.stack });
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });
@@ -1091,7 +1331,7 @@ router.post('/synthesize', async (req, res) => {
       source_step_ids,
       intent_text,
       max_tokens,
-      template,
+      section_focus,
     } = req.body;
 
     if (!bank_id || typeof bank_id !== 'string') {
@@ -1153,17 +1393,18 @@ router.post('/synthesize', async (req, res) => {
       sourceSteps.push(step);
     }
 
+    const parsed = section_focus ? { sectionFocus: section_focus, intentText: intent_text } : parseSectionDirectives(intent_text);
+
     const handlerOptions = {
       ...(max_tokens !== undefined && { max_tokens }),
-      ...(template !== undefined && { template }),
+      ...(parsed.sectionFocus !== undefined && { section_focus: parsed.sectionFocus }),
       source_steps: sourceSteps.map((s) => ({
         intent_text: s.rstep_intent_text,
         action_type: s.rstep_action_type,
         parameters: s.rstep_parameters,
         selections: s.rstep_selections,
         viewpoint_ids: s.rstep_viewpoint_ids,
-        canvas: s.rstep_canvas_state,
-        synthesis: s.rstep_synthesis,
+        envelope: s.rstep_envelope,
         calls: s.rstep_calls,
       })),
     };
@@ -1173,13 +1414,15 @@ router.post('/synthesize', async (req, res) => {
     const stepResult = await createStep(db, {
       rs_id: session_id,
       rstep_parent_step_id: parentStepId,
+      // Store the raw user query so "Use details" / reuse can restore the full
+      // AQL including block directives. The parsed/stripped intent is passed to
+      // the agent below while the original query lives in the step record.
       rstep_intent_text: intent_text,
+      rstep_raw_query: req.body.raw_query || intent_text,
       rstep_selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
       rstep_action_type: 'synthesize',
       rstep_parameters: handlerOptions,
       rstep_viewpoint_ids: [],
-      rstep_canvas_state: {},
-      rstep_synthesis: {},
       rstep_tool_calls_used: 0,
       rstep_status: 'running',
       rstep_error_message: null,
@@ -1205,7 +1448,7 @@ router.post('/synthesize', async (req, res) => {
         serverId: server_id,
         bankId: bank_id,
         queryDepth: 'synthesize',
-        intentText: intent_text,
+        intentText: parsed.intentText,
         selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
         options: handlerOptions,
         rsId: session_id,
@@ -1251,12 +1494,14 @@ router.post('/synthesize', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [bank_id, viewpoint_ids]
+ *             required: [server_id, bank_id, viewpoint_ids]
  *             properties:
  *               title:
  *                 type: string
  *               description:
  *                 type: string
+ *               server_id:
+ *                 type: integer
  *               bank_id:
  *                 type: string
  *               viewpoint_ids:
@@ -1265,8 +1510,12 @@ router.post('/synthesize', async (req, res) => {
  */
 router.post('/sessions', async (req, res) => {
   const start = Date.now();
-  const { title, description, bank_id, viewpoint_ids } = req.body;
+  const { title, description, server_id, bank_id, viewpoint_ids, scope_entity_ids } = req.body;
 
+  if (!server_id || typeof server_id !== 'number') {
+    sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions', duration: Date.now() - start });
+    return;
+  }
   if (!bank_id || typeof bank_id !== 'string') {
     sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions', duration: Date.now() - start });
     return;
@@ -1279,8 +1528,10 @@ router.post('/sessions', async (req, res) => {
   const result = await createSession(db, {
     rs_title: typeof title === 'string' && title.trim() ? title.trim() : 'Untitled session',
     rs_description: typeof description === 'string' && description.trim() ? description.trim() : null,
+    rs_server_id: server_id,
     rs_bank_id: bank_id,
     rs_viewpoint_ids: viewpoint_ids,
+    rs_scope_entity_ids: scope_entity_ids ?? [],
     rs_status: 'active',
   });
 
@@ -1293,25 +1544,37 @@ router.post('/sessions', async (req, res) => {
 
 /**
  * @openapi
- * /research/banks/{bankId}/sessions:
+ * /research/sessions:
  *   get:
- *     summary: List research sessions for a bank
+ *     summary: List research sessions for a server and bank
  *     tags: [Research]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
  */
-router.get('/banks/:bankId/sessions', async (req, res) => {
+router.get('/sessions', async (req, res) => {
   const start = Date.now();
-  const bankId = req.params.bankId;
-  if (!bankId || typeof bankId !== 'string') {
-    sendResponse({ res, status: 400, error: 'bankId is required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/banks/:bankId/sessions', duration: Date.now() - start });
+  const serverId = parseInt(req.query.server_id, 10);
+  const bankId = req.query.bank_id;
+  if (!serverId || !bankId || typeof bankId !== 'string') {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/sessions', duration: Date.now() - start });
     return;
   }
 
-  const result = await listSessionsByBank(db, bankId);
+  const result = await listSessionsByServerBank(db, serverId, bankId);
   if (!result.success) {
-    sendResponse({ res, status: 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'GET', path: '/research/banks/:bankId/sessions', duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'GET', path: '/research/sessions', duration: Date.now() - start });
     return;
   }
-  sendResponse({ res, status: 200, data: (result.data || []).map(toApiSession), logger, method: 'GET', path: '/research/banks/:bankId/sessions', duration: Date.now() - start });
+  sendResponse({ res, status: 200, data: (result.data || []).map(toApiSession), logger, method: 'GET', path: '/research/sessions', duration: Date.now() - start });
 });
 
 /**
@@ -1329,11 +1592,12 @@ router.put('/sessions/:id', async (req, res) => {
   const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id', start });
   if (!idCheck.valid) return;
 
-  const { title, description, status } = req.body;
+  const { title, description, status, scope_entity_ids } = req.body;
   const updateData = {};
   if (title !== undefined) updateData.rs_title = title;
   if (description !== undefined) updateData.rs_description = description;
   if (status !== undefined) updateData.rs_status = status;
+  if (scope_entity_ids !== undefined) updateData.rs_scope_entity_ids = scope_entity_ids;
 
   const result = await updateSession(db, idCheck.id, updateData);
   if (!result.success) {
@@ -1378,6 +1642,62 @@ router.get('/sessions/:id/steps', async (req, res) => {
 
 /**
  * @openapi
+ * /research/sessions/{id}/pages:
+ *   post:
+ *     summary: Create a new curated page inside a research session
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title]
+ *             properties:
+ *               title:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Curated page created
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: Session not found
+ */
+router.post('/sessions/:id/pages', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/pages', start });
+  if (!idCheck.valid) return;
+
+  const { title } = req.body;
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    sendResponse({ res, status: 400, error: 'title is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  const sessionResult = await getSession(db, idCheck.id);
+  if (!sessionResult.success || !sessionResult.data) {
+    sendResponse({ res, status: 404, error: 'Research session not found', code: 'NOT_FOUND', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  const result = await createSessionPage(db, idCheck.id, title.trim());
+  if (!result.success) {
+    sendResponse({ res, status: mapErrorToStatus(result.code) || 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  const stepResult = await getStep(db, result.data);
+  if (!stepResult.success || !stepResult.data) {
+    sendResponse({ res, status: 500, error: 'Created step could not be loaded', code: 'DATABASE_ERROR', logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+    return;
+  }
+
+  sendResponse({ res, status: 201, data: toApiStepSummary(stepResult.data), logger, method: 'POST', path: '/research/sessions/:id/pages', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
  * /research/steps/{id}:
  *   get:
  *     summary: Get a single research step
@@ -1409,6 +1729,43 @@ router.get('/steps/:id', async (req, res) => {
     return;
   }
   sendResponse({ res, status: 200, data: toApiStep(result.data), logger, method: 'GET', path: '/research/steps/:id', duration: Date.now() - start });
+});
+
+router.put('/steps/:id', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/steps/:id', start });
+  if (!idCheck.valid) return;
+
+  const stepResult = await getStep(db, idCheck.id);
+  if (!stepResult.success || !stepResult.data) {
+    sendResponse({ res, status: 404, error: 'Research step not found', code: 'NOT_FOUND', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const step = stepResult.data;
+  if (step.rstep_action_type !== 'curated_page') {
+    sendResponse({ res, status: 400, error: 'Only curated_page steps can be updated via this route', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const { intent_text, envelope } = req.body;
+  const updateData = {};
+  if (intent_text !== undefined) updateData.rstep_intent_text = intent_text;
+  if (envelope !== undefined) updateData.rstep_envelope = envelope;
+
+  if (Object.keys(updateData).length === 0) {
+    sendResponse({ res, status: 400, error: 'No fields to update', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const result = await updateCuratedPage(db, idCheck.id, updateData);
+  if (!result.success) {
+    sendResponse({ res, status: mapErrorToStatus(result.code) || 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
+    return;
+  }
+
+  const updated = await getStep(db, idCheck.id);
+  sendResponse({ res, status: 200, data: toApiStep(updated.data), logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
 });
 
 router.delete('/steps/:id', async (req, res) => {
@@ -1517,8 +1874,7 @@ router.post('/steps/:id/rerun', async (req, res) => {
   }
 
   const snapshot = {
-    rstep_canvas_state: step.rstep_canvas_state,
-    rstep_synthesis: step.rstep_synthesis,
+    rstep_envelope: step.rstep_envelope,
     rstep_calls: step.rstep_calls,
     rstep_status: step.rstep_status,
     rstep_error_message: step.rstep_error_message,
@@ -1589,22 +1945,22 @@ router.post('/steps/:id/rerun', async (req, res) => {
 
 /**
  * @openapi
- * /research/banks/{bankId}/graph:
+ * /research/graph:
  *   get:
- *     summary: Get the global entity graph for a bank
- *     description: Returns the normalized Hindsight entity graph for the selected bank, with architxt entity labels/types resolved.
+ *     summary: Get the global entity graph for a server/bank
+ *     description: Returns the normalized Hindsight entity graph for the selected server and bank, with architxt entity labels/types resolved.
  *     tags: [Research]
  *     parameters:
- *       - in: path
- *         name: bankId
- *         required: true
- *         schema:
- *           type: string
  *       - in: query
  *         name: server_id
  *         required: true
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
  *       - in: query
  *         name: limit
  *         schema:
@@ -1626,14 +1982,14 @@ router.post('/steps/:id/rerun', async (req, res) => {
  *                 edges:
  *                   type: array
  */
-router.get('/banks/:bankId/graph', async (req, res) => {
+router.get('/graph', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
   const { limit, min_count } = req.query;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
     return;
   }
 
@@ -1643,30 +1999,31 @@ router.get('/banks/:bankId/graph', async (req, res) => {
       min_count: min_count ? Number.parseInt(min_count, 10) : undefined,
     });
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'GRAPH_FAILED', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'GRAPH_FAILED', logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
   } catch (err) {
-    logger.error('Research bank graph route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/graph`, duration: Date.now() - start });
+    logger.error('Research graph route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/graph', duration: Date.now() - start });
   }
 });
 
 /**
- * @swagger
- * /research/banks/{bankId}/entities:
+ * @openapi
+ * /research/entities:
  *   get:
- *     summary: Get all entities for a bank
- *     description: Returns every Hindsight entity for the bank resolved to architxt canonical entities.
+ *     summary: Get all entities for a server/bank
+ *     description: Returns every Hindsight entity for the server and bank resolved to architxt canonical entities.
+ *     tags: [Research]
  *     parameters:
  *       - in: query
  *         name: server_id
  *         required: true
  *         schema:
  *           type: integer
- *       - in: path
- *         name: bankId
+ *       - in: query
+ *         name: bank_id
  *         required: true
  *         schema:
  *           type: string
@@ -1683,26 +2040,26 @@ router.get('/banks/:bankId/graph', async (req, res) => {
  *                 edges:
  *                   type: array
  */
-router.get('/banks/:bankId/entities', async (req, res) => {
+router.get('/entities', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await normalizeHindsightEntities(serverId, bankId, db, { limit: 1000 });
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITIES_FAILED', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITIES_FAILED', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: { nodes: result.nodes, edges: result.edges }, logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
   } catch (err) {
-    logger.error('Research bank entities route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/research/banks/${bankId}/entities`, duration: Date.now() - start });
+    logger.error('Research entities route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
   }
 });
 

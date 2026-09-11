@@ -78,23 +78,23 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} modal={true}>
-      <DialogContent className="sm:max-w-2xl bg-[oklch(0.23_0_0)] border-white/[0.08] text-white">
+      <DialogContent className="sm:max-w-2xl bg-surface-card border-on-dark/[0.08] text-foreground-default">
         <DialogHeader>
-          <DialogTitle className="text-base font-medium text-white">
+          <DialogTitle className="text-base font-medium text-foreground-default">
             Related documents
           </DialogTitle>
-          <p className="text-xs text-white/50 mt-1">
+          <p className="text-xs text-foreground-subtle mt-1">
             {selectedEntityIds.length} {selectedEntityIds.length === 1 ? 'entity' : 'entities'} selected
           </p>
         </DialogHeader>
 
-        <div className="mt-4 rounded-md border border-white/[0.08] overflow-hidden">
+        <div className="mt-4 rounded-md border border-on-dark/[0.08] overflow-hidden">
           {loading && docs.length === 0 ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />
+              <Loader2 className="h-5 w-5 animate-spin text-accent-secondary-fg" />
             </div>
           ) : docs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-white/40">
+            <div className="flex flex-col items-center justify-center py-12 text-foreground-subtle">
               <FileText className="h-8 w-8 mb-3 opacity-30" />
               <span className="text-sm">No related documents found</span>
               <span className="text-xs mt-1">Try selecting different entities</span>
@@ -102,11 +102,11 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
           ) : (
             <div className="max-h-[60vh] overflow-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-[oklch(0.23_0_0)]">
-                  <TableRow className="border-b border-white/10 hover:bg-transparent">
-                    <TableHead className="text-xs uppercase text-white/60 font-medium h-8 py-1.5 px-4 w-16">ID</TableHead>
-                    <TableHead className="text-xs uppercase text-white/60 font-medium h-8 py-1.5 px-4 w-[35%]">External ID</TableHead>
-                    <TableHead className="text-xs uppercase text-white/60 font-medium h-8 py-1.5 px-4">Filename</TableHead>
+                <TableHeader className="sticky top-0 z-10 bg-surface-card">
+                  <TableRow className="border-b border-border-default hover:bg-transparent">
+                    <TableHead className="text-xs uppercase text-foreground-faint font-medium h-8 py-1.5 px-4 w-16">ID</TableHead>
+                    <TableHead className="text-xs uppercase text-foreground-faint font-medium h-8 py-1.5 px-4 w-[35%]">External ID</TableHead>
+                    <TableHead className="text-xs uppercase text-foreground-faint font-medium h-8 py-1.5 px-4">Filename</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -114,17 +114,17 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
                     <TableRow
                       key={doc.id}
                       onClick={() => handleRowClick(doc)}
-                      className="border-b border-white/[0.06] hover:bg-white/[0.06] cursor-pointer"
+                      className="border-b border-on-dark/[0.06] hover:bg-on-dark/[0.06] cursor-pointer"
                     >
-                      <TableCell className="py-1.5 px-4 text-xs font-mono text-white/70">
+                      <TableCell className="py-1.5 px-4 text-xs font-mono text-foreground-faint">
                         {fetchingDocId === doc.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-secondary-fg" />
                         ) : (
                           doc.id
                         )}
                       </TableCell>
-                      <TableCell className="py-1.5 px-4 text-xs text-white/80">{doc.ext_id || '-'}</TableCell>
-                      <TableCell className="py-1.5 px-4 text-xs text-white/80 truncate max-w-[200px]">{doc.filename || '-'}</TableCell>
+                      <TableCell className="py-1.5 px-4 text-xs text-foreground-muted">{doc.ext_id || '-'}</TableCell>
+                      <TableCell className="py-1.5 px-4 text-xs text-foreground-muted truncate max-w-[200px]">{doc.filename || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -133,11 +133,11 @@ export function EntityDocumentsDialog({ isOpen, onClose, selectedEntityIds }: Pr
           )}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/[0.08] flex justify-end">
+        <div className="mt-4 pt-4 border-t border-on-dark/[0.08] flex justify-end">
           <Button
             variant="ghost"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>

@@ -6,6 +6,7 @@ import { stmt } from '../cache.js';
 import { createLogger } from '../utils/logger.js';
 import { createFtsIndex } from '../services/search/full-text.js';
 import { resetSeedData } from './ensure-seed.js';
+import { getTagByName, createTag } from './crud/tags.js';
 
 const logger = createLogger('schema');
 
@@ -36,24 +37,25 @@ function ensureMissingTables(db) {
     {
       name: 'mental_models',
       ddl: `CREATE TABLE IF NOT EXISTS mental_models (
-        mm_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        mm_ext_id TEXT NOT NULL UNIQUE,
-        mm_name TEXT,
-        mm_source_query TEXT,
-        mm_refresh_after_consolidation TEXT DEFAULT 'false',
-        mm_refresh_mode TEXT DEFAULT 'full',
-        mm_exclude_all_mental_models TEXT DEFAULT 'false',
-        mm_exclude_mental_model_list TEXT,
-        mm_tags_match_mode TEXT DEFAULT 'all_strict',
-        mm_is_template TEXT DEFAULT 'false',
-        mm_max_tokens INTEGER DEFAULT 2048,
-        mm_viewp_description TEXT,
-        mm_viewp_meta JSON,
-        mm_dimension TEXT,
-        mm_returns TEXT DEFAULT 'narrative' CHECK (mm_returns IN ('json', 'narrative')),
-        mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
-        mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      mm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mm_ext_id TEXT NOT NULL UNIQUE,
+      mm_name TEXT,
+      mm_source_query TEXT,
+      mm_refresh_after_consolidation TEXT DEFAULT 'false',
+      mm_refresh_mode TEXT DEFAULT 'full',
+      mm_exclude_all_mental_models TEXT DEFAULT 'false',
+      mm_exclude_mental_model_list TEXT,
+      mm_tags_match_mode TEXT DEFAULT 'all_strict',
+      mm_is_template TEXT DEFAULT 'false',
+      mm_template_role TEXT,
+      mm_max_tokens INTEGER DEFAULT 2048,
+      mm_viewp_description TEXT,
+      mm_viewp_meta JSON,
+      mm_dimension TEXT,
+      mm_returns TEXT,
+      mm_concatenation TEXT,
+      mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
     },
     {
@@ -91,12 +93,12 @@ function ensureMissingTables(db) {
         rs_id INTEGER NOT NULL,
         rstep_parent_step_id INTEGER,
         rstep_intent_text TEXT NOT NULL,
+        rstep_raw_query TEXT,
         rstep_selections JSON,
         rstep_action_type TEXT NOT NULL,
         rstep_parameters JSON,
         rstep_viewpoint_ids JSON,
-        rstep_canvas_state JSON,
-        rstep_synthesis JSON,
+        rstep_envelope JSON,
         rstep_tool_calls_used INTEGER DEFAULT 0,
         rstep_status TEXT,
         rstep_error_message TEXT,
@@ -112,12 +114,15 @@ function ensureMissingTables(db) {
         rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
         rs_title TEXT NOT NULL,
         rs_description TEXT,
+        rs_server_id INTEGER,
         rs_bank_id TEXT NOT NULL,
         rs_viewpoint_ids JSON NOT NULL,
+        rs_scope_entity_ids JSON,
         rs_status TEXT NOT NULL DEFAULT 'active',
         rs_current_step_id INTEGER,
         rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
         FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
       )`
     },
@@ -198,6 +203,80 @@ function ensureMissingTables(db) {
         pt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         pt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
+    },
+    {
+      name: 'contextual_graph_nodes',
+      ddl: `CREATE TABLE IF NOT EXISTS contextual_graph_nodes (
+        cgn_id TEXT NOT NULL,
+        cgn_server_id INTEGER NOT NULL,
+        cgn_bank_id TEXT NOT NULL,
+        cgn_labels TEXT NOT NULL,
+        cgn_properties TEXT NOT NULL,
+        cgn_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        cgn_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY (cgn_server_id, cgn_bank_id, cgn_id),
+        FOREIGN KEY (cgn_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'contextual_graph_edges',
+      ddl: `CREATE TABLE IF NOT EXISTS contextual_graph_edges (
+        cge_id TEXT NOT NULL,
+        cge_server_id INTEGER NOT NULL,
+        cge_bank_id TEXT NOT NULL,
+        cge_source_id TEXT NOT NULL,
+        cge_target_id TEXT NOT NULL,
+        cge_type TEXT,
+        cge_properties TEXT NOT NULL,
+        cge_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        cge_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY (cge_server_id, cge_bank_id, cge_id),
+        FOREIGN KEY (cge_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'contextual_graph_jobs',
+      ddl: `CREATE TABLE IF NOT EXISTS contextual_graph_jobs (
+        cgj_id TEXT PRIMARY KEY,
+        cgj_server_id INTEGER NOT NULL,
+        cgj_bank_id TEXT NOT NULL,
+        cgj_status TEXT NOT NULL DEFAULT 'pending' CHECK (cgj_status IN ('pending','running','completed','failed','cancelled')),
+        cgj_stages JSON NOT NULL DEFAULT '[]',
+        cgj_logs JSON NOT NULL DEFAULT '[]',
+        cgj_options JSON,
+        cgj_stats JSON,
+        cgj_error_message TEXT,
+        cgj_error_code TEXT,
+        cgj_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        cgj_started_at TIMESTAMP,
+        cgj_finished_at TIMESTAMP,
+        cgj_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (cgj_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'contextual_graph_job_logs',
+      ddl: `CREATE TABLE IF NOT EXISTS contextual_graph_job_logs (
+        cgjl_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cgj_id TEXT NOT NULL,
+        cgjl_stage TEXT,
+        cgjl_level TEXT NOT NULL CHECK (cgjl_level IN ('info','warn','error')),
+        cgjl_message TEXT NOT NULL,
+        cgjl_details JSON,
+        cgjl_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (cgj_id) REFERENCES contextual_graph_jobs(cgj_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'template_roles',
+      ddl: `CREATE TABLE IF NOT EXISTS template_roles (
+        tr_role_id TEXT PRIMARY KEY,
+        tr_display_name TEXT NOT NULL,
+        tr_derivation_scope TEXT NOT NULL,
+        tr_sort_order INTEGER,
+        tr_created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        tr_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`
     }
   ];
 
@@ -219,67 +298,81 @@ function ensureMissingTables(db) {
  */
 const BUILTIN_TEMPLATES = [
   {
-    name: 'narrative',
-    mode: 'narrative',
-    description: 'Narrative-only output.',
-    body: 'Answer the topic below as a focused Markdown narrative. Do not return a graph section.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '[]',
-    variables: '["ARCHITXT_TOPIC"]',
+    name: 'generic',
+    mode: 'generic',
+    description: 'Universal template. Returns narrative + graph + tables + diagrams based on user directives.',
+    body: `Produce output for the topic below according to the Section rules. Do not write narrative prose unless the narrative section is active.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS","ARCHITXT_DIAGRAM_FOCUS"]',
     examplesHeuristic: null,
   },
   {
-    name: 'graph-known',
-    mode: 'graph-known',
-    description: 'Graph-only output using known entities only.',
-    body: 'Return only the graph section for the topic below. Use only entity ids from the provided catalog. Do not invent new entities.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
+    name: 'sys_entity_summary',
+    mode: 'sys_entity_summary',
+    description: 'System template: concise evidence-backed summary for one contextual-graph node.',
+    body: `Answer the topic below.
+
+## Topic
+
+{{ARCHITXT_TOPIC}}
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    examplesHeuristic: null,
   },
   {
-    name: 'graph-discovery',
-    mode: 'graph-discovery',
-    description: 'Graph-only output allowing discovered nodes.',
-    body: 'Return only the graph section for the topic below. Prefer known entities from the catalog; you may add found: nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-allowed.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
+    name: 'sys_entity_capabilities',
+    mode: 'sys_entity_capabilities',
+    description: 'System template: capabilities table for one contextual-graph node.',
+    body: `Answer the topic below.
+
+## Topic
+
+{{ARCHITXT_TOPIC}}
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    examplesHeuristic: null,
   },
   {
-    name: 'graph-discovered-only',
-    mode: 'graph-discovered-only',
-    description: 'Graph-only output returning discovered nodes and edges only.',
-    body: 'Return only the graph section for the topic below. Emit only discovered nodes and edges. Known entities may appear only as endpoints of discovered edges; do not return them as standalone nodes.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '["output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-discovered-only.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
+    name: 'sys_edge_context',
+    mode: 'sys_edge_context',
+    description: 'System template: directed interactions between two specific contextual-graph nodes.',
+    body: `Answer the topic below.
+
+## Topic
+
+{{ARCHITXT_TOPIC}}
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    examplesHeuristic: null,
   },
   {
-    name: 'narrative-graph-known',
-    mode: 'narrative-graph-known',
-    description: 'Narrative + graph using known entities only.',
-    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section. Use only entity ids from the provided catalog. Do not invent new entities.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-known.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
-  },
-  {
-    name: 'narrative-graph-discovery',
-    mode: 'narrative-graph-discovery',
-    description: 'Narrative + graph allowing discovered nodes.',
-    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section. Prefer known entities from the catalog; you may add found: nodes for persistent named architectural elements not in the catalog.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-allowed.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
-  },
-  {
-    name: 'narrative-graph-discovered-only',
-    mode: 'narrative-graph-discovered-only',
-    description: 'Narrative + graph returning discovered nodes and edges only.',
-    body: 'Answer the topic below as a focused Markdown narrative. Then return a graph section containing only discovered nodes and edges. Known entities may appear only as endpoints of discovered edges; do not return them as standalone nodes.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}',
-    fragments: '["output-format-narrative-graph.md","output-format-graph.md","entity-catalog.md","entity-id-format.md","node-discovery-policy-discovered-only.md","edge-vocabulary.md","node-eligibility.md","label-rules.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_ENTITIES","ARCHITXT_NODE_EXAMPLES"]',
-    examplesHeuristic: 'top-n',
+    name: 'sys_discovery_context',
+    mode: 'sys_discovery_context',
+    description: 'System template: suggest new contextual-graph nodes and edges around a seed node.',
+    body: `Answer the topic below.
+
+## Topic
+
+{{ARCHITXT_TOPIC}}
+
+## Source material
+
+{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","node-discovery-policy-known.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    examplesHeuristic: null,
   },
 ];
 
@@ -397,6 +490,232 @@ function ensureBuiltinPromptTemplates(db) {
   return seeded + coerced + patched;
 }
 
+/**
+ * Seed system template roles for contextual-graph mental models.
+ * Idempotent: inserts missing roles and updates labels/scopes/sort order when
+ * rows already exist. User-created roles are never modified.
+ */
+function ensureTemplateRoles(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
+  if (!tableExists) return 0;
+
+  const roles = [
+    { role_id: 'sys_entity_summary', display_name: 'Entity summary', derivation_scope: 'node', sort_order: 1 },
+    { role_id: 'sys_entity_capabilities', display_name: 'Entity capabilities', derivation_scope: 'node', sort_order: 2 },
+    { role_id: 'sys_edge_context', display_name: 'Edge context', derivation_scope: 'edge', sort_order: 3 },
+    { role_id: 'sys_discovery_context', display_name: 'Discovery', derivation_scope: 'seed', sort_order: 4 },
+    { role_id: 'user_entity_derived', display_name: 'User entity derived', derivation_scope: 'node', sort_order: 5 },
+  ];
+
+  const upsert = db.prepare(`
+    INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(tr_role_id) DO UPDATE SET
+      tr_display_name = excluded.tr_display_name,
+      tr_derivation_scope = excluded.tr_derivation_scope,
+      tr_sort_order = excluded.tr_sort_order
+  `);
+
+  let seeded = 0;
+  for (const r of roles) {
+    const result = upsert.run(r.role_id, r.display_name, r.derivation_scope, r.sort_order);
+    if (result.changes > 0) seeded++;
+  }
+
+  if (seeded > 0) {
+    logger.info('Ensured template roles', { seeded, roles: roles.map((r) => r.role_id) });
+  }
+  return seeded;
+}
+
+/**
+ * Backfill legacy template_roles rows that were created before the timestamp
+ * columns existed. Uses the migration epoch for rows that still carry the
+ * placeholder default value.
+ */
+function backfillTemplateRoleTimestamps(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='template_roles'").get();
+  if (!tableExists) return 0;
+
+  const cols = new Set(db.prepare("PRAGMA table_info(template_roles)").all().map((r) => r.name));
+  if (!cols.has('tr_created_at') || !cols.has('tr_updated_at')) return 0;
+
+  const result = db.prepare(`
+    UPDATE template_roles
+    SET tr_created_at = CURRENT_TIMESTAMP, tr_updated_at = CURRENT_TIMESTAMP
+    WHERE tr_created_at = '1970-01-01T00:00:00Z' OR tr_updated_at = '1970-01-01T00:00:00Z'
+  `).run();
+  if (result.changes > 0) {
+    logger.info(`Backfilled ${result.changes} template role timestamp(s)`);
+  }
+  return result.changes;
+}
+
+/**
+ * System-owned contextual-graph mental-model templates.
+ *
+ * These rows are identified by mm_template_role, not by tags. They are never
+ * derived from mental_model_entities; add-context renders instances from the
+ * working graph and pushes them directly to Hindsight.
+ */
+export const CONTEXTUAL_GRAPH_TEMPLATES = [
+  {
+    extId: 'entity-summary-{entity-id}',
+    name: 'Entity summary: {entity-name}',
+    role: 'sys_entity_summary',
+    sourceQuery: `[[{entity-name} ({entity-id})]].
+#narrative
+Describe its core architectural role, responsibilities, and relationships to other components.
+#end`,
+    maxTokens: 8192,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'true',
+    tagsMatchMode: 'any',
+  },
+  {
+    extId: 'entity-capabilities-{entity-id}',
+    name: 'Entity capabilities: {entity-name}',
+    role: 'sys_entity_capabilities',
+    sourceQuery: `[[{entity-name} ({entity-id})]].
+#table
+#table-name Capabilities
+Return the major architectural capabilities of the entity in a table with columns: name, responsibility, purpose, business_capability_mapping, evidence.
+- name: the capability name.
+- responsibility: what the entity does for this capability.
+- purpose: why the capability matters.
+- business_capability_mapping: the business domain this capability belongs to.
+- evidence: array of Hindsight memory IDs supporting this capability.
+List its major capabilities, each with its purpose, responsibility, business capability mapping, and evidence.
+#end`,
+    maxTokens: 8192,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'true',
+    tagsMatchMode: 'any',
+  },
+  {
+    extId: 'edge-ctx-{source-id}|{target-id}',
+    name: 'Edge context: {source-name} ↔ {target-name}',
+    role: 'sys_edge_context',
+    sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
+#graph
+For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
+#end`,
+    maxTokens: 8192,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'true',
+    tagsMatchMode: 'any',
+  },
+  {
+    extId: 'discover-{seed-id}',
+    name: 'Discover around {seed-name}',
+    role: 'sys_discovery_context',
+    sourceQuery: 'Seed entity: {seed-id} ({seed-name}).\n#graph\nSuggest candidate related components, systems, or entities that interact with or are adjacent to this seed, and describe how they connect. Candidates should use the same node id as the seed for any known neighbor; only use a bare lowercase slug for genuinely new candidates.\n#end',
+    maxTokens: 8192,
+    refreshMode: 'full',
+    refreshAfterConsolidation: 'false',
+    excludeAllMentalModels: 'true',
+    tagsMatchMode: 'any',
+  },
+];
+
+function migrateLegacyIdPlaceholder(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
+  if (!tableExists) return 0;
+
+  // Rename the old bare {id} placeholder to the canonical {entity-id} across
+  // all templated mental-model fields. This unifies user/system/custom
+  // templates with the shared substitution vocabulary.
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query'];
+  let migrated = 0;
+  for (const col of cols) {
+    const update = db.prepare(`
+      UPDATE mental_models
+      SET ${col} = REPLACE(${col}, '{id}', '{entity-id}')
+      WHERE ${col} LIKE '%{id}%'
+    `);
+    const result = update.run();
+    migrated += result.changes;
+  }
+  if (migrated > 0) {
+    logger.info(`Migrated ${migrated} mental-model field(s) from {id} to {entity-id}`);
+  }
+  return migrated;
+}
+
+function ensureContextualGraphTemplates(db) {
+  const mmTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
+  const ptTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'prompt_templates'").get();
+  if (!mmTableExists || !ptTableExists) return 0;
+
+  const existing = db.prepare('SELECT mm_ext_id, mm_template_role FROM mental_models WHERE mm_is_template = ?').all('true');
+  const existingRoles = new Set(existing.map((r) => r.mm_template_role));
+
+  // Delete stale contextual-graph template rows whose role is one of ours but
+  // whose ext_id no longer matches the canonical shape. This prevents old
+  // deployed templates (e.g. discover-*-{batch}) from shadowing the new ones.
+  let deleted = 0;
+  const deleteStale = db.prepare(`
+    DELETE FROM mental_models
+    WHERE mm_is_template = ?
+      AND mm_template_role = ?
+      AND mm_ext_id != ?
+  `);
+  for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
+    const result = deleteStale.run('true', t.role, t.extId);
+    deleted += result.changes;
+  }
+
+  // Delete deprecated contextual-graph roles that are no longer canonical
+  // (e.g. sys_entity_context was replaced by sys_entity_summary).
+  const deprecatedRoles = ['sys_entity_context'];
+  if (deprecatedRoles.length > 0) {
+    const deleteDeprecated = db.prepare(`
+      DELETE FROM mental_models
+      WHERE mm_is_template = ?
+        AND mm_template_role IN (${deprecatedRoles.map(() => '?').join(',')})
+    `);
+    const deprecatedResult = deleteDeprecated.run('true', ...deprecatedRoles);
+    deleted += deprecatedResult.changes;
+  }
+
+  let seeded = 0;
+  const insertIfMissing = db.prepare(`
+    INSERT OR IGNORE INTO mental_models (mm_ext_id, mm_name, mm_source_query, mm_is_template, mm_template_role, mm_max_tokens, mm_refresh_mode, mm_refresh_after_consolidation, mm_exclude_all_mental_models, mm_tags_match_mode)
+    VALUES (?, ?, ?, 'true', ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
+    try {
+      const result = insertIfMissing.run(
+        t.extId,
+        t.name,
+        t.sourceQuery,
+        t.role,
+        t.maxTokens,
+        t.refreshMode,
+        t.refreshAfterConsolidation,
+        t.excludeAllMentalModels,
+        t.tagsMatchMode,
+      );
+
+      if (result.changes > 0) {
+        seeded++;
+      }
+    } catch (err) {
+      logger.error('Failed to ensure contextual-graph template', { extId: t.extId, role: t.role, error: err.message });
+    }
+  }
+
+  if (seeded > 0 || deleted > 0) {
+    logger.info('Ensured contextual-graph system templates', { seeded, deleted, roles: CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role) });
+  }
+
+  return seeded;
+}
+
 function relaxResearchStepsParentCascade(db) {
   const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'research_steps'").get();
   if (!tableExists) {
@@ -419,10 +738,11 @@ function relaxResearchStepsParentCascade(db) {
 
   logger.warn('Recreating research_steps with ON DELETE SET NULL for rstep_parent_step_id');
 
+  // SQLite only supports a limited subset of ALTER TABLE, so recreate the
+  // table when adding a column. Existing columns are preserved.
   const columns = [
-    'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_selections',
-    'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_canvas_state',
-    'rstep_synthesis', 'rstep_proposed_actions', 'rstep_anchors', 'rstep_intent_tag',
+    'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
+    'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
     'rstep_status', 'rstep_error_message',
     'rstep_tool_calls_used', 'rstep_tool_tokens_used', 'rstep_synthesis_tokens_used',
     'rstep_truncated_by', 'rstep_created_at'
@@ -437,12 +757,12 @@ function relaxResearchStepsParentCascade(db) {
       rs_id INTEGER NOT NULL,
       rstep_parent_step_id INTEGER,
       rstep_intent_text TEXT NOT NULL,
+      rstep_raw_query TEXT,
       rstep_selections JSON,
       rstep_action_type TEXT NOT NULL,
       rstep_parameters JSON,
       rstep_viewpoint_ids JSON,
-      rstep_canvas_state JSON,
-      rstep_synthesis JSON,
+      rstep_envelope JSON,
       rstep_status TEXT,
       rstep_error_message TEXT,
       rstep_tool_calls_used INTEGER DEFAULT 0,
@@ -495,16 +815,17 @@ function removeMentalModelCheckConstraints(db) {
       mm_exclude_mental_model_list TEXT,
       mm_tags_match_mode TEXT DEFAULT 'all_strict',
       mm_is_template TEXT DEFAULT 'false',
+      mm_template_role TEXT,
       mm_max_tokens INTEGER DEFAULT 2048,
       mm_viewp_description TEXT,
       mm_viewp_meta JSON,
       mm_dimension TEXT,
-      mm_returns TEXT DEFAULT 'narrative' REFERENCES prompt_templates(pt_name),
-      mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
+      mm_returns TEXT,
+      mm_concatenation TEXT,
       mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
     )`,
-    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_viewp_description', 'mm_viewp_meta', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
+    columns: ['mm_id', 'mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_template_role', 'mm_max_tokens', 'mm_viewp_description', 'mm_viewp_meta', 'mm_dimension', 'mm_returns', 'mm_concatenation', 'mm_created_at', 'mm_updated_at']
   };
 
   const mentalModelEntitiesInfo = {
@@ -537,7 +858,10 @@ function removeMentalModelCheckConstraints(db) {
 
     return ['mm_refresh_mode', 'mm_tags_match_mode', 'mm_ent_refresh_mode', 'mm_returns'].some((colName) => {
       const checkPattern = new RegExp(`CHECK\\s*\\(\\s*${colName}\\s+IN`, 'i');
-      return checkPattern.test(sql);
+      const fkPattern = colName === 'mm_returns'
+        ? new RegExp(`${colName}\\s+[^,]*REFERENCES`, 'i')
+        : null;
+      return checkPattern.test(sql) || (fkPattern && fkPattern.test(sql));
     });
   }
 
@@ -578,7 +902,7 @@ function removeMentalModelCheckConstraints(db) {
     const colList = columns.join(', ');
     if (name === 'mental_models') {
       const mappedColList = columns.map((c) =>
-        c === 'mm_returns' ? "CASE mm_returns WHEN 'json' THEN 'graph-known' WHEN 'narrative' THEN 'narrative' ELSE mm_returns END AS mm_returns" : c
+        c === 'mm_returns' ? "CASE mm_returns WHEN 'json' THEN 'generic' WHEN 'narrative' THEN 'generic' WHEN 'graph-known' THEN 'generic' WHEN 'graph-discovery' THEN 'generic' WHEN 'graph-discovered-only' THEN 'generic' WHEN 'narrative-graph-known' THEN 'generic' WHEN 'narrative-graph-discovery' THEN 'generic' WHEN 'narrative-graph-discovered-only' THEN 'generic' ELSE mm_returns END AS mm_returns" : c
       ).join(', ');
       db.exec(`INSERT INTO ${name}_new (${colList}) SELECT ${mappedColList} FROM ${name}`);
     } else {
@@ -603,6 +927,95 @@ function removeMentalModelCheckConstraints(db) {
   }
 
   return migrated;
+}
+
+/**
+ * Remove the column-level UNIQUE constraint on mental_models.mm_template_role.
+ *
+ * The unlimited 'user_entity_derived' role is meant to be assigned to many
+ * mental models (one per User derived entity type), so a blanket UNIQUE
+ * constraint is incorrect. We recreate the table without it, then rely on a
+ * partial unique index (created by ensureTemplateRoleUniqueIndex) to keep
+ * system/user role-based template roles unique at the database level.
+ */
+function removeMentalModelTemplateRoleUnique(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mental_models'").get();
+  if (!tableExists) return 0;
+
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='mental_models'").pluck().get();
+  if (typeof sql !== 'string') return 0;
+
+  const hasUnique = /mm_template_role\s+TEXT\s+UNIQUE/i.test(sql);
+  if (!hasUnique) return 0;
+
+  logger.warn('Recreating mental_models to remove mm_template_role UNIQUE constraint');
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    // Save junction rows before dropping the parent table.
+    db.exec(`DROP TABLE IF EXISTS _temp_mm_tags`);
+    db.exec(`CREATE TABLE _temp_mm_tags AS SELECT * FROM mental_model_tags`);
+    db.exec(`DROP TABLE IF EXISTS _temp_mm_entities`);
+    db.exec(`CREATE TABLE _temp_mm_entities AS SELECT * FROM mental_model_entities`);
+
+    db.exec(`CREATE TABLE mental_models_new (
+      mm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mm_ext_id TEXT NOT NULL UNIQUE,
+      mm_name TEXT,
+      mm_source_query TEXT,
+      mm_refresh_after_consolidation TEXT DEFAULT 'false',
+      mm_refresh_mode TEXT DEFAULT 'full',
+      mm_exclude_all_mental_models TEXT DEFAULT 'false',
+      mm_exclude_mental_model_list TEXT,
+      mm_tags_match_mode TEXT DEFAULT 'all_strict',
+      mm_is_template TEXT DEFAULT 'false',
+      mm_template_role TEXT,
+      mm_max_tokens INTEGER DEFAULT 2048,
+      mm_viewp_description TEXT,
+      mm_viewp_meta JSON,
+      mm_dimension TEXT,
+      mm_returns TEXT,
+      mm_concatenation TEXT,
+      mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    )`);
+
+    db.exec(`INSERT INTO mental_models_new (
+      mm_id, mm_ext_id, mm_name, mm_source_query, mm_refresh_after_consolidation,
+      mm_refresh_mode, mm_exclude_all_mental_models, mm_exclude_mental_model_list,
+      mm_tags_match_mode, mm_is_template, mm_template_role, mm_max_tokens,
+      mm_viewp_description, mm_viewp_meta, mm_dimension, mm_returns,
+      mm_concatenation, mm_created_at, mm_updated_at
+    ) SELECT
+      mm_id, mm_ext_id, mm_name, mm_source_query, mm_refresh_after_consolidation,
+      mm_refresh_mode, mm_exclude_all_mental_models, mm_exclude_mental_model_list,
+      mm_tags_match_mode, mm_is_template, mm_template_role, mm_max_tokens,
+      mm_viewp_description, mm_viewp_meta, mm_dimension,
+      CASE mm_returns WHEN 'json' THEN 'generic' WHEN 'narrative' THEN 'generic' WHEN 'graph-known' THEN 'generic' WHEN 'graph-discovery' THEN 'generic' WHEN 'graph-discovered-only' THEN 'generic' WHEN 'narrative-graph-known' THEN 'generic' WHEN 'narrative-graph-discovery' THEN 'generic' WHEN 'narrative-graph-discovered-only' THEN 'generic' ELSE mm_returns END AS mm_returns,
+      mm_concatenation, mm_created_at, mm_updated_at
+    FROM mental_models`);
+
+    db.exec(`DROP TABLE mental_models`);
+    db.exec(`ALTER TABLE mental_models_new RENAME TO mental_models`);
+
+    // Restore junction rows.
+    db.exec(`INSERT INTO mental_model_tags (tag_id, mm_id, mm_tag_created_at, mm_tag_updated_at)
+             SELECT tag_id, mm_id, mm_tag_created_at, mm_tag_updated_at FROM _temp_mm_tags`);
+    db.exec(`DROP TABLE _temp_mm_tags`);
+    db.exec(`INSERT INTO mental_model_entities (ent_id, mm_id, mm_ent_refresh_mode, mm_ent_refresh_after_consolidation, mm_ent_exclude_all_mental_models, mm_ent_max_tokens, mm_ent_created_at, mm_ent_updated_at)
+             SELECT ent_id, mm_id, mm_ent_refresh_mode, mm_ent_refresh_after_consolidation, mm_ent_exclude_all_mental_models, mm_ent_max_tokens, mm_ent_created_at, mm_ent_updated_at FROM _temp_mm_entities`);
+    db.exec(`DROP TABLE _temp_mm_entities`);
+
+    const fkCheck = db.pragma('foreign_key_check');
+    if (fkCheck && fkCheck.length > 0) {
+      logger.warn('Foreign key check found issues after removing mm_template_role UNIQUE constraint', { issues: fkCheck });
+    }
+
+    logger.info('Recreated mental_models without mm_template_role UNIQUE constraint');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
 }
 
 /**
@@ -669,6 +1082,26 @@ function removePromptTemplateModeCheck(db) {
 }
 
 /**
+ * Migrate legacy mm_returns values ('json', 'narrative', 'graph-known', etc.)
+ * to 'generic' since the old per-mode templates have been replaced by a single
+ * universal template with directive-driven output.
+ */
+function migrateMentalModelReturnsToGeneric(db) {
+  const mmTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mental_models'").get();
+  if (!mmTableExists) return 0;
+
+  const legacyValues = ['json', 'narrative', 'graph-known', 'graph-discovery', 'graph-discovered-only', 'narrative-graph-known', 'narrative-graph-discovery', 'narrative-graph-discovered-only'];
+  const placeholders = legacyValues.map(() => '?').join(',');
+  const existingLegacy = db.prepare(`SELECT mm_returns, COUNT(*) as c FROM mental_models WHERE mm_returns IN (${placeholders}) GROUP BY mm_returns`).all(...legacyValues);
+  if (!existingLegacy || existingLegacy.length === 0) return 0;
+
+  const update = db.prepare(`UPDATE mental_models SET mm_returns = 'generic' WHERE mm_returns IN (${placeholders})`);
+  const result = update.run(...legacyValues);
+  logger.info(`Migrated ${result.changes} mental model(s) from legacy mm_returns to 'generic'`, { legacyValues, counts: existingLegacy });
+  return result.changes;
+}
+
+/**
  * Ensure the FTS index for documents exists and is backfilled.
  * Delegates to the search adapter so the migration engine stays free of
  * SQLite FTS5 specifics.
@@ -681,6 +1114,15 @@ function ensureDocumentsFts(db) {
 function ensureMissingColumns(db) {
   const migrations = [
     {
+      table: 'servers',
+      columns: [
+        {
+          name: 'svr_contextual_graph_banks',
+          ddl: 'ALTER TABLE servers ADD COLUMN svr_contextual_graph_banks JSON'
+        }
+      ]
+    },
+    {
       table: 'pending_operations',
       columns: [
         {
@@ -690,6 +1132,19 @@ function ensureMissingColumns(db) {
         {
           name: 'pop_rstep_id',
           ddl: 'ALTER TABLE pending_operations ADD COLUMN pop_rstep_id INTEGER'
+        }
+      ]
+    },
+    {
+      table: 'research_sessions',
+      columns: [
+        {
+          name: 'rs_server_id',
+          ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_server_id INTEGER REFERENCES servers(svr_id) ON DELETE SET NULL'
+        },
+        {
+          name: 'rs_scope_entity_ids',
+          ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_scope_entity_ids JSON'
         }
       ]
     },
@@ -707,6 +1162,14 @@ function ensureMissingColumns(db) {
         {
           name: 'rstep_calls',
           ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_calls JSON'
+        },
+        {
+          name: 'rstep_raw_query',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_raw_query TEXT'
+        },
+        {
+          name: 'rstep_envelope',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_envelope JSON'
         }
       ]
     },
@@ -740,6 +1203,10 @@ function ensureMissingColumns(db) {
         {
           name: 'mm_concatenation',
           ddl: "ALTER TABLE mental_models ADD COLUMN mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile'))"
+        },
+        {
+          name: 'mm_template_role',
+          ddl: 'ALTER TABLE mental_models ADD COLUMN mm_template_role TEXT'
         }
       ]
     },
@@ -783,6 +1250,32 @@ function ensureMissingColumns(db) {
         {
           name: 'ent_word_boundary_match',
           ddl: "ALTER TABLE entities ADD COLUMN ent_word_boundary_match TEXT DEFAULT 'boundaries' CHECK (ent_word_boundary_match IN ('boundaries', 'no-boundaries'))"
+        }
+      ]
+    },
+    {
+      table: 'contextual_graph_jobs',
+      columns: [
+        {
+          name: 'cgj_logs',
+          ddl: "ALTER TABLE contextual_graph_jobs ADD COLUMN cgj_logs JSON NOT NULL DEFAULT '[]'"
+        },
+        {
+          name: 'cgj_updated_at',
+          ddl: 'ALTER TABLE contextual_graph_jobs ADD COLUMN cgj_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL'
+        }
+      ]
+    },
+    {
+      table: 'template_roles',
+      columns: [
+        {
+          name: 'tr_created_at',
+          ddl: "ALTER TABLE template_roles ADD COLUMN tr_created_at DATETIME NOT NULL DEFAULT '1970-01-01T00:00:00Z'"
+        },
+        {
+          name: 'tr_updated_at',
+          ddl: "ALTER TABLE template_roles ADD COLUMN tr_updated_at DATETIME NOT NULL DEFAULT '1970-01-01T00:00:00Z'"
         }
       ]
     }
@@ -878,6 +1371,148 @@ function normalizeEntityMatchInheritance(db) {
 }
 
 /**
+ * Repair a broken rs_server_id foreign key created by the original v0.3.6
+ * migration that referenced servers(server_id) instead of servers(svr_id).
+ * SQLite only reports the mismatch on insert, so we recreate the table with
+ * the correct FK, preserving all existing rows and related child tables.
+ */
+function ensureResearchSessionsServerFk(db) {
+  const fkList = db.prepare("PRAGMA foreign_key_list(research_sessions)").all();
+  const serverFk = fkList.find((fk) => fk.from === 'rs_server_id');
+  if (!serverFk) return 0;
+  if (serverFk.table === 'servers' && serverFk.to === 'svr_id') return 0;
+
+  logger.warn('Recreating research_sessions to fix rs_server_id foreign key target');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`
+      CREATE TABLE _research_sessions_new (
+        rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rs_title TEXT NOT NULL,
+        rs_description TEXT,
+        rs_server_id INTEGER,
+        rs_bank_id TEXT NOT NULL,
+        rs_viewpoint_ids JSON NOT NULL,
+        rs_scope_entity_ids JSON,
+        rs_status TEXT NOT NULL DEFAULT 'active',
+        rs_current_step_id INTEGER,
+        rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
+        FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+      )
+    `);
+
+    const columns = [
+      'rs_id', 'rs_title', 'rs_description', 'rs_server_id', 'rs_bank_id',
+      'rs_viewpoint_ids', 'rs_scope_entity_ids', 'rs_status', 'rs_current_step_id', 'rs_created_at', 'rs_updated_at'
+    ];
+    const colList = columns.join(', ');
+    db.exec(`INSERT INTO _research_sessions_new (${colList}) SELECT ${colList} FROM research_sessions`);
+    db.exec('DROP TABLE research_sessions');
+    db.exec('ALTER TABLE _research_sessions_new RENAME TO research_sessions');
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_sessions_bank_id ON research_sessions(rs_bank_id)');
+
+    logger.info('research_sessions recreated with rs_server_id -> servers(svr_id)');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+function migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='research_steps'").get();
+  if (!tableExists) return 0;
+
+  const cols = new Set(db.prepare("PRAGMA table_info(research_steps)").all().map((r) => r.name));
+  const hasCanvas = cols.has('rstep_canvas_state');
+  const hasSynthesis = cols.has('rstep_synthesis');
+  const hasEnvelope = cols.has('rstep_envelope');
+
+  if (!hasCanvas && !hasSynthesis) return 0;
+
+  if (hasEnvelope) {
+    // Backfill rows that have legacy split fields but no unified envelope.
+    const pending = db.prepare(`
+      SELECT rstep_id, rstep_synthesis, rstep_canvas_state
+      FROM research_steps
+      WHERE rstep_envelope IS NULL AND (rstep_synthesis IS NOT NULL OR rstep_canvas_state IS NOT NULL)
+    `).all();
+
+    const update = db.prepare(`
+      UPDATE research_steps
+      SET rstep_envelope = ?
+      WHERE rstep_id = ?
+    `);
+
+    for (const row of pending) {
+      const synthesis = row.rstep_synthesis ? JSON.parse(row.rstep_synthesis) : { narrative: '' };
+      const canvas = row.rstep_canvas_state ? JSON.parse(row.rstep_canvas_state) : { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
+      const firstNarrative = typeof synthesis.narrative === 'string' ? synthesis.narrative : '';
+      const envelope = {
+        narratives: firstNarrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: firstNarrative }] : [],
+        graph: canvas.graph ?? { nodes: [], edges: [] },
+        tables: canvas.tables ?? [],
+        diagrams: canvas.diagrams ?? [],
+      };
+      update.run(JSON.stringify(envelope), row.rstep_id);
+    }
+
+    if (pending.length > 0) {
+      logger.info(`Backfilled ${pending.length} legacy step(s) into rstep_envelope`);
+    }
+  }
+
+  // Recreate research_steps without the legacy split columns.
+  logger.warn('Recreating research_steps to remove rstep_canvas_state and rstep_synthesis');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`CREATE TABLE _research_steps_new (
+      rstep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rs_id INTEGER NOT NULL,
+      rstep_parent_step_id INTEGER,
+      rstep_intent_text TEXT NOT NULL,
+      rstep_raw_query TEXT,
+      rstep_selections JSON,
+      rstep_action_type TEXT NOT NULL,
+      rstep_parameters JSON,
+      rstep_viewpoint_ids JSON,
+      rstep_envelope JSON,
+      rstep_tool_calls_used INTEGER DEFAULT 0,
+      rstep_status TEXT,
+      rstep_error_message TEXT,
+      rstep_calls JSON,
+      rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
+      FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
+    )`);
+
+    const columns = [
+      'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
+      'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
+      'rstep_tool_calls_used', 'rstep_status', 'rstep_error_message', 'rstep_calls', 'rstep_created_at'
+    ];
+    const colList = columns.join(', ');
+    db.exec(`INSERT INTO _research_steps_new (${colList}) SELECT ${colList} FROM research_steps`);
+    db.exec('DROP TABLE research_steps');
+    db.exec('ALTER TABLE _research_steps_new RENAME TO research_steps');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_steps_session ON research_steps(rs_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_steps_parent ON research_steps(rstep_parent_step_id)');
+
+    const fkCheck = db.pragma('foreign_key_check');
+    if (fkCheck && fkCheck.length > 0) {
+      logger.warn('Foreign key check found issues after research_steps migration', { issues: fkCheck });
+    }
+
+    logger.info('Recreated research_steps without legacy canvas/synthesis columns');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
  * Ensure pending_operations.pop_doc_id is nullable. Older schemas created it
  * as NOT NULL, but document-less async operations (e.g. mental-model refresh)
  * need to leave it null. Recreate the table preserving existing rows only when
@@ -927,6 +1562,10 @@ function ensurePendingOpsNullableDocId(db) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_research_session ON pending_operations(pop_rs_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_pending_ops_research_step ON pending_operations(pop_rstep_id)');
 
+    db.exec('CREATE INDEX IF NOT EXISTS idx_cge_server_bank_source_target ON contextual_graph_edges(cge_server_id, cge_bank_id, cge_source_id, cge_target_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_cge_source ON contextual_graph_edges(cge_source_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_cge_target ON contextual_graph_edges(cge_target_id)');
+
     logger.info('pending_operations recreated with nullable pop_doc_id');
     return 1;
   } finally {
@@ -935,28 +1574,182 @@ function ensurePendingOpsNullableDocId(db) {
 }
 
 /**
- * Apply the DDL schema to a fresh database.
- * Called automatically by db/connection.js when no tables exist.
+ * Recreate contextual graph tables if they still use the old cg_* schema.
+ * This is a one-time destructive migration for the experimental pre-v36 tables.
  */
+function ensureContextualGraphSchema(db) {
+  const nodesInfo = db.prepare("PRAGMA table_info(contextual_graph_nodes)").all();
+  const hasOldNodes = nodesInfo.some((c) => c.name === 'cg_id');
+  const edgesInfo = db.prepare("PRAGMA table_info(contextual_graph_edges)").all();
+  const hasOldEdges = edgesInfo.some((c) => c.name === 'cg_id');
+
+  if (!hasOldNodes && !hasOldEdges) return 0;
+
+  logger.warn('Recreating contextual graph tables to align with v36 schema');
+  db.pragma('foreign_keys = OFF');
+  try {
+    if (hasOldNodes) db.exec('DROP TABLE IF EXISTS contextual_graph_nodes');
+    if (hasOldEdges) db.exec('DROP TABLE IF EXISTS contextual_graph_edges');
+
+    db.exec(`CREATE TABLE contextual_graph_nodes (
+      cgn_id TEXT NOT NULL,
+      cgn_server_id INTEGER NOT NULL,
+      cgn_bank_id TEXT NOT NULL,
+      cgn_labels TEXT NOT NULL,
+      cgn_properties TEXT NOT NULL,
+      cgn_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      cgn_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      PRIMARY KEY (cgn_server_id, cgn_bank_id, cgn_id),
+      FOREIGN KEY (cgn_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+    )`);
+
+    db.exec(`CREATE TABLE contextual_graph_edges (
+      cge_id TEXT NOT NULL,
+      cge_server_id INTEGER NOT NULL,
+      cge_bank_id TEXT NOT NULL,
+      cge_source_id TEXT NOT NULL,
+      cge_target_id TEXT NOT NULL,
+      cge_type TEXT,
+      cge_properties TEXT NOT NULL,
+      cge_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      cge_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      PRIMARY KEY (cge_server_id, cge_bank_id, cge_id),
+      FOREIGN KEY (cge_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+    )`);
+
+    return 2;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
+ * Ensure contextual graph edge indexes exist. Runs during additive migration
+ * in case the table was created before the indexes were added.
+ */
+function ensureContextualGraphIndexes(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'contextual_graph_edges'").get();
+  if (!tableExists) return 0;
+
+  const columns = new Set(
+    db.prepare("PRAGMA table_info(contextual_graph_edges)").all().map((r) => r.name)
+  );
+  const needsServerBank = columns.has('cge_server_id') && columns.has('cge_bank_id') && columns.has('cge_source_id') && columns.has('cge_target_id');
+  const needsSource = columns.has('cge_source_id');
+  const needsTarget = columns.has('cge_target_id');
+
+  const existing = new Set(
+    db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name = 'contextual_graph_edges'").all().map((r) => r.name)
+  );
+  const indexes = [
+    { name: 'idx_cge_server_bank_source_target', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_server_bank_source_target ON contextual_graph_edges(cge_server_id, cge_bank_id, cge_source_id, cge_target_id)', needed: needsServerBank },
+    { name: 'idx_cge_source', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_source ON contextual_graph_edges(cge_source_id)', needed: needsSource },
+    { name: 'idx_cge_target', ddl: 'CREATE INDEX IF NOT EXISTS idx_cge_target ON contextual_graph_edges(cge_target_id)', needed: needsTarget },
+  ];
+
+  let created = 0;
+  for (const { name, ddl, needed } of indexes) {
+    if (needed && !existing.has(name)) {
+      db.exec(ddl);
+      created++;
+    }
+  }
+  return created;
+}
+
+/**
+ * Ensure mental_models.mm_template_role is unique for non-null values, except
+ * for the unlimited 'user_entity_derived' role which may be assigned to many
+ * mental models (one per User derived entity type).
+ *
+ * SQLite treats multiple NULLs as distinct, so plain (Generic/no-role) models
+ * are not affected. Before adding the index, any duplicate non-null roles other
+ * than 'user_entity_derived' are resolved by keeping the lowest mm_id for each
+ * role and clearing the role on the rest. This allows existing dev/test
+ * databases that accidentally shared a legacy role to migrate cleanly.
+ */
+function ensureTemplateRoleUniqueIndex(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'mental_models'").get();
+  if (!tableExists) return false;
+
+  const existing = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='index' AND name = 'idx_mental_models_template_role_unique'").get();
+  const isPartial = existing && existing.sql && /WHERE\s+mm_template_role\s*!=?\s*['"]user_entity_derived['"]/i.test(existing.sql);
+  if (isPartial) return false;
+
+  // Drop the old non-partial unique index if present so we can recreate it with
+  // the unlimited-role exception. Column-level UNIQUE constraints created by
+  // earlier schema versions are also backed by an index, but dropping by name
+  // only removes the explicit index; SQLite will still enforce the column
+  // constraint via its auto-generated index. Those are removed by recreating
+  // the table in removeMentalModelCheckConstraints when CHECK constraints
+  // still exist, or by the dedicated removeMentalModelTemplateRoleUnique
+  // migration below.
+  if (existing) {
+    db.exec('DROP INDEX IF EXISTS idx_mental_models_template_role_unique');
+    logger.info('Dropped old non-partial unique index on mental_models.mm_template_role');
+  }
+
+  const duplicates = db.prepare(`
+    SELECT mm_template_role, GROUP_CONCAT(mm_id) AS ids, GROUP_CONCAT(mm_ext_id) AS ext_ids
+    FROM mental_models
+    WHERE mm_template_role IS NOT NULL
+      AND mm_template_role != 'user_entity_derived'
+    GROUP BY mm_template_role
+    HAVING COUNT(*) > 1
+  `).all();
+  if (duplicates.length > 0) {
+    const cleared = db.prepare(`
+      UPDATE mental_models
+      SET mm_template_role = NULL,
+          mm_updated_at = CURRENT_TIMESTAMP
+      WHERE mm_id NOT IN (
+        SELECT MIN(mm_id)
+        FROM mental_models
+        WHERE mm_template_role IS NOT NULL
+          AND mm_template_role != 'user_entity_derived'
+        GROUP BY mm_template_role
+      )
+      AND mm_template_role IS NOT NULL
+      AND mm_template_role != 'user_entity_derived'
+    `).run();
+    logger.warn(`Cleared duplicate mm_template_role values from ${cleared.changes} mental model row(s) to prepare unique index: ${duplicates.map((d) => `${d.mm_template_role} (ids ${d.ids})`).join('; ')}`);
+  }
+
+  db.exec("CREATE UNIQUE INDEX idx_mental_models_template_role_unique ON mental_models(mm_template_role) WHERE mm_template_role != 'user_entity_derived'");
+  logger.info('Created partial unique index on mental_models.mm_template_role (excludes user_entity_derived)');
+  return true;
+}
+
 export function ensureSchema(db) {
   const hadSchema = hasSchema(db);
 
   if (hadSchema) {
+    const cgSchemaFixed = ensureContextualGraphSchema(db);
     const created = ensureMissingTables(db);
     const templatesSeeded = ensureBuiltinPromptTemplates(db);
     const added = ensureMissingColumns(db);
+    backfillTemplateRoleTimestamps(db);
     const removed = removeMentalModelCheckConstraints(db);
+    const templateRoleUniqueRemoved = removeMentalModelTemplateRoleUnique(db);
     const promptTemplateFixed = removePromptTemplateModeCheck(db);
+    const mmReturnsMigrated = migrateMentalModelReturnsToGeneric(db);
+    const curatedPagesMigrated = migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db);
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
+    const researchFkFixed = ensureResearchSessionsServerFk(db);
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
-    if (created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${added} new column(s), ${removed} CHECK constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}`);
+    const cgIndexes = ensureContextualGraphIndexes(db);
+    const cgTemplates = ensureContextualGraphTemplates(db);
+    const templateRolesSeeded = ensureTemplateRoles(db);
+    const templateRoleUniqueIndex = ensureTemplateRoleUniqueIndex(db);
+    const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, id placeholder migrated: ${idPlaceholderMigrated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0;
+    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
@@ -977,6 +1770,7 @@ export function ensureSchema(db) {
   db.exec(cleaned);
   logger.info('Schema applied successfully');
   const templatesSeeded = ensureBuiltinPromptTemplates(db);
+  const cgTemplates = ensureContextualGraphTemplates(db);
   return true;
 }
 

@@ -1,0 +1,22 @@
+{
+  "name": "@architxt/aql",
+  "version": "0.3.6",
+  "description": "Architxt Query Language parser and renderer for architxt server and UI",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "require": "./src/index.cjs"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "lint": "echo 'no linter configured'",
+    "test": "node --test"
+  }
+}

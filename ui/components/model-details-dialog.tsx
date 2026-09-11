@@ -4,10 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { mentalModelsApi } from '@/lib/api/client';
 import {
-  MENTAL_MODEL_RETURNS_OPTIONS,
-  MentalModelReturns,
-  StandardDimension,
-  toMentalModelReturns,
   type DerivedMentalModel,
   type Entity,
   type MentalModel,
@@ -15,25 +11,30 @@ import {
 } from '@/lib/types/index';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
+import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
+import { getRoleLabel } from '@/lib/contextual-graph/display';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
+
+const USER_ENTITY_DERIVED_LABEL = 'User entity derived';
 import { ManageDerivedModelConfigDialog } from '@/components/manage-derived-model-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DerivedModelHealthDialog } from '@/components/derived-model-health-dialog';
-import { DerivedModelQueryPreviewDialog } from '@/components/derived-model-query-preview-dialog';
+import {
+  getRoleTemplateRule,
+  getRoleTemplateInstructions,
+  extractRoleTemplatePrefix,
+  buildRoleTemplateValue,
+  validateRoleBasedTemplate,
+} from '@/lib/validation/contextual-template';
 
-const inputFocusStyle = {
-  '--tw-ring-color': 'rgb(52, 211, 153)',
-  '--tw-ring-opacity': '0.4',
-} as React.CSSProperties;
 
 const inputClass =
-  '!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2';
+  '!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle';
 
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
@@ -47,9 +48,6 @@ export interface BaseConfig {
   refresh_after_consolidation: boolean;
   exclude_all_mental_models: boolean;
   max_tokens: number;
-  dimension: string | null;
-  returns: MentalModelReturns;
-  concatenation: 'merge' | 'compile';
 }
 
 interface ModelDetailsDialogProps {
@@ -57,6 +55,9 @@ interface ModelDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
+  templateRoles?: { value: string; label: string; derivation_scope: string }[];
+  availableEntities?: AqlEntityLike[];
+  availableEdges?: AqlEdgeLike[];
 }
 
 function substitutePlaceholders(template: string | null, entity: Entity): string {
@@ -87,9 +88,6 @@ function buildBaseConfig(
     exclude_all_mental_models:
       local.exclude_all_mental_models ?? model.exclude_all_mental_models ?? false,
     max_tokens: local.max_tokens ?? model.max_tokens ?? 2048,
-    dimension: local.dimension ?? model.dimension ?? null,
-    returns: local.returns ?? model.returns ?? 'narrative',
-    concatenation: local.concatenation ?? model.concatenation ?? 'compile',
   };
 }
 
@@ -114,10 +112,8 @@ function buildDerivedRow(
     exclude_mental_model_list: null,
     max_tokens: overrides.max_tokens ?? baseConfig.max_tokens,
     tags_match_mode: model.tags_match_mode,
-    dimension: baseConfig.dimension,
-    returns: baseConfig.returns,
-    concatenation: baseConfig.concatenation,
     is_template: false,
+    is_system_template: false,
     is_derived: true,
     derived_entity: entity,
     tags: [],
@@ -131,10 +127,13 @@ function buildDerivedRows(model: MentalModel, baseConfig: BaseConfig): DerivedMe
   return (model.entities ?? []).map((entity) => buildDerivedRow(entity, model, baseConfig));
 }
 
-export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: ModelDetailsDialogProps) {
+export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templateRoles, availableEntities = [], availableEdges = [] }: ModelDetailsDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState(model.name ?? '');
   const [sourceQuery, setSourceQuery] = useState(model.source_query ?? '');
+  const [systemTemplateDefaults, setSystemTemplateDefaults] = useState<
+    { role: string; ext_id: string; name: string; source_query: string }[] | null
+  >(null);
   const [refreshMode, setRefreshMode] = useState<'full' | 'delta'>(model.refresh_mode ?? 'full');
   const [refreshAfterConsolidation, setRefreshAfterConsolidation] = useState(
     model.refresh_after_consolidation ?? false
@@ -147,43 +146,66 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     'all_strict' | 'any_strict' | 'all' | 'any' | 'exact'
   >(model.tags_match_mode ?? 'all_strict');
   const [isTemplate, setIsTemplate] = useState(model.is_template ?? false);
-  const [dimension, setDimension] = useState(model.dimension || 'none');
-  const [returns, setReturns] = useState<MentalModelReturns>(model.returns ?? 'narrative');
-  const [concatenation, setConcatenation] = useState<'merge' | 'compile'>(model.concatenation ?? 'compile');
+  const isSystemTemplate = model.is_system_template;
+  const isRoleTemplate = !!model.template_role;
+  const isLockedTemplate = isSystemTemplate || isRoleTemplate;
+  // Derived panel only applies to entity-bound templates. Edge role templates derive from
+  // contextual graph edges, not model.entities, so they use a different UI surface.
+  const showDerivedPanel = model.is_template === true && (model.entities?.length ?? 0) > 0 && !isSystemTemplate;
+
+  const effectiveTemplateRoleId = isSystemTemplate
+    ? model.template_role
+    : (model.template_role || 'user_entity_derived');
+  const selectedTemplateRole = useMemo(
+    () => (templateRoles ?? []).find((r) => r.value === effectiveTemplateRoleId) ?? null,
+    [templateRoles, effectiveTemplateRoleId]
+  );
+  const selectedStoredTemplateRole = useMemo(
+    () => (templateRoles ?? []).find((r) => r.value === model.template_role) ?? null,
+    [templateRoles, model.template_role]
+  );
+  const roleScope = selectedStoredTemplateRole?.derivation_scope ?? null;
+  const roleRule = roleScope ? getRoleTemplateRule(roleScope) : null;
+
+  // For role-based templates, the user only edits the prefix of the name; the
+  // mandatory placeholder tail is read-only. ext_id is immutable, so we only
+  // validate that it matches the expected format and derive the prefix from it.
+  const [namePrefix, setNamePrefix] = useState('');
+
+  useEffect(() => {
+    if (!roleScope) {
+      setNamePrefix('');
+      return;
+    }
+    const extPrefix = extractRoleTemplatePrefix(roleScope, 'extId', model.ext_id ?? '') ?? '';
+    const namePrefixFromModel = extractRoleTemplatePrefix(roleScope, 'name', model.name ?? '') ?? '';
+    setNamePrefix(namePrefixFromModel || extPrefix);
+  }, [roleScope, model.ext_id, model.name]);
+
+  const effectiveName = useMemo(() => {
+    if (!roleScope || !roleRule) return name;
+    return buildRoleTemplateValue(roleScope, 'name', namePrefix) ?? roleRule.nameTail;
+  }, [roleScope, roleRule, namePrefix, name]);
+
   const [derived, setDerived] = useState<DerivedMentalModel[]>(() =>
-    buildDerivedRows(model, buildBaseConfig(model))
+    showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []
   );
   const [selectedDerived, setSelectedDerived] = useState<DerivedMentalModel[]>([]);
   const [derivedConfigOpen, setDerivedConfigOpen] = useState(false);
   const [derivedHealthOpen, setDerivedHealthOpen] = useState(false);
-  const [derivedQueryPreviewOpen, setDerivedQueryPreviewOpen] = useState(false);
   const [confirmTemplateOffOpen, setConfirmTemplateOffOpen] = useState(false);
-  const [standardDimensions, setStandardDimensions] = useState<StandardDimension[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    mentalModelsApi.listStandardDimensions().then((dims) => {
-      if (!cancelled) setStandardDimensions(dims);
-    }).catch(() => {
-      if (!cancelled) setStandardDimensions([]);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const baseConfig: BaseConfig = useMemo(
     () => ({
       ext_id: model.ext_id,
-      name: name.trim() || null,
+      name: effectiveName.trim() || null,
       source_query: sourceQuery.trim() || null,
       refresh_mode: refreshMode,
       refresh_after_consolidation: refreshAfterConsolidation,
       exclude_all_mental_models: excludeAll,
       max_tokens: parseMaxTokens(maxTokens, model.max_tokens ?? 2048),
-      dimension: dimension.trim() || null,
-      returns,
-      concatenation,
     }),
-    [model.ext_id, name, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens, dimension, returns, concatenation]
+    [model.ext_id, effectiveName, sourceQuery, refreshMode, refreshAfterConsolidation, excludeAll, maxTokens, model.max_tokens]
   );
 
   const derivedRef = useRef(derived);
@@ -205,21 +227,27 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setMaxTokensError(null);
     setTagsMatchMode(model.tags_match_mode ?? 'all_strict');
     setIsTemplate(model.is_template ?? false);
-    setDimension(model.dimension || 'none');
-    setReturns(model.returns ?? 'narrative');
-    setConcatenation(model.concatenation ?? 'compile');
-    setDerived(buildDerivedRows(model, buildBaseConfig(model)));
+    setDerived(
+      showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []
+    );
     setSelectedDerived([]);
     setDerivedConfigOpen(false);
     setDerivedHealthOpen(false);
-    setDerivedQueryPreviewOpen(false);
-  }, [open]);
+    if (model.is_system_template) {
+      mentalModelsApi
+        .getSystemTemplateDefaults()
+        .then((defaults) => setSystemTemplateDefaults(defaults))
+        .catch(() => setSystemTemplateDefaults(null));
+    } else {
+      setSystemTemplateDefaults(null);
+    }
+  }, [open, model]);
 
   // If entities are added/removed while the modal is open, rebuild derived
-  // rows. Existing rows are preserved so live edits survive; new entities
-  // inherit the current template form values.
+  // rows. Existing rows are preserved so live edits survive. Skip when the
+  // derived panel is not shown for this template role.
   useEffect(() => {
-    if (!open || !model) return;
+    if (!open || !model || !showDerivedPanel) return;
     setDerived((prev) => {
       const existingById = new Map(prev.map((d) => [d.derived_entity.id, d]));
       const next: DerivedMentalModel[] = [];
@@ -232,8 +260,8 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   }, [model.entities, open]);
 
   const baselineDerived = useMemo(
-    () => buildDerivedRows(model, buildBaseConfig(model)),
-    [model]
+    () => (showDerivedPanel ? buildDerivedRows(model, buildBaseConfig(model)) : []),
+    [model, showDerivedPanel]
   );
 
   const derivedChanged = useMemo(() => {
@@ -259,27 +287,53 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   const parsedMaxTokens = parseMaxTokens(maxTokens, model.max_tokens ?? 2048);
 
   const hasChanges =
-    name !== (model.name ?? '') ||
-    sourceQuery !== (model.source_query ?? '') ||
+    (!isSystemTemplate && effectiveName.trim() !== (model.name ?? '').trim()) ||
+    sourceQuery.trim() !== (model.source_query ?? '').trim() ||
     refreshMode !== (model.refresh_mode ?? 'full') ||
     refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false) ||
     excludeAll !== (model.exclude_all_mental_models ?? false) ||
     excludeList !== (model.exclude_mental_model_list ?? '') ||
     parsedMaxTokens !== (model.max_tokens ?? 2048) ||
     tagsMatchMode !== (model.tags_match_mode ?? 'all_strict') ||
-    isTemplate !== (model.is_template ?? false) ||
-    dimension !== (model.dimension || 'none') ||
-    returns !== (model.returns ?? 'narrative') ||
-    concatenation !== (model.concatenation ?? 'compile') ||
-    derivedChanged;
+    (!isLockedTemplate && isTemplate !== (model.is_template ?? false)) ||
+    (showDerivedPanel && derivedChanged);
 
   const templateValidation = useMemo(() => {
     if (!isTemplate) return null;
-    if (!/\{entity-(id|name|type)\}/.test(model.ext_id ?? '')) {
-      return 'Template mode requires {entity-id}, {entity-name} or {entity-type} to be present in External ID at a minimum. Name or Source Query can also use entity tags.';
+    if (isSystemTemplate) return null;
+    if (roleRule) return null; // role-based validation takes over
+    if (!/\{entity-(id|name|type)|node-(id|name)|source-(id|name)|target-(id|name)|seed-(id|name)|batch\}/.test(model.ext_id ?? '')) {
+      return 'Template mode requires a supported placeholder in External ID. Supported: {entity-id}, {entity-name}, {entity-type}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.';
     }
     return null;
-  }, [isTemplate, model.ext_id]);
+  }, [isTemplate, isSystemTemplate, roleRule, model.ext_id]);
+
+  const roleTemplateValidation = useMemo(() => {
+    if (!roleScope || !model.template_role) return null;
+    return validateRoleBasedTemplate(roleScope, {
+      extId: model.ext_id ?? '',
+      name: effectiveName,
+      sourceQuery,
+    });
+  }, [roleScope, model.ext_id, model.template_role, effectiveName, sourceQuery]);
+
+  const extIdFormatWarning = useMemo(() => {
+    if (!roleScope || !model.template_role) return null;
+    const result = validateRoleBasedTemplate(roleScope, {
+      extId: model.ext_id ?? '',
+      name: model.name ?? '',
+      sourceQuery: model.source_query ?? '',
+    });
+    if (result.valid) return null;
+    // Surface only ext_id related errors; name/source_query will be validated live.
+    const extIdErrors = result.errors.filter((e) => e.includes('External ID'));
+    return extIdErrors.length > 0 ? extIdErrors.join(' ') : null;
+  }, [roleScope, model.ext_id, model.name, model.source_query, model.template_role]);
+
+  const roleInstructions = useMemo(() => {
+    if (!roleScope) return null;
+    return getRoleTemplateInstructions(roleScope);
+  }, [roleScope]);
 
   const willDisableTemplateOnSave =
     model.is_template === true && isTemplate === false && (model.entities?.length ?? 0) > 0;
@@ -296,10 +350,20 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleNameChange = (value: string) => {
-    setName(value);
+    if (!roleScope) {
+      setName(value);
+      updateDerivedPlaceholders({
+        ...baseConfig,
+        name: value.trim() || null,
+      });
+      return;
+    }
+    // The role tail is immutable; only accept changes to the prefix.
+    const prefix = extractRoleTemplatePrefix(roleScope, 'name', value) ?? value;
+    setNamePrefix(prefix);
     updateDerivedPlaceholders({
       ...baseConfig,
-      name: value.trim() || null,
+      name: buildRoleTemplateValue(roleScope, 'name', prefix) ?? null,
     });
   };
 
@@ -309,6 +373,13 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       ...baseConfig,
       source_query: value.trim() || null,
     });
+  };
+
+  const handleResetSourceQuery = () => {
+    if (!model.template_role || !systemTemplateDefaults) return;
+    const defaultDef = systemTemplateDefaults.find((d) => d.role === model.template_role);
+    if (!defaultDef) return;
+    handleSourceQueryChange(defaultDef.source_query);
   };
 
   const handleRefreshModeChange = (value: 'full' | 'delta') => {
@@ -336,29 +407,15 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const handleIsTemplateChange = (value: boolean) => {
+    if (isLockedTemplate) return;
     setIsTemplate(value);
     if (value && derived.length === 0) {
       setDerived(buildDerivedRows(model, baseConfig));
     }
   };
 
-  const handleDimensionChange = (value: string) => {
-    setDimension(value);
-    setDerived((prev) => prev.map((d) => ({ ...d, dimension: value.trim() || null })));
-  };
-
-  const handleReturnsChange = (value: MentalModelReturns) => {
-    setReturns(value);
-    setDerived((prev) => prev.map((d) => ({ ...d, returns: value })));
-  };
-
-  const handleConcatenationChange = (value: 'merge' | 'compile') => {
-    setConcatenation(value);
-    setDerived((prev) => prev.map((d) => ({ ...d, concatenation: value })));
-  };
-
   const handleSave = async () => {
-    if (!name.trim() || !sourceQuery.trim()) {
+    if (!effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
       return;
     }
@@ -366,6 +423,10 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     if (Number(maxTokens.trim()) !== parsed) {
       toast.error('Max tokens must be an integer between 1 and 8192');
       setMaxTokensError('Max tokens must be an integer between 1 and 8192');
+      return;
+    }
+    if (roleTemplateValidation && !roleTemplateValidation.valid) {
+      toast.error(roleTemplateValidation.errors.join(' '));
       return;
     }
     if (willDisableTemplateOnSave) {
@@ -376,7 +437,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   };
 
   const executeSave = async () => {
-    if (!name.trim() || !sourceQuery.trim()) {
+    if (!effectiveName.trim() || !sourceQuery.trim()) {
       toast.error('Name and Source Query are required');
       return;
     }
@@ -389,7 +450,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
     setIsSaving(true);
     try {
       const updates: Record<string, any> = {};
-      if (name.trim() !== (model.name ?? '')) updates.name = name.trim();
+      if (!isSystemTemplate && effectiveName.trim() !== (model.name ?? '')) updates.name = effectiveName.trim();
       if (sourceQuery.trim() !== (model.source_query ?? '')) updates.source_query = sourceQuery.trim();
       if (refreshMode !== (model.refresh_mode ?? 'full')) updates.refresh_mode = refreshMode;
       if (refreshAfterConsolidation !== (model.refresh_after_consolidation ?? false)) {
@@ -403,18 +464,14 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
         updates.exclude_mental_model_list = nextExcludeList || null;
       }
       if (tagsMatchMode !== (model.tags_match_mode ?? 'all_strict')) updates.tags_match_mode = tagsMatchMode;
-      if (isTemplate !== (model.is_template ?? false)) updates.is_template = isTemplate;
-      const nextDimension = dimension.trim() || null;
-      if (nextDimension !== (model.dimension ?? null)) updates.dimension = nextDimension;
-      if (returns !== (model.returns ?? 'narrative')) updates.returns = returns;
-      if (concatenation !== (model.concatenation ?? 'compile')) updates.concatenation = concatenation;
+      if (!isLockedTemplate && isTemplate !== (model.is_template ?? false)) updates.is_template = isTemplate;
 
       if (Object.keys(updates).length > 0) {
         await mentalModelsApi.update(model.id, updates);
         toast.success('Mental model updated');
       }
 
-      if (isTemplate && derived.length > 0) {
+      if (!isLockedTemplate && isTemplate && derived.length > 0) {
         const groups = new Map<string, { entityIds: number[]; overrides: MentalModelEntityOverrides }>();
         for (const d of derived) {
           const overrides: MentalModelEntityOverrides = {
@@ -451,126 +508,146 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       <div className="space-y-6 shrink-0">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase text-white/50 font-medium">Entity Template</Label>
-            <p className="text-[10px] text-white/40">Derive one mental model per related entity</p>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Entity Template</Label>
+              {isSystemTemplate && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
+                  System template
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-foreground-subtle">Derive one mental model per related entity</p>
             {templateValidation && (
-              <p className="text-[10px] text-red-400 mt-0.5">{templateValidation}</p>
+              <p className="text-[10px] text-destructive-fg mt-0.5">{templateValidation}</p>
             )}
           </div>
-          <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} />
+          <Switch checked={isTemplate} onCheckedChange={handleIsTemplateChange} disabled={isLockedTemplate} />
         </div>
 
-        {!isTemplate && (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
-                Dimension
-              </Label>
-              <select
-                id="mm-detail-dimension"
-                value={dimension}
-                onChange={(e) => handleDimensionChange(e.target.value)}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-              >
-                {standardDimensions.map((d) => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
-                Returns
-              </Label>
-              <select
-                id="mm-detail-returns"
-                value={returns}
-                onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-              >
-                {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
-                Concatenation
-              </Label>
-              <select
-                id="mm-detail-concatenation"
-                value={concatenation}
-                onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
-                className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-              >
-                <option value="merge">Merge</option>
-                <option value="compile">Compile</option>
-              </select>
-            </div>
+          {isTemplate && (
+          <div className="space-y-2">
+            <Label htmlFor="mm-detail-template-role" className="text-xs uppercase text-foreground-subtle font-medium">
+              Template Role
+            </Label>
+            <p id="mm-detail-template-role" className="text-sm text-foreground-default font-mono truncate">
+              {selectedTemplateRole?.label || getRoleLabel(effectiveTemplateRoleId || undefined) || (isSystemTemplate ? (model.ext_id || 'system template') : USER_ENTITY_DERIVED_LABEL)}
+            </p>
           </div>
+          )}
+
+        {roleInstructions && (
+          <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-badge-caution-fg">
+            <p className="font-medium">{selectedTemplateRole?.label} format requirements</p>
+            <p className="mt-1 text-badge-caution-fg/80">{roleInstructions}</p>
+          </div>
+        )}
+
+        {extIdFormatWarning && (
+          <p className="text-[10px] text-destructive-fg">External ID: {extIdFormatWarning}</p>
         )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-ext-id" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-ext-id" className="text-xs uppercase text-foreground-subtle font-medium">
               External ID
             </Label>
-            <p id="mm-detail-ext-id" className="text-sm text-white font-mono truncate">
+            <p id="mm-detail-ext-id" className="text-sm text-foreground-default font-mono truncate">
               {model.ext_id || '-'}
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-name" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-name" className="text-xs uppercase text-foreground-subtle font-medium">
               Name *
             </Label>
-            <Input
-              id="mm-detail-name"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="Display name"
-              className={inputClass}
-              style={inputFocusStyle}
-            />
+            {roleScope && roleRule ? (
+              <div className="flex items-stretch rounded-lg overflow-hidden border border-border-strong focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring-subtle">
+                <Input
+                  id="mm-detail-name"
+                  value={namePrefix}
+                  disabled={isSystemTemplate}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="prefix"
+                  className="!rounded-none !border-0 !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle flex-1 min-w-0"
+                  
+                />
+                <span className="inline-flex items-center px-3 bg-surface-card text-foreground-faint text-xs whitespace-nowrap border-l border-border-default">
+                  {roleRule.nameTail}
+                </span>
+              </div>
+            ) : (
+              <Input
+                id="mm-detail-name"
+                value={name}
+                disabled={isSystemTemplate}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="Display name"
+                className={inputClass}
+                
+              />
+            )}
+            {roleTemplateValidation && !roleTemplateValidation.valid && (
+              <div className="mt-1 space-y-0.5">
+                {roleTemplateValidation.errors
+                  .filter((e) => !e.includes('External ID'))
+                  .map((err, idx) => (
+                    <p key={idx} className="text-[10px] text-destructive-fg">{err}</p>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-white/50 font-medium">
-            Source Query *
-          </Label>
-          <Textarea
+          <div className="flex items-center justify-between">
+            <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-foreground-subtle font-medium">
+              Source Query *
+            </Label>
+            {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
+              <span className="text-[10px] text-badge-caution-fg">
+                Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
+              </span>
+            )}
+            {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
+              <span className="text-[10px] text-accent-secondary-fg">All required placeholders present</span>
+            )}
+          </div>
+          <AqlEditor
             id="mm-detail-source-query"
             value={sourceQuery}
-            onChange={(e) => handleSourceQueryChange(e.target.value)}
-            placeholder="Query used to source this model"
+            onChange={(value) => handleSourceQueryChange(value)}
+            disabled={false}
+            placeholder="AQL query used to source this model"
+            availableEntities={availableEntities}
+            availableEdges={availableEdges}
             className={inputClass}
-            style={{ ...inputFocusStyle, minHeight: '80px' }}
+            style={{ minHeight: '80px' }}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-refresh-mode" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-refresh-mode" className="text-xs uppercase text-foreground-subtle font-medium">
               Refresh Mode
             </Label>
             <select
               id="mm-detail-refresh-mode"
               value={refreshMode}
               onChange={(e) => handleRefreshModeChange(e.target.value as 'full' | 'delta')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
             >
               <option value="full">Full</option>
               <option value="delta">Delta</option>
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-tags-match-mode" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-tags-match-mode" className="text-xs uppercase text-foreground-subtle font-medium">
               Tags Match
             </Label>
             <select
               id="mm-detail-tags-match-mode"
               value={tagsMatchMode}
               onChange={(e) => setTagsMatchMode(e.target.value as 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact')}
-              className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
+              className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle focus:ring-focus-ring-subtle outline-none"
             >
               <option value="all_strict">All Strict</option>
               <option value="any_strict">Any Strict</option>
@@ -578,25 +655,25 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               <option value="any">Any</option>
               <option value="exact">Exact</option>
             </select>
-            <p className="text-[10px] text-white/40">How tags on this model must match document tags</p>
+            <p className="text-[10px] text-foreground-subtle">How tags on this model must match document tags</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between border border-border-default rounded-lg p-3">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Refresh after consolidation</Label>
-              <p className="text-[10px] text-white/40">Run a refresh once consolidation completes</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Refresh after consolidation</Label>
+              <p className="text-[10px] text-foreground-subtle">Run a refresh once consolidation completes</p>
             </div>
             <Switch
               checked={refreshAfterConsolidation}
               onCheckedChange={handleRefreshAfterConsolidationChange}
             />
           </div>
-          <div className="flex items-center justify-between border border-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between border border-border-default rounded-lg p-3">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Exclude All Mental Models</Label>
-              <p className="text-[10px] text-white/40">Hide every other mental model from this one</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Exclude All Mental Models</Label>
+              <p className="text-[10px] text-foreground-subtle">Hide every other mental model from this one</p>
             </div>
             <Switch checked={excludeAll} onCheckedChange={handleExcludeAllChange} />
           </div>
@@ -604,7 +681,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-exclude-list" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-exclude-list" className="text-xs uppercase text-foreground-subtle font-medium">
               Exclude List
             </Label>
             <Input
@@ -613,11 +690,11 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               onChange={(e) => setExcludeList(e.target.value)}
               placeholder="Comma-separated model IDs"
               className={inputClass}
-              style={inputFocusStyle}
+              
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mm-detail-max-tokens" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="mm-detail-max-tokens" className="text-xs uppercase text-foreground-subtle font-medium">
               Max Tokens
             </Label>
             <Input
@@ -630,67 +707,67 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
               onChange={(e) => handleMaxTokensChange(e.target.value)}
               placeholder="2048"
               className={inputClass}
-              style={inputFocusStyle}
+              
             />
             {maxTokensError && (
-              <p className="text-[10px] text-red-400">{maxTokensError}</p>
+              <p className="text-[10px] text-destructive-fg">{maxTokensError}</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Read-only Metadata */}
-      <div className="space-y-4 pt-2 border-t border-white/10 shrink-0">
+      <div className="space-y-4 pt-2 border-t border-border-default shrink-0">
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-white/50 font-medium">Tags</Label>
+          <Label className="text-xs uppercase text-foreground-subtle font-medium">Tags</Label>
           {model.tags?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {model.tags.map((t) => (
                 <span
                   key={t.id}
-                  className="px-2.5 py-1 rounded-full bg-orange-400/20 text-orange-300 text-xs border border-orange-400/30"
+                  className="px-2.5 py-1 rounded-full bg-badge-caution-bg text-badge-caution-fg text-xs border border-badge-caution-bd"
                 >
                   {t.name}
                 </span>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/40 italic">-</p>
+            <p className="text-sm text-foreground-subtle italic">-</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-white/50 font-medium">Entities</Label>
+          <Label className="text-xs uppercase text-foreground-subtle font-medium">Entities</Label>
           {model.entities?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {model.entities.map((e) => (
                 <span
                   key={e.id}
-                  className="px-2.5 py-1 rounded-full bg-purple-800/15 text-purple-400 text-xs border border-purple-700/20"
+                  className="px-2.5 py-1 rounded-full bg-badge-entity-bg text-badge-entity-fg text-xs border border-badge-entity-bd/50"
                 >
                   {e.entity_id} — {e.name}
                 </span>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/40 italic">-</p>
+            <p className="text-sm text-foreground-subtle italic">-</p>
           )}
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
-            <p className="text-xs uppercase text-white/50 font-medium">ID</p>
-            <p className="text-sm text-white font-mono">{model.id}</p>
+            <p className="text-xs uppercase text-foreground-subtle font-medium">ID</p>
+            <p className="text-sm text-foreground-default font-mono">{model.id}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-            <p className="text-sm text-white/70">
+            <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+            <p className="text-sm text-foreground-faint">
               {formatDistanceToNow(new Date(model.created_at), { addSuffix: true })}
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-            <p className="text-sm text-white/70">
+            <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+            <p className="text-sm text-foreground-faint">
               {formatDistanceToNow(new Date(model.updated_at), { addSuffix: true })}
             </p>
           </div>
@@ -700,18 +777,30 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   );
 
   const actionBar = (
-    <div className="shrink-0 px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+    <div className="shrink-0 px-6 py-4 border-t border-border-default flex justify-end gap-3">
+      {isSystemTemplate && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleResetSourceQuery}
+          disabled={!systemTemplateDefaults}
+          className="text-foreground-muted border-border-strong hover:bg-surface-panel hover:text-foreground-default flex items-center gap-2 mr-auto"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset query to default
+        </Button>
+      )}
       <Button
         variant="ghost"
         onClick={() => onOpenChange(false)}
-        className="text-white/70 hover:text-white hover:bg-white/5"
+        className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
       >
         Close
       </Button>
       <Button
         onClick={handleSave}
-        disabled={!hasChanges || isSaving}
-        className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        disabled={!hasChanges || isSaving || !!(roleTemplateValidation && !roleTemplateValidation.valid)}
+        className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
         {isSaving ? 'Saving...' : 'Save Changes'}
@@ -720,7 +809,7 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && (derivedConfigOpen || derivedHealthOpen || derivedQueryPreviewOpen)) return;
+    if (!nextOpen && (derivedConfigOpen || derivedHealthOpen)) return;
     onOpenChange(nextOpen);
   };
 
@@ -729,71 +818,28 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           className={`${
-            isTemplate ? '!w-[85vw] !max-w-none' : 'sm:max-w-4xl'
+            showDerivedPanel ? '!w-[85vw] !max-w-none' : 'sm:max-w-4xl'
           } max-h-[85vh] overflow-hidden p-0 flex flex-col`}
         >
           <DialogHeader className="shrink-0 px-6 pt-6">
-            <DialogTitle className="text-xl font-semibold text-white">Mental Model Details</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-foreground-default">Mental Model Details</DialogTitle>
           </DialogHeader>
 
-          {isTemplate ? (
+          {showDerivedPanel ? (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto py-4 px-6">{formBody}</div>
                 <div className="w-1/2 min-w-[480px] p-4 flex flex-col gap-4 overflow-hidden">
-                  <div className="shrink-0 border border-white/10 rounded-lg p-3 bg-white/[0.02]">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="mm-detail-dimension" className="text-xs uppercase text-white/50 font-medium">
-                          Dimension
-                        </Label>
-                        <select
-                          id="mm-detail-dimension"
-                          value={dimension}
-                          onChange={(e) => handleDimensionChange(e.target.value)}
-                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-                        >
-                          {standardDimensions.map((d) => (
-                            <option key={d.value} value={d.value}>{d.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="mm-detail-returns" className="text-xs uppercase text-white/50 font-medium">
-                          Returns
-                        </Label>
-                        <select
-                          id="mm-detail-returns"
-                          value={returns}
-                          onChange={(e) => handleReturnsChange(toMentalModelReturns(e.target.value))}
-                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-                        >
-                          {MENTAL_MODEL_RETURNS_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="mm-detail-concatenation" className="text-xs uppercase text-white/50 font-medium">
-                          Concatenation
-                        </Label>
-                        <select
-                          id="mm-detail-concatenation"
-                          value={concatenation}
-                          onChange={(e) => handleConcatenationChange(e.target.value as 'merge' | 'compile')}
-                          className="w-full h-10 rounded-lg border border-white/20 bg-[oklch(0.23_0_0)] px-3 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 outline-none"
-                        >
-                          <option value="merge">Merge</option>
-                          <option value="compile">Compile</option>
-                        </select>
-                      </div>
-                    </div>
+                  <div className="shrink-0 border border-border-default rounded-lg p-3 bg-on-dark/[0.02]">
+                    <p className="text-xs uppercase text-foreground-subtle font-medium">
+                      Derived instances inherit the template configuration above.
+                    </p>
                   </div>
 
                   <DerivedModelsPanel
                     model={model}
                     derived={derived}
-                    className="flex-1 border border-white/10 rounded-md overflow-hidden"
+                    className="flex-1 border border-border-default rounded-md overflow-hidden"
                     onConfigure={(selected) => {
                       setSelectedDerived(selected);
                       setDerivedConfigOpen(true);
@@ -801,10 +847,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
                     onHealth={(selected) => {
                       setSelectedDerived(selected);
                       setDerivedHealthOpen(true);
-                    }}
-                    onPreviewQuery={(selected) => {
-                      setSelectedDerived(selected);
-                      setDerivedQueryPreviewOpen(true);
                     }}
                   />
                 </div>
@@ -842,16 +884,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated }: Mod
           setDerivedHealthOpen(false);
           setSelectedDerived([]);
         }}
-        derived={selectedDerived}
-      />
-
-      <DerivedModelQueryPreviewDialog
-        isOpen={derivedQueryPreviewOpen}
-        onClose={() => {
-          setDerivedQueryPreviewOpen(false);
-          setSelectedDerived([]);
-        }}
-        modelId={model.id}
         derived={selectedDerived}
       />
 

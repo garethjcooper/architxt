@@ -12,8 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = path.join(__dirname, '../../tmp/test-synthesize-handler.db');
 
 function seedTestEntities(db) {
-  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label) VALUES ('com', 'COM', 'Component')").run();
-  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label) VALUES ('svc', 'SVC', 'Service')").run();
+  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label, et_id_format_prefix) VALUES ('com', 'COM', 'Component', 'com')").run();
+  db.prepare("INSERT OR IGNORE INTO entity_types (et_type_name, et_id_label, et_name_label, et_id_format_prefix) VALUES ('svc', 'SVC', 'Service', 'svc')").run();
   const comType = db.prepare("SELECT et_id FROM entity_types WHERE et_type_name = 'com'").pluck().get();
   const svcType = db.prepare("SELECT et_id FROM entity_types WHERE et_type_name = 'svc'").pluck().get();
   db.prepare("INSERT OR IGNORE INTO entities (ent_entity_id, ent_name, ent_type_id, ent_description) VALUES (?, ?, ?, ?)").run('a-com:COM-001', 'Singleview', comType, 'Billing CRM');
@@ -25,6 +25,11 @@ function makeCompletion(content) {
     success: true,
     data: { content, model: 'test-model', usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 } },
   });
+}
+
+function buildEnvelope({ narrative = '', narrative_name = '', nodes = [], edges = [], tables = [], diagrams = [] } = {}) {
+  const narratives = narrative ? [{ narrative_name, narrative }] : [];
+  return JSON.stringify({ narratives, graph: { nodes, edges }, tables, diagrams });
 }
 
 describe('synthesize handler', () => {
@@ -58,17 +63,17 @@ describe('synthesize handler', () => {
   it('returns empty result when no model is configured and no source material', async () => {
     const result = await handleSynthesize(1, 'bank', 'test query', { source_steps: [] }, db);
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'No source material available for synthesis.');
+    assert.deepEqual(result.narratives, []);
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
   it('returns missing model response when source material exists but no model is configured', async () => {
     const result = await handleSynthesize(1, 'bank', 'test query', {
-      source_steps: [{ synthesis: { narrative: 'Narrative' }, canvas: { graph: { nodes: [], edges: [] } } }],
+      source_steps: [{ envelope: { narratives: [{ narrative_name: '', narrative: 'Narrative' }], graph: { nodes: [], edges: [] } } }],
       output_mode: 'narrative+graph',
     }, db);
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'Synthesis is not configured: missing model.');
+    assert.deepEqual(result.narratives, []);
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
@@ -81,21 +86,29 @@ describe('synthesize handler', () => {
   it('returns empty result when no source material is provided', async () => {
     const result = await handleSynthesize(1, 'bank', 'test query', { source_steps: [], model: 'test-model' }, db);
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'No source material available for synthesis.');
+    assert.deepEqual(result.narratives, []);
     assert.deepEqual(result.graph, { nodes: [], edges: [] });
   });
 
-  it('parses universal format, normalizes, and keeps corpus/catalog nodes in known-only mode', async () => {
-    const response = `Synthesized summary.
-
-## ARCHITXT-GRAPH-DATA
-{"nodes": [{"id": "a-com:COM-001", "name": "Singleview"}, {"id": "a-svc:SVC-005", "name": "Rating"}, {"id": "found:payment-gateway", "name": "Payment Gateway"}], "edges": [{"from": "a-com:COM-001", "to": "a-svc:SVC-005", "type": "sends", "label": "usage data", "detail": "Billable events"}, {"from": "a-com:COM-001", "to": "found:payment-gateway", "type": "calls", "label": "charges"}]}`;
+  it('parses contextual envelope, normalizes, and keeps corpus/catalog nodes in known-only mode', async () => {
+    const response = buildEnvelope({
+      narrative: 'Synthesized summary.',
+      nodes: [
+        { id: 'a-com:COM-001', name: 'Singleview' },
+        { id: 'a-svc:SVC-005', name: 'Rating' },
+        { id: 'payment-gateway', name: 'Payment Gateway' },
+      ],
+      edges: [
+        { from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'usage data', detail: 'Billable events' },
+        { from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' },
+      ],
+    });
 
     const sourceSteps = [
       {
         intent_text: 'step one',
-        synthesis: { narrative: 'Narrative one' },
-        canvas: {
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
           graph: {
             nodes: [
               { id: 'a-com:COM-001', name: 'Singleview' },
@@ -115,7 +128,7 @@ describe('synthesize handler', () => {
     }, db);
 
     assert.equal(result.success, true);
-    assert.equal(result.narrative, 'Synthesized summary.');
+    assert.equal(result.narratives[0]?.narrative, 'Synthesized summary.');
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
     assert.equal(result.graph.nodes[0].id, 'a-com:COM-001');
@@ -135,16 +148,22 @@ describe('synthesize handler', () => {
   });
 
   it('keeps discovered nodes in discovery mode', async () => {
-    const response = `Synthesized summary.
-
-## ARCHITXT-GRAPH-DATA
-{"nodes": [{"id": "a-com:COM-001", "name": "Singleview"}, {"id": "found:payment-gateway", "name": "Payment Gateway"}], "edges": [{"from": "a-com:COM-001", "to": "found:payment-gateway", "type": "calls", "label": "charges"}]}`;
+    const response = buildEnvelope({
+      narrative: 'Synthesized summary.',
+      nodes: [
+        { id: 'a-com:COM-001', name: 'Singleview' },
+        { id: 'payment-gateway', name: 'Payment Gateway' },
+      ],
+      edges: [
+        { from: 'a-com:COM-001', to: 'payment-gateway', type: 'calls', label: 'charges' },
+      ],
+    });
 
     const sourceSteps = [
       {
         intent_text: 'step one',
-        synthesis: { narrative: 'Narrative one' },
-        canvas: {
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
           graph: {
             nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }],
             edges: [],
@@ -164,6 +183,75 @@ describe('synthesize handler', () => {
     assert.equal(result.success, true);
     assert.equal(result.graph.nodes.length, 2);
     assert.equal(result.graph.edges.length, 1);
-    assert.ok(result.graph.nodes.some((n) => n.id === 'found:payment-gateway'));
+    assert.ok(result.graph.nodes.some((n) => n.id === 'payment-gateway'));
+  });
+
+  it('scrubs narrative when only diagrams are requested', async () => {
+    const response = buildEnvelope({
+      narrative: 'The model should not have written this.',
+      nodes: [],
+      edges: [],
+      tables: [],
+      diagrams: [{
+        name: 'ICMS and Singleview Dataflow',
+        type: 'erDiagram',
+        content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+      }],
+    });
+
+    const sourceSteps = [
+      {
+        intent_text: 'step one',
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
+          graph: { nodes: [], edges: [] },
+          tables: [],
+          diagrams: [{
+            name: 'ICMS and Singleview Dataflow',
+            type: 'erDiagram',
+            content: 'erDiagram\n    SINGLEVIEW --o{ ICMS : \"sends usage data\"',
+          }],
+        },
+      },
+    ];
+
+    const result = await handleSynthesize(1, 'bank', 'test1 (erDiagram)', {
+      source_steps: sourceSteps,
+      model: 'test-model',
+      section_focus: { diagram: [{ name: 'test1', type: 'erDiagram', content: 'show the relationship...' }] },
+      generateCompletion: makeCompletion(response),
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.equal(result.narratives[0]?.narrative ?? '', '');
+    assert.equal(result.diagrams.length, 1);
+  });
+
+  it('keeps narrative when narrative section is explicitly requested', async () => {
+    const response = buildEnvelope({
+      narrative: 'Keep this summary.',
+      nodes: [],
+      edges: [],
+    });
+
+    const sourceSteps = [
+      {
+        intent_text: 'step one',
+        envelope: {
+          narratives: [{ narrative_name: '', narrative: 'Narrative one' }],
+          graph: { nodes: [], edges: [] },
+        },
+      },
+    ];
+
+    const result = await handleSynthesize(1, 'bank', '#narrative\nsummarize this\n#end', {
+      source_steps: sourceSteps,
+      model: 'test-model',
+      section_focus: { narrative: 'summarize this' },
+      generateCompletion: makeCompletion(response),
+    }, db);
+
+    assert.equal(result.success, true);
+    assert.equal(result.narratives[0]?.narrative, 'Keep this summary.');
   });
 });

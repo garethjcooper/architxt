@@ -34,6 +34,14 @@ import DirectiveSyncRow from './directive-sync-row';
 
 const logger = createLogger('HindsightPage');
 
+// Mental models that are auto-managed (derived from templates or provisioned by
+// the contextual graph) should not be pushable/pulled from this sync page.
+const isUnactionableMentalModel = (row: any) =>
+  row?.arch?.is_derived === true ||
+  row?.hindsight?.is_derived === true ||
+  row?.arch?.is_contextual === true ||
+  row?.hindsight?.is_contextual === true;
+
 
 interface DiffResult {
   same: { ext_id: string; arch: any; hindsight: any; divergence?: any }[];
@@ -87,27 +95,27 @@ function ColumnCard({
   const selectedCount = extIds.filter((id) => selectedIds.has(id)).length;
 
   return (
-    <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col h-full">
+    <div className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col h-full">
       {/* Header */}
-      <div className={`px-3 py-2 border-b border-white/10 ${colorClass}`}>
+      <div className={`px-3 py-2 border-b border-border-default ${colorClass}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {icon}
             <span className="font-medium text-sm">{title}</span>
             {headerExtra && <div className="ml-1">{headerExtra}</div>}
           </div>
-          <span className="text-xs font-mono bg-black/30 px-2 py-0.5 rounded">{count} ({selectedCount})</span>
+          <span className="text-xs font-mono bg-surface-inset px-2 py-0.5 rounded">{count} ({selectedCount})</span>
         </div>
       </div>
 
       {/* Select-all bar */}
       {showSelectAll && (
-        <div className="px-3 py-1.5 border-b border-white/5 flex items-center gap-2 bg-white/[0.02]">
+        <div className="px-3 py-1.5 border-b border-border-subtle flex items-center gap-2 bg-on-dark/[0.02]">
           <Checkbox
             checked={allSelected}
             onCheckedChange={(checked) => onSelectAll(extIds, checked === true)}
           />
-          <span className="text-[10px] text-white/40">{allSelected ? 'Deselect all' : 'Select all'}</span>
+          <span className="text-[10px] text-foreground-subtle">{allSelected ? 'Deselect all' : 'Select all'}</span>
         </div>
       )}
 
@@ -160,6 +168,29 @@ export default function HindsightPage() {
   useEffect(() => {
     setSelectedIds(new Set());
   }, [col2Filter]);
+
+  // Derived and contextual mental models are auto-managed; don't let them stay
+  // selected after a diff refresh, because they can't be pushed or pulled.
+  useEffect(() => {
+    if (!diffResult) return;
+    const allRows = [
+      ...(diffResult.same || []),
+      ...(diffResult.different || []),
+      ...(diffResult.only_architxt || []),
+      ...(diffResult.only_hindsight || []),
+    ];
+    const unactionableIds = new Set(
+      allRows.filter(isUnactionableMentalModel).map((d) => d.ext_id)
+    );
+    setSelectedIds((prev) => {
+      if ([...prev].every((id) => !unactionableIds.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of unactionableIds) {
+        next.delete(id);
+      }
+      return next;
+    });
+  }, [diffResult]);
 
   // Poll pending operations every 5 seconds when a server+bank is selected
   useEffect(() => {
@@ -267,10 +298,13 @@ export default function HindsightPage() {
     return op ? op.pop_status : null;
   };
 
-  // ── Derived mental model detection ─────────────────────────────────
+  // ── Derived / contextual mental model detection ─────────────────────
 
-  const isDerivedMentalModel = (row: any) =>
-    row?.arch?.is_derived === true || row?.hindsight?.is_derived === true;
+  const isUnactionableMentalModel = (row: any) =>
+    row?.arch?.is_derived === true ||
+    row?.hindsight?.is_derived === true ||
+    row?.arch?.is_contextual === true ||
+    row?.hindsight?.is_contextual === true;
 
   // ── Selection helpers ───────────────────────────────────────────────
 
@@ -457,6 +491,11 @@ export default function HindsightPage() {
 
       const isDerived = row.arch?.is_derived === true;
       if (isDerived) {
+        return [];
+      }
+
+      const isContextual = row.arch?.is_contextual === true;
+      if (isContextual) {
         return [];
       }
 
@@ -698,15 +737,15 @@ export default function HindsightPage() {
   const filteredCol3 = col3Filtered.merged;
 
   const col2PullCount = filteredCol2.filter(
-    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d))
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d))
   ).length;
   const col2PushCount = filteredCol2.filter(
-    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync'
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d))
   ).length;
 
   return (
     <PageShell
-      title="Hindsight"
+      title="Hindsight Sync"
       subtitle={isEntityMode
         ? "Compare and synchronise entity labels with a remote Hindsight server."
         : isMentalModelMode
@@ -717,13 +756,13 @@ export default function HindsightPage() {
       loading={loadingServers}
     >
       {/* Controls */}
-      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border-default">
         <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-white/40" />
+          <Server className="h-4 w-4 text-foreground-subtle" />
           <select
             value={selectedServerId}
             onChange={(e) => setSelectedServerId(e.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             <option value="">Select server...</option>
             {servers.map((s, idx) => (
@@ -733,12 +772,12 @@ export default function HindsightPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-white/40" />
+          <Database className="h-4 w-4 text-foreground-subtle" />
           <select
             value={selectedBankId}
             onChange={(e) => setSelectedBankId(e.target.value)}
             disabled={!selectedServerId || loadingBanks || banks.length === 0}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none disabled:opacity-50"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
           >
             <option value="">{loadingBanks ? 'Loading...' : banks.length === 0 ? 'No banks' : 'Select bank...'}</option>
             {banks.map((b, idx) => (
@@ -749,7 +788,7 @@ export default function HindsightPage() {
 
         {/* Object selector */}
         <div className="flex items-center gap-2">
-          <GitCompare className="h-4 w-4 text-white/40" />
+          <GitCompare className="h-4 w-4 text-foreground-subtle" />
           <select
             value={selectedObject}
             onChange={(e) => {
@@ -758,7 +797,7 @@ export default function HindsightPage() {
               setCounts(null);
               setSelectedIds(new Set());
             }}
-            className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
           >
             <option value="documents">Documents</option>
             <option value="entities">Entities</option>
@@ -770,20 +809,20 @@ export default function HindsightPage() {
         <Button
           onClick={fetchDiff}
           disabled={loadingDiff || !selectedServerId || !selectedBankId}
-          className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-emerald-900/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-accent-primary-bg border border-accent-primary-bd text-accent-primary-fg hover:bg-accent-primary-bg-hover transition-colors disabled:opacity-50"
         >
           {loadingDiff ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
           {loadingDiff ? 'Fetching...' : `Fetch ${selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'}`}
         </Button>
 
         {counts && (
-          <span className="text-xs text-white/40">{counts.total} total</span>
+          <span className="text-xs text-foreground-subtle">{counts.total} total</span>
         )}
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 rounded bg-red-900/20 border border-red-500/30 text-red-300 text-sm flex items-center gap-2">
+        <div className="mb-4 p-3 rounded bg-destructive-bg border border-destructive-bd text-destructive-fg text-sm flex items-center gap-2">
           <AlertCircle className="h-4 w-4" />
           {error}
         </div>
@@ -791,7 +830,7 @@ export default function HindsightPage() {
 
       {/* Empty state */}
       {!diffResult && !loadingDiff && (
-        <div className="text-center py-16 text-white/30">
+        <div className="text-center py-16 text-foreground-placeholder">
           <ArrowRightLeft className="h-12 w-12 mx-auto mb-3 opacity-40" />
           <p className="text-sm">Select a server and bank, then click Fetch {selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'} to start the comparison.</p>
         </div>
@@ -801,10 +840,10 @@ export default function HindsightPage() {
       {loadingDiff && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08]">
-              <div className="px-4 py-2 border-b border-white/10"><Skeleton className="h-4 w-24" /></div>
+            <div key={i} className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08]">
+              <div className="px-4 py-2 border-b border-border-default"><Skeleton className="h-4 w-24" /></div>
               {Array.from({ length: 5 }).map((_, j) => (
-                <div key={j} className="px-4 py-3 border-b border-white/5"><Skeleton className="h-3 w-full" /></div>
+                <div key={j} className="px-4 py-3 border-b border-border-subtle"><Skeleton className="h-3 w-full" /></div>
               ))}
             </div>
           ))}
@@ -818,17 +857,17 @@ export default function HindsightPage() {
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={searchCol1}
                   onChange={(e) => setSearchCol1(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol1 && (
                   <button
                     onClick={() => setSearchCol1('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -841,22 +880,22 @@ export default function HindsightPage() {
                   handlePushSelected(ids);
                 }}
                 disabled={!filteredCol1.some((d) => selectedIds.has(d.ext_id))}
-                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-blue-900/30 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50 shrink-0"
+                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-accent-secondary-bg border border-accent-secondary-bd text-accent-secondary-fg hover:bg-accent-secondary-bg transition-colors disabled:opacity-50 shrink-0"
               >
                 <Upload className="h-4 w-4" /> Push to Bank
               </Button>
             </div>
             <ColumnCard
               title="Only on architxt"
-              icon={<Server className="h-4 w-4 text-blue-400" />}
+              icon={<Server className="h-4 w-4 text-accent-primary-fg" />}
               count={col1Filtered.pureFiltered.length}
-              colorClass="bg-blue-900/20 text-blue-300 border-blue-500/20"
+              colorClass="bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
               extIds={filteredCol1.map((d) => d.ext_id)}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
             >
               {filteredCol1.length === 0 ? (
-                <div className="px-3 py-6 text-center text-white/30 text-xs">{emptyCol1Text}</div>
+                <div className="px-3 py-6 text-center text-foreground-placeholder text-xs">{emptyCol1Text}</div>
               ) : (
                 isEntityMode ? (
                   filteredCol1.map((item) => (
@@ -911,17 +950,17 @@ export default function HindsightPage() {
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={searchCol2}
                   onChange={(e) => setSearchCol2(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol2 && (
                   <button
                     onClick={() => setSearchCol2('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -934,8 +973,8 @@ export default function HindsightPage() {
                     if (ids.length === 0) return;
                     handleMakeLikeBank(ids);
                   }}
-                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isDerivedMentalModel(d)))}
-                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50 shrink-0"
+                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d)))}
+                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-tertiary-bg border border-accent-tertiary-bd text-accent-tertiary-fg hover:bg-accent-tertiary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Download className="h-4 w-4" /> Pull from Bank{col2PullCount > 0 ? ` (${col2PullCount})` : ''}
                   </Button>
@@ -945,8 +984,8 @@ export default function HindsightPage() {
                     if (ids.length === 0) return;
                     handleMakeLikeArchitxt(ids);
                   }}
-                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync')}
-                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-blue-900/30 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50 shrink-0"
+                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d)))}
+                  className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-secondary-bg border border-accent-secondary-bd text-accent-secondary-fg hover:bg-accent-secondary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Upload className="h-4 w-4" /> Push to Bank{col2PushCount > 0 ? ` (${col2PushCount})` : ''}
                   </Button>
@@ -954,9 +993,9 @@ export default function HindsightPage() {
             </div>
             <ColumnCard
               title="On Both"
-              icon={<ArrowRightLeft className="h-4 w-4 text-emerald-400" />}
+              icon={<ArrowRightLeft className="h-4 w-4 text-accent-primary-fg" />}
               count={col2Filtered.pureFiltered.length}
-              colorClass="bg-emerald-900/20 text-emerald-300 border-emerald-500/20"
+              colorClass="bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
               extIds={filteredCol2.filter((d) => d.syncStatus === 'out_of_sync').map((d) => d.ext_id)}
               showSelectAll={col2Filter === 'out_of_sync' || col2Filter === 'all'}
               selectedIds={selectedIds}
@@ -969,8 +1008,8 @@ export default function HindsightPage() {
                       onClick={() => setCol2Filter(f)}
                       className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                         col2Filter === f
-                          ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200'
-                          : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                          ? 'bg-diff-match-bg border-diff-match-bd text-diff-match-fg'
+                          : 'bg-surface-card border-border-default text-foreground-subtle hover:bg-surface-panel'
                       }`}
                     >
                       {f === 'out_of_sync' ? 'Out of Sync' : f === 'in_sync' ? 'In Sync' : 'All'}
@@ -980,7 +1019,7 @@ export default function HindsightPage() {
               }
             >
               {filteredCol2.length === 0 ? (
-                <div className="px-3 py-6 text-center text-white/30 text-xs">
+                <div className="px-3 py-6 text-center text-foreground-placeholder text-xs">
                   {emptyCol2Text}
                 </div>
               ) : (
@@ -1009,7 +1048,7 @@ export default function HindsightPage() {
                       divergence={item.divergence}
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
-                      showCheckbox={item.syncStatus === 'out_of_sync'}
+                      showCheckbox={item.syncStatus === 'out_of_sync' && !isUnactionableMentalModel(item)}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setMentalCompareId(item.ext_id)}
                     />
@@ -1044,6 +1083,7 @@ export default function HindsightPage() {
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                       showCheckbox={item.syncStatus === 'out_of_sync'}
+                      showStatusBadge={false}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setCompareId(item.ext_id)}
                       pendingStatus={getPendingStatus(item.ext_id)}
@@ -1058,17 +1098,17 @@ export default function HindsightPage() {
           <div className="flex flex-col gap-3 h-full min-h-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={searchCol3}
                   onChange={(e) => setSearchCol3(e.target.value)}
                   placeholder="Search..."
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {searchCol3 && (
                   <button
                     onClick={() => setSearchCol3('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -1081,22 +1121,22 @@ export default function HindsightPage() {
                   handlePullSelected(ids);
                 }}
                 disabled={!filteredCol3.some((d) => selectedIds.has(d.ext_id))}
-                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-purple-900/30 border border-purple-500/30 text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50 shrink-0"
+                className="inline-flex items-center justify-center gap-2 h-8 w-36 rounded text-sm font-medium bg-accent-tertiary-bg border border-accent-tertiary-bd text-accent-tertiary-fg hover:bg-accent-tertiary-bg transition-colors disabled:opacity-50 shrink-0"
               >
                 <Download className="h-4 w-4" /> Pull from Bank
               </Button>
             </div>
             <ColumnCard
               title="Only on Bank"
-              icon={<Database className="h-4 w-4 text-purple-400" />}
+              icon={<Database className="h-4 w-4 text-accent-primary-fg" />}
               count={col3Filtered.pureFiltered.length}
-              colorClass="bg-purple-900/20 text-purple-300 border-purple-500/20"
+              colorClass="bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
               extIds={filteredCol3.map((d) => d.ext_id)}
               selectedIds={selectedIds}
               onSelectAll={selectAll}
             >
               {filteredCol3.length === 0 ? (
-                <div className="px-3 py-6 text-center text-white/30 text-xs">{emptyCol3Text}</div>
+                <div className="px-3 py-6 text-center text-foreground-placeholder text-xs">{emptyCol3Text}</div>
               ) : isEntityMode ? (
                 filteredCol3.map((item) => (
                   <EntitySyncRow

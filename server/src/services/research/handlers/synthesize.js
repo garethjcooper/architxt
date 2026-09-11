@@ -12,31 +12,12 @@
 import * as llmClient from '../../llm/client.js';
 import { config } from '../../../config.js';
 import { createLogger } from '../../../utils/logger.js';
-import { loadAndComposeWithCatalog } from '../../../prompts/template-service.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
-import { normalizeGraph } from '../../../prompts/normalize-graph.js';
+import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
+import { normalizeModelOutput } from '../../contextual-graph/normalize-model-output.js';
+import { toEnvelope } from '../../contextual-graph/to-envelope.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 
 const logger = createLogger('research-synthesize');
-
-const DISCOVERY_MODES = new Set([
-  'graph-discovery',
-  'narrative-graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-discovered-only',
-]);
-
-function resolveTemplate(requestedTemplate, outputMode, allowDiscovery) {
-  if (typeof requestedTemplate === 'string' && DISCOVERY_MODES.has(requestedTemplate)) return requestedTemplate;
-
-  // Legacy UI output_mode values map to v0.3.5 template names.
-  if (outputMode === 'narrative') return 'narrative';
-  if (outputMode === 'graph-only') return allowDiscovery ? 'graph-discovery' : 'graph-known';
-  if (outputMode === 'narrative+graph') {
-    return allowDiscovery ? 'narrative-graph-discovery' : 'narrative-graph-known';
-  }
-  return 'narrative-graph-known';
-}
 
 function formatEntity(entity) {
   const name = entity.name || entity.id;
@@ -57,12 +38,14 @@ function collectFromSteps(sourceSteps) {
   const narratives = [];
 
   for (const step of sourceSteps) {
-    const canvas = step.canvas || {};
-    const graph = canvas.graph || {};
-    const synthesis = step.synthesis || {};
+    const envelope = step.envelope || {};
+    const graph = envelope.graph || {};
 
-    if (synthesis.narrative) {
-      narratives.push(`## Step: ${step.intent_text || 'untitled'}\n${synthesis.narrative}`);
+    const stepNarratives = Array.isArray(envelope.narratives) ? envelope.narratives : [];
+    if (stepNarratives.length > 0) {
+      const title = `## Step: ${step.intent_text || 'untitled'}`;
+      const body = stepNarratives.map((n) => `${n.narrative_name ? `### ${n.narrative_name}\n` : ''}${n.narrative}`).join('\n\n');
+      narratives.push(`${title}\n${body}`);
     }
 
     for (const n of graph.nodes || []) {
@@ -151,7 +134,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   const intentText = query;
   const sourceSteps = options?.source_steps || [];
   const cfg = config.research.synthesize;
-  const templateName = resolveTemplate(options?.template, options?.output_mode, options?.allow_discovery);
+  const allowDiscovery = options?.allow_discovery === true;
 
   if (!db) {
     return {
@@ -162,13 +145,15 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   }
 
   // Guard: ensure we have something to synthesize.
-  const { nodes: corpusNodes, edges: corpusEdges } = collectFromSteps(sourceSteps);
-  const hasNarratives = sourceSteps.some((s) => s.synthesis?.narrative);
+  const { nodes: corpusNodes, edges: corpusEdges, narratives: corpusNarratives } = collectFromSteps(sourceSteps);
+  const hasNarratives = corpusNarratives.length > 0;
   if (!hasNarratives && corpusNodes.length === 0 && corpusEdges.length === 0) {
     return {
       success: true,
-      narrative: 'No source material available for synthesis.',
+      narratives: [],
       graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
       calls: [],
     };
   }
@@ -176,8 +161,10 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   if (!cfg.model && !options?.model) {
     return {
       success: true,
-      narrative: 'Synthesis is not configured: missing model.',
+      narratives: [],
       graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
       calls: [],
     };
   }
@@ -189,7 +176,7 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     sourceStepCount: sourceSteps.length,
     provider: cfg.provider,
     model: options?.model || cfg.model,
-    template: templateName,
+    template: 'generic',
     maxTokens: options?.max_tokens ?? cfg.max_tokens,
     corpusChars: corpus.length,
   });
@@ -200,17 +187,49 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     sourceStepCount: sourceSteps.length,
     nodeCount: corpusNodes.length,
     edgeCount: corpusEdges.length,
-    narrativeCount: sourceSteps.filter((s) => s.synthesis?.narrative).length,
+    narrativeCount: sourceSteps.filter((s) => s.envelope?.narratives?.some((n) => n.narrative)).length,
   });
 
-  const { prompt: systemPrompt, mode } = await loadAndComposeWithCatalog(db, templateName, {
-    ARCHITXT_TOPIC: intentText,
+  const focus = options?.section_focus || {};
+  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
+    ? focus.narrative.trim().length > 0
+    : focus.narrative.content?.trim().length > 0);
+  const activeSections = [
+    focus.graph && 'graph',
+    focus.table?.length && 'tables',
+    focus.diagram?.length && 'diagrams',
+    requestedNarrative && 'narrative',
+  ].filter(Boolean);
+  const requestedStructured = activeSections.includes('tables') || activeSections.includes('diagrams') || activeSections.includes('graph');
+  // When the caller gave no directives at all, keep the legacy default: narrative is active.
+  const hasAnyDirective = requestedNarrative || requestedStructured;
+
+  const topic = intentText;
+  const focusVars = {
     ARCHITXT_CORPUS: corpus,
-  });
+    ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
+    ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+    ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(focus.diagram),
+    ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
+  };
+  const systemPrompt = await composeMentalModelPrompt(db, 'generic', topic, focusVars);
+
+  // Make the user request match the active section directives. Avoid asking
+  // for narrative when only structured sections are active.
+  let userInstruction;
+  if (requestedNarrative && requestedStructured) {
+    userInstruction = 'Synthesize the source material above into a narrative and structured output. Follow the output format exactly.';
+  } else if (requestedNarrative || !hasAnyDirective) {
+    userInstruction = 'Synthesize the source material above into a narrative. Follow the output format exactly.';
+  } else if (requestedStructured) {
+    userInstruction = `Synthesize the source material above into the active structured output sections (${activeSections.join(', ')}). Do not produce narrative prose. Set narrative to an empty string. Follow the output format exactly.`;
+  } else {
+    userInstruction = 'Synthesize the source material above into a concise narrative and graph. Follow the output format exactly.';
+  }
 
   const messages = [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: 'Synthesize the source material above into a narrative and graph. Follow the output format exactly.' },
+    { role: 'user', content: userInstruction },
   ];
 
   const completionFn = typeof options?.generateCompletion === 'function'
@@ -243,58 +262,32 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   const catalogEntities = await loadEntityCatalog(db);
   const knownCatalog = new Map(catalogEntities.map((e) => [e.id, e]));
 
+  const parsed = normalizeModelOutput(llmResult.data.content);
   const corpusNodeIds = new Set(corpusNodes.map((n) => n.id));
 
-  const expectGraph = templateName !== 'narrative';
-  const parsed = parseGraphResponse(llmResult.data.content, { mode, expectGraph });
-  const normalized = normalizeGraph(parsed.graph, {
-    activity: 'synthesize',
+  // Normalize the raw envelope through the shared helper. Discovery filtering is
+  // applied afterwards because Synthesize has stricter allowDiscovery rules.
+  const envelope = toEnvelope(parsed, {
     knownCatalog,
-    mode: templateName,
+    activity: 'synthesize',
+    mode: 'generic',
+    preserveParallelEdges: true,
   });
 
-  const discoveredOnly = templateName.includes('discovered-only');
-  const discoveryMode = DISCOVERY_MODES.has(templateName);
-
-  // Known templates: keep corpus/catalog nodes only.
-  // Discovery templates: keep all normalized nodes.
-  // Discovered-only templates: keep only discovered nodes as standalone nodes, but known/corpus
-  // entities may still appear as endpoints of discovered edges.
+  // Filter nodes based on discovery permission.
   let filteredNodes;
   let filteredEdges;
 
-  if (discoveredOnly) {
-    // For discovered-only, start from nodes that are NOT already in the corpus/catalog.
-    const discoveredNodes = normalized.nodes.filter(
-      (n) => !corpusNodeIds.has(n.id) && !knownCatalog.has(n.id)
-    );
-    const discoveredNodeIds = new Set(discoveredNodes.map((n) => n.id));
-
-    // Keep edges that touch at least one discovered node.
-    const discoveredEdges = normalized.edges.filter(
-      (e) => discoveredNodeIds.has(e.from) || discoveredNodeIds.has(e.to)
-    );
-
-    // Known/corpus nodes may appear as endpoints of discovered edges.
-    const edgeEndpointIds = new Set();
-    for (const e of discoveredEdges) {
-      edgeEndpointIds.add(e.from);
-      edgeEndpointIds.add(e.to);
-    }
-
-    filteredNodes = normalized.nodes.filter((n) => edgeEndpointIds.has(n.id));
+  if (allowDiscovery) {
+    filteredNodes = envelope.graph.nodes;
     const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = discoveredEdges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
-  } else if (discoveryMode) {
-    filteredNodes = normalized.nodes;
-    const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = normalized.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
+    filteredEdges = envelope.graph.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
   } else {
-    filteredNodes = normalized.nodes.filter(
+    filteredNodes = envelope.graph.nodes.filter(
       (n) => corpusNodeIds.has(n.id) || knownCatalog.has(n.id)
     );
     const keptNodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = normalized.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
+    filteredEdges = envelope.graph.edges.filter((e) => keptNodeIds.has(e.from) && keptNodeIds.has(e.to));
   }
 
   logger.info('Synthesize graph filtered', {
@@ -306,26 +299,35 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
     corpusNodes: corpusNodes.length,
     corpusEdges: corpusEdges.length,
     knownCatalogSize: knownCatalog.size,
-    templateName,
-    discoveredOnly,
+    allowDiscovery,
   });
 
-  const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
+  // Defense in depth: if narrative was not requested, scrub any model-generated
+  // narratives so downstream consumers only see structured output.
+  let finalNarratives = envelope.narratives;
+  if (hasAnyDirective && !requestedNarrative) {
+    finalNarratives = [];
+  }
 
-  const graphOnly = templateName.startsWith('graph-');
+  const graph = toInternalGraph({ nodes: filteredNodes, edges: filteredEdges });
+  graph.name = envelope.graph.name;
 
   logger.info('Synthesize handler completed', {
     intentText,
-    templateName,
-    narrativeLength: graphOnly ? 0 : parsed.narrative.length,
+    templateName: 'generic',
+    narrativeCount: finalNarratives.length,
+    narrativeNameLength: (finalNarratives[0]?.narrative_name || '').length,
+    graphNameLength: (graph.name || '').length,
     graphNodeCount: graph.nodes.length,
     graphEdgeCount: graph.edges.length,
   });
 
   return {
     success: true,
-    narrative: graphOnly ? '' : parsed.narrative,
+    narratives: finalNarratives,
     graph,
+    tables: envelope.tables,
+    diagrams: envelope.diagrams,
     calls: [
       {
         mode: 'synthesize',

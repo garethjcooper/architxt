@@ -132,13 +132,13 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
     }
   };
 
-  const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2";
+  const inputClass = "!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Create Entity
           </DialogTitle>
         </DialogHeader>
@@ -146,14 +146,14 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           {/* Type */}
           <div className="space-y-2">
-            <Label htmlFor="ce-type" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="ce-type" className="text-xs uppercase text-foreground-subtle font-medium">
               Type *
             </Label>
             <select
               id="ce-type"
               value={typeId}
               onChange={(e) => setTypeId(Number(e.target.value) || '')}
-              className="w-full h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="w-full h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
               required
             >
               <option value="">Select type…</option>
@@ -165,7 +165,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="ce-eid" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="ce-eid" className="text-xs uppercase text-foreground-subtle font-medium">
                 Entity ID *
               </Label>
               <Input
@@ -174,10 +174,6 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                 onChange={(e) => setEntityId(e.target.value)}
                 placeholder="SYS-001"
                 className={inputClass}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
                 required
               />
               {selectedType?.uses_entity_id_pattern && entityIdConformity && (
@@ -186,19 +182,19 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                     title={entityIdConformity.message || ''}
                     className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
                       entityIdConformity.conforms
-                        ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
-                        : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
+                        ? 'bg-badge-success-bg text-accent-secondary-fg border-accent-secondary-bd'
+                        : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                     }`}
                   >
                     {formatEntityIdPattern(selectedType)}
                   </span>
                   <div className="flex items-center gap-2">
-                    {nextIdLoading && <Loader2 className="h-3 w-3 animate-spin text-white/40" />}
+                    {nextIdLoading && <Loader2 className="h-3 w-3 animate-spin text-foreground-subtle" />}
                     {nextEntityId && (
                       <button
                         type="button"
                         onClick={() => setEntityId(nextEntityId)}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-emerald-800/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-800/30"
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border bg-badge-success-bg text-badge-success-fg border-badge-success-bd hover:bg-badge-success-bg-hover"
                       >
                         Next ID: {nextEntityId}
                       </button>
@@ -208,7 +204,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ce-name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="ce-name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Name *
               </Label>
               <Input
@@ -217,10 +213,6 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Finance Gateway"
                 className={inputClass}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
                 required
               />
             </div>
@@ -228,7 +220,7 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="ce-desc" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="ce-desc" className="text-xs uppercase text-foreground-subtle font-medium">
               Description
             </Label>
             <Input
@@ -237,26 +229,18 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
           {/* Aliases */}
           <div className="space-y-2">
-            <Label className="text-xs uppercase text-white/50 font-medium">Aliases</Label>
+            <Label className="text-xs uppercase text-foreground-subtle font-medium">Aliases</Label>
             <div className="flex gap-2">
               <Input
                 value={newAlias}
                 onChange={(e) => setNewAlias(e.target.value)}
                 placeholder="Add alias…"
                 className={inputClass}
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAlias(); } }}
               />
               <Button type="button" variant="outline" size="sm" onClick={addAlias}>Add</Button>
@@ -264,9 +248,9 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
             {aliases.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {aliases.map((a, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-purple-800/15 text-purple-400 border border-purple-700/20">
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-badge-entity-bg text-badge-entity-fg border border-badge-entity-bd/50">
                     {a}
-                    <button type="button" onClick={() => removeAlias(i)} className="text-purple-400/60 hover:text-purple-300">
+                    <button type="button" onClick={() => removeAlias(i)} className="text-badge-entity-fg/60 hover:text-badge-entity-fg">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -278,8 +262,8 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
           {/* Case Match Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Case-Sensitive Match</Label>
-              <p className="text-[10px] text-white/40">OFF = insensitive (default), ON = exact case</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Case-Sensitive Match</Label>
+              <p className="text-[10px] text-foreground-subtle">OFF = insensitive (default), ON = exact case</p>
             </div>
             <CaseMatchToggle
               checked={caseSensitive}
@@ -290,8 +274,8 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
           {/* Word Boundary Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
-              <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match (default)</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Respect Word Boundaries</Label>
+              <p className="text-[10px] text-foreground-subtle">OFF = substring match, ON = whole-word match (default)</p>
             </div>
             <CaseMatchToggle
               checked={wordBoundaries}
@@ -299,11 +283,11 @@ export function CreateEntityDialog({ open, onOpenChange, entityTypes, onEntityCr
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-white/70 hover:text-white hover:bg-white/5">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card">
               Close
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <Button type="submit" disabled={isLoading} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Create
             </Button>

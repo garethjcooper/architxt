@@ -192,7 +192,7 @@ export const config = {
     synthesize: {
       provider: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_PROVIDER', 'ollama_cloud'),
       model: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MODEL', ''),
-      template: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPLATE', 'narrative-graph-known'),
+      template: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPLATE', 'generic'),
       temperature: parseFloat(getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPERATURE', '0.2')),
       max_tokens: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', '') !== ''
         ? getInt('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', 0)
@@ -220,6 +220,16 @@ export const config = {
     normalize_whitespace: getEnv('ARCHITXT_DENOISE_NORMALIZE_WS', 'true') === 'true',
     remove_non_ascii: getEnv('ARCHITXT_DENOISE_REMOVE_NON_ASCII', 'true') === 'true',
     max_consecutive_newlines: getInt('ARCHITXT_DENOISE_MAX_NEWLINES', 3)
-  }
+  },
+  // Contextual graph feature flags (legacy; retained for API compatibility but no longer used).
+  // patchRoles: removed; use allowed_model_types on the Hindsight bank instead.
+  contextualGraph: {
+    // Sync daemon auto-starts contextual-graph sync jobs for managed banks.
+    // Background refresh poll removed: the sync daemon is now the only scheduled contextual-graph refresh path.
+    sync_daemon: {
+      enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_ENABLED', 'false') === 'true',
+      poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_POLL_INTERVAL_MS', 60000),
+    },
+  },
 
 };

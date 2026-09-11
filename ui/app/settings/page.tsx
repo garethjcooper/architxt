@@ -52,7 +52,7 @@ export default function SettingsPage() {
           onClick={fetchSettings}
           disabled={loading}
           title="Refresh"
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
@@ -68,12 +68,12 @@ export default function SettingsPage() {
                 label="Diagram Description (Vision)"
                 data={settings.prompts.diagram_description}
               />
-              <div className="border-t border-white/10" />
+              <div className="border-t border-border-default" />
               <PromptBlock
                 label="Document Denoise (LLM)"
                 data={settings.prompts.document_denoise_llm}
               />
-              <div className="border-t border-white/10" />
+              <div className="border-t border-border-default" />
               <DenoiseConfigBlock
                 label="Document Denoise Rules"
                 data={settings.prompts.document_denoise}
@@ -188,10 +188,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-white/[0.08] bg-[oklch(0.23_0_0)] overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
-        <span className="text-white/60">{icon}</span>
-        <h3 className="text-sm font-semibold text-white/90">{title}</h3>
+    <div className="rounded-lg border border-on-dark/[0.08] bg-surface-card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-on-dark/[0.06] bg-on-dark/[0.02]">
+        <span className="text-foreground-faint">{icon}</span>
+        <h3 className="text-sm font-semibold text-foreground-default">{title}</h3>
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -213,19 +213,19 @@ function ConfigRow({
   return (
     <div className="flex items-start gap-3 py-1">
       <div className="w-[160px] shrink-0">
-        <span className="text-sm text-white/50">{name}</span>
+        <span className="text-sm text-foreground-subtle">{name}</span>
       </div>
       <div className="flex-1 min-w-0">
         {isCode ? (
-          <code className="block text-xs text-white/80 font-mono bg-black/30 border border-white/10 px-2 py-0.5 rounded break-all">
+          <code className="block text-xs text-foreground-muted font-mono bg-surface-inset border border-border-default px-2 py-0.5 rounded break-all">
             {display}
           </code>
         ) : (
-          <span className="text-sm text-white/80">{display}</span>
+          <span className="text-sm text-foreground-muted">{display}</span>
         )}
       </div>
       <div className="w-[240px] shrink-0 text-right">
-        <span className="text-xs text-white/30 font-mono">{envVar}</span>
+        <span className="text-xs text-foreground-placeholder font-mono">{envVar}</span>
       </div>
     </div>
   );
@@ -236,20 +236,20 @@ function StatusBadge({ value }: { value: boolean | string | '—' }) {
   const isOff = value === false || value === 'false' || value === '—';
   if (isOn) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-800/15 text-emerald-400 border border-emerald-700/20">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-badge-success-bg text-badge-success-fg border border-badge-success-bd">
         Enabled
       </span>
     );
   }
   if (isOff) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-800/15 text-red-400 border border-red-700/20">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-destructive-bg text-destructive-fg border border-destructive-bd">
         Disabled
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800/15 text-slate-400 border border-slate-700/20">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd">
       {String(value)}
     </span>
   );
@@ -265,13 +265,13 @@ function EnabledRow({
   return (
     <div className="flex items-center gap-3 py-1.5">
       <div className="w-[160px] shrink-0">
-        <span className="text-sm text-white/50">enabled</span>
+        <span className="text-sm text-foreground-subtle">enabled</span>
       </div>
       <div className="flex-1 min-w-0">
         <StatusBadge value={value} />
       </div>
       <div className="w-[240px] shrink-0 text-right">
-        <span className="text-xs text-white/30 font-mono">{envVar}</span>
+        <span className="text-xs text-foreground-placeholder font-mono">{envVar}</span>
       </div>
     </div>
   );
@@ -296,7 +296,7 @@ function DiagramPromptBlock({
   } | null;
 }) {
   if (!data) {
-    return <div className="text-sm text-white/40 italic">{label} — not configured</div>;
+    return <div className="text-sm text-foreground-subtle italic">{label} — not configured</div>;
   }
 
   return (
@@ -314,25 +314,25 @@ function DiagramPromptBlock({
 
       <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wide">System Prompt</span>
-          <span className="text-xs text-white/30 font-mono">{data.system_prompt.envVar}</span>
+          <span className="text-xs font-medium text-foreground-subtle uppercase tracking-wide">System Prompt</span>
+          <span className="text-xs text-foreground-placeholder font-mono">{data.system_prompt.envVar}</span>
         </div>
         <Textarea
           readOnly
           value={data.system_prompt.value}
-          className="min-h-[60px] text-xs text-white/80 bg-black/20 border-white/10 resize-none focus-visible:ring-0 focus-visible:border-white/20"
+          className="min-h-[60px] text-xs text-foreground-muted bg-surface-inset border-border-default resize-none focus-visible:ring-0 focus-visible:border-border-strong"
         />
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wide">Task Prompt</span>
-          <span className="text-xs text-white/30 font-mono">{data.task_prompt.envVar}</span>
+          <span className="text-xs font-medium text-foreground-subtle uppercase tracking-wide">Task Prompt</span>
+          <span className="text-xs text-foreground-placeholder font-mono">{data.task_prompt.envVar}</span>
         </div>
         <Textarea
           readOnly
           value={data.task_prompt.value}
-          className="min-h-[100px] text-xs text-white/80 bg-black/20 border-white/10 resize-none focus-visible:ring-0 focus-visible:border-white/20"
+          className="min-h-[100px] text-xs text-foreground-muted bg-surface-inset border-border-default resize-none focus-visible:ring-0 focus-visible:border-border-strong"
         />
       </div>
     </div>
@@ -355,7 +355,7 @@ function PromptBlock({
   } | null;
 }) {
   if (!data) {
-    return <div className="text-sm text-white/40 italic">{label} — not configured</div>;
+    return <div className="text-sm text-foreground-subtle italic">{label} — not configured</div>;
   }
 
   return (
@@ -370,25 +370,25 @@ function PromptBlock({
 
       <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wide">System Prompt</span>
-          <span className="text-xs text-white/30 font-mono">{data.system_prompt.envVar}</span>
+          <span className="text-xs font-medium text-foreground-subtle uppercase tracking-wide">System Prompt</span>
+          <span className="text-xs text-foreground-placeholder font-mono">{data.system_prompt.envVar}</span>
         </div>
         <Textarea
           readOnly
           value={data.system_prompt.value}
-          className="min-h-[60px] text-xs text-white/80 bg-black/20 border-white/10 resize-none focus-visible:ring-0 focus-visible:border-white/20"
+          className="min-h-[60px] text-xs text-foreground-muted bg-surface-inset border-border-default resize-none focus-visible:ring-0 focus-visible:border-border-strong"
         />
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wide">Task Prompt</span>
-          <span className="text-xs text-white/30 font-mono">{data.task_prompt.envVar}</span>
+          <span className="text-xs font-medium text-foreground-subtle uppercase tracking-wide">Task Prompt</span>
+          <span className="text-xs text-foreground-placeholder font-mono">{data.task_prompt.envVar}</span>
         </div>
         <Textarea
           readOnly
           value={data.task_prompt.value}
-          className="min-h-[100px] text-xs text-white/80 bg-black/20 border-white/10 resize-none focus-visible:ring-0 focus-visible:border-white/20"
+          className="min-h-[100px] text-xs text-foreground-muted bg-surface-inset border-border-default resize-none focus-visible:ring-0 focus-visible:border-border-strong"
         />
       </div>
     </div>
@@ -407,7 +407,7 @@ function DenoiseConfigBlock({
 
   return (
     <div className="space-y-1">
-      <h4 className="text-sm font-semibold text-white/60 mb-2">{label}</h4>
+      <h4 className="text-sm font-semibold text-foreground-faint mb-2">{label}</h4>
       {enabledEntry && (
         <EnabledRow envVar={enabledEntry.envVar} value={enabledEntry.value as boolean | string} />
       )}

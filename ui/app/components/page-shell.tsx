@@ -58,13 +58,13 @@ export function PageShell({
       {/* Page Header */}
       <div className="pt-1 pb-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-        {subtitle && <p className="text-white/70 mt-2">{subtitle}</p>}
+        {subtitle && <p className="text-foreground-faint mt-2">{subtitle}</p>}
       </div>
 
       <div className="mt-4 flex flex-col flex-1 min-h-0">
         {/* Tabs */}
         {tabs && tabs.length > 0 && activeTab && onTabChange && (
-          <div className="border-b border-white/15">
+          <div className="border-b border-on-dark/15">
             <div className="flex">
               {tabs.map((tab) => (
                 <button
@@ -72,8 +72,8 @@ export function PageShell({
                   onClick={() => onTabChange(tab.value)}
                   className={`py-3 w-[120px] text-sm transition-colors text-center border-b-2 ${
                     activeTab === tab.value
-                      ? 'text-emerald-500 border-emerald-500 font-bold'
-                      : 'text-white/70 hover:text-white border-transparent font-medium'
+                      ? 'text-accent-primary-fg border-accent-primary-bd font-bold'
+                      : 'text-foreground-faint hover:text-foreground-default border-transparent font-medium'
                   }`}
                 >
                   <span className="inline-block">{tab.label}</span>
@@ -85,7 +85,7 @@ export function PageShell({
 
         {/* Row count */}
         {(count !== undefined || loading) && (
-          <p className="text-sm text-white/70 mt-2">{countText}</p>
+          <p className="text-sm text-foreground-faint mt-2">{countText}</p>
         )}
 
         {/* Content */}

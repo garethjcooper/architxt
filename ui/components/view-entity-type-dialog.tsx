@@ -25,10 +25,6 @@ const MIN_DIGITS = 1;
 const MAX_DIGITS = 10;
 const DEFAULT_DIGITS = 3;
 
-const inputFocusStyle = {
-  '--tw-ring-color': 'rgb(52, 211, 153)',
-  '--tw-ring-opacity': '0.4',
-} as React.CSSProperties;
 
 export function ViewEntityTypeDialog({
   entityType,
@@ -145,14 +141,14 @@ export function ViewEntityTypeDialog({
     }
   };
 
-  const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2";
+  const inputClass = "!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
   const disabledClass = "opacity-50 pointer-events-none";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Entity Type Details
           </DialogTitle>
         </DialogHeader>
@@ -161,7 +157,7 @@ export function ViewEntityTypeDialog({
           {/* Editable Fields */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="et-name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="et-name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Type Name
               </Label>
               <Input
@@ -170,12 +166,12 @@ export function ViewEntityTypeDialog({
                 onChange={(e) => setTypeName(e.target.value)}
                 placeholder="e.g. Application Component"
                 className={inputClass}
-                style={inputFocusStyle}
+                
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="et-desc" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="et-desc" className="text-xs uppercase text-foreground-subtle font-medium">
                 Description
               </Label>
               <Input
@@ -184,15 +180,15 @@ export function ViewEntityTypeDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
                 className={inputClass}
-                style={inputFocusStyle}
+                
               />
             </div>
 
             {/* Entity Id Pattern Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-xs uppercase text-white/50 font-medium">Use Entity Id Pattern</Label>
-                <p className="text-[10px] text-white/40">Generate formatted ids like PREFIX-001</p>
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">Use Entity Id Pattern</Label>
+                <p className="text-[10px] text-foreground-subtle">Generate formatted ids like PREFIX-001</p>
               </div>
               <Switch checked={usesPattern} onCheckedChange={(v) => setUsesPattern(v)} />
             </div>
@@ -201,7 +197,7 @@ export function ViewEntityTypeDialog({
             <div className={`space-y-3 transition-opacity ${!usesPattern ? disabledClass : ''}`}>
               <div className="flex gap-3 items-start">
                 <div className="flex-1 space-y-2 min-w-0">
-                  <Label htmlFor="et-prefix" className="text-xs uppercase text-white/50 font-medium">
+                  <Label htmlFor="et-prefix" className="text-xs uppercase text-foreground-subtle font-medium">
                     Id Format Prefix
                   </Label>
                   <Input
@@ -210,12 +206,12 @@ export function ViewEntityTypeDialog({
                     onChange={(e) => handlePrefixChange(e.target.value)}
                     placeholder="e.g. APP"
                     className={inputClass}
-                    style={inputFocusStyle}
+                    
                     disabled={!usesPattern}
                   />
                 </div>
                 <div className="w-20 space-y-2">
-                  <Label htmlFor="et-separator" className="text-xs uppercase text-white/50 font-medium">
+                  <Label htmlFor="et-separator" className="text-xs uppercase text-foreground-subtle font-medium">
                     Separator
                   </Label>
                   <EntityTypeIdSeparatorSelect
@@ -226,7 +222,7 @@ export function ViewEntityTypeDialog({
                   />
                 </div>
                 <div className="w-24 space-y-2">
-                  <Label htmlFor="et-digits" className="text-xs uppercase text-white/50 font-medium">
+                  <Label htmlFor="et-digits" className="text-xs uppercase text-foreground-subtle font-medium">
                     Digits
                   </Label>
                   <Input
@@ -238,19 +234,19 @@ export function ViewEntityTypeDialog({
                     onChange={(e) => handleDigitsChange(e.target.value)}
                     placeholder="3"
                     className={inputClass}
-                    style={inputFocusStyle}
+                    
                     disabled={!usesPattern}
                   />
                 </div>
               </div>
-              <p className="text-[10px] text-white/40">Alphanumeric prefix; separator between prefix and number; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
+              <p className="text-[10px] text-foreground-subtle">Alphanumeric prefix; separator between prefix and number; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
             </div>
 
             {/* Case Match Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-xs uppercase text-white/50 font-medium">Case-Sensitive Match</Label>
-                <p className="text-[10px] text-white/40">OFF = insensitive (default), ON = exact case</p>
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">Case-Sensitive Match</Label>
+                <p className="text-[10px] text-foreground-subtle">OFF = insensitive (default), ON = exact case</p>
               </div>
               <CaseMatchToggle
                 checked={caseSensitive}
@@ -261,8 +257,8 @@ export function ViewEntityTypeDialog({
             {/* Word Boundary Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
-                <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match (default)</p>
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">Respect Word Boundaries</Label>
+                <p className="text-[10px] text-foreground-subtle">OFF = substring match, ON = whole-word match (default)</p>
               </div>
               <CaseMatchToggle
                 checked={wordBoundaries}
@@ -272,38 +268,38 @@ export function ViewEntityTypeDialog({
           </div>
 
           {/* Read-only Metadata */}
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border-default">
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">ID</p>
-              <p className="text-sm text-white font-mono">{entityType.id}</p>
+              <p className="text-xs uppercase text-foreground-subtle font-medium">ID</p>
+              <p className="text-sm text-foreground-default font-mono">{entityType.id}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(entityType.created_at), { addSuffix: true })}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(entityType.updated_at), { addSuffix: true })}
               </p>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

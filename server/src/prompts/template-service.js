@@ -1,19 +1,17 @@
 import { stmt } from '../cache.js';
 import { createLogger } from '../utils/logger.js';
 import { composeFragments } from './fragment-loader.js';
-import { buildEntityCatalogVariable, loadEntityCatalog } from './entity-catalog.js';
-import { applyHeuristic } from './examples-heuristics/index.js';
+import { parseSectionDirectives } from './section-directives.js';
 
 const logger = createLogger('prompt-templates');
 
-const VALID_MODES = new Set([
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
+export const VALID_MODES = new Set([
+  'generic',
+  'sys_entity_summary',
+  'sys_entity_capabilities',
+  'sys_edge_context',
+  'sys_discovery_context',
+  'sys_patch',
 ]);
 
 /**
@@ -45,7 +43,7 @@ export function composePrompt(template, variables = {}) {
   const required = JSON.parse(template.pt_variables || '[]');
   const missing = required.filter((key) => {
     const value = variables[key];
-    return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+    return value === undefined || value === null;
   });
   if (missing.length > 0) {
     throw new Error(`Missing required variables for template ${template.pt_name}: ${missing.join(', ')}`);
@@ -54,7 +52,7 @@ export function composePrompt(template, variables = {}) {
   const fragments = JSON.parse(template.pt_fragments || '[]');
   const fragmentText = composeFragments(fragments);
   const body = template.pt_body || '';
-  const composed = fragmentText ? `${fragmentText}\n\n${body}` : body;
+  const composed = fragmentText ? `${body}\n\n${fragmentText}` : body;
   if (composed.trim() === '') {
     throw new Error(`Composed prompt for template ${template.pt_name} is empty`);
   }
@@ -120,32 +118,27 @@ export function loadAndCompose(db, name, variables) {
 }
 
 /**
- * Load template by name and compose it, auto-populating ARCHITXT_ENTITIES from the DB catalog.
+ * Compose a full prompt for a derived mental model.
  *
- * @param {object} db
- * @param {string} name
- * @param {Record<string, string>} variables
- * @returns {Promise<{prompt: string, mode: string}>}
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} sectionFocus
+ * @returns {{active: string[], empty: string[]}}
  */
-export async function loadAndComposeWithCatalog(db, name, variables = {}) {
-  const entityCatalog = await buildEntityCatalogVariable(db);
-  const template = getTemplateByName(db, name);
-  if (!template) {
-    throw new Error(`Prompt template not found: ${name}`);
+function computeSectionState(sectionFocus) {
+  const active = [];
+  const empty = [];
+  if (sectionFocus?.graph) active.push('graph');
+  else empty.push('graph');
+  if (sectionFocus?.table?.length) active.push('tables');
+  else empty.push('tables');
+  if (sectionFocus?.diagram?.length) active.push('diagrams');
+  else empty.push('diagrams');
+  if (sectionFocus?.narrative) active.push('narrative');
+  else empty.push('narrative');
+  // If no directives at all, narrative is the default fallback.
+  if (active.length === 0) {
+    return { active: ['narrative'], empty: ['graph', 'tables', 'diagrams'] };
   }
-
-  let examples = variables.ARCHITXT_NODE_EXAMPLES;
-  if (examples === undefined && template.pt_examples_heuristic) {
-    const entities = await loadEntityCatalog(db);
-    const result = applyHeuristic(template.pt_examples_heuristic, entities);
-    examples = formatNodeExamples(result);
-  }
-
-  return composePrompt(template, {
-    ARCHITXT_ENTITIES: entityCatalog,
-    ARCHITXT_NODE_EXAMPLES: examples || '',
-    ...variables,
-  });
+  return { active, empty };
 }
 
 function formatNodeExamples({ include, exclude }) {
@@ -159,19 +152,337 @@ function formatNodeExamples({ include, exclude }) {
   return lines.join('\n');
 }
 
+const DIAGRAM_TYPE_TO_FRAGMENT = {
+  flowchart: 'output-format-diagram-flowchart.md',
+  sequenceDiagram: 'output-format-diagram-sequence.md',
+  classDiagram: 'output-format-diagram-class.md',
+  'stateDiagram-v2': 'output-format-diagram-state.md',
+  erDiagram: 'output-format-diagram-er.md',
+  journey: 'output-format-diagram-journey.md',
+  gantt: 'output-format-diagram-gantt.md',
+  pie: 'output-format-diagram-pie.md',
+  timeline: 'output-format-diagram-timeline.md',
+  'radar-beta': 'output-format-diagram-radar.md',
+  'architecture-beta': 'output-format-diagram-architecture.md',
+  mindmap: 'output-format-diagram-mindmap.md',
+  'venn-beta': 'output-format-diagram-venn.md',
+};
+
+/**
+ * Build conditional output-format fragments based on parsed section directives.
+ *
+ * Only includes schema fragments when the corresponding directive is present,
+ * keeping prompt size minimal and preventing the LLM from hallucinating
+ * unrequested sections.
+ *
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} sectionFocus
+ * @returns {string[]}
+ */
+export function buildConditionalFragments(sectionFocus) {
+  const extra = [];
+  if (sectionFocus?.graph) {
+    extra.push('output-format-graph-contextual.md');
+  }
+  if (sectionFocus?.table) {
+    extra.push('output-format-table-contextual.md');
+  }
+  if (sectionFocus?.diagram?.length) {
+    extra.push('output-format-diagram-contextual.md');
+    const requestedTypes = new Set(
+      sectionFocus.diagram
+        .map((d) => d.type?.trim())
+        .filter(Boolean)
+    );
+    if (requestedTypes.size > 0) {
+      for (const type of requestedTypes) {
+        const fragment = DIAGRAM_TYPE_TO_FRAGMENT[type];
+        if (fragment && !extra.includes(fragment)) {
+          extra.push(fragment);
+        }
+      }
+    } else {
+      // No explicit type requested; include all diagram syntax fragments so the
+      // model can pick a valid type safely.
+      for (const fragment of Object.values(DIAGRAM_TYPE_TO_FRAGMENT)) {
+        if (!extra.includes(fragment)) {
+          extra.push(fragment);
+        }
+      }
+    }
+  }
+  return extra;
+}
+
+/**
+ * Merge conditional fragments into a template's static fragment list.
+ *
+ * @param {object} template - prompt_templates row (pt_fragments is a JSON string)
+ * @param {string[]} extraFragments
+ * @returns {object} New template-like object with merged fragments
+ */
+function mergeFragments(template, extraFragments) {
+  const base = JSON.parse(template.pt_fragments || '[]');
+  // Insert conditional fragments right after contextual-patch.md (if present)
+  // so they precede section-focus.md and semantic fragments.
+  const patchIndex = base.indexOf('contextual-patch.md');
+  if (patchIndex !== -1 && extraFragments.length > 0) {
+    base.splice(patchIndex + 1, 0, ...extraFragments);
+  } else {
+    base.push(...extraFragments);
+  }
+  return {
+    ...template,
+    pt_fragments: JSON.stringify(base),
+  };
+}
+
+/**
+ * Format active/empty section instructions for injection into a composed prompt.
+ *
+ * @param {{active: string[], empty: string[]}} sectionState
+ * @returns {string}
+ */
+function formatSectionInstructions({ active, empty }) {
+  const lines = [];
+  lines.push('### Section rules');
+  lines.push('');
+  lines.push(`Active output sections: ${active.map((s) => `\`${s}\``).join(', ')}.`);
+  lines.push(`Empty output sections (must remain exactly as shown in the envelope example): ${empty.map((s) => `\`${s}\``).join(', ')}.`);
+  lines.push('');
+  if (!active.includes('narrative')) {
+    lines.push('Do not answer the topic in narrative prose. Set `narrative` to an empty string and express all findings through the structured output sections above.');
+    lines.push('');
+  } else {
+    lines.push('Narrative is active: you may use it for concise human-readable prose.');
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Inject section instructions into a composed prompt, placing them before
+ * the "## Output directives" heading if it exists.
+ *
+ * @param {string} prompt
+ * @param {string} instructions
+ * @returns {string}
+ */
+function injectBeforeOutputDirectives(prompt, instructions) {
+  const match = prompt.match(/\n## Output directives/i);
+  if (match) {
+    const idx = match.index;
+    return prompt.slice(0, idx) + '\n' + instructions + '\n' + prompt.slice(idx);
+  }
+  return prompt + '\n' + instructions;
+}
+function buildFocusFromDirectives(topic) {
+  const { intentText, sectionFocus } = parseSectionDirectives(topic || '');
+  return {
+    topic: intentText,
+    sectionFocus,
+    focusVariables: {
+      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(sectionFocus?.graph || ''),
+      ARCHITXT_TABLE_FOCUS: formatFocusVariable(sectionFocus?.table || ''),
+      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(sectionFocus?.diagram || ''),
+      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(sectionFocus?.narrative || ''),
+    },
+  };
+}
+const ENTITY_TAG_RE = /\[\[(.*?)\s*(?:\(([^)]*)\))?\]\]/g;
+const PARENTHETICAL_ID_RE = /\s*\([^)]*\)/g;
+
+/**
+ * Strip UI entity tokens and parenthetical IDs from a string so they do not leak
+ * into generated output formats that have their own bracket or parenthesis syntax
+ * (e.g. Mermaid diagrams).
+ *
+ * Entity tags like `[[Singleview (Company:COM-001)]]` are replaced with their
+ * matched text (`Singleview`). Any remaining parenthetical identifiers, such as
+ * catalog names that include `(COM-001)`, are also removed.
+ */
+function sanitizeOutputTokens(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(ENTITY_TAG_RE, (_, matchedText) => matchedText.trim())
+    .replace(PARENTHETICAL_ID_RE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * @deprecated Use sanitizeOutputTokens.
+ */
+function stripEntityTags(str) {
+  return sanitizeOutputTokens(str);
+}
+
+/**
+ * Format a raw focus string (or array of strings / table directives) into bullet
+ * or blank.
+ *
+ * When an array of strings is provided, each item becomes its own bullet line.
+ * When an array of table directives is provided, each renders as:
+ *   - **Name** — description  (if name is present)
+ *   - description               (if name is omitted; LLM should generate one)
+ *
+ * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
+ *   - #graph, #narrative -> { name?, content }
+ *   - #table             -> TableDirective[] (one per table, with optional #table-name)
+ *   - #diagram           -> DiagramDirective[] with #diagram-name, #diagram-type, and content
+ *
+ * @param {string|{name?:string,content:string}|string[]|{name?:string,content:string}[]|{name:string,type:string,content:string}[]} [raw]
+ * @returns {string}
+ */
+export function formatFocusVariable(raw) {
+  // Single named content entry (graph/narrative) or legacy plain string.
+  if (!Array.isArray(raw) && typeof raw === 'object' && raw !== null && 'content' in raw) {
+    const { name, content } = /** @type {{name?:string,content:string}} */ (raw);
+    const cleanedContent = stripEntityTags(content?.trim() || '');
+    const cleanedName = name?.trim() ? stripEntityTags(name.trim()) : '';
+    if (!cleanedContent) return '';
+    if (cleanedName) return `- **${cleanedName}** — ${cleanedContent}`;
+    return `- ${cleanedContent}`;
+  }
+
+  // Legacy plain string.
+  if (!Array.isArray(raw)) {
+    if (!raw || typeof raw !== 'string' || raw.trim() === '') return '';
+    return `- ${stripEntityTags(raw.trim())}`;
+  }
+
+  // Diagram directives
+  if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'type' in raw[0]) {
+    const directives = /** @type {{name:string,type:string,content:string}[]} */ (raw);
+    const lines = directives
+      .filter((d) => d.type?.trim() !== '' && d.content?.trim() !== '')
+      .map((d) => {
+        const type = d.type.trim();
+        const content = stripEntityTags(d.content.trim());
+        const name = d.name?.trim() ? stripEntityTags(d.name.trim()) : '';
+        if (name) return `- **${name}** (${type}) — ${content}`;
+        return `- (${type}) — ${content}`;
+      });
+    return lines.join('\n');
+  }
+
+  // Table directives
+  if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'content' in raw[0]) {
+    const directives = /** @type {{name?:string,content:string}[]} */ (raw);
+    const lines = directives
+      .filter((d) => d.content?.trim() !== '')
+      .map((d) => {
+        const content = stripEntityTags(d.content.trim());
+        const name = d.name?.trim() ? stripEntityTags(d.name.trim()) : '';
+        if (name) return `- **${name}** — ${content}`;
+        return `- ${content}`;
+      });
+    return lines.join('\n');
+  }
+
+  // String array (legacy graph/narrative multiple scopes, or legacy table array)
+  const lines = raw
+    .filter((s) => typeof s === 'string' && s.trim() !== '')
+    .map((s) => `- ${stripEntityTags(s.trim())}`);
+  return lines.join('\n');
+}
+
+/**
+ * Derive effective section focus from parsed directives and merged variables.
+ *
+ * The caller may pass directives in the topic text (parsed) OR as explicit
+ * focus variables (synthesize handler). We take the union of both so that
+ * callers who supply section_focus as variables still get the right fragments.
+ *
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} parsedSectionFocus
+ * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_DIAGRAM_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} merged
+ * @returns {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}}
+ */
+function computeEffectiveFocus(parsedSectionFocus, merged) {
+  const effectiveFocus = {
+    ...parsedSectionFocus,
+  };
+  if (merged.ARCHITXT_GRAPH_FOCUS?.trim()) {
+    const graphLine = merged.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
+    const namedMatch = graphLine.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+    if (namedMatch) {
+      effectiveFocus.graph = { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
+    } else {
+      effectiveFocus.graph = { content: graphLine };
+    }
+  }
+  if (merged.ARCHITXT_TABLE_FOCUS?.trim()) {
+    const lines = merged.ARCHITXT_TABLE_FOCUS.trim().split('\n').filter((l) => l.trim());
+    effectiveFocus.table = lines.map((line) => {
+      const m = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+      if (m) return { name: m[1].trim(), content: m[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
+  }
+  if (merged.ARCHITXT_DIAGRAM_FOCUS?.trim()) {
+    const lines = merged.ARCHITXT_DIAGRAM_FOCUS.trim().split('\n').filter((l) => l.trim());
+    effectiveFocus.diagram = lines.map((line) => {
+      const namedMatch = line.match(/^- \*\*(.+?)\*\*\s*\((.+?)\)\s*—\s*(.+)$/);
+      if (namedMatch) return { name: namedMatch[1].trim(), type: namedMatch[2].trim(), content: namedMatch[3].trim() };
+      const anonMatch = line.match(/^- \((.+?)\)\s*—\s*(.+)$/);
+      if (anonMatch) return { type: anonMatch[1].trim(), content: anonMatch[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
+  }
+  if (merged.ARCHITXT_NARRATIVE_FOCUS?.trim()) {
+    const narrativeLine = merged.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
+    const namedMatch = narrativeLine.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+    if (namedMatch) {
+      effectiveFocus.narrative = { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
+    } else {
+      effectiveFocus.narrative = { content: narrativeLine };
+    }
+  }
+  return effectiveFocus;
+}
+
 /**
  * Compose a full prompt for a derived mental model.
  *
  * @param {object} db
- * @param {string} templateName - value from mental_models.mm_returns
+ * @param {string} templateName - value from mental_models.mm_template_role for
+ *   contextual-graph system templates, or mental_models.mm_returns for all others.
  * @param {string} topic - rendered mm_source_query after single-brace substitution
+ * @param {Record<string, string>} [focusVariables] - Optional per-section focus variables
+ *   (ARCHITXT_GRAPH_FOCUS, ARCHITXT_TABLE_FOCUS, ARCHITXT_DIAGRAM_FOCUS, ARCHITXT_NARRATIVE_FOCUS).
  * @returns {Promise<string>}
  */
-export async function composeMentalModelPrompt(db, templateName, topic) {
-  const { prompt } = await loadAndComposeWithCatalog(db, templateName, {
-    ARCHITXT_TOPIC: topic || '',
-  });
-  return prompt;
+export async function composeMentalModelPrompt(db, templateName, topic, focusVariables = {}) {
+  const template = getTemplateByName(db, templateName);
+  if (!template) {
+    throw new Error(`Prompt template not found: ${templateName}`);
+  }
+
+  // Parse directives from the topic to determine which sections are active
+  const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus: parsedSectionFocus } = buildFocusFromDirectives(topic);
+
+  // Merge parsed focus with caller-supplied focus (caller wins for overrides)
+  const merged = {
+    ARCHITXT_TOPIC: parsedTopic || '',
+    ARCHITXT_GRAPH_FOCUS: '',
+    ARCHITXT_TABLE_FOCUS: '',
+    ARCHITXT_DIAGRAM_FOCUS: '',
+    ARCHITXT_NARRATIVE_FOCUS: '',
+    ...parsedFocus,
+    ...focusVariables,
+  };
+
+  // Build conditional output-format fragments based on which sections are active.
+  // The caller may pass directives in the topic text (parsed) OR as explicit
+  // focus variables (synthesize handler). We take the union of both so that
+  // callers who supply section_focus as variables still get the right fragments.
+  const effectiveFocus = computeEffectiveFocus(parsedSectionFocus, merged);
+
+  const extra = buildConditionalFragments(effectiveFocus);
+  const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
+  const { prompt } = composePrompt(effectiveTemplate, merged);
+  const sectionState = computeSectionState(effectiveFocus);
+  const instructions = formatSectionInstructions(sectionState);
+  return injectBeforeOutputDirectives(prompt, instructions).trimEnd();
 }
 
 /**
@@ -182,7 +493,7 @@ export async function composeMentalModelPrompt(db, templateName, topic) {
  * derived mental models.
  *
  * @param {object} db
- * @param {Array<{returns: string, source_query: string}>} items
+ * @param {Array<{returns: string, source_query: string, role?: string, template_role?: string}>} items
  * @returns {Promise<Array<{composed_query: string|null, compose_error?: string}>>}
  */
 export async function composeMentalModelPromptBatch(db, items) {
@@ -190,52 +501,52 @@ export async function composeMentalModelPromptBatch(db, items) {
     return [];
   }
 
-  // Shared, expensive lookups done exactly once.
-  const entityCatalog = await buildEntityCatalogVariable(db);
-  let entities = null; // only loaded if a template needs heuristic examples
-
   const templatesByName = new Map();
-  const examplesByTemplate = new Map();
 
   // Pre-load every unique template so we don't query per row.
-  const uniqueNames = new Set(items.map((i) => i.returns).filter(Boolean));
+  const uniqueNames = new Set(items.map((i) => i.role || i.template_role || i.returns).filter(Boolean));
   for (const name of uniqueNames) {
     const template = getTemplateByName(db, name);
     if (template) templatesByName.set(name, template);
   }
 
+  // Load the generic fallback once, used for roles that don't have a dedicated template.
+  const genericTemplate = getTemplateByName(db, 'generic');
+
   const results = [];
   for (const item of items) {
-    const template = templatesByName.get(item.returns);
+    const lookupKey = item.role || item.template_role || item.returns;
+    let template = templatesByName.get(lookupKey);
+    if (!template && genericTemplate) {
+      template = genericTemplate;
+    }
     if (!template) {
-      results.push({ composed_query: null, compose_error: `Prompt template not found: ${item.returns}` });
+      results.push({ composed_query: null, compose_error: `Prompt template not found: ${lookupKey}` });
       continue;
     }
 
     try {
-      let examples = '';
-      if (template.pt_examples_heuristic) {
-        if (!examplesByTemplate.has(template.pt_name)) {
-          if (entities === null) {
-            entities = await loadEntityCatalog(db);
-          }
-          const result = applyHeuristic(template.pt_examples_heuristic, entities);
-          examples = formatNodeExamples(result);
-          examplesByTemplate.set(template.pt_name, examples);
-        } else {
-          examples = examplesByTemplate.get(template.pt_name);
-        }
-      }
+      const { topic: parsedTopic, focusVariables: parsedFocus, sectionFocus } = buildFocusFromDirectives(item.source_query);
+      const variables = {
+        ARCHITXT_TOPIC: parsedTopic || '',
+        ARCHITXT_GRAPH_FOCUS: '',
+        ARCHITXT_TABLE_FOCUS: '',
+        ARCHITXT_DIAGRAM_FOCUS: '',
+        ARCHITXT_NARRATIVE_FOCUS: '',
+        ...parsedFocus,
+      };
 
-      const { prompt } = composePrompt(template, {
-        ARCHITXT_ENTITIES: entityCatalog,
-        ARCHITXT_NODE_EXAMPLES: examples,
-        ARCHITXT_TOPIC: item.source_query || '',
-      });
-      results.push({ composed_query: prompt });
+      const effectiveFocus = computeEffectiveFocus(sectionFocus, variables);
+      const extra = buildConditionalFragments(effectiveFocus);
+      const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
+      const { prompt } = composePrompt(effectiveTemplate, variables);
+      const sectionState = computeSectionState(effectiveFocus);
+      const instructions = formatSectionInstructions(sectionState);
+      const finalPrompt = injectBeforeOutputDirectives(prompt, instructions).trimEnd();
+      results.push({ composed_query: finalPrompt });
     } catch (err) {
       logger.warn('Failed to compose mental model prompt in batch', {
-        template: item.returns,
+        template: lookupKey,
         error: err.message,
       });
       results.push({ composed_query: null, compose_error: err.message });

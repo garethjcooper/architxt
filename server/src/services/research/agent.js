@@ -6,6 +6,8 @@ const logger = createLogger('research-agent');
 
 const EMPTY_CANVAS = {
   graph: { nodes: [], edges: [] },
+  tables: [],
+  diagrams: [],
 };
 
 function buildCallLog(handlerResult, options, duration_ms) {
@@ -34,8 +36,8 @@ function buildCallLog(handlerResult, options, duration_ms) {
 /**
  * Run a single research discovery step.
  *
- * Dispatches to a query-depth handler (prebuilt, recall, reflect, synthesize, models). The handler returns { narrative, graph }. We store only the narrative
- * in rstep_synthesis; findings/seams are no longer part of the contract.
+ * Dispatches to a query-depth handler (prebuilt, recall, reflect, synthesize, models).
+ * Stores the canonical unified envelope in rstep_envelope.
  */
 export async function runDiscoverStep(params) {
   const {
@@ -84,15 +86,25 @@ export async function runDiscoverStep(params) {
       return failStep(handlerResult.error, handlerResult.code || 'HANDLER_FAILED');
     }
 
-    const narrative = handlerResult.narrative || '';
+    const narratives = handlerResult.narratives || [];
+    if (narratives.length === 0 && typeof handlerResult.narrative === 'string' && handlerResult.narrative) {
+      narratives.push({ narrative_name: '', narrative: handlerResult.narrative });
+    }
     const canvas = {
       ...EMPTY_CANVAS,
       graph: handlerResult.graph || { nodes: [], edges: [] },
+      tables: handlerResult.tables || [],
+      diagrams: handlerResult.diagrams || [],
+    };
+    const envelope = {
+      narratives,
+      graph: canvas.graph,
+      tables: canvas.tables,
+      diagrams: canvas.diagrams,
     };
 
     await updateStep(db, rstepId, {
-      rstep_canvas_state: canvas,
-      rstep_synthesis: { narrative },
+      rstep_envelope: envelope,
       rstep_tool_calls_used: calls.length,
       rstep_calls: calls,
       rstep_status: 'completed',
@@ -102,8 +114,7 @@ export async function runDiscoverStep(params) {
     return {
       success: true,
       data: {
-        synthesis: { narrative },
-        canvas,
+        envelope,
         calls,
         tool_calls_used: calls.length,
       },

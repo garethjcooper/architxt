@@ -6,41 +6,13 @@
  */
 
 import { reflect } from '../../hindsight/index.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
-import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';
-import { composeMentalModelPrompt } from '../../../prompts/template-service.js';
+import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../../contextual-graph/unified-response-schema.js';
+import { toEnvelope } from '../../contextual-graph/to-envelope.js';
 
 const logger = createLogger('research-handler-reflect');
-
-const VALID_TEMPLATES = new Set([
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
-]);
-
-function resolveTemplate(requestedTemplate, outputMode, allowDiscovery) {
-  if (VALID_TEMPLATES.has(requestedTemplate)) return requestedTemplate;
-
-  // Legacy UI output_mode values map to v0.3.5 template names.
-  if (outputMode === 'narrative') return 'narrative';
-  if (outputMode === 'graph-only') return 'graph-known';
-  if (outputMode === 'narrative+graph') {
-    return allowDiscovery ? 'narrative-graph-discovery' : 'narrative-graph-known';
-  }
-  return 'narrative-graph-known';
-}
-
-async function composeReflectPrompt(db, query, requestedTemplate, outputMode, allowDiscovery) {
-  if (!db) throw new Error('db is required to compose Reflect prompt');
-  const templateName = resolveTemplate(requestedTemplate, outputMode, allowDiscovery);
-  return composeMentalModelPrompt(db, templateName, query);
-}
 
 function basedOnToMarkdown(data, query) {
   const memories = data?.based_on?.memories;
@@ -84,13 +56,25 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
 
   logger.info('Reflect research query', { serverId, bankId, queryLength: query.length });
 
-  const templateName = resolveTemplate(options.template, options.output_mode, options.allow_discovery);
-
+  const focus = options.section_focus || {};
+  const requestedGraph = Boolean(focus.graph && (typeof focus.graph === 'string' ? focus.graph.trim() : focus.graph.content?.trim()));
+  const requestedTables = Array.isArray(focus.table) && focus.table.length > 0;
+  const requestedDiagrams = Array.isArray(focus.diagram) && focus.diagram.length > 0;
+  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
+    ? focus.narrative.trim().length > 0
+    : focus.narrative.content?.trim().length > 0);
+  const requestedStructured = requestedGraph || requestedTables || requestedDiagrams;
+  const hasAnyDirective = requestedNarrative || requestedStructured;
   let composedQuery;
   try {
-    composedQuery = await composeReflectPrompt(db, query, options.template, options.output_mode, options.allow_discovery);
+    composedQuery = await composeMentalModelPrompt(db, 'generic', query, {
+      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
+      ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(focus.diagram),
+      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
+    });
   } catch (err) {
-    logger.error('Failed to compose Reflect prompt', { error: err.message, template: templateName });
+    logger.error('Failed to compose Reflect prompt', { error: err.message });
     return { success: false, error: err.message, code: 'COMPOSE_PROMPT_FAILED' };
   }
 
@@ -99,6 +83,7 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const body = {
     query: composedQuery,
     budget: options.budget || 'low',
+    response_schema: UNIFIED_RESPONSE_SCHEMA,
   };
   if (options.max_tokens) body.max_tokens = options.max_tokens;
   if (options.types?.length) body.types = options.types;
@@ -135,60 +120,81 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     };
   }
 
-  const text = result.data?.text;
-  const extracted = parseGraphResponse(text || '', {
-    mode: templateName,
-    expectGraph: templateName.startsWith('graph-'),
-    defaultSource: 'mental_model',
-  });
-  const knownCatalog = await knownCatalogPromise;
-  const normalizedGraph = normalizeGraph(extracted.graph, {
-    activity: 'reflect',
-    knownCatalog,
-    mode: templateName,
-  });
-
-  const graph = {
-    nodes: normalizedGraph.nodes,
-    edges: normalizedGraph.edges,
-  };
-  const hasGraph = graph.nodes.length > 0 || graph.edges.length > 0;
-  const graphOnly = templateName.startsWith('graph-');
-
-  if (graphOnly) {
-    if (!hasGraph) {
-      logger.warn('Reflect graph-only response missing graph data', { keys: Object.keys(result.data || {}), preview: text?.slice(0, 200) });
-      return {
-        success: false,
-        error: 'Reflect graph-only response missing graph data',
-        code: 'INVALID_REFLECT_RESPONSE',
-        calls: [{
-          ...baseCall,
-          status: 'failure',
-          error: 'Reflect graph-only response missing graph data',
-          code: 'INVALID_REFLECT_RESPONSE',
-        }],
-      };
-    }
-  } else if (typeof text !== 'string' || text.length === 0) {
-    logger.warn('Reflect response missing plain text narrative', { keys: Object.keys(result.data || {}) });
+  const structuredOutput = result.data?.structured_output;
+  if (!structuredOutput || typeof structuredOutput !== 'object') {
+    const keys = Object.keys(result.data || {});
+    logger.warn('Reflect response missing structured_output', { keys });
     return {
       success: false,
-      error: 'Reflect response missing plain text narrative',
+      error: 'Reflect response missing structured_output',
       code: 'INVALID_REFLECT_RESPONSE',
       calls: [{
         ...baseCall,
         status: 'failure',
-        error: 'Reflect response missing plain text narrative',
+        error: 'Reflect response missing structured_output',
         code: 'INVALID_REFLECT_RESPONSE',
       }],
     };
   }
+  const extracted = structuredOutput;
+  const knownCatalog = await knownCatalogPromise;
+  const envelope = toEnvelope(extracted, {
+    knownCatalog,
+    mode: 'generic',
+    activity: 'reflect',
+    preserveParallelEdges: true,
+  });
+
+  const hasGraph = envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0;
+  const hasTables = Array.isArray(envelope.tables) && envelope.tables.length > 0;
+  const hasDiagrams = Array.isArray(envelope.diagrams) && envelope.diagrams.length > 0;
+  const hasStructuredOutput = hasGraph || hasTables || hasDiagrams;
+
+  // Require at least one non-empty narrative only when narrative was explicitly requested
+  // or when no structured output sections were produced.
+  const firstNarrative = envelope.narratives[0];
+  if (!firstNarrative || !firstNarrative.narrative || firstNarrative.narrative.length === 0) {
+    if (requestedNarrative || !hasStructuredOutput) {
+      logger.warn('Reflect response missing narrative', { keys: Object.keys(result.data || {}) });
+      return {
+        success: false,
+        error: 'Reflect response missing narrative',
+        code: 'INVALID_REFLECT_RESPONSE',
+        calls: [{
+          ...baseCall,
+          status: 'failure',
+          error: 'Reflect response missing narrative',
+          code: 'INVALID_REFLECT_RESPONSE',
+        }],
+      };
+    }
+  }
+
+  // Only discard a produced narrative when the caller explicitly requested
+  // structured sections (graph/table/diagram) and the model also produced that
+  // structured output. For plain Reflect queries with no explicit section
+  // directives, the narrative is the primary output and must be preserved.
+  let finalNarratives = envelope.narratives;
+  if (requestedStructured && !requestedNarrative && hasStructuredOutput) {
+    finalNarratives = [];
+  }
+
+  // If no narrative remains but structured output exists, leave narratives empty.
+  const basedOnMarkdown = basedOnToMarkdown(result.data, query);
+  if (basedOnMarkdown && finalNarratives.length > 0) {
+    // Append source memories to the last narrative section.
+    const last = finalNarratives[finalNarratives.length - 1];
+    last.narrative = last.narrative + basedOnMarkdown;
+  } else if (basedOnMarkdown) {
+    finalNarratives = [{ narrative_name: '', narrative: basedOnMarkdown }];
+  }
 
   return {
     success: true,
-    narrative: graphOnly ? '' : `# Results - ${query}\n\n${text}` + basedOnToMarkdown(result.data, query),
-    graph,
+    narratives: finalNarratives,
+    graph: envelope.graph,
+    tables: envelope.tables,
+    diagrams: envelope.diagrams,
     calls_used: ['reflect'],
     calls: [baseCall],
   };

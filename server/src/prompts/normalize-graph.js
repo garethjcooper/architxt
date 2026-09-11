@@ -12,23 +12,10 @@ import { createLogger } from '../utils/logger.js';
 const logger = createLogger('normalize-graph');
 
 const KNOWN_ID_RE = /^[a-z][a-z0-9-]*:[A-Za-z0-9._-]+$/;
-const FOUND_ID_PREFIX = 'found:';
 const MAX_SLUG_LENGTH = 64;
 
 const VALID_EDGE_TYPES = new Set(['calls', 'sends', 'reads', 'writes', 'depends-on']);
 const VALID_PROVENANCE = new Set(['known', 'discovered', 'inferred']);
-
-const DISCOVERY_MODES = new Set([
-  'graph-discovery',
-  'narrative-graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-discovered-only',
-]);
-
-const DISCOVERED_ONLY_MODES = new Set([
-  'graph-discovered-only',
-  'narrative-graph-discovered-only',
-]);
 
 /**
  * Normalize a graph object.
@@ -37,10 +24,9 @@ const DISCOVERED_ONLY_MODES = new Set([
  * @param {object} [options]
  * @param {string} [options.activity='reflect'] - Producing activity: 'reflect', 'synthesize', or 'mental-model'.
  * @param {Map<string, EntityCatalogEntry>} [options.knownCatalog] - Known entity catalog for conflict resolution, validation warnings, and endpoint completion.
- * @param {string} [options.mode='narrative-graph-known'] - Template mode; determines discovery policy.
  * @returns {{nodes: object[], edges: object[]}}
  */
-export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map(), mode = 'narrative-graph-known' } = {}) {
+export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new Map(), preserveParallelEdges = false } = {}) {
   if (!graph || typeof graph !== 'object') {
     return { nodes: [], edges: [] };
   }
@@ -49,7 +35,6 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
   const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
 
   const nodeById = new Map();
-  const foundNameCollisions = new Map();
 
   for (const n of rawNodes) {
     if (!n || typeof n !== 'object') continue;
@@ -67,11 +52,6 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       name = id;
     }
 
-    if (id.startsWith(FOUND_ID_PREFIX)) {
-      const baseSlug = id.slice(FOUND_ID_PREFIX.length);
-      id = `${FOUND_ID_PREFIX}${normalizeSlug(baseSlug, name)}`;
-    }
-
     if (nodeById.has(id)) {
       const existing = nodeById.get(id);
       // Known catalog wins for name conflicts.
@@ -84,12 +64,17 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       continue;
     }
 
-    if (id.startsWith(FOUND_ID_PREFIX) && !DISCOVERY_MODES.has(mode)) {
-      logger.warn('Discovered node present in known-only mode', { id });
+    if (KNOWN_ID_RE.test(id) && !knownCatalog.has(id)) {
+      // Only warn when the catalog explicitly does not contain the id; do not
+      // treat valid data-driven type prefixes (e.g. "System:Singleview") as
+      // suspicious just because the regex is lowercase-only.
+      logger.warn('Node id uses known format but is not in catalog', { id });
     }
 
-    if (KNOWN_ID_RE.test(id) && !id.startsWith(FOUND_ID_PREFIX) && !knownCatalog.has(id)) {
-      logger.warn('Node id uses known format but is not in catalog', { id });
+    // Slug-normalize only plain discovered slugs, preserving explicit type ids
+    // and legacy `found:` ids for backward compatibility.
+    if (!id.includes(':')) {
+      id = normalizeSlug(id);
     }
 
     nodeById.set(id, {
@@ -102,45 +87,37 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
     });
   }
 
-  // Resolve found: id collisions with same name.
+  // Collapse discovered nodes that share the same name but have different slugs.
+  // This prevents the model from emitting both "found:payment-gateway" and
+  // "payment-gateway" as separate nodes.
+  const discoveredNameCollisions = new Map();
   for (const [id, node] of nodeById) {
-    if (!id.startsWith(FOUND_ID_PREFIX)) continue;
-    if (foundNameCollisions.has(node.name)) {
-      const firstId = foundNameCollisions.get(node.name);
+    if (node.provenance !== 'discovered' && !id.startsWith('found:')) continue;
+    const key = node.name.toLowerCase().replace(/\W+/g, '-');
+    if (discoveredNameCollisions.has(key)) {
+      const firstId = discoveredNameCollisions.get(key);
       if (firstId !== id) {
-        logger.warn('Found nodes with same name but different slugs; collapsing', { id, firstId, name: node.name });
+        logger.warn('Discovered nodes with same name but different ids; collapsing', { id, firstId, name: node.name });
         nodeById.delete(id);
       }
     } else {
-      foundNameCollisions.set(node.name, id);
+      discoveredNameCollisions.set(key, id);
     }
   }
 
-  const nodeIds = new Set(nodeById.keys());
   const edgeByKey = new Map();
 
   for (const e of rawEdges) {
     if (!e || typeof e !== 'object') continue;
 
-    let from = normalizeEdgeEndpoint(e.from, nodeById, 'from');
-    let to = normalizeEdgeEndpoint(e.to, nodeById, 'to');
+    let from = normalizeEdgeEndpoint(e.from);
+    let to = normalizeEdgeEndpoint(e.to);
     if (!from || !to) {
       logger.warn('Skipping edge with missing endpoint', { edge: e });
       continue;
     }
 
-    // For discovered-only, any edge that only touches known/corpus nodes is invalid:
-    // known/corpus entities may only appear as endpoints of a discovered edge.
-    if (DISCOVERED_ONLY_MODES.has(mode)) {
-      const fromDiscovered = from.startsWith(FOUND_ID_PREFIX);
-      const toDiscovered = to.startsWith(FOUND_ID_PREFIX);
-      if (!fromDiscovered && !toDiscovered) {
-        logger.warn('Discovered-only edge missing discovered endpoint', { from, to, edge: e });
-        continue;
-      }
-    }
-
-    // Complete known endpoint nodes that the model omitted from the nodes array.
+    // Complete missing known endpoint nodes that the model omitted from the nodes array.
     // This is explicit contract enforcement, not a silent fallback: we warn every time.
     for (const [id, role] of [[from, 'from'], [to, 'to']]) {
       if (!nodeById.has(id) && knownCatalog.has(id)) {
@@ -173,47 +150,43 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
 
     const label = typeof e.label === 'string' ? e.label.trim() : '';
     const detail = typeof e.detail === 'string' ? e.detail.trim() : '';
+    const properties = e.properties && typeof e.properties === 'object' && !Array.isArray(e.properties)
+      ? e.properties
+      : undefined;
 
-    const key = `${from}|${to}|${type}`;
-    const provenance = deriveProvenance(from, to, activity);
+    const key = preserveParallelEdges ? `${from}|${to}|${type}|${edgeByKey.size}` : `${from}|${to}|${type}`;
+    const provenance = deriveProvenance(from, to, activity, nodeById);
 
     if (edgeByKey.has(key)) {
       const existing = edgeByKey.get(key);
       existing.label = mergeField(existing.label, label);
       existing.detail = mergeField(existing.detail, detail);
+      existing.properties = mergeProperties(existing.properties, properties);
       existing.provenance = mergeProvenance(existing.provenance, provenance);
     } else {
-      edgeByKey.set(key, { from, to, type, provenance, label, detail });
+      edgeByKey.set(key, { from, to, type, provenance, label, detail, properties });
     }
   }
 
   return {
+    name: typeof graph.name === 'string' ? graph.name : undefined,
     nodes: Array.from(nodeById.values()),
     edges: Array.from(edgeByKey.values()),
   };
 }
 
-function normalizeEdgeEndpoint(value, nodeById, role) {
+function normalizeEdgeEndpoint(value) {
   if (typeof value !== 'string') return null;
   const id = value.trim();
   if (!id) return null;
-
-  if (id.startsWith(FOUND_ID_PREFIX)) {
-    // If the endpoint was supplied as found:slug but we collapsed it, resolve to existing node.
-    for (const [existingId, node] of nodeById) {
-      if (existingId.startsWith(FOUND_ID_PREFIX) && node.name.toLowerCase().replace(/\W+/g, '-') === id.slice(FOUND_ID_PREFIX.length).toLowerCase()) {
-        return existingId;
-      }
-    }
-  }
-
   return id;
 }
 
-function deriveProvenance(from, to, activity) {
-  if (from.startsWith(FOUND_ID_PREFIX) || to.startsWith(FOUND_ID_PREFIX)) {
-    return 'discovered';
-  }
+function deriveProvenance(from, to, activity, nodeById) {
+  const fromNode = nodeById.get(from);
+  const toNode = nodeById.get(to);
+  if (from.startsWith('found:') || to.startsWith('found:')) return 'discovered';
+  if (fromNode?.provenance === 'discovered' || toNode?.provenance === 'discovered') return 'discovered';
   if (activity === 'synthesize') return 'inferred';
   return 'known';
 }
@@ -223,6 +196,33 @@ function mergeField(existing, incoming) {
   if (!existing) return incoming;
   if (existing === incoming) return existing;
   return [existing, incoming].join('; ');
+}
+
+function mergeProperties(existing, incoming) {
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (value === undefined || value === null || value === '') continue;
+    const existingValue = merged[key];
+    if (Array.isArray(value)) {
+      const existingArray = Array.isArray(existingValue) ? existingValue : (existingValue != null ? [existingValue] : []);
+      const seen = new Set(existingArray.map((v) => String(v)));
+      for (const item of value) {
+        const s = String(item);
+        if (!seen.has(s)) {
+          existingArray.push(item);
+          seen.add(s);
+        }
+      }
+      merged[key] = existingArray;
+    } else if (existingValue === undefined || existingValue === null || existingValue === '') {
+      merged[key] = value;
+    } else if (String(existingValue) !== String(value)) {
+      merged[key] = [String(existingValue), String(value)].join('; ');
+    }
+  }
+  return merged;
 }
 
 function mergeProvenance(a, b) {

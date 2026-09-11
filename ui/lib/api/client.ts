@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns } from '../types';
+import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -47,12 +47,16 @@ async function fetchApi<T>(
     return undefined as T;
   }
 
-  const data = await response.json().catch((err) => {
-    throw new ApiError(
-      `Invalid JSON response from ${endpoint}: ${err.message}`,
-      response.status,
-      'INVALID_JSON'
-    );
+  const data = await response.text().then((text) => {
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch (err) {
+      throw new ApiError(
+        `Invalid JSON response from ${endpoint}: ${(err as Error).message}. Body: ${text.slice(0, 200)}`,
+        response.status,
+        'INVALID_JSON'
+      );
+    }
   });
 
   if (!response.ok) {
@@ -325,12 +329,12 @@ export const tagsApi = {
 export const serversApi = {
   list: () => fetchApi<Server[]>('/servers'),
   get: (id: number) => fetchApi<Server>(`/servers/${id}`),
-  create: (data: { base_url: string; name?: string; api_key?: string; api_version?: string }) => 
+  create: (data: { base_url: string; name?: string; api_key?: string; api_version?: string; contextual_graph_banks?: ContextualGraphBankConfig[] }) => 
     fetchApi<{ id: number }>('/servers', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id: number, data: { base_url?: string; name?: string; api_key?: string; api_version?: string }) => 
+  update: (id: number, data: { base_url?: string; name?: string; api_key?: string; api_version?: string; contextual_graph_banks?: ContextualGraphBankConfig[] }) => 
     fetchApi<void>(`/servers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -343,9 +347,9 @@ export const serversApi = {
   listBanks: (id: number) =>
     fetchApi<Array<{ bank_id: string; name: string; description?: string }>>(`/servers/${id}/banks`),
   getBankGraph: (serverId: number, bankId: string) =>
-    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/graph?server_id=${serverId}`),
+    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/graph?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`),
   getBankEntities: (serverId: number, bankId: string) =>
-    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/banks/${encodeURIComponent(bankId)}/entities?server_id=${serverId}`),
+    fetchApi<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/research/entities?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`),
 };
 
 // Metadata API
@@ -363,6 +367,19 @@ export const metadataApi = {
       body: JSON.stringify(data),
     }),
   delete: (id: number) => fetchApi<void>(`/metadata/${id}`, { method: 'DELETE' }),
+};
+
+// Entity info API
+export const entityInfoApi = {
+  info: (serverId: number, bankId: string, entityIds: string[], includeContent = true) =>
+    fetchApi<{
+      entities: Record<string, EntityInfo>;
+      content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
+      meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
+    }>('/entities/info', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, entity_ids: entityIds, include_content: includeContent }),
+    }),
 };
 
 // Entities API
@@ -465,6 +482,14 @@ export const mentalModelsApi = {
   },
   listDimensions: () => fetchApi<string[]>('/mentalmodels/dimensions'),
   listStandardDimensions: () => fetchApi<{ value: string; label: string }[]>('/mentalmodels/dimensions/standard'),
+  listTemplateRoles: (options?: { available?: boolean; exclude_mm_id?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.available) params.set('available', 'true');
+    if (options?.exclude_mm_id != null) params.set('exclude_mm_id', options.exclude_mm_id.toString());
+    const queryString = params.toString();
+    return fetchApi<{ value: string; label: string; derivation_scope: string }[]>(`/mentalmodels/roles/template${queryString ? '?' + queryString : ''}`);
+  },
+  getSystemTemplateDefaults: () => fetchApi<{ role: string; ext_id: string; name: string; source_query: string }[]>('/mentalmodels/system-template-defaults'),
   get: (id: number) => fetchApi<MentalModel>(`/mentalmodels/${id}`),
   create: (data: {
     ext_id: string;
@@ -476,10 +501,8 @@ export const mentalModelsApi = {
     exclude_mental_model_list?: string;
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-    dimension?: string | null;
-    returns?: MentalModelReturns;
-    concatenation?: 'merge' | 'compile';
     is_template?: boolean;
+    template_role?: string;
   }) => fetchApi<{ id: number }>('/mentalmodels', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -494,9 +517,6 @@ export const mentalModelsApi = {
     exclude_mental_model_list?: string;
     max_tokens?: number;
     tags_match_mode?: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-    dimension?: string | null;
-    returns?: MentalModelReturns;
-    concatenation?: 'merge' | 'compile';
     is_template?: boolean;
   }) => fetchApi<{ success: boolean }>(`/mentalmodels/${id}`, {
     method: 'PUT',
@@ -533,15 +553,23 @@ export const mentalModelsApi = {
         content?: string | object | null;
         content_length?: number;
         parsed?: { narrative?: string; graph?: { nodes: unknown[]; edges: unknown[] } };
-        node_count?: number;
-        edge_count?: number;
         error?: string;
       }[];
     }>('/research/mental-models/health', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }, { timeoutMs: 60000 }),
+    }),
 
+  // Fetch normalized Hindsight mental-model envelope (plus raw content for inspection)
+  fetchContent: (serverId: number, bankId: string, extId: string) =>
+    fetchApi<{
+      ext_id: string;
+      found: boolean;
+      content: string | object | null;
+      content_hash: string | null;
+      updated_at: string | null;
+      envelope: MentalModelEnvelope | null;
+    }>(`/research/mental-models/content?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&ext_id=${encodeURIComponent(extId)}`),
   // Tags
   getTags: (id: number) => fetchApi<Tag[]>(`/mentalmodels/${id}/tags`),
   addTag: (mmId: number, tagId: number) =>
@@ -566,6 +594,13 @@ export const mentalModelsApi = {
     fetchApi<void>(`/mentalmodels/${mmId}/entities/remove`, {
       method: 'POST',
       body: JSON.stringify({ id: entId }),
+    }),
+
+  // Compose preview for mental-model prompts (templates and system templates)
+  composePreview: (items: { returns?: string | null; source_query?: string | null; role?: string | null; template_role?: string | null }[]) =>
+    fetchApi<{ results: { composed_query: string | null; compose_error?: string }[] }>('/mentalmodels/compose-preview', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
     }),
 
   // Derived instances
@@ -618,6 +653,40 @@ export const mentalModelsApi = {
     ),
 };
 
+// Template Roles API
+export interface TemplateRole {
+  role_id: string;
+  display_name: string;
+  derivation_scope: 'node' | 'edge' | 'seed';
+  sort_order: number;
+  is_system: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const templateRolesApi = {
+  list: () => fetchApi<TemplateRole[]>('/template-roles'),
+  create: (data: {
+    role_id: string;
+    display_name: string;
+    derivation_scope: 'node' | 'edge' | 'seed';
+    sort_order?: number;
+  }) => fetchApi<{ role_id: string }>('/template-roles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (roleId: string, data: {
+    display_name?: string;
+    derivation_scope?: 'node' | 'edge' | 'seed';
+    sort_order?: number;
+  }) => fetchApi<{ success: boolean }>(`/template-roles/${roleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: (roleId: string) => fetchApi<void>(`/template-roles/${roleId}`, { method: 'DELETE' }),
+};
+
 // Health check
 export const healthApi = {
   check: () => 
@@ -668,7 +737,7 @@ export const hindsightApi = {
     }),
 
   pushMentalModel: (serverId: number, bankId: string, model: any, create = false) =>
-    fetchApi<{ success: boolean; created?: boolean }>('/hindsight/push-mental-model', {
+    fetchApi<{ success: boolean; created?: boolean; operation_id?: string | null; status?: string | null; pop_id?: number | null }>('/hindsight/push-mental-model', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create }),
     }),
@@ -689,6 +758,21 @@ export const hindsightApi = {
     fetchApi<{ success: boolean; created?: number; updated?: number; inSync?: number; errors?: string[] }>('/hindsight/pull-mental-models', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, targets }),
+    }),
+
+  clearAllMentalModels: (serverId: number, bankId: string) =>
+    fetchApi<{
+      success: boolean;
+      total?: number;
+      deleted_count?: number;
+      failed_count?: number;
+      deleted?: string[];
+      failed?: { ext_id: string; error: string }[];
+      error?: string;
+      code?: string;
+    }>('/hindsight/mental-models/bulk', {
+      method: 'DELETE',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
     }),
 
   compare: (serverId: number, bankId: string, documentId: string) =>
@@ -754,15 +838,15 @@ export const hindsightApi = {
     }>('/hindsight/operations/all'),
 
   recall: (serverId: number, bankId: string, body: { query: string; limit?: number; trace?: boolean }) =>
-    fetchApi<any>(`/hindsight/banks/${encodeURIComponent(bankId)}/recall?server_id=${serverId}`, {
+    fetchApi<any>('/hindsight/recall', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...body }),
     }, { timeoutMs: 60000 }),
 
   reflect: (serverId: number, bankId: string, body: { query: string; budget?: string }) =>
-    fetchApi<any>(`/hindsight/banks/${encodeURIComponent(bankId)}/reflect?server_id=${serverId}`, {
+    fetchApi<any>('/hindsight/reflect', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...body }),
     }, { timeoutMs: 120000 }),
 
   reflectWithBudgetFallback: async (serverId: number, bankId: string, body: { query: string; budget?: string }) => {
@@ -831,6 +915,14 @@ export interface GraphNode {
   source?: 'canonical' | 'alias' | 'hindsight' | 'mental_model' | 'mental_model_referenced' | string;
   provenance?: 'known' | 'discovered' | 'inferred' | string;
   mental_model_applied?: boolean;
+  /** Attached contextual mental-model refs, if any. */
+  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string; fetched_at?: string; content_hash?: string }>;
+  /** Raw contextual-graph properties stored on this node. */
+  properties?: Record<string, any>;
+  /** Patch health status (green = all roles present, orange = some, red = none). */
+  health?: 'green' | 'orange' | 'red';
+  /** Pre-rendered, stripped summary text for cards/lists. */
+  summaryText?: string;
   x?: number;
   y?: number;
   width?: number;
@@ -853,12 +945,125 @@ export interface GraphEdge {
   weight?: number;
   provenance?: 'known' | 'discovered' | 'inferred' | string;
   source?: 'co_occurrence' | 'mental_model' | 'synthesize' | 'reflect' | string;
+  mental_model_applied?: boolean;
   source_fact_ids?: string[];
+  evidence?: string[];
+  /** Attached contextual mental-model refs, if any. */
+  modelRefs?: Array<{ role?: string; ext_id?: string; attached_at?: string; fetched_at?: string; content_hash?: string }>;
+  /** Raw contextual-graph properties stored on this edge. */
+  properties?: Record<string, any>;
+  /** Patch health status (green = all roles present, orange = some, red = none). */
+  health?: 'green' | 'orange' | 'red';
 }
 
 export interface GraphCanvas {
   nodes: GraphNode[];
   edges: GraphEdge[];
+}
+
+export interface EntityInfoGraphNode {
+  id: string;
+  labels: string[];
+  display_name: string;
+  is_grounded: boolean;
+  is_candidate: boolean;
+}
+
+export interface EntityInfoCatalog {
+  id: number;
+  entity_id: string;
+  name: string;
+  type_name: string;
+  description: string | null;
+  aliases: string[];
+}
+
+export interface EntityInfoContextualRef {
+  role: string;
+  ext_id: string;
+  scope: Record<string, unknown> | null;
+  attached_at: string | null;
+  fetched_at: string | null;
+  content_hash: string | null;
+  last_refresh_status: string | null;
+  last_refresh_at: string | null;
+  last_refresh_error: string | null;
+}
+
+export interface EntityInfoMentalModel {
+  id: number | string;
+  ext_id: string;
+  name: string;
+  source_query: string | null;
+  template_role: string | null;
+  is_template: boolean;
+  returns: string | null;
+  refresh_mode: string | null;
+  refresh_after_consolidation: boolean;
+  exclude_all_mental_models: boolean;
+  exclude_mental_model_list: string | null;
+  max_tokens: number | null;
+  tags_match_mode: string | null;
+  description: string | null;
+  meta: Record<string, unknown>;
+  concatenation: string | null;
+  created_at: string;
+  updated_at: string;
+  overrides: {
+    refresh_mode: string | null;
+    refresh_after_consolidation: boolean;
+    exclude_all_mental_models: boolean;
+    max_tokens: number | null;
+  };
+}
+
+export interface EntityInfoEdgeContext {
+  source_id: string;
+  target_id: string;
+  edge_id: string;
+  edge_type: string | null;
+  origin: 'hindsight' | 'derived';
+  scope: { source_id: string; target_id: string } | null;
+  refs: EntityInfoContextualRef[];
+}
+
+// Normalized envelope returned by `/research/mental-models/content` in addition to raw content.
+export interface MentalModelEnvelope {
+  narratives: UnifiedNarrativeBlock[];
+  graph: { name: string; nodes: GraphNode[]; edges: GraphEdge[] };
+  tables: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
+  diagrams: Array<{ name: string; type: string; content: string }>;
+}
+
+export interface MentalModelContent {
+  ext_id: string;
+  found?: boolean;
+  content?: string | object | null;
+  content_hash?: string | null;
+  updated_at?: string | null;
+  envelope?: MentalModelEnvelope;
+  /** @deprecated Prefer `narratives`. Kept for raw legacy payloads. */
+  narrative?: string;
+  /** @deprecated Prefer `narratives`. Kept for raw legacy payloads. */
+  narrative_name?: string;
+  narratives?: UnifiedNarrativeBlock[];
+  concatenation?: string;
+  graph?: { name?: string | null; nodes: unknown[]; edges: unknown[] };
+  diagrams?: Array<{ name: string; type: string; content: string }>;
+  tables?: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
+  findings?: Array<{ summary: string; confidence?: number; evidence?: string }>;
+  seams?: Array<{ target: string; issue: string }>;
+  [key: string]: unknown;
+}
+
+export interface EntityInfo {
+  graph_node: EntityInfoGraphNode | null;
+  catalog: EntityInfoCatalog | null;
+  contextual_refs: EntityInfoContextualRef[];
+  derived_models: EntityInfoMentalModel[];
+  plain_models: EntityInfoMentalModel[];
+  edge_contexts: EntityInfoEdgeContext[];
+  content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
 }
 
 export interface GraphMeta {
@@ -890,13 +1095,18 @@ export interface PrebuiltEntityResult {
   model_results: PrebuiltModelResult[];
 }
 
-export interface PrebuiltDimensionResult {
-  dimension: string;
+export interface NarrativeSection {
+  narrative_name: string;
+  narrative: string;
+}
+
+export interface PrebuiltRoleResult {
+  role: string;
   entities: PrebuiltEntityResult[];
   found_count: number;
   missing_count: number;
   result: {
-    narrative?: string;
+    narratives?: NarrativeSection[];
     json_result?:
       | {
           nodes: GraphNode[];
@@ -906,6 +1116,16 @@ export interface PrebuiltDimensionResult {
           nodes: GraphNode[];
           edges: GraphEdge[];
         }>;
+    tables: Array<{
+      name: string;
+      columns: string[];
+      rows: Record<string, any>[];
+    }>;
+    diagrams: Array<{
+      name: string;
+      type: string;
+      content: string;
+    }>;
     errors?: Array<{ model?: string; error: string }>;
   };
 }
@@ -914,8 +1134,8 @@ export interface PrebuiltResponse {
   success: boolean;
   error?: string;
   entities: string[];
-  entity_summary: Array<{ entity: string; dimension: string; found: boolean }>;
-  dimensions: PrebuiltDimensionResult[];
+  entity_summary: Array<{ entity: string; role: string; found: boolean }>;
+  roles: PrebuiltRoleResult[];
   session_id?: number;
   step_id?: number;
 }
@@ -924,8 +1144,10 @@ export interface ResearchSession {
   id: number;
   title: string;
   description: string | null;
+  server_id: number | null;
   bank_id: string;
   viewpoint_ids: number[];
+  scope_entity_ids: string[] | null;
   status: 'active' | 'closed' | 'archived';
   current_step_id: number | null;
   created_at: string;
@@ -941,16 +1163,8 @@ export interface DiscoverStepResponse {
   query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | string;
   action_type?: string;
   parameters?: Record<string, any> | null;
-  synthesis?: {
-    narrative: string;
-  };
-  canvas?: {
-    graph: {
-      nodes: GraphNode[];
-      edges: GraphEdge[];
-    };
-    meta?: GraphMeta;
-  };
+  /** Unified envelope is the canonical shape for all step responses. */
+  envelope: UnifiedEnvelope;
   calls?: Array<{
     tool: string;
     mode: string;
@@ -965,6 +1179,30 @@ export interface DiscoverStepResponse {
   }>;
   tool_calls_used?: number;
   error_message?: string | null;
+}
+
+export interface UnifiedNarrativeBlock {
+  narrative_name: string;
+  narrative: string;
+}
+
+export interface UnifiedEnvelope {
+  narratives: UnifiedNarrativeBlock[];
+  graph: {
+    name?: string | null;
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  };
+  tables: Array<{
+    name: string;
+    columns: string[];
+    rows: Record<string, any>[];
+  }>;
+  diagrams: Array<{
+    name: string;
+    type: string;
+    content: string;
+  }>;
 }
 
 export interface ResearchStepCall {
@@ -1003,16 +1241,17 @@ export interface ResearchStep {
   session_id: number;
   parent_step_id: number | null;
   intent_text: string;
+  raw_query: string | null;
   action_type: string;
   parameters: Record<string, any> | null;
   selections: any[] | null;
   viewpoint_ids: number[] | null;
-  canvas: DiscoverStepResponse['canvas'] | null;
-  synthesis: DiscoverStepResponse['synthesis'] | null;
+  /** Unified envelope is the canonical shape for all step responses. */
+  envelope: UnifiedEnvelope;
   calls: ResearchStepCall[] | null;
-  tool_calls_used: number;
   status: 'running' | 'completed' | 'failed';
   error_message: string | null;
+  tool_calls_used: number;
   created_at: string;
 }
 
@@ -1021,11 +1260,12 @@ export interface ResearchStepSummary {
   session_id: number;
   parent_step_id: number | null;
   intent_text: string;
+  raw_query: string | null;
   action_type: string;
   parameters: Record<string, any> | null;
   created_at: string;
-  canvas: DiscoverStepResponse['canvas'] | null;
-  synthesis: DiscoverStepResponse['synthesis'] | null;
+  /** Unified envelope is the canonical shape for all step responses. */
+  envelope: UnifiedEnvelope;
   selections: any[] | null;
   viewpoint_ids: number[] | null;
   calls: ResearchStepCall[] | null;
@@ -1041,8 +1281,8 @@ export const researchApi = {
     bank_id: string;
     viewpoint_ids: number[];
     intent_text: string;
-    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models';
-    dimension?: string;
+    raw_query?: string;
+    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
     selections?: any[];
     budget?: 'low' | 'mid' | 'high';
     max_tokens?: number;
@@ -1052,9 +1292,9 @@ export const researchApi = {
     fact_types?: string[];
     exclude_mental_models?: boolean;
     include_source_facts?: boolean;
-    template?: string;
     tags?: string[];
     tags_match?: string;
+    section_focus?: Record<string, string | { name?: string; content: string } | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/discover', {
       method: 'POST',
@@ -1064,8 +1304,9 @@ export const researchApi = {
     server_id: number;
     bank_id: string;
     entities: string[];
-    dimensions: string[];
+    roles: string[];
     session_id?: number;
+    raw_query?: string;
   }) =>
     fetchApi<PrebuiltResponse>('/research/prebuilt', {
       method: 'POST',
@@ -1076,12 +1317,37 @@ export const researchApi = {
     server_id: number;
     bank_id: string;
     entities: string[];
-    dimensions: string[];
+    roles: string[];
   }) =>
     fetchApi<PrebuiltResponse>('/research/prebuilt/oneshot', {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { timeoutMs: 60000 }),
+
+  eligibleTemplateModels: (payload: {
+    server_id: number;
+    bank_id: string;
+    entities: string[];
+  }) =>
+    fetchApi<{
+      success: boolean;
+      data: {
+        templates: Array<{
+          id: number;
+          ext_id: string;
+          name: string;
+          matched_entities: Array<{
+            entity_id: string;
+            name: string;
+            type_name?: string;
+            derived_ext_id: string;
+          }>;
+        }>;
+      };
+    }>('/research/eligible-template-models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }).then((res) => res.data),
 
   synthesize: (payload: {
     server_id: number;
@@ -1089,8 +1355,9 @@ export const researchApi = {
     session_id: number;
     source_step_ids: number[];
     intent_text: string;
+    raw_query?: string;
     max_tokens?: number;
-    template?: string;
+    section_focus?: Record<string, string | { name?: string; content: string } | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
   }) =>
     fetchApi<DiscoverStepResponse>('/research/synthesize', {
       method: 'POST',
@@ -1111,22 +1378,36 @@ export const researchApi = {
       body: JSON.stringify(payload),
     }),
 
-  listSessions: (bankId: string) =>
-    fetchApi<ResearchSession[]>(`/research/banks/${encodeURIComponent(bankId)}/sessions`),
+  listSessions: (serverId: number, bankId: string) =>
+    fetchApi<ResearchSession[]>(`/research/sessions?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`),
 
   createSession: (payload: {
+    server_id: number;
     bank_id: string;
     viewpoint_ids: number[];
     title?: string;
     description?: string;
+    scope_entity_ids?: string[];
   }) =>
     fetchApi<{ session_id: number }>('/research/sessions', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
-  updateSession: (sessionId: number, data: { title?: string; description?: string; status?: 'active' | 'closed' | 'archived' }) =>
+  updateSession: (sessionId: number, data: { title?: string; description?: string; status?: 'active' | 'closed' | 'archived'; scope_entity_ids?: string[] }) =>
     fetchApi<{ updated: true; session_id: number }>(`/research/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  createSessionPage: (sessionId: number, title: string) =>
+    fetchApi<ResearchStepSummary>(`/research/sessions/${sessionId}/pages`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }),
+
+  updateCuratedPage: (stepId: number, data: { intent_text?: string; canvas?: unknown; synthesis?: { narrative?: string }; envelope?: UnifiedEnvelope }) =>
+    fetchApi<ResearchStep>(`/research/steps/${stepId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -1165,6 +1446,16 @@ export const configApi = {
         }
       >;
     }>('/config/entity-format'),
+
+  settings: () => fetchApi<SettingsSnapshot>('/config/settings'),
+
+  /** Safe read-only snapshot of enabled contextual-graph patch roles. */
+  contextualGraph: () => fetchApi<ContextualGraphConfig>('/config/contextual-graph'),
+};
+
+// Settings API (legacy alias — prefer configApi.settings for new code)
+export const settingsApi = {
+  get: () => configApi.settings(),
 };
 
 export interface PromptSection {
@@ -1215,10 +1506,260 @@ export interface SettingsSnapshot {
   };
 }
 
-export const settingsApi = {
-  get: () => fetchApi<SettingsSnapshot>('/config/settings'),
-  restart: () =>
-    fetchApi<{ success: boolean; message: string; method: string }>('/config/restart', {
+export interface ContextualGraphConfig {
+  // Legacy field; the server now returns {} for compatibility.
+  patchRoles?: Record<string, boolean>;
+}
+
+// Contextual Graph API
+export const contextualGraphApi = {
+  import: (serverId: number, bankId: string, options?: { min_count?: number; min_weight?: number }) =>
+    fetchApi<{ success: boolean; imported?: { nodes: number; edges: number }; raw?: { nodes: number; edges: number }; error?: string; code?: string }>('/contextual-graph/import', {
       method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
     }),
+
+  addContext: (serverId: number, bankId: string, options?: {
+    min_count?: number;
+    min_weight?: number;
+    seed_node_ids?: string[];
+    node_ids?: string[];
+    import_skeleton?: boolean;
+    neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number };
+  }) =>
+    fetchApi<{
+      success: boolean;
+      queued?: { entitySummary: number; entityCapabilities: number; edge: number; discover: number };
+      deployed?: string[];
+      pushed?: string[];
+      skipped?: string[];
+      failed?: { ext_id: string; error: string; code?: string }[];
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/add-context', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
+    }),
+
+  listNodes: (serverId: number, bankId: string, options?: { labels?: string[]; idPrefix?: string; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    if (options?.labels?.length) params.set('labels', options.labels.join(','));
+    if (options?.idPrefix) params.set('idPrefix', options.idPrefix);
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    return fetchApi<Array<{ id: string; labels: string[]; properties: Record<string, any> }>>(`/contextual-graph/nodes?${params.toString()}`);
+  },
+
+  getNode: (id: string, serverId: number, bankId: string) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    return fetchApi<{ id: string; labels: string[]; properties: Record<string, any> }>(`/contextual-graph/nodes/${encodeURIComponent(id)}?${params.toString()}`);
+  },
+
+  upsertNode: (id: string, serverId: number, bankId: string, data: { labels?: string[]; properties?: Record<string, any> }) =>
+    fetchApi<{ id: string; labels: string[]; properties: Record<string, any> }>(`/contextual-graph/nodes/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, labels: data.labels, properties: data.properties }),
+    }),
+
+  deleteNode: (id: string, serverId: number, bankId: string) =>
+    fetchApi<void>(`/contextual-graph/nodes/${encodeURIComponent(id)}?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}`, { method: 'DELETE' }),
+
+  listEdges: (serverId: number, bankId: string, options?: { sourceId?: string; targetId?: string; type?: string | null; undirected?: boolean; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    if (options?.sourceId) params.set('source_id', options.sourceId);
+    if (options?.targetId) params.set('target_id', options.targetId);
+    if (options?.type !== undefined) params.set('type', options.type ?? '');
+    if (options?.undirected) params.set('undirected', 'true');
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    return fetchApi<Array<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>>(`/contextual-graph/edges?${params.toString()}`);
+  },
+
+  getEdge: (id: string, serverId: number, bankId: string) => {
+    const params = new URLSearchParams();
+    params.set('server_id', String(serverId));
+    params.set('bank_id', bankId);
+    return fetchApi<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>(`/contextual-graph/edges/${encodeURIComponent(id)}?${params.toString()}`);
+  },
+
+  upsertEdge: (id: string, serverId: number, bankId: string, data: { source_id: string; target_id: string; type?: string | null; properties?: Record<string, any> }) =>
+    fetchApi<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>(`/contextual-graph/edges/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, source_id: data.source_id, target_id: data.target_id, type: data.type ?? null, properties: data.properties }),
+    }),
+
+  deleteEdge: (id: string, serverId: number, bankId: string) =>
+    fetchApi<void>(`/contextual-graph/edges/${encodeURIComponent(id)}?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}`, { method: 'DELETE' }),
+
+  clear: (serverId: number, bankId: string) =>
+    fetchApi<{ success: boolean; cleared?: { nodes: number; edges: number }; error?: string; code?: string }>('/contextual-graph/clear', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
+
+  deleteGenerated: (serverId: number, bankId: string, options?: { dry_run?: boolean }) =>
+    fetchApi<{
+      success: boolean;
+      dry_run?: boolean;
+      total?: number;
+      ids?: string[];
+      failed?: { ext_id: string; error: string }[];
+      by_role?: Record<string, number>;
+      deleted?: Array<{ ext_id: string; success: boolean; error?: string }>;
+      cleared?: { nodes: number; edges: number };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/delete-generated', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, dry_run: options?.dry_run ?? false }),
+    }),
+
+  refresh: (serverId: number, bankId: string, options?: { dry_run?: boolean; rerun?: boolean }) =>
+    fetchApi<{
+      success: boolean;
+      stats?: {
+        fetched: number;
+        matched: number;
+        skippedDisabled: number;
+        skippedUnchanged: number;
+        applied: number;
+        failed: number;
+        rerunRequested?: number;
+        rerunFailed?: number;
+        sync?: {
+          checked: number;
+          skippedNoChange: number;
+          skippedMissingRemote: number;
+          skippedNoTemplate: number;
+          skippedNoSpec: number;
+          updated: number;
+          failed: number;
+        };
+      };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/refresh', {
+      method: 'POST',
+      body: JSON.stringify({
+        server_id: serverId,
+        bank_id: bankId,
+        dry_run: options?.dry_run ?? false,
+      }),
+    }),
+
+  undeployBank: (serverId: number, bankId: string, options?: { dry_run?: boolean; delete_local_graph?: boolean }) =>
+    fetchApi<{
+      success: boolean;
+      dry_run?: boolean;
+      delete_local_graph?: boolean;
+      stopped_auto_sync?: boolean;
+      target_count?: number;
+      deleted_count?: number;
+      deleted?: string[];
+      failed?: { ext_id: string; error: string }[];
+      cleared?: { nodes: number; edges: number };
+      marked_stale?: { nodes: number; edges: number };
+      deleted_local_graph?: { nodes: number; edges: number };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/undeploy-bank', {
+      method: 'POST',
+      body: JSON.stringify({
+        server_id: serverId,
+        bank_id: bankId,
+        dry_run: options?.dry_run ?? false,
+        delete_local_graph: options?.delete_local_graph ?? false,
+      }),
+    }),
+
+  listSyncJobs: (options: {
+    serverId?: number;
+    bankId?: string;
+    status?: string;
+    since?: string;
+    until?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (options.serverId !== undefined) params.set('server_id', String(options.serverId));
+    if (options.bankId) params.set('bank_id', options.bankId);
+    if (options.status) params.set('status', options.status);
+    if (options.since) params.set('since', options.since);
+    if (options.until) params.set('until', options.until);
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    if (options.offset !== undefined) params.set('offset', String(options.offset));
+    return fetchApi<Array<{
+      id: string;
+      server_id: number;
+      bank_id: string;
+      status: string;
+      stages: Array<{ name: string; label: string; status: string; started_at?: string; finished_at?: string; error_message?: string; error_code?: string; stats?: any }>;
+      options: any;
+      stats: any;
+      error_message?: string;
+      error_code?: string;
+      created_at: string;
+      started_at?: string;
+      finished_at?: string;
+      updated_at?: string;
+    }>>(`/contextual-graph/sync-jobs?${params.toString()}`);
+  },
+
+  startSyncJob: (serverId: number, bankId: string, options?: {
+    node_ids?: string[];
+    seed_node_ids?: string[];
+    min_count?: number;
+    min_weight?: number;
+    neighborhood?: { top_k_neighbors?: number; min_weight?: number; min_count?: number };
+  }) =>
+    fetchApi<{
+      success: boolean;
+      job?: {
+        id: string;
+        server_id: number;
+        bank_id: string;
+        status: string;
+        stages: any[];
+        options: any;
+        created_at: string;
+      };
+      error?: string;
+      code?: string;
+    }>('/contextual-graph/sync-jobs', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
+    }),
+
+  getSyncJob: (id: string, options?: { limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    const query = params.toString();
+    return fetchApi<{
+      id: string;
+      server_id: number;
+      bank_id: string;
+      status: string;
+      stages: Array<{ name: string; label: string; status: string; started_at?: string; finished_at?: string; error_message?: string; error_code?: string; stats?: any }>;
+      options: any;
+      stats: any;
+      error_message?: string;
+      error_code?: string;
+      created_at: string;
+      started_at?: string;
+      finished_at?: string;
+      updated_at?: string;
+      logs: Array<{ id: number; stage: string | null; level: string; message: string; details?: any; created_at: string }>;
+    }>(`/contextual-graph/sync-jobs/${encodeURIComponent(id)}${query ? `?${query}` : ''}`);
+  },
+
+  cancelSyncJob: (id: string) =>
+    fetchApi<{ success: boolean; error?: string; code?: string }>(`/contextual-graph/sync-jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 };

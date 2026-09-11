@@ -35,27 +35,9 @@ import { MetadataIcon } from '@/components/icons/metadata-icon';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
 import { formatErrorSummary } from '@/lib/error-format';
+import { getStatusBadge, familyClass } from '@/lib/status-badge';
 
 const logger = createLogger('DocumentsPage');
-
-// Status badge mapping — unique colours, no overlap with action buttons
-const statusColors: Record<string, string> = {
-  uploaded:              'bg-fuchsia-800/15 text-fuchsia-400 border-fuchsia-700/20',
-  ready_to_extract:      'bg-sky-800/15 text-sky-400 border-sky-700/20',
-  processing_extract:    'bg-amber-800/15 text-amber-400 border-amber-700/20',
-  request_release:       'bg-yellow-800/15 text-yellow-400 border-yellow-700/20',
-  processed_extract_success: 'bg-emerald-800/15 text-emerald-400 border-emerald-700/20',
-  processed_extract_failed:  'bg-rose-800/15 text-rose-400 border-rose-700/20',
-};
-
-const statusLabels: Record<string, string> = {
-  uploaded: 'uploaded',
-  ready_to_extract: 'ready to extract',
-  processing_extract: 'extracting',
-  request_release: 'releasing',
-  processed_extract_success: 'extracted',
-  processed_extract_failed: 'extracted - failed',
-};
 
 // Manage tab dropdown options — pure Architxt concepts
 const MANAGE_FILTERS = [
@@ -69,11 +51,11 @@ export default function DocumentsPage() {
   return (
     <Suspense fallback={
       <PageShell title="Documents" subtitle="Upload and process documents." loading={true}>
-        <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08]">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
+        <div className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg">
             <span className="font-medium text-sm">Documents</span>
           </div>
-          <div className="py-8 text-center text-white/70">Loading...</div>
+          <div className="py-8 text-center text-foreground-faint">Loading...</div>
         </div>
       </PageShell>
     }>
@@ -332,42 +314,42 @@ function DocumentsPageContent() {
           <div className="flex items-center gap-2 mb-2">
               {/* Search */}
               <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search id, filename, date, context, tags, metadata…"
-                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                  className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                 />
                 {search && (
                   <button
                     onClick={() => setSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 )}
               </div>
-              <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-orange-500/30 text-orange-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
-              <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-blue-500/30 text-blue-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
-              <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-violet-500/30 text-violet-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
-              <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
-              <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-emerald-500/30 text-emerald-300 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
+              <Button onClick={() => setManageTagsDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Tag className="h-3.5 w-3.5" />Tags</Button>
+              <Button onClick={() => setManageMetadataDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><MetadataIcon className="h-3.5 w-3.5" />Metadata</Button>
+              <Button onClick={() => setManageContextDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><FolderOpen className="h-3.5 w-3.5" />Context</Button>
+              <Button onClick={() => setManageConfigDialogOpen(true)} disabled={selected.size === 0} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-border-strong text-foreground-muted hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Settings2 className="h-3.5 w-3.5" />Config</Button>
+              <Button onClick={handleExtractAction} disabled={isExtractDisabled} className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-accent-secondary-bd text-accent-secondary-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Play className="h-3.5 w-3.5" />{extractButtonLabel}</Button>
               <div className="flex-1" />
-              <div className="w-px h-5 bg-white/10 mx-1" />
-              <Button onClick={fetchDocuments} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
-              <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
-              <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
+              <div className="w-px h-5 bg-surface-panel mx-1" />
+              <Button onClick={fetchDocuments} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+              <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
             </div>
         }
-        <div className="rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-emerald-900/20 text-emerald-300">
+        <div className="rounded-md bg-surface-card border border-on-dark/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg">
             <div className="flex items-center gap-1">
               {MANAGE_FILTERS.map(f => (
                     <button
                       key={f.value}
                       onClick={() => setManageFilter(f.value)}
-                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${manageFilter === f.value ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-200' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${manageFilter === f.value ? 'bg-accent-secondary-bg border-accent-secondary-bd text-accent-secondary-fg' : 'bg-surface-card border-border-default text-foreground-subtle hover:bg-surface-panel'}`}
                     >
                       {f.label}
                     </button>
@@ -377,54 +359,54 @@ function DocumentsPageContent() {
                 <button
                   onClick={() => setShowAllBadges(!showAllBadges)}
                   title={showAllBadges ? 'Limit to 3 badges' : 'Show all badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-foreground-subtle hover:text-foreground-faint border border-transparent"].join(" ")}
                 >
                   <BadgeExpandIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setCompactBadges(!compactBadges)}
                   title={compactBadges ? 'Expand badges' : 'Compact badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-foreground-subtle hover:text-foreground-faint border border-transparent"].join(" ")}
                 >
                   <BadgeCompactIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setFreeze(!freeze)}
                   title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-                  className={["inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors", freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors", freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-foreground-subtle hover:text-foreground-faint border border-transparent"].join(" ")}
                 >
                   <TableIcon className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">{filteredDocuments.length} ({selected.size})</span>
+                <span className="text-xs font-mono text-accent-secondary-fg bg-surface-inset border border-accent-secondary-bd px-2 py-0.5 rounded">{filteredDocuments.length} ({selected.size})</span>
               </div>
             </div>
 
           <div className={["flex-1 overflow-auto", !freeze ? "min-h-0" : ""].filter(Boolean).join(" ")}>
             <table className="w-full caption-bottom text-sm table-fixed">
               <TableHeader>
-                <TableRow className="border-b border-white/10">
-                  <TableHead className={["w-12 py-1.5 px-4", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}>
+                <TableRow className="border-b border-border-default">
+                  <TableHead className={["w-12 py-1.5 px-4", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-border-subtle"].filter(Boolean).join(" ")}>
                     <Checkbox
                       checked={isAllSelected}
                       onCheckedChange={toggleAll}
                     />
                   </TableHead>
-                  <TableHead className={["w-12 text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>ID</TableHead>
-                  <TableHead className={["w-[25%] text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>External ID</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Document Date</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Tags</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Context</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Metadata</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Char (K)</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entities</TableHead>
-                  <TableHead className={["text-xs uppercase text-white/60 font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Status</TableHead>
+                  <TableHead className={["w-12 text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>ID</TableHead>
+                  <TableHead className={["w-[25%] text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>External ID</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Document Date</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Tags</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Context</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Metadata</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Char (K)</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Entities</TableHead>
+                  <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i} className="border-b border-white/5">
-                      <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
+                    <TableRow key={i} className="border-b border-border-subtle">
+                      <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-surface-card border-r border-border-subtle"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
@@ -438,7 +420,7 @@ function DocumentsPageContent() {
                   ))
                 ) : displayDocuments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-white/70">
+                    <TableCell colSpan={10} className="text-center py-8 text-foreground-faint">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-8 w-8 opacity-50" />
                         <p>No documents found.</p>
@@ -449,11 +431,11 @@ function DocumentsPageContent() {
                   displayDocuments.map((doc) => (
                     <TableRow
                       key={doc.id}
-                      className={`border-b border-white/5 transition-colors ${
-                        selected.has(doc.id) ? 'bg-emerald-900/20' : 'hover:bg-white/5'
+                      className={`border-b border-border-subtle transition-colors ${
+                        selected.has(doc.id) ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
                       }`}
                     >
-                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${selected.has(doc.id) ? 'bg-emerald-900/20' : 'bg-[oklch(0.23_0_0)]'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-border-subtle ${selected.has(doc.id) ? 'bg-accent-primary-bg' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selected.has(doc.id)}
                           onCheckedChange={() => toggleSelection(doc.id)}
@@ -462,7 +444,7 @@ function DocumentsPageContent() {
                       <TableCell className="py-1.5 px-4 font-mono text-xs cursor-pointer"
                         onClick={() => handleView(doc)}
                       >{doc.id}</TableCell>
-                      <TableCell className="py-1.5 px-4 font-mono text-xs cursor-pointer text-white font-semibold"
+                      <TableCell className="py-1.5 px-4 font-mono text-xs cursor-pointer text-foreground-default font-semibold"
                         onClick={() => handleView(doc)}
                       ><span className="truncate max-w-full inline-block">{doc.ext_id || '-'}</span></TableCell>
                       <TableCell className="py-1.5 px-4 text-xs cursor-pointer"
@@ -479,8 +461,8 @@ function DocumentsPageContent() {
                                 key={t.id}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[100px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-orange-400/40 text-orange-200 border-orange-400/60 ring-1 ring-orange-400/50'
-                                    : 'bg-orange-400/20 text-orange-300 border-orange-400/30'
+                                    ? 'bg-badge-caution-bg/80 text-badge-caution-fg border-badge-caution-bd ring-1 ring-badge-caution-fg/50'
+                                    : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'
                                 }`}
                                 title={t.name}
                               >
@@ -492,28 +474,28 @@ function DocumentsPageContent() {
                             <span
                               className={`text-[10px] px-1 rounded ${
                                 search.trim() && doc.tags!.slice(3).some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-                                  ? 'text-orange-300 bg-orange-400/15'
-                                  : 'text-white/30'
+                                  ? 'text-badge-caution-fg bg-badge-caution-bg'
+                                  : 'text-foreground-placeholder'
                               }`}
                             >
                               +{doc.tags!.length - 3}
                             </span>
                           )}
                           {(!doc.tags || doc.tags.length === 0) && (
-                            <span className="text-white/30 text-xs">-</span>
+                            <span className="text-foreground-placeholder text-xs">-</span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell
-                        className="py-1.5 px-4 text-xs cursor-pointer text-white/70 whitespace-normal"
+                        className="py-1.5 px-4 text-xs cursor-pointer text-foreground-faint whitespace-normal"
                         onClick={() => handleView(doc)}
                       >
                         {doc.context ? (
                           <span
                             className={`${!compactBadges ? 'inline-flex truncate max-w-full' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                               search.trim() && doc.context.description.toLowerCase().includes(search.toLowerCase())
-                                ? 'bg-violet-400/40 text-violet-200 border-violet-400/60 ring-1 ring-violet-400/50'
-                                : 'bg-violet-400/20 text-violet-300 border-violet-400/30'
+                                ? 'bg-badge-context-bg text-badge-context-fg border-badge-context-bd ring-1 ring-badge-context-fg/50'
+                                : 'bg-badge-context-bg text-badge-context-fg border-badge-context-bd'
                             }`}
                             title={doc.context.description}
                           >
@@ -538,8 +520,8 @@ function DocumentsPageContent() {
                                 key={m.key}
                                 className={`${!compactBadges ? 'inline-flex truncate max-w-[120px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
                                   isHit
-                                    ? 'bg-blue-400/40 text-blue-200 border-blue-400/60 ring-1 ring-blue-400/50'
-                                    : 'bg-blue-400/20 text-blue-300 border-blue-400/30'
+                                    ? 'bg-badge-info-bg/80 text-badge-info-fg border-badge-info-bd ring-1 ring-badge-info-fg/50'
+                                    : 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
                                 }`}
                                 title={label}
                               >
@@ -554,20 +536,20 @@ function DocumentsPageContent() {
                                   const q = search.toLowerCase();
                                   return m.key.toLowerCase().includes(q) || (m.value && m.value.toLowerCase().includes(q));
                                 })
-                                  ? 'text-blue-300 bg-blue-400/15'
-                                  : 'text-white/30'
+                                  ? 'text-badge-info-fg bg-badge-info-bg'
+                                  : 'text-foreground-placeholder'
                               }`}
                             >
                               +{doc.metadata!.length - 3}
                             </span>
                           )}
                           {(!doc.metadata || doc.metadata.length === 0) && (
-                            <span className="text-white/30 text-xs">-</span>
+                            <span className="text-foreground-placeholder text-xs">-</span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell
-                        className="py-1.5 px-4 text-xs cursor-pointer font-mono text-white/60"
+                        className="py-1.5 px-4 text-xs cursor-pointer font-mono text-foreground-faint"
                         onClick={() => handleView(doc)}
                       >{doc.content_length_k != null ? `${doc.content_length_k}K` : '-'}</TableCell>
                       <TableCell
@@ -575,12 +557,12 @@ function DocumentsPageContent() {
                         onClick={() => handleView(doc)}
                       >
                         {doc.has_entities ? (
-                          <Badge className="text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 bg-purple-800/15 text-purple-400 border-purple-700/20">
+                          <Badge className={`${familyClass.entity} text-[10px] px-2.5 py-1 border inline-flex items-center gap-1`}>
                             <ScanSearch className="h-3 w-3" />
                             Detected
                           </Badge>
                         ) : (
-                          <span className="text-white/30 text-xs">-</span>
+                          <span className="text-foreground-placeholder text-xs">-</span>
                         )}
                       </TableCell>
                       <TableCell
@@ -589,14 +571,14 @@ function DocumentsPageContent() {
                       >
                         <Badge
                           title={getLastExtractError(doc) || undefined}
-                          className={`text-[10px] px-2.5 py-1 border inline-flex items-center gap-1 ${statusColors[doc.status] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}
+                          className={`${getStatusBadge(doc.status).className} text-[10px] px-2.5 py-1 border inline-flex items-center gap-1`}
                         >
                           {doc.status === 'processed_extract_failed' ? (
                             <AlertCircle className="h-3 w-3 shrink-0" />
                           ) : (
                             <ArchitxtIcon className="h-3 w-3" />
                           )}
-                          {statusLabels[doc.status] || doc.status}
+                          {getStatusBadge(doc.status).label}
                         </Badge>
                       </TableCell>
                     </TableRow>

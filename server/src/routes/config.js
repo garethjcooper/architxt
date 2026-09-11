@@ -86,6 +86,38 @@ router.get('/entity-format', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Contextual graph — safe read-only snapshot of enabled patch roles.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /config/contextual-graph:
+ *   get:
+ *     summary: Contextual graph feature flags
+ *     description: |
+ *       Deprecated endpoint retained for compatibility. The contextual graph
+ *       is now controlled per-bank via allowed_model_types on the Hindsight
+ *       bank; this route returns an empty object.
+ *     tags: [Config]
+ *     responses:
+ *       200:
+ *         description: Empty feature flags object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: { type: boolean }
+ */
+router.get('/contextual-graph', (req, res) => {
+  try {
+    res.json({});
+  } catch (err) {
+    logger.error('contextual-graph config route error', { error: err.message });
+    res.status(500).json({ error: err.message, code: 'CONFIG_ERROR' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Settings — read-only safe snapshot of currently-effective prompt/docling
 // and entity format configuration.
 // ─────────────────────────────────────────────────────────────────────────────

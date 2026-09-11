@@ -1,40 +1,67 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { slugifyHeading } from './smart-document-editor';
+import { MermaidDiagram } from './mermaid-diagram';
 
 interface MarkdownProps {
   children: string;
   className?: string;
+  /** Optional resolver that returns an icon element for a heading text. When returned, the icon is prepended to the heading and the matched prefix is removed. */
+  headingIconResolver?: (text: string) => { icon: React.ReactNode; text: string } | null;
 }
 
-export function Markdown({ children, className = '' }: MarkdownProps) {
+export function Markdown({ children, className = '', headingIconResolver }: MarkdownProps) {
   const headingWithId = ({ node, children, level, ...props }: any) => {
     const text = node?.children
       ?.map((c: any) => (c.type === 'text' ? c.value : ''))
       .join('') || '';
     const id = slugifyHeading(text);
+    const resolved = headingIconResolver?.(text);
+    const displayText = resolved?.text ?? text;
+    const icon = resolved?.icon;
     const baseClass = level === 1
       ? 'text-lg font-semibold mb-2 mt-4 first:mt-0'
       : level === 2
         ? 'text-base font-semibold mb-2 mt-3 first:mt-0'
         : 'text-sm font-semibold mb-1 mt-2 first:mt-0';
 
+    const childrenWithIcon = icon ? (
+      <span className="flex items-center gap-1.5">
+        {icon}
+        <span>{displayText}</span>
+      </span>
+    ) : (
+      children
+    );
+
     switch (level) {
       case 1:
-        return <h1 id={id} className={baseClass} {...props}>{children}</h1>;
+        return <h1 id={id} className={baseClass} {...props}>{childrenWithIcon}</h1>;
       case 2:
-        return <h2 id={id} className={baseClass} {...props}>{children}</h2>;
+        return <h2 id={id} className={baseClass} {...props}>{childrenWithIcon}</h2>;
       case 3:
-        return <h3 id={id} className={baseClass} {...props}>{children}</h3>;
+        return <h3 id={id} className={baseClass} {...props}>{childrenWithIcon}</h3>;
       case 4:
-        return <h4 id={id} className={baseClass} {...props}>{children}</h4>;
+        return <h4 id={id} className={baseClass} {...props}>{childrenWithIcon}</h4>;
       case 5:
-        return <h5 id={id} className={baseClass} {...props}>{children}</h5>;
+        return <h5 id={id} className={baseClass} {...props}>{childrenWithIcon}</h5>;
       case 6:
-        return <h6 id={id} className={baseClass} {...props}>{children}</h6>;
+        return <h6 id={id} className={baseClass} {...props}>{childrenWithIcon}</h6>;
       default:
-        return <h3 id={id} className={baseClass} {...props}>{children}</h3>;
+        return <h3 id={id} className={baseClass} {...props}>{childrenWithIcon}</h3>;
     }
+  };
+
+  const renderCode = ({ node, inline, className: codeClassName, children, ...props }: any) => {
+    const match = /language-(\w+)/.exec(codeClassName || '');
+    const language = match ? match[1] : '';
+    const content = String(children || '').replace(/\n$/, '');
+
+    if (!inline && language === 'mermaid') {
+      return <MermaidDiagram content={content} />;
+    }
+
+    return <code className="bg-markdown-code-bg rounded px-1 py-0.5 text-xs" {...props}>{children}</code>;
   };
 
   return (
@@ -52,17 +79,17 @@ export function Markdown({ children, className = '' }: MarkdownProps) {
           h4: headingWithId,
           h5: headingWithId,
           h6: headingWithId,
-          code: ({ ...props }) => <code className="bg-white/10 rounded px-1 py-0.5 text-xs" {...props} />,
-          pre: ({ ...props }) => <pre className="bg-white/5 rounded p-2 overflow-x-auto text-xs mb-3" {...props} />,
-          a: ({ ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
-          strong: ({ ...props }) => <strong className="font-semibold text-white" {...props} />,
-          em: ({ ...props }) => <em className="italic text-white/80" {...props} />,
+          code: renderCode,
+          pre: ({ ...props }) => <pre className="bg-markdown-pre-bg rounded p-2 overflow-x-auto text-xs mb-3" {...props} />,
+          a: ({ ...props }) => <a className="text-markdown-link hover:underline" {...props} />,
+          strong: ({ ...props }) => <strong className="font-semibold text-markdown-strong" {...props} />,
+          em: ({ ...props }) => <em className="italic text-foreground-default" {...props} />,
           blockquote: ({ ...props }) =>
-            <blockquote className="border-l-2 border-white/20 pl-3 italic text-white/60 mb-3" {...props} />,
-          table: ({ ...props }) => <table className="w-full text-sm border-collapse mb-3" {...props} />,
-          thead: ({ ...props }) => <thead className="border-b border-white/20" {...props} />,
-          th: ({ ...props }) => <th className="text-left py-1.5 px-2 font-medium text-white/80" {...props} />,
-          td: ({ ...props }) => <td className="py-1.5 px-2 border-b border-white/10 text-white/70" {...props} />,
+            <blockquote className="border-l-2 border-markdown-blockquote-border pl-3 italic text-foreground-muted mb-3" {...props} />,
+          table: ({ ...props }) => <table className="w-full text-[12px] border-collapse mb-3" {...props} />,
+          thead: ({ ...props }) => <thead className="border-b border-markdown-table-border" {...props} />,
+          th: ({ ...props }) => <th className="text-left py-1.5 px-2 font-medium text-markdown-table-head" {...props} />,
+          td: ({ ...props }) => <td className="py-1.5 px-2 border-b border-markdown-table-border text-foreground-muted" {...props} />,
         }}
       >
         {children}

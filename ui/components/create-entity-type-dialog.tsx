@@ -102,21 +102,21 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
     }
   };
 
-  const inputClass = "!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2";
+  const inputClass = "!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle";
   const disabledClass = "opacity-50 pointer-events-none";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Create Entity Type
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <div className="space-y-2">
-            <Label htmlFor="cet-name" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="cet-name" className="text-xs uppercase text-foreground-subtle font-medium">
               Type Name *
             </Label>
             <Input
@@ -125,16 +125,12 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
               onChange={(e) => setTypeName(e.target.value)}
               placeholder="e.g. Application Component"
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cet-desc" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="cet-desc" className="text-xs uppercase text-foreground-subtle font-medium">
               Description
             </Label>
             <Input
@@ -143,18 +139,14 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               className={inputClass}
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
             />
           </div>
 
           {/* Entity Id Pattern Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Use Entity Id Pattern</Label>
-              <p className="text-[10px] text-white/40">Generate formatted ids like PREFIX-001</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Use Entity Id Pattern</Label>
+              <p className="text-[10px] text-foreground-subtle">Generate formatted ids like PREFIX-001</p>
             </div>
             <Switch checked={usesPattern} onCheckedChange={(v) => setUsesPattern(v)} />
           </div>
@@ -163,7 +155,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
           <div className={`space-y-3 transition-opacity ${!usesPattern ? disabledClass : ''}`}>
             <div className="flex gap-3 items-start">
               <div className="flex-1 space-y-2 min-w-0">
-                <Label htmlFor="cet-prefix" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="cet-prefix" className="text-xs uppercase text-foreground-subtle font-medium">
                   Id Format Prefix *
                 </Label>
                 <Input
@@ -172,15 +164,11 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
                   onChange={(e) => handlePrefixChange(e.target.value)}
                   placeholder="e.g. APP"
                   className={inputClass}
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                   disabled={!usesPattern}
                 />
               </div>
               <div className="w-20 space-y-2">
-                <Label htmlFor="cet-separator" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="cet-separator" className="text-xs uppercase text-foreground-subtle font-medium">
                   Separator *
                 </Label>
                 <EntityTypeIdSeparatorSelect
@@ -191,7 +179,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
                 />
               </div>
               <div className="w-24 space-y-2">
-                <Label htmlFor="cet-digits" className="text-xs uppercase text-white/50 font-medium">
+                <Label htmlFor="cet-digits" className="text-xs uppercase text-foreground-subtle font-medium">
                   Digits *
                 </Label>
                 <Input
@@ -203,22 +191,18 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
                   onChange={(e) => handleDigitsChange(e.target.value)}
                   placeholder="3"
                   className={inputClass}
-                  style={{
-                    '--tw-ring-color': 'rgb(52, 211, 153)',
-                    '--tw-ring-opacity': '0.4',
-                  } as React.CSSProperties}
                   disabled={!usesPattern}
                 />
               </div>
             </div>
-            <p className="text-[10px] text-white/40">Alphanumeric prefix; separator between prefix and number; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
+            <p className="text-[10px] text-foreground-subtle">Alphanumeric prefix; separator between prefix and number; {MIN_DIGITS}–{MAX_DIGITS} digits.</p>
           </div>
 
           {/* Case Match Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Case-Sensitive Match</Label>
-              <p className="text-[10px] text-white/40">OFF = insensitive (default), ON = exact case</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Case-Sensitive Match</Label>
+              <p className="text-[10px] text-foreground-subtle">OFF = insensitive (default), ON = exact case</p>
             </div>
             <CaseMatchToggle
               checked={caseSensitive}
@@ -229,8 +213,8 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
           {/* Word Boundary Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs uppercase text-white/50 font-medium">Respect Word Boundaries</Label>
-              <p className="text-[10px] text-white/40">OFF = substring match, ON = whole-word match (default)</p>
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">Respect Word Boundaries</Label>
+              <p className="text-[10px] text-foreground-subtle">OFF = substring match, ON = whole-word match (default)</p>
             </div>
             <CaseMatchToggle
               checked={wordBoundaries}
@@ -238,11 +222,11 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-white/70 hover:text-white hover:bg-white/5">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card">
               Close
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <Button type="submit" disabled={isLoading} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Create
             </Button>

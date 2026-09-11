@@ -89,6 +89,7 @@ CREATE TABLE servers (
   svr_name TEXT,
   svr_api_key TEXT,
   svr_api_version TEXT,
+  svr_contextual_graph_banks JSON,
   svr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   svr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -122,6 +123,80 @@ CREATE INDEX idx_pending_ops_ext_id ON pending_operations(pop_ext_id);
 CREATE INDEX idx_pending_ops_doc_id ON pending_operations(pop_doc_id);
 CREATE INDEX idx_pending_ops_research_session ON pending_operations(pop_rs_id);
 CREATE INDEX idx_pending_ops_research_step ON pending_operations(pop_rstep_id);
+
+-- ============================================================================
+-- CONTEXTUAL GRAPH — property-graph working view for Hindsight skeleton
+-- enrichment. SQLite-first: labels and properties stored as JSON text.
+-- ============================================================================
+
+CREATE TABLE contextual_graph_nodes (
+  cgn_id TEXT NOT NULL,
+  cgn_server_id INTEGER NOT NULL,
+  cgn_bank_id TEXT NOT NULL,
+  cgn_labels TEXT NOT NULL,
+  cgn_properties TEXT NOT NULL,
+  cgn_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  cgn_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (cgn_server_id, cgn_bank_id, cgn_id),
+  FOREIGN KEY (cgn_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE TABLE contextual_graph_edges (
+  cge_id TEXT NOT NULL,
+  cge_server_id INTEGER NOT NULL,
+  cge_bank_id TEXT NOT NULL,
+  cge_source_id TEXT NOT NULL,
+  cge_target_id TEXT NOT NULL,
+  cge_type TEXT,
+  cge_properties TEXT NOT NULL,
+  cge_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  cge_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (cge_server_id, cge_bank_id, cge_id),
+  FOREIGN KEY (cge_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_cge_server_bank_source_target
+  ON contextual_graph_edges(cge_server_id, cge_bank_id, cge_source_id, cge_target_id);
+CREATE INDEX idx_cge_source ON contextual_graph_edges(cge_source_id);
+CREATE INDEX idx_cge_target ON contextual_graph_edges(cge_target_id);
+
+-- ============================================================================
+-- CONTEXTUAL GRAPH SYNC JOBS — tracked, cancellable background graph sync
+-- ============================================================================
+
+CREATE TABLE contextual_graph_jobs (
+  cgj_id TEXT PRIMARY KEY,
+  cgj_server_id INTEGER NOT NULL,
+  cgj_bank_id TEXT NOT NULL,
+  cgj_status TEXT NOT NULL DEFAULT 'pending' CHECK (cgj_status IN ('pending','running','completed','failed','cancelled')),
+  cgj_stages JSON NOT NULL DEFAULT '[]',
+  cgj_logs JSON NOT NULL DEFAULT '[]',
+  cgj_options JSON,
+  cgj_stats JSON,
+  cgj_error_message TEXT,
+  cgj_error_code TEXT,
+  cgj_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  cgj_started_at TIMESTAMP,
+  cgj_finished_at TIMESTAMP,
+  cgj_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (cgj_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_contextual_graph_jobs_server_bank ON contextual_graph_jobs(cgj_server_id, cgj_bank_id);
+CREATE INDEX idx_contextual_graph_jobs_status ON contextual_graph_jobs(cgj_status);
+
+CREATE TABLE contextual_graph_job_logs (
+  cgjl_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cgj_id TEXT NOT NULL,
+  cgjl_stage TEXT,
+  cgjl_level TEXT NOT NULL CHECK (cgjl_level IN ('info','warn','error')),
+  cgjl_message TEXT NOT NULL,
+  cgjl_details JSON,
+  cgjl_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (cgj_id) REFERENCES contextual_graph_jobs(cgj_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_contextual_graph_job_logs_job ON contextual_graph_job_logs(cgj_id);
 
 -- ============================================================================
 -- ENTITY TYPES — classification groups (e.g. Application Component, Service)
@@ -193,11 +268,12 @@ CREATE TABLE mental_models (
   mm_exclude_mental_model_list TEXT,
   mm_tags_match_mode TEXT DEFAULT 'all_strict',
   mm_is_template TEXT DEFAULT 'false',
+  mm_template_role TEXT,
   mm_max_tokens INTEGER DEFAULT 2048,
   mm_viewp_description TEXT,
   mm_viewp_meta JSON,
   mm_dimension TEXT,
-  mm_returns TEXT DEFAULT 'narrative' REFERENCES prompt_templates(pt_name),
+  mm_returns TEXT DEFAULT 'narrative',
   mm_concatenation TEXT DEFAULT 'compile' CHECK (mm_concatenation IN ('merge', 'compile')),
   mm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   mm_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -226,6 +302,26 @@ CREATE TABLE mental_model_entities (
   FOREIGN KEY (ent_id) REFERENCES entities(ent_id) ON DELETE CASCADE,
   FOREIGN KEY (mm_id) REFERENCES mental_models(mm_id) ON DELETE CASCADE
 );
+
+-- ============================================================================
+-- TEMPLATE ROLES — derivation scope and display label for mental-model templates
+-- ============================================================================
+
+CREATE TABLE template_roles (
+  tr_role_id TEXT PRIMARY KEY,
+  tr_display_name TEXT NOT NULL,
+  tr_derivation_scope TEXT NOT NULL,
+  tr_sort_order INTEGER,
+  tr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  tr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order) VALUES
+('sys_entity_summary', 'Entity summary', 'node', 1),
+('sys_entity_capabilities', 'Entity capabilities', 'node', 2),
+('sys_edge_context', 'Edge context', 'edge', 3),
+('sys_discovery_context', 'Discovery', 'seed', 4),
+('user_entity_derived', 'User entity derived', 'node', 5);
 
 -- ============================================================================
 -- PROMPT TEMPLATES — reusable prompt compositions for graph/narrative output
@@ -275,12 +371,15 @@ CREATE TABLE research_sessions (
   rs_id INTEGER PRIMARY KEY AUTOINCREMENT,
   rs_title TEXT NOT NULL,
   rs_description TEXT,
+  rs_server_id INTEGER,
   rs_bank_id TEXT NOT NULL,
   rs_viewpoint_ids JSON NOT NULL,
+  rs_scope_entity_ids JSON,
   rs_status TEXT NOT NULL DEFAULT 'active',
   rs_current_step_id INTEGER,
   rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
   FOREIGN KEY (rs_current_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
 );
 
@@ -299,12 +398,12 @@ CREATE TABLE research_steps (
   rs_id INTEGER NOT NULL,
   rstep_parent_step_id INTEGER,
   rstep_intent_text TEXT NOT NULL,
+  rstep_raw_query TEXT,
   rstep_selections JSON,
   rstep_action_type TEXT NOT NULL,
   rstep_parameters JSON,
   rstep_viewpoint_ids JSON,
-  rstep_canvas_state JSON,
-  rstep_synthesis JSON,
+  rstep_envelope JSON,
   rstep_tool_calls_used INTEGER DEFAULT 0,
   rstep_status TEXT,
   rstep_error_message TEXT,

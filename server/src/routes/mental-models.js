@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
+import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import {
   sendResponse,
   validateId,
@@ -18,6 +19,7 @@ import {
   listMentalModels,
   listMentalModelDimensions,
   listStandardDimensions,
+  listTemplateRoles,
   getMentalModelTags,
   addMentalModelTag,
   removeMentalModelTag,
@@ -28,6 +30,7 @@ import {
   batchUpdateMentalModelEntities,
   batchUpdateMentalModelConfig,
   validateEntityTemplateEligibility,
+  validateRoleBasedTemplateEligibility,
   deriveMentalModels,
   composeDerivedMentalModels,
   updateMentalModelEntityOverrides,
@@ -37,14 +40,14 @@ import {
   normaliseRefreshMode,
   normaliseTagsMatchMode,
   normaliseMaxTokens,
-  normaliseReturns,
-  normaliseConcatenation,
   toDbBool,
   DEFAULT_MAX_TOKENS,
   DEFAULT_REFRESH_MODE,
   DEFAULT_TAGS_MATCH_MODE,
   DEFAULT_BOOL,
+  isSystemTemplateRole,
 } from '../db/crud/mental-models.js';
+import { CONTEXTUAL_GRAPH_TEMPLATES } from '../db/ensure-schema.js';
 const logger = createLogger('mental-models-route');
 const router = Router();
 
@@ -87,9 +90,8 @@ const toApiMentalModel = (dbRow) => ({
   max_tokens: dbRow.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
   tags_match_mode: dbRow.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
   is_template: dbRow.mm_is_template === 'true',
-  dimension: dbRow.mm_dimension ?? null,
-  returns: dbRow.mm_returns ?? 'narrative',
-  concatenation: dbRow.mm_concatenation ?? 'compile',
+  template_role: dbRow.mm_template_role ?? null,
+  is_system_template: isSystemTemplateRole(dbRow.mm_template_role),
   tags: dbRow.mm_tags || [],
   entities: (dbRow.mm_entities || []).map((e) => ({
     ...e,
@@ -144,8 +146,6 @@ router.get('/', async (req, res) => {
   const result = await listMentalModels(db, {
     limit: Number(req.query.limit) || 1000,
     offset: Number(req.query.offset) || 0,
-    dimension: req.query.dimension,
-    returns: req.query.returns,
   });
   handleCrudResult({
     res,
@@ -200,6 +200,73 @@ router.get('/dimensions/standard', async (req, res) => {
   const start = Date.now();
   const result = listStandardDimensions();
   sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: '/mentalmodels/dimensions/standard', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/roles/template:
+ *   get:
+ *     summary: List distinct system template roles
+ *     tags: [MentalModels]
+ *     responses:
+ *       200:
+ *         description: Array of role value/label pairs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   value: { type: string }
+ *                   label: { type: string }
+ *                   derivation_scope: { type: string }
+ */
+router.get('/roles/template', async (req, res) => {
+  const start = Date.now();
+  const availableOnly = req.query.available === 'true';
+  const excludeMmId = req.query.exclude_mm_id ? Number(req.query.exclude_mm_id) : null;
+  const rows = await listTemplateRoles(db, { availableOnly, excludeMmId });
+  const roles = rows
+    .filter((r) => r.role)
+    .map((r) => ({
+      value: r.role,
+      label: r.label || r.role,
+      derivation_scope: r.derivation_scope || '',
+    }));
+  sendResponse({ res, status: 200, data: roles, logger, method: 'GET', path: '/mentalmodels/roles/template', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/system-template-defaults:
+ *   get:
+ *     summary: Canonical defaults for system-owned contextual-graph templates
+ *     tags: [MentalModels]
+ *     responses:
+ *       200:
+ *         description: Array of canonical system template defaults
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   role: { type: string }
+ *                   ext_id: { type: string }
+ *                   name: { type: string }
+ *                   source_query: { type: string }
+ */
+router.get('/system-template-defaults', async (req, res) => {
+  const start = Date.now();
+  const data = CONTEXTUAL_GRAPH_TEMPLATES.map((t) => ({
+    role: t.role,
+    ext_id: t.extId,
+    name: t.name,
+    source_query: t.sourceQuery,
+  }));
+  sendResponse({ res, status: 200, data, logger, method: 'GET', path: '/mentalmodels/system-template-defaults', duration: Date.now() - start });
 });
 
 /**
@@ -295,6 +362,7 @@ router.post('/', async (req, res) => {
     mm_name: body.name,
     mm_ext_id: extIdCheck.value,
     mm_source_query: body.source_query,
+    mm_template_role: body.template_role ?? null,
   });
 
   if (!eligibility.valid) {
@@ -302,20 +370,16 @@ router.post('/', async (req, res) => {
     return sendResponse({ res, status: 400, error: eligibility.error, code: eligibility.code, logger, method: 'POST', path, duration });
   }
 
-  const returns = normaliseReturns(body.returns) ?? 'narrative';
-  const templateExists = db.prepare("SELECT 1 FROM prompt_templates WHERE pt_name = ?").get(returns);
-  if (!templateExists) {
+  const roleEligibility = validateRoleBasedTemplateEligibility(db, {
+    mm_template_role: body.template_role ?? null,
+    mm_ext_id: extIdCheck.value,
+    mm_name: body.name,
+    mm_source_query: body.source_query,
+  });
+
+  if (!roleEligibility.valid) {
     const duration = Date.now() - start;
-    return sendResponse({
-      res,
-      status: 400,
-      error: `No prompt template found for returns='${returns}'. Restart the server to apply built-in template migrations.`,
-      code: 'TEMPLATE_NOT_FOUND',
-      logger,
-      method: 'POST',
-      path,
-      duration,
-    });
+    return sendResponse({ res, status: 400, error: roleEligibility.error, code: roleEligibility.code, logger, method: 'POST', path, duration });
   }
 
   const result = await createMentalModel(db, {
@@ -329,9 +393,7 @@ router.post('/', async (req, res) => {
     mm_tags_match_mode: normaliseTagsMatchMode(body.tags_match_mode) ?? DEFAULT_TAGS_MATCH_MODE,
     mm_is_template: isTemplate,
     mm_max_tokens: normaliseMaxTokens(body.max_tokens) ?? DEFAULT_MAX_TOKENS,
-    mm_dimension: body.dimension ?? null,
-    mm_returns: returns,
-    mm_concatenation: normaliseConcatenation(body.concatenation) ?? 'compile',
+    mm_template_role: body.template_role ?? null,
   });
 
   handleCrudResult({
@@ -410,10 +472,22 @@ router.put('/:id', async (req, res) => {
       mm_name: data.mm_name ?? row?.mm_name ?? null,
       mm_ext_id: data.mm_ext_id ?? row?.mm_ext_id ?? null,
       mm_source_query: data.mm_source_query ?? row?.mm_source_query ?? null,
+      mm_template_role: row?.mm_template_role ?? null,
     });
     if (!eligibility.valid) {
       const duration = Date.now() - start;
       return sendResponse({ res, status: 400, error: eligibility.error, code: eligibility.code, logger, method: 'PUT', path, duration });
+    }
+
+    const roleEligibility = validateRoleBasedTemplateEligibility(db, {
+      mm_template_role: row?.mm_template_role ?? null,
+      mm_ext_id: data.mm_ext_id ?? row?.mm_ext_id ?? null,
+      mm_name: data.mm_name ?? row?.mm_name ?? null,
+      mm_source_query: data.mm_source_query ?? row?.mm_source_query ?? null,
+    });
+    if (!roleEligibility.valid) {
+      const duration = Date.now() - start;
+      return sendResponse({ res, status: 400, error: roleEligibility.error, code: roleEligibility.code, logger, method: 'PUT', path, duration });
     }
   }
 
@@ -434,30 +508,6 @@ router.put('/:id', async (req, res) => {
   }
   if (body.tags_match_mode !== undefined) {
     data.mm_tags_match_mode = normaliseTagsMatchMode(body.tags_match_mode);
-  }
-  if (body.dimension !== undefined) {
-    data.mm_dimension = body.dimension === '' ? null : body.dimension;
-  }
-  if (body.returns !== undefined) {
-    const returns = normaliseReturns(body.returns);
-    const templateExists = db.prepare("SELECT 1 FROM prompt_templates WHERE pt_name = ?").get(returns);
-    if (!templateExists) {
-      const duration = Date.now() - start;
-      return sendResponse({
-        res,
-        status: 400,
-        error: `No prompt template found for returns='${returns}'. Restart the server to apply built-in template migrations.`,
-        code: 'TEMPLATE_NOT_FOUND',
-        logger,
-        method: 'PUT',
-        path,
-        duration,
-      });
-    }
-    data.mm_returns = returns;
-  }
-  if (body.concatenation !== undefined) {
-    data.mm_concatenation = normaliseConcatenation(body.concatenation);
   }
 
   const result = await updateMentalModel(db, idCheck.id, data);
@@ -521,6 +571,63 @@ router.get('/:id/derived', async (req, res) => {
   const derived = deriveMentalModels(template);
   const composed = await composeDerivedMentalModels(db, derived);
   sendResponse({ res, status: 200, data: composed, logger, method: 'GET', path, duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /mentalmodels/compose-preview:
+ *   post:
+ *     summary: Preview composed prompts for mental-model items
+ *     tags: [MentalModels]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [items]
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     role: { type: string }
+ *                     template_role: { type: string }
+ *                     source_query: { type: string }
+ *                     returns: { type: string }
+ *     responses:
+ *       200:
+ *         description: Array of composed query results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       composed_query: { type: string, nullable: true }
+ *                       compose_error: { type: string, nullable: true }
+ */
+router.post('/compose-preview', async (req, res) => {
+  const start = Date.now();
+  const path = '/mentalmodels/compose-preview';
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    sendResponse({ res, status: 400, error: 'items must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path, duration: Date.now() - start });
+    return;
+  }
+  const inputs = items.map((item) => ({
+    returns: item.returns,
+    source_query: item.source_query,
+    role: item.role,
+    template_role: item.template_role,
+  }));
+  const results = await composeMentalModelPromptBatch(db, inputs);
+  sendResponse({ res, status: 200, data: { results }, logger, method: 'POST', path, duration: Date.now() - start });
 });
 
 /**
