@@ -79,11 +79,17 @@ export function ServerGraphBanksDialog({
     async function loadTemplateRoles() {
       setLoadingRoles(true);
       try {
-        const roles = await mentalModelsApi.listTemplateRoles({ available: true });
+        // Bank deploy limits need all contextual-graph template roles, including
+        // the seeded system roles. The mental-model creation API uses
+        // `available: true` to hide already-assigned roles, but that would hide
+        // the four system contextual roles. We also exclude user_entity_derived,
+        // which is for entity-derived mental models, not contextual graph patches.
+        const roles = await mentalModelsApi.listTemplateRoles();
         const seen = new Set<string>();
         setTemplateRoles(
           (roles || [])
             .filter((r) => r.value)
+            .filter((r) => r.value !== 'user_entity_derived')
             .filter((r) => {
               if (seen.has(r.value)) return false;
               seen.add(r.value);
