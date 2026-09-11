@@ -1,13 +1,19 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/lib/graph/render-utils';
 
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
 import { type EntityInfo, type Entity } from '@/lib/api/client';
-import { type DisplayNode, getRoleScopeLabel, getRoleLabel, loadRoleScopeMap } from '@/lib/contextual-graph/display';
+import {
+  type DisplayNode,
+  getRoleScopeLabel,
+  getRoleLabel,
+  loadRoleScopeMap,
+  type RoleScopeMaps,
+} from '@/lib/contextual-graph/display';
 import { type ModelContentCacheEntry } from './model-content-utils';
 
 export interface ModelItem {
@@ -44,6 +50,7 @@ function getEntityModelItems(
   entityNameById?: Map<string, string>,
   contextualNodeNameById?: Map<string, string>,
   contentCache?: Record<string, ModelContentCacheEntry>,
+  roleMaps?: RoleScopeMaps,
 ): ModelItem[] {
   const resolveName = (entityId: string): string => {
     const infoName = entityInfoMap?.[entityId]?.catalog?.name || entityInfoMap?.[entityId]?.graph_node?.display_name;
@@ -56,6 +63,8 @@ function getEntityModelItems(
   };
 
   const items: ModelItem[] = [];
+  const scopeMap = roleMaps?.roleScopeMap;
+  const labelMap = roleMaps?.roleLabelMap;
 
   // Attached contextual model refs on the graph node.
   info.contextual_refs.forEach((ref, i) => {
@@ -65,8 +74,8 @@ function getEntityModelItems(
     const title = ref.name || resolveName(entityId);
     items.push({
       key: `ctx-${ref.role}-${ref.ext_id || i}`,
-      scopeLabel: getRoleScopeLabel(ref.role),
-      roleLabel: getRoleLabel(ref.role),
+      scopeLabel: getRoleScopeLabel(ref.role, scopeMap),
+      roleLabel: getRoleLabel(ref.role, labelMap),
       title,
       extId: ref.ext_id,
       edgeCount: 0,
@@ -78,8 +87,8 @@ function getEntityModelItems(
     const extId = m.ext_id || String(m.id);
     items.push({
       key: `derived-${m.id || extId}`,
-      scopeLabel: m.template_role ? getRoleScopeLabel(m.template_role) : 'DERIVED',
-      roleLabel: m.template_role ? getRoleLabel(m.template_role) : undefined,
+      scopeLabel: m.template_role ? getRoleScopeLabel(m.template_role, scopeMap) : 'DERIVED',
+      roleLabel: m.template_role ? getRoleLabel(m.template_role, labelMap) : undefined,
       title: m.name || extId,
       extId,
       edgeCount: 0,
@@ -92,7 +101,7 @@ function getEntityModelItems(
     items.push({
       key: `plain-${m.id || extId}`,
       scopeLabel: 'PLAIN',
-      roleLabel: m.template_role ? getRoleLabel(m.template_role) : undefined,
+      roleLabel: m.template_role ? getRoleLabel(m.template_role, labelMap) : undefined,
       title: m.name || extId,
       extId,
       edgeCount: 0,
@@ -131,7 +140,7 @@ function getEntityModelItems(
     items.push({
       key: `edge-${extId}`,
       scopeLabel: 'EDGE',
-      roleLabel: firstRefRole ? getRoleLabel(firstRefRole) : undefined,
+      roleLabel: firstRefRole ? getRoleLabel(firstRefRole, labelMap) : undefined,
       title,
       extId,
       edgeCount: countModelEdges(contentCache, extId) ?? contexts.length,
@@ -169,8 +178,10 @@ export function AttachedEntitiesPanel({
     return map;
   }, [contextualNodes]);
 
+  const [roleMaps, setRoleMaps] = useState<RoleScopeMaps>({ roleScopeMap: {}, roleLabelMap: {} });
+
   useEffect(() => {
-    loadRoleScopeMap().catch(() => {
+    loadRoleScopeMap().then(setRoleMaps).catch(() => {
       // ignore; helpers fall back to role-id formatting
     });
   }, []);
@@ -179,14 +190,14 @@ export function AttachedEntitiesPanel({
     return entityIds
       .map((entityId) => {
         const info = entityInfoMap?.[entityId];
-        const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById, modelContentCache) : [];
+        const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById, modelContentCache, roleMaps) : [];
         const node = contextualNodes.find((n) => n.id === entityId);
         const displayName = info?.catalog?.name || info?.graph_node?.display_name || node?.label || entityId;
         return { entityId, info, items, displayName, hasItems: items.length > 0 };
       })
       .filter((row) => row.hasItems)
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, modelContentCache]);
+  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, modelContentCache, roleMaps]);
 
   return (
     <Panel className="flex-1">

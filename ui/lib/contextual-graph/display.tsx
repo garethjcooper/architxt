@@ -201,15 +201,20 @@ export function PropertyRow({ label, value }: { label: string; value: unknown })
   );
 }
 
-// Obsolete hardcoded role -> scope badge map. Kept for backwards compatibility
-// until all consumers are migrated; prefer getRoleScopeLabel() which derives the
-// derivation_scope from the template_roles table, and getRoleLabel() for the
-// human-readable role name.
+// Hardcoded fallback for the four original system roles, used only when a
+// caller has not loaded the template_roles map. Prefer passing an explicit map.
 export const MODEL_ROLE_LABELS: Record<string, string> = {
   sys_entity_summary: 'NODE',
   sys_entity_capabilities: 'NODE',
   sys_edge_context: 'EDGE',
   sys_discovery_context: 'SEED',
+};
+
+const MODEL_ROLE_LABEL_NAMES: Record<string, string> = {
+  sys_entity_summary: 'Entity summary',
+  sys_entity_capabilities: 'Entity capabilities',
+  sys_edge_context: 'Edge context',
+  sys_discovery_context: 'Discovery',
 };
 
 const CONTEXTUAL_ROLES = new Set([
@@ -219,36 +224,49 @@ const CONTEXTUAL_ROLES = new Set([
   'sys_discovery_context',
 ]);
 
-function roleIsEntityLike(role?: string): boolean {
-  return role === 'sys_entity_summary' || role === 'sys_entity_capabilities' || role === 'sys_discovery_context';
+function getRoleScopeFromMap(role?: string, roleScopeMap?: Record<string, string> | null): string {
+  const map = roleScopeMap || globalRoleScopeMap;
+  return map?.[role || ''] || MODEL_ROLE_LABELS[role || ''];
 }
 
-export function isContextualRole(role?: string): boolean {
-  return typeof role === 'string' && (CONTEXTUAL_ROLES.has(role) || !!roleScopeMap?.[role]);
+function getRoleLabelFromMap(role?: string, roleLabelMap?: Record<string, string> | null): string {
+  if (!role) return 'Unknown role';
+  const map = roleLabelMap || globalRoleLabelMap;
+  return map?.[role] || MODEL_ROLE_LABEL_NAMES[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function getContextualPatchRefs(item: DisplayNode | DisplayEdge): ModelRef[] {
-  const refs = item.modelRefs.filter((ref) => ref.ext_id && isContextualRole(ref.role));
+function roleIsEntityLike(role?: string, roleScopeMap?: Record<string, string>): boolean {
+  const scope = getRoleScopeFromMap(role, roleScopeMap);
+  return scope === 'NODE' || scope === 'SEED' || CONTEXTUAL_ROLES.has(role || '');
+}
+
+function roleIsNodeLike(role?: string, roleScopeMap?: Record<string, string>): boolean {
+  const scope = getRoleScopeFromMap(role, roleScopeMap);
+  return scope === 'NODE' || scope === 'SEED';
+}
+
+function roleIsEdgeLike(role?: string, roleScopeMap?: Record<string, string>): boolean {
+  return getRoleScopeFromMap(role, roleScopeMap) === 'EDGE' || role === 'sys_edge_context';
+}
+
+export function isContextualRole(role?: string, roleScopeMap?: Record<string, string>): boolean {
+  return typeof role === 'string' && (!!getRoleScopeFromMap(role, roleScopeMap) || CONTEXTUAL_ROLES.has(role));
+}
+
+export function getContextualPatchRefs(item: DisplayNode | DisplayEdge, roleScopeMap?: Record<string, string>): ModelRef[] {
+  const refs = item.modelRefs.filter((ref) => ref.ext_id && isContextualRole(ref.role, roleScopeMap));
   if ('source_id' in item && 'target_id' in item) {
-    return refs.filter((ref) => roleIsEdgeLike(ref.role));
+    return refs.filter((ref) => roleIsEdgeLike(ref.role, roleScopeMap));
   }
-  return refs.filter((ref) => roleIsEntityLike(ref.role) || roleIsNodeLike(ref.role));
-}
-
-function roleIsNodeLike(role?: string): boolean {
-  return !!roleScopeMap?.[role || ''];
-}
-
-function roleIsEdgeLike(role?: string): boolean {
-  return roleScopeMap?.[role || ''] === 'EDGE' || role === 'sys_edge_context';
+  return refs.filter((ref) => roleIsEntityLike(ref.role, roleScopeMap) || roleIsNodeLike(ref.role, roleScopeMap));
 }
 
 // Client-side derivation of a scope badge from a role id. Mirrors the
-// server-side template_roles table. Falls back to a readable label for unknown
-// roles; use getDerivationScope() when only NODE/EDGE/SEED/PATCH is needed.
-export function getRoleScopeLabel(role?: string): string {
+// server-side template_roles table. Falls back to deriving from the ref's own
+// scope object, then to a readable label for unknown roles.
+export function getRoleScopeLabel(role?: string, roleScopeMap?: Record<string, string>): string {
   if (!role) return 'PATCH';
-  const scope = getRoleScope(role);
+  const scope = getRoleScope(role, roleScopeMap);
   if (scope) return scope.toUpperCase();
   return role.replace(/^sys_/, '').replace(/_/g, ' ').toUpperCase();
 }
@@ -256,8 +274,8 @@ export function getRoleScopeLabel(role?: string): string {
 // Clean derivation scope (NODE / EDGE / SEED) for the scope badge.
 // Falls back to deriving from the ref's own scope object when the role is not
 // present in the template_roles table (e.g. custom/imported roles).
-export function getDerivationScope(role?: string, refScope?: ModelScope): string {
-  const roleScope = getRoleScope(role);
+export function getDerivationScope(role?: string, refScope?: ModelScope, roleScopeMap?: Record<string, string>): string {
+  const roleScope = getRoleScope(role, roleScopeMap);
   if (roleScope === 'NODE' || roleScope === 'EDGE' || roleScope === 'SEED') return roleScope;
   if (refScope) {
     if ('node_id' in refScope) return 'NODE';
@@ -268,45 +286,52 @@ export function getDerivationScope(role?: string, refScope?: ModelScope): string
 }
 
 // Human-readable role label from the template_roles table.
-export function getRoleLabel(role?: string): string {
+export function getRoleLabel(role?: string, roleLabelMap?: Record<string, string>): string {
   if (!role) return 'Unknown role';
-  return roleLabelMap?.[role] || role.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return getRoleLabelFromMap(role, roleLabelMap);
 }
 
-export function getRoleScope(role?: string): string {
-  return roleScopeMap?.[role || ''] || MODEL_ROLE_LABELS[role || ''];
+export function getRoleScope(role?: string, roleScopeMap?: Record<string, string>): string {
+  return getRoleScopeFromMap(role, roleScopeMap);
 }
 
-let roleScopeMap: Record<string, string> | null = null;
-let roleLabelMap: Record<string, string> | null = null;
+let globalRoleScopeMap: Record<string, string> | null = null;
+let globalRoleLabelMap: Record<string, string> | null = null;
 
-export async function loadRoleScopeMap(): Promise<Record<string, string>> {
-  if (roleScopeMap && roleLabelMap) return roleScopeMap;
+export type RoleScopeMaps = {
+  roleScopeMap: Record<string, string>;
+  roleLabelMap: Record<string, string>;
+};
+
+export async function loadRoleScopeMap(): Promise<RoleScopeMaps> {
+  // Always refetch: different consumers need different subsets, and a cached
+  // subset (e.g. "available only") must not poison later callers.
   try {
     const roles = await mentalModelsApi.listTemplateRoles();
-    roleScopeMap = Object.fromEntries(
+    globalRoleScopeMap = Object.fromEntries(
       (roles || []).map((r: { value: string; label?: string; derivation_scope?: string }) => [r.value, (r.derivation_scope || '').toUpperCase()]),
     );
-    roleLabelMap = Object.fromEntries(
+    globalRoleLabelMap = Object.fromEntries(
       (roles || []).map((r: { value: string; label?: string }) => [r.value, r.label || '']),
     );
-    return roleScopeMap;
   } catch {
-    roleLabelMap = Object.fromEntries(Object.entries(MODEL_ROLE_LABELS).map(([k]) => [k, k.replace(/^sys_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())]));
-    return MODEL_ROLE_LABELS;
+    globalRoleScopeMap = { ...MODEL_ROLE_LABELS };
+    globalRoleLabelMap = { ...MODEL_ROLE_LABEL_NAMES };
   }
+  return { roleScopeMap: globalRoleScopeMap, roleLabelMap: globalRoleLabelMap };
 }
 
+/** @deprecated Prefer consuming the maps returned by loadRoleScopeMap(). */
 export function setRoleScopeMap(map: Record<string, string>) {
-  roleScopeMap = map;
+  globalRoleScopeMap = map;
 }
 
-export function hasEdgeContextRef(edge: DisplayEdge, roles?: Set<string>): boolean {
-  return edge.modelRefs.some((r) => r.role && ((roles?.has(r.role) ?? false) || roleIsEdgeLike(r.role)));
+export function hasEdgeContextRef(edge: DisplayEdge, roles?: Set<string>, roleScopeMap?: Record<string, string>): boolean {
+  return edge.modelRefs.some((r) => r.role && ((roles?.has(r.role) ?? false) || roleIsEdgeLike(r.role, roleScopeMap)));
 }
 
-export function getEdgeContextPairKey(edge: DisplayEdge, roles?: Set<string>): string | null {
-  const ref = edge.modelRefs.find((r) => r.role && ((roles?.has(r.role) ?? false) || roleIsEdgeLike(r.role)));
+export function getEdgeContextPairKey(edge: DisplayEdge, roles?: Set<string>, roleScopeMap?: Record<string, string>): string | null {
+  const ref = edge.modelRefs.find((r) => r.role && ((roles?.has(r.role) ?? false) || roleIsEdgeLike(r.role, roleScopeMap)));
   if (!ref?.scope || !('source_id' in ref.scope) || !('target_id' in ref.scope)) return null;
   const { source_id: a, target_id: b } = ref.scope as { source_id: string; target_id: string };
   return [a, b].sort().join('|');
