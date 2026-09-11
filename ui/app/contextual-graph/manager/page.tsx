@@ -47,7 +47,6 @@ import {
   getLastRefreshedAt,
   getRoleScopeLabel,
   getRoleLabel,
-  setRoleScopeMap,
 } from '@/lib/contextual-graph/display';
 export type { BackendNode, BackendEdge, ModelRef, DisplayNode, DisplayEdge } from '@/lib/contextual-graph/display';
 
@@ -94,19 +93,26 @@ export default function ContextManagerPage() {
   const [templateRoles, setTemplateRoles] = useState<{ value: string; label: string; derivation_scope: string }[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
 
+  const roleScopeMap = useMemo(() => {
+    return Object.fromEntries(
+      templateRoles.map((r) => [r.value, (r.derivation_scope || '').toUpperCase()])
+    );
+  }, [templateRoles]);
+
+  const roleLabelMap = useMemo(() => {
+    return Object.fromEntries(
+      templateRoles.map((r) => [r.value, r.label || ''])
+    );
+  }, [templateRoles]);
+
   useEffect(() => {
     if (!selectedServer) return;
     let cancelled = false;
     setLoadingRoles(true);
-    mentalModelsApi.listTemplateRoles({ available: true })
+    mentalModelsApi.listTemplateRoles()
       .then((roles) => {
         if (cancelled) return;
         setTemplateRoles(roles || []);
-        setRoleScopeMap(
-          Object.fromEntries(
-            (roles || []).map((r) => [r.value, (r.derivation_scope || '').toUpperCase()])
-          )
-        );
       })
       .catch((err) => {
         if (cancelled) return;
@@ -272,7 +278,7 @@ export default function ContextManagerPage() {
     const isMentalModelEdge = (e: DisplayEdge) =>
       e.id.startsWith('hindsight-') ||
       e.properties.provenance?.source === 'hindsight' ||
-      e.modelRefs.some((r) => r.role === 'sys_edge_context');
+      e.modelRefs.some((r) => r.role && (roleScopeMap[r.role] === 'EDGE' || r.role === 'sys_edge_context'));
 
     const rows: Array<{
       edge: DisplayEdge;
@@ -470,8 +476,8 @@ export default function ContextManagerPage() {
           ) : (
             <div className="space-y-2">
                   {modelRefs.map((ref, i) => {
-                    const roleLabel = getRoleLabel(ref.role);
-                    const scopeLabel = getRoleScopeLabel(ref.role);
+                    const roleLabel = getRoleLabel(ref.role, roleLabelMap);
+                    const scopeLabel = getRoleScopeLabel(ref.role, roleScopeMap);
                     return (
                       <div key={`${ref.ext_id ?? ref.role ?? 'ref'}-${i}`} className="rounded border border-border-subtle bg-overlay p-2 space-y-1">
                         <div className="flex items-center gap-2">

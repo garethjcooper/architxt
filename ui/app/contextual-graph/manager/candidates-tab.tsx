@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Search } from 'lucide-react';
-import { formatRelative, getLastRefreshedAt, getRoleScopeLabel, isCandidateNode, isCandidateEdge } from '@/lib/contextual-graph/display';
+import { formatRelative, getLastRefreshedAt, getRoleScopeLabel, isCandidateNode, isCandidateEdge, loadRoleScopeMap, type RoleScopeMaps } from '@/lib/contextual-graph/display';
 import type { DisplayNode, DisplayEdge } from './page';
 
 export interface CandidatesTabProps {
@@ -34,6 +34,13 @@ export function CandidatesTab({
 }: CandidatesTabProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<CandidateFilter>('all');
+  const [roleMaps, setRoleMaps] = useState<RoleScopeMaps>({ roleScopeMap: {}, roleLabelMap: {} });
+
+  useEffect(() => {
+    loadRoleScopeMap().then(setRoleMaps).catch(() => {
+      // ignore; helpers fall back to role-id formatting
+    });
+  }, []);
 
   const discoveredNodes = useMemo(
     () => nodes.filter((n) => isCandidateNode(n)).sort((a, b) => a.label.localeCompare(b.label)),
@@ -147,7 +154,7 @@ export function CandidatesTab({
                           <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {node.modelRefs.map((ref, i) => (
                               <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
-                                {getRoleScopeLabel(ref.role)}
+                                {getRoleScopeLabel(ref.role, roleMaps.roleScopeMap)}
                               </Badge>
                             ))}
                           </div>
@@ -206,7 +213,7 @@ export function CandidatesTab({
                           <div className="flex items-center gap-1 flex-wrap mt-0.5">
                             {edge.modelRefs.map((ref, i) => (
                               <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
-                                {getRoleScopeLabel(ref.role)}
+                                {getRoleScopeLabel(ref.role, roleMaps.roleScopeMap)}
                               </Badge>
                             ))}
                           </div>

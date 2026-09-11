@@ -91,9 +91,13 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   const resizeStartWidthRef = useRef(45);
   const containerWidthRef = useRef(0);
   const [roleScopeMap, setRoleScopeMap] = useState<Record<string, string>>({});
+  const [roleLabelMap, setRoleLabelMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    loadRoleScopeMap().then(setRoleScopeMap);
+    loadRoleScopeMap().then(({ roleScopeMap: scopeMap, roleLabelMap: labelMap }) => {
+      setRoleScopeMap(scopeMap);
+      setRoleLabelMap(labelMap);
+    });
   }, []);
 
   const refs = useMemo(() => {
@@ -128,8 +132,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     return refs.filter((r) => {
       const id = (r.ext_id || '').toLowerCase();
       const role = (r.role || '').toLowerCase();
-      const roleLabel = getRoleLabel(r.role).toLowerCase();
-      const scopeLabel = getRoleScopeLabel(r.role).toLowerCase();
+      const roleLabel = getRoleLabel(r.role, roleLabelMap).toLowerCase();
+      const scopeLabel = getRoleScopeLabel(r.role, roleScopeMap).toLowerCase();
       return id.includes(q) || role.includes(q) || roleLabel.includes(q) || scopeLabel.includes(q);
     });
   }, [refs, search]);
@@ -531,15 +535,16 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRefs.map((ref) => {
-                    const extId = ref.ext_id || '';
-                    const roleLabel = getRoleLabel(ref.role);
-                    const scopeBadge = getDerivationScope(ref.role, ref.scope);
-                    const scopeDetail = getScopeLabel(ref, nodes, edges);
-                    const op = getOperationForRow(extId);
-                    const isRefreshing = Boolean(op) || refreshingIds.has(extId);
-                    const isRowSelected = selectedExtId === extId;
-                    return (
+                  <>
+                    {filteredRefs.map((ref) => {
+                      const extId = ref.ext_id || '';
+                      const roleLabel = getRoleLabel(ref.role, roleLabelMap);
+                      const scopeBadge = getDerivationScope(ref.role, ref.scope, roleScopeMap);
+                      const scopeDetail = getScopeLabel(ref, nodes, edges);
+                      const op = getOperationForRow(extId);
+                      const isRefreshing = Boolean(op) || refreshingIds.has(extId);
+                      const isRowSelected = selectedExtId === extId;
+                      return (
                       <TableRow
                         key={extId || `${ref.role}-${Math.random()}`}
                         onClick={() => handleSelectRow(ref)}
@@ -623,8 +628,9 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           </div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })
+                      );
+                    })}
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -646,7 +652,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
           style={{ width: `${panelWidth}%` }}
         >
           <EnvelopeControls
-            headerTitle={selectedRef ? getRoleLabel(selectedRef.role) : 'Content'}
+            headerTitle={selectedRef ? getRoleLabel(selectedRef.role, roleLabelMap) : 'Content'}
             plain={plainView}
             onPlainChange={setPlainView}
             onCopyText={copyContent}
