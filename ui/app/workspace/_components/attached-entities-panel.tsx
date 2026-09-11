@@ -137,7 +137,7 @@ function getEntityModelItems(
       roleLabel: firstRefRole ? getRoleLabel(firstRefRole, labelMap) : undefined,
       title,
       extId,
-      edgeCount: contexts.length,
+      edgeCount: new Set(contexts.map((c) => c.edge_id)).size,
     });
   });
 
