@@ -395,6 +395,7 @@ export function deriveMentalModels(template, context = {}, { includeSystemTempla
     max_tokens: normaliseMaxTokens(template.max_tokens),
     tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
     is_template: template.is_template,
+    template_role: template.template_role || null,
     tags: template.tags || [],
     entities: entities,
     created_at: template.created_at,

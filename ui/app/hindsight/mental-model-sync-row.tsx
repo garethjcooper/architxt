@@ -61,7 +61,7 @@ function MentalModelDivergenceBadges({
   return (
     <div className="flex flex-wrap gap-1 mt-1">
       {allFields.map((f) => {
-        const differs = (divergence as any)[f.key];
+        const differs = (divergence as unknown as Record<string, boolean>)[f.key];
         const color = differs
           ? f.pullable
             ? 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
@@ -117,7 +117,7 @@ export default function MentalModelSyncRow({
                   contextual
                 </span>
               )}
-              {arch?.is_derived && (
+              {arch?.is_derived && !arch?.is_contextual && (
                 <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border bg-badge-info-bg text-badge-info-fg border-badge-info-bd shrink-0" title="Derived from template">
                   derived
                 </span>

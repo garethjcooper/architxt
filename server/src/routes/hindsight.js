@@ -55,6 +55,7 @@ import {
   DEFAULT_TAGS_MATCH_MODE,
   normaliseMaxTokens,
 } from '../db/crud/mental-models.js';
+import { isContextualGraphRole } from '../db/crud/template-roles.js';
 import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import { listDirectivesForDiff } from '../db/crud/directives.js';
 import { extractModelRefsFromDb } from '../services/contextual-graph/refresh-patches.js';
@@ -163,6 +164,7 @@ async function composePlainMentalModels(db, rows) {
       tags_match_mode: r.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
       tags: r.mm_tag_names || [],
       is_derived: false,
+      template_role: r.mm_template_role || null,
       response_schema: UNIFIED_RESPONSE_SCHEMA,
     }))
   );
@@ -492,6 +494,7 @@ router.get('/diff', async (req, res) => {
         // The diff/push surface expects these fields on derived rows.
         derivedRows[i].response_schema = UNIFIED_RESPONSE_SCHEMA;
         derivedRows[i].is_derived = true;
+        derivedRows[i].is_contextual = !!derivedRows[i].template_role && isContextualGraphRole(derivedRows[i].template_role);
       }
 
       const composedPlain = await composePlainMentalModels(db, plainRows);
@@ -509,6 +512,8 @@ router.get('/diff', async (req, res) => {
         tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
         tags: r.mm_tag_names || [],
         is_derived: false,
+        template_role: r.mm_template_role || null,
+        is_contextual: !!r.mm_template_role && isContextualGraphRole(r.mm_template_role),
         composed_query: r.composed_query,
         response_schema: UNIFIED_RESPONSE_SCHEMA,
         ...(r.compose_error ? { compose_error: r.compose_error } : {}),
@@ -598,11 +603,13 @@ router.get('/diff', async (req, res) => {
         const arch = plainArch || derivedArch || contextualArch;
 
         if (!hind) {
-          onlyArchitxt.push({
-            ext_id: extId,
-            arch: summaryMode ? { ext_id: extId, is_derived: arch?.is_derived ?? false, is_contextual: !!contextualArch }
-              : arch,
-          });
+          if (!arch.is_contextual) {
+            onlyArchitxt.push({
+              ext_id: extId,
+              arch: summaryMode ? { ext_id: extId, is_derived: arch?.is_derived ?? false, is_contextual: !!arch?.is_contextual }
+                : arch,
+            });
+          }
           continue;
         }
 
@@ -611,7 +618,7 @@ router.get('/diff', async (req, res) => {
           const anyDiffers = Object.values(divergence).some(Boolean);
           const row = {
             ext_id: extId,
-            arch: summaryMode ? { ext_id: extId, is_derived: false } : plainArch,
+            arch: summaryMode ? { ext_id: extId, is_derived: false, is_contextual: !!plainArch?.is_contextual } : plainArch,
             hindsight: summaryMode ? { ext_id: extId } : hind,
             divergence,
           };
@@ -624,7 +631,7 @@ router.get('/diff', async (req, res) => {
           const anyDiffers = Object.values(divergence).some(Boolean);
           const row = {
             ext_id: extId,
-            arch: summaryMode ? { ext_id: extId, is_derived: true } : derivedArch,
+            arch: summaryMode ? { ext_id: extId, is_derived: true, is_contextual: !!derivedArch?.is_contextual } : derivedArch,
             hindsight: summaryMode ? { ext_id: extId } : hind,
             divergence,
           };
