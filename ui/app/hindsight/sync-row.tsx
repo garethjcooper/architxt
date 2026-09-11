@@ -17,6 +17,7 @@ const statusBadgeClass: Record<string, string> = {
   ready_to_extract:      familyClass.info,
   processing_extract:    familyClass.caution,
   request_release:       familyClass.caution,
+  processed_extract_success: familyClass.success,
   processed_extract_failed:  familyClass.danger,
   publishing:            familyClass.caution,
   published:             familyClass.success,
@@ -27,6 +28,7 @@ const statusLabel: Record<string, string> = {
   ready_to_extract: 'ready',
   processing_extract: 'extracting',
   request_release: 'releasing',
+  processed_extract_success: 'extracted',
   processed_extract_failed: 'failed',
   publishing: 'publishing',
   published: 'published',
@@ -108,7 +110,7 @@ export default function SyncRow({
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono text-foreground-faint truncate" title={ext_id}>{ext_id}</span>
             <div className="flex items-center gap-1.5 shrink-0">
-              {archStatus && (
+              {archStatus && archStatus !== 'processed_extract_success' && (
                 <span className={getStatusBadge(archStatus).className}>
                   {getStatusBadge(archStatus).label}
                 </span>
