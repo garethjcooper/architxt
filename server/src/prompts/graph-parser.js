@@ -84,6 +84,9 @@ export function normalizeEdge(e) {
   if (!from || !to || !type) return null;
   const label = typeof e.label === 'string' && e.label.length > 0 ? e.label : undefined;
   const detail = typeof e.detail === 'string' && e.detail.length > 0 ? e.detail : undefined;
+  const properties = e.properties && typeof e.properties === 'object' && !Array.isArray(e.properties)
+    ? e.properties
+    : undefined;
   const source_fact_ids = Array.isArray(e.source_fact_ids) ? e.source_fact_ids : undefined;
   const edge = {
     from,
@@ -91,6 +94,7 @@ export function normalizeEdge(e) {
     type,
     label,
     detail,
+    properties,
     source_fact_ids,
   };
   edge.id = `${from}|${to}|${type}|${label || ''}|${edgeHash(edge)}`;
@@ -101,7 +105,7 @@ export function normalizeEdge(e) {
  * Recursively walk a parsed object/string and return the first graph-shaped
  * payload found. This is a defensive, low-level helper for callers that may
  * receive wrapped objects (e.g. `{ answer: "..." }`) rather than the standard
- * `## ARCHITXT-GRAPH-DATA` text. Heading-aware extraction should use
+ * contextual JSON envelope. Envelope-aware extraction should use
  * `parse-graph-response.js` instead.
  *
  * @param {string|object|null} content

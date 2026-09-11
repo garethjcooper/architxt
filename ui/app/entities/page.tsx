@@ -38,14 +38,12 @@ import { CreateEntityTypeDialog } from '@/components/create-entity-type-dialog';
 import { ViewEntityDialog } from '@/components/view-entity-dialog';
 import { ViewEntityTypeDialog } from '@/components/view-entity-type-dialog';
 import { ImportDialog, parseEntityImport } from '@/components/import-dialog';
-import { colorForType } from '@/components/research-canvas';
 import { ManageEntityConfigDialog } from '@/components/manage-entity-config-dialog';
 import { EntityDocumentsDialog } from '@/components/entity-documents-dialog';
-import { BadgeExpandIcon } from '@/components/icons/badge-expand-icon';
-import { BadgeCompactIcon } from '@/components/icons/badge-compact-icon';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
-import { checkEntityIdConformity, formatEntityIdPattern } from '@/lib/entity-id-pattern';
+import { formatEntityIdPattern } from '@/lib/entity-id-pattern';
+import { familyClass } from '@/lib/status-badge';
 
 const logger = createLogger('EntitiesPage');
 
@@ -81,8 +79,6 @@ export default function EntitiesPage() {
 
   /* ── Freeze panes state ── */
   const [freeze, setFreeze] = useState(false);
-  const [compactBadges, setCompactBadges] = useState(false);
-  const [showAllBadges, setShowAllBadges] = useState(false);
 
   /* ── Entity Types tab state ── */
   const [createTypeOpen, setCreateTypeOpen] = useState(false);
@@ -268,7 +264,7 @@ export default function EntitiesPage() {
                 const v = e.target.value;
                 setEntityTypeFilter(v === 'all' ? 'all' : Number(v));
               }}
-              className="h-8 rounded-md border border-white/10 bg-[oklch(0.23_0_0)] px-2.5 text-sm text-white/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
             >
               <option value="all">All Types</option>
               {entityTypes.map((t) => (
@@ -278,17 +274,17 @@ export default function EntitiesPage() {
 
             {/* Search */}
             <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
               <Input
                 value={entitySearch}
                 onChange={(e) => setEntitySearch(e.target.value)}
                 placeholder="Search name, id, aliases, type…"
-                className="h-8 pl-7 pr-7 text-xs rounded-full bg-white/5 border-2 border-white/10 text-white placeholder:text-white/30 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                className="h-8 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
               />
               {entitySearch && (
                 <button
                   onClick={() => setEntitySearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -298,7 +294,7 @@ export default function EntitiesPage() {
             <Button
               onClick={() => setManageConfigDialogOpen(true)}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-border-strong text-foreground-muted hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Settings2 className="h-3.5 w-3.5" />Config
             </Button>
@@ -306,27 +302,27 @@ export default function EntitiesPage() {
             <Button
               onClick={() => setEntityDocumentsOpen(true)}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/20 text-white/80 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-border-strong text-foreground-muted hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText className="h-3.5 w-3.5" />Documents
             </Button>
 
             <div className="flex-1" />
-            <div className="w-px h-5 bg-white/10 mx-1" />
+            <div className="w-px h-5 bg-surface-panel mx-1" />
 
-            <Button onClick={() => setImportOpen(true)} title="Import" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><Download className="h-3.5 w-3.5" /></Button>
-            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+            <Button onClick={() => setImportOpen(true)} title="Import" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><Download className="h-3.5 w-3.5" /></Button>
+            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
             <Button
               onClick={openDeleteEntities}
               disabled={entityMulti.selected.size === 0}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => setCreateEntityOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
               title="Add"
             >
               <Plus className="h-4 w-4" />
@@ -335,35 +331,21 @@ export default function EntitiesPage() {
 
           {/* Table card */}
           <div className={[
-            "rounded-md bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden",
+            "rounded-md bg-surface-card border border-on-dark/[0.08] flex flex-col flex-1 min-h-0 overflow-hidden",
             !freeze ? "max-h-[calc(100vh-240px)]" : "",
           ].filter(Boolean).join(" ")}>
             {/* Header bar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-emerald-900/20 border-b border-emerald-500/30 shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
               <div className="flex-1" />
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setShowAllBadges(!showAllBadges)}
-                  title={showAllBadges ? 'Limit to 3 badges' : 'Show all badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", showAllBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
-                >
-                  <BadgeExpandIcon className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => setCompactBadges(!compactBadges)}
-                  title={compactBadges ? 'Expand badges' : 'Compact badges'}
-                  className={["inline-flex items-center justify-center h-6 rounded-md transition-colors px-1", compactBadges ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
-                >
-                  <BadgeCompactIcon className="h-5 w-5" />
-                </button>
-                <button
                   onClick={() => setFreeze(!freeze)}
                   title={!freeze ? 'Unfreeze panes' : 'Freeze panes'}
-                  className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "text-white/40 hover:text-white/70 border border-transparent"].join(" ")}
+                  className={["inline-flex items-center justify-center h-6 w-6 rounded transition-colors", !freeze ? "bg-accent-secondary-bg text-accent-secondary-fg border border-accent-secondary-bd" : "text-foreground-subtle hover:text-foreground-faint border border-transparent"].join(" ")}
                 >
                   <TableIcon className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-xs font-mono text-emerald-400 bg-black/30 border border-emerald-500/30 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-accent-secondary-fg bg-surface-inset border border-accent-secondary-bd px-2 py-0.5 rounded">
                   {filteredEntities.length} ({entityMulti.selected.size})
                 </span>
               </div>
@@ -373,86 +355,64 @@ export default function EntitiesPage() {
               {displayEntities.length === 0 && !loading ? (
                 <div className="text-center py-12">
                   <Box className="h-8 w-8 opacity-30 mx-auto mb-3" />
-                  <p className="text-white/50 text-sm">No entities found.</p>
+                  <p className="text-foreground-subtle text-sm">No entities found.</p>
                 </div>
               ) : (
                 <table className="w-full caption-bottom text-sm">
                   <TableHeader>
-                    <TableRow className="border-b border-white/10">
-                      <TableHead className={["w-12 py-2 px-4", !freeze && "sticky top-0 left-0 z-30 bg-[oklch(0.23_0_0)] border-r border-white/5"].filter(Boolean).join(" ")}>
+                    <TableRow className="border-b border-border-default">
+                      <TableHead className={["w-12 py-2 px-4", !freeze && "sticky top-0 left-0 z-30 bg-surface-card border-r border-border-subtle"].filter(Boolean).join(" ")}>
                         <Checkbox
                           checked={entityMultiAll}
                           onCheckedChange={toggleEntityMultiAll}
                         />
                       </TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Entity ID</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Pattern</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Name</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Type</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Case</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Boundary</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Documents</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Aliases</TableHead>
-                      <TableHead className={["text-xs uppercase text-white/60 font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-[oklch(0.23_0_0)]"].filter(Boolean).join(" ")}>Created</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Entity ID</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-20", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Pattern</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Name</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Type</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Case</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-16", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Boundary</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Documents</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Aliases</TableHead>
+                      <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {displayEntities.map((item) => (
                       <TableRow
                         key={item.id}
-                        className={`border-b border-white/5 transition-colors cursor-pointer ${
-                          entityMulti.selected.has(item.id) ? 'bg-emerald-900/20' : 'hover:bg-white/5'
+                        className={`border-b border-border-subtle transition-colors cursor-pointer ${
+                          entityMulti.selected.has(item.id) ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
                         }`}
                         onClick={() => handleEntityClick(item)}
                       >
-                        <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-white/5 ${entityMulti.selected.has(item.id) ? 'bg-emerald-900/20' : 'bg-[oklch(0.23_0_0)]'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
+                        <TableCell className={["py-1.5 px-4", !freeze && `sticky left-0 z-10 border-r border-border-subtle ${entityMulti.selected.has(item.id) ? 'bg-accent-primary-bg' : 'bg-surface-card'}`].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={entityMulti.selected.has(item.id)}
                             onCheckedChange={() => entityMulti.toggleSelection(item.id)}
                           />
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs text-white/50 font-mono">{item.entity_id}</TableCell>
-                        <TableCell className="py-1.5 px-4">
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-subtle font-mono">{item.entity_id}</TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs font-mono text-foreground-faint">
                           {(() => {
                             const type = entityTypes.find((t) => t.id === item.type_id);
                             if (!type?.uses_entity_id_pattern) {
-                              return <span className="text-white/20 text-[10px]">-</span>;
+                              return <span className="text-foreground-placeholder text-[10px]">-</span>;
                             }
-                            const result = checkEntityIdConformity(item.entity_id, type);
-                            const patternLabel = formatEntityIdPattern(type);
-                            return (
-                              <span
-                                title={result.message || (result.conforms ? 'Conforms to entity type pattern' : 'Does not conform to entity type pattern')}
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono font-medium border ${
-                                  result.conforms
-                                    ? 'bg-emerald-800/20 text-emerald-400 border-emerald-500/30'
-                                    : 'bg-orange-800/20 text-orange-400 border-orange-500/30'
-                                }`}
-                              >
-                                {patternLabel}
-                              </span>
-                            );
+                            return <span title={formatEntityIdPattern(type)}>{formatEntityIdPattern(type)}</span>;
                           })()}
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs font-medium text-white/80">{item.name}</TableCell>
                         <TableCell className="py-1.5 px-4">
-                          {(() => {
-                            const typeName = entityTypeName(item.type_id);
-                            const typeColor = colorForType(typeName);
-                            return (
-                              <span
-                                title={typeName}
-                                className="inline-flex px-2.5 py-1 rounded-full text-[10px] border transition-colors"
-                                style={{
-                                  color: typeColor,
-                                  backgroundColor: `${typeColor}1A`,
-                                  borderColor: `${typeColor}33`,
-                                }}
-                              >
-                                {typeName}
-                              </span>
-                            );
-                          })()}
+                          <span
+                            className={`${familyClass.entity} text-[10px]`}
+                            title={item.name}
+                          >
+                            {item.name}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {entityTypeName(item.type_id)}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {(() => {
@@ -465,9 +425,9 @@ export default function EntitiesPage() {
                                 title={differs ? `Entity override — entity type: case-${typeValue}` : `Case-${isSensitive ? 'sensitive' : 'insensitive'} match`}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   isSensitive
-                                    ? 'bg-amber-800/15 text-amber-400 border-amber-700/20'
-                                    : 'bg-white/5 text-white/40 border-white/10'
-                                } ${differs ? 'ring-1 ring-amber-400/40' : ''}`}
+                                    ? 'bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd'
+                                    : 'bg-surface-card text-foreground-subtle border-border-default'
+                                } ${differs ? 'ring-1 ring-accent-secondary-fg/40' : ''}`}
                               >
                                 {isSensitive ? 'Aa' : 'aa'}
                               </span>
@@ -486,9 +446,9 @@ export default function EntitiesPage() {
                                 title={differs ? `Entity override — entity type: ${typeLabel}` : `${hasBoundaries ? 'Whole-word' : 'No boundaries'} match`}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   !hasBoundaries
-                                    ? 'bg-rose-800/15 text-rose-400 border-rose-700/20'
-                                    : 'bg-white/5 text-white/40 border-white/10'
-                                } ${differs ? 'ring-1 ring-amber-400/40' : ''}`}
+                                    ? 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
+                                    : 'bg-surface-card text-foreground-subtle border-border-default'
+                                } ${differs ? 'ring-1 ring-diff-differ-fg/40' : ''}`}
                               >
                                 {hasBoundaries ? '∂' : '∞'}
                               </span>
@@ -497,48 +457,33 @@ export default function EntitiesPage() {
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {item.usage_count ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-400/20 text-blue-300 border border-blue-400/30">
+                            <span className="text-foreground-faint text-[10px]">
                               {item.usage_count} document{item.usage_count !== 1 ? 's' : ''}
                             </span>
                           ) : (
-                            <span className="text-white/20 text-[10px]">-</span>
+                            <span className="text-foreground-placeholder text-[10px]">-</span>
                           )}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {item.aliases.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {(showAllBadges ? item.aliases : item.aliases.slice(0, 3))?.map((a, i) => {
-                                const isHit = entitySearch.trim() && a.toLowerCase().includes(entitySearch.toLowerCase());
-                                return (
-                                  <span
-                                    key={i}
-                                    className={`${!compactBadges ? 'inline-flex truncate max-w-[120px]' : 'inline-block whitespace-normal break-words max-w-[200px]'} px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
-                                      isHit
-                                        ? 'bg-purple-800/30 text-purple-200 border-purple-700/40 ring-1 ring-purple-400/40'
-                                        : 'bg-purple-800/15 text-purple-400 border-purple-700/20'
-                                    }`}
-                                  >
-                                    {a}
-                                  </span>
-                                );
-                              })}
-                              {!showAllBadges && item.aliases.length > 3 && (
+                            (() => {
+                              const full = item.aliases.join(', ');
+                              const isHit = entitySearch.trim() && item.aliases.some((a) => a.toLowerCase().includes(entitySearch.toLowerCase()));
+                              const truncated = full.length > 50 ? full.slice(0, 50).replace(/,\s*[^,]*$/, '') + '…' : full;
+                              return (
                                 <span
-                                  className={`text-[10px] px-1 rounded ${
-                                    entitySearch.trim() && item.aliases.slice(3).some((a) => a.toLowerCase().includes(entitySearch.toLowerCase()))
-                                      ? 'text-purple-300 bg-purple-400/15'
-                                      : 'text-white/30'
-                                  }`}
+                                  title={full}
+                                  className={`text-[10px] ${isHit ? 'text-badge-entity-fg' : 'text-foreground-faint'}`}
                                 >
-                                  +{item.aliases.length - 3}
+                                  {truncated}
                                 </span>
-                              )}
-                            </div>
+                              );
+                            })()
                           ) : (
-                            <span className="text-white/20 text-[10px]">-</span>
+                            <span className="text-foreground-placeholder text-[10px]">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs text-white/50">
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-subtle">
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </TableCell>
                       </TableRow>
@@ -557,19 +502,19 @@ export default function EntitiesPage() {
           {/* Action bar */}
           <div className="flex items-center gap-2 mb-2 shrink-0">
             <div className="flex-1" />
-            <div className="w-px h-5 bg-white/10 mx-1" />
-            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+            <div className="w-px h-5 bg-surface-panel mx-1" />
+            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
             <Button
               onClick={openDeleteTypes}
               disabled={typeMulti.selected.size === 0}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-red-500/30 text-red-400 hover:bg-[oklch(0.27_0_0)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => setCreateTypeOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-[oklch(0.23_0_0)] border border-white/10 text-white hover:bg-[oklch(0.27_0_0)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
               title="Add"
             >
               <Plus className="h-4 w-4" />
@@ -577,11 +522,11 @@ export default function EntitiesPage() {
           </div>
 
           {/* Table card */}
-          <div className="rounded-md overflow-hidden bg-[oklch(0.23_0_0)] border border-white/[0.08] flex flex-col flex-1 min-h-0">
+          <div className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col flex-1 min-h-0">
             {/* Header bar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-blue-900/20 border-b border-blue-500/30 shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
               <div className="flex-1" />
-              <span className="text-xs font-mono text-blue-400 bg-black/30 border border-blue-500/30 px-2 py-0.5 rounded">
+              <span className="text-xs font-mono text-accent-secondary-fg bg-surface-inset border border-accent-secondary-bd px-2 py-0.5 rounded">
                 {entityTypes.length} ({typeMulti.selected.size})
               </span>
             </div>
@@ -590,33 +535,33 @@ export default function EntitiesPage() {
               {entityTypes.length === 0 && !loading ? (
                 <div className="text-center py-12">
                   <Layers className="h-8 w-8 opacity-30 mx-auto mb-3" />
-                  <p className="text-white/50 text-sm">No entity types found.</p>
-                  <p className="text-white/30 text-xs mt-1">Create a type first, then add entities.</p>
+                  <p className="text-foreground-subtle text-sm">No entity types found.</p>
+                  <p className="text-foreground-placeholder text-xs mt-1">Create a type first, then add entities.</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-white/10">
+                    <TableRow className="border-b border-border-default">
                       <TableHead className="w-12 py-2 px-4">
                         <Checkbox
                           checked={typeMulti.isAllSelected}
                           onCheckedChange={typeMulti.toggleAll}
                         />
                       </TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Type Name</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Description</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-20">Pattern</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16">Case</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left w-16">Boundary</TableHead>
-                      <TableHead className="text-xs uppercase text-white/60 font-medium py-2 px-4 text-left">Created</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Type Name</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Description</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-20">Pattern</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-16">Case</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-16">Boundary</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {entityTypes.map((type) => (
                       <TableRow
                         key={type.id}
-                        className={`border-b border-white/5 transition-colors cursor-pointer ${
-                          typeMulti.selected.has(type.id) ? 'bg-blue-900/20' : 'hover:bg-white/5'
+                        className={`border-b border-border-subtle transition-colors cursor-pointer ${
+                          typeMulti.selected.has(type.id) ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
                         }`}
                         onClick={(e) => handleTypeClick(type, e)}
                       >
@@ -626,11 +571,11 @@ export default function EntitiesPage() {
                             onCheckedChange={() => typeMulti.toggleSelection(type.id)}
                           />
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs font-medium text-white/80">
+                        <TableCell className="py-1.5 px-4 text-xs font-medium text-foreground-muted">
                           {type.type_name}
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs text-white/60">
-                          {type.description || <span className="text-white/20">-</span>}
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {type.description || <span className="text-foreground-placeholder">-</span>}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
                           {type.uses_entity_id_pattern ? (
@@ -641,14 +586,14 @@ export default function EntitiesPage() {
                               return (
                                 <span
                                   title={`${placeholder.length} digit(s)`}
-                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border bg-emerald-800/15 text-emerald-400 border-emerald-700/20"
+                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border bg-accent-primary-bg text-accent-primary-fg border-accent-primary-bd"
                                 >
                                   {type.id_format_prefix || ''}{sep}{placeholder}
                                 </span>
                               );
                             })()
                           ) : (
-                            <span className="text-white/20 text-xs">-</span>
+                            <span className="text-foreground-placeholder text-xs">-</span>
                           )}
                         </TableCell>
                         <TableCell className="py-1.5 px-4">
@@ -659,8 +604,8 @@ export default function EntitiesPage() {
                                 title={isSensitive ? 'Case-sensitive match (default for entities of this type)' : 'Case-insensitive match (default for entities of this type)'}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   isSensitive
-                                    ? 'bg-amber-800/15 text-amber-400 border-amber-700/20'
-                                    : 'bg-white/5 text-white/20 border-white/5'
+                                    ? 'bg-accent-secondary-bg text-accent-secondary-fg border-accent-secondary-bd'
+                                    : 'bg-surface-card text-foreground-placeholder border-border-subtle'
                                 }`}
                               >
                                 {isSensitive ? 'Aa' : 'aa'}
@@ -676,8 +621,8 @@ export default function EntitiesPage() {
                                 title={hasBoundaries ? 'Respects word boundaries (default)' : 'Substring match'}
                                 className={`inline-flex items-center justify-center px-2.5 py-1 rounded text-[10px] font-mono font-medium border ${
                                   hasBoundaries
-                                    ? 'bg-white/5 text-white/20 border-white/5'
-                                    : 'bg-rose-800/15 text-rose-400 border-rose-700/20'
+                                    ? 'bg-surface-card text-foreground-placeholder border-border-subtle'
+                                    : 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
                                 }`}
                               >
                                 {hasBoundaries ? '∂' : '∞'}
@@ -685,7 +630,7 @@ export default function EntitiesPage() {
                             );
                           })()}
                         </TableCell>
-                        <TableCell className="py-1.5 px-4 text-xs text-white/50">
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-subtle">
                           {formatDistanceToNow(new Date(type.created_at), { addSuffix: true })}
                         </TableCell>
                       </TableRow>

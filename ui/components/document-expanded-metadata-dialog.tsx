@@ -49,11 +49,11 @@ export function DocumentExpandedMetadataDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!w-[600px] !max-w-none max-h-[70vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
-            <ArchitxtIcon className="h-5 w-5 text-white/70" />
+          <DialogTitle className="text-lg font-semibold text-foreground-default flex items-center gap-2">
+            <ArchitxtIcon className="h-5 w-5 text-foreground-faint" />
             Document Metadata
           </DialogTitle>
-          <p className="text-xs text-white/40 mt-1">
+          <p className="text-xs text-foreground-subtle mt-1">
             Metadata tags associated with this document
           </p>
         </DialogHeader>
@@ -61,11 +61,11 @@ export function DocumentExpandedMetadataDialog({
         <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 mt-2">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 text-white/40 animate-spin" />
-              <span className="ml-2 text-sm text-white/40">Loading metadata...</span>
+              <Loader2 className="h-5 w-5 text-foreground-subtle animate-spin" />
+              <span className="ml-2 text-sm text-foreground-subtle">Loading metadata...</span>
             </div>
           ) : metadata.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-white/40">
+            <div className="flex flex-col items-center justify-center py-12 text-foreground-subtle">
               <FileText className="h-8 w-8 mb-2 opacity-50" />
               <p className="text-sm">No metadata available</p>
             </div>
@@ -76,35 +76,35 @@ export function DocumentExpandedMetadataDialog({
                   key={m.id}
                   className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
                     m.expanded
-                      ? 'bg-amber-900/10 border-amber-500/20'
-                      : 'bg-white/[0.03] border-white/10'
+                      ? 'bg-badge-caution-bg/50 border-badge-caution-bd/50'
+                      : 'bg-on-dark/[0.03] border-border-default'
                   }`}
                 >
                   {/* Key */}
-                  <span className="text-xs font-mono text-white/60 shrink-0 w-40 truncate">
+                  <span className="text-xs font-mono text-foreground-faint shrink-0 w-40 truncate">
                     {m.key}
                   </span>
 
                   {/* Value */}
-                  <span className="text-xs text-white/80 flex-1 min-w-0 truncate">
+                  <span className="text-xs text-foreground-muted flex-1 min-w-0 truncate">
                     {m.value ?? '-'}
                   </span>
 
                   {/* Badges */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {m.expanded && (
-                      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/20 text-[10px] px-1.5 py-0">
+                      <Badge className="bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd/50 text-[10px] px-1.5 py-0">
                         <Sparkles className="h-3 w-3 mr-1" />
                         Computed
                       </Badge>
                     )}
                     {m.generated_by === 'user' && (
-                      <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/20 text-[10px] px-1.5 py-0">
+                      <Badge className="bg-badge-info-bg text-badge-info-fg border-badge-info-bd/50 text-[10px] px-1.5 py-0">
                         User
                       </Badge>
                     )}
                     {m.generated_by === 'import' && (
-                      <Badge className="bg-purple-500/15 text-purple-400 border-purple-500/20 text-[10px] px-1.5 py-0">
+                      <Badge className="bg-badge-entity-bg text-badge-entity-fg border-badge-entity-bd/50 text-[10px] px-1.5 py-0">
                         Import
                       </Badge>
                     )}
@@ -115,11 +115,11 @@ export function DocumentExpandedMetadataDialog({
           )}
         </div>
 
-        <div className="flex justify-end pt-3 border-t border-white/10">
+        <div className="flex justify-end pt-3 border-t border-border-default">
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-white/70 hover:text-white hover:bg-white/5"
+            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
           >
             Close
           </Button>

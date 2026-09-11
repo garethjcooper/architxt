@@ -38,8 +38,8 @@ export function ConfirmDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             {variant === 'destructive' && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-900/30">
-                <AlertTriangle className="h-5 w-5 text-red-400" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive-bg">
+                <AlertTriangle className="h-5 w-5 text-destructive-fg" />
               </div>
             )}
             <div>
@@ -54,7 +54,7 @@ export function ConfirmDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+            className="border-border-strong text-foreground-default hover:bg-surface-panel hover:text-foreground-default"
           >
             {cancelLabel}
           </Button>
@@ -64,9 +64,9 @@ export function ConfirmDialog({
               onOpenChange(false);
             }}
             className={
-              variant === 'destructive'
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+             variant === 'destructive'
+               ? 'bg-destructive-fg text-foreground-default hover:bg-destructive-fg/80'
+               : 'bg-accent-primary-solid text-foreground-default hover:bg-accent-primary-solid-hover'
             }
           >
             {confirmLabel}

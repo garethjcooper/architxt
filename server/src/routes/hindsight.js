@@ -11,14 +11,18 @@ import {
   deleteBank,
 } from '../services/hindsight/index.js';
 import { pushEntities, pushEntityTypes, pullEntities, pullEntityTypes } from '../services/hindsight/entities.js';
-import { listAllMentalModels as hindsightListAllMentalModels } from '../services/hindsight/mental-models.js';
-import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
+import {
+  listAllMentalModels as hindsightListAllMentalModels,
+  deleteMentalModel,
+} from '../services/hindsight/mental-models.js';
 import { listDirectives as hindsightListDirectives } from '../services/hindsight/directives.js';
 import { pushDirective as pushHindsightDirective } from '../services/hindsight/push-directive.js';
 import { pullDirective as pullHindsightDirective } from '../services/hindsight/pull-directive.js';
 import { pushMentalModel, createMentalModel } from '../services/hindsight/push-mental-model.js';
 import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import { getBankConfig } from '../services/hindsight/bank-config.js';
+import { buildMentalModelDivergence } from '../services/mental-model-divergence.js';
+import { UNIFIED_RESPONSE_SCHEMA } from '../services/contextual-graph/unified-response-schema.js';
 import { db } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
 import { getExpandedDocumentMetadata } from '../db/crud/document-metadata.js';
@@ -42,8 +46,21 @@ import {
 import { getDocumentsForDiff, getDocumentByExtId, getAllDocumentContexts } from '../db/crud/documents.js';
 import { getAllDocumentTags, getDocumentTagsByDocId } from '../db/crud/document-tags.js';
 import { getContextDescriptionById } from '../db/crud/contexts.js';
-import { listMentalModelsForDiff, DEFAULT_MAX_TOKENS, DEFAULT_REFRESH_MODE, DEFAULT_TAGS_MATCH_MODE, normaliseMaxTokens } from '../db/crud/mental-models.js';
+import {
+  listMentalModelsForDiff,
+  deriveMentalModels,
+  composeDerivedMentalModels,
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_REFRESH_MODE,
+  DEFAULT_TAGS_MATCH_MODE,
+  normaliseMaxTokens,
+} from '../db/crud/mental-models.js';
+import { composeMentalModelPromptBatch } from '../prompts/template-service.js';
 import { listDirectivesForDiff } from '../db/crud/directives.js';
+import { extractModelRefsFromDb } from '../services/contextual-graph/refresh-patches.js';
+import { deriveSpecsForRefs } from '../services/contextual-graph/specs.js';
+import { getManagedBanks } from '../services/contextual-graph/server-bank-config.js';
+import { getServer } from '../db/crud/servers.js';
 
 const logger = createLogger('hindsight-route');
 const router = Router();
@@ -82,90 +99,80 @@ function arraySetEqual(a, b) {
   return a.every((x) => setB.has(x));
 }
 
-function buildMentalModelDivergence(arch, hind) {
-  const nameDiffers = arch.name !== (hind.name ?? null);
-  const sourceQueryDiffers = arch.composed_query !== (hind.source_query ?? null);
-  const maxTokensDiffers = Number(arch.max_tokens) !== Number(hind.max_tokens);
-  const refreshModeDiffers = arch.refresh_mode !== hind.refresh_mode;
-  const refreshAfterConsolidationDiffers = !!arch.refresh_after_consolidation !== !!hind.refresh_after_consolidation;
-  const excludeAllDiffers = !!arch.exclude_all_mental_models !== !!hind.exclude_all_mental_models;
-  const excludeListDiffers = !arraySetEqual(
-    normalizeCsv(arch.exclude_mental_model_list),
-    hind.exclude_mental_model_ids || []
+const normaliseBool = (value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    return value.trim().toLowerCase() === 'true';
+  }
+  return false;
+};
+
+const toApiMentalModelForDiff = (dbRow) => ({
+  id: dbRow.mm_id,
+  ext_id: dbRow.mm_ext_id,
+  name: dbRow.mm_name,
+  source_query: dbRow.mm_source_query,
+  refresh_after_consolidation: normaliseBool(dbRow.mm_refresh_after_consolidation),
+  refresh_mode: dbRow.mm_refresh_mode,
+  exclude_all_mental_models: normaliseBool(dbRow.mm_exclude_all_mental_models),
+  exclude_mental_model_list: dbRow.mm_exclude_mental_model_list,
+  max_tokens: dbRow.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+  tags_match_mode: dbRow.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
+  is_template: dbRow.mm_is_template === 'true',
+  template_role: dbRow.mm_template_role ?? null,
+  tags: dbRow.mm_tag_names || [],
+  entities: (dbRow.mm_entities || []).map((e) => ({
+    ...e,
+    overrides: e.overrides
+      ? {
+          refresh_mode: e.overrides.refresh_mode,
+          refresh_after_consolidation:
+            e.overrides.refresh_after_consolidation === null
+              ? null
+              : normaliseBool(e.overrides.refresh_after_consolidation),
+          exclude_all_mental_models:
+            e.overrides.exclude_all_mental_models === null
+              ? null
+              : normaliseBool(e.overrides.exclude_all_mental_models),
+          max_tokens: e.overrides.max_tokens ?? null,
+        }
+      : undefined,
+  })),
+});
+
+/**
+ * Compose a single plain mental model prompt using the generic template.
+ * Used by the Hindsight diff path so plain rows are composed the same way as
+ * derived rows (via the generic prompt template).
+ */
+async function composePlainMentalModels(db, rows) {
+  const composed = await composeDerivedMentalModels(
+    db,
+    rows.map((r) => ({
+      id: r.mm_id,
+      ext_id: r.mm_ext_id,
+      name: r.mm_name,
+      source_query: r.mm_source_query,
+      refresh_after_consolidation: normaliseBool(r.mm_refresh_after_consolidation),
+      refresh_mode: r.mm_refresh_mode,
+      exclude_all_mental_models: normaliseBool(r.mm_exclude_all_mental_models),
+      exclude_mental_model_list: r.mm_exclude_mental_model_list,
+      max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+      tags_match_mode: r.mm_tags_match_mode ?? DEFAULT_TAGS_MATCH_MODE,
+      tags: r.mm_tag_names || [],
+      is_derived: false,
+      response_schema: UNIFIED_RESPONSE_SCHEMA,
+    }))
   );
-  const tagsMatchModeDiffers = arch.tags_match_mode !== hind.tags_match_mode;
-  const tagsDiffers = !arraySetEqual(
-    (arch.tags || []).slice().sort(),
-    (hind.tags || []).slice().sort()
-  );
-
-  return {
-    name_differs: nameDiffers,
-    source_query_differs: sourceQueryDiffers,
-    tags_differs: tagsDiffers,
-    max_tokens_differs: maxTokensDiffers,
-    refresh_mode_differs: refreshModeDiffers,
-    refresh_after_consolidation_differs: refreshAfterConsolidationDiffers,
-    exclude_all_mental_models_differs: excludeAllDiffers,
-    exclude_mental_model_list_differs: excludeListDiffers,
-    tags_match_mode_differs: tagsMatchModeDiffers,
-  };
-}
-
-function substituteDerived(template, entity) {
-  if (!template) return template;
-  return template
-    .replaceAll('{entity-name}', entity.name ?? '')
-    .replaceAll('{entity-id}', entity.entity_id ?? '')
-    .replaceAll('{entity-type}', entity.type_name ?? '');
-}
-
-function deriveMentalModelsForDiff(template) {
-  const entities = template.mm_entities || [];
-  if (!entities.length) return [];
-
-  return entities.map((entity) => {
-    const overrides = entity.overrides || {};
-
-    /**
-     * Mental model entity overrides are stored as TEXT in SQLite with values
-     * 'true' / 'false' / NULL, but defensive parsing also accepts 1/0 and
-     * real booleans in case the UI or future migration writes other forms.
-     */
-    const parseOverrideBool = (v) => {
-      if (v === null || v === undefined) return null;
-      if (typeof v === 'boolean') return v;
-      if (typeof v === 'number') return v === 1;
-      if (typeof v === 'string') {
-        const trimmed = v.trim().toLowerCase();
-        if (trimmed === 'true' || trimmed === '1') return true;
-        if (trimmed === 'false' || trimmed === '0') return false;
-      }
-      logger.warn('Unrecognized mental model entity override boolean value; treating as unset', { value: v, entity });
-      return null;
-    };
-
-    const refreshAfterConsolidation = parseOverrideBool(overrides.refresh_after_consolidation) ?? template.mm_refresh_after_consolidation === 'true';
-    const excludeAll = parseOverrideBool(overrides.exclude_all_mental_models) ?? template.mm_exclude_all_mental_models === 'true';
-
-    return {
-      id: `${template.mm_id}:${entity.id}`,
-      ext_id: substituteDerived(template.mm_ext_id, entity),
-      name: substituteDerived(template.mm_name, entity),
-      source_query: substituteDerived(template.mm_source_query, entity),
-      returns: template.mm_returns,
-      refresh_after_consolidation: refreshAfterConsolidation,
-      refresh_mode: overrides.refresh_mode || template.mm_refresh_mode || DEFAULT_REFRESH_MODE,
-      exclude_all_mental_models: excludeAll,
-      exclude_mental_model_list: template.mm_exclude_mental_model_list,
-      max_tokens: normaliseMaxTokens(overrides.max_tokens) ?? template.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
-      tags_match_mode: template.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
-      tags: template.mm_tag_names || [],
-      is_derived: true,
-      derived_entity: { id: entity.id, mm_id: template.mm_id, entity_id: entity.entity_id, name: entity.name },
-      __rawOverrides: overrides,
-    };
-  });
+  for (let i = 0; i < rows.length; i += 1) {
+    rows[i].composed_query = composed[i].composed_query;
+    if (composed[i].compose_error) {
+      rows[i].compose_error = composed[i].compose_error;
+    }
+  }
+  return rows;
 }
 
 /**
@@ -451,6 +458,7 @@ router.get('/diff', async (req, res) => {
           max_tokens: mm.max_tokens,
           tags_match_mode: mm.trigger?.tags_match || DEFAULT_TAGS_MATCH_MODE,
           tags: Array.isArray(mm.tags) ? mm.tags : [],
+          response_schema: mm.trigger?.response_schema || null,
         });
       }
 
@@ -465,49 +473,46 @@ router.get('/diff', async (req, res) => {
       const templates = archRows.filter((r) => r.mm_is_template === 'true');
       const plainRows = archRows.filter((r) => r.mm_is_template !== 'true');
 
+      // Use the same derivation and composition as the models-page preview.
+      // The shared helpers support all placeholders and compose with the
+      // generic prompt template, so the Hindsight diff sees the same fully
+      // composed prompts as the preview dialog.
       const derivedRows = [];
-      for (const template of templates) {
-        const templateDerived = deriveMentalModelsForDiff(template);
+      for (const dbRow of templates) {
+        const template = toApiMentalModelForDiff(dbRow);
+        const templateDerived = deriveMentalModels(template);
         derivedRows.push(...templateDerived);
       }
-
-      // Compose prompts for plain and derived rows in a single batch.
-      // composeMentalModelPromptBatch builds the entity catalog once and caches
-      // templates/examples, so this is much faster than per-row composition.
-      const allComposeInputs = [
-        ...plainRows.map((r) => ({ returns: r.mm_returns, source_query: r.mm_source_query })),
-        ...derivedRows.map((r) => ({ returns: r.returns, source_query: r.source_query })),
-      ];
-      const allComposed = await composeMentalModelPromptBatch(db, allComposeInputs);
-
-      const plainComposed = allComposed.slice(0, plainRows.length);
-      const derivedComposed = allComposed.slice(plainRows.length);
+      const composedDerived = await composeDerivedMentalModels(db, derivedRows);
       for (let i = 0; i < derivedRows.length; i += 1) {
-        derivedRows[i].composed_query = derivedComposed[i].composed_query;
-        if (derivedComposed[i].compose_error) {
-          derivedRows[i].compose_error = derivedComposed[i].compose_error;
+        derivedRows[i].composed_query = composedDerived[i].composed_query;
+        if (composedDerived[i].compose_error) {
+          derivedRows[i].compose_error = composedDerived[i].compose_error;
         }
+        // The diff/push surface expects these fields on derived rows.
+        derivedRows[i].response_schema = UNIFIED_RESPONSE_SCHEMA;
+        derivedRows[i].is_derived = true;
       }
 
-      const plainCandidates = plainRows.map((r, i) => {
-        const composed = plainComposed[i];
-        return {
-          id: r.mm_id,
-          ext_id: r.mm_ext_id,
-          name: r.mm_name,
-          source_query: r.mm_source_query,
-          refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
-          refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
-          exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
-          exclude_mental_model_list: r.mm_exclude_mental_model_list,
-          max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
-          tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
-          tags: r.mm_tag_names || [],
-          is_derived: false,
-          composed_query: composed.composed_query,
-          ...(composed.compose_error ? { compose_error: composed.compose_error } : {}),
-        };
-      });
+      const composedPlain = await composePlainMentalModels(db, plainRows);
+
+      const plainCandidates = composedPlain.map((r) => ({
+        id: r.mm_id,
+        ext_id: r.mm_ext_id,
+        name: r.mm_name,
+        source_query: r.mm_source_query,
+        refresh_after_consolidation: r.mm_refresh_after_consolidation === 'true',
+        refresh_mode: r.mm_refresh_mode || DEFAULT_REFRESH_MODE,
+        exclude_all_mental_models: r.mm_exclude_all_mental_models === 'true',
+        exclude_mental_model_list: r.mm_exclude_mental_model_list,
+        max_tokens: r.mm_max_tokens ?? DEFAULT_MAX_TOKENS,
+        tags_match_mode: r.mm_tags_match_mode || DEFAULT_TAGS_MATCH_MODE,
+        tags: r.mm_tag_names || [],
+        is_derived: false,
+        composed_query: r.composed_query,
+        response_schema: UNIFIED_RESPONSE_SCHEMA,
+        ...(r.compose_error ? { compose_error: r.compose_error } : {}),
+      }));
 
       // 3. Categorise. Keep plain and derived candidates in separate buckets so a
       // plain model and a derived instance with the same ext_id do not shadow
@@ -534,20 +539,72 @@ router.get('/diff', async (req, res) => {
 
       const allArchExtIds = new Set([...plainByExtId.keys(), ...derivedByExtId.keys()]);
 
+      // 4. Build virtual candidates for any contextual mental models that the
+      // contextual-graph service has provisioned for this server+bank. They are
+      // not stored as plain/template rows, so without this step they appear in
+      // "Only on Hindsight". Mark them so the UI can badge them as contextual.
+      let contextualByExtId = new Map();
+      try {
+        const serverResult = getServer(db, serverId);
+        const managedBanks = serverResult?.success ? getManagedBanks(serverResult.data) : [];
+        const isManagedBank = managedBanks.some((b) => b.bank_id === bankId);
+        if (isManagedBank) {
+          const refsByExtId = extractModelRefsFromDb(db, serverId, bankId);
+          const specs = await deriveSpecsForRefs(db, serverId, bankId, refsByExtId);
+          const composeInputs = specs.map(({ spec }) => ({ role: spec.role, source_query: spec.source_query }));
+          const composedResults = await composeMentalModelPromptBatch(db, composeInputs);
+          for (let i = 0; i < specs.length; i += 1) {
+            const { extId, spec } = specs[i];
+            if (!extId || !spec) continue;
+            const composed = composedResults[i];
+            if (!composed?.composed_query) {
+              logger.warn('Failed to compose contextual mental model prompt for diff', {
+                extId,
+                role: spec.role,
+                error: composed?.compose_error,
+              });
+              continue;
+            }
+            contextualByExtId.set(extId, {
+              ...spec,
+              ext_id: extId,
+              is_derived: false,
+              is_contextual: true,
+              composed_query: composed.composed_query,
+              response_schema: UNIFIED_RESPONSE_SCHEMA,
+            });
+          }
+        }
+      } catch (contextualErr) {
+        logger.warn('Failed to build contextual mental model candidates for diff', {
+          serverId,
+          bankId,
+          error: contextualErr.message,
+        });
+        contextualByExtId = new Map();
+      }
+
+      for (const [extId, candidate] of contextualByExtId) {
+        if (!allArchExtIds.has(extId)) {
+          allArchExtIds.add(extId);
+        }
+      }
+
       for (const extId of allArchExtIds) {
         const hind = hindMap.get(extId);
+        const plainArch = plainByExtId.get(extId);
+        const derivedArch = derivedByExtId.get(extId);
+        const contextualArch = contextualByExtId.get(extId);
+        const arch = plainArch || derivedArch || contextualArch;
 
         if (!hind) {
           onlyArchitxt.push({
             ext_id: extId,
-            arch: summaryMode ? { ext_id: extId, is_derived: plainByExtId.get(extId)?.is_derived ?? false }
-              : (plainByExtId.get(extId) || derivedByExtId.get(extId)),
+            arch: summaryMode ? { ext_id: extId, is_derived: arch?.is_derived ?? false, is_contextual: !!contextualArch }
+              : arch,
           });
           continue;
         }
-
-        const plainArch = plainByExtId.get(extId);
-        const derivedArch = derivedByExtId.get(extId);
 
         if (plainArch) {
           const divergence = buildMentalModelDivergence(plainArch, hind);
@@ -568,6 +625,22 @@ router.get('/diff', async (req, res) => {
           const row = {
             ext_id: extId,
             arch: summaryMode ? { ext_id: extId, is_derived: true } : derivedArch,
+            hindsight: summaryMode ? { ext_id: extId } : hind,
+            divergence,
+          };
+          if (anyDiffers) {
+            different.push(row);
+          } else {
+            same.push(row);
+          }
+        }
+
+        if (contextualArch && !plainArch && !derivedArch) {
+          const divergence = buildMentalModelDivergence(contextualArch, hind);
+          const anyDiffers = Object.values(divergence).some(Boolean);
+          const row = {
+            ext_id: extId,
+            arch: summaryMode ? { ext_id: extId, is_derived: false, is_contextual: true } : contextualArch,
             hindsight: summaryMode ? { ext_id: extId } : hind,
             divergence,
           };
@@ -768,7 +841,7 @@ router.get('/diff', async (req, res) => {
     }
 
     // 2b. Fetch all architxt tags for fast comparison
-    const archResult = await listDocumentsForDiff(db);
+    const archResult = await getDocumentsForDiff(db);
     const tagResult = await getAllDocumentTags(db);
     if (!tagResult.success) {
       return res.status(500).json({ error: tagResult.error, code: tagResult.code });
@@ -1076,12 +1149,18 @@ router.post('/push-mental-model', async (req, res) => {
 
   try {
     const result = create
-      ? await createMentalModel(serverId, bankId, model)
-      : await pushMentalModel(serverId, bankId, model);
+      ? await createMentalModel(serverId, bankId, model, db)
+      : await pushMentalModel(serverId, bankId, model, db);
     if (!result.success) {
       return res.status(502).json({ error: result.error, code: 'PUSH_FAILED' });
     }
-    res.json({ success: true, created: create });
+    res.json({
+      success: true,
+      created: create,
+      operation_id: result.operationId || null,
+      status: result.status || null,
+      pop_id: result.popId || null,
+    });
   } catch (err) {
     logger.error('Push mental model failed', { serverId, bankId, extId: model?.ext_id, error: err.message, stack: err.stack });
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
@@ -1637,95 +1716,227 @@ router.post('/entities/pull', async (req, res) => {
   }
 });
 
-router.post('/banks/:bankId/recall', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/recall:
+ *   post:
+ *     summary: Recall memories from a Hindsight bank
+ *     description: |
+ *       Proxies a recall request to Hindsight. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, query]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *               bank_id:
+ *                 type: string
+ *               query:
+ *                 type: string
+ *               limit:
+ *                 type: integer
+ *               trace:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Recall results
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.post('/recall', async (req, res) => {
   const start = Date.now();
-  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await recall(serverId, bankId, req.body);
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'RECALL_FAILED', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'RECALL_FAILED', logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
   } catch (err) {
     logger.error('Recall route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/recall`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: '/hindsight/recall', duration: Date.now() - start });
   }
 });
 
-router.post('/banks/:bankId/reflect', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/reflect:
+ *   post:
+ *     summary: Reflect on a Hindsight bank
+ *     description: |
+ *       Proxies a reflect request to Hindsight. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, query]
+ *             properties:
+ *               server_id:
+ *                 type: integer
+ *               bank_id:
+ *                 type: string
+ *               query:
+ *                 type: string
+ *               budget:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Reflect results
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.post('/reflect', async (req, res) => {
   const start = Date.now();
-  const serverId = parseInt(req.body.server_id || req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await reflectWithBudgetFallback(serverId, bankId, req.body);
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'REFLECT_FAILED', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'REFLECT_FAILED', logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
   } catch (err) {
     logger.error('Reflect route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: `/hindsight/banks/${bankId}/reflect`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'POST', path: '/hindsight/reflect', duration: Date.now() - start });
   }
 });
 
-router.get('/banks/:bankId/tags', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/bank-tags:
+ *   get:
+ *     summary: List tags for a Hindsight bank
+ *     description: |
+ *       Returns tags from a Hindsight bank. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Tag list
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.get('/bank-tags', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await listBankTags(serverId, bankId);
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: 'BANK_TAGS_FAILED', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: 'BANK_TAGS_FAILED', logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: { items: result.items || [], total: result.total ?? 0 }, logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: { items: result.items || [], total: result.total ?? 0 }, logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
   } catch (err) {
     logger.error('Bank tags route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/tags`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/bank-tags', duration: Date.now() - start });
   }
 });
 
-router.get('/banks/:bankId/graph', async (req, res) => {
+/**
+ * @openapi
+ * /hindsight/entity-graph:
+ *   get:
+ *     summary: Get entity graph for a Hindsight bank
+ *     description: |
+ *       Returns the Hindsight entity graph for a bank. The bank is scoped by
+ *       both server_id and bank_id because bank_id is not globally unique.
+ *     tags: [Hindsight]
+ *     parameters:
+ *       - in: query
+ *         name: server_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: bank_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: min_count
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Graph data
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight error
+ */
+router.get('/entity-graph', async (req, res) => {
   const start = Date.now();
   const serverId = parseInt(req.query.server_id, 10);
-  const bankId = req.params.bankId;
+  const bankId = req.query.bank_id;
 
   if (!serverId || !bankId) {
-    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
     return;
   }
 
   try {
     const result = await getEntityGraph(serverId, bankId, { limit: req.query.limit, min_count: req.query.min_count });
     if (!result.success) {
-      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITY_GRAPH_FAILED', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+      sendResponse({ res, status: 502, error: result.error, code: result.code || 'ENTITY_GRAPH_FAILED', logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
       return;
     }
-    sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 200, data: result.data, logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
   } catch (err) {
     logger.error('Entity graph route error', { serverId, bankId, error: err.message });
-    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: `/hindsight/banks/${bankId}/graph`, duration: Date.now() - start });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/entity-graph', duration: Date.now() - start });
   }
 });
 
@@ -1887,6 +2098,116 @@ router.get('/bank-config', async (req, res) => {
   } catch (err) {
     logger.error('Bank config route error', { serverId, bankId, error: err.message });
     sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/hindsight/bank-config', duration: Date.now() - start });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clear all mental models from a Hindsight bank
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /hindsight/mental-models/bulk:
+ *   delete:
+ *     summary: Delete all mental models from a Hindsight bank
+ *     description: |
+ *       Lists every mental model in the remote Hindsight bank and deletes each
+ *       one. This is a destructive operation intended for cleanup/reset. Hindsight
+ *       404 responses are treated as success (already deleted).
+ *     tags: [Hindsight]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *             required: [server_id, bank_id]
+ *     responses:
+ *       200:
+ *         description: Deletion summary
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 total: { type: integer }
+ *                 deleted_count: { type: integer }
+ *                 failed_count: { type: integer }
+ *                 deleted: { type: array, items: { type: string } }
+ *                 failed: { type: array, items: { type: object } }
+ *       400:
+ *         description: Missing server_id or bank_id
+ *       502:
+ *         description: Hindsight server error
+ *       500:
+ *         description: Internal error
+ */
+router.delete('/mental-models/bulk', async (req, res) => {
+  const start = Date.now();
+  const serverId = parseInt(req.body.server_id, 10);
+  const bankId = req.body.bank_id;
+
+  if (!serverId || !bankId) {
+    sendResponse({ res, status: 400, error: 'server_id and bank_id are required', code: 'VALIDATION_ERROR', logger, method: 'DELETE', path: '/hindsight/mental-models/bulk', duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const listResult = await hindsightListAllMentalModels(serverId, bankId, { detail: 'metadata' });
+    if (!listResult.success) {
+      sendResponse({ res, status: 502, error: listResult.error, code: 'REMOTE_ERROR', logger, method: 'DELETE', path: '/hindsight/mental-models/bulk', duration: Date.now() - start });
+      return;
+    }
+
+    const mentalModels = listResult.mentalModels || [];
+    const deleted = [];
+    const failed = [];
+
+    for (const mm of mentalModels) {
+      const extId = mm.ext_id || mm.id;
+      if (!extId) {
+        failed.push({ ext_id: null, error: 'Mental model has no ext_id or id' });
+        continue;
+      }
+      const deleteResult = await deleteMentalModel(serverId, bankId, extId);
+      if (deleteResult.success) {
+        deleted.push(extId);
+      } else {
+        failed.push({ ext_id: extId, error: deleteResult.error || 'Delete failed' });
+      }
+    }
+
+    logger.info('Cleared all mental models from Hindsight bank', {
+      serverId,
+      bankId,
+      total: mentalModels.length,
+      deleted: deleted.length,
+      failed: failed.length,
+    });
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        success: true,
+        total: mentalModels.length,
+        deleted_count: deleted.length,
+        failed_count: failed.length,
+        deleted,
+        failed,
+      },
+      logger,
+      method: 'DELETE',
+      path: '/hindsight/mental-models/bulk',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Clear all mental models route error', { serverId, bankId, error: err.message });
+    sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'DELETE', path: '/hindsight/mental-models/bulk', duration: Date.now() - start });
   }
 });
 

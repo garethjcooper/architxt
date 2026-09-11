@@ -1,0 +1,543 @@
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import Database from 'better-sqlite3';
+import { ensureSchema } from '../src/db/ensure-schema.js';
+import { upsertNode, upsertEdge, getNode, getEdge, listEdges } from '../src/db/crud/contextual-graph.js';
+import { normalizeModelOutput } from '../src/services/contextual-graph/normalize-model-output.js';
+import { applyModelOutput } from '../src/services/contextual-graph/apply-model-output.js';
+import { createTemplateRole } from '../src/db/crud/template-roles.js';
+import { clearCache } from '../src/cache.js';
+
+function createDb() {
+  clearCache();
+  const db = new Database(':memory:');
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  ensureSchema(db);
+  db.prepare('INSERT INTO servers (svr_name, svr_base_url) VALUES (?, ?)').run('Test', 'http://hindsight');
+  return db;
+}
+
+function model(extId, role) {
+  const scope =
+    role === 'sys_entity_summary' ? { node_id: extId.replace(/^entity-summary-/, '') }
+    : role === 'sys_entity_capabilities' ? { node_id: extId.replace(/^entity-capabilities-/, '') }
+    : role === 'sys_edge_context'
+      ? (() => {
+          const pair = extId.replace(/^edge-ctx-/, '');
+          const [sourceId, targetId] = pair.split('|');
+          return { source_id: sourceId, target_id: targetId };
+        })()
+    : role === 'sys_discovery_context'
+      ? { seed_id: extId.replace(/^discover-/, '') }
+      : null;
+
+  return {
+    mm_ext_id: extId,
+    mm_template_role: role,
+    mm_dimension: role,
+    mm_name: 'Test model',
+    scope,
+  };
+}
+
+describe('applyModelOutput', () => {
+  let db;
+  const serverId = 1;
+  const bankId = 'bank-1';
+
+  beforeEach(() => {
+    db = createDb();
+  });
+
+  it('applies entity summary to a node', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [{ narrative: 'Handles customer billing.' }],
+      graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('entity-summary-svc-001', 'sys_entity_summary'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.nodeId, 'svc-001');
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, 'Handles customer billing.');
+    assert.equal(node.properties.provenance.source, 'contextual-graph');
+    assert.equal(node.properties.provenance.model_refs.length, 1);
+    assert.equal(node.properties.provenance.model_refs[0].role, 'sys_entity_summary');
+    assert.equal(node.properties.provenance.model_refs[0].ext_id, 'entity-summary-svc-001');
+    assert.ok(node.properties.provenance.model_refs[0].content_hash);
+  });
+
+  it('applies entity capabilities to a node', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: { nodes: [], edges: [] },
+      tables: [{
+        name: 'capabilities',
+        columns: ['name', 'evidence'],
+        rows: [{ name: 'billing', evidence: ['mem-1'] }],
+      }],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('entity-capabilities-svc-001', 'sys_entity_capabilities'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.nodeId, 'svc-001');
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.capabilities.length, 1);
+    assert.equal(node.properties.capabilities[0].name, 'billing');
+    assert.deepEqual(node.properties.capabilities[0].evidence, ['mem-1']);
+  });
+
+  it('applies edge context to matching edges', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {});
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], {});
+    upsertEdge(db, serverId, bankId, 'edge-001', 'svc-001', 'svc-002', 'sends', { directed: false });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'A sends usage data to B', evidence: ['mem-2'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const edge = getEdge(db, serverId, bankId, 'edge-001').data;
+    assert.equal(edge.cge_type, 'sends');
+    assert.equal(edge.properties.label, 'usage data');
+    assert.deepEqual(edge.properties.evidence, ['mem-2']);
+    assert.equal(edge.properties.provenance.model_refs[0].role, 'sys_edge_context');
+  });
+
+  it('replaces a discovery subgraph scoped to a seed', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+
+    const firstOutput = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [{ id: 'candidate:a', name: 'A', type: 'service' }],
+        edges: [{ from: 'svc-001', to: 'candidate:a', type: 'calls', label: 'calls', detail: 'detail', evidence: ['mem-3'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    let result = await applyModelOutput(db, serverId, bankId, model('discover-svc-001', 'sys_discovery_context'), firstOutput);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.nodeCount, 1);
+
+    const discovered = getNode(db, serverId, bankId, 'a').data;
+    assert.ok(discovered.labels.includes('candidate'));
+    assert.equal(discovered.properties.provenance.discovery, 'discovered');
+
+    // Re-apply with a different candidate; old candidate should be removed.
+    const secondOutput = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [{ id: 'candidate:b', name: 'B', type: 'service' }],
+        edges: [{ from: 'svc-001', to: 'candidate:b', type: 'sends', label: 'sends', detail: 'detail', evidence: ['mem-4'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    result = await applyModelOutput(db, serverId, bankId, model('discover-svc-001', 'sys_discovery_context'), secondOutput);
+    assert.equal(result.success, true);
+
+    const oldNode = getNode(db, serverId, bankId, 'a').data;
+    assert.equal(oldNode, null);
+    const newNode = getNode(db, serverId, bankId, 'b').data;
+    assert.ok(newNode);
+
+    // Count edges after second apply. The old edge should be gone and one new edge should exist.
+    const edges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    const discoveredEdges = edges.filter((e) => e.cge_source_id === 'svc-001' && e.cge_target_id === 'b');
+    assert.equal(discoveredEdges.length, 1);
+    assert.equal(discoveredEdges[0].cge_type, 'sends');
+  });
+
+  it('creates missing nodes and edges from edge-context model output', async () => {
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [
+          { id: 'svc-001', name: 'Billing Service', type: 'service' },
+          { id: 'svc-002', name: 'Payment API', type: 'service' },
+        ],
+        edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'A sends usage data to B', evidence: ['mem-2'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 2);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const sourceNode = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(sourceNode.properties.display_name, 'Billing Service');
+    assert.equal(sourceNode.properties.provenance.inferred, 'edge-context');
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'svc-001');
+    assert.equal(edge.cge_target_id, 'svc-002');
+    assert.equal(edge.cge_type, 'sends');
+    assert.equal(edge.properties.label, 'usage data');
+    assert.equal(edge.properties.directed, true);
+    assert.deepEqual(edge.properties.evidence, ['mem-2']);
+  });
+
+  it('creates a missing edge when endpoint nodes already exist', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], { display_name: 'Payment API' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [{ id: 'svc-001', name: 'Billing Service', type: 'service' }, { id: 'svc-002', name: 'Payment API', type: 'service' }],
+        edges: [{ from: 'svc-001', to: 'svc-002', type: 'reads', label: 'account data', detail: 'Reads account data', evidence: ['mem-5'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'svc-001');
+    assert.equal(edge.cge_target_id, 'svc-002');
+    assert.equal(edge.cge_type, 'reads');
+  });
+
+  it('does not create working-graph nodes for intermediaries in edge-context output', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-024', ['active'], { display_name: 'Siebel CRM' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+    // Simulate a stale orphan node left by an earlier edge-context run that
+    // emitted the intermediary as an endpoint.
+    upsertNode(db, serverId, bankId, 'a-com:COM-132', ['active'], {
+      display_name: 'EAI',
+      provenance: {
+        source: 'contextual-graph',
+        inferred: 'edge-context',
+        model_refs: [{ role: 'sys_edge_context', ext_id: 'edge-ctx-a-com:COM-024|a-com:COM-002' }],
+      },
+    });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        name: 'Siebel‑ICMS Integration Flows',
+        nodes: [
+          { id: 'a-com:COM-024', name: 'Siebel CRM' },
+          { id: 'a-com:COM-002', name: 'ICMS' },
+          { id: 'a-com:COM-132', name: 'EAI' },
+        ],
+        edges: [
+          {
+            from: 'a-com:COM-002',
+            to: 'a-com:COM-024',
+            type: 'sends',
+            label: 'MQ notifications',
+            detail: 'ICMS publishes MQ notifications through the EAI layer to Siebel.',
+            properties: {
+              protocol: 'MQ',
+              frequency: 'real-time',
+              intermediaries: ['a-com:COM-132'],
+            },
+          },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-024|a-com:COM-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+    assert.equal(result.applied.deletedNodes, 1);
+
+    const intermediary = getNode(db, serverId, bankId, 'a-com:COM-132').data;
+    assert.equal(intermediary, null, 'stale intermediary node should be removed on refresh');
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.deepEqual(edge.properties.intermediaries, ['a-com:COM-132']);
+  });
+
+  it('resolves model-emitted bare ids to existing typed nodes', async () => {
+    upsertNode(db, serverId, bankId, 'svc:mozart-api', ['active'], { display_name: 'Mozart API', aliases: ['mozart-api'] });
+    upsertNode(db, serverId, bankId, 'svc:subscriber', ['active'], { display_name: 'Subscriber', aliases: ['subscriber'] });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [
+          { id: 'mozart-api', name: 'Mozart API', type: 'service' },
+          { id: 'subscriber', name: 'Subscriber', type: 'service' },
+        ],
+        edges: [{ from: 'mozart-api', to: 'subscriber', type: 'sends', label: 'usage data', detail: 'Mozart API sends usage data to Subscriber', evidence: ['mem-1'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-mozart-api|subscriber', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'svc:mozart-api');
+    assert.equal(edge.cge_target_id, 'svc:subscriber');
+    assert.equal(edge.cge_type, 'sends');
+  });
+
+  it('resolves model-emitted found: ids to existing grounded nodes', async () => {
+    // Reproduces the fresh-bank scenario where the edge-context model emits
+    // discovery-style ids for nodes that already exist as grounded nodes from
+    // the Hindsight skeleton.
+    upsertNode(db, serverId, bankId, 'mozart-api', ['grounded', 'active'], { display_name: 'Mozart API', aliases: ['Mozart API'] });
+    upsertNode(db, serverId, bankId, 'subscriber', ['grounded', 'active'], { display_name: 'Subscriber', aliases: ['Subscriber'] });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [
+          { id: 'found:mozart-api', name: 'Mozart API', type: 'api' },
+          { id: 'found:subscriber', name: 'Subscriber', type: 'service' },
+        ],
+        edges: [{ from: 'found:mozart-api', to: 'found:subscriber', type: 'sends', label: 'usage data', detail: 'Mozart API sends usage data to Subscriber', evidence: ['mem-1'] }],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-subscriber|mozart-api', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.createdNodes, 0);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const mozart = getNode(db, serverId, bankId, 'mozart-api').data;
+    const subscriber = getNode(db, serverId, bankId, 'subscriber').data;
+    assert.equal(mozart.properties.provenance.inferred, 'edge-context');
+    assert.equal(subscriber.properties.provenance.inferred, 'edge-context');
+
+    const edge = getEdge(db, serverId, bankId, result.applied.edgeIds[0]).data;
+    assert.equal(edge.cge_source_id, 'mozart-api');
+    assert.equal(edge.cge_target_id, 'subscriber');
+    assert.equal(edge.cge_type, 'sends');
+
+    const foundMozart = getNode(db, serverId, bankId, 'found:mozart-api').data;
+    const foundSubscriber = getNode(db, serverId, bankId, 'found:subscriber').data;
+    assert.equal(foundMozart, null);
+    assert.equal(foundSubscriber, null);
+  });
+
+  it('fails when edge-context model returns no edges', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {});
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], {});
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-svc-001|svc-002', 'sys_edge_context'), output);
+    assert.equal(result.success, false);
+    assert.equal(result.code, 'NO_EDGES');
+  });
+
+  it('parses JSON containing non-breaking hyphens and no-break spaces', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    const output = normalizeModelOutput('Some prose before the envelope.\n\n{\n  "narratives": [{"narrative": "payment‑method and account‑merge routing"}],\n  "graph": { "nodes": [], "edges": [] },\n  "tables": [],\n  "diagrams": []\n}\n\nTrailing prose.');
+    assert.equal(output.errors.length, 0);
+    assert.equal(output.narratives[0].narrative, 'payment-method and account-merge routing');
+  });
+
+  it('parses real Hindsight content envelope for edge-context model', () => {
+    const realContent = '## Overview\n\n{ \\"narratives\\": [{\\"narrative_name\\": \\"\\", \\"narrative\\": \\"Singleview (a-com:COM-001) is the emerging canonical source for customer agreement, payment‑method and usage information. ICMS (a-com:COM-002) reads account and payment data from Singleview, depends on Singleview for account‑merge and transaction routing, and receives usage data forwarded by Singleview for rating and billing.\\"}], \\"graph\\": { \\"nodes\\": [ { \\"id\\": \\"a-com:COM-002\\", \\"name\\": \\"ICMS\\", \\"type\\": \\"component\\" }, { \\"id\\": \\"a-com:COM-001\\", \\"name\\": \\"Singleview\\", \\"type\\": \\"component\\" } ], \\"edges\\": [ { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"reads\\", \\"label\\": \\"account data\\", \\"detail\\": \\"ICMS reads account and payment‑method information from Singleview to populate credit‑account identifiers.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-capabilities-txt-COM-002\\"] }, { \\"from\\": \\"a-com:COM-002\\", \\"to\\": \\"a-com:COM-001\\", \\"type\\": \\"depends-on\\", \\"label\\": \\"account merge\\", \\"detail\\": \\"ICMS depends on Singleview for account‑merge and transaction routing in the future AR‑master role.\\", \\"evidence\\": [\\"entity-summary-a-com:COM-001\\", \\"architxt-summary-txt-COM-001\\"] }, { \\"from\\": \\"a-com:COM-001\\", \\"to\\": \\"a-com:COM-002\\", \\"type\\": \\"sends\\", \\"label\\": \\"usage data\\", \\"detail\\": \\"Singleview forwards product‑usage records to ICMS for rating and billing processing.\\", \\"evidence\\": [\\"architxt-summary-txt-COM-001\\"] } ] }, \\"tables\\": [], \\"diagrams\\": [] }';
+    const output = normalizeModelOutput(realContent);
+    assert.equal(output.errors.length, 0);
+    assert.equal(output.graph.edges.length, 3);
+    assert.equal(output.graph.nodes.length, 2);
+    const reads = output.graph.edges.find((e) => e.type === 'reads');
+    assert.equal(reads.label, 'account data');
+    assert.ok(reads.detail.includes('payment-method'));
+  });
+
+  it('normalizes JSON containing smart quotes inside string values', () => {
+    const content = '{\n  "narratives": [{"narrative_name":"","narrative":"Uses \u201cFile: DBnnnn00\u201d interface."}],\n  "graph": {"nodes": [], "edges": []},\n  "tables": [],\n  "diagrams": []\n}';
+    const output = normalizeModelOutput(content);
+    assert.equal(output.errors.length, 0);
+    assert.ok(output.narratives[0].narrative.includes('File: DBnnnn00'));
+  });
+
+  it('replaces prior edges when the same edge-context model is applied again', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+
+    const firstOutput = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'Singleview sends postpaid usage, mobile data, Fibre Voice usage, and Fibre 0900 call records to ICMS via a BLINCL file feed for rating and billing. Typically transmitted in nightly batch files.', evidence: ['m1'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const m = model('edge-ctx-a-com:COM-002|a-com:COM-001', 'sys_edge_context');
+    let result = await applyModelOutput(db, serverId, bankId, m, firstOutput);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const secondOutput = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'Singleview sends various usage data (postpaid usage, mobile data, Fibre Voice Usage, Fibre 0900 call data) to ICMS via a BLINCL feed for rating and billing.', evidence: ['m2'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    result = await applyModelOutput(db, serverId, bankId, m, secondOutput);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 1);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 1);
+    assert.equal(allEdges[0].cge_type, 'sends');
+    assert.ok(allEdges[0].cge_properties.detail.includes('various usage data'));
+  });
+
+  it('does not overwrite an existing edge of a different type between the same endpoints', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+    upsertEdge(db, serverId, bankId, 'original-edge', 'a-com:COM-002', 'a-com:COM-001', 'reads', {
+      directed: true, label: 'account data', detail: 'original detail', provenance: { source: 'contextual-graph', model_refs: [] },
+    });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-002', to: 'a-com:COM-001', type: 'reads', label: 'account data', detail: 'updated detail', evidence: ['m1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'sends usage data', evidence: ['m1'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-002|a-com:COM-001', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 2);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 2);
+
+    const readsEdge = allEdges.find((e) => e.cge_type === 'reads');
+    assert.ok(readsEdge);
+    assert.equal(readsEdge.cge_properties.detail, 'updated detail');
+
+    const sendsEdge = allEdges.find((e) => e.cge_type === 'sends');
+    assert.ok(sendsEdge);
+    assert.ok(sendsEdge.cge_id.startsWith('edge-ctx-a-com:COM-001-a-com:COM-002-sends-'));
+  });
+
+  it('keeps parallel edges with the same type but different labels distinct', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'usage detail', evidence: ['m1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'events', detail: 'events detail', evidence: ['m2'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-001|a-com:COM-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 2);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 2);
+
+    const byLabel = Object.fromEntries(allEdges.map((e) => [e.properties.label, e.cge_id]));
+    assert.ok(byLabel['usage data']);
+    assert.ok(byLabel.events);
+    assert.notEqual(byLabel['usage data'], byLabel.events);
+    assert.ok(byLabel['usage data'].startsWith('edge-ctx-a-com:COM-001-a-com:COM-002-sends-'));
+  });
+
+  it('synthesizes envelope from Markdown capability table', () => {
+    const content = '## Overview\n\nSingleview is the billing hub.\n\n```markdown\n| Capability | Responsibility | Purpose | Business Capability Mapping |\n|---|---|---|---|\n| Adjustments | Corrects charges. | Enables corrections. | Billing Adjustments |\n```';
+    const output = normalizeModelOutput(content);
+    assert.equal(output.errors.length, 0);
+    assert.equal(output.tables.length, 1);
+    assert.equal(output.tables[0].name, 'capabilities');
+    assert.deepStrictEqual(output.tables[0].columns, ['name', 'responsibility', 'purpose', 'business_capability_mapping']);
+    assert.equal(output.tables[0].rows.length, 1);
+    assert.equal(output.tables[0].rows[0].name, 'Adjustments');
+  });
+
+  it('applies a custom node-scoped template role generically', async () => {
+    createTemplateRole(db, { role_id: 'software_tech_stack', display_name: 'Software Tech Stack', derivation_scope: 'node' });
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [{ narrative: 'Node.js, PostgreSQL, Redis.' }],
+      graph: { nodes: [], edges: [] },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const customModel = {
+      mm_ext_id: 'software-tech-stack-svc-001',
+      mm_template_role: 'software_tech_stack',
+      mm_dimension: 'software_tech_stack',
+      mm_name: 'Software Tech Stack',
+      scope: { node_id: 'svc-001' },
+    };
+
+    const result = await applyModelOutput(db, serverId, bankId, customModel, output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.nodeId, 'svc-001');
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, 'Node.js, PostgreSQL, Redis.');
+    assert.equal(node.properties.provenance.source, 'contextual-graph');
+    assert.equal(node.properties.provenance.model_refs.length, 1);
+    assert.equal(node.properties.provenance.model_refs[0].role, 'software_tech_stack');
+    assert.equal(node.properties.provenance.model_refs[0].ext_id, 'software-tech-stack-svc-001');
+  });
+});

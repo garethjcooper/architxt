@@ -200,12 +200,12 @@ export function ManageModelTagsDialog({
           tag.currentState === 'common' ? '' : 'cursor-pointer'
         } ${
           isRemoved
-            ? 'bg-slate-800/20 border-slate-600 text-white/40 line-through hover:bg-slate-800/30'
+            ? 'bg-badge-neutral-bg border-border-default text-foreground-subtle line-through hover:bg-surface-card'
             : tag.currentState === 'common'
-              ? 'bg-orange-500/20 border-orange-500/30 text-orange-300'
+              ? 'bg-badge-caution-bg border-badge-caution-bd text-badge-caution-fg'
               : tag.currentState === 'partial'
-                ? 'bg-slate-700/40 border-slate-600 text-white/70 hover:bg-slate-700/50'
-                : 'bg-slate-800/30 border-slate-700 text-white/60 hover:bg-slate-700/30 hover:border-slate-600'
+                ? 'bg-badge-neutral-bg border-badge-neutral-bd text-badge-neutral-fg hover:bg-badge-neutral-bg/70'
+                : 'bg-surface-card border-border-default text-foreground-faint hover:bg-surface-hover hover:border-border-strong'
         }`}
       >
         <span className={isRemoved ? 'line-through' : ''}>{label}</span>
@@ -230,85 +230,85 @@ export function ManageModelTagsDialog({
       <DialogContent className="!w-[50vw] !max-w-none max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Model Tags</DialogTitle>
-          <p className="text-sm text-white/60 mt-2">
+          <p className="text-sm text-foreground-faint mt-2">
             {selectedModelIds.length} mental model(s) selected
           </p>
         </DialogHeader>
 
         <div className="relative">
-          <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+          <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-foreground-subtle pointer-events-none" />
           <input
             type="text"
             placeholder="Filter by tag..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded border border-white/20 bg-slate-800/50 text-white placeholder-white/50 focus:outline-none focus:border-orange-500/50 transition-colors"
+            className="w-full pl-10 pr-3 py-2 rounded border border-border-strong bg-surface-card text-foreground-default placeholder-foreground-placeholder focus:outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle transition-colors"
           />
         </div>
 
         <div className="space-y-6 overflow-y-auto flex-1">
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">On All Models</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">On All Models</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading tags...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading tags...</p>
               ) : commonTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">{commonTags.map(renderPill)}</div>
               ) : (
-                <p className="text-xs text-white/40 italic">No tags on all models</p>
+                <p className="text-xs text-foreground-subtle italic">No tags on all models</p>
               )}
             </div>
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">On Some Models</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">On Some Models</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading tags...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading tags...</p>
               ) : partialTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">{partialTags.map(renderPill)}</div>
               ) : (
-                <p className="text-xs text-white/40 italic">No tags on some models</p>
+                <p className="text-xs text-foreground-subtle italic">No tags on some models</p>
               )}
             </div>
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">Marked for Removal</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">Marked for Removal</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading tags...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading tags...</p>
               ) : removedTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2 opacity-60">{removedTags.map(renderPill)}</div>
               ) : (
-                <p className="text-xs text-white/40 italic">No tags marked for removal</p>
+                <p className="text-xs text-foreground-subtle italic">No tags marked for removal</p>
               )}
             </div>
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-white/80 mb-2">Available to Add</h3>
+            <h3 className="text-sm font-medium text-foreground-muted mb-2">Available to Add</h3>
             <div className="max-h-32 overflow-y-auto">
               {loading ? (
-                <p className="text-xs text-white/40 italic">Loading tags...</p>
+                <p className="text-xs text-foreground-subtle italic">Loading tags...</p>
               ) : availableTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">{availableTags.map(renderPill)}</div>
               ) : (
-                <p className="text-xs text-white/40 italic">All tags are assigned</p>
+                <p className="text-xs text-foreground-subtle italic">All tags are assigned</p>
               )}
             </div>
           </div>
 
           {tags.length === 0 && !loading && (
-            <div className="text-center text-white/50 py-8">No tags available</div>
+            <div className="text-center text-foreground-subtle py-8">No tags available</div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-6 border-t border-white/10">
-          <Button variant="ghost" onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/5">
+        <div className="flex justify-end gap-2 pt-6 border-t border-border-default">
+          <Button variant="ghost" onClick={onClose} className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card">
             Close
           </Button>
-          <Button onClick={handleSave} disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white">
+          <Button onClick={handleSave} disabled={loading} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default">
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>

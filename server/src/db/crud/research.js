@@ -6,7 +6,8 @@ import { dbExec, requireString, requireInt, requireField, fromJson, toJson } fro
 const SESSION_TABLE = 'research_sessions';
 const SESSION_PK = 'rs_id';
 const SESSION_JSON_FIELDS = [
-  'rs_viewpoint_ids'
+  'rs_viewpoint_ids',
+  'rs_scope_entity_ids',
 ];
 
 // research_steps
@@ -16,8 +17,7 @@ const STEP_JSON_FIELDS = [
   'rstep_selections',
   'rstep_parameters',
   'rstep_viewpoint_ids',
-  'rstep_canvas_state',
-  'rstep_synthesis',
+  'rstep_envelope',
   'rstep_calls',
 ];
 
@@ -31,7 +31,7 @@ export const deleteSession = sessionBase.del;
 export const getStep = stepBase.get;
 export const updateStep = (db, stepId, data) => dbExec(() => {
   const id = requireInt('stepId', stepId);
-  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_created_at']);
+  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_raw_query', 'rstep_created_at']);
   const entries = Object.entries(data).filter(([key]) => allowedFields.has(key));
   if (entries.length === 0) {
     throw new Error('No allowed fields to update');
@@ -81,7 +81,7 @@ export const deleteStepWithSession = (db, stepId) => dbExec(() => {
 /**
  * Create a research session.
  * @param {Object} db
- * @param {Object} data - DB field names (rs_title, rs_bank_id, rs_viewpoint_ids, rs_description)
+ * @param {Object} data - DB field names (rs_title, rs_server_id, rs_bank_id, rs_viewpoint_ids, rs_description)
  */
 export const createSession = (db, data) => dbExec(() => {
   requireString('rs_title', data.rs_title);
@@ -94,19 +94,32 @@ export const createSession = (db, data) => dbExec(() => {
 
   const prepared = toJson(data, SESSION_JSON_FIELDS);
   const sql = `INSERT INTO ${SESSION_TABLE} (
-    rs_title, rs_description, rs_bank_id, rs_viewpoint_ids, rs_status, rs_current_step_id
-  ) VALUES (?, ?, ?, ?, ?, ?)`;
+    rs_title, rs_description, rs_server_id, rs_bank_id, rs_viewpoint_ids, rs_scope_entity_ids, rs_status, rs_current_step_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     prepared.rs_title ?? '',
     prepared.rs_description ?? null,
+    prepared.rs_server_id ?? null,
     prepared.rs_bank_id,
     prepared.rs_viewpoint_ids,
+    prepared.rs_scope_entity_ids ?? null,
     prepared.rs_status ?? 'active',
     prepared.rs_current_step_id ?? null
   );
   return result.lastInsertRowid;
 }, 'research.createSession');
+
+export const listSessionsByServerBank = (db, serverId, bankId) => dbExec(() => {
+  const sid = requireInt('serverId', serverId);
+  const bid = requireString('bankId', bankId);
+  // Legacy rows created before the rs_server_id migration have a NULL server id.
+  // Show them as a fallback so existing sessions remain visible until they are
+  // re-associated with a specific server.
+  const sql = `SELECT * FROM ${SESSION_TABLE} WHERE rs_bank_id = ? AND (rs_server_id = ? OR rs_server_id IS NULL) ORDER BY rs_updated_at DESC, rs_id DESC`;
+  const rows = stmt(db, sql).all(bid, sid);
+  return rows.map(r => fromJson(r, SESSION_JSON_FIELDS));
+}, 'research.listSessionsByServerBank');
 
 /**
  * Update session's current step pointer.
@@ -140,13 +153,6 @@ export const updateSession = (db, sessionId, data) => dbExec(() => {
   return result.changes > 0 ? true : null;
 }, 'research.updateSession');
 
-export const listSessionsByBank = (db, bankId) => dbExec(() => {
-  const id = requireString('bankId', bankId);
-  const sql = `SELECT * FROM ${SESSION_TABLE} WHERE rs_bank_id = ? ORDER BY rs_updated_at DESC, rs_id DESC`;
-  const rows = stmt(db, sql).all(id);
-  return rows.map(r => fromJson(r, SESSION_JSON_FIELDS));
-}, 'research.listSessionsByBank');
-
 /**
  * Delete a research session and cascade delete its steps.
  */
@@ -170,22 +176,21 @@ export const createStep = (db, data) => dbExec(() => {
 
   const prepared = toJson(data, STEP_JSON_FIELDS);
   const sql = `INSERT INTO ${STEP_TABLE} (
-    rs_id, rstep_parent_step_id, rstep_intent_text, rstep_selections,
-    rstep_action_type, rstep_parameters, rstep_viewpoint_ids, rstep_canvas_state,
-    rstep_synthesis, rstep_status, rstep_error_message,
+    rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
+    rstep_action_type, rstep_parameters, rstep_viewpoint_ids,
+    rstep_status, rstep_error_message,
     rstep_tool_calls_used, rstep_calls
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     prepared.rs_id,
     prepared.rstep_parent_step_id ?? null,
     prepared.rstep_intent_text,
+    prepared.rstep_raw_query ?? null,
     prepared.rstep_selections ?? null,
     prepared.rstep_action_type,
     prepared.rstep_parameters ?? null,
     prepared.rstep_viewpoint_ids ?? null,
-    prepared.rstep_canvas_state ?? null,
-    prepared.rstep_synthesis ?? null,
     data.rstep_status ?? 'running',
     data.rstep_error_message ?? null,
     prepared.rstep_tool_calls_used ?? 0,
@@ -193,6 +198,66 @@ export const createStep = (db, data) => dbExec(() => {
   );
   return result.lastInsertRowid;
 }, 'research.createStep');
+
+/**
+ * Get a full session with tags and its current step.
+ * @param {Object} db
+ * @param {number} sessionId
+ */
+export const createSessionPage = (db, sessionId, title) => dbExec(() => {
+  const rsId = requireInt('sessionId', sessionId);
+  requireString('title', title);
+
+  const sql = `INSERT INTO ${STEP_TABLE} (
+    rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
+    rstep_action_type, rstep_parameters, rstep_viewpoint_ids,
+    rstep_envelope, rstep_status, rstep_error_message,
+    rstep_tool_calls_used, rstep_calls
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  const blankEnvelope = JSON.stringify({ narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
+  const result = stmt(db, sql).run(
+    rsId,
+    null,
+    title,
+    null,
+    null,
+    'curated_page',
+    null,
+    null,
+    blankEnvelope,
+    'completed',
+    null,
+    0,
+    null
+  );
+  return result.lastInsertRowid;
+}, 'research.createSessionPage');
+
+/**
+ * Update a curated_page step. Unlike updateStep, this allows renaming the page
+ * by updating rstep_intent_text.
+ */
+export const updateCuratedPage = (db, stepId, data) => dbExec(() => {
+  const id = requireInt('stepId', stepId);
+  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_intent_text', 'rstep_status', 'rstep_error_message']);
+  const entries = Object.entries(data).filter(([key]) => allowedFields.has(key));
+  if (entries.length === 0) {
+    throw new Error('No allowed fields to update');
+  }
+
+  const updateData = Object.fromEntries(entries);
+
+  const prepared = toJson(updateData, STEP_JSON_FIELDS);
+  const columns = Object.keys(updateData).map((key) => `${key} = ?`).join(', ');
+  const values = Object.keys(updateData).map((key) => prepared[key] ?? updateData[key]);
+  const sql = `UPDATE ${STEP_TABLE} SET ${columns} WHERE ${STEP_PK} = ? AND rstep_action_type = 'curated_page'`;
+  const result = stmt(db, sql).run(...values, id);
+  if (result.changes === 0) {
+    throw new Error('Step not found or is not a curated_page');
+  }
+  return true;
+}, 'research.updateCuratedPage');
 
 /**
  * Get a full session with tags and its current step.

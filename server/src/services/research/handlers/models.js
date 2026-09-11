@@ -12,7 +12,6 @@
  */
 
 import { getMentalModel as getHindsightMentalModel } from '../../hindsight/mental-models.js';
-import { parseGraphResponse } from '../../../prompts/parse-graph-response.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('research-handler-models');
@@ -62,7 +61,7 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
   logger.info('Models query', { serverId, bankId, modelCount: models.length });
 
   const fetchMentalModel = injectFetch || ((extId) => getHindsightMentalModel(serverId, bankId, extId, {
-    detail: 'content',
+    detail: 'full',
     timeoutMs,
   }));
 
@@ -90,38 +89,52 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         };
       }
 
-      const content = result.mentalModel.content ?? null;
-      if (!content) {
+      const structuredOutput = result.mentalModel.reflect_response?.structured_output ?? null;
+      if (!structuredOutput || typeof structuredOutput !== 'object') {
         return {
           ext_id: extId,
           name,
-          found: true,
           content: null,
+          found: true,
           graph: { nodes: [], edges: [] },
-          graph_error: 'Mental-model content is empty or missing.',
+          graph_error: 'Mental-model reflect_response.structured_output is empty or missing.',
         };
       }
 
-      const { graph, error: graphError } = parseGraphResponse(content, {
-        mode: 'graph-known',
-        expectGraph: true,
-        defaultSource: 'mental_model',
-      });
+      const content = structuredOutput;
+      const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
+      const rawNarratives = Array.isArray(content.narratives)
+        ? content.narratives
+          .filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+        : [];
+      const legacyNarrative = typeof content.narrative === 'string' ? content.narrative : '';
+      const narratives = rawNarratives.length > 0
+        ? rawNarratives.map((n) => ({
+          narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+          narrative: n.narrative,
+        }))
+        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
+      const tables = Array.isArray(content.tables) ? content.tables : [];
+      const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
 
       return {
         ext_id: extId,
         name,
-        found: true,
         content,
-        concatenation: selection.concatenation,
+        found: true,
+        narratives,
         graph,
-        graph_error: graphError,
+        tables,
+        diagrams,
+        errors: undefined,
       };
     }),
   );
 
   const narratives = [];
   const graphs = [];
+  const tables = [];
+  const diagrams = [];
   const errors = [];
 
   for (const item of fetched) {
@@ -129,35 +142,40 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
       errors.push({ model: item.name || item.ext_id, error: item.error || 'Not found' });
       continue;
     }
-    if (item.content) {
-      narratives.push(`## ${item.name || item.ext_id}\n\n${item.content}`);
+    if (item.narratives && item.narratives.length > 0) {
+      for (const n of item.narratives) {
+        if (!n.narrative) continue;
+        const name = n.narrative_name || `${item.name || item.ext_id}`;
+        narratives.push({ narrative_name: name, narrative: n.narrative });
+      }
+    } else if (item.content) {
+      const fallback = typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback });
     }
-    if (item.graph) {
-      if (item.graph.nodes.length > 0 || item.graph.edges.length > 0) {
-        graphs.push(item.graph);
-      } else if (item.graph_error) {
-        errors.push({ model: item.name || item.ext_id, error: item.graph_error });
+    if (item.graph && (item.graph.nodes.length > 0 || item.graph.edges.length > 0)) {
+      graphs.push(item.graph);
+    }
+    if (item.tables && item.tables.length > 0) {
+      tables.push(...item.tables);
+    }
+    if (item.diagrams && item.diagrams.length > 0) {
+      diagrams.push(...item.diagrams);
+    }
+    if (item.errors) {
+      for (const err of item.errors) {
+        errors.push({ model: item.name || item.ext_id, error: err });
       }
     }
-  }
-
-  let narrative = narratives.join('\n\n');
-  if (narrative) {
-    narrative = `# Models Query\n\n${narrative}`;
-  } else if (graphs.length > 0) {
-    narrative = `Found model data for ${graphs.length} selected model(s).`;
-  }
-
-  if (!narrative && errors.length > 0) {
-    narrative = 'No model content could be retrieved.';
   }
 
   const graph = graphs.length > 0 ? mergeGraphs(graphs) : { nodes: [], edges: [] };
 
   return {
     success: true,
-    narrative,
+    narratives,
     graph,
+    tables,
+    diagrams,
     calls_used: ['list_mental_models'],
     errors: errors.length > 0 ? errors : undefined,
   };

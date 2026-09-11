@@ -119,43 +119,43 @@ export function DaemonStatus() {
     <div className="relative mr-4">
       <button
         onClick={handleToggle}
-        className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/10 px-3 py-1.5 hover:bg-white/[0.06] transition-colors"
+        className="flex items-center gap-2 rounded-lg bg-on-dark/[0.03] border border-border-default px-3 py-1.5 hover:bg-on-dark/[0.06] transition-colors"
       >
         <span className="relative flex h-2 w-2">
           {isProcessing ? (
             <>
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-running opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-primary-solid"></span>
             </>
           ) : (
-            <span className="inline-flex rounded-full h-2 w-2 bg-white/20"></span>
+            <span className="inline-flex rounded-full h-2 w-2 bg-surface-strong"></span>
           )}
         </span>
 
         <div className="flex flex-col items-start min-w-0">
           <div className="flex items-center gap-1.5 text-xs">
-            <ArchitxtIcon className="h-3 w-3 text-white/40" />
+            <ArchitxtIcon className="h-3 w-3 text-foreground-subtle" />
             {isProcessing && doc ? (
               <>
-                <span className="text-white/70 font-medium">Doc #{doc.id}</span>
-                <span className="text-white/30">•</span>
-                <span className="text-emerald-400 font-medium">{currentStageName}</span>
+                <span className="text-foreground-faint font-medium">Doc #{doc.id}</span>
+                <span className="text-foreground-placeholder">•</span>
+                <span className="text-accent-secondary-fg font-medium">{currentStageName}</span>
                 {(() => {
                   const sub = progress?.stages?.[currentStageName]?.sub_progress;
                   if (sub?.label) return (
-                    <span className="text-white/40">• {sub.label}</span>
+                    <span className="text-foreground-subtle">• {sub.label}</span>
                   );
                   return null;
                 })()}
               </>
             ) : (
-              <span className="text-white/50">Extraction idle</span>
+              <span className="text-foreground-subtle">Extraction idle</span>
             )}
           </div>
           {isProcessing && (
-            <div className="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+            <div className="w-full h-1 bg-surface-panel rounded-full mt-1 overflow-hidden">
               <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                className="h-full bg-accent-primary-solid rounded-full transition-all duration-500"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -163,43 +163,43 @@ export function DaemonStatus() {
         </div>
 
         {expanded ? (
-          <ChevronUp className="h-3.5 w-3.5 text-white/40 ml-1" />
+          <ChevronUp className="h-3.5 w-3.5 text-foreground-subtle ml-1" />
         ) : (
-          <ChevronDown className="h-3.5 w-3.5 text-white/40 ml-1" />
+          <ChevronDown className="h-3.5 w-3.5 text-foreground-subtle ml-1" />
         )}
       </button>
 
       {expanded && (
-        <div className="absolute top-full right-0 mt-2 z-50 w-80 rounded-xl border border-white/10 bg-[oklch(0.18_0_0)] shadow-xl p-4 space-y-3">
+        <div className="absolute top-full right-0 mt-2 z-50 w-80 rounded-xl border border-border-default bg-surface-raised shadow-xl p-4 space-y-3">
           {isProcessing && progress && doc ? (
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
-                  <span className="text-sm font-medium text-white">Processing</span>
+                  <Loader2 className="h-4 w-4 text-accent-secondary-fg animate-spin" />
+                  <span className="text-sm font-medium text-foreground-default">Processing</span>
                 </div>
-                <span className="text-[11px] text-white/40">{percent}%</span>
+                <span className="text-[11px] text-foreground-subtle">{percent}%</span>
               </div>
 
-              <div className="rounded-lg bg-white/[0.03] p-2.5 space-y-1">
+              <div className="rounded-lg bg-surface-card p-2.5 space-y-1">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-white/40">Document:</span>
-                  <span className="text-white/70 font-mono">#{doc.id}</span>
+                  <span className="text-foreground-subtle">Document:</span>
+                  <span className="text-foreground-faint font-mono">#{doc.id}</span>
                 </div>
                 {doc.ext_id && (
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-white/40">External ID:</span>
-                    <span className="text-white/70 font-mono">{doc.ext_id}</span>
+                    <span className="text-foreground-subtle">External ID:</span>
+                    <span className="text-foreground-faint font-mono">{doc.ext_id}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-white/40">Status:</span>
-                  <span className="text-emerald-400">{doc.status}</span>
+                  <span className="text-foreground-subtle">Status:</span>
+                  <span className="text-accent-secondary-fg">{doc.status}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <Clock className="h-3 w-3 text-white/30" />
-                  <span className="text-white/40">Started</span>
-                  <span className="text-white/60">
+                  <Clock className="h-3 w-3 text-foreground-placeholder" />
+                  <span className="text-foreground-subtle">Started</span>
+                  <span className="text-foreground-faint">
                     {progress.started_at && !Number.isNaN(Date.parse(progress.started_at))
                       ? formatDistanceToNow(new Date(progress.started_at), { addSuffix: true })
                       : '-'}
@@ -211,7 +211,7 @@ export function DaemonStatus() {
               <button
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-destructive-bg border border-destructive-bd/50 px-3 py-1.5 text-xs text-destructive-fg hover:bg-destructive-bg transition-colors disabled:opacity-50"
               >
                 {isCancelling ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -222,7 +222,7 @@ export function DaemonStatus() {
               </button>
 
               {cancelError && (
-                <div className="text-[11px] text-red-400 text-center">{cancelError}</div>
+                <div className="text-[11px] text-destructive-fg text-center">{cancelError}</div>
               )}
 
               <div className="space-y-1">
@@ -235,32 +235,32 @@ export function DaemonStatus() {
                     <div key={stageName} className="flex items-center gap-2">
                       <div className="flex-shrink-0 w-4 flex justify-center">
                         {isCompleted ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-accent-primary-fg" />
                         ) : isCurrent ? (
-                          <Loader2 className="h-3.5 w-3.5 text-emerald-400 animate-spin" />
+                          <Loader2 className="h-3.5 w-3.5 text-accent-secondary-fg animate-spin" />
                         ) : (
-                          <div className="h-2 w-2 rounded-full bg-white/15" />
+                          <div className="h-2 w-2 rounded-full bg-on-dark/15" />
                         )}
                       </div>
                       <div className="flex flex-col">
                         <span
                           className={`text-xs font-medium ${
                             isCompleted
-                              ? 'text-emerald-400'
+                              ? 'text-accent-secondary-fg'
                               : isCurrent
-                              ? 'text-white'
-                              : 'text-white/30'
+                              ? 'text-foreground-default'
+                              : 'text-foreground-placeholder'
                           }`}
                         >
                           {stageName}
                         </span>
                         {isCurrent && stage?.sub_progress?.label && (
-                          <span className="text-[10px] text-white/40">
+                          <span className="text-[10px] text-foreground-subtle">
                             {stage.sub_progress.label}
                           </span>
                         )}
                         {isCurrent && stage?.metrics?.avgDurationMs && (
-                          <span className="text-[10px] text-white/40">
+                          <span className="text-[10px] text-foreground-subtle">
                             avg {stage.metrics.avgDurationMs < 1000 
                               ? `${stage.metrics.avgDurationMs}ms` 
                               : `${(stage.metrics.avgDurationMs / 1000).toFixed(1)}s`}
@@ -273,9 +273,9 @@ export function DaemonStatus() {
                           </span>
                         )}
                         {isCurrent && (stage?.sub_progress?.total ?? 0) > 0 && (
-                          <div className="w-24 h-0.5 bg-white/10 rounded-full mt-0.5">
+                          <div className="w-24 h-0.5 bg-surface-panel rounded-full mt-0.5">
                             <div
-                              className="h-full bg-emerald-500/60 rounded-full transition-all duration-300"
+                              className="h-full bg-accent-primary-solid/60 rounded-full transition-all duration-300"
                               style={{
                                 width: `${Math.round(
                                   (((stage?.sub_progress?.current ?? 0)) / (stage?.sub_progress?.total ?? 1)) * 100
@@ -286,7 +286,7 @@ export function DaemonStatus() {
                         )}
                       </div>
                       {stage?.metrics?.durationMs && (
-                        <span className="text-[11px] text-white/30 ml-auto">
+                        <span className="text-[11px] text-foreground-placeholder ml-auto">
                           {stage.metrics.durationMs < 1000
                             ? `${stage.metrics.durationMs}ms`
                             : `${(stage.metrics.durationMs / 1000).toFixed(1)}s`}
@@ -297,19 +297,19 @@ export function DaemonStatus() {
                 })}
               </div>
 
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-surface-panel rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-600 to-green-400 rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-progress-from to-progress-to rounded-full transition-all duration-500"
                   style={{ width: `${percent}%` }}
                 />
               </div>
 
-              <div className="text-[10px] text-white/20 text-center">
+              <div className="text-[10px] text-foreground-placeholder text-center">
                 {currentStep} of {totalSteps} stages complete
               </div>
             </>
           ) : (
-            <div className="text-xs text-white/40 text-center py-2">No documents currently processing</div>
+            <div className="text-xs text-foreground-subtle text-center py-2">No documents currently processing</div>
           )}
         </div>
       )}

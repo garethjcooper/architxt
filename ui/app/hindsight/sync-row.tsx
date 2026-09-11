@@ -2,6 +2,7 @@
 
 import { GitCompare, Clock, ScanSearch } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { getStatusBadge, familyClass } from '@/lib/status-badge';
 
 interface Divergence {
   content_differs: boolean;
@@ -12,14 +13,14 @@ interface Divergence {
 }
 
 const statusBadgeClass: Record<string, string> = {
-  uploaded:              'bg-fuchsia-800/15 text-fuchsia-400 border-fuchsia-700/20',
-  ready_to_extract:      'bg-sky-800/15 text-sky-400 border-sky-700/20',
-  processing_extract:    'bg-amber-800/15 text-amber-400 border-amber-700/20',
-  request_release:       'bg-yellow-800/15 text-yellow-400 border-yellow-700/20',
-  processed_extract_success: 'bg-emerald-800/15 text-emerald-400 border-emerald-700/20',
-  processed_extract_failed:  'bg-rose-800/15 text-rose-400 border-rose-700/20',
-  publishing:            'bg-orange-800/15 text-orange-400 border-orange-700/20',
-  published:             'bg-emerald-800/15 text-emerald-400 border-emerald-700/20',
+  uploaded:              familyClass.info,
+  ready_to_extract:      familyClass.info,
+  processing_extract:    familyClass.caution,
+  request_release:       familyClass.caution,
+  processed_extract_success: familyClass.success,
+  processed_extract_failed:  familyClass.danger,
+  publishing:            familyClass.caution,
+  published:             familyClass.success,
 };
 
 const statusLabel: Record<string, string> = {
@@ -45,6 +46,7 @@ interface SyncRowProps {
   isSelected: boolean;
   onSelect: (checked: boolean) => void;
   showCheckbox?: boolean;
+  showStatusBadge?: boolean;
   showCompare?: boolean;
   onCompare?: () => void;
   pendingStatus?: string | null;
@@ -65,8 +67,8 @@ function DivergenceBadges({ divergence }: { divergence?: Divergence }) {
     <div className="flex flex-wrap gap-1 mt-1.5">
       {fields.map((f) => {
         const color = f.differs
-          ? 'bg-red-500/15 text-red-300 border-red-500/25'
-          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25';
+          ? 'bg-diff-differ-bg text-diff-differ-fg border-diff-differ-bd'
+          : 'bg-diff-match-bg text-diff-match-fg border-diff-match-bd';
         return (
           <span key={f.label} className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${color}`}>
             {f.label}
@@ -89,12 +91,13 @@ export default function SyncRow({
   isSelected,
   onSelect,
   showCheckbox = true,
+  showStatusBadge = true,
   showCompare,
   onCompare,
   pendingStatus,
 }: SyncRowProps) {
   return (
-    <div className={`px-3 py-2 border-b border-white/5 hover:bg-white/5 transition-colors ${isSelected ? 'bg-white/[0.04]' : ''}`}>
+    <div className={`px-3 py-2 border-b border-border-subtle hover:bg-surface-card transition-colors ${isSelected ? 'bg-on-dark/[0.04]' : ''}`}>
       <div className="flex items-start gap-2">
         {showCheckbox && (
           <div className="pt-0.5 shrink-0">
@@ -107,21 +110,21 @@ export default function SyncRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-mono text-white/60 truncate" title={ext_id}>{ext_id}</span>
+            <span className="text-xs font-mono text-foreground-faint truncate" title={ext_id}>{ext_id}</span>
             <div className="flex items-center gap-1.5 shrink-0">
-              {archStatus && (
-                <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusBadgeClass[archStatus] || 'bg-neutral-500/15 text-neutral-300 border-neutral-400/30'}`}>
-                  {statusLabel[archStatus] || archStatus}
+              {archStatus && showStatusBadge && (
+                <span className={getStatusBadge(archStatus).className}>
+                  {getStatusBadge(archStatus).label}
                 </span>
               )}
               {archHasEntities && (
-                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium bg-purple-800/15 text-purple-400 border-purple-700/20" title="Entities detected in extracted content">
+                <span className={`${familyClass.entity} text-[10px] px-1.5 py-0.5 gap-1`} title="Entities detected in extracted content">
                   <ScanSearch className="h-3 w-3" />
                   Detected
                 </span>
               )}
               {pendingStatus && (
-                <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${pendingStatus === 'processing' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`} title={`Async task — ${pendingStatus}`}>
+                <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${pendingStatus === 'processing' ? familyClass.info : familyClass.caution}`} title={`Async task — ${pendingStatus}`}>
                   <Clock className="h-3 w-3" />
                   {pendingStatus}
                 </span>
@@ -132,17 +135,17 @@ export default function SyncRow({
           <div className="flex flex-col gap-0.5 mt-1 text-[11px]">
             {archFilename && (
               <span className="flex items-center gap-1.5 min-w-0 truncate" title={`${archFilename} • ${archHash || ''}`}>
-                <span className="text-white/40 shrink-0">A: {archFilename}</span>
-                {archHash && <span className="text-white/20 font-mono text-[10px] shrink-0">{archHash.slice(0, 8)}</span>}
+                <span className="text-foreground-subtle shrink-0">A: {archFilename}</span>
+                {archHash && <span className="text-foreground-placeholder font-mono text-[10px] shrink-0">{archHash.slice(0, 8)}</span>}
               </span>
             )}
             {!archFilename && archHash && (
-              <span className="text-white/20 font-mono text-[10px] truncate" title={archHash}>A-hash: {archHash.slice(0, 8)}</span>
+              <span className="text-foreground-placeholder font-mono text-[10px] truncate" title={archHash}>A-hash: {archHash.slice(0, 8)}</span>
             )}
             {hindTitle && (
               <span className="flex items-center gap-1.5 min-w-0 truncate" title={`${hindTitle} • ${hindHash || ''}`}>
-                <span className="text-white/40 shrink-0">H: {hindTitle}</span>
-                {hindHash && <span className="text-white/20 font-mono text-[10px] shrink-0">{hindHash.slice(0, 8)}</span>}
+                <span className="text-foreground-subtle shrink-0">H: {hindTitle}</span>
+                {hindHash && <span className="text-foreground-placeholder font-mono text-[10px] shrink-0">{hindHash.slice(0, 8)}</span>}
               </span>
             )}
           </div>
@@ -152,7 +155,7 @@ export default function SyncRow({
             {showCompare && divergence && (
               <button
                 onClick={(e) => { e.stopPropagation(); onCompare?.(); }}
-                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors shrink-0 mt-1.5"
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface-card border border-border-default text-foreground-subtle hover:bg-surface-panel hover:text-foreground-muted transition-colors shrink-0 mt-1.5"
                 title="Compare"
               >
                 <GitCompare className="h-3 w-3" />

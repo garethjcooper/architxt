@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { fork, execSync } from 'child_process';
+import { fork } from 'child_process';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { createLogger } from './utils/logger.js';
@@ -18,6 +18,8 @@ import configRoute from './routes/config.js';
 import mentalModelsRoute from './routes/mental-models.js';
 import directivesRoute from './routes/directives.js';
 import researchRoute from './routes/research.js';
+import contextualGraphRoute from './routes/contextual-graph.js';
+import templateRolesRoute from './routes/template-roles.js';
 import swaggerSpecs, { swaggerUi } from './swagger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,8 +40,10 @@ try {
 // Daemon state
 let daemon = null;
 let hindsightPollDaemon = null;
+let contextualGraphSyncDaemon = null;
 let daemonRestartTimer = null;
 let hindsightPollRestartTimer = null;
+let contextualGraphSyncRestartTimer = null;
 const DAEMON_RESTART_DELAY_MS = 5000;
 
 
@@ -126,6 +130,46 @@ function spawnHindsightPollDaemon() {
 }
 
 /**
+ * Spawn the contextual-graph sync daemon as a child process
+ * Controlled by config.contextualGraph.sync_daemon.enabled (default: false)
+ */
+function spawnContextualGraphSyncDaemon() {
+  if (!config.contextualGraph?.sync_daemon?.enabled) {
+    logger.info('Contextual-graph sync daemon disabled via config');
+    return null;
+  }
+
+  const daemonPath = path.join(__dirname, 'daemons', 'contextual-graph-sync-daemon.js');
+  const child = fork(daemonPath, [], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  logger.info('Contextual-graph sync daemon spawned', { pid: child.pid, path: daemonPath });
+
+  child.on('exit', (code, signal) => {
+    logger.warn('Contextual-graph sync daemon exited', { code, signal, pid: child.pid });
+
+    if (contextualGraphSyncDaemon === child) {
+      contextualGraphSyncDaemon = null;
+    }
+
+    if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
+      logger.info(`Contextual-graph sync daemon restart scheduled in ${DAEMON_RESTART_DELAY_MS}ms`);
+      contextualGraphSyncRestartTimer = setTimeout(() => {
+        contextualGraphSyncDaemon = spawnContextualGraphSyncDaemon();
+      }, DAEMON_RESTART_DELAY_MS);
+    }
+  });
+
+  child.on('error', (err) => {
+    logger.error('Contextual-graph sync daemon error', { error: err.message, pid: child.pid });
+  });
+
+  return child;
+}
+
+/**
  * Stop a specific daemon by child process ref
  */
 function stopChildDaemon(child, name, signal = 'SIGTERM') {
@@ -159,9 +203,14 @@ function stopDaemon(signal = 'SIGTERM') {
     clearTimeout(hindsightPollRestartTimer);
     hindsightPollRestartTimer = null;
   }
+  if (contextualGraphSyncRestartTimer) {
+    clearTimeout(contextualGraphSyncRestartTimer);
+    contextualGraphSyncRestartTimer = null;
+  }
   const promises = [
     stopChildDaemon(daemon, 'Extract daemon', signal),
     stopChildDaemon(hindsightPollDaemon, 'Hindsight poll daemon', signal),
+    stopChildDaemon(contextualGraphSyncDaemon, 'Contextual-graph sync daemon', signal),
   ];
   return Promise.all(promises);
 }
@@ -186,7 +235,9 @@ app.use('/api/v1/entities', entitiesRoute);
 app.use('/api/v1/config', configRoute);
 app.use('/api/v1/mentalmodels', mentalModelsRoute);
 app.use('/api/v1/directives', directivesRoute);
+app.use('/api/v1/template-roles', templateRolesRoute);
 app.use('/api/v1/research', researchRoute);
+app.use('/api/v1/contextual-graph', contextualGraphRoute);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -241,6 +292,7 @@ server.headersTimeout = 120000;
 // Spawn daemons after server starts
 daemon = spawnDaemon();
 hindsightPollDaemon = spawnHindsightPollDaemon();
+contextualGraphSyncDaemon = spawnContextualGraphSyncDaemon();
 
 // Graceful shutdown
 let isShuttingDown = false;

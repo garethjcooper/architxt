@@ -53,7 +53,7 @@ export function CreateMetadataDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Create Metadata Entry
           </DialogTitle>
         </DialogHeader>
@@ -61,7 +61,7 @@ export function CreateMetadataDialog({
         <div className="space-y-6 py-4">
           {/* Key Field */}
           <div className="space-y-2">
-            <Label htmlFor="create-key" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="create-key" className="text-xs uppercase text-foreground-subtle font-medium">
               Key *
             </Label>
             <Input
@@ -69,17 +69,13 @@ export function CreateMetadataDialog({
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="Enter metadata key"
-              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
+              className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
             />
           </div>
 
           {/* Value Field */}
           <div className="space-y-2">
-            <Label htmlFor="create-value" className="text-xs uppercase text-white/50 font-medium">
+            <Label htmlFor="create-value" className="text-xs uppercase text-foreground-subtle font-medium">
               Value
             </Label>
             <Input
@@ -87,27 +83,23 @@ export function CreateMetadataDialog({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Enter metadata value (optional)"
-              className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
-              style={{
-                '--tw-ring-color': 'rgb(52, 211, 153)',
-                '--tw-ring-opacity': '0.4',
-              } as React.CSSProperties}
+              className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleCreate}
               disabled={!key.trim() || isLoading}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Create

@@ -34,7 +34,8 @@ export function formatEntityCatalog(entities) {
 
   const lines = entities.map((e) => {
     const aliasPart = e.aliases.length > 0 ? ` (aliases: ${e.aliases.join(', ')})` : '';
-    return `- ${e.name} (${e.type}:${e.id})${aliasPart}`;
+    const displayName = e.name.replace(/[()[\]{}]/g, '');
+    return `- ${displayName} (${e.type}:${e.id})${aliasPart}`;
   });
 
   return `### Entity catalog\n\n${lines.join('\n')}`;

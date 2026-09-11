@@ -16,6 +16,7 @@ interface Server {
   name: string;
   api_key: string | null;
   api_version: string | null;
+  contextual_graph_banks: { bank_id: string; mode: 'manual' | 'auto'; refresh_interval?: string }[];
   created_at: string;
   updated_at: string;
 }
@@ -85,7 +86,7 @@ export function ViewServerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
+          <DialogTitle className="text-xl font-semibold text-foreground-default">
             Server Details
           </DialogTitle>
         </DialogHeader>
@@ -95,7 +96,7 @@ export function ViewServerDialog({
           <div className="space-y-4">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="name" className="text-xs uppercase text-foreground-subtle font-medium">
                 Name
               </Label>
               <Input
@@ -103,17 +104,13 @@ export function ViewServerDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter server name"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
 
             {/* Base URL */}
             <div className="space-y-2">
-              <Label htmlFor="base-url" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="base-url" className="text-xs uppercase text-foreground-subtle font-medium">
                 Base URL
               </Label>
               <Input
@@ -121,17 +118,13 @@ export function ViewServerDialog({
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="Enter base URL"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
 
             {/* API Key */}
             <div className="space-y-2">
-              <Label htmlFor="api-key" className="text-xs uppercase text-white/50 font-medium">
+              <Label htmlFor="api-key" className="text-xs uppercase text-foreground-subtle font-medium">
                 API Key
               </Label>
               <Input
@@ -140,49 +133,70 @@ export function ViewServerDialog({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="Enter API key (hidden)"
-                className="!rounded-lg !border !border-white/20 !bg-transparent !text-white !placeholder:text-white/40 focus:!border-emerald-400 focus:!ring-2"
-                style={{
-                  '--tw-ring-color': 'rgb(52, 211, 153)',
-                  '--tw-ring-opacity': '0.4',
-                } as React.CSSProperties}
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
               />
             </div>
           </div>
 
           {/* Read-only Metadata */}
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border-default">
+            <div className="col-span-2 space-y-2">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Contextual Graph Banks</p>
+              {(server.contextual_graph_banks || []).length === 0 ? (
+                <p className="text-sm text-foreground-subtle">None configured.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {(server.contextual_graph_banks || []).map((cfg) => (
+                    <span
+                      key={cfg.bank_id}
+                      className={[
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border",
+                        cfg.mode === 'auto'
+                          ? 'bg-accent-secondary-bg/50 text-accent-secondary-fg border-accent-secondary-bd'
+                          : 'bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd',
+                      ].join(' ')}
+                      title={cfg.mode === 'auto' ? `Auto sync${cfg.refresh_interval ? ` (${cfg.refresh_interval})` : ''}` : 'Manual only'}
+                    >
+                      {cfg.bank_id}
+                      <span className="text-foreground-subtle">·{cfg.mode === 'auto' ? 'auto' : 'manual'}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Server ID</p>
-              <p className="text-sm text-white font-mono">{server.id}</p>
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Server ID</p>
+              <p className="text-sm text-foreground-default font-mono">{server.id}</p>
             </div>
             <div className="col-span-1"></div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Created</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Created</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(server.created_at), { addSuffix: true })}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs uppercase text-white/50 font-medium">Updated</p>
-              <p className="text-sm text-white/70">
+              <p className="text-xs uppercase text-foreground-subtle font-medium">Updated</p>
+              <p className="text-sm text-foreground-faint">
                 {formatDistanceToNow(new Date(server.updated_at), { addSuffix: true })}
               </p>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white hover:bg-white/5"
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
             >
               Close
             </Button>
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}

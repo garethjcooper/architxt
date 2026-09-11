@@ -4,6 +4,8 @@ import { fromJson, requireInt, requireString, dbExec } from '../../utils/db-help
 import { getOrCreateTagByName } from './tags.js';
 import { createLogger } from '../../utils/logger.js';
 import { composeMentalModelPrompt } from '../../prompts/template-service.js';
+import { validateRoleBasedTemplate } from '../../services/contextual-graph/template-validation.js';
+import { getRoleScopeMap } from './template-roles.js';
 
 const logger = createLogger('mental-models-crud');
 
@@ -14,30 +16,127 @@ const JSON_FIELDS = [];
 const base = createBaseCrud(TABLE, PK, JSON_FIELDS, { pkType: 'integer' });
 
 export const getMentalModel = base.get;
-export const deleteMentalModel = base.del;
+
+/** Roles owned by the system. User actions must not mutate these rows. */
+export const SYSTEM_TEMPLATE_ROLES = new Set([
+  'sys_entity_summary',
+  'sys_entity_capabilities',
+  'sys_edge_context',
+  'sys_discovery_context',
+]);
+
+/** Returns values used by contextual-graph system templates. */
+export const CONTEXTUAL_RETURNS = new Set(['sys_patch']);
+
+export function isSystemTemplateRole(role) {
+  return SYSTEM_TEMPLATE_ROLES.has(role);
+}
+
+/** Returns true if the role is in template_roles (system or user). */
+export function isTemplateRole(db, role) {
+  if (!role) return false;
+  return isKnownTemplateRole(db, role);
+}
+
+/** Read the template role and external id for a mental model directly from the current DB. */
+function getMentalModelTemplateIdentity(db, id) {
+  const row = db.prepare(`SELECT mm_template_role, mm_ext_id FROM ${TABLE} WHERE ${PK} = ?`).get(requireInt(PK, id));
+  return row ? { role: row.mm_template_role, extId: row.mm_ext_id } : null;
+}
+
+/** Read the template role for a mental model directly from the current DB. */
+function getMentalModelTemplateRole(db, id) {
+  const identity = getMentalModelTemplateIdentity(db, id);
+  return identity ? identity.role : null;
+}
+
+/** Reusable guard result for system-template mutations. */
+function systemTemplateGuard(role, action) {
+  if (!isSystemTemplateRole(role)) return { blocked: false };
+  return {
+    blocked: true,
+    error: `System template cannot be ${action}.`,
+    code: 'SYSTEM_TEMPLATE_IMMUTABLE',
+  };
+}
+
+/** Returns true if the role is a built-in role that should be protected in admin. */
+export function isBuiltInTemplateRole(role) {
+  return role === 'user_entity_derived' || isSystemTemplateRole(role);
+}
+
+/** Reusable guard result for built-in template-role mutations. */
+function builtInTemplateRoleGuard(role, action) {
+  if (!isBuiltInTemplateRole(role)) return { blocked: false };
+  return {
+    blocked: true,
+    error: `Built-in template role cannot be ${action}.`,
+    code: 'BUILT_IN_TEMPLATE_ROLE_IMMUTABLE',
+  };
+}
+
+export function getMentalModelSystemTemplateGuard(db, id, action) {
+  const role = getMentalModelTemplateRole(db, id);
+  return systemTemplateGuard(role, action);
+}
+
+export const deleteMentalModel = (db, id) => dbExec(() => {
+  const guard = getMentalModelSystemTemplateGuard(db, id, 'deleted');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
+  return base.del(db, id);
+}, 'mentalModels.delete');
 
 /** Placeholders supported in template fields (ext_id, name, source_query). */
 const ENTITY_NAME_PLACEHOLDER = '{entity-name}';
 const ENTITY_ID_PLACEHOLDER = '{entity-id}';
 const ENTITY_TYPE_PLACEHOLDER = '{entity-type}';
+const ENTITY_DESCRIPTION_PLACEHOLDER = '{entity-description}';
+const ENTITY_ALIASES_PLACEHOLDER = '{entity-aliases}';
+const BANK_ID_PLACEHOLDER = '{bank-id}';
+const SERVER_ID_PLACEHOLDER = '{server-id}';
+const NOW_PLACEHOLDER = '{now}';
+const DATE_PLACEHOLDER = '{date}';
+
+/** Contextual-graph placeholders that can also satisfy template eligibility. */
+const CONTEXTUAL_PLACEHOLDERS = [
+  '{node-id}',
+  '{node-name}',
+  '{source-id}',
+  '{source-name}',
+  '{target-id}',
+  '{target-name}',
+  '{seed-id}',
+  '{seed-name}',
+  '{batch}',
+];
+
 const PLACEHOLDER_PATTERN = new RegExp(
-  `\\${ENTITY_NAME_PLACEHOLDER}|\\${ENTITY_ID_PLACEHOLDER}|\\${ENTITY_TYPE_PLACEHOLDER}`,
+  [
+    ENTITY_NAME_PLACEHOLDER,
+    ENTITY_ID_PLACEHOLDER,
+    ENTITY_TYPE_PLACEHOLDER,
+    ENTITY_DESCRIPTION_PLACEHOLDER,
+    ENTITY_ALIASES_PLACEHOLDER,
+    BANK_ID_PLACEHOLDER,
+    SERVER_ID_PLACEHOLDER,
+    NOW_PLACEHOLDER,
+    DATE_PLACEHOLDER,
+    ...CONTEXTUAL_PLACEHOLDERS,
+  ]
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$\u0026'))
+    .join('|'),
   'g'
 );
 
 const VALID_REFRESH_MODES = new Set(['full', 'delta']);
 const VALID_TAGS_MATCH_MODES = new Set(['all_strict', 'any_strict', 'all', 'any', 'exact']);
-export const VALID_RETURNS = new Set([
-  'narrative',
-  'graph-known',
-  'graph-discovery',
-  'graph-discovered-only',
-  'narrative-graph-known',
-  'narrative-graph-discovery',
-  'narrative-graph-discovered-only',
-]);
+export const VALID_RETURNS = new Set(['generic']);
 export const VALID_CONCATENATIONS = new Set(['merge', 'compile']);
-export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability'];
+export const STANDARD_DIMENSIONS = ['none', 'interface', 'summary', 'interface-found', 'capability', 'contextual-graph'];
 const VALID_BOOLEAN_STRINGS = new Set(['true', 'false']);
 const MIN_MAX_TOKENS = 256;
 const MAX_MAX_TOKENS = 8192;
@@ -133,14 +232,34 @@ export function isStandardDimension(value) {
 }
 
 /**
- * Substitute entity placeholders into a template string.
+ * Substitute entity and runtime placeholders into a template string.
+ *
+ * @param {string} template
+ * @param {Object} entity
+ * @param {Object} [context]
+ * @param {string} [context.bankId]
+ * @param {number|string} [context.serverId]
+ * @param {string|Date} [context.now] - defaults to current time
  */
-function substitutePlaceholders(template, entity) {
+export function substitutePlaceholders(template, entity, context = {}) {
   if (!template) return template;
+  const now = context.now ? new Date(context.now) : new Date();
+  const date = now.toISOString().slice(0, 10);
+  const aliases = Array.isArray(entity.aliases)
+    ? entity.aliases.join(', ')
+    : typeof entity.aliases === 'string'
+      ? entity.aliases
+      : '';
   return template
     .replaceAll(ENTITY_NAME_PLACEHOLDER, entity.name ?? '')
     .replaceAll(ENTITY_ID_PLACEHOLDER, entity.entity_id ?? '')
-    .replaceAll(ENTITY_TYPE_PLACEHOLDER, entity.type_name ?? '');
+    .replaceAll(ENTITY_TYPE_PLACEHOLDER, entity.type_name ?? '')
+    .replaceAll(ENTITY_DESCRIPTION_PLACEHOLDER, entity.description ?? '')
+    .replaceAll(ENTITY_ALIASES_PLACEHOLDER, aliases)
+    .replaceAll(BANK_ID_PLACEHOLDER, context.bankId ?? '')
+    .replaceAll(SERVER_ID_PLACEHOLDER, context.serverId != null ? String(context.serverId) : '')
+    .replaceAll(NOW_PLACEHOLDER, now.toISOString())
+    .replaceAll(DATE_PLACEHOLDER, date);
 }
 
 /**
@@ -167,16 +286,36 @@ export function validateEntityTemplateEligibility({
   mm_is_template,
   mm_name,
   mm_ext_id,
+  mm_template_role,
   mm_source_query,
 }) {
   if (mm_is_template !== 'true') {
     return { valid: true };
   }
 
+  // System templates are pre-seeded and do not require user entity placeholders.
+  if (isSystemTemplateRole(mm_template_role)) {
+    return { valid: true };
+  }
+
+  // The default user entity role is a plain template; it only needs the
+  // generic entity placeholders used during derivation, not the strict
+  // contextual role format enforced by validateRoleBasedTemplate.
+  if (isUnlimitedTemplateRole(mm_template_role)) {
+    if (!mm_source_query || mm_source_query.trim() === '') {
+      return {
+        valid: false,
+        error: 'Template mode requires a source_query.',
+        code: 'VALIDATION_ERROR',
+      };
+    }
+    return { valid: true };
+  }
+
   if (!hasEntityPlaceholders(mm_name, mm_ext_id, '')) {
     return {
       valid: false,
-      error: `Template mode requires '${ENTITY_ID_PLACEHOLDER}' or '${ENTITY_NAME_PLACEHOLDER}' in Template Id (External ID) or Name`,
+      error: `Template mode requires a supported placeholder in Template Id (External ID) or Name. Supported: {entity-id}, {entity-name}, {entity-type}, {entity-description}, {entity-aliases}, {bank-id}, {server-id}, {now}, {date}, {node-id}, {node-name}, {source-id}, {source-name}, {target-id}, {target-name}, {seed-id}, {seed-name}, {batch}.`,
       code: 'VALIDATION_ERROR',
     };
   }
@@ -185,12 +324,62 @@ export function validateEntityTemplateEligibility({
 }
 
 /**
+ * Validate that a role-based template conforms to the required format for its
+ * derivation scope. Called after the generic placeholder check.
+ *
+ * @param {object} db
+ * @param {object} params
+ * @returns {{valid: boolean, error?: string, code?: string}}
+ */
+export function validateRoleBasedTemplateEligibility(db, { mm_template_role, mm_ext_id, mm_name, mm_source_query }) {
+  if (!mm_template_role) return { valid: true };
+  if (isSystemTemplateRole(mm_template_role)) return { valid: true };
+  if (isUnlimitedTemplateRole(mm_template_role)) return { valid: true };
+
+  const result = validateRoleBasedTemplate(db, {
+    roleId: mm_template_role,
+    extId: mm_ext_id,
+    name: mm_name,
+    sourceQuery: mm_source_query,
+  });
+
+  if (!result.valid) {
+    return { valid: false, error: result.errors.join(' '), code: 'VALIDATION_ERROR' };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Derive virtual mental models from a template model.
  * The template must be pre-loaded with tags and entities.
+ *
+ * @param {Object} template
+ * @param {Object} [context]
+ * @param {string} [context.bankId]
+ * @param {number|string} [context.serverId]
+ * @param {string|Date} [context.now]
+ * @param {Object} [context.db] - optional database connection for role scope lookup
  */
-export function deriveMentalModels(template) {
+export function deriveMentalModels(template, context = {}, { includeSystemTemplates = false } = {}) {
   const entities = template?.entities;
   if (template?.is_template !== true || !Array.isArray(entities) || entities.length === 0) {
+    return [];
+  }
+
+  // System templates are normally derived by the contextual-graph service from
+  // graph state, but the prebuilt research path needs per-entity derivation too.
+  if (!includeSystemTemplates && isSystemTemplateRole(template.template_role)) {
+    return [];
+  }
+
+  const effectiveRole = template.template_role || 'user_entity_derived';
+  const scopeMap = getRoleScopeMap(context?.db);
+  const scope = scopeMap.get(effectiveRole) || null;
+
+  if (scope === 'edge') {
+    // Edge role templates cannot derive per-entity instances from attached
+    // entities. Derivation for edges is handled by the contextual graph.
     return [];
   }
 
@@ -205,9 +394,6 @@ export function deriveMentalModels(template) {
     exclude_mental_model_list: template.exclude_mental_model_list,
     max_tokens: normaliseMaxTokens(template.max_tokens),
     tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
-    dimension: template.dimension,
-    returns: template.returns,
-    concatenation: template.concatenation,
     is_template: template.is_template,
     tags: template.tags || [],
     entities: entities,
@@ -220,17 +406,14 @@ export function deriveMentalModels(template) {
     return {
       ...baseModel,
       id: `${template.id}:${entity.id}`,
-      ext_id: substitutePlaceholders(template.ext_id, entity),
-      name: substitutePlaceholders(template.name, entity),
-      source_query: substitutePlaceholders(template.source_query, entity),
+      ext_id: substitutePlaceholders(template.ext_id, entity, context),
+      name: substitutePlaceholders(template.name, entity, context),
+      source_query: substitutePlaceholders(template.source_query, entity, context),
       refresh_mode: overrides.refresh_mode ?? normaliseRefreshMode(template.refresh_mode),
       refresh_after_consolidation: overrides.refresh_after_consolidation ?? template.refresh_after_consolidation,
       exclude_all_mental_models: overrides.exclude_all_mental_models ?? template.exclude_all_mental_models,
       max_tokens: overrides.max_tokens ?? normaliseMaxTokens(template.max_tokens),
       tags_match_mode: normaliseTagsMatchMode(template.tags_match_mode),
-      dimension: template.dimension,
-      returns: template.returns,
-      concatenation: template.concatenation,
       derived_entity: entity,
       is_derived: true,
     };
@@ -249,12 +432,11 @@ export async function composeDerivedMentalModels(db, derivedRows) {
   return Promise.all(
     derivedRows.map(async (row) => {
       try {
-        const composedQuery = await composeMentalModelPrompt(db, row.returns, row.source_query);
+        const composedQuery = await composeMentalModelPrompt(db, 'generic', row.source_query);
         return { ...row, composed_query: composedQuery };
       } catch (err) {
         logger.warn('Failed to compose derived mental model prompt', {
           derivedId: row.id,
-          returns: row.returns,
           error: err.message,
         });
         return { ...row, composed_query: null, compose_error: err.message };
@@ -307,7 +489,7 @@ const ENTITIES_SQL = `
  * List all mental models with their associated tags and entities as JSON arrays.
  */
 export const listMentalModels = (db, options = {}) => dbExec(() => {
-  const { limit = 1000, offset = 0, dimension, dimensions, returns } = options;
+  const { limit = 1000, offset = 0, dimension, dimensions, templateRole, templateRoles, returns } = options;
   const conditions = [];
   const params = [];
   if (dimension !== undefined && dimension !== null) {
@@ -317,6 +499,14 @@ export const listMentalModels = (db, options = {}) => dbExec(() => {
   if (Array.isArray(dimensions) && dimensions.length > 0) {
     conditions.push(`m.mm_dimension IN (${dimensions.map(() => '?').join(',')})`);
     params.push(...dimensions);
+  }
+  if (templateRole !== undefined && templateRole !== null) {
+    conditions.push('m.mm_template_role = ?');
+    params.push(templateRole);
+  }
+  if (Array.isArray(templateRoles) && templateRoles.length > 0) {
+    conditions.push(`m.mm_template_role IN (${templateRoles.map(() => '?').join(',')})`);
+    params.push(...templateRoles);
   }
   if (returns !== undefined && returns !== null) {
     conditions.push('m.mm_returns = ?');
@@ -365,6 +555,7 @@ const DISPLAY_LABELS = {
   summary: 'Summary',
   'interface-found': 'Interface-Discovered',
   capability: 'Capability',
+  'contextual-graph': 'Contextual Graph',
 };
 
 export const listStandardDimensions = () => {
@@ -394,6 +585,59 @@ export const listMentalModelsForDiff = (db, options = {}) => dbExec(() => {
   const rows = stmt(db, sql).all(requireInt('limit', limit), requireInt('offset', offset));
   return rows.map(r => fromJson(r, ['mm_tag_names', 'mm_entities']));
 }, 'mentalModels.listForDiff');
+/**
+ * List distinct template roles with display labels from template_roles table.
+ * Falls back to sys_* roles discovered in mental_models if template_roles missing.
+ */
+const ROLE_LABELS = {
+  sys_entity_summary: 'Entity summary',
+  sys_entity_capabilities: 'Entity capabilities',
+  sys_edge_context: 'Edge context',
+  sys_discovery_context: 'Discovery',
+};
+
+export const listTemplateRoles = (db, { availableOnly = false, excludeMmId = null } = {}) => {
+  const result = dbExec(() => {
+    const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'template_roles'").get();
+    if (tableExists) {
+      let rows = stmt(db, `
+        SELECT tr_role_id AS role,
+               tr_display_name AS label,
+               tr_derivation_scope AS derivation_scope
+        FROM template_roles
+        ORDER BY COALESCE(tr_sort_order, 9999) ASC, tr_role_id ASC
+      `).all();
+      if (availableOnly) {
+        // Roles already assigned to another mental model are not available for a new assignment.
+        // user_entity_derived is intentionally unlimited and always available.
+        const inUseRows = stmt(db, `
+          SELECT DISTINCT mm_template_role AS role
+          FROM ${TABLE}
+          WHERE mm_template_role IS NOT NULL
+            AND mm_template_role != 'user_entity_derived'
+            ${excludeMmId != null ? 'AND mm_id != ?' : ''}
+        `).all(...(excludeMmId != null ? [excludeMmId] : []));
+        const inUse = new Set(inUseRows.map((r) => r.role));
+        rows = rows.filter((r) => !inUse.has(r.role));
+      }
+      return rows;
+    }
+
+    // Legacy fallback for old schemas before template_roles migration.
+    const rows = stmt(db, `
+      SELECT DISTINCT mm_template_role AS role
+      FROM ${TABLE}
+      WHERE mm_template_role IS NOT NULL
+        AND mm_template_role LIKE 'sys_%'
+      ORDER BY mm_template_role ASC
+    `).all();
+    return rows.map((r) => ({
+      value: r.role,
+      label: ROLE_LABELS[r.role] ?? r.role,
+    }));
+  }, 'mentalModels.listTemplateRoles');
+  return result.success ? result.data : [];
+};
 
 /**
  * Get a single mental model with tags and entities.
@@ -422,6 +666,17 @@ export const getMentalModelIdByExtId = (db, extId) => dbExec(() => {
   return row ? row[PK] : null;
 }, `${TABLE}.getIdByExtId`);
 
+export function isUnlimitedTemplateRole(role) {
+  return role === 'user_entity_derived';
+}
+
+/** Read the mental model id that currently owns a non-null template role, if any. */
+function getMentalModelIdByTemplateRole(db, role) {
+  if (!role || isUnlimitedTemplateRole(role)) return null;
+  const row = db.prepare(`SELECT ${PK} FROM ${TABLE} WHERE mm_template_role = ?`).get(role);
+  return row ? row[PK] : null;
+}
+
 /**
  * Create mental model.
  * Route layer should already validate and translate API field names to DB names.
@@ -429,7 +684,34 @@ export const getMentalModelIdByExtId = (db, extId) => dbExec(() => {
 export const createMentalModel = (db, data) => dbExec(() => {
   requireString('mm_ext_id', data.mm_ext_id);
 
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation'];
+  // Prevent anyone from minting a new system-template row via the API.
+  if (isSystemTemplateRole(data.mm_template_role)) {
+    const err = new Error('Reserved system template role cannot be assigned.');
+    err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+    throw err;
+  }
+  if (SYSTEM_TEMPLATE_ROLES.has(data.mm_ext_id)) {
+    const err = new Error('Reserved system template external id cannot be used.');
+    err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+    throw err;
+  }
+
+  // Each non-null template role may be assigned to at most one mental model.
+  const existingId = getMentalModelIdByTemplateRole(db, data.mm_template_role);
+  if (existingId) {
+    const err = new Error(`Template role is already assigned to mental model ${existingId}.`);
+    err.code = 'TEMPLATE_ROLE_IN_USE';
+    throw err;
+  }
+
+  // Contextual roles require a source query so derivation has something to compose.
+  if (data.mm_template_role && !data.mm_source_query) {
+    const err = new Error('Contextual template role requires a source_query.');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_template_role'];
   const presentCols = cols.filter(c => data[c] !== undefined && data[c] !== null);
   const placeholders = presentCols.map(() => '?').join(',');
   const values = presentCols.map(c => data[c]);
@@ -443,9 +725,53 @@ export const createMentalModel = (db, data) => dbExec(() => {
  * Update mental model. Only present fields are updated.
  */
 export const updateMentalModel = (db, id, data) => dbExec(() => {
-  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_dimension', 'mm_returns', 'mm_concatenation'];
+  const cols = ['mm_ext_id', 'mm_name', 'mm_source_query', 'mm_refresh_after_consolidation', 'mm_refresh_mode', 'mm_exclude_all_mental_models', 'mm_exclude_mental_model_list', 'mm_tags_match_mode', 'mm_is_template', 'mm_max_tokens', 'mm_template_role'];
   const updates = [];
   const values = [];
+
+  const identity = getMentalModelTemplateIdentity(db, id);
+  const role = identity?.role ?? null;
+
+  // For system templates, keep the historical SYSTEM_TEMPLATE_IMMUTABLE code
+  // when any role change is attempted. Otherwise use the generic immutability
+  // code for all other mental models.
+  if (data.mm_template_role !== undefined && data.mm_template_role !== role) {
+    const isSystem = isSystemTemplateRole(role);
+    const err = new Error(isSystem ? 'System template role cannot be changed.' : 'Template role cannot be changed after creation.');
+    err.code = isSystem ? 'SYSTEM_TEMPLATE_IMMUTABLE' : 'TEMPLATE_ROLE_IMMUTABLE';
+    throw err;
+  }
+
+  // Guard against assigning a role that is already owned by a different model
+  // during an update that introduces a new role (e.g., from null to a role).
+  if (role === null && data.mm_template_role !== undefined && data.mm_template_role !== null) {
+    const existingId = getMentalModelIdByTemplateRole(db, data.mm_template_role);
+    if (existingId && existingId !== id) {
+      const err = new Error(`Template role is already assigned to mental model ${existingId}.`);
+      err.code = 'TEMPLATE_ROLE_IN_USE';
+      throw err;
+    }
+  }
+
+  if (isSystemTemplateRole(role)) {
+    // System templates cannot stop being templates, change role, change
+    // their reserved ext_id, or be renamed. Other configurable fields remain editable.
+    if (data.mm_is_template === 'false') {
+      const err = new Error('System template cannot be converted to a non-template.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+    if (data.mm_ext_id !== undefined && data.mm_ext_id !== identity.extId) {
+      const err = new Error('System template external id cannot be changed.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+    if (data.mm_name !== undefined) {
+      const err = new Error('System template name cannot be changed.');
+      err.code = 'SYSTEM_TEMPLATE_IMMUTABLE';
+      throw err;
+    }
+  }
 
   for (const c of cols) {
     if (data[c] !== undefined && data[c] !== null) {
@@ -485,6 +811,12 @@ export const getMentalModelTags = (db, mmId) => dbExec(() => {
  */
 export const addMentalModelTag = (db, mmId, tagId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const tId = requireInt('tag_id', tagId);
   const sql = `INSERT OR IGNORE INTO mental_model_tags (mm_id, tag_id) VALUES (?, ?)`;
   stmt(db, sql).run(mId, tId);
@@ -496,6 +828,12 @@ export const addMentalModelTag = (db, mmId, tagId) => dbExec(() => {
  */
 export const removeMentalModelTag = (db, mmId, tagId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const tId = requireInt('tag_id', tagId);
   const sql = `DELETE FROM mental_model_tags WHERE mm_id = ? AND tag_id = ?`;
   const result = stmt(db, sql).run(mId, tId);
@@ -514,6 +852,12 @@ export const removeMentalModelTag = (db, mmId, tagId) => dbExec(() => {
  */
 export const syncMentalModelTags = (db, mmId, tagNames) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
 
   // Remove existing tags
   const deleteSql = `DELETE FROM mental_model_tags WHERE mm_id = ?`;
@@ -581,6 +925,12 @@ function getMentalModelTemplateValues(db, mmId) {
  */
 export const addMentalModelEntity = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity associations are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const template = getMentalModelTemplateValues(db, mId);
 
@@ -637,6 +987,12 @@ export const getMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() => {
  */
 export const updateMentalModelEntityOverrides = (db, mmId, entId, overrides) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
 
   const updates = [];
@@ -724,6 +1080,12 @@ export const updateMentalModelEntityOverrides = (db, mmId, entId, overrides) => 
  */
 export const deleteMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const sql = `UPDATE mental_model_entities SET mm_ent_refresh_mode = NULL, mm_ent_refresh_after_consolidation = NULL, mm_ent_exclude_all_mental_models = NULL, mm_ent_max_tokens = NULL, mm_ent_updated_at = CURRENT_TIMESTAMP WHERE mm_id = ? AND ent_id = ?`;
   const result = stmt(db, sql).run(mId, eId);
@@ -735,6 +1097,12 @@ export const deleteMentalModelEntityOverrides = (db, mmId, entId) => dbExec(() =
  */
 export const clearMentalModelEntityOverrides = (db, mmId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const sql = `UPDATE mental_model_entities SET mm_ent_refresh_mode = NULL, mm_ent_refresh_after_consolidation = NULL, mm_ent_exclude_all_mental_models = NULL, mm_ent_max_tokens = NULL, mm_ent_updated_at = CURRENT_TIMESTAMP WHERE mm_id = ?`;
   const result = stmt(db, sql).run(mId);
   return { cleared: result.changes };
@@ -745,6 +1113,12 @@ export const clearMentalModelEntityOverrides = (db, mmId) => dbExec(() => {
  */
 export const batchUpdateMentalModelEntityOverrides = (db, mmId, entityIds, overrides) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity overrides are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   if (!Array.isArray(entityIds) || entityIds.length === 0) {
     throw new Error('At least one entity_id is required');
   }
@@ -768,6 +1142,12 @@ export const batchUpdateMentalModelEntityOverrides = (db, mmId, entityIds, overr
  */
 export const removeMentalModelEntity = (db, mmId, entId) => dbExec(() => {
   const mId = requireInt('mm_id', mmId);
+  const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity associations are managed by the system');
+  if (guard.blocked) {
+    const err = new Error(guard.error);
+    err.code = guard.code;
+    throw err;
+  }
   const eId = requireInt('ent_id', entId);
   const sql = `DELETE FROM mental_model_entities WHERE mm_id = ? AND ent_id = ?`;
   const result = stmt(db, sql).run(mId, eId);
@@ -779,6 +1159,14 @@ export const removeMentalModelEntity = (db, mmId, entId) => dbExec(() => {
  */
 export const batchUpdateMentalModelTags = (db, mmIds, tagsToAdd, tagsToRemove) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: tags are managed by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
   let tagsAdded = 0;
   let tagsRemoved = 0;
 
@@ -814,6 +1202,14 @@ export const batchUpdateMentalModelTags = (db, mmIds, tagsToAdd, tagsToRemove) =
  */
 export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitiesToRemove) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: entity associations are managed by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
   let entitiesAdded = 0;
   let entitiesRemoved = 0;
 
@@ -869,6 +1265,14 @@ export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitie
  */
 export const batchUpdateMentalModelConfig = (db, mmIds, config) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: system templates are configured by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
 
   const updates = [];
   const values = [];

@@ -59,10 +59,21 @@ export function usePersistentServerBank<S extends ServerLike, B extends BankLike
     [selectedServerId, save]
   );
 
+  const saveSessionId = useCallback(
+    (sessionId: number) => {
+      if (selectedServerId && selectedBankId) {
+        save(selectedServerId, selectedBankId, sessionId);
+      }
+    },
+    [selectedServerId, selectedBankId, save]
+  );
+
   return {
     selectedServerId,
     setSelectedServerId: handleSetServerId,
     selectedBankId,
     setSelectedBankId: handleSetBankId,
+    saveSessionId,
+    lastSessionId: stored?.sessionId,
   };
 }

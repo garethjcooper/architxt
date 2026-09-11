@@ -76,12 +76,33 @@ export interface Tag {
   updated_at: string;
 }
 
+export interface ContextualGraphBankConfig {
+  bank_id: string;
+  mode: 'manual' | 'auto';
+  refresh_interval?: string;
+  restriction?: {
+    import?: {
+      top_k_nodes?: number;
+      min_weight?: number;
+      include_patterns?: string[];
+      exclude_patterns?: string[];
+    };
+    deploy?: {
+      max_models_per_run?: number;
+      allowed_model_types?: string[];
+      include_node_ids?: string[];
+      exclude_node_ids?: string[];
+    };
+  };
+}
+
 export interface Server {
   id: number;
   base_url: string;
   name: string;
   api_key: string | null;
   api_version: string | null;
+  contextual_graph_banks: ContextualGraphBankConfig[];
   created_at: string;
   updated_at: string;
 }
@@ -136,31 +157,15 @@ export interface Entity {
   updated_at: string;
 }
 
-export type MentalModelReturns =
-  | 'narrative'
-  | 'graph-known'
-  | 'graph-discovery'
-  | 'graph-discovered-only'
-  | 'narrative-graph-known'
-  | 'narrative-graph-discovery'
-  | 'narrative-graph-discovered-only';
+export type MentalModelReturns = 'generic';
 
 export const MENTAL_MODEL_RETURNS_OPTIONS: { value: MentalModelReturns; label: string }[] = [
-  { value: 'narrative', label: 'Narrative' },
-  { value: 'graph-known', label: 'Graph (known nodes)' },
-  { value: 'graph-discovery', label: 'Graph (discovery allowed)' },
-  { value: 'graph-discovered-only', label: 'Graph (discovered only)' },
-  { value: 'narrative-graph-known', label: 'Narrative + graph (known nodes)' },
-  { value: 'narrative-graph-discovery', label: 'Narrative + graph (discovery allowed)' },
-  { value: 'narrative-graph-discovered-only', label: 'Narrative + graph (discovered only)' },
+  { value: 'generic', label: 'Generic (directive-driven)' },
 ];
 
 export function toMentalModelReturns(value: string): MentalModelReturns {
-  const option = MENTAL_MODEL_RETURNS_OPTIONS.find((o) => o.value === value);
-  if (!option) {
-    throw new Error(`Invalid mental model returns value: ${value}`);
-  }
-  return option.value;
+  if (value === 'generic') return 'generic';
+  throw new Error(`Invalid mental model returns value: ${value}`);
 }
 
 export interface MentalModel {
@@ -176,17 +181,16 @@ export interface MentalModel {
   exclude_mental_model_list: string | null;
   max_tokens: number;
   tags_match_mode: 'all_strict' | 'any_strict' | 'all' | 'any' | 'exact';
-  dimension: string | null;
-  returns: MentalModelReturns;
-  concatenation: 'merge' | 'compile';
   is_template: boolean;
+  template_role?: string | null;
+  is_system_template: boolean;
   tags: Tag[];
   entities: Entity[];
   created_at: string;
   updated_at: string;
 }
 
-export type StandardDimension = {
+export type TemplateRole = {
   value: string;
   label: string;
 };

@@ -1,15 +1,15 @@
 /**
  * Mental model discovery service.
  *
- * Looks up dimension-classified mental models in the local (bank-agnostic) DB,
+ * Looks up role-classified mental models in the local (bank-agnostic) DB,
  * derives template instances for the requested entities, queries Hindsight for
- * each candidate ext_id, and merges/compiles found content per dimension.
+ * each candidate ext_id, and merges/compiles found content per role.
  *
  * Contract:
- *   Input:  { db, serverId, bankId, entities: string[], dimensions: string[] }
- *   Output: { success, dimensions: { [dimension]: DimensionResult }, error?, code? }
+ *   Input:  { db, serverId, bankId, entities: string[], roles: string[] }
+ *   Output: { success, roles: { [role]: RoleResult }, error?, code? }
  *
- *   DimensionResult:
+ *   RoleResult:
  *   {
  *     candidates: Candidate[],
  *     found_count: number,
@@ -18,11 +18,12 @@
  *   }
  */
 
-import { listMentalModels as listLocalMentalModels, deriveMentalModels } from '../../db/crud/mental-models.js';
+import { listMentalModels as listLocalMentalModels, deriveMentalModels, isSystemTemplateRole } from '../../db/crud/mental-models.js';
+import { listEdges } from '../../db/crud/contextual-graph.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { parseGraphResponse } from '../../prompts/parse-graph-response.js';
 import { modelMatchesEntities } from '../../prompts/graph-parser.js';
 import { createLogger } from '../../utils/logger.js';
+import { substituteTemplateFields } from '../contextual-graph/template-models.js';
 
 const logger = createLogger('research-mental-model-discovery');
 
@@ -49,7 +50,7 @@ function normalizeLocalModel(dbRow) {
     ext_id: dbRow.mm_ext_id,
     name: dbRow.mm_name,
     source_query: dbRow.mm_source_query,
-    dimension: dbRow.mm_dimension,
+    template_role: dbRow.mm_template_role,
     returns: dbRow.mm_returns,
     concatenation: dbRow.mm_concatenation,
     is_template: normalizeDbBool(dbRow.mm_is_template),
@@ -68,7 +69,18 @@ function stripTypePrefix(value) {
   return colonIdx > 0 ? value.slice(colonIdx + 1) : value;
 }
 
-function buildCandidatesForDimension(localModels, entityIds) {
+/**
+ * Build candidate mental models from local template / model rows.
+ *
+ * For system templates (sys_* roles):
+ *   - Single-entity roles (entity-summary, entity-capabilities, discovery) substitute
+ *     the full type-prefixed entity id (e.g. "a-com:COM-001") into placeholders.
+ *   - Edge-context derives candidates from actual undirected graph edges between
+ *     selected entities; it cannot be inferred from a single entity id.
+ *
+ * For normal templates: delegates to deriveMentalModels.
+ */
+function buildCandidatesForRole(localModels, entityIds, db, serverId, bankId) {
   const queryEntitySet = new Set(entityIds.map(stripTypePrefix));
   const hasEntityFilter = entityIds.length > 0;
   const candidates = [];
@@ -81,31 +93,96 @@ function buildCandidatesForDimension(localModels, entityIds) {
       id: model.id,
       ext_id: model.ext_id,
       name: model.name,
-      dimension: model.dimension,
+      template_role: model.template_role,
       returns: model.returns || 'json',
       concatenation: model.concatenation || 'merge',
       is_template: isTemplate,
       is_derived: false,
     };
 
-    if (isTemplate) {
-      const derived = deriveMentalModels(model);
-      for (const d of derived) {
-        const derivedEntityId = stripTypePrefix(d.derived_entity?.entity_id);
-        if (hasEntityFilter && !queryEntitySet.has(derivedEntityId)) {
-          continue;
+    if (!isTemplate) {
+      candidates.push(base);
+      continue;
+    }
+
+    // System templates have no mental_model_entities rows and use placeholder
+    // substitution like contextual graph add-context.
+    if (isSystemTemplateRole(model.template_role)) {
+      if (model.template_role === 'sys_edge_context') {
+        // Edge-context requires actual graph edges between selected entities.
+        if (!db || !serverId || !bankId) continue;
+        const edgesResult = listEdges(db, serverId, bankId, { undirected: true, limit: 10000 });
+        if (!edgesResult.success) continue;
+        const edges = edgesResult.data || [];
+        const selectedSet = new Set(entityIds);
+        const seenPairs = new Set();
+        for (const edge of edges) {
+          const sourceId = edge.cge_source_id;
+          const targetId = edge.cge_target_id;
+          if (!selectedSet.has(sourceId) || !selectedSet.has(targetId)) continue;
+          const pk = `${sourceId}|${targetId}`;
+          if (seenPairs.has(pk)) continue;
+          seenPairs.add(pk);
+
+          const values = {
+            '{source-id}': sourceId,
+            '{source-name}': stripTypePrefix(sourceId),
+            '{target-id}': targetId,
+            '{target-name}': stripTypePrefix(targetId),
+          };
+          const extId = substituteTemplateFields(model.ext_id, values);
+          const name = substituteTemplateFields(model.name, values);
+          candidates.push({
+            ...base,
+            id: `${model.id}:${sourceId}|${targetId}`,
+            ext_id: extId,
+            name,
+            is_derived: true,
+            derived_entity_id: `${stripTypePrefix(sourceId)}|${stripTypePrefix(targetId)}`,
+          });
         }
+        continue;
+      }
+
+      // Single-entity system templates (entity-summary, entity-capabilities, discovery).
+      // Use the FULL type-prefixed id for ext_id placeholders; bare id for display name fallback.
+      for (const entityId of entityIds) {
+        const bareId = stripTypePrefix(entityId);
+        const values = {
+          '{entity-id}': entityId,
+          '{entity-name}': bareId,
+          '{seed-id}': entityId,
+          '{seed-name}': bareId,
+        };
+        const extId = substituteTemplateFields(model.ext_id, values);
+        const name = substituteTemplateFields(model.name, values);
         candidates.push({
           ...base,
-          id: d.id,
-          ext_id: d.ext_id,
-          name: d.name,
+          id: `${model.id}:${bareId}`,
+          ext_id: extId,
+          name,
           is_derived: true,
-          derived_entity_id: derivedEntityId,
+          derived_entity_id: bareId,
         });
       }
-    } else {
-      candidates.push(base);
+      continue;
+    }
+
+    // Normal entity templates with mental_model_entities junction rows
+    const derived = deriveMentalModels(model, {}, { includeSystemTemplates: false });
+    for (const d of derived) {
+      const derivedEntityId = stripTypePrefix(d.derived_entity?.entity_id);
+      if (hasEntityFilter && !queryEntitySet.has(derivedEntityId)) {
+        continue;
+      }
+      candidates.push({
+        ...base,
+        id: d.id,
+        ext_id: d.ext_id,
+        name: d.name,
+        is_derived: true,
+        derived_entity_id: derivedEntityId,
+      });
     }
   }
 
@@ -125,7 +202,7 @@ async function fetchCandidateContents(serverId, bankId, candidates, timeoutMs) {
       }
 
       const result = await getHindsightMentalModel(serverId, bankId, extId, {
-        detail: 'content',
+        detail: 'full',
         timeoutMs,
       });
 
@@ -146,16 +223,25 @@ async function fetchCandidateContents(serverId, bankId, candidates, timeoutMs) {
         };
       }
 
+      const structuredOutput = mentalModel.reflect_response?.structured_output;
+      if (!structuredOutput || typeof structuredOutput !== 'object') {
+        return {
+          ...candidate,
+          found: false,
+          error: 'Hindsight mental model missing reflect_response.structured_output',
+        };
+      }
+
       return {
         ...candidate,
         found: true,
-        content: mentalModel.content ?? null,
+        content: structuredOutput,
       };
     })
   );
 }
 
-async function mergeDimensionResult(candidates, entityIds) {
+async function mergeRoleResult(candidates, entityIds) {
   const nodeById = new Map();
   const edgeKeys = new Set();
   const edges = [];
@@ -166,30 +252,38 @@ async function mergeDimensionResult(candidates, entityIds) {
     if (!candidate.found || !candidate.content) continue;
     if (!modelMatchesEntities({ content: candidate.content }, entityIds)) continue;
 
-    const returns = (candidate.returns || 'json').toLowerCase();
-    if (returns === 'json') {
-      const { graph, error: graphError } = parseGraphResponse(candidate.content, {
-        mode: 'graph-known',
-        expectGraph: true,
-        defaultSource: 'mental_model',
-      });
-      if (graph.nodes.length > 0 || graph.edges.length > 0) {
-        for (const n of graph.nodes) {
-          if (!nodeById.has(n.id)) nodeById.set(n.id, n);
-        }
-        for (const e of graph.edges) {
-          const key = `${e.from}|${e.to}|${e.label}`;
-          if (edgeKeys.has(key)) continue;
-          edgeKeys.add(key);
-          edges.push(e);
-        }
-      } else if (graphError) {
-        errors.push({ model: candidate.name || candidate.ext_id, error: graphError });
+    const content = candidate.content;
+    const rawNarratives = Array.isArray(content.narratives)
+      ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
+      : [];
+    const legacyNarrative = typeof content.narrative === 'string' ? content.narrative : '';
+    const roleNarratives = rawNarratives.length > 0
+      ? rawNarratives.map((n) => ({
+        narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+        narrative: n.narrative,
+      }))
+      : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
+    let graph = { nodes: [], edges: [] };
+    if (content.graph && typeof content.graph === 'object') {
+      graph = {
+        nodes: Array.isArray(content.graph.nodes) ? content.graph.nodes : [],
+        edges: Array.isArray(content.graph.edges) ? content.graph.edges : [],
+      };
+    }
+
+    for (const n of roleNarratives) {
+      if (n.narrative) narratives.push(n);
+    }
+
+    if (graph.nodes.length > 0 || graph.edges.length > 0) {
+      for (const n of graph.nodes) {
+        if (!nodeById.has(n.id)) nodeById.set(n.id, n);
       }
-    } else if (returns === 'narrative') {
-      const { narrative } = parseGraphResponse(candidate.content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
-      if (narrative) {
-        narratives.push(narrative);
+      for (const e of graph.edges) {
+        const key = `${e.from}|${e.to}|${e.label}`;
+        if (edgeKeys.has(key)) continue;
+        edgeKeys.add(key);
+        edges.push(e);
       }
     }
   }
@@ -199,7 +293,7 @@ async function mergeDimensionResult(candidates, entityIds) {
     result.graph = { nodes: Array.from(nodeById.values()), edges };
   }
   if (narratives.length > 0) {
-    result.narrative = narratives.join('\n\n');
+    result.narratives = narratives;
   }
   if (errors.length > 0) {
     result.errors = errors;
@@ -207,56 +301,7 @@ async function mergeDimensionResult(candidates, entityIds) {
   return result;
 }
 
-export async function listEligibleMentalModels(db, options = {}) {
-  if (!db) {
-    return { success: false, error: 'db is required', code: 'MISSING_DB' };
-  }
-
-  const entityIds = Array.isArray(options.entities) ? options.entities : [];
-  if (entityIds.length === 0) {
-    return { success: false, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR' };
-  }
-
-  const dimensions = Array.isArray(options.dimensions) && options.dimensions.length > 0
-    ? options.dimensions
-    : [];
-  if (dimensions.length === 0) {
-    return { success: false, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR' };
-  }
-
-  const localResult = await listLocalMentalModels(db, { dimensions, limit: 1000 });
-  if (!localResult.success) {
-    logger.error('Failed to list local mental models', { dimensions, error: localResult.error, code: localResult.code });
-    return { success: false, error: localResult.error, code: localResult.code || 'DATABASE_ERROR' };
-  }
-
-  const modelsByDimension = {};
-  for (const model of localResult.data || []) {
-    const dim = model.dimension || model.mm_dimension;
-    if (!dim) continue;
-    if (!modelsByDimension[dim]) modelsByDimension[dim] = [];
-    modelsByDimension[dim].push(model);
-  }
-
-  const dimensionResults = {};
-  for (const dimension of dimensions) {
-    dimensionResults[dimension] = buildCandidatesForDimension(modelsByDimension[dimension] || [], entityIds);
-  }
-
-  logger.info('Listed eligible mental models', {
-    entityCount: entityIds.length,
-    dimensions,
-    candidateCount: Object.values(dimensionResults).flat().length,
-  });
-
-  return {
-    success: true,
-    entities: entityIds,
-    dimensions: dimensionResults,
-  };
-}
-
-export async function discoverMentalModelsByDimensions(db, serverId, bankId, options = {}) {
+export async function discoverMentalModelsByRoles(db, serverId, bankId, options = {}) {
   if (!db) {
     return { success: false, error: 'db is required', code: 'MISSING_DB' };
   }
@@ -268,32 +313,32 @@ export async function discoverMentalModelsByDimensions(db, serverId, bankId, opt
   }
 
   const entityIds = Array.isArray(options.entities) ? options.entities : [];
-  const dimensions = Array.isArray(options.dimensions) && options.dimensions.length > 0
-    ? options.dimensions
-    : ['interface'];
+  const roles = Array.isArray(options.roles) && options.roles.length > 0
+    ? options.roles
+    : ['sys_entity_summary'];
   const timeoutMs = typeof options.timeoutMs === 'number' && options.timeoutMs > 0
     ? options.timeoutMs
     : DEFAULT_TIMEOUT_MS;
 
-  const dimensionResults = {};
+  const roleResults = {};
 
-  for (const dimension of dimensions) {
-    const localResult = await listLocalMentalModels(db, { dimension, limit: 1000 });
+  for (const role of roles) {
+    const localResult = await listLocalMentalModels(db, { templateRole: role, limit: 1000 });
     if (!localResult.success) {
-      logger.error('Failed to list local mental models', { dimension, error: localResult.error, code: localResult.code });
+      logger.error('Failed to list local mental models', { role, error: localResult.error, code: localResult.code });
       return { success: false, error: localResult.error, code: localResult.code || 'DATABASE_ERROR' };
     }
 
-    const candidates = buildCandidatesForDimension(localResult.data || [], entityIds);
+    const candidates = buildCandidatesForRole(localResult.data || [], entityIds, db, serverId, bankId);
     const populated = await fetchCandidateContents(serverId, bankId, candidates, timeoutMs);
 
     const found = populated.filter((c) => c.found);
     const missing = populated.filter((c) => !c.found);
 
-    logger.info('Discovered mental models for dimension', {
+    logger.info('Discovered mental models for role', {
       serverId,
       bankId,
-      dimension,
+      role,
       entityCount: entityIds.length,
       candidateCount: populated.length,
       foundCount: found.length,
@@ -301,17 +346,17 @@ export async function discoverMentalModelsByDimensions(db, serverId, bankId, opt
       candidateExtIds: populated.map((c) => ({ ext_id: c.ext_id, found: c.found, error: c.error })),
     });
 
-    dimensionResults[dimension] = {
+    roleResults[role] = {
       candidates: populated,
       found_count: found.length,
       missing_count: missing.length,
-      result: await mergeDimensionResult(populated, entityIds),
+      result: await mergeRoleResult(populated, entityIds),
     };
   }
 
   return {
     success: true,
     entities: entityIds,
-    dimensions: dimensionResults,
+    roles: roleResults,
   };
 }

@@ -29,7 +29,7 @@ export function EntityTaggedContent({
   }, [highlightRange]);
 
   if (!content) {
-    return <p className="text-white/30 italic">No content available</p>;
+    return <p className="text-foreground-placeholder italic">No content available</p>;
   }
 
   // Check active format to know whether to show name chip
@@ -49,7 +49,7 @@ export function EntityTaggedContent({
   ) => {
     if (!highlightRange) {
       return (
-        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-white/80">
+        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-foreground-muted">
           {text}
         </span>
       );
@@ -61,7 +61,7 @@ export function EntityTaggedContent({
     if (hStart >= hEnd) {
       // No overlap
       return (
-        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-white/80">
+        <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-foreground-muted">
           {text}
         </span>
       );
@@ -77,11 +77,11 @@ export function EntityTaggedContent({
     const after = afterLen > 0 ? text.slice(beforeLen + highlightLen) : null;
 
     return (
-      <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-white/80">
+      <span key={key} data-text-start={segStart} data-text-end={segEnd} className="text-foreground-muted">
         {before != null && <span>{before}</span>}
         <span
           data-highlight-match
-          className="bg-yellow-400/30 text-yellow-200 rounded px-0.5 transition-all"
+          className="bg-badge-caution-bg/60 text-badge-caution-fg rounded px-0.5 transition-all"
         >
           {highlighted}
         </span>
@@ -106,17 +106,17 @@ export function EntityTaggedContent({
               key={i}
               data-tag-start={seg.start}
               data-highlight-match={isHighlighted ? '' : undefined}
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-sans bg-purple-500/20 text-purple-300 border border-purple-500/30 mx-0.5 transition-all ${
-                isHighlighted ? 'ring-2 ring-yellow-400/60 bg-yellow-400/20' : ''
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-sans bg-badge-entity-bg text-badge-entity-fg border border-badge-entity-bd mx-0.5 transition-all ${
+                isHighlighted ? 'ring-2 ring-accent-tertiary-bd bg-accent-tertiary-bg' : ''
               }`}
               title={seg.id ? `id: ${seg.id}` : undefined}
             >
               <span>{seg.content}</span>
               {showNameChip && seg.name && (
-                <span className="text-[9px] text-purple-400/60">name:{seg.name}</span>
+                <span className="text-[9px] text-badge-entity-fg/60">name:{seg.name}</span>
               )}
               {seg.id && (
-                <span className="text-[9px] text-purple-400/60">id:{seg.id}</span>
+                <span className="text-[9px] text-badge-entity-fg/60">id:{seg.id}</span>
               )}
             </span>
           );

@@ -6,12 +6,12 @@
  * model's declared `returns` and `concatenation` metadata.
  *
  * Contract:
- *   Input:  { db, serverId, bankId, entities: string[], dimensions: string[] }
- *   Output: { success, entities, dimensions[] }
+ *   Input:  { db, serverId, bankId, entities: string[], roles: string[] }
+ *   Output: { success, entities, roles[] }
  *
- *   DimensionResult:
+ *   RoleResult:
  *   {
- *     dimension: string,
+ *     role: string,
  *     entities: EntityResult[],
  *     found_count: number,
  *     missing_count: number,
@@ -19,9 +19,9 @@
  *   }
  */
 
-import { listEligibleMentalModels } from './mental-model-discovery.js';
+import { discoverMentalModelsByRoles } from './mental-model-discovery.js';
 import { getMentalModel as getHindsightMentalModel } from '../hindsight/mental-models.js';
-import { parseGraphResponse } from '../../prompts/parse-graph-response.js';
+import { normalizeGraph } from '../../prompts/normalize-graph.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('research-prebuilt');
@@ -45,7 +45,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   }
 
   const hindsightResult = await getHindsightMentalModel(serverId, bankId, extId, {
-    detail: 'content',
+    detail: 'full',
     timeoutMs,
   });
 
@@ -58,68 +58,62 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
   }
 
   const mentalModel = hindsightResult.mentalModel;
-  const content = mentalModel.content ?? null;
-  const contentLength = typeof content === 'string' ? content.length : content ? JSON.stringify(content).length : 0;
-  const returns = (candidate.returns || 'json').toLowerCase();
+  const structuredOutput = mentalModel.reflect_response?.structured_output ?? null;
+  const contentLength = structuredOutput ? JSON.stringify(structuredOutput).length : 0;
 
-  if (!content) {
-    logger.info('Prebuilt candidate content missing', {
+  if (!structuredOutput || typeof structuredOutput !== 'object') {
+    logger.info('Prebuilt candidate structured output missing', {
       serverId,
       bankId,
       extId,
       candidateId: candidate.id,
-      returns,
       contentKeys: Object.keys(mentalModel),
     });
     return {
       ...candidate,
       found: true,
       content: null,
+      narrative: '',
       graph: { nodes: [], edges: [] },
-      graph_error: 'Mental-model content is empty or missing.',
+      graph_error: 'Mental-model reflect_response.structured_output is empty or missing.',
     };
   }
 
-  if (returns === 'narrative') {
-    const { narrative, error: parseError } = parseGraphResponse(content, { mode: 'narrative', expectGraph: false, defaultSource: 'mental_model' });
-    logger.info('Prebuilt candidate narrative extracted', {
-      serverId,
-      bankId,
-      extId,
-      candidateId: candidate.id,
-      contentLength,
-      narrativeLength: narrative.length,
-      parseError: parseError || null,
-    });
-    return {
-      ...candidate,
-      found: true,
-      content,
-      narrative,
-    };
-  }
-
-  const { graph, error: graphError } = parseGraphResponse(content, {
-    mode: returns.startsWith('narrative-graph') ? returns : 'graph-known',
-    expectGraph: true,
-    defaultSource: 'mental_model',
-  });
-  logger.info('Prebuilt candidate graph extracted', {
+  const content = structuredOutput;
+  const narratives = Array.isArray(content.narratives)
+    ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string').map((n) => ({
+      narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+      narrative: n.narrative,
+    }))
+    : [];
+  const { graph, tables, diagrams, errors: modelErrors } = {
+    graph: normalizeGraph(content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] }, { preserveParallelEdges: true }),
+    tables: Array.isArray(content.tables) ? content.tables : [],
+    diagrams: Array.isArray(content.diagrams) ? content.diagrams : [],
+    errors: [],
+  };
+  logger.info('Prebuilt candidate envelope extracted', {
     serverId,
     bankId,
     extId,
     candidateId: candidate.id,
     contentLength,
+    narrativeLength: narrative.length,
     nodeCount: graph?.nodes.length ?? 0,
     edgeCount: graph?.edges.length ?? 0,
-    graphError: graphError || null,
+    tableCount: tables?.length ?? 0,
+    diagramCount: diagrams?.length ?? 0,
+    modelError: modelErrors?.length ? modelErrors.join('; ') : null,
   });
   return {
     ...candidate,
     found: true,
-    content,
-    graph: graph || { nodes: [], edges: [] },
-    graph_error: graphError,
+    content: null,
+    narratives,
+    graph,
+    tables: tables || [],
+    diagrams: diagrams || [],
+    graph_error: modelErrors?.length ? modelErrors.join('; ') : null,
   };
 }
 
@@ -159,27 +153,38 @@ function toApiModelResult(candidate) {
   if (!candidate.found) {
     return { ...base, error: candidate.error || 'Not found' };
   }
-  if (candidate.returns === 'narrative') {
-    return { ...base, narrative: candidate.narrative };
+  const result = { ...base };
+  if (candidate.narratives != null && candidate.narratives.length > 0) {
+    result.narratives = candidate.narratives;
   }
-  return {
-    ...base,
-    graph: candidate.graph,
-    graph_error: candidate.graph_error || undefined,
-  };
+  if (candidate.graph) {
+    result.graph = candidate.graph;
+  }
+  if (candidate.tables && candidate.tables.length > 0) {
+    result.tables = candidate.tables;
+  }
+  if (candidate.diagrams && candidate.diagrams.length > 0) {
+    result.diagrams = candidate.diagrams;
+  }
+  if (candidate.graph_error) {
+    result.graph_error = candidate.graph_error;
+  }
+  return result;
 }
 
-function aggregateDimensionResults(entityResults) {
+function aggregateRoleResults(entityResults) {
   const narratives = [];
   const graphs = [];
+  const tables = [];
+  const diagrams = [];
   const errors = [];
   let effectiveConcatenation = 'merge';
 
   for (const entityResult of entityResults) {
     for (const candidate of entityResult.model_results) {
       if (!candidate.found) continue;
-      if (candidate.narrative) {
-        narratives.push(candidate.narrative);
+      if (candidate.narratives && candidate.narratives.length > 0) {
+        narratives.push(...candidate.narratives);
       }
       if (candidate.graph) {
         if (candidate.graph.nodes.length > 0 || candidate.graph.edges.length > 0) {
@@ -189,17 +194,29 @@ function aggregateDimensionResults(entityResults) {
           errors.push({ model: candidate.name || candidate.ext_id, error: candidate.graph_error });
         }
       }
+      if (candidate.tables && candidate.tables.length > 0) {
+        tables.push(...candidate.tables);
+      }
+      if (candidate.diagrams && candidate.diagrams.length > 0) {
+        diagrams.push(...candidate.diagrams);
+      }
     }
   }
 
   const result = {};
   if (narratives.length > 0) {
-    result.narrative = narratives.join('\n\n');
+    result.narratives = narratives;
   }
   if (graphs.length > 0) {
     result.json_result = effectiveConcatenation === 'compile'
       ? graphs
       : mergeGraphs(graphs);
+  }
+  if (tables.length > 0) {
+    result.tables = tables;
+  }
+  if (diagrams.length > 0) {
+    result.diagrams = diagrams;
   }
   if (errors.length > 0) {
     result.errors = errors;
@@ -223,27 +240,31 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
     return { success: false, error: 'entities must be a non-empty array', code: 'VALIDATION_ERROR' };
   }
 
-  const dimensions = Array.isArray(options.dimensions) && options.dimensions.length > 0
-    ? options.dimensions
+  const roles = Array.isArray(options.roles) && options.roles.length > 0
+    ? options.roles
     : [];
-  if (dimensions.length === 0) {
-    return { success: false, error: 'dimensions must be a non-empty array', code: 'VALIDATION_ERROR' };
+  if (roles.length === 0) {
+    return { success: false, error: 'roles must be a non-empty array', code: 'VALIDATION_ERROR' };
   }
 
   const timeoutMs = typeof options.timeoutMs === 'number' && options.timeoutMs > 0
     ? options.timeoutMs
     : DEFAULT_TIMEOUT_MS;
 
-  const eligible = await listEligibleMentalModels(db, { entities: entityIds, dimensions });
-  if (!eligible.success) {
-    return eligible;
+  const discovery = await discoverMentalModelsByRoles(db, serverId, bankId, {
+    entities: entityIds,
+    roles,
+    timeoutMs,
+  });
+  if (!discovery.success) {
+    return { success: false, error: discovery.error, code: discovery.code };
   }
 
-  const dimensionOutputs = [];
+  const roleOutputs = [];
   const entitySummaryMap = new Map();
 
-  for (const dimension of dimensions) {
-    const candidates = eligible.dimensions[dimension] || [];
+  for (const role of roles) {
+    const candidates = discovery.roles[role]?.candidates || [];
     const populated = await Promise.all(
       candidates.map((c) => fetchModelResult(serverId, bankId, c, timeoutMs)),
     );
@@ -263,9 +284,9 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
       const bucket = byEntity[stripTypePrefix(entityId)];
       const modelResults = bucket ? bucket.candidates.map(toApiModelResult) : [];
       const found = modelResults.some((m) => m.found);
-      const key = `${entityId}|${dimension}`;
+      const key = `${entityId}|${role}`;
       if (!entitySummaryMap.has(key)) {
-        entitySummaryMap.set(key, { entity: entityId, dimension, found });
+        entitySummaryMap.set(key, { entity: entityId, role, found });
       }
       return {
         entity: entityId,
@@ -277,22 +298,22 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
     const foundCount = entityResults.filter((e) => e.found).length;
     const missingCount = entityResults.length - foundCount;
 
-    logger.info('Ran prebuilt research for dimension', {
+    logger.info('Ran prebuilt research for role', {
       serverId,
       bankId,
-      dimension,
+      role,
       entityCount: entityIds.length,
       candidateCount: populated.length,
       foundCount,
       missingCount,
     });
 
-    dimensionOutputs.push({
-      dimension,
+    roleOutputs.push({
+      role,
       entities: entityResults,
       found_count: foundCount,
       missing_count: missingCount,
-      result: aggregateDimensionResults(entityResults),
+      result: aggregateRoleResults(entityResults),
     });
   }
 
@@ -300,6 +321,6 @@ export async function runPrebuiltResearch(db, serverId, bankId, options = {}) {
     success: true,
     entities: entityIds,
     entity_summary: Array.from(entitySummaryMap.values()),
-    dimensions: dimensionOutputs,
+    roles: roleOutputs,
   };
 }

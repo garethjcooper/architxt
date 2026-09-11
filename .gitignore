@@ -11,6 +11,7 @@ database/
 documents/
 logs/
 tmp/
+server/test-tmp/
 
 # Environment
 .env
