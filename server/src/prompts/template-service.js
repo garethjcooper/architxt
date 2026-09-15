@@ -180,6 +180,12 @@ const DIAGRAM_TYPE_TO_FRAGMENT = {
  */
 export function buildConditionalFragments(sectionFocus) {
   const extra = [];
+  // If no directives are present at all, narrative is the default fallback.
+  // Include it explicitly so the model still sees the per-section rules.
+  const hasAnyDirective = sectionFocus?.graph || sectionFocus?.table || sectionFocus?.diagram?.length || sectionFocus?.narrative;
+  if (!hasAnyDirective || sectionFocus?.narrative) {
+    extra.push('output-format-narrative-contextual.md');
+  }
   if (sectionFocus?.graph) {
     extra.push('output-format-graph-contextual.md');
   }
@@ -214,7 +220,62 @@ export function buildConditionalFragments(sectionFocus) {
 }
 
 /**
+ * Extract the exact title/name from a rendered focus variable string.
+ * Returns the raw name or an empty string when unnamed.
+ *
+ * @param {string} rendered
+ * @returns {string}
+ */
+function extractFocusName(rendered) {
+  if (!rendered?.trim()) return '';
+  const line = rendered.trim().replace(/^- /, '');
+  const namedMatch = line.match(/^\*\*(.+?)\*\*\s*(?:—|\().*$/);
+  if (namedMatch) return namedMatch[1].trim();
+  return '';
+}
+
+/**
+ * Compose a set of extra name variables from the effective section focus.
+ *
+ * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} effectiveFocus
+ * @param {Record<string,string>} baseVariables
+ * @returns {Record<string,string>}
+ */
+function buildNameVariables(effectiveFocus, baseVariables) {
+  const names = {
+    ARCHITXT_NARRATIVE_NAME: effectiveFocus?.narrative?.name || extractFocusName(baseVariables.ARCHITXT_NARRATIVE_FOCUS || ''),
+    ARCHITXT_GRAPH_NAME: effectiveFocus?.graph?.name || extractFocusName(baseVariables.ARCHITXT_GRAPH_FOCUS || ''),
+    ARCHITXT_TABLE_NAME: '',
+    ARCHITXT_DIAGRAM_NAME: '',
+  };
+
+  const firstTable = effectiveFocus?.table?.[0];
+  if (firstTable?.name) {
+    names.ARCHITXT_TABLE_NAME = firstTable.name;
+  } else {
+    const tableFocus = baseVariables.ARCHITXT_TABLE_FOCUS || '';
+    const firstLine = tableFocus.split('\n').find((l) => l.trim()) || '';
+    names.ARCHITXT_TABLE_NAME = extractFocusName(firstLine);
+  }
+
+  const firstDiagram = effectiveFocus?.diagram?.[0];
+  if (firstDiagram?.name) {
+    names.ARCHITXT_DIAGRAM_NAME = firstDiagram.name;
+  } else {
+    const diagramFocus = baseVariables.ARCHITXT_DIAGRAM_FOCUS || '';
+    const firstLine = diagramFocus.split('\n').find((l) => l.trim()) || '';
+    names.ARCHITXT_DIAGRAM_NAME = extractFocusName(firstLine);
+  }
+
+  return names;
+}
+
+/**
  * Merge conditional fragments into a template's static fragment list.
+ *
+ * Places `section-focus.md` immediately after `contextual-patch.md` and before
+ * the conditional output-format fragments so the model sees exact requested
+ * names before the detailed per-section rules.
  *
  * @param {object} template - prompt_templates row (pt_fragments is a JSON string)
  * @param {string[]} extraFragments
@@ -222,14 +283,28 @@ export function buildConditionalFragments(sectionFocus) {
  */
 function mergeFragments(template, extraFragments) {
   const base = JSON.parse(template.pt_fragments || '[]');
-  // Insert conditional fragments right after contextual-patch.md (if present)
-  // so they precede section-focus.md and semantic fragments.
   const patchIndex = base.indexOf('contextual-patch.md');
+  const focusIndex = base.indexOf('section-focus.md');
+  const hasFocus = focusIndex !== -1;
+
+  if (hasFocus) {
+    // Remove section-focus.md from its current position; it will be reinserted
+    // right after contextual-patch.md.
+    base.splice(focusIndex, 1);
+  }
+
   if (patchIndex !== -1 && extraFragments.length > 0) {
     base.splice(patchIndex + 1, 0, ...extraFragments);
   } else {
     base.push(...extraFragments);
   }
+
+  if (hasFocus) {
+    const newPatchIndex = base.indexOf('contextual-patch.md');
+    const insertAt = newPatchIndex !== -1 ? newPatchIndex + 1 : 0;
+    base.splice(insertAt, 0, 'section-focus.md');
+  }
+
   return {
     ...template,
     pt_fragments: JSON.stringify(base),
@@ -476,10 +551,12 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
   // focus variables (synthesize handler). We take the union of both so that
   // callers who supply section_focus as variables still get the right fragments.
   const effectiveFocus = computeEffectiveFocus(parsedSectionFocus, merged);
+  const nameVariables = buildNameVariables(effectiveFocus, merged);
+  const variablesWithNames = { ...merged, ...nameVariables };
 
   const extra = buildConditionalFragments(effectiveFocus);
   const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
-  const { prompt } = composePrompt(effectiveTemplate, merged);
+  const { prompt } = composePrompt(effectiveTemplate, variablesWithNames);
   const sectionState = computeSectionState(effectiveFocus);
   const instructions = formatSectionInstructions(sectionState);
   return injectBeforeOutputDirectives(prompt, instructions).trimEnd();
@@ -537,9 +614,11 @@ export async function composeMentalModelPromptBatch(db, items) {
       };
 
       const effectiveFocus = computeEffectiveFocus(sectionFocus, variables);
+      const nameVariables = buildNameVariables(effectiveFocus, variables);
+      const variablesWithNames = { ...variables, ...nameVariables };
       const extra = buildConditionalFragments(effectiveFocus);
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
-      const { prompt } = composePrompt(effectiveTemplate, variables);
+      const { prompt } = composePrompt(effectiveTemplate, variablesWithNames);
       const sectionState = computeSectionState(effectiveFocus);
       const instructions = formatSectionInstructions(sectionState);
       const finalPrompt = injectBeforeOutputDirectives(prompt, instructions).trimEnd();

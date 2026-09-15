@@ -48,14 +48,12 @@ export function graphToMermaid(
   graph: { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
   options: GraphToMermaidOptions = {},
 ): string {
-  const { direction = 'TB', defaultRenderer, showEdgeLabels = true } = options;
+  const { direction = 'TB', defaultRenderer = 'elk', showEdgeLabels = true } = options;
   const nodeSet = new Set(graph.nodes.map((n) => n.id));
   const visibleEdges = graph.edges.filter((e) => nodeSet.has(e.from) && nodeSet.has(e.to));
 
   const lines: string[] = ['flowchart ' + direction];
-  if (defaultRenderer) {
-    lines.unshift(`%%{init: {'flowchart': {'defaultRenderer': '${defaultRenderer}'}}}%%`);
-  }
+  lines.unshift(`%%{init: {'layout': '${defaultRenderer}'}}%%`);
 
   for (const node of graph.nodes) {
     const id = safeNodeId(node.id);

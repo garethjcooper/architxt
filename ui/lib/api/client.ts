@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns } from '../types';
+import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -693,9 +693,32 @@ export const healthApi = {
     fetchApi<{ status: string; timestamp: string }>('/health'),
 };
 
+export type HindsightDocument = {
+  id: string;
+  title?: string | null;
+  content?: string | null;
+  content_hash?: string | null;
+  tags?: string[];
+  document_metadata?: Record<string, any> | null;
+  retain_params?: Record<string, any> | null;
+  timestamp?: string | null;
+  event_date?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type HindsightChunk = {
+  bank_id: string;
+  chunk_id: string;
+  chunk_index: number;
+  chunk_text: string;
+  created_at: string;
+  document_id: string;
+};
+
 // Hindsight Sync API
 export const hindsightApi = {
-  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' | 'directives' = 'documents', summary = false) =>
+  diff: (serverId: number, bankId: string, object: 'documents' | 'entities' | 'mental-models' | 'directives' | 'bank-settings' = 'documents', summary = false) =>
     fetchApi<{
       data: {
         same: any[];
@@ -711,6 +734,18 @@ export const hindsightApi = {
         total: number;
       };
     }>(`/hindsight/diff?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&object=${object}${summary ? '&summary=true' : ''}`),
+
+  pushBankSettings: (serverId: number, bankId: string) =>
+    fetchApi<{ success: boolean; profile_skipped?: boolean }>('/hindsight/bank-settings/push', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
+
+  pullBankSettings: (serverId: number, bankId: string) =>
+    fetchApi<{ success: boolean; settings: BankSettings; profile_skipped?: boolean }>('/hindsight/bank-settings/pull', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
 
   pull: (serverId: number, bankId: string, documentId: string) =>
     fetchApi<{ success: boolean; created: boolean; document: any }>('/hindsight/pull', {
@@ -736,10 +771,21 @@ export const hindsightApi = {
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, type_names: typeNames }),
     }),
 
-  pushMentalModel: (serverId: number, bankId: string, model: any, create = false) =>
-    fetchApi<{ success: boolean; created?: boolean; operation_id?: string | null; status?: string | null; pop_id?: number | null }>('/hindsight/push-mental-model', {
+  pushMentalModel: (serverId: number, bankId: string, model: any, create = false, refreshAfter = false) =>
+    fetchApi<{
+      success: boolean;
+      created?: boolean;
+      operation_id?: string | null;
+      status?: string | null;
+      pop_id?: number | null;
+      refresh_operation_id?: string | null;
+      refresh_status?: string | null;
+      refresh_pop_id?: number | null;
+      refresh_failed?: boolean;
+      refresh_error?: string;
+    }>('/hindsight/push-mental-model', {
       method: 'POST',
-      body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create }),
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, model, create, refresh_after: refreshAfter }),
     }),
 
   pushDirective: (serverId: number, bankId: string, dirId: number, create = false) =>
@@ -773,6 +819,47 @@ export const hindsightApi = {
     }>('/hindsight/mental-models/bulk', {
       method: 'DELETE',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId }),
+    }),
+
+  deleteMentalModels: (serverId: number, bankId: string, extIds: string[]) =>
+    fetchApi<{
+      success: boolean;
+      total?: number;
+      deleted_count?: number;
+      failed_count?: number;
+      deleted?: string[];
+      failed?: { ext_id: string; error: string }[];
+      error?: string;
+      code?: string;
+    }>('/hindsight/mental-models/delete', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ext_ids: extIds }),
+    }),
+
+  previewDeleteMentalModels: (serverId: number, bankId: string, mmIds: number[]) =>
+    fetchApi<{
+      success: boolean;
+      models: {
+        mm_id: number;
+        ext_id: string | null;
+        name: string | null;
+        is_template: boolean;
+        template_role: string | null;
+        derived: {
+          ext_id: string;
+          name: string | null;
+          entity_id: string;
+          entity_name: string;
+          present: boolean;
+        }[];
+        present: boolean;
+        missing_reason: string | null;
+      }[];
+      present_count: number;
+      missing_count: number;
+    }>('/hindsight/mental-models/preview-delete', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, mm_ids: mmIds }),
     }),
 
   compare: (serverId: number, bankId: string, documentId: string) =>
@@ -899,6 +986,127 @@ export const hindsightApi = {
     fetchApi<{ bank_id: string; config: { entity_labels?: any[]; retain_mission?: string | null } }>(
       `/hindsight/bank-config?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`
     ),
+
+  memoryEvidence: (serverId: number, bankId: string, memoryIds: string[]) =>
+    fetchApi<HindsightMemoryEvidenceResponse>('/hindsight/memory-evidence', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, memory_ids: memoryIds }),
+    }),
+
+  getHindsightDocument: (serverId: number, bankId: string, documentId: string, excludeContent = false) =>
+    fetchApi<HindsightDocument>(
+      `/hindsight/documents/${encodeURIComponent(documentId)}?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}${excludeContent ? '&exclude_content=true' : ''}`
+    ),
+
+
+  listHindsightDocuments: (serverId: number, bankId: string, params?: { limit?: number; offset?: number }) =>
+    fetchApi<{
+      success: boolean;
+      items: HindsightDocument[];
+      total: number;
+    }>(`/hindsight/documents?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}${params?.limit ? `&limit=${params.limit}` : ''}${params?.offset ? `&offset=${params.offset}` : ''}`),
+
+  previewDeleteDocuments: (serverId: number, bankId: string, docIds: number[]) =>
+    fetchApi<{
+      success: boolean;
+      documents: {
+        doc_id: number;
+        ext_id: string | null;
+        name: string | null;
+        present: boolean;
+        missing_reason: string | null;
+      }[];
+      present_count: number;
+      missing_count: number;
+    }>('/hindsight/documents/preview-delete', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, doc_ids: docIds }),
+    }),
+
+  deleteDocuments: (serverId: number, bankId: string, extIds: string[]) =>
+    fetchApi<{
+      success: boolean;
+      total?: number;
+      deleted_count?: number;
+      failed_count?: number;
+      deleted?: string[];
+      failed?: { ext_id: string; error: string }[];
+      error?: string;
+      code?: string;
+    }>('/hindsight/documents/delete', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId, bank_id: bankId, ext_ids: extIds }),
+    }),
+  getHindsightDocumentChunks: async (serverId: number, bankId: string, documentId: string, pageSize = 1000) => {
+    const allItems: HindsightChunk[] = [];
+    let offset = 0;
+    let total = 0;
+    let lastPageSize = 0;
+    do {
+      const page = await fetchApi<{ items: HindsightChunk[]; total: number; limit: number; offset: number }>(
+        `/hindsight/documents/${encodeURIComponent(documentId)}/chunks?server_id=${serverId}&bank_id=${encodeURIComponent(bankId)}&limit=${pageSize}&offset=${offset}`
+      );
+      total = page.total ?? page.items.length;
+      lastPageSize = page.items.length;
+      allItems.push(...page.items);
+      offset += pageSize;
+    } while (lastPageSize === pageSize && allItems.length < total);
+
+    return { items: allItems, total: Math.max(total, allItems.length), limit: pageSize, offset: 0 };
+  },
+};
+
+export type HindsightMemoryEvidenceResponse = {
+  success: boolean;
+  document_count: number;
+  document_list: string[];
+  documents: Array<{
+    document_id: string;
+    queried_memory_count: number;
+    supporting_memory_count: number;
+    queried_memory_ids: string[];
+    chunks: Array<{
+      chunk_id: string;
+      chunk_index: number | null;
+      chunk_text: string;
+      memory_ids: string[];
+      memory_types?: Record<string, string>;
+      queried_memory_ids: string[];
+    }>;
+  }>;
+  evidence: Array<{
+    memory_id: string;
+    memory_type: string | null;
+    document_count: number;
+    document_list: string[];
+    documents: Array<{
+      document_id: string;
+      document_referenced_count: number;
+      chunks: Array<{
+        chunk_id: string;
+        chunk_index: number | null;
+        memory_ids: string[];
+        memory_types?: Record<string, string>;
+      }>;
+    }>;
+    observations_skipped: string[];
+    unresolved_error?: string;
+  }>;
+  errors: string[];
+};
+
+// Bank Settings API — Architxt master defaults
+export const bankSettingsApi = {
+  get: () => fetchApi<{ settings: BankSettings; defaults: BankSettings }>('/bank-settings'),
+
+  update: (settings: BankSettings) =>
+    fetchApi<{ success: boolean; settings: BankSettings }>('/bank-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+
+  reset: () =>
+    fetchApi<{ success: boolean; settings: BankSettings; defaults: BankSettings }>('/bank-settings', { method: 'DELETE' }),
 };
 
 /**
@@ -921,8 +1129,6 @@ export interface GraphNode {
   properties?: Record<string, any>;
   /** Patch health status (green = all roles present, orange = some, red = none). */
   health?: 'green' | 'orange' | 'red';
-  /** Pre-rendered, stripped summary text for cards/lists. */
-  summaryText?: string;
   x?: number;
   y?: number;
   width?: number;
@@ -1033,8 +1239,8 @@ export interface EntityInfoEdgeContext {
 export interface MentalModelEnvelope {
   narratives: UnifiedNarrativeBlock[];
   graph: { name: string; nodes: GraphNode[]; edges: GraphEdge[] };
-  tables: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[] }>;
-  diagrams: Array<{ name: string; type: string; content: string }>;
+  tables: Array<{ name: string; columns: string[]; rows: Record<string, unknown>[]; evidence: string[] }>;
+  diagrams: Array<{ name: string; type: string; content: string; evidence: string[] }>;
 }
 
 export interface MentalModelContent {
@@ -1122,11 +1328,13 @@ export interface PrebuiltRoleResult {
       name: string;
       columns: string[];
       rows: Record<string, any>[];
+      evidence: string[];
     }>;
     diagrams: Array<{
       name: string;
       type: string;
       content: string;
+      evidence: string[];
     }>;
     errors?: Array<{ model?: string; error: string }>;
   };
@@ -1186,6 +1394,7 @@ export interface DiscoverStepResponse {
 export interface UnifiedNarrativeBlock {
   narrative_name: string;
   narrative: string;
+  evidence: string[];
 }
 
 export interface UnifiedEnvelope {
@@ -1199,11 +1408,13 @@ export interface UnifiedEnvelope {
     name: string;
     columns: string[];
     rows: Record<string, any>[];
+    evidence: string[];
   }>;
   diagrams: Array<{
     name: string;
     type: string;
     content: string;
+    evidence: string[];
   }>;
 }
 
@@ -1243,6 +1454,7 @@ export interface ResearchStep {
   session_id: number;
   parent_step_id: number | null;
   intent_text: string;
+  title: string | null;
   raw_query: string | null;
   action_type: string;
   parameters: Record<string, any> | null;
@@ -1262,6 +1474,7 @@ export interface ResearchStepSummary {
   session_id: number;
   parent_step_id: number | null;
   intent_text: string;
+  title: string | null;
   raw_query: string | null;
   action_type: string;
   parameters: Record<string, any> | null;
@@ -1372,6 +1585,12 @@ export const researchApi = {
   deleteStep: (stepId: number) =>
     fetchApi<{ deleted_step_id: number; session_id: number; remaining_step_count: number }>(`/research/steps/${stepId}`, {
       method: 'DELETE',
+    }),
+
+  updateStepTitle: (stepId: number, title: string | null) =>
+    fetchApi<ResearchStepSummary>(`/research/steps/${stepId}/title`, {
+      method: 'PUT',
+      body: JSON.stringify({ title }),
     }),
 
   rerunStep: (stepId: number, payload: { server_id: number }) =>

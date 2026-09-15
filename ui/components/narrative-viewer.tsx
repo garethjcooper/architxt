@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
-import { Plus, Eye, FileText, Table2, GitGraph, Workflow } from 'lucide-react';
+import { Plus, Eye, FileText, FileSearch, Table2, GitGraph, Workflow } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
 import { slugifyHeading } from './smart-document-editor';
 import { Markdown } from './markdown';
@@ -73,12 +73,20 @@ export interface NarrativeViewerProps {
   viewMode?: 'plain' | 'markdown';
   /** Whether to show the left-hand index sidebar. */
   showIndex?: boolean;
+  /** Controlled sidebar width in pixels. When omitted, width is managed internally and persisted per-instance. */
+  sidebarWidth?: number;
+  /** Called when the sidebar width changes (e.g. during resize). */
+  onSidebarWidthChange?: (width: number) => void;
   /** Optional key namespace so multiple NarrativeViewers on the same page don't share React keys. */
   keyPrefix?: string;
   /** Optional header content rendered above the sidebar/content panes. */
   header?: React.ReactNode;
-  /** Optional id of a block currently being edited. If provided, that block is rendered via renderEditingBlock. */
-  editingBlockId?: string;
+  /** Optional resolver that returns the memory ids backing a section, used by the evidence action. */
+  resolveSectionEvidence?: (heading: string) => string[] | null;
+  /** Optional callback when the user requests to see the evidence backing a section. Receives the section's memory ids and a human-readable label. */
+  onShowEvidence?: (memoryIds: string[], label: string) => void;
+  /** Optional label for the evidence action. */
+  evidenceLabel?: string;
   /** Optional render prop replacing the block currently being edited. */
   renderEditingBlock?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
   /** Optional render prop for extra sidebar row actions, appended inside the default row. */
@@ -116,9 +124,14 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   className = '',
   viewMode = 'plain',
   showIndex = true,
+  sidebarWidth: sidebarWidthProp,
+  onSidebarWidthChange,
   keyPrefix = '',
   header,
-  editingBlockId,
+  onFocusSection,
+  resolveSectionEvidence,
+  onShowEvidence,
+  evidenceLabel = 'Evidence',
   renderEditingBlock,
   renderSidebarRowActions,
   renderBlockActions,
@@ -127,7 +140,6 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   showHeaderActions,
   resolveSectionCopy,
   onCopyWholeDocument,
-  onFocusSection,
   focusLabel = 'Focus section',
 }: NarrativeViewerProps, ref: React.Ref<{ scrollToBlock: (id: string) => void }>) {
   const instanceId = useId().replace(/:/g, '');
@@ -139,8 +151,42 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   const activeBlockId = activeBlockIdProp ?? internalActiveBlockId;
   const activeRangeIds = activeRangeIdsProp ?? internalActiveRangeIds;
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-  const [sidebarWidth, setSidebarWidth] = useState(13 * 16); // 13rem default
+  const storageKey = 'narrative-sidebar-width';
+  const isControlled = sidebarWidthProp !== undefined;
+  const [internalWidth, setInternalWidth] = useState(13 * 16); // 13rem default
+  const sidebarWidth = isControlled ? sidebarWidthProp : internalWidth;
   const isDraggingRef = useRef(false);
+
+  // Hydration-safe: restore the saved width after mount so the first server
+  // render stays at the default and the client only updates once hydrated.
+  useEffect(() => {
+    if (isControlled || typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        setInternalWidth(Math.max(10 * 16, Number(saved)));
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [isControlled]);
+
+  useEffect(() => {
+    if (isControlled || typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(storageKey, String(internalWidth));
+    } catch {
+      // ignore storage errors
+    }
+  }, [isControlled, internalWidth]);
+
+  const setSidebarWidth = useCallback((width: number) => {
+    if (isControlled) {
+      onSidebarWidthChange?.(width);
+    } else {
+      setInternalWidth(width);
+    }
+  }, [isControlled, onSidebarWidthChange]);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -338,7 +384,23 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
             {label}
           </span>
         </button>
-        <div className="flex items-center flex-shrink-0">
+        <div className="flex items-center gap-0.5 flex-shrink-0 max-w-0 overflow-hidden group-hover/copy:max-w-fit focus-within:max-w-fit transition-[max-width]">
+          {onShowEvidence && b.type === 'heading' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const evidenceIds = resolveSectionEvidence?.(b.title ?? '') ?? [];
+                if (evidenceIds.length === 0) return;
+                onShowEvidence(evidenceIds, b.title || evidenceLabel);
+              }}
+              className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+              title={evidenceLabel}
+              aria-label={evidenceLabel}
+            >
+              <FileSearch className="h-3 w-3" />
+            </button>
+          )}
           {onFocusSection && b.type === 'heading' && (
             <button
               type="button"
@@ -346,7 +408,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 e.stopPropagation();
                 handleFocusSection(b);
               }}
-              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-foreground-placeholder hover:text-narrative-active-fg hover:bg-surface-panel transition-opacity"
+              className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
               title={focusLabel}
               aria-label={focusLabel}
             >
@@ -360,7 +422,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 e.stopPropagation();
                 onAddToPage(makeSectionEvent(b));
               }}
-              className="opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 p-1 rounded text-foreground-placeholder hover:text-narrative-focus-add hover:bg-surface-panel transition-opacity"
+              className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
               title={addToPageLabel}
               aria-label={addToPageLabel}
             >
@@ -421,7 +483,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                       e.stopPropagation();
                       onAddToPage(makeBlockEvent(b.raw, b.title));
                     }}
-                    className="p-1 rounded text-foreground-placeholder hover:text-narrative-focus-add hover:bg-surface-panel transition-colors"
+                    className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                     title={addToPageLabel}
                     aria-label={addToPageLabel}
                   >
@@ -439,7 +501,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                     e.stopPropagation();
                     onAddToPage(makeBlockEvent(b.raw, b.title));
                   }}
-                  className="p-1 rounded text-foreground-placeholder hover:text-narrative-focus-add hover:bg-surface-panel transition-colors"
+                  className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                   title={addToPageLabel}
                   aria-label={addToPageLabel}
                 >
@@ -545,7 +607,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                     e.stopPropagation();
                     onAddToPage(makeBlockEvent(b.raw, b.title));
                   }}
-                  className="p-1 rounded text-foreground-placeholder hover:text-narrative-focus-add hover:bg-surface-panel transition-colors"
+                  className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                   title={addToPageLabel}
                   aria-label={addToPageLabel}
                 >
@@ -563,7 +625,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                   e.stopPropagation();
                   onAddToPage(makeBlockEvent(b.raw, b.title));
                 }}
-                className="p-1 rounded text-foreground-placeholder hover:text-narrative-focus-add hover:bg-surface-panel transition-colors"
+                className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                 title={addToPageLabel}
                 aria-label={addToPageLabel}
               >
@@ -600,7 +662,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                         e.stopPropagation();
                         copyWholeDocument();
                       }}
-                      className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-foreground-subtle hover:text-narrative-focus-add hover:bg-surface-panel transition-opacity"
+                      className="opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100 p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-opacity"
                       title={addToPageLabel}
                       aria-label={addToPageLabel}
                     >
@@ -643,7 +705,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           ) : (
             blocks.map(b => {
               const isActive = activeRangeIds.has(b.id);
-              if (editingBlockId === b.id && renderEditingBlock) {
+              if (renderEditingBlock) {
                 return <Fragment key={`${prefix}block-${b.id}`}>{renderEditingBlock(b, { isActive })}</Fragment>;
               }
               return defaultBlock(b, isActive);
