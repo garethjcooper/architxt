@@ -84,6 +84,7 @@ async function fetchModelResult(serverId, bankId, candidate, timeoutMs) {
     ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string').map((n) => ({
       narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
       narrative: n.narrative,
+      evidence: Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [],
     }))
     : [];
   const { graph, tables, diagrams, errors: modelErrors } = {

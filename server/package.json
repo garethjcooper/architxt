@@ -3,7 +3,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "architxt: Document processing backend",
   "main": "src/index.js",
   "type": "module",
@@ -16,8 +16,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@architxt/aql": "^0.3.7",
-    "@architxt/entity-matcher": "^0.3.7",
+    "@architxt/aql": "^0.3.8",
+    "@architxt/entity-matcher": "^0.3.8",
     "better-sqlite3": "^12.10.0",
     "cors": "^2.8.6",
     "dotenv": "^16.3.1",

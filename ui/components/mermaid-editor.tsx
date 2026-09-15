@@ -5,13 +5,12 @@ import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import { Tag, tagHighlighter } from '@lezer/highlight';
-import mermaid from 'mermaid';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DiagramControls } from '@/components/diagram-controls';
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 import { CopyDiagramMenu } from '@/components/copy-diagram-menu';
-import { maybeInitializeMermaid, ensureMermaidInitialized } from '@/lib/mermaid-init';
+import { maybeInitializeMermaid, ensureMermaidInitialized, renderMermaid } from '@/lib/mermaid-init';
 
 export interface MermaidEditorProps {
   /** Raw Mermaid source (without fence markers). */
@@ -144,7 +143,8 @@ function PreviewPane({
   onRender?: (error: string | null) => void;
   onErrorChange?: (error: string | null) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -169,7 +169,7 @@ function PreviewPane({
       }
       try {
         const id = `mermaid-editor-${Math.random().toString(36).slice(2, 11)}`;
-        const { svg: rendered } = await mermaid.render(id, source);
+        const { svg: rendered } = await renderMermaid(id, source);
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
@@ -191,42 +191,47 @@ function PreviewPane({
   return (
     <div className="flex flex-col h-full rounded-md border border-border-default bg-surface-overlay overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        <div
-          ref={containerRef}
-          className={cn(
-            'absolute inset-0 p-3 overflow-hidden origin-top-left',
-            fitToPage && 'flex items-center justify-center',
-          )}
-        >
-          {error ? (
-            <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
-              <div className="max-w-full rounded-md border border-destructive-bd bg-destructive-bg backdrop-blur-sm px-3 py-2 text-xs text-destructive-fg font-mono whitespace-pre-wrap shadow-lg">
-                {error}
-              </div>
-            </div>
-          ) : null}
-          {svg ? (
-            <div
-              dangerouslySetInnerHTML={{ __html: svg }}
-              className={cn(
-                'mermaid-diagram',
-                fitToPage && 'w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:!transform-none',
-              )}
-            />
-          ) : !error ? (
-            <div className="text-xs text-foreground-placeholder">Rendering diagram…</div>
-          ) : null}
+        {/* Viewport: clips the transformed canvas. Panzoom sets parent overflow to hidden. */}
+        <div ref={viewportRef} className="absolute inset-0 p-3">
+          {/* Canvas: receives panzoom transforms and must NOT clip unscaled content. */}
+          <div
+            ref={canvasRef}
+            className="absolute inset-3 overflow-visible cursor-grab active:cursor-grabbing"
+          >
+            {svg ? (
+              <div
+                dangerouslySetInnerHTML={{ __html: svg }}
+                className="mermaid-diagram"
+              />
+            ) : !error ? (
+              <div className="text-xs text-foreground-placeholder">Rendering diagram…</div>
+            ) : null}
+          </div>
         </div>
-        {!error && svg && <DiagramControls targetRef={containerRef} fitToPage={fitToPage} onFitToPageChange={onFitToPageChange} />}
+        {error ? (
+          <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
+            <div className="max-w-full rounded-md border border-destructive-bd bg-destructive-bg backdrop-blur-sm px-3 py-2 text-xs text-destructive-fg font-mono whitespace-pre-wrap shadow-lg">
+              {error}
+            </div>
+          </div>
+        ) : null}
+        {!error && svg && (
+          <DiagramControls
+            viewportRef={viewportRef}
+            canvasRef={canvasRef}
+            fitToPage={fitToPage}
+            onFitToPageChange={onFitToPageChange}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 export function MermaidEditor({ content, onChange, onErrorChange, className, name, type, readOnly = false }: MermaidEditorProps) {
-  const [fitToPage, setFitToPage] = useState(true);
+  const [fitToPage, setFitToPage] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [sourceWidth, setSourceWidth] = useState(35);
+  const [sourceWidth, setSourceWidth] = useState(50);
   const lastValueRef = useRef(content);
   const draggingRef = useRef(false);
 

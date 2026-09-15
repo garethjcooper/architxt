@@ -40,6 +40,8 @@ Example:
 { "type": "flowchart", "content": "flowchart LR\n  A[\"Billing\"] --\u003e B(\"Rating\")\n  B --\u003e C{\"Valid?\"}\n  C --\u003e|Yes| D[\"Invoice\"]\n  C --\u003e|No| E[\"Reject\"]" }
 ```
 
+In the example above, the `content` value contains real line breaks. After JSON serialization those line breaks become `\\n`; do not type the literal characters `\\n` in the source string.
+
 Rules:
 - Node IDs must be plain identifiers with no spaces, parentheses, brackets, braces, quotes, colons, slashes, or special characters. Labels go inside the shape brackets.
 - Use `flowchart` for new diagrams; `graph` is the legacy alias.

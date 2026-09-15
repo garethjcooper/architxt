@@ -148,6 +148,7 @@ describe('normalizeGraph', () => {
           label: 'usage events',
           detail: 'Intermediate distributes usage event data to Fuse.',
           properties: { dataObjects: ['usage events'] },
+          evidence: ['a84faf98', 'entity-summary-a-com:COM-019'],
         },
       ],
     }, { activity: 'mental-model', knownCatalog: new Map() });
@@ -156,6 +157,15 @@ describe('normalizeGraph', () => {
     assert.strictEqual(result.edges[0].from, 'a-com:COM-019');
     assert.strictEqual(result.edges[0].to, 'a-com:COM-049');
     assert.strictEqual(result.edges[0].provenance, 'known');
+    assert.deepStrictEqual(result.edges[0].evidence, ['a84faf98', 'entity-summary-a-com:COM-019']);
+  });
+
+  it('preserves short evidence IDs without silently dropping them', () => {
+    const result = normalizeGraph({
+      nodes: [{ id: 'a-com:COM-019', name: 'Intermediate' }, { id: 'a-com:COM-049', name: 'Fuse' }],
+      edges: [{ from: 'a-com:COM-019', to: 'a-com:COM-049', type: 'sends', evidence: ['a84faf98'] }],
+    }, { activity: 'mental-model', knownCatalog: new Map() });
+    assert.deepStrictEqual(result.edges[0].evidence, ['a84faf98']);
   });
 
   it('completes missing mental-model endpoint from known catalog', () => {

@@ -25,6 +25,8 @@ import { ManageContextDialog } from '@/components/manage-context-dialog';
 import { ManageDocumentConfigDialog } from '@/components/manage-document-config-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { BatchProgressDialog, type BatchItem, type BatchResult } from '@/components/batch-progress-dialog';
+import { DeleteDocumentsFromBankDialog } from '@/components/delete-documents-from-bank-dialog';
+import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { FileText, AlertCircle, Plus, Trash2, Play, RefreshCw, Tag, FolderOpen, Search, X, ScanSearch, TableIcon, Settings2 } from 'lucide-react';
 import { ArchitxtIcon } from '@/components/icons/architxt-icon';
 import { toast } from 'sonner';
@@ -78,6 +80,7 @@ function DocumentsPageContent() {
   const [manageConfigDialogOpen, setManageConfigDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteFromBankOpen, setDeleteFromBankOpen] = useState(false);
   const [processActionConfirmOpen, setProcessActionConfirmOpen] = useState(false);
   const [batchProgressOpen, setBatchProgressOpen] = useState(false);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
@@ -246,6 +249,8 @@ function DocumentsPageContent() {
 
   const isAllSelected = filteredDocuments.length > 0 && selected.size === filteredDocuments.length;
 
+  const selectedDocuments = useMemo(() => documents.filter((d) => selected.has(d.id)), [documents, selected]);
+
   // Dynamic Extract button state — based on selected document statuses
   // Count uploaded (new) and extracted (reprocess) among selected docs
   const extractCounts = useMemo(() => {
@@ -339,6 +344,7 @@ function DocumentsPageContent() {
               <div className="w-px h-5 bg-surface-panel mx-1" />
               <Button onClick={fetchDocuments} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
               <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <Button onClick={() => setDeleteFromBankOpen(true)} disabled={selected.size === 0} title="Delete from Hindsight bank" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><HindsightIcon className="h-4 w-4" /></Button>
               <Button onClick={() => setUploadDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
             </div>
         }
@@ -690,6 +696,16 @@ function DocumentsPageContent() {
         items={batchItems}
         operation={batchOperation}
         onComplete={handleBatchComplete}
+      />
+
+      <DeleteDocumentsFromBankDialog
+        documents={selectedDocuments}
+        open={deleteFromBankOpen}
+        onOpenChange={setDeleteFromBankOpen}
+        onDeleted={() => {
+          clearSelection();
+          fetchDocuments();
+        }}
       />
     </>
   );
