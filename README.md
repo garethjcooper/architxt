@@ -4,6 +4,8 @@
 
 architxt is a document processing pipeline and web UI that ingests documents — extracts structured content via an LLM-augmented pipeline (Docling, denoising, vision analysis, entity detection) — and produces clean, versioned, entity-tagged knowledge. Results can be reviewed, edited, and pushed to a [Hindsight](https://github.com/vectorize-io/hindsight/tree/main) memory bank for enterprise-scale semantic search, mental models, and cross-document reasoning.
 
+📚 **Documentation:** [https://www.architxtlabs.com/](https://www.architxtlabs.com/)
+
 **PDF is the preferred format.** DOCX, XLSX, and PPTX are also supported but have received minimal testing.
 
 It is built on the idea of the [Temporal Mosaic](docs/concepts/architxt-temporal-mosaic.md): the "best known state" of a system is not a single document, but a composite of the freshest knowledge for each scope — regardless of when the document was written.
