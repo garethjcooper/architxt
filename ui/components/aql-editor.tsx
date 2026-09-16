@@ -528,7 +528,7 @@ function aqlCompletions(
   };
 }
 
-export function AqlEditor(props: AqlEditorProps) {
+function AqlEditorComponent(props: AqlEditorProps) {
   const {
     id,
     value,
@@ -628,3 +628,10 @@ export function AqlEditor(props: AqlEditorProps) {
     </div>
   );
 }
+
+// Memoize so parent re-renders (e.g. polling trail/session updates) do not
+// reach CodeMirror and queue stale external-value updates while the user is
+// typing. The controlled value race in @uiw/react-codemirror's 200 ms typing
+// latch can otherwise overwrite the editor with a stale `value` prop and reset
+// the cursor to position 0.
+export const AqlEditor = React.memo(AqlEditorComponent);
