@@ -17,23 +17,9 @@ const NON_CONTEXTUAL_MODES = [
 ];
 
 describe('buildConditionalFragments', () => {
-  it('includes narrative fragment by default when no directives are present', () => {
+  it('includes no diagram fragments when no diagram section is requested', () => {
     const fragments = buildConditionalFragments({ narrative: 'hello' });
-    assert.deepEqual(fragments, ['output-format-narrative-contextual.md']);
-  });
-
-  it('omits narrative fragment when only structured sections are active', () => {
-    const fragments = buildConditionalFragments({ graph: { content: 'A --> B' } });
-    assert.ok(!fragments.includes('output-format-narrative-contextual.md'));
-  });
-
-  it('includes narrative fragment when narrative is explicitly active alongside other sections', () => {
-    const fragments = buildConditionalFragments({
-      narrative: { content: 'summarize' },
-      graph: { content: 'A --> B' },
-    });
-    assert.ok(fragments.includes('output-format-narrative-contextual.md'));
-    assert.ok(fragments.includes('output-format-graph-contextual.md'));
+    assert.deepEqual(fragments, []);
   });
 
   it('includes all diagram fragments when type is not specified', () => {

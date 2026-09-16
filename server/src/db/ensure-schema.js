@@ -103,7 +103,6 @@ function ensureMissingTables(db) {
         rstep_status TEXT,
         rstep_error_message TEXT,
         rstep_calls JSON,
-        rstep_title TEXT,
         rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
         FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
@@ -277,21 +276,6 @@ function ensureMissingTables(db) {
         tr_sort_order INTEGER,
         tr_created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         tr_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`
-    },
-    {
-      name: 'bank_settings',
-      ddl: `CREATE TABLE IF NOT EXISTS bank_settings (
-        bs_id INTEGER PRIMARY KEY CHECK (bs_id = 1),
-        retain_mission TEXT NOT NULL DEFAULT '',
-        observations_mission TEXT NOT NULL DEFAULT '',
-        reflect_mission TEXT NOT NULL DEFAULT '',
-        disposition TEXT NOT NULL DEFAULT '{"empathy":1,"literalism":4,"skepticism":1}',
-        retain_extraction_mode TEXT NOT NULL DEFAULT 'verbose',
-        retain_chunk_size INTEGER NOT NULL DEFAULT 2000 CHECK (retain_chunk_size > 0),
-        entities_allow_free_form INTEGER NOT NULL DEFAULT 0 CHECK (entities_allow_free_form IN (0, 1)),
-        bs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        bs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
     }
   ];
@@ -507,105 +491,6 @@ function ensureBuiltinPromptTemplates(db) {
 }
 
 /**
- * Ensure the single-row bank_settings table exists with default values.
- * Idempotent: inserts the default row only if the table is empty.
- */
-function ensureBankSettingsDefaults(db) {
-  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'bank_settings'").get();
-  if (!tableExists) return 0;
-
-  // Migration: add entities_allow_free_form column if missing.
-  const columnInfo = db.prepare("PRAGMA table_info(bank_settings)").all();
-  const hasFreeFormColumn = columnInfo.some((col) => col.name === 'entities_allow_free_form');
-  if (!hasFreeFormColumn) {
-    try {
-      db.prepare(`
-        ALTER TABLE bank_settings
-        ADD COLUMN entities_allow_free_form INTEGER NOT NULL DEFAULT 0 CHECK (entities_allow_free_form IN (0, 1))
-      `).run();
-      logger.info('Added entities_allow_free_form column to bank_settings');
-    } catch (err) {
-      logger.error('Failed to add entities_allow_free_form column', { error: err.message });
-    }
-  }
-
-  const DEFAULT_RETAIN_MISSION = `Extract every discrete architectural fact from this IT component design as a separate, atomic statement. Do not combine multiple facts into one. Do not summarize broadly.
-
-For each specific, singular piece of information, capture exactly one of the following:
-
-1. COMPONENTS: A single system, service, database, or external integration. Use entity labels [[Name (ID)]] when present. Components by themselves (i.e. just being present) is NOT a fact.
-2. INTERFACES: One API endpoint, data format, file pattern, or parameter — not a list of endpoints. Extract each interface flow direction as a discreet, separate fact.
-3. DATA FLOWS: One directional relationship — which specific component produces data and which specific component consumes it. Use explicit language: sends to, receives from, exchanges with.
-4. RISKS & CONSTRAINTS: One performance limit, size limit, vendor gap, or regulatory requirement.
-5. SIZING: One data volume, collection size, or throughput figure.
-6. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse). If the source text states what would break or degrade if this system were unavailable, capture that as a separate purpose fact.
-
-Rules:
-- DO NOT capture individual field names, column names, row values or field definitions unless there are directly related to an architectural component, interface, dataflow or decision.
-- Separate facts per component connections - e.g. If a component has 5 connections, extract 5 separate data-flow facts, not 1 summary fact.
-- Separate facts per interface - e.g. If a system exposes 3 API endpoints, extract 3 separate interface facts.
-- Separate facts per sizing, amounts, totals - e.g. If a table lists 4 sizing figures, extract 4 separate sizing facts.
-- If a system's purpose or architectural role is described in the source text, extract it as a separate purpose fact. Do not combine purpose with identity or connection facts.
-- Each fact must contain exactly one specific piece of information.
-- Preserve [[Name (ID)]] bracket notation exactly. Do not paraphrase or rewrite entity references.
-
-Only extract purpose and capability statements that are stated explicitly in the source text. If the document describes what a system does, what it stores, or what downstream processes depend on it, capture that verbatim as a purpose fact. Do not infer, extrapolate, or invent purpose facts — if the source text does not describe a system's architectural role, do not create a purpose fact for it.`;
-
-  const DEFAULT_OBSERVATIONS_MISSION = `When consolidating related world facts into observations, follow these rules:
-
-1. Preserve [[Name (ID)]] bracket notation exactly. Observations must remain entity-tagged. Include the same [[Name (ID)]] labels from the source world facts so the observation is traversable in the entity graph.
-
-2. Synthesize, do not concatenate. Only create an observation when merging multiple related facts genuinely produces a richer insight or reveals a cross-system pattern. Do not create observations that merely join atomic facts with commas or "and" — leave those as separate world facts.
-
-3. Exclude temporal and procedural noise. Strip migration timelines, phase references ("before/after"), "intent", "recommendation", "should", and "may" language. Observations must state what is, not what is planned or advised.
-
-4. Prefer architectural relationships over restatements. Prioritize observations that describe cross-system data flows, dependency chains, or architectural trade-offs. Avoid observations that only restate identity, sizing, or deployment counts already captured in world facts.`;
-
-  const DEFAULT_REFLECT_MISSION = 'You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.';
-
-  const row = db.prepare('SELECT bs_id FROM bank_settings WHERE bs_id = 1').get();
-  if (!row) {
-    try {
-      db.prepare(`
-        INSERT INTO bank_settings (bs_id, retain_mission, observations_mission, reflect_mission, disposition, retain_extraction_mode, retain_chunk_size, entities_allow_free_form)
-        VALUES (1, ?, ?, ?, '{"empathy":1,"literalism":4,"skepticism":1}', 'verbose', 2000, 0)
-      `).run(DEFAULT_RETAIN_MISSION, DEFAULT_OBSERVATIONS_MISSION, DEFAULT_REFLECT_MISSION);
-      logger.info('Seeded default bank_settings row');
-      return 1;
-    } catch (err) {
-      logger.error('Failed to seed bank_settings defaults', { error: err.message });
-      return 0;
-    }
-  }
-
-  // One-time backfill for rows created before the canonical mission defaults existed.
-  const empty = db.prepare(`
-    SELECT bs_id FROM bank_settings
-    WHERE bs_id = 1
-      AND IFNULL(retain_mission, '') = ''
-      AND IFNULL(observations_mission, '') = ''
-      AND IFNULL(reflect_mission, '') = ''
-  `).get();
-  if (!empty) return 0;
-
-  try {
-    db.prepare(`
-      UPDATE bank_settings
-      SET retain_mission = ?,
-          observations_mission = ?,
-          reflect_mission = ?,
-          bs_updated_at = CURRENT_TIMESTAMP
-      WHERE bs_id = 1
-    `).run(DEFAULT_RETAIN_MISSION, DEFAULT_OBSERVATIONS_MISSION, DEFAULT_REFLECT_MISSION);
-    logger.info('Backfilled default bank_settings missions');
-    return 1;
-  } catch (err) {
-    logger.error('Failed to backfill bank_settings defaults', { error: err.message });
-    return 0;
-  }
-}
-
-/**
  * Seed system template roles for contextual-graph mental models.
  * Idempotent: inserts missing roles and updates labels/scopes/sort order when
  * rows already exist. User-created roles are never modified.
@@ -680,7 +565,6 @@ export const CONTEXTUAL_GRAPH_TEMPLATES = [
     role: 'sys_entity_summary',
     sourceQuery: `[[{entity-name} ({entity-id})]].
 #narrative
-#narrative-name Summary {entity-name} ({entity-id})
 Describe its core architectural role, responsibilities, and relationships to other components.
 #end`,
     maxTokens: 8192,
@@ -695,14 +579,13 @@ Describe its core architectural role, responsibilities, and relationships to oth
     role: 'sys_entity_capabilities',
     sourceQuery: `[[{entity-name} ({entity-id})]].
 #table
-#table-name Capabilities {entity-name} ({entity-id})
+#table-name Capabilities
 Return the major architectural capabilities of the entity in a table with columns: name, responsibility, purpose, business_capability_mapping, evidence.
-Also populate the table-level evidence array with the full Hindsight memory IDs that justify the entire table (the deduplicated union of all row evidence IDs).
 - name: the capability name.
 - responsibility: what the entity does for this capability.
 - purpose: why the capability matters.
 - business_capability_mapping: the business domain this capability belongs to.
-- evidence: array of the full, exact Hindsight memory IDs supporting this capability. Do not truncate, shorten, hash, abbreviate, or invent IDs.
+- evidence: array of Hindsight memory IDs supporting this capability.
 List its major capabilities, each with its purpose, responsibility, business capability mapping, and evidence.
 #end`,
     maxTokens: 8192,
@@ -717,7 +600,6 @@ List its major capabilities, each with its purpose, responsibility, business cap
     role: 'sys_edge_context',
     sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
 #graph
-#graph-name Edge Context {source-name} - {target-name}
 For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
 #end`,
     maxTokens: 8192,
@@ -730,7 +612,7 @@ For each flow, describe what is transferred, how it is transferred, how often, a
     extId: 'discover-{seed-id}',
     name: 'Discover around {seed-name}',
     role: 'sys_discovery_context',
-    sourceQuery: 'Seed entity: {seed-id} ({seed-name}).\n#graph\n#graph-name Discovery {seed-id} ({seed-name})\nSuggest candidate related components, systems, or entities that interact with or are adjacent to this seed, and describe how they connect. Candidates should use the same node id as the seed for any known neighbor; only use a bare lowercase slug for genuinely new candidates.\n#end',
+    sourceQuery: 'Seed entity: {seed-id} ({seed-name}).\n#graph\nSuggest candidate related components, systems, or entities that interact with or are adjacent to this seed, and describe how they connect. Candidates should use the same node id as the seed for any known neighbor; only use a bare lowercase slug for genuinely new candidates.\n#end',
     maxTokens: 8192,
     refreshMode: 'full',
     refreshAfterConsolidation: 'false',
@@ -1288,10 +1170,6 @@ function ensureMissingColumns(db) {
         {
           name: 'rstep_envelope',
           ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_envelope JSON'
-        },
-        {
-          name: 'rstep_title',
-          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_title TEXT'
         }
       ]
     },
@@ -1573,7 +1451,7 @@ function migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db) {
       const canvas = row.rstep_canvas_state ? JSON.parse(row.rstep_canvas_state) : { graph: { nodes: [], edges: [] }, tables: [], diagrams: [] };
       const firstNarrative = typeof synthesis.narrative === 'string' ? synthesis.narrative : '';
       const envelope = {
-        narratives: firstNarrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: firstNarrative, evidence: [] }] : [],
+        narratives: firstNarrative ? [{ narrative_name: synthesis.narrative_name || '', narrative: firstNarrative }] : [],
         graph: canvas.graph ?? { nodes: [], edges: [] },
         tables: canvas.tables ?? [],
         diagrams: canvas.diagrams ?? [],
@@ -1865,10 +1743,9 @@ export function ensureSchema(db) {
     const cgTemplates = ensureContextualGraphTemplates(db);
     const templateRolesSeeded = ensureTemplateRoles(db);
     const templateRoleUniqueIndex = ensureTemplateRoleUniqueIndex(db);
-    const bankSettingsSeeded = ensureBankSettingsDefaults(db);
     const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
-    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || idPlaceholderMigrated > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, id placeholder migrated: ${idPlaceholderMigrated}`);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, id placeholder migrated: ${idPlaceholderMigrated}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }

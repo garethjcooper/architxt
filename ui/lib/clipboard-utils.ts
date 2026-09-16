@@ -1,7 +1,7 @@
 'use client';
 
 import { toast } from 'sonner';
-import { renderMermaid } from '@/lib/mermaid-init';
+import mermaid from 'mermaid';
 
 export async function copyText(text: string, label = 'Text') {
   try {
@@ -20,7 +20,7 @@ export async function copyMermaidSource(source: string) {
 export async function copyMermaidSvg(source: string) {
   try {
     const id = `copy-svg-${Math.random().toString(36).slice(2, 11)}`;
-    const { svg } = await renderMermaid(id, source);
+    const { svg } = await mermaid.render(id, source.trim());
     await navigator.clipboard.writeText(svg);
     toast.success('SVG copied to clipboard');
   } catch (err) {
@@ -32,7 +32,7 @@ export async function copyMermaidSvg(source: string) {
 export async function copyMermaidPng(source: string) {
   try {
     const id = `copy-png-${Math.random().toString(36).slice(2, 11)}`;
-    const { svg } = await renderMermaid(id, source);
+    const { svg } = await mermaid.render(id, source.trim());
     const blob = await svgToPngBlob(svg);
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
     toast.success('PNG copied to clipboard');

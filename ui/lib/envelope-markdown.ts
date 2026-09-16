@@ -8,7 +8,6 @@ function toNarratives(envelope: EnvelopeLike): UnifiedNarrativeBlock[] {
     ? envelope.narratives.map((n) => ({
         narrative_name: n.narrative_name ?? '',
         narrative: n.narrative ?? '',
-        evidence: n.evidence ?? [],
       }))
     : [];
 }
@@ -29,14 +28,8 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
       name: t.name,
       columns: t.columns ?? [],
       rows: t.rows,
-      evidence: t.evidence ?? [],
     })),
-    diagrams: (envelope.diagrams ?? []).map((d) => ({
-      name: d.name,
-      type: d.type,
-      content: d.content,
-      evidence: d.evidence ?? [],
-    })),
+    diagrams: envelope.diagrams ?? [],
   };
 }
 

@@ -6,9 +6,10 @@ import { EditorView } from '@codemirror/view';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
 import { Tag, tagHighlighter } from '@lezer/highlight';
 import type { GraphNode, GraphEdge } from '@/lib/api/client';
+import mermaid from 'mermaid';
 import { DiagramControls } from '@/components/diagram-controls';
 import { Markdown } from '@/components/markdown';
-import { maybeInitializeMermaid, ensureMermaidInitialized, renderMermaid } from '@/lib/mermaid-init';
+import { maybeInitializeMermaid, ensureMermaidInitialized } from '@/lib/mermaid-init';
 import {
   Dialog,
   DialogContent,
@@ -156,8 +157,7 @@ function PreviewPane({
   fitToPage: boolean;
   onFitToPageChange: (fit: boolean) => void;
 }) {
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -173,7 +173,7 @@ function PreviewPane({
       }
       try {
         const id = `graph-view-${Math.random().toString(36).slice(2, 11)}`;
-        const { svg: rendered } = await renderMermaid(id, source);
+        const { svg: rendered } = await mermaid.render(id, source);
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
@@ -192,36 +192,31 @@ function PreviewPane({
   return (
     <div className="flex flex-col h-full rounded-md border border-border-default bg-surface-overlay overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        {/* Viewport: clips the transformed canvas. Panzoom sets parent overflow to hidden. */}
-        <div ref={viewportRef} className="absolute inset-0 p-3">
-          {/* Canvas: receives panzoom transforms and must NOT clip unscaled content. */}
-          <div
-            ref={canvasRef}
-            className={cn(
-              'absolute inset-3 overflow-visible cursor-grab active:cursor-grabbing',
-            )}
-          >
-            {svg ? (
-              <div
-                dangerouslySetInnerHTML={{ __html: svg }}
-                className="mermaid-diagram"
-              />
-            ) : !error ? (
-              <div className="text-xs text-foreground-subtle">Rendering diagram…</div>
-            ) : null}
-          </div>
-        </div>
-        {error ? (
-          <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
-            <div className="max-w-full rounded-md border border-destructive-bd bg-destructive-bg backdrop-blur-sm px-3 py-2 text-xs text-destructive-fg font-mono whitespace-pre-wrap shadow-lg">
-              {error}
+        <div
+          ref={containerRef}
+          className={cn(
+            'absolute inset-0 p-3 overflow-hidden origin-top-left cursor-grab active:cursor-grabbing',
+          )}
+        >
+          {error ? (
+            <div className="absolute inset-0 flex items-end justify-start p-4 pointer-events-none">
+              <div className="max-w-full rounded-md border border-destructive-bd bg-destructive-bg backdrop-blur-sm px-3 py-2 text-xs text-destructive-fg font-mono whitespace-pre-wrap shadow-lg">
+                {error}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+          {svg ? (
+            <div
+              dangerouslySetInnerHTML={{ __html: svg }}
+              className="mermaid-diagram"
+            />
+          ) : !error ? (
+            <div className="text-xs text-foreground-subtle">Rendering diagram…</div>
+          ) : null}
+        </div>
         {!error && svg && (
           <DiagramControls
-            viewportRef={viewportRef}
-            canvasRef={canvasRef}
+            targetRef={containerRef}
             fitToPage={fitToPage}
             onFitToPageChange={onFitToPageChange}
             className="top-2 right-2"
@@ -335,14 +330,6 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
     setEdgeTableName(defaultEdgeTableName);
   }, [graphKey]);
 
-  // Always reset add-to-page toggles when the modal opens so the last session doesn't carry over.
-  useEffect(() => {
-    if (open) {
-      setIncludeDiagram(false);
-      setIncludeTables(false);
-    }
-  }, [open]);
-
   const source = generatedSource;
   const isEmpty = !graph.nodes.length && !graph.edges.length;
 
@@ -437,8 +424,8 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
   }, [handleHResizeMove, handleHResizeEnd]);
 
   const effectiveRenderer = useMemo(() => {
-    const init = source.match(/%%\{init:[\s\S]*?'layout':\s*'(dagre|elk)'/);
-    return init ? (init[1] as Renderer) : 'elk';
+    const init = source.match(/%%\{init:[\s\S]*?'defaultRenderer':\s*'(dagre|elk)'/);
+    return init ? (init[1] as Renderer) : 'dagre';
   }, [source]);
 
   const toggleButtonClass = (active: boolean) =>
@@ -485,12 +472,12 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
           evidence: e.evidence || [],
         };
       });
-      const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[]; evidence: string[] }> = [];
+      const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[] }> = [];
       if (nodeRows.length > 0) {
-        tables.push({ name: nodeTableName, columns: ['id', 'type', 'label', 'name'], rows: nodeRows, evidence: [] });
+        tables.push({ name: nodeTableName, columns: ['id', 'type', 'label', 'name'], rows: nodeRows });
       }
       if (edgeRows.length > 0) {
-        tables.push({ name: edgeTableName, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows, evidence: [] });
+        tables.push({ name: edgeTableName, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows });
       }
       if (tables.length > 0) {
         events.push({
@@ -539,6 +526,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                 <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0">
                   <span>Mermaid source</span>
                   <div className="flex items-center gap-2">
+                    <CopyDiagramMenu source={source} />
                     {!readOnly && (
                       <>
                         {includeDiagram && (
@@ -559,7 +547,6 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
                         </button>
                       </>
                     )}
-                    <CopyDiagramMenu source={source} />
                   </div>
                 </div>
                 <div className="flex-1 min-h-0">

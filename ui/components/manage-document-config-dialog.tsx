@@ -236,7 +236,7 @@ export function ManageDocumentConfigDialog({
                       )}
                     </div>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-border-strong">
                     <div className="p-3">
                       <Calendar
                         mode="single"

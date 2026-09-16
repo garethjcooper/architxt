@@ -56,32 +56,29 @@ test('removes summary and capabilities from nodes when roles are disallowed', as
     updated_at: '2026-01-01T00:00:00Z',
   });
 
-  // Both entity-summary and entity-capabilities are disallowed, so both refs
-  // and both legacy fields should be removed. Only edge-ctx remains allowed.
-  const result = await cleanupDisallowedModels(db, serverId, bankId, ['edge-ctx'], {
+  const result = await cleanupDisallowedModels(db, serverId, bankId, ['entity-capabilities'], {
     deleteFromHindsight,
     listMentalModels,
   });
 
   assert.equal(result.success, true);
-  assert.deepEqual(result.deleted.sort(), [`entity-capabilities-${nodeId}`, `entity-summary-${nodeId}`].sort());
+  assert.deepEqual(result.deleted, [`entity-summary-${nodeId}`]);
   assert.equal(result.cleared.nodes, 1);
 
   const nodeResult = getNode(db, serverId, bankId, nodeId);
   const nextProperties = nodeResult.data.properties;
 
-  assert.equal(nextProperties.summary, undefined, 'summary should be removed during cleanup');
-  assert.equal(nextProperties.capabilities, undefined, 'capabilities should be removed during cleanup');
-  const remainingRefs = nextProperties.provenance?.model_refs || [];
+  assert.equal(nextProperties.summary, undefined, 'summary should be removed when entity-summary is disallowed');
+  assert.deepEqual(nextProperties.capabilities, ['read', 'write'], 'capabilities should remain when allowed');
   assert.equal(
-    remainingRefs.some((ref) => ref.ext_id === `entity-summary-${nodeId}`),
+    nextProperties.provenance.model_refs.some((ref) => ref.ext_id === `entity-summary-${nodeId}`),
     false,
     'entity-summary ref should be stripped',
   );
   assert.equal(
-    remainingRefs.some((ref) => ref.ext_id === `entity-capabilities-${nodeId}`),
-    false,
-    'entity-capabilities ref should be stripped',
+    nextProperties.provenance.model_refs.some((ref) => ref.ext_id === `entity-capabilities-${nodeId}`),
+    true,
+    'entity-capabilities ref should remain',
   );
 
   cleanupTestDb(db, file);
@@ -267,22 +264,22 @@ test('does nothing when all referenced roles are allowed', async () => {
   const nodeId = 'node-keep';
 
   upsertNode(db, serverId, bankId, nodeId, ['active'], {
-    display_name: 'Keep Node',
+    summary: 'Keep me',
     provenance: {
       model_refs: [
-        { role: 'sys_edge_context', ext_id: `edge-ctx-${nodeId}|other`, scope: { source_id: nodeId, target_id: 'other' }, attached_at: '2026-01-01T00:00:00Z' },
+        { role: 'sys_entity_summary', ext_id: `entity-summary-${nodeId}`, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },
       ],
     },
   });
 
-  const result = await makeCleanup(db, serverId, bankId, ['edge-ctx']);
+  const result = await makeCleanup(db, serverId, bankId, ['entity-summary']);
 
   assert.equal(result.success, true);
   assert.deepEqual(result.deleted, []);
   assert.deepEqual(result.cleared, { nodes: 0, edges: 0 });
 
   const nodeResult = getNode(db, serverId, bankId, nodeId);
-  assert.equal(nodeResult.data.properties.display_name, 'Keep Node');
+  assert.equal(nodeResult.data.properties.summary, 'Keep me');
 
   cleanupTestDb(db, file);
 });

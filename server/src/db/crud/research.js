@@ -31,7 +31,7 @@ export const deleteSession = sessionBase.del;
 export const getStep = stepBase.get;
 export const updateStep = (db, stepId, data) => dbExec(() => {
   const id = requireInt('stepId', stepId);
-  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_raw_query', 'rstep_created_at', 'rstep_title']);
+  const allowedFields = new Set([...STEP_JSON_FIELDS, 'rstep_status', 'rstep_error_message', 'rstep_raw_query', 'rstep_created_at']);
   const entries = Object.entries(data).filter(([key]) => allowedFields.has(key));
   if (entries.length === 0) {
     throw new Error('No allowed fields to update');
@@ -212,8 +212,8 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
     rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
     rstep_action_type, rstep_parameters, rstep_viewpoint_ids,
     rstep_envelope, rstep_status, rstep_error_message,
-    rstep_tool_calls_used, rstep_calls, rstep_title
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    rstep_tool_calls_used, rstep_calls
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const blankEnvelope = JSON.stringify({ narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] });
   const result = stmt(db, sql).run(
@@ -229,8 +229,7 @@ export const createSessionPage = (db, sessionId, title) => dbExec(() => {
     'completed',
     null,
     0,
-    null,
-    title
+    null
   );
   return result.lastInsertRowid;
 }, 'research.createSessionPage');

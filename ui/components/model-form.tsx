@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import type { MentalModel } from '@/lib/types/index';
 import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import {
@@ -182,22 +181,6 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
     !(roleTemplateValidation && !roleTemplateValidation.valid) &&
     !maxTokensError;
 
-  // Collect all form-level validation messages for the top banner.
-  const formValidationItems = useMemo(() => {
-    const items: string[] = [];
-    if (!effectiveExtId.trim()) items.push('External ID is required.');
-    if (!effectiveName.trim()) items.push('Name is required.');
-    if (!sourceQuery.trim()) items.push('Source query is required.');
-    if (maxTokensError) items.push(maxTokensError);
-    if (genericTemplateValidation) items.push(genericTemplateValidation);
-    if (roleTemplateValidation && !roleTemplateValidation.valid) {
-      items.push(...roleTemplateValidation.errors);
-    }
-    return items;
-  }, [effectiveExtId, effectiveName, sourceQuery, maxTokensError, genericTemplateValidation, roleTemplateValidation]);
-
-  const hasFormValidationErrors = formValidationItems.length > 0;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!effectiveExtId.trim() || !effectiveName.trim() || !sourceQuery.trim()) {
@@ -253,38 +236,15 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
             )}
           </div>
           <p className="text-[10px] text-foreground-subtle">Derive one mental model per related entity</p>
-          {roleInstructions ? (
-            <div
-              className={cn(
-                'rounded-md border p-3 text-xs mt-2',
-                hasFormValidationErrors
-                  ? 'border-destructive-border bg-destructive-bg text-destructive-fg'
-                  : 'border-badge-caution-bd bg-badge-caution-bg/50 text-badge-caution-fg'
-              )}
-            >
-              <p className="font-medium">
-                {hasFormValidationErrors ? 'Validation required' : `${selectedRole?.label} format requirements`}
-              </p>
-              <ul className="mt-1 list-disc list-inside space-y-0.5">
-                {hasFormValidationErrors ? (
-                  formValidationItems.map((item, idx) => (
-                    <li key={idx}>{item}</li>
-                  ))
-                ) : (
-                  <li>{roleInstructions}</li>
-                )}
-              </ul>
+          {roleInstructions && (
+            <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-badge-caution-fg mt-2">
+              <p className="font-medium">{selectedRole?.label} format requirements</p>
+              <p className="mt-1 text-badge-caution-fg/80">{roleInstructions}</p>
             </div>
-          ) : hasFormValidationErrors ? (
-            <div className="rounded-md border border-destructive-border bg-destructive-bg p-3 text-xs text-destructive-fg mt-2">
-              <p className="font-medium">Validation required</p>
-              <ul className="mt-1 list-disc list-inside space-y-0.5">
-                {formValidationItems.map((item, idx) => (
-                  <li key={idx}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          )}
+          {genericTemplateValidation && (
+            <p className="text-[10px] text-destructive-fg mt-0.5">{genericTemplateValidation}</p>
+          )}
           {!genericTemplateValidation && !roleScope && isTemplate && (
             <p className="text-[10px] text-foreground-subtle mt-0.5">Generic templates also require a placeholder.</p>
           )}
@@ -360,6 +320,14 @@ export function ModelForm({ initial, mode, templateRoles, availableEntities = []
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="mm-source-query" className="text-xs uppercase text-foreground-subtle font-medium">Source Query *</Label>
+          {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
+            <span className="text-[10px] text-badge-caution-fg">
+              Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
+            </span>
+          )}
+          {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
+            <span className="text-[10px] text-accent-secondary-fg">All required placeholders present</span>
+          )}
         </div>
         <AqlEditor
           id="mm-source-query"

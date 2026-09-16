@@ -1,6 +1,4 @@
 'use client';
-
-import { useEffect, useState } from 'react';
 import { EnvelopeViewer } from '@/components/envelope-viewer';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { CuratedPageEditor, type CuratedPageEnvelope } from './curated-page-editor';
@@ -13,14 +11,8 @@ export interface WorkspaceResultPanelProps {
   error?: string | null;
   title?: string;
   count?: number;
-  /** Optional server id for evidence resolution. */
-  serverId?: number;
-  /** Optional bank id for evidence resolution. */
-  bankId?: string;
-  /** Optional key namespace passed through to NarrativeViewer. */
-  keyPrefix?: string;
-  /** Name used for downloaded file names. */
   sessionName?: string;
+  keyPrefix?: string;
   /** When a curated page tab is active, editing happens here. */
   activeCuratedPage?: ResearchStepSummary | null;
   /** Server baseline for the active curated page, used to compute dirty state. */
@@ -53,10 +45,8 @@ export function WorkspaceResultPanel({
   error,
   title = 'Workspace',
   count,
-  serverId,
-  bankId,
-  keyPrefix,
   sessionName,
+  keyPrefix,
   activeCuratedPage,
   activeCuratedPageBaseline,
   curatedPages = [],
@@ -70,31 +60,6 @@ export function WorkspaceResultPanel({
   headerTitle,
 }: WorkspaceResultPanelProps) {
   const showControls = true;
-  const [showIndex, setShowIndex] = useState(true);
-  const [plain, setPlain] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(13 * 16);
-
-  // Hydration-safe: restore the saved sidebar width after mount.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = window.localStorage.getItem('narrative-sidebar-width');
-      if (saved) {
-        setSidebarWidth(Math.max(10 * 16, Number(saved)));
-      }
-    } catch {
-      // ignore storage errors
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('narrative-sidebar-width', String(sidebarWidth));
-    } catch {
-      // ignore storage errors
-    }
-  }, [sidebarWidth]);
 
   if (error) {
     return (
@@ -104,10 +69,10 @@ export function WorkspaceResultPanel({
             title={title}
             headerTitle={headerTitle}
             count={count}
-            showIndex={showIndex}
-            onShowIndexChange={setShowIndex}
-            plain={plain}
-            onPlainChange={setPlain}
+            showIndex={false}
+            onShowIndexChange={() => {}}
+            plain={false}
+            onPlainChange={() => {}}
             onCopyText={() => {}}
             onSaveMd={() => {}}
           />
@@ -128,10 +93,10 @@ export function WorkspaceResultPanel({
             title={title}
             headerTitle={headerTitle}
             count={count}
-            showIndex={showIndex}
-            onShowIndexChange={setShowIndex}
-            plain={plain}
-            onPlainChange={setPlain}
+            showIndex={false}
+            onShowIndexChange={() => {}}
+            plain={false}
+            onPlainChange={() => {}}
             onCopyText={() => {}}
             onSaveMd={() => {}}
           />
@@ -154,19 +119,11 @@ export function WorkspaceResultPanel({
         onSave={onSaveCuratedPage}
         tabs={tabs}
         headerTitle={headerTitle}
-        serverId={serverId}
-        bankId={bankId}
         onDirtyChange={onCuratedPageDirtyChange}
         saveTrigger={saveCuratedPageTrigger}
         onChange={onCuratedPageChange}
         initialDeletedBlockIds={activeCuratedPageDeletions?.deletedBlockIds}
         initialDeletedStructuredKeys={activeCuratedPageDeletions?.deletedStructuredKeys}
-        showIndex={showIndex}
-        onShowIndexChange={setShowIndex}
-        plain={plain}
-        onPlainChange={setPlain}
-        sidebarWidth={sidebarWidth}
-        onSidebarWidthChange={setSidebarWidth}
       />
     );
   }
@@ -186,15 +143,8 @@ export function WorkspaceResultPanel({
         count={count}
         keyPrefix={keyPrefix}
         className="h-full"
-        showIndex={showIndex}
-        onShowIndexChange={setShowIndex}
-        plain={plain}
-        onPlainChange={setPlain}
+        showIndex
         showControls
-        sidebarWidth={sidebarWidth}
-        onSidebarWidthChange={setSidebarWidth}
-        serverId={serverId}
-        bankId={bankId}
         sessionName={sessionName}
         onAddToPage={onCopyToCuratedPage}
         tabs={tabs}

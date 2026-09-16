@@ -49,6 +49,15 @@ function buildLocalModel(model, scope) {
   };
 }
 
+function arraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function edgeContentEqual(props, modelEdge) {
   const label = modelEdge.label ?? '';
   const detail = modelEdge.detail ?? '';
@@ -79,9 +88,23 @@ function hasDivergence(db, serverId, bankId, scope, output) {
   }
 
   if (scope.type === 'node') {
-    // Node-scoped models no longer persist summary/capabilities, so we only
-    // need to check graph-edge divergence (e.g. edge-ctx models whose ref is
-    // attached to an endpoint node).
+    const current = scope.node?.properties || {};
+
+    // Narrative divergence against summary
+    if (firstNarrative !== undefined && current.summary !== firstNarrative) {
+      return true;
+    }
+
+    // Table divergence against capabilities
+    if (output.tables.length > 0) {
+      const capabilitiesTable = output.tables.find((t) => t.name === 'capabilities');
+      const modelCapabilities = capabilitiesTable?.rows || [];
+      if (!arraysEqual(current.capabilities || [], modelCapabilities)) {
+        return true;
+      }
+    }
+
+    // Graph-edge divergence (e.g. edge-ctx model whose ref is attached to an endpoint node)
     if (output.graph.edges.length > 0) {
       for (const modelEdge of output.graph.edges) {
         if (!modelEdge.from || !modelEdge.to || !modelEdge.type) continue;
@@ -90,6 +113,7 @@ function hasDivergence(db, serverId, bankId, scope, output) {
         if (!existing) return true;
         if (!edgeContentEqual(existing.cge_properties || {}, modelEdge)) return true;
       }
+      return false;
     }
 
     return false;
@@ -464,12 +488,9 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const hashChanged = !oldHash || oldHash !== newHash;
       const diverged = hasDivergence(db, serverId, bankId, scope, output);
 
-      if (!diverged) {
-        // No structural divergence. Refresh the ref metadata (hash, fetched_at,
-        // status) without re-running applyModelOutput. This keeps the stats honest
-        // so "applied" only counts actual graph mutations.
+      if (!hashChanged && !diverged) {
         stats.skippedUnchanged += 1;
-        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash, fetched_at: timestamp }, timestamp, { status: 'ok' });
+        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp, { status: 'ok' });
         continue;
       }
 

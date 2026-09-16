@@ -179,7 +179,7 @@ export const config = {
   diagram_description: {
     enabled: getEnv('ARCHITXT_VISION_ENABLED', 'true') === 'true',
     provider: getEnv('ARCHITXT_VISION_PROVIDER', 'ollama_cloud'),
-    model: getEnv('ARCHITXT_VISION_MODEL', 'gemma4:31b-cloud'),
+    model: getEnv('ARCHITXT_VISION_MODEL', 'ministral-3:14b-cloud'),
     task_prompt: getEnv('ARCHITXT_VISION_PROMPT', PROMPTS.diagram_description.task),
     system_prompt: getEnv('ARCHITXT_VISION_SYSTEM_PROMPT', PROMPTS.diagram_description.system),
     timeout_ms: getInt('ARCHITXT_VISION_TIMEOUT_MS', 300000),
@@ -204,7 +204,7 @@ export const config = {
   document_denoise_llm: {
     enabled: getEnv('ARCHITXT_DENOISE_LLM_ENABLED', 'true') === 'true',
     provider: getEnv('ARCHITXT_DENOISE_LLM_PROVIDER', 'ollama_cloud'),
-    model: getEnv('ARCHITXT_DENOISE_LLM_MODEL', 'gpt-oss:20b-cloud'),
+    model: getEnv('ARCHITXT_DENOISE_LLM_MODEL', 'ministral-3:14b-cloud'),
     timeout_ms: getInt('ARCHITXT_DENOISE_LLM_TIMEOUT_MS', 600000),
     task_prompt: getEnv('ARCHITXT_DENOISE_LLM_PROMPT', PROMPTS.document_denoise_llm.task),
     system_prompt: getEnv('ARCHITXT_DENOISE_LLM_SYSTEM_PROMPT', PROMPTS.document_denoise_llm.system),

@@ -110,6 +110,9 @@ export default function ServersPage() {
   return (
     <PageShell
       title="Servers"
+      subtitle="Manage backend servers and processing nodes."
+      count={servers.length}
+      countLabel="server"
       loading={loading}
     >
       {/* Action buttons */}
@@ -121,6 +124,14 @@ export default function ServersPage() {
         >
           {checkingHealth.size > 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
           Health
+        </Button>
+
+        <Button
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add Server
         </Button>
 
         <div className="flex-1" />
@@ -135,14 +146,6 @@ export default function ServersPage() {
           title="Delete"
         >
           <Trash2 className="h-4 w-4" />
-        </Button>
-
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
-          title="Add Server"
-        >
-          <Plus className="h-4 w-4" />
         </Button>
       </div>
 

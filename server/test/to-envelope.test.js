@@ -14,7 +14,6 @@ describe('toEnvelope', () => {
     assert.equal(envelope.narratives.length, 1);
     assert.equal(envelope.narratives[0].narrative_name, 'The billing service handles customer invoices');
     assert.equal(envelope.narratives[0].narrative, 'The billing service handles customer invoices.');
-    assert.deepEqual(envelope.narratives[0].evidence, []);
   });
 
   it('keeps a provided narrative_name unchanged', () => {
@@ -26,7 +25,6 @@ describe('toEnvelope', () => {
     });
 
     assert.equal(envelope.narratives[0].narrative_name, 'Overview');
-    assert.deepEqual(envelope.narratives[0].evidence, []);
   });
 
   it('backfills from a markdown heading when present', () => {

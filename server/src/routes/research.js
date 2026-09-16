@@ -183,7 +183,7 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
 
   await updateStep(db, step.rstep_id, {
     rstep_envelope: {
-      narratives: narratives.map((body) => ({ narrative_name: '', narrative: body, evidence: [] })),
+      narratives: narratives.map((body) => ({ narrative_name: '', narrative: body })),
       graph: mergedGraph,
       tables: mergedTables,
       diagrams: mergedDiagrams,
@@ -237,7 +237,6 @@ const toApiStepSummary = (dbRow) => {
     session_id: dbRow.rs_id,
     parent_step_id: dbRow.rstep_parent_step_id,
     intent_text: dbRow.rstep_intent_text,
-    title: dbRow.rstep_title || null,
     raw_query: dbRow.rstep_raw_query || null,
     action_type: dbRow.rstep_action_type,
     parameters: dbRow.rstep_parameters,
@@ -258,7 +257,6 @@ const toApiStep = (dbRow) => {
     session_id: dbRow.rs_id,
     parent_step_id: dbRow.rstep_parent_step_id,
     intent_text: dbRow.rstep_intent_text,
-    title: dbRow.rstep_title || null,
     raw_query: dbRow.rstep_raw_query || null,
     action_type: dbRow.rstep_action_type,
     parameters: dbRow.rstep_parameters,
@@ -785,7 +783,7 @@ router.post('/prebuilt', async (req, res) => {
 
     await updateStep(db, stepId, {
       rstep_envelope: {
-        narratives: narratives.map((body) => ({ narrative_name: '', narrative: body, evidence: [] })),
+        narratives: narratives.map((body) => ({ narrative_name: '', narrative: body })),
         graph: mergedGraph,
         tables: mergedTables,
         diagrams: mergedDiagrams,
@@ -1768,33 +1766,6 @@ router.put('/steps/:id', async (req, res) => {
 
   const updated = await getStep(db, idCheck.id);
   sendResponse({ res, status: 200, data: toApiStep(updated.data), logger, method: 'PUT', path: '/research/steps/:id', duration: Date.now() - start });
-});
-
-router.put('/steps/:id/title', async (req, res) => {
-  const start = Date.now();
-  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/steps/:id/title', start });
-  if (!idCheck.valid) return;
-
-  const stepResult = await getStep(db, idCheck.id);
-  if (!stepResult.success || !stepResult.data) {
-    sendResponse({ res, status: 404, error: 'Research step not found', code: 'NOT_FOUND', logger, method: 'PUT', path: '/research/steps/:id/title', start });
-    return;
-  }
-
-  const { title } = req.body;
-  if (title === undefined || (title !== null && typeof title !== 'string')) {
-    sendResponse({ res, status: 400, error: 'title must be a string or null', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/steps/:id/title', start });
-    return;
-  }
-
-  const result = await updateStep(db, idCheck.id, { rstep_title: title });
-  if (!result.success) {
-    sendResponse({ res, status: mapErrorToStatus(result.code) || 500, error: result.error, code: result.code || 'DATABASE_ERROR', logger, method: 'PUT', path: '/research/steps/:id/title', start });
-    return;
-  }
-
-  const updated = await getStep(db, idCheck.id);
-  sendResponse({ res, status: 200, data: toApiStep(updated.data), logger, method: 'PUT', path: '/research/steps/:id/title', duration: Date.now() - start });
 });
 
 router.delete('/steps/:id', async (req, res) => {

@@ -22,12 +22,10 @@ import { ManageModelEntitiesDialog } from '@/components/manage-model-entities-di
 import { ManageModelConfigDialog } from '@/components/manage-model-config-dialog';
 import { ModelForm } from '@/components/model-form';
 import { ModelDetailsDialog } from '@/components/model-details-dialog';
-import { DeleteMentalModelsFromBankDialog } from '@/components/delete-mental-models-from-bank-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Plus, Trash2, RefreshCw, Tag, Search, X, TableIcon, Settings2, LayoutTemplate, MessageSquareText } from 'lucide-react';
 import { EntityIcon } from '@/components/icons/entity-icon';
-import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { toast } from 'sonner';
 import { PageShell } from '@/app/components/page-shell';
 import type { EntityLike as AqlEntityLike } from '@/components/aql-editor';
@@ -67,7 +65,6 @@ function ModelsPageContent() {
   const [manageConfigDialogOpen, setManageConfigDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteFromBankOpen, setDeleteFromBankOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<MentalModel | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [queryPreviewModel, setQueryPreviewModel] = useState<MentalModel | null>(null);
@@ -129,8 +126,6 @@ function ModelsPageContent() {
     const selectedHidden = models.filter((item) => selected.has(item.id) && !visibleIds.has(item.id));
     return [...filteredModels, ...selectedHidden];
   }, [filteredModels, models, search, selected]);
-
-  const selectedModels = useMemo(() => models.filter((m) => selected.has(m.id)), [models, selected]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -309,7 +304,6 @@ function ModelsPageContent() {
             <div className="w-px h-5 bg-surface-panel mx-1" />
             <Button onClick={fetchModels} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
             <Button onClick={openDeleteConfirm} disabled={selected.size === 0} title="Delete" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="h-3.5 w-3.5" /></Button>
-            <Button onClick={() => setDeleteFromBankOpen(true)} disabled={selected.size === 0} title="Delete from Hindsight bank" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><HindsightIcon className="h-4 w-4" /></Button>
             <Button onClick={() => setCreateDialogOpen(true)} title="Add" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><Plus className="h-3.5 w-3.5" /></Button>
           </div>
         }
@@ -676,20 +670,10 @@ function ModelsPageContent() {
       <SystemTemplateQueryPreviewDialog
         isOpen={!!composePreviewModel}
         onClose={closeComposePreview}
-        refItem={composePreviewModel ? { role: composePreviewModel.template_role || composePreviewModel.ext_id, scope: undefined } : null}
+        refItem={composePreviewModel ? { role: composePreviewModel.template_role || composePreviewModel.ext_id, ext_id: composePreviewModel.ext_id, scope: undefined } : null}
         composedQuery={composePreviewResult}
         composeError={composePreviewError}
         loading={composePreviewLoading}
-      />
-
-      <DeleteMentalModelsFromBankDialog
-        models={selectedModels}
-        open={deleteFromBankOpen}
-        onOpenChange={setDeleteFromBankOpen}
-        onDeleted={() => {
-          clearSelection();
-          fetchModels();
-        }}
       />
     </>
   );

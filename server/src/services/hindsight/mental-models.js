@@ -8,7 +8,7 @@
 import { createLogger } from '../../utils/logger.js';
 import { getServerConfig } from './config.js';
 import { getOperation } from './memories.js';
-import { createPendingOperation, findByOperationId } from '../../db/crud/pending-operations.js';
+import { createPendingOperation } from '../../db/crud/pending-operations.js';
 import { db } from '../../db/connection.js';
 
 const logger = createLogger('hindsight-mental-models-client');
@@ -120,18 +120,6 @@ export async function refreshMentalModel(serverId, bankId, mentalModelId) {
     logger.info('Hindsight refreshMentalModel OK', { serverId, bankId, mentalModelId, operationId: data.operation_id, status: data.status });
 
     // Track long-running refresh so the existing poll daemon monitors it.
-    // If this operation_id was already tracked by a preceding push, reuse it
-    // to avoid duplicate pending rows.
-    const existing = findByOperationId(db, data.operation_id);
-    if (existing?.success && existing.data) {
-      return {
-        success: true,
-        operationId: data.operation_id,
-        status: data.status,
-        popId: existing.data.pop_id ?? null,
-      };
-    }
-
     const pendingResult = createPendingOperation(db, {
       pop_operation_id: data.operation_id,
       pop_server_id: serverId,

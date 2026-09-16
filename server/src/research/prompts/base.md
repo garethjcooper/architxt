@@ -30,14 +30,14 @@ Your response must be a single JSON object with this structure:
         "id": "string",
         "statement": "string",
         "confidence": 0.0-1.0,
-        "source_fact_ids": ["string"]  // full, exact Hindsight fact IDs; do not truncate or invent
+        "source_fact_ids": ["string"]
       }
     ],
     "seams": [
       {
         "type": "gap | contradiction | low_confidence | broad_query | budget_truncated",
         "description": "string",
-        "source_fact_ids": ["string"]  // full, exact Hindsight fact IDs; omit if none
+        "source_fact_ids": ["string"]
       }
     ]
   },
