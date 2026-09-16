@@ -1,0 +1,41 @@
+---
+sidebar_position: 1
+---
+
+# Installation
+
+architxt is a Node.js application with an Express backend and a Next.js frontend. It uses SQLite for local state and can connect to a Hindsight vector-memory server.
+
+## Requirements
+
+- Node.js ≥ 22
+- npm 10+
+- A Docling server if you want to parse PDFs or Office documents (see [Prerequisites](./prerequisites))
+- A Hindsight server URL and API token
+
+## Clone and install
+
+```bash
+git clone <your-architxt-repo>
+cd architxt
+npm run setup
+```
+
+`npm run setup` checks the Node version, installs dependencies in `server/` and `ui/`, creates the required directories, copies `server/.env.example` to `server/.env` if it does not exist, and builds the UI.
+
+## Start the application
+
+```bash
+npm run dev
+```
+
+This starts both the backend API and the frontend UI. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Verify the backend
+
+The API is available at [http://localhost:3001](http://localhost:3001) by default. Visit `/api-docs` to see the OpenAPI/Swagger UI.
+
+## Next steps
+
+- [Configuration](./configuration)
+- [AQL language reference](../../core-concepts/aql)
