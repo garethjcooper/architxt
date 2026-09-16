@@ -266,6 +266,25 @@ const options = {
               description: 'Error code'
             }
           }
+        },
+        BankSettings: {
+          type: 'object',
+          properties: {
+            retain_mission: { type: 'string', nullable: true, description: 'Mission for retain operations' },
+            observations_mission: { type: 'string', nullable: true, description: 'Mission for observation consolidation' },
+            reflect_mission: { type: 'string', nullable: true, description: 'Mission for reflect operations' },
+            retain_extraction_mode: { type: 'string', enum: ['concise', 'verbose', 'custom', 'verbatim', 'chunks'], description: 'Fact extraction mode' },
+            retain_chunk_size: { type: 'integer', minimum: 1, description: 'Target maximum characters per content chunk' },
+            entities_allow_free_form: { type: 'boolean', description: 'Allow free-form entity extraction' },
+            disposition: {
+              type: 'object',
+              properties: {
+                empathy: { type: 'integer', minimum: 1, maximum: 5 },
+                literalism: { type: 'integer', minimum: 1, maximum: 5 },
+                skepticism: { type: 'integer', minimum: 1, maximum: 5 }
+              }
+            }
+          }
         }
       },
       parameters: {

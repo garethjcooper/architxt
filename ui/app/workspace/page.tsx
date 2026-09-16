@@ -574,7 +574,7 @@ export default function WorkspacePage() {
             } catch {
               // Raw markdown payload: use it as-is with the event label as the name.
             }
-            const newBlock = { narrative_name: name, narrative: content };
+            const newBlock = { narrative_name: name, narrative: content, evidence: [] };
             nextEnvelope.narratives = [...(nextEnvelope.narratives ?? []), newBlock];
             toastMessage = `Added ${name || 'narrative'} to ${page.intent_text || `Page ${page.id}`}`;
             break;
@@ -600,7 +600,9 @@ export default function WorkspacePage() {
           case 'diagrams': {
             const parsedDiagrams = JSON.parse(ev.payload);
             const existingNames = new Set(nextEnvelope.diagrams.map((d) => d.name));
-            const newDiagrams = (parsedDiagrams ?? []).filter((d: { name: string }) => !existingNames.has(d.name));
+            const newDiagrams = (parsedDiagrams ?? [])
+              .filter((d: { name: string }) => !existingNames.has(d.name))
+              .map((d: any) => ({ ...d, evidence: d.evidence ?? [] }));
             nextEnvelope.diagrams = [...nextEnvelope.diagrams, ...newDiagrams];
             toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
@@ -985,26 +987,28 @@ export default function WorkspacePage() {
   // Keep curated tabs in sync with the session's curated pages. Preserve the anchor tab.
   useEffect(() => {
     setTabs((prev) => {
-      const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
-      const existingCuratedIds = new Set(
-        prev.filter((t) => t.kind === 'curated' && t.stepId != null).map((t) => t.stepId!)
-      );
+      const curatedTabs = prev.filter((t) => t.kind === 'curated' && t.stepId != null);
+      const existingCuratedIds = new Set(curatedTabs.map((t) => t.stepId!));
       const currentPageIds = new Set(workspaceSession.curatedPages.map((p) => p.id));
 
-      // Remove tabs whose pages were deleted, keep all view tabs including anchor.
+      const tabsToRemove = curatedTabs.filter((t) => !currentPageIds.has(t.stepId!));
+      const pagesToAdd = workspaceSession.curatedPages.filter((p) => !existingCuratedIds.has(p.id));
+
+      if (tabsToRemove.length === 0 && pagesToAdd.length === 0) {
+        return prev;
+      }
+
+      const anchor = prev.find((t) => t.id === ANCHOR_TAB_ID) ?? makeAnchorTab();
       const cleaned = prev.filter(
         (t) => t.id === ANCHOR_TAB_ID || t.kind !== 'curated' || (t.stepId != null && currentPageIds.has(t.stepId))
       );
 
-      // Add tabs for new pages.
-      const added = workspaceSession.curatedPages
-        .filter((p) => !existingCuratedIds.has(p.id))
-        .map((p) => ({
-          id: `curated-${p.id}`,
-          kind: 'curated' as const,
-          label: p.intent_text || `Page ${p.id}`,
-          stepId: p.id,
-        }));
+      const added = pagesToAdd.map((p) => ({
+        id: `curated-${p.id}`,
+        kind: 'curated' as const,
+        label: p.intent_text || `Page ${p.id}`,
+        stepId: p.id,
+      }));
 
       const next = [anchor, ...cleaned.filter((t) => t.id !== ANCHOR_TAB_ID), ...added];
 
@@ -1014,7 +1018,6 @@ export default function WorkspacePage() {
         if (!stillActive && next.length > 0) {
           return added[0]?.id || next[0].id;
         }
-        if (next.length === 0) return null;
         return current;
       });
 
@@ -1066,21 +1069,21 @@ export default function WorkspacePage() {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => setConfirmSessionDelete(true)}
-              disabled={activeSession?.id == null}
-              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
-              title="Delete selected session"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => void handleEditSession()}
               disabled={activeSession?.id == null}
               className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-foreground-faint hover:bg-surface-panel hover:text-foreground-default disabled:opacity-30 transition-colors"
               title="Edit selected session"
             >
               <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmSessionDelete(true)}
+              disabled={activeSession?.id == null}
+              className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
+              title="Delete selected session"
+            >
+              <Trash2 className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -1187,6 +1190,8 @@ export default function WorkspacePage() {
               headerTitle="Pages"
               isRunning={reflectLoading && activeTabId === ANCHOR_TAB_ID}
               error={previewError}
+              serverId={serverId}
+              bankId={bankId}
               sessionName={activeSession?.title}
               keyPrefix="preview"
               activeCuratedPage={activeCuratedPageWithEdits}

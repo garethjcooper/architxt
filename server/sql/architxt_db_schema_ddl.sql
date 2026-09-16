@@ -4,6 +4,20 @@
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
+CREATE TABLE bank_settings (
+  bs_id INTEGER PRIMARY KEY CHECK (bs_id = 1),
+  retain_mission TEXT NOT NULL DEFAULT '',
+  observations_mission TEXT NOT NULL DEFAULT '',
+  reflect_mission TEXT NOT NULL DEFAULT '',
+  disposition TEXT NOT NULL DEFAULT '{"empathy":1,"literalism":4,"skepticism":1}',
+  retain_extraction_mode TEXT NOT NULL DEFAULT 'verbose',
+  retain_chunk_size INTEGER NOT NULL DEFAULT 2000 CHECK (retain_chunk_size > 0),
+  bs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  bs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT INTO bank_settings (bs_id, retain_mission, observations_mission, reflect_mission, disposition, retain_extraction_mode, retain_chunk_size) VALUES (1, '', '', '', '{"empathy":1,"literalism":4,"skepticism":1}', 'verbose', 2000);
+
 -- ============================================================================
 -- CORE TABLES
 -- ============================================================================
@@ -312,8 +326,8 @@ CREATE TABLE template_roles (
   tr_display_name TEXT NOT NULL,
   tr_derivation_scope TEXT NOT NULL,
   tr_sort_order INTEGER,
-  tr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  tr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+  tr_created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  tr_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order) VALUES
@@ -322,6 +336,12 @@ INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr
 ('sys_edge_context', 'Edge context', 'edge', 3),
 ('sys_discovery_context', 'Discovery', 'seed', 4),
 ('user_entity_derived', 'User entity derived', 'node', 5);
+
+-- ============================================================================
+-- ARCHITXT MASTER BANK SETTINGS (seed default for single-row bank_settings)
+-- ============================================================================
+
+INSERT OR IGNORE INTO bank_settings (bs_id, retain_mission, observations_mission, reflect_mission, disposition, retain_extraction_mode, retain_chunk_size) VALUES (1, '', '', '', '{"empathy":1,"literalism":4,"skepticism":1}', 'verbose', 2000);
 
 -- ============================================================================
 -- PROMPT TEMPLATES — reusable prompt compositions for graph/narrative output
@@ -408,6 +428,7 @@ CREATE TABLE research_steps (
   rstep_status TEXT,
   rstep_error_message TEXT,
   rstep_calls JSON,
+  rstep_title TEXT,
   rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
   FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL

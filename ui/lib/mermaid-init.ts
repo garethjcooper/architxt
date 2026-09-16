@@ -17,25 +17,32 @@ export function initializeMermaid(renderer?: 'dagre' | 'elk', theme: 'default' |
     securityLevel: 'strict',
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
     suppressErrorRendering: true,
+    // Mermaid v12 defaults to ELK; align the app default with upstream so the
+    // upgraded renderer is actually used unless a surface explicitly asks for dagre.
+    layout: renderer ?? 'elk',
+    flowchart: {
+      // Render to fixed pixel dimensions so pan/zoom fit-to-page centers on the
+      // actual diagram rather than the surrounding container.
+      useMaxWidth: false,
+    },
   };
-  if (renderer) {
-    config.flowchart = { defaultRenderer: renderer };
-  }
   mermaid.initialize(config);
   lastRenderer = renderer;
   lastTheme = theme;
 }
 
 /**
- * Ensure Mermaid is initialized with the desired default config before each render.
- * We always re-initialize rather than only on renderer changes, because the app theme
- * can change and other imports or auto-initialization may have left stale config.
+ * Ensure Mermaid is initialized with the desired default config before a render.
+ * Skips re-initialization if the renderer/theme haven't changed, because calling
+ * mermaid.initialize() during active ELK renders can trigger a second layout pass.
  */
 export function ensureMermaidInitialized(renderer?: 'dagre' | 'elk') {
-  initializeMermaid(renderer, getMermaidTheme());
+  const theme = getMermaidTheme();
+  if (renderer === lastRenderer && theme === lastTheme) return;
+  initializeMermaid(renderer, theme);
 }
 
-/** @deprecated Use ensureMermaidInitialized, which always re-applies config. */
+/** @deprecated Use ensureMermaidInitialized, which guards against redundant re-init. */
 export function maybeInitializeMermaid(renderer?: 'dagre' | 'elk') {
   ensureMermaidInitialized(renderer);
 }
@@ -46,4 +53,38 @@ export function useMermaidThemeSync() {
   if (theme !== lastTheme) {
     ensureMermaidInitialized(lastRenderer);
   }
+}
+
+let hiddenRenderContainer: HTMLDivElement | null = null;
+
+function getHiddenRenderContainer(): HTMLDivElement | undefined {
+  if (typeof document === 'undefined') return undefined;
+  if (!hiddenRenderContainer || !document.body.contains(hiddenRenderContainer)) {
+    const hidden = document.createElement('div');
+    hidden.style.position = 'fixed';
+    hidden.style.visibility = 'hidden';
+    hidden.style.pointerEvents = 'none';
+    hidden.style.left = '-9999px';
+    hidden.style.top = '-9999px';
+    hidden.style.width = '0';
+    hidden.style.height = '0';
+    hidden.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(hidden);
+    hiddenRenderContainer = hidden;
+  }
+  return hiddenRenderContainer;
+}
+
+/**
+ * Render a Mermaid diagram into a hidden off-screen container.
+ *
+ * Mermaid's `render()` appends a temporary div to `document.body` when no
+ * container is supplied. During async ELK layout this temporary DOM can
+ * flash at the bottom of the viewport. Passing a hidden container keeps the
+ * intermediate render off-screen.
+ */
+export async function renderMermaid(id: string, source: string, renderer?: 'dagre' | 'elk') {
+  ensureMermaidInitialized(renderer);
+  const container = getHiddenRenderContainer();
+  return mermaid.render(id, source.trim(), container);
 }

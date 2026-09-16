@@ -96,6 +96,22 @@ export interface ContextualGraphBankConfig {
   };
 }
 
+export interface BankSettings {
+  bank_id?: string;
+  name?: string;
+  retain_mission: string;
+  observations_mission: string;
+  reflect_mission: string;
+  retain_extraction_mode: 'concise' | 'verbose' | 'custom' | 'verbatim' | 'chunks';
+  retain_chunk_size: number;
+  entities_allow_free_form: boolean;
+  disposition: {
+    empathy: number;
+    literalism: number;
+    skepticism: number;
+  };
+}
+
 export interface Server {
   id: number;
   base_url: string;

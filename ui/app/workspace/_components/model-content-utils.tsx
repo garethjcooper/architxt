@@ -38,12 +38,16 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
   // Resolve narratives from the unified envelope first, then legacy scalar fields.
   const resolveNarratives = (src: { narratives?: UnifiedNarrativeBlock[]; narrative?: string | null; narrative_name?: string | null } | null | undefined): UnifiedNarrativeBlock[] => {
     if (src?.narratives && src.narratives.length > 0) {
-      return src.narratives.filter((n) => typeof n.narrative === 'string');
+      return src.narratives.filter((n) => typeof n.narrative === 'string').map((n) => ({
+        narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
+        narrative: n.narrative,
+        evidence: Array.isArray(n.evidence) ? n.evidence : [],
+      }));
     }
     const legacyNarrative = src?.narrative ?? '';
     const legacyName = src?.narrative_name ?? '';
     if (typeof legacyNarrative === 'string' && legacyNarrative.trim().length > 0) {
-      return [{ narrative_name: legacyName, narrative: legacyNarrative }];
+      return [{ narrative_name: legacyName, narrative: legacyNarrative, evidence: [] }];
     }
     return [];
   };
@@ -91,7 +95,9 @@ function parseMentalModelContent(raw: HindsightContentResult | ModelContentCache
     concatenation: undefined,
     graph: (parsedRecord.graph ?? { nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
     tables: Array.isArray(parsedRecord.tables) ? parsedRecord.tables : [],
-    diagrams: Array.isArray(parsedRecord.diagrams) ? parsedRecord.diagrams : [],
+    diagrams: Array.isArray(parsedRecord.diagrams)
+      ? parsedRecord.diagrams.map((d: any) => ({ ...d, evidence: Array.isArray(d.evidence) ? d.evidence : [] }))
+      : [],
   };
 }
 
@@ -109,6 +115,7 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
     session_id: -1,
     parent_step_id: null,
     intent_text: name,
+    title: null,
     raw_query: null,
     action_type: 'curated_page',
     parameters: null,
@@ -122,8 +129,8 @@ export function mentalModelContentToStepSummary(name: string, raw: HindsightCont
     envelope: content.envelope ?? {
       narratives: content.narratives ?? [],
       graph: (content.graph ?? { name: '', nodes: [], edges: [] }) as { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
-      tables: content.tables ?? [],
-      diagrams: content.diagrams ?? [],
+      tables: (content.tables ?? []).map((t: any) => ({ ...t, evidence: Array.isArray(t.evidence) ? t.evidence : [] })),
+      diagrams: (content.diagrams ?? []).map((d: any) => ({ ...d, evidence: Array.isArray(d.evidence) ? d.evidence : [] })),
     },
   };
 }

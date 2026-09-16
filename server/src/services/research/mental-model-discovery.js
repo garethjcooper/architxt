@@ -261,8 +261,9 @@ async function mergeRoleResult(candidates, entityIds) {
       ? rawNarratives.map((n) => ({
         narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
         narrative: n.narrative,
+        evidence: Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [],
       }))
-      : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
+      : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative, evidence: [] }] : [];
     let graph = { nodes: [], edges: [] };
     if (content.graph && typeof content.graph === 'object') {
       graph = {

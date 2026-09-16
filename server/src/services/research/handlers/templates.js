@@ -111,8 +111,9 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         ? rawNarratives.map((n) => ({
           narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
           narrative: n.narrative,
+          evidence: Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [],
         }))
-        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
+        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative, evidence: [] }] : [];
       const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
       const tables = Array.isArray(content.tables) ? content.tables : [];
       const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
@@ -147,13 +148,13 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
       for (const n of item.narratives) {
         if (!n.narrative) continue;
         const name = n.narrative_name || `${item.name || item.ext_id}`;
-        narratives.push({ narrative_name: name, narrative: n.narrative });
+        narratives.push({ narrative_name: name, narrative: n.narrative, evidence: n.evidence && Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [] });
       }
     } else if (item.diagrams?.length > 0 || item.tables?.length > 0 || item.graph?.nodes?.length > 0 || item.graph?.edges?.length > 0) {
-      narratives.push({ narrative_name: item.name || item.ext_id, narrative: 'No narrative text provided.' });
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: 'No narrative text provided.', evidence: [] });
     } else if (item.content != null) {
       const fallback = typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
-      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback });
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback, evidence: [] });
     }
     if (item.graph) {
       if (item.graph.nodes.length > 0 || item.graph.edges.length > 0) {
