@@ -76,10 +76,13 @@ describe('refreshContextualGraphPatches', () => {
       listAllMentalModels: injectedList,
     });
     assert.equal(result.success, true);
-    assert.equal(result.stats.applied, 1);
+    // Node-scoped models no longer persist summary, so there's no structural
+    // divergence; the ref metadata is refreshed without a full apply.
+    assert.equal(result.stats.applied, 0);
+    assert.equal(result.stats.skippedUnchanged, 1);
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.summary, 'Updated summary.');
+    assert.equal(node.properties.summary, undefined);
     const storedHash = node.properties.provenance.model_refs[0].content_hash;
     assert.notEqual(storedHash, 'oldhash');
 
@@ -95,7 +98,6 @@ describe('refreshContextualGraphPatches', () => {
 
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
-      summary: 'Same summary.',
       provenance: {
         source: 'contextual-graph',
         model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
@@ -125,7 +127,6 @@ describe('refreshContextualGraphPatches', () => {
 
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',
-      summary: 'Stable summary.',
       provenance: {
         source: 'contextual-graph',
         model_refs: [{ ext_id: 'entity-summary-svc-001', role: 'sys_entity_summary', scope: { node_id: 'svc-001' }, content_hash: hash, fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
@@ -173,9 +174,7 @@ describe('refreshContextualGraphPatches', () => {
     assert.equal(node.properties.summary, undefined);
   });
 
-
-
-  it('re-applies when content hash is unchanged but applied content is missing', async () => {
+  it('does not re-apply node-scoped model when content hash is unchanged', async () => {
     const content = JSON.stringify({ narratives: [{ narrative: 'Same summary.' }], graph: { nodes: [], edges: [] }, tables: [],
       diagrams: [] });
     const hash = contentHash(content);
@@ -196,11 +195,45 @@ describe('refreshContextualGraphPatches', () => {
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
     assert.equal(result.success, true);
-    assert.equal(result.stats.skippedUnchanged, 0);
+    assert.equal(result.stats.skippedUnchanged, 1);
+    assert.equal(result.stats.applied, 0);
+
+    const node = getNode(db, serverId, bankId, 'svc-001').data;
+    assert.equal(node.properties.summary, undefined);
+  });
+
+  it('detects edge divergence for edge-ctx models attached to endpoint nodes', async () => {
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
+    upsertNode(db, serverId, bankId, 'svc-002', ['active'], { display_name: 'Payment Service' });
+    upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
+      display_name: 'Billing Service',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{ ext_id: 'edge-ctx-svc-001|svc-002', role: 'sys_edge_context', scope: { source_id: 'svc-001', target_id: 'svc-002' }, content_hash: 'oldhash', fetched_at: '2026-01-01T00:00:00Z', attached_at: '2026-01-01T00:00:00Z' }],
+      },
+    });
+
+    const newContent = JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [{ from: 'svc-001', to: 'svc-002', type: 'sends', label: 'usage data', detail: 'sends usage', evidence: ['m1'] }],
+      },
+      tables: [],
+      diagrams: [],
+    });
+
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [mentalModelWithContent('edge-ctx-svc-001|svc-002', newContent)],
+    });
+
+    const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
     assert.equal(result.stats.applied, 1);
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.summary, 'Same summary.');
+    assert.equal(node.properties.provenance.model_refs[0].last_refresh_status, 'ok');
   });
 
   it('skips newly deployed models and marks them pending_build', async () => {
@@ -395,11 +428,13 @@ describe('refreshContextualGraphPatches', () => {
 
     const result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
     assert.equal(result.success, true);
-    assert.equal(result.stats.applied, 1);
+    // Node-scoped models no longer persist summary, so no structural divergence;
+    // ref metadata is refreshed without a full apply.
+    assert.equal(result.stats.applied, 0);
     assert.equal(result.stats.failed, 0);
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.summary, 'Node.js, PostgreSQL, Redis.');
+    assert.equal(node.properties.summary, undefined);
     const ref = node.properties.provenance.model_refs[0];
     assert.equal(ref.role, 'software_tech_stack');
     assert.equal(ref.last_refresh_status, 'ok');

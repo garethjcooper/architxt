@@ -10,7 +10,7 @@ Write a concise plain-language summary of what the current step discovered. Ment
 
 Produce 0–5 focused findings. Each finding must:
 - Be a single declarative sentence.
-- Map to one or more Hindsight fact IDs in `source_fact_ids`.
+- Map to one or more **full, exact** Hindsight fact IDs in `source_fact_ids`. Do not truncate, shorten, hash, abbreviate, or invent IDs.
 - Have a confidence score derived from the rules in base.md.
 
 Do not include unsupported claims. If nothing confident can be said, return no findings and add a `gap` seam.

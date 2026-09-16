@@ -179,14 +179,14 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     finalNarratives = [];
   }
 
-  // If no narrative remains but structured output exists, leave narratives empty.
+  // Source-memory appendix should only extend an existing model-produced
+  // narrative. Never fabricate a narrative section solely to hold source
+  // memories when the caller asked for structured/diagram-only output.
   const basedOnMarkdown = basedOnToMarkdown(result.data, query);
   if (basedOnMarkdown && finalNarratives.length > 0) {
     // Append source memories to the last narrative section.
     const last = finalNarratives[finalNarratives.length - 1];
     last.narrative = last.narrative + basedOnMarkdown;
-  } else if (basedOnMarkdown) {
-    finalNarratives = [{ narrative_name: '', narrative: basedOnMarkdown }];
   }
 
   return {

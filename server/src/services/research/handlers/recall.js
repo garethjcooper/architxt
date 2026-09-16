@@ -135,7 +135,7 @@ export async function handleRecall(serverId, bankId, query, options = {}) {
 
   return {
     success: true,
-    narratives: [{ narrative_name: '', narrative }],
+    narratives: [{ narrative_name: '', narrative, evidence: [] }],
     graph: { nodes: [], edges: [] },
     tables: [],
     diagrams: [],
