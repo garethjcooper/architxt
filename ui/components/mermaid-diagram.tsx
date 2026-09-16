@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
-import { ensureMermaidInitialized } from '@/lib/mermaid-init';
+import { ensureMermaidInitialized, renderMermaid } from '@/lib/mermaid-init';
 
 export interface MermaidDiagramProps {
   /** Raw Mermaid source (without fence markers). */
@@ -40,7 +39,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
 
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`;
-        const { svg: rendered } = await mermaid.render(id, source);
+        const { svg: rendered } = await renderMermaid(id, source, defaultRenderer);
         if (!cancelled) {
           setSvg(rendered);
           setError(null);

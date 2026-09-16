@@ -178,10 +178,14 @@ describe('system template hygiene', () => {
     expectBlocked(result);
   });
 
-  it('cannot batch update config on a system template', () => {
+  it('can batch update config on a system template', () => {
     const { mm_id } = getSystemTemplate(db, 'sys_entity_summary');
+    const before = db.prepare('SELECT mm_max_tokens FROM mental_models WHERE mm_id = ?').get(mm_id);
     const result = batchUpdateMentalModelConfig(db, [mm_id], { max_tokens: 1024 });
-    expectBlocked(result);
+    assert.strictEqual(result.success, true, result.error?.message || 'batch update should succeed');
+    assert.strictEqual(result.data.modelsUpdated, 1);
+    const after = db.prepare('SELECT mm_max_tokens FROM mental_models WHERE mm_id = ?').get(mm_id);
+    assert.strictEqual(after.mm_max_tokens, 1024);
   });
 
   it('does not derive per-entity models from a system template', () => {

@@ -320,7 +320,7 @@ export function ViewDocumentDialog({
                         )}
                       </div>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-[oklch(0.20_0_0)] border-border-strong">
+                    <PopoverContent className="w-auto p-0">
                       <div className="p-3">
                         <Calendar
                           mode="single"
