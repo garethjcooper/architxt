@@ -82,7 +82,7 @@ export function transformPrebuiltToDiscoverResponse(
     query_depth: 'prebuilt',
     action_type: 'prebuilt',
     envelope: {
-      narratives: [{ narrative_name: '', narrative: narrativeParts.join('\n') }],
+      narratives: [{ narrative_name: '', narrative: narrativeParts.join('\n'), evidence: [] }],
       graph: graphs.length > 0 ? mergeGraphs(...graphs) : { name: '', nodes: [], edges: [] },
       tables,
       diagrams,

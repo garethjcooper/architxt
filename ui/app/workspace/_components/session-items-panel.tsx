@@ -1,13 +1,33 @@
 'use client';
 
 import { useState } from 'react';
-import { MoreHorizontal, ChevronDown, ChevronUp, Trash2, Info, ClipboardList, RefreshCw, ExternalLink } from 'lucide-react';
+import {
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Info,
+  ClipboardList,
+  RefreshCw,
+  ExternalLink,
+  Type,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { AqlView } from '@/components/aql-view';
 import { researchApi, type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
@@ -27,6 +47,7 @@ export interface SessionItemsPanelProps {
   onRerunStep?: (stepId: number) => Promise<unknown>;
   onInspectStep?: (step: ResearchStepSummary) => void;
   onRefresh?: () => void | Promise<void>;
+  onUpdateTitle?: (stepId: number, title: string | null) => void;
 }
 
 function formatCreatedAt(value?: string | null): string | null {
@@ -48,19 +69,6 @@ function firstLinePreview(query: string): string {
   return query;
 }
 
-function queryRemainder(query: string): string {
-  const lines = query.split('\n');
-  let foundFirstNonEmpty = false;
-  let startIndex = 0;
-  for (let i = 0; i < lines.length; i++) {
-    if (!foundFirstNonEmpty && lines[i].trim().length > 0) {
-      foundFirstNonEmpty = true;
-      startIndex = i + 1;
-    }
-  }
-  return lines.slice(startIndex).join('\n');
-}
-
 export function SessionItemsPanel({
   session,
   items,
@@ -72,8 +80,12 @@ export function SessionItemsPanel({
   onRerunStep,
   onInspectStep,
   onRefresh,
+  onUpdateTitle,
 }: SessionItemsPanelProps) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [editTitleStep, setEditTitleStep] = useState<ResearchStepSummary | null>(null);
+  const [editTitleValue, setEditTitleValue] = useState('');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
 
   const toggleExpanded = (stepId: number) => {
     setExpandedIds((prev) => {
@@ -98,6 +110,40 @@ export function SessionItemsPanel({
     }
   };
 
+  const handleEditTitleOpen = (step: ResearchStepSummary) => {
+    setEditTitleStep(step);
+    setEditTitleValue(step.title ?? '');
+  };
+
+  const handleEditTitleClose = () => {
+    setEditTitleStep(null);
+    setEditTitleValue('');
+    setIsSavingTitle(false);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!editTitleStep) return;
+    const trimmed = editTitleValue.trim();
+    const newTitle = trimmed || null;
+    if (newTitle === editTitleStep.title) {
+      handleEditTitleClose();
+      return;
+    }
+    setIsSavingTitle(true);
+    try {
+      const updated = await researchApi.updateStepTitle(editTitleStep.id, newTitle);
+      toast.success(newTitle ? 'Title updated' : 'Title removed');
+      onUpdateTitle?.(editTitleStep.id, newTitle);
+      await onRefresh?.();
+      handleEditTitleClose();
+    } catch (err) {
+      logger.error('Failed to update step title', err);
+      toast.error('Failed to update title');
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
   const anyRunning = runningStepId != null;
 
   return (
@@ -113,8 +159,8 @@ export function SessionItemsPanel({
               const createdAt = formatCreatedAt(step.created_at);
               const query = step.raw_query || step.intent_text || '';
               const previewQuery = firstLinePreview(query);
-              const remainder = queryRemainder(query);
-              const canExpand = remainder.trim().length > 0;
+              const hasMultipleLines = query.split('\n').filter((l) => l.trim().length > 0).length > 1;
+              const canExpand = hasMultipleLines;
 
               return (
                 <div
@@ -125,7 +171,11 @@ export function SessionItemsPanel({
                       : 'bg-surface-inset border-border-subtle hover:bg-surface-card'
                   }`}
                 >
-                  <div className="flex items-center gap-2 px-2 py-1.5 min-h-[2.8125rem]">
+                  <div
+                    className={`flex items-center gap-2 px-2 pt-1.5 min-h-[2.8125rem] ${
+                      isExpanded ? 'pb-0.5' : 'pb-1.5'
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => toggleExpanded(step.id)}
@@ -160,9 +210,13 @@ export function SessionItemsPanel({
                             <span className="text-destructive-fg">● failed</span>
                           )}
                         </span>
-                      </div>
+                      </div>                        
                       <div className="text-[10px] text-foreground-subtle font-mono truncate">
-                        <AqlView query={previewQuery} compact className="text-[10px] leading-tight" />
+                        {step.title ? (
+                          <span className="font-medium text-foreground-default">{step.title}</span>
+                        ) : (
+                          <AqlView query={previewQuery} compact className="text-[10px] leading-tight" />
+                        )}
                       </div>
                     </button>
 
@@ -197,6 +251,14 @@ export function SessionItemsPanel({
                           }}
                         >
                           <ExternalLink className="h-3 w-3 mr-2" /> Open in new tab
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditTitleOpen(step);
+                          }}
+                        >
+                          <Type className="h-3 w-3 mr-2" /> Edit title
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => {
@@ -238,10 +300,22 @@ export function SessionItemsPanel({
                   </div>
 
                   {isExpanded && canExpand && (
-                    <div className="px-2 pb-2 border-t border-border-subtle">
-                      <div className="pt-2 text-[10px] text-foreground-subtle font-mono">
+                    <div
+                      className="px-2 pb-2 border-t border-border-subtle cursor-pointer hover:bg-surface-panel/50"
+                      onClick={() => onSelectStep(step)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelectStep(step);
+                        }
+                      }}
+                      title="Show contents"
+                    >
+                      <div className="pt-0.5 pl-8 text-[10px] text-foreground-subtle font-mono">
                         <AqlView
-                          query={remainder}
+                          query={query}
                           className="text-[10px] leading-tight whitespace-pre-wrap"
                         />
                       </div>
@@ -262,6 +336,38 @@ export function SessionItemsPanel({
           </div>
         </div>
       </PanelContent>
+
+      <Dialog open={editTitleStep != null} onOpenChange={(open) => !open && handleEditTitleClose()}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Edit title</DialogTitle>
+            <DialogDescription>
+              {editTitleStep ? `Update the display title for this ${editTitleStep.action_type === 'curated_page' ? 'page' : 'query'}.` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editTitleValue}
+            onChange={(e) => setEditTitleValue(e.target.value)}
+            placeholder="Title"
+            maxLength={120}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveTitle();
+              }
+              if (e.key === 'Escape') {
+                handleEditTitleClose();
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={handleEditTitleClose} disabled={isSavingTitle}>Cancel</Button>
+            <Button onClick={handleSaveTitle} disabled={isSavingTitle || editTitleValue.trim() === (editTitleStep?.title ?? '').trim()}>
+              {isSavingTitle ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Panel>
   );
 }

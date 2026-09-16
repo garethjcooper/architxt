@@ -17,8 +17,9 @@ export const UNIFIED_RESPONSE_SCHEMA = {
         properties: {
           narrative_name: { type: 'string' },
           narrative: { type: 'string' },
+          evidence: { type: 'array', items: { type: 'string' } },
         },
-        required: ['narrative'],
+        required: ['narrative', 'evidence'],
       },
     },
     graph: {
@@ -51,14 +52,38 @@ export const UNIFIED_RESPONSE_SCHEMA = {
               },
               evidence: { type: 'array', items: { type: 'string' } },
             },
-            required: ['from', 'to', 'type', 'label', 'detail'],
+            required: ['from', 'to', 'type', 'label', 'detail', 'evidence'],
           },
         },
       },
       required: ['nodes', 'edges'],
     },
-    tables: { type: 'array' },
-    diagrams: { type: 'array' },
+    tables: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          columns: { type: 'array', items: { type: 'string' } },
+          rows: { type: 'array' },
+          evidence: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['name', 'columns', 'rows', 'evidence'],
+      },
+    },
+    diagrams: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          type: { type: 'string' },
+          content: { type: 'string' },
+          evidence: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['name', 'type', 'content', 'evidence'],
+      },
+    },
   },
   required: ['narratives', 'graph', 'tables', 'diagrams'],
 };

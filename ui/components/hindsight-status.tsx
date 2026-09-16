@@ -119,11 +119,11 @@ export function HindsightStatus() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-foreground-faint font-mono truncate">
+                        <span className="text-foreground-faint font-mono truncate" title={op.pop_ext_id || `doc-${op.pop_doc_id}`}>
                           {op.pop_ext_id || `doc-${op.pop_doc_id}`}
                         </span>
                         <span className="text-foreground-placeholder">→</span>
-                        <span className="text-foreground-subtle truncate">{op.pop_bank_id}</span>
+                        <span className="text-foreground-subtle truncate" title={op.pop_bank_id}>{op.pop_bank_id}</span>
                         <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${op.pop_status === 'processing' ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd' : 'bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd'}`}>
                           <Clock className="h-3 w-3" />
                           {op.pop_status}

@@ -550,9 +550,14 @@ export function AqlEditor(props: AqlEditorProps) {
 
   const lastCursorRef = useRef(0);
   const lastValueRef = useRef(value);
+  const lastNotifiedValueRef = useRef(value);
   useEffect(() => {
     lastValueRef.current = value;
+    lastNotifiedValueRef.current = value;
   }, [value]);
+
+  const notifyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingValueRef = useRef<{ value: string; cursor: number } | null>(null);
 
   // Keep the change callback stable so CodeMirror doesn't rebind on every
   // keystroke. We still suppress duplicate notifications with value/cursor refs.
@@ -567,14 +572,36 @@ export function AqlEditor(props: AqlEditorProps) {
           lastCursorRef.current = cursor;
         }
         // Notify parent whenever the document value changes, but not for
-        // pure cursor/selection movements.
+        // pure cursor/selection movements. Debounce the notification slightly
+        // so rapid typing doesn't trigger a parent re-render on every keystroke,
+        // which can make CodeMirror's external-value sync compete with the user.
         if (valueChanged) {
-          onChange(newValue, cursor);
+          pendingValueRef.current = { value: newValue, cursor };
+          if (notifyTimeoutRef.current) {
+            clearTimeout(notifyTimeoutRef.current);
+          }
+          notifyTimeoutRef.current = setTimeout(() => {
+            notifyTimeoutRef.current = null;
+            const pending = pendingValueRef.current;
+            pendingValueRef.current = null;
+            if (pending != null && pending.value !== lastNotifiedValueRef.current) {
+              onChange(pending.value, pending.cursor);
+              lastNotifiedValueRef.current = pending.value;
+            }
+          }, 120);
         }
       }
     },
     [onChange],
   );
+
+  useEffect(() => {
+    return () => {
+      if (notifyTimeoutRef.current) {
+        clearTimeout(notifyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Keep the submit callback in a ref so the keymap extension never has to be
   // recreated when the parent passes a new function reference (e.g. a closure

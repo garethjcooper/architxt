@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { AqlEditor, type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import { getRoleLabel } from '@/lib/contextual-graph/display';
 import { DerivedModelsPanel } from '@/components/derived-models-panel';
@@ -317,6 +318,21 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
     });
   }, [roleScope, model.ext_id, model.template_role, effectiveName, sourceQuery]);
 
+  // Collect all form-level validation messages for the top banner.
+  const formValidationItems = useMemo(() => {
+    const items: string[] = [];
+    if (!effectiveName.trim()) items.push('Name is required.');
+    if (!sourceQuery.trim()) items.push('Source query is required.');
+    if (maxTokensError) items.push(maxTokensError);
+    if (templateValidation) items.push(templateValidation);
+    if (roleTemplateValidation && !roleTemplateValidation.valid) {
+      items.push(...roleTemplateValidation.errors);
+    }
+    return items;
+  }, [effectiveName, sourceQuery, maxTokensError, templateValidation, roleTemplateValidation]);
+
+  const hasFormValidationErrors = formValidationItems.length > 0;
+
   const extIdFormatWarning = useMemo(() => {
     if (!roleScope || !model.template_role) return null;
     const result = validateRoleBasedTemplate(roleScope, {
@@ -535,16 +551,38 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
           </div>
           )}
 
-        {roleInstructions && (
-          <div className="rounded-md border border-badge-caution-bd bg-badge-caution-bg/50 p-3 text-xs text-badge-caution-fg">
-            <p className="font-medium">{selectedTemplateRole?.label} format requirements</p>
-            <p className="mt-1 text-badge-caution-fg/80">{roleInstructions}</p>
+        {roleInstructions ? (
+          <div
+            className={cn(
+              'rounded-md border p-3 text-xs',
+              hasFormValidationErrors
+                ? 'border-destructive-border bg-destructive-bg text-destructive-fg'
+                : 'border-badge-caution-bd bg-badge-caution-bg/50 text-badge-caution-fg'
+            )}
+          >
+            <p className="font-medium">
+              {hasFormValidationErrors ? 'Validation required' : `${selectedTemplateRole?.label} format requirements`}
+            </p>
+            <ul className="mt-1 list-disc list-inside space-y-0.5">
+              {hasFormValidationErrors ? (
+                formValidationItems.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))
+              ) : (
+                <li>{roleInstructions}</li>
+              )}
+            </ul>
           </div>
-        )}
-
-        {extIdFormatWarning && (
-          <p className="text-[10px] text-destructive-fg">External ID: {extIdFormatWarning}</p>
-        )}
+        ) : hasFormValidationErrors ? (
+          <div className="rounded-md border border-destructive-border bg-destructive-bg p-3 text-xs text-destructive-fg">
+            <p className="font-medium">Validation required</p>
+            <ul className="mt-1 list-disc list-inside space-y-0.5">
+              {formValidationItems.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -585,15 +623,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
                 
               />
             )}
-            {roleTemplateValidation && !roleTemplateValidation.valid && (
-              <div className="mt-1 space-y-0.5">
-                {roleTemplateValidation.errors
-                  .filter((e) => !e.includes('External ID'))
-                  .map((err, idx) => (
-                    <p key={idx} className="text-[10px] text-destructive-fg">{err}</p>
-                  ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -602,14 +631,6 @@ export function ModelDetailsDialog({ model, open, onOpenChange, onUpdated, templ
             <Label htmlFor="mm-detail-source-query" className="text-xs uppercase text-foreground-subtle font-medium">
               Source Query *
             </Label>
-            {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length > 0 && (
-              <span className="text-[10px] text-badge-caution-fg">
-                Missing: {roleTemplateValidation.missingQueryPlaceholders.join(', ')}
-              </span>
-            )}
-            {roleTemplateValidation && roleTemplateValidation.missingQueryPlaceholders.length === 0 && roleScope && (
-              <span className="text-[10px] text-accent-secondary-fg">All required placeholders present</span>
-            )}
           </div>
           <AqlEditor
             id="mm-detail-source-query"

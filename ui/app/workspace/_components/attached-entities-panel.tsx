@@ -131,13 +131,22 @@ function getEntityModelItems(
 
     const firstRefRole = contexts[0]?.refs[0]?.role;
 
+    // Count only physical edges produced by the edge-context model. The
+    // undirected skeleton edge that hosts the model ref has cge_type === null
+    // and is excluded, matching the manager page's childCount behavior.
+    const physicalEdgeIds = new Set(
+      contexts
+        .filter((c) => c.edge_type !== null)
+        .map((c) => c.edge_id),
+    );
+
     items.push({
       key: `edge-${extId}`,
       scopeLabel: 'EDGE',
       roleLabel: firstRefRole ? getRoleLabel(firstRefRole, labelMap) : undefined,
       title,
       extId,
-      edgeCount: new Set(contexts.map((c) => c.edge_id)).size,
+      edgeCount: physicalEdgeIds.size,
     });
   });
 
