@@ -1,0 +1,251 @@
+/*
+ * Infima variable overrides.
+ *
+ * Loaded via docusaurus.config.ts stylesheets so it is NOT wrapped in the
+ * low-priority custom CSS layer. These declarations are intentionally
+ * unlayered so they always win over Docusaurus/Infima's defaults.
+ */
+
+:root {
+  /* === Typography === */
+  --atx-font-sans: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --atx-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  --atx-font-regular: 400;
+  --atx-font-medium: 500;
+  --atx-font-semibold: 600;
+  --atx-font-bold: 700;
+
+  /* === Architxt semantic primitives (light mode) === */
+  --atx-page-bg: #f8fafc;
+  --atx-surface-bg: #f3f5f7;
+  --atx-surface-bg-hover: #eef0f2;
+  --atx-surface-bg-active: #f0fdfa;
+  --atx-raised-bg: #ffffff;
+  --atx-inset-bg: #f1f5f9;
+
+  --atx-text: #1e293b;
+  --atx-text-muted: #64748b;
+  --atx-text-subtle: #94a3b8;
+  --atx-text-on-dark: #f8fafc;
+
+  /* Teal accent from the architxt UI */
+  --atx-brand: #0d9488;
+  --atx-brand-bd: #0f766e;
+  --atx-brand-dark: #115e59;
+  --atx-brand-light: #14b8a6;
+  --atx-brand-lighter: #2dd4bf;
+  --atx-brand-lightest: #5eead4;
+  --atx-brand-soft: #ccfbf1;
+  --atx-brand-soft-hover: #e6fffa;
+
+  --atx-border: #e2e8f0;
+  --atx-border-subtle: #f1f5f9;
+  --atx-border-strong: #cbd5e1;
+
+  --atx-radius-sm: 0.5rem;
+  --atx-radius-md: 0.75rem;
+  --atx-radius-lg: 0.75rem;
+  --atx-radius-pill: 9999px;
+
+  --atx-shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --atx-shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.05);
+
+  --atx-code-bg: var(--atx-inset-bg);
+  --atx-code-text: var(--atx-text);
+  --atx-focus-ring: var(--atx-brand-light);
+
+  /* === Infima mappings (light) === */
+  --ifm-color-primary: var(--atx-brand);
+  --ifm-color-primary-dark: var(--atx-brand-bd);
+  --ifm-color-primary-darker: var(--atx-brand-dark);
+  --ifm-color-primary-darkest: var(--atx-brand-dark);
+  --ifm-color-primary-light: var(--atx-brand-light);
+  --ifm-color-primary-lighter: var(--atx-brand-lighter);
+  --ifm-color-primary-lightest: var(--atx-brand-lightest);
+
+  --ifm-link-color: var(--atx-brand);
+  --ifm-link-hover-color: var(--atx-brand-dark);
+  --ifm-link-decoration: none;
+
+  --ifm-background-color: var(--atx-page-bg);
+  --ifm-navbar-background-color: var(--atx-raised-bg);
+  --ifm-navbar-height: 3.5rem;
+  --ifm-navbar-link-color: var(--atx-text);
+  --ifm-navbar-link-hover-color: var(--atx-brand);
+  --ifm-navbar-link-active-color: var(--atx-brand);
+  --ifm-navbar-shadow: none;
+
+  --ifm-font-color-base: var(--atx-text);
+  --ifm-font-color-secondary: var(--atx-text-muted);
+  --ifm-heading-color: var(--atx-text);
+
+  --ifm-menu-color: var(--atx-text);
+  --ifm-menu-color-active: var(--atx-brand-dark);
+  --ifm-menu-color-background-active: var(--atx-brand-soft);
+  --ifm-menu-color-background-hover: var(--atx-surface-bg-hover);
+  --ifm-sidebar-background-color: var(--atx-surface-bg);
+
+  --ifm-toc-link-color: var(--atx-text-muted);
+  --ifm-toc-link-color-active: var(--atx-brand);
+  --ifm-toc-border-color: var(--atx-border);
+
+  --ifm-font-family-base: var(--atx-font-sans);
+  --ifm-font-family-monospace: var(--atx-font-mono);
+  --ifm-heading-font-family: var(--atx-font-sans);
+
+  /* Match architxt app heading scale (PageShell uses text-3xl) */
+  --ifm-h1-font-size: 1.875rem;
+  --ifm-h2-font-size: 1.25rem;
+  --ifm-h3-font-size: 1.125rem;
+  --ifm-font-weight-base: 400;
+  --ifm-font-weight-semibold: 500;
+  --ifm-font-weight-bold: 700;
+  --ifm-heading-font-weight: 600;
+
+  --ifm-code-font-size: 95%;
+  --ifm-code-background: var(--atx-code-bg);
+  --ifm-code-color: var(--atx-code-text);
+  --docusaurus-highlighted-code-line-bg: rgb(15 23 42 / 0.05);
+
+  --ifm-footer-background-color: var(--atx-surface-bg);
+  --ifm-footer-color: var(--atx-text-muted);
+  --ifm-footer-link-color: var(--atx-text-muted);
+  --ifm-footer-title-color: var(--atx-text);
+
+  --doc-sidebar-width: 16rem;
+  --doc-sidebar-hidden-width: 4rem;
+}
+
+/* Docusaurus inflates the first markdown H1 to 3rem; keep it consistent. */
+.markdown h1,
+.markdown h1:first-child {
+  --ifm-h1-font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.markdown h2 {
+  --ifm-h2-font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.markdown h3 {
+  --ifm-h3-font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+strong,
+b {
+  font-weight: 500;
+}
+
+html[data-theme='dark'] {
+  /* === Architxt semantic primitives (dark mode) === */
+  --atx-page-bg: #141414;
+  --atx-surface-bg: #1a1a1a;
+  --atx-surface-bg-hover: #252525;
+  --atx-surface-bg-active: #1f3d3a;
+  --atx-raised-bg: #1c1c1c;
+  --atx-inset-bg: #0f0f0f;
+
+  --atx-text: #ededed;
+  --atx-text-muted: #a1a1aa;
+  --atx-text-subtle: #71717a;
+  --atx-text-on-dark: #ffffff;
+
+  --atx-brand: #2dd4bf;
+  --atx-brand-bd: #14b8a6;
+  --atx-brand-dark: #0d9488;
+  --atx-brand-light: #5eead4;
+  --atx-brand-lighter: #99f6e4;
+  --atx-brand-lightest: #ccfbf1;
+  --atx-brand-soft: #153c36;
+  --atx-brand-soft-hover: #1a4d45;
+
+  --atx-border: #27272a;
+  --atx-border-subtle: #18181b;
+  --atx-border-strong: #3f3f46;
+
+  --atx-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --atx-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+
+  --atx-code-bg: var(--atx-inset-bg);
+  --atx-code-text: var(--atx-text);
+  --atx-focus-ring: var(--atx-brand-light);
+
+  /* === Infima mappings (dark) === */
+  --ifm-color-primary: var(--atx-brand);
+  --ifm-color-primary-dark: var(--atx-brand-bd);
+  --ifm-color-primary-darker: var(--atx-brand-dark);
+  --ifm-color-primary-darkest: var(--atx-brand-dark);
+  --ifm-color-primary-light: var(--atx-brand-light);
+  --ifm-color-primary-lighter: var(--atx-brand-lighter);
+  --ifm-color-primary-lightest: var(--atx-brand-lightest);
+
+  --ifm-color-primary-contrast-background: var(--atx-brand-soft);
+  --ifm-color-primary-contrast-foreground: var(--atx-brand-light);
+
+  --ifm-link-color: var(--atx-brand);
+  --ifm-link-hover-color: var(--atx-brand-light);
+
+  --ifm-background-color: var(--atx-page-bg);
+  --ifm-navbar-background-color: var(--atx-raised-bg);
+  --ifm-navbar-link-color: var(--atx-text);
+  --ifm-navbar-link-hover-color: var(--atx-brand);
+  --ifm-navbar-link-active-color: var(--atx-brand);
+  --ifm-navbar-shadow: none;
+
+  --ifm-font-color-base: var(--atx-text);
+  --ifm-font-color-secondary: var(--atx-text-muted);
+  --ifm-heading-color: var(--atx-text);
+
+  --ifm-menu-color: var(--atx-text);
+  --ifm-menu-color-active: var(--atx-brand-light);
+  --ifm-menu-color-background-active: var(--atx-brand-soft);
+  --ifm-menu-color-background-hover: var(--atx-surface-bg-hover);
+  --ifm-sidebar-background-color: var(--atx-surface-bg);
+
+  --ifm-toc-link-color: var(--atx-text-muted);
+  --ifm-toc-link-color-active: var(--atx-brand);
+  --ifm-toc-border-color: var(--atx-border);
+
+  --ifm-breadcrumb-color-active: var(--atx-brand);
+
+  --ifm-color-emphasis-0: var(--atx-raised-bg);
+  --ifm-color-emphasis-100: var(--atx-surface-bg);
+  --ifm-color-emphasis-200: var(--atx-surface-bg-hover);
+  --ifm-color-emphasis-300: var(--atx-border);
+  --ifm-color-emphasis-600: var(--atx-text-muted);
+  --ifm-color-emphasis-700: var(--atx-text);
+  --ifm-color-emphasis-800: var(--atx-text-on-dark);
+  --ifm-color-emphasis-900: #ffffff;
+  --ifm-color-emphasis-1000: #ffffff;
+
+  --ifm-color-content: var(--atx-text);
+  --ifm-color-content-secondary: var(--atx-text-muted);
+  --ifm-color-content-inverse: var(--atx-text-on-dark);
+
+  --ifm-card-background-color: var(--atx-raised-bg);
+  --ifm-badge-background-color: var(--atx-brand-soft);
+  --ifm-badge-color: var(--atx-brand-light);
+  --ifm-alert-background-color: var(--atx-surface-bg);
+  --ifm-blockquote-color: var(--atx-text-muted);
+
+  --ifm-button-background-color: var(--atx-surface-bg);
+  --ifm-button-color: var(--atx-text);
+  --ifm-button-border-color: var(--atx-border);
+
+  --docusaurus-highlighted-code-line-bg: rgb(255 255 255 / 0.06);
+
+  --ifm-footer-background-color: var(--atx-surface-bg);
+  --ifm-footer-link-color: var(--atx-text-muted);
+  --ifm-footer-title-color: var(--atx-heading-color);
+}
+
+html[data-theme='dark'] .markdown h1,
+html[data-theme='dark'] .markdown h1:first-child {
+  --ifm-h1-font-size: 1.875rem;
+}

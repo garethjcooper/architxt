@@ -1,0 +1,263 @@
+---
+sidebar_position: 3
+---
+
+# AQL: architxt Query Language
+
+AQL (architxt Query Language) is the compact, line-based language used to tell architxt which contextual data you want in a workspace section. It combines free-text intent with block directives, named outputs, and machine-readable entity or edge references.
+
+AQL is used throughout the UI whenever you edit mental-model queries, focus a section, or compose a curated page.
+
+## The basics
+
+An AQL query is a plain text string. The parser recognizes three things:
+
+1. **Intent text** — any plain sentence outside a block.
+2. **Block directives** — `#graph`, `#table`, `#diagram`, or `#narrative` ... `#end`.
+3. **References** — `[[Label (type:id)]]` for entities and `[[source — label → target]]` for edges.
+
+If you write only plain text, AQL treats it as an implicit narrative request:
+
+```aql
+What is the impact of the Order Engine on the Payment Gateway?
+```
+
+This is the simplest possible query: one intent, no blocks, no references.
+
+## Block directives
+
+Blocks define the shape of the answer. Each block starts with a `#` directive and ends with `#end`.
+
+| Directive | Output shape |
+|---|---|
+| `#graph` | A contextual graph view of referenced entities and edges. |
+| `#table` | One or more tables. |
+| `#diagram` | A Mermaid diagram. |
+| `#narrative` | Free-form prose. |
+
+A block contains the prompt text the model should use inside that section.
+
+### Graph block
+
+```aql
+#graph
+Show how the Customer Registry and the Payment Gateway relate.
+Customer Registry, Payment Gateway
+#end
+```
+
+The body of the block is the content passed to the graph renderer.
+
+### Narrative block
+
+```aql
+#narrative
+Describe the integration flow between the Customer Registry and the Payment Gateway.
+#end
+```
+
+### Table block
+
+```aql
+#table
+#table-name Upstream dependencies
+List every upstream service and the interface it uses.
+#end
+```
+
+A `#table-name` sub-directive labels the table. Multiple `#table` blocks can appear in one query.
+
+### Diagram block
+
+```aql
+#diagram
+#diagram-name "Entity lifecycle"
+#diagram-type sequenceDiagram
+Alice->>Bob: Hello
+#end
+```
+
+`#diagram-name` sets the title and `#diagram-type` selects the Mermaid renderer. Supported diagram types include:
+
+- `flowchart`
+- `sequenceDiagram`
+- `classDiagram`
+- `stateDiagram-v2`
+- `erDiagram`
+- `journey`
+- `gantt`
+- `pie`
+- `timeline`
+- `radar-beta`
+- `architecture-beta`
+- `mindmap`
+- `venn-beta`
+
+## Combining intent and blocks
+
+Intent text written outside a block is preserved separately and used as the overall request.
+
+```aql
+compare current and desired state
+#graph
+Customer Registry
+#end
+```
+
+The parser returns `intentText` = `compare current and desired state` plus a graph block with body `Customer Registry`.
+
+You can also stack multiple blocks:
+
+```aql
+Summarize the architecture.
+#narrative
+#narrative-name Executive summary
+Write a short paragraph for non-technical readers.
+#end
+#table
+#table-name Components
+List each component, its owner, and its status.
+#end
+```
+
+## Sub-directives and scoping
+
+Sub-directives only make sense inside specific block types. Using a sub-directive in the wrong block produces an error.
+
+| Sub-directive | Allowed in | Purpose |
+|---|---|---|
+| `#graph-name` | `#graph` | Optional graph title. |
+| `#narrative-name` | `#narrative` | Optional narrative title. |
+| `#table-name` | `#table` | Optional table title. |
+| `#diagram-name` | `#diagram` | Optional diagram title. |
+| `#diagram-type` | `#diagram` | Required Mermaid diagram type. |
+
+## Entity references with `[[...]]`
+
+Entity references link an AQL query to actual entities in the contextual graph. The format is:
+
+```aql
+[[Label (type:id)]]
+```
+
+For example:
+
+```aql
+[[Order Engine (Component:COMP-002)]]
+[[Payment Gateway]]
+```
+
+If the type is omitted, the parser treats the label itself as the ID:
+
+```aql
+[[Payment Gateway]]
+```
+
+This is useful for ad-hoc queries, but qualified references are preferred because they survive renames and disambiguate duplicate labels.
+
+The UI provides a helper that builds these tokens for you:
+
+```js
+formatEntityToken('Order Engine', 'COMP-002', 'Component')
+// => "[[Order Engine (Component:COMP-002)]]"
+```
+
+## Edge references
+
+Edges use a longer form that names both endpoints and the relationship:
+
+```aql
+[[source — label → target]]
+```
+
+For example:
+
+```aql
+[[Order Engine — depends-on → Payment Gateway]]
+```
+
+The parser separates the string on em-dash (`—`) and arrow (`→`).
+
+The UI helper is:
+
+```js
+formatEdgeToken('Order Engine', 'Payment Gateway', 'depends-on')
+// => "[[Order Engine — depends-on → Payment Gateway]]"
+```
+
+## Stripping references
+
+If you need the human-readable label without the markup, AQL can strip references back to plain text:
+
+```aql
+// Input
+[[Order Engine (Component:COMP-002)]]
+
+// Stripped
+Order Engine
+```
+
+For edges, the strip keeps the readable path:
+
+```aql
+// Input
+[[Order Engine — depends-on → Payment Gateway]]
+
+// Stripped
+Order Engine — depends-on → Payment Gateway
+```
+
+## Common errors
+
+The parser validates AQL and returns error objects with a line number. Watch out for these mistakes:
+
+| Query | Problem |
+|---|---|
+| `#graph\nCustomer Registry` | Unclosed block. Add `#end`. |
+| `#graph\n#foo bar\n#end` | Unknown directive `foo`. |
+| `#graph\n#table-name T\n#end` | `#table-name` is not allowed inside `#graph`. |
+| `#end` | Unmatched `#end` with no opening directive. |
+| `#diagram\n#diagram-type notARealDiagram\n#end` | Unknown diagram type. |
+
+## Full example
+
+A typical curated-page section query might look like this:
+
+```aql
+Explain the data flow from [[Order Engine (Component:COMP-002)]] to [[Payment Gateway (Component:COMP-015)]].
+#diagram
+#diagram-name "Data flow"
+#diagram-type sequenceDiagram
+OrderEngine->>PaymentGateway: invoice data
+#end
+#table
+#table-name Interfaces
+List each interface, its format, and owner.
+#end
+```
+
+This produces:
+
+- Intent text with two qualified entity references.
+- A sequence diagram block named **Data flow**.
+- A table block named **Interfaces**.
+
+## Where AQL is used
+
+- **Mental model form** — every mental model has an AQL query that defines its source data.
+- **Workspace preview focus** — narrowing a previewed section generates AQL.
+- **Curated page composition** — sections you add to a page carry AQL that can be re-edited later.
+- **Reflect queries** — bespoke questions can be expressed as plain-text AQL intent.
+
+## Summary
+
+| Construct | Syntax | Notes |
+|---|---|---|
+| Intent text | Plain sentence | Used as the overall request when no block is present. |
+| Block | `#graph`, `#table`, `#diagram`, `#narrative` | Closed with `#end`. |
+| Block name | `#graph-name`, `#table-name`, etc. | Optional title for the section. |
+| Diagram type | `#diagram-type <type>` | Required inside `#diagram`. |
+| Entity reference | `[[Label (type:id)]]` | Qualified references are preferred. |
+| Edge reference | `[[src — label → target]]` | Separated by em-dash and arrow. |
+
+AQL is intentionally small: a few directives plus two reference shapes. That small surface is enough to compose precise, grounded sections from the contextual graph.

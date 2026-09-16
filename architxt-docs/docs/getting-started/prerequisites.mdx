@@ -1,0 +1,174 @@
+---
+sidebar_position: 1
+---
+
+# Prerequisites
+
+Before you install architxt, make sure you have the runtime stack, document parsing service, at least one LLM provider, and an optional Hindsight server ready.
+
+## Runtime
+
+architxt is a Node.js application with an Express backend, a Next.js frontend, and a SQLite database. You only need Node.js and npm to get started.
+
+| Requirement | Minimum | Notes |
+|---|---|---|
+| **Node.js** | 22.0.0 | Required for native ESM, `fetch`, and `better-sqlite3` binary compatibility |
+| **npm** | 10.0.0 | Bundled with Node.js 22+ |
+| **git** | 2.30+ | For cloning and updates |
+
+Verify your versions:
+
+```bash
+node --version   # Should print v22.x.x or higher
+npm --version    # Should print 10.x.x or higher
+```
+
+If Node.js is too old, install via [nvm](https://github.com/nvm-sh/nvm):
+
+```bash
+nvm install 22
+nvm use 22
+```
+
+## Docling
+
+The extract pipeline uses [Docling](https://github.com/DS4SD/docling) to parse PDFs, Word documents, and images into structured markdown. architxt expects Docling to be running as a **standalone server** via `docling serve`.
+
+This is optional if you only plan to upload plain text or images handled directly by the vision pipeline, but for most document workflows it is required. A GPU is recommended for Docling processing — CPU-only conversion is much slower and can become a bottleneck when batching large PDFs or slide decks.
+
+### Install and start Docling
+
+```bash
+# Requires Python 3.10–3.12
+pip install docling
+
+# Default port is 5001
+docling serve
+```
+
+### Point architxt at the Docling server
+
+In `server/.env`:
+
+```bash
+DOCLING_SERVICE_URL=http://localhost:5001
+```
+
+### Force OCR when needed
+
+If your PDFs contain subsetted fonts without ToUnicode CMaps, extracted text may show glyph artifacts such as `/g###/` tokens. Enable forced OCR to eliminate this corruption:
+
+```bash
+ARCHITXT_DOCLING_FORCE_OCR=true
+```
+
+This is slower but produces clean text from problematic PDFs.
+
+## LLM provider access
+
+**At least one LLM provider must be configured.** architxt uses LLMs for denoising, vision analysis, research synthesis, and mental-model generation. The backend reads provider settings from `server/.env` and references each stage by a named provider, not by hard-coded URLs.
+
+Supported provider types:
+
+| Provider | Required variables | Notes |
+|---|---|---|
+| **Ollama Local** | `ARCHITXT_OLLAMA_LOCAL_URL` | Self-hosted models on your machine. No API key needed. |
+| **Ollama Cloud** | `ARCHITXT_OLLAMA_CLOUD_API_KEY` | Managed Ollama endpoint. Get a key from [ollama.com](https://ollama.com). |
+| **OpenAI Compatible** | `ARCHITXT_OPENAI_API_KEY` | OpenAI or any OpenAI-style API endpoint. |
+| **Anthropic** | `ARCHITXT_ANTHROPIC_API_KEY` | Claude models via Anthropic's API. |
+
+The minimum environment block is:
+
+```bash
+# Local Ollama example — only a URL is required
+ARCHITXT_OLLAMA_LOCAL_URL=http://localhost:11434
+
+# Or add a cloud key
+ARCHITXT_OLLAMA_CLOUD_API_KEY=your-key-here
+```
+
+### Default models
+
+Each provider has a default model that is used when a stage does not override it:
+
+| Provider | Default model | Variable |
+|---|---|---|
+| Ollama Local | `qwen3.5:4b` | `ARCHITXT_OLLAMA_LOCAL_DEFAULT_MODEL` |
+| Ollama Cloud | `kimi-k2.7-code:cloud` | `ARCHITXT_OLLAMA_CLOUD_DEFAULT_MODEL` |
+| OpenAI | `gpt-4o` | `ARCHITXT_OPENAI_DEFAULT_MODEL` |
+| Anthropic | `claude-3-sonnet-20240229` | `ARCHITXT_ANTHROPIC_DEFAULT_MODEL` |
+
+### Stage-specific model overrides
+
+Some pipeline stages can use a different provider or model from the defaults. The most common overrides are:
+
+| Stage | Default provider | Default model | Variable |
+|---|---|---|---|
+| Vision / diagram description | `ollama_cloud` | `gemma4:31b-cloud` | `ARCHITXT_VISION_MODEL` |
+| Document denoise (LLM) | `ollama_cloud` | `gpt-oss:20b-cloud` | `ARCHITXT_DENOISE_LLM_MODEL` |
+
+Set the matching `*_PROVIDER` and `*_MODEL` variables in `server/.env` if you want to route a specific stage elsewhere. The backend uses fail-fast config validation, so an invalid or missing required value exits immediately with a clear error.
+
+### Timeout defaults
+
+| Provider | Default timeout |
+|---|---|
+| Ollama Local | 300 seconds |
+| Ollama Cloud | 300 seconds |
+| OpenAI | 60 seconds |
+| Anthropic | 180 seconds |
+| Vision | 300 seconds |
+| Denoise LLM | 600 seconds |
+
+Increase the matching `ARCHITXT_*_TIMEOUT_MS` variable if you process large documents or run on slower hardware.
+
+## Hindsight
+
+[Hindsight](https://github.com/vectorize-io/hindsight) is a vector-memory server. architxt pushes documents, entity labels, mental models, and directives to a Hindsight bank, and pulls existing knowledge back into the working graph. It is a critical dependency for the full knowledge workflow: without it you can upload and inspect individual documents, but you cannot build contextual graphs, run mental models, or perform cross-document reasoning.
+
+Hindsight is required for:
+
+- Enterprise semantic search across documents.
+- Cross-document reasoning and mental models.
+- Contextual-graph sync and refresh.
+- Evidence-backed synthesis with exact memory IDs.
+
+### What you need
+
+| Requirement | Purpose |
+|---|---|
+| Hindsight server URL | Base URL of the running Hindsight instance, e.g. `http://localhost:8080` |
+| API token | Bearer token for authentication |
+| Target bank | The bank that will hold your architxt corpus |
+
+You configure Hindsight as a server record inside architxt rather than in `server/.env`. After starting architxt, use **Settings → Servers** or the `/api/v1/servers` API to add:
+
+- `base_url` — the Hindsight server URL.
+- `api_key` — your API token.
+- `name` — a readable label.
+
+Once a server is saved, you can select its banks from the **Hindsight Sync** page.
+
+### Recommended start models
+
+When you configure a Hindsight bank for use with architxt, set the default models for `retain` and `reflect` operations to `gpt-oss:120b-cloud`. These operations handle ingestion and reasoning over your corpus, and the larger model gives more reliable extraction and synthesis.
+
+| Operation | Recommended model |
+|---|---|
+| **Retain** | `gpt-oss:120b-cloud` |
+| **Reflect** | `gpt-oss:120b-cloud` |
+
+For detailed setup instructions, including how to install Hindsight and configure a bank, see the [Hindsight install guide](https://hindsight.vectorize.io/developer/installation). It is also recommended to install the [Hindsight Control Plane UI](https://hindsight.vectorize.io/developer/installation#control-plane) so you can inspect banks, memories, and operations outside of architxt.
+
+## Pre-install checklist
+
+- [ ] Node.js 22+ and npm 10+ installed.
+- [ ] Python 3.10–3.12 available if you plan to run Docling.
+- [ ] Docling installed and `docling serve` reachable on the URL you will set in `server/.env`.
+- [ ] At least one LLM provider configured with a working endpoint or API key.
+- [ ] Hindsight server running and ability to create your first bank.
+
+## Next steps
+
+- [Install architxt](./installation)
+- [Configure environment variables](./configuration)
