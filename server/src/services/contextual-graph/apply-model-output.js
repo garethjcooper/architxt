@@ -50,10 +50,6 @@ function mergeModelRefs(currentRefs, newRef) {
   return [...deduped, newRef];
 }
 
-function now() {
-  return new Date().toISOString();
-}
-
 /**
  * Apply a normalized contextual-graph model output to the working graph.
  *
@@ -75,12 +71,9 @@ export async function applyModelOutput(db, serverId, bankId, model, output, opti
 
   try {
     if (roleScope === 'node') {
-      if (role === ROLES.entityCapabilities) {
-        return applyEntityCapabilities(db, serverId, bankId, model, output, timestamp);
-      }
-      // Any other node-scoped role (entity summary or custom) applies narrative
-      // and optional capability tables to the scoped node.
-      return applyEntitySummary(db, serverId, bankId, model, output, timestamp);
+      // Node-scoped roles now only attach their model_ref to the target node;
+      // legacy summary/capabilities fields are no longer persisted.
+      return applyEntityNodeRef(db, serverId, bankId, model, output, timestamp);
     }
     if (role === ROLES.edgeContext || roleScope === 'edge') {
       return applyEdgeContext(db, serverId, bankId, model, output, timestamp);
@@ -95,14 +88,14 @@ export async function applyModelOutput(db, serverId, bankId, model, output, opti
   }
 }
 
-function firstNarrativeText(output) {
-  return output?.narratives?.[0]?.narrative ?? '';
+function now() {
+  return new Date().toISOString();
 }
 
-function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
+function applyEntityNodeRef(db, serverId, bankId, model, output, timestamp) {
   const nodeId = model.scope?.node_id;
   if (!nodeId) {
-    return { success: false, error: 'Cannot resolve node id from entity-summary model scope', code: 'BAD_SCOPE' };
+    return { success: false, error: 'Cannot resolve node id from entity model scope', code: 'BAD_SCOPE' };
   }
 
   const nodeResult = getNode(db, serverId, bankId, nodeId);
@@ -112,10 +105,8 @@ function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
   const node = nodeResult.data;
 
   const modelRef = buildModelRef(model, output.raw, timestamp);
-  const firstNarrative = firstNarrativeText(output);
   const properties = {
     ...node.properties,
-    summary: firstNarrative,
     provenance: {
       ...(node.properties?.provenance || {}),
       source: 'contextual-graph',
@@ -125,55 +116,9 @@ function applyEntitySummary(db, serverId, bankId, model, output, timestamp) {
     updated_at: timestamp,
   };
 
-  // Also apply tables if the model produced them (e.g. capabilities alongside summary).
-  if (output.tables.length > 0) {
-    const capabilitiesTable = output.tables.find((t) => t.name === 'capabilities');
-    if (capabilitiesTable) {
-      properties.capabilities = capabilitiesTable.rows || [];
-    }
-  }
-
   upsertNode(db, serverId, bankId, nodeId, node.labels || [], properties);
 
-  return { success: true, applied: { nodeId, summary: properties.summary, capabilities: properties.capabilities } };
-}
-
-function applyEntityCapabilities(db, serverId, bankId, model, output, timestamp) {
-  const nodeId = model.scope?.node_id;
-  if (!nodeId) {
-    return { success: false, error: 'Cannot resolve node id from entity-capabilities model scope', code: 'BAD_SCOPE' };
-  }
-
-  const nodeResult = getNode(db, serverId, bankId, nodeId);
-  if (!nodeResult?.success || !nodeResult.data) {
-    return { success: false, error: `Node not found: ${nodeId}`, code: 'NODE_NOT_FOUND' };
-  }
-  const node = nodeResult.data;
-
-  const capabilitiesTable = output.tables.find((t) => t.name === 'capabilities');
-  const capabilities = capabilitiesTable?.rows || [];
-
-  // Also apply narrative if the model produced one.
-  const modelRef = buildModelRef(model, output.raw, timestamp);
-  const properties = {
-    ...node.properties,
-    capabilities,
-    provenance: {
-      ...(node.properties?.provenance || {}),
-      source: 'contextual-graph',
-      model_refs: mergeModelRefs(node.properties?.provenance?.model_refs, modelRef),
-      updated_at: timestamp,
-    },
-    updated_at: timestamp,
-  };
-
-  if (firstNarrativeText(output).trim()) {
-    properties.summary = firstNarrativeText(output);
-  }
-
-  upsertNode(db, serverId, bankId, nodeId, node.labels || [], properties);
-
-  return { success: true, applied: { nodeId, capabilities, summary: properties.summary } };
+  return { success: true, applied: { nodeId } };
 }
 
 function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {

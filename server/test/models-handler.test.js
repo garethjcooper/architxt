@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { handleModels } from '../src/services/research/handlers/models.js';
 
 const TEST_CONTENT = JSON.stringify({
-  narratives: [{ narrative_name: 'Overview', narrative: 'Some narrative text.' }],
+  narratives: [{ narrative_name: 'Overview', narrative: 'Some narrative text.', evidence: [] }],
   graph: {
     nodes: [
       { id: 'a', name: 'Alpha' },

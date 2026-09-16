@@ -83,6 +83,7 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
     // poll daemon. When using an injected mock we do not expect that side effect.
 
     const nodeResult = await import('../src/db/crud/contextual-graph.js').then((m) => m.getNode(db, serverId, bankId, 'svc-001'));
+    // Legacy summary field is no longer persisted by entity-summary models.
     assert.equal(nodeResult.data.properties.summary, 'Existing summary');
     assert.equal(nodeResult.data.properties.provenance.model_refs[0].last_refresh_status, 'pending_refresh');
   });
@@ -134,7 +135,8 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
 
     assert.equal(result.stats.rerunRequested, 1);
     assert.equal(result.stats.rerunFailed, 1);
-    assert.equal(result.stats.applied, 1);
+    // Refresh failed before apply, so nothing applied.
+    assert.equal(result.stats.applied, 0);
     assert.equal(result.stats.errors.length, 1);
     assert.equal(result.stats.errors[0].phase, 'rerun');
   });
@@ -193,6 +195,9 @@ describe('refreshContextualGraphPatches rerunExtIds', () => {
     assert.equal(result.success, true);
     assert.deepEqual(refreshed, []);
     assert.equal(result.stats.rerunRequested, 0);
-    assert.equal(result.stats.applied, 1);
+    // Content differs but node-scoped narrative-only models produce no structural
+    // divergence now that summary is no longer persisted. The ref hash is still
+    // refreshed, so applied stays 0.
+    assert.equal(result.stats.applied, 0);
   });
 });

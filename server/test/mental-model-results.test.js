@@ -44,7 +44,7 @@ describe('normalizeModelOutput (contextual envelope)', () => {
     assert.equal(errors.length, 0);
     assert.equal(graph.nodes.length, 1);
     assert.equal(graph.nodes[0].id, 'a-com:COM-002');
-    assert.deepEqual(narratives, [{ narrative_name: 'ICMS is the invoice system', narrative: 'ICMS is the invoice system.' }]);
+    assert.deepEqual(narratives, [{ narrative_name: 'ICMS is the invoice system', narrative: 'ICMS is the invoice system.', evidence: [] }]);
   });
 
   it('reports errors for invalid envelope', () => {
