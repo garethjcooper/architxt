@@ -118,17 +118,30 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
     void refresh();
   }, [serverId, bankId, refresh]);
 
-  return {
-    ...research,
-    activeSession,
-    workspaceItems,
-    curatedPages,
-    runningStepId,
-    refresh,
-    autoCreating,
-    sessionsLoading: sessionsLoading || autoCreating,
-    trailLoading,
-  };
+  return useMemo(
+    () => ({
+      ...research,
+      activeSession,
+      workspaceItems,
+      curatedPages,
+      runningStepId,
+      refresh,
+      autoCreating,
+      sessionsLoading: sessionsLoading || autoCreating,
+      trailLoading,
+    }),
+    [
+      research,
+      activeSession,
+      workspaceItems,
+      curatedPages,
+      runningStepId,
+      refresh,
+      autoCreating,
+      sessionsLoading,
+      trailLoading,
+    ],
+  );
 }
 
 export type { ResearchSession, ResearchStepSummary, ResearchQueryOptions };
