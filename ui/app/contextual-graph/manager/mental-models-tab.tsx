@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, MessageSquareText } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { mentalModelContentToStepSummary } from '@/app/workspace/_components/mod
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { getRoleScopeLabel, getRoleLabel, getDerivationScope, type ModelRef, type DisplayNode, type DisplayEdge, loadRoleScopeMap } from '@/lib/contextual-graph/display';
+import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
 
@@ -79,6 +81,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   const [selectedRefIds, setSelectedRefIds] = useState<Set<string>>(new Set());
   const [panelWidth, setPanelWidth] = useState(45);
   const [confirmRefreshAllOpen, setConfirmRefreshAllOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [queryDialogRef, setQueryDialogRef] = useState<ModelRef | null>(null);
   const [queryLoading, setQueryLoading] = useState(false);
   const [queryResult, setQueryResult] = useState<string | null>(null);
@@ -320,6 +323,34 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     await fetchPendingOps();
   }, [serverId, bankId, selectedRefIds, fetchPendingOps]);
 
+  const handleDeleteSelected = useCallback(async () => {
+    if (!serverId || !bankId) {
+      toast.error('Select a server and bank first');
+      return;
+    }
+    const targets = Array.from(selectedRefIds).filter(Boolean);
+    if (targets.length === 0) {
+      toast.error('Select at least one mental model');
+      return;
+    }
+    try {
+      const result = await hindsightApi.deleteMentalModels(serverId, bankId, targets);
+      if (result.failed_count && result.failed_count > 0) {
+        toast.error(`${result.failed_count} deletion${result.failed_count === 1 ? '' : 's'} failed`, {
+          description: result.failed?.map((f) => `${f.ext_id}: ${f.error}`).join('\n'),
+        });
+      } else {
+        toast.success(`Deleted ${result.deleted_count ?? targets.length} mental model${(result.deleted_count ?? targets.length) === 1 ? '' : 's'} from Hindsight`);
+      }
+      setSelectedRefIds(new Set());
+      setSelectedExtId(null);
+      await fetchPendingOps();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to delete selected mental models', { description: message });
+    }
+  }, [serverId, bankId, selectedRefIds, fetchPendingOps]);
+
   const handleQuery = useCallback(async (ref: ModelRef) => {
     const role = ref.role;
     const extId = ref.ext_id;
@@ -432,7 +463,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     const containerWidth = containerWidthRef.current;
     if (!containerWidth) return;
     const deltaPercent = (dx / containerWidth) * 100;
-    const next = Math.min(70, Math.max(20, resizeStartWidthRef.current + deltaPercent));
+    // Reverse direction: dragging the resizer left expands the right-hand content panel.
+    const next = Math.min(70, Math.max(20, resizeStartWidthRef.current - deltaPercent));
     setPanelWidth(next);
   }, []);
 
@@ -469,16 +501,28 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
             />
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 rounded bg-surface-panel text-foreground-faint hover:text-foreground-default hover:bg-surface-panel disabled:opacity-30 transition-colors"
-          disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0 || selectedRefIds.size === 0}
-          onClick={() => setConfirmRefreshAllOpen(true)}
-          title="Refresh selected mental models"
-        >
-          <RefreshCw className={cn('h-4 w-4', refreshingIds.size > 0 && 'animate-spin')} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded bg-surface-panel text-foreground-faint hover:text-foreground-default hover:bg-surface-panel disabled:opacity-30 transition-colors"
+            disabled={!serverId || !bankId || refreshingIds.size > 0 || filteredRefs.length === 0 || selectedRefIds.size === 0}
+            onClick={() => setConfirmRefreshAllOpen(true)}
+            title="Refresh selected mental models"
+          >
+            <RefreshCw className={cn('h-4 w-4', refreshingIds.size > 0 && 'animate-spin')} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded bg-surface-panel text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg disabled:opacity-30 transition-colors"
+            disabled={!serverId || !bankId || filteredRefs.length === 0 || selectedRefIds.size === 0}
+            onClick={() => setConfirmDeleteOpen(true)}
+            title="Delete selected mental models from Hindsight"
+          >
+            <HindsightIcon className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 flex mt-2 overflow-hidden">
@@ -511,7 +555,6 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                   <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-3">External ID</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-foreground-faint font-medium py-2 px-3">Fetched</TableHead>
                   <TableHead className="w-28 text-xs uppercase text-foreground-faint font-medium py-2 px-3">Refresh state</TableHead>
-                  <TableHead className="w-10 text-xs uppercase text-foreground-faint font-medium py-2 px-3"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -525,12 +568,11 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-8" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredRefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-xs text-foreground-subtle">
+                    <TableCell colSpan={7} className="text-center py-8 text-xs text-foreground-subtle">
                       {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
                     </TableCell>
                   </TableRow>
@@ -603,19 +645,6 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              disabled={!extId || isRefreshing}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRefreshSelected([extId]);
-                              }}
-                              title="Refresh model"
-                            >
-                              <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
                               disabled={!extId}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -639,18 +668,16 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
 
         {/* Resizer */}
         <div
-          className="w-3 shrink-0 cursor-col-resize flex items-center justify-center group"
+          className="w-3 shrink-0 cursor-col-resize flex flex-col items-center justify-center group"
           onMouseDown={handleResizeStart}
-          title="Drag to resize panels"
+          onDoubleClick={() => setPanelWidth(45)}
+          title="Drag to resize left and right panels; double-click to reset"
         >
-          <div className="h-14 w-0.5 rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors" />
+          <div className="w-1 h-16 rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors" />
         </div>
 
         {/* Content panel */}
-        <div
-          className="min-w-0 rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col"
-          style={{ width: `${panelWidth}%` }}
-        >
+        <Card className="min-w-0 border-border-default bg-surface-card flex flex-col overflow-hidden pt-0" style={{ width: `${panelWidth}%` }}>
           <EnvelopeControls
             headerTitle={selectedRef ? getRoleLabel(selectedRef.role, roleLabelMap) : 'Content'}
             plain={plainView}
@@ -682,7 +709,7 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
               formatPreview(selectedContent, selectedContentError)
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
       <ConfirmDialog
@@ -695,6 +722,20 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
         onConfirm={() => {
           setConfirmRefreshAllOpen(false);
           handleRefreshSelected();
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete selected mental models?"
+        description={`This will permanently delete ${selectedRefIds.size} selected mental model${selectedRefIds.size === 1 ? '' : 's'} from the Hindsight bank. This cannot be undone.`}
+        confirmLabel="Delete selected"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          handleDeleteSelected();
         }}
       />
 

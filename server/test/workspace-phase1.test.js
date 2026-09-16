@@ -139,10 +139,10 @@ describe('workspace phase 1: schema and CRUD', () => {
     const updateResult = updateCuratedPage(db, stepId, {
       rstep_intent_text: 'Renamed page',
       rstep_envelope: {
-        narratives: [{ narrative_name: '', narrative: '# Summary\nHello' }],
+        narratives: [{ narrative_name: '', narrative: '# Summary\nHello', evidence: [] }],
         graph: { name: '', nodes: [{ id: 'n1' }], edges: [] },
         tables: [{ name: 'T1', columns: [], rows: [] }],
-        diagrams: [{ name: 'D1', type: 'mermaid', content: 'graph LR\nA-->B' }],
+        diagrams: [{ name: 'D1', type: 'mermaid', content: 'graph LR\nA-->B', evidence: [] }],
       },
     });
     assert.equal(updateResult.success, true);
@@ -150,7 +150,7 @@ describe('workspace phase 1: schema and CRUD', () => {
     const step = getStep(db, stepId).data;
     assert.equal(step.rstep_intent_text, 'Renamed page');
     assert.deepEqual(step.rstep_envelope.graph.nodes, [{ id: 'n1' }]);
-    assert.deepEqual(step.rstep_envelope.narratives, [{ narrative_name: '', narrative: '# Summary\nHello' }]);
+    assert.deepEqual(step.rstep_envelope.narratives, [{ narrative_name: '', narrative: '# Summary\nHello', evidence: [] }]);
   });
 
   it('refuses to update a non-curated_page step via updateCuratedPage', () => {

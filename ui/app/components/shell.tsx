@@ -23,6 +23,7 @@ import {
   Network,
   LayoutTemplate,
   Puzzle,
+  Database,
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
@@ -36,8 +37,8 @@ import { useServerEnv } from '@/lib/use-server-env';
 const navItems = [
   { href: '/workspace', label: 'Workspace', icon: LayoutTemplate },
   { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/contextual-graph/manager', label: 'Context Patches', icon: Network },
   { href: '/models', label: 'Mental Models', icon: Layers },
+  { href: '/contextual-graph/manager', label: 'Context Patches', icon: Network },
   { href: '/hindsight', label: 'Hindsight Sync', icon: HindsightIcon },
   { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/tags', label: 'Tags', icon: Tags },
@@ -46,6 +47,7 @@ const navItems = [
   { href: '/directives', label: 'Directives', icon: DirectiveIcon },
   { href: '/template-roles', label: 'Template Roles', icon: Puzzle },
   { href: '/servers', label: 'Servers', icon: Server },
+  { href: '/bank-settings', label: 'Bank Settings', icon: Database },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
