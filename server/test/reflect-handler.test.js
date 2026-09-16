@@ -18,7 +18,7 @@ const REFLECT_STRUCT_WITH_GRAPH = buildEnvelope({
     { id: 'b', name: 'Beta' },
   ],
   edges: [
-    { from: 'a', to: 'b', type: 'calls', label: 'links to', detail: 'Alpha calls Beta.', evidence: ['mem-abc123'] },
+    { from: 'a', to: 'b', type: 'calls', label: 'links to' },
   ],
 });
 
@@ -70,8 +70,6 @@ describe('reflect handler', () => {
     assert.equal(result.graph.edges.length, 1);
     assert.equal(result.graph.nodes[0].id, 'a');
     assert.equal(result.graph.nodes[0].name, 'Alpha');
-    assert.equal(result.graph.edges[0].evidence.length, 1);
-    assert.equal(result.graph.edges[0].evidence[0], 'mem-abc123');
   });
 
   it('returns empty graph when envelope graph is empty', async () => {
@@ -100,8 +98,6 @@ describe('reflect handler', () => {
     assert.ok(!capturedBody.query.includes('{{ARCHITXT_TOPIC}}'));
     assert.ok(capturedBody.query.includes('## Topic'));
     assert.deepEqual(capturedBody.response_schema, (await import('../src/services/contextual-graph/unified-response-schema.js')).UNIFIED_RESPONSE_SCHEMA);
-    const edgeSchema = capturedBody.response_schema.properties.graph.properties.edges.items;
-    assert.ok(edgeSchema.required.includes('evidence'), 'edge schema should require evidence');
   });
 
   it('injects section focus variables when provided', async () => {

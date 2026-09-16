@@ -17,7 +17,6 @@ import {
   GitCompare,
   Search,
   X,
-  Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
@@ -28,25 +27,20 @@ import CompareModal from './compare-modal';
 import EntityCompareModal from './entity-compare-modal';
 import MentalModelCompareModal from './mental-model-compare-modal';
 import DirectiveCompareModal from './directive-compare-modal';
-import BankSettingsCompareModal from './bank-settings-compare-modal';
 import SyncRow from './sync-row';
 import EntitySyncRow from './entity-sync-row';
 import MentalModelSyncRow from './mental-model-sync-row';
 import DirectiveSyncRow from './directive-sync-row';
-import BankSettingsSyncRow from './bank-settings-sync-row';
 
 const logger = createLogger('HindsightPage');
 
-// Contextual mental models are fully auto-managed; no push/pull from this page.
-const isContextualMentalModel = (row: any) =>
-  row?.arch?.is_contextual === true || row?.hindsight?.is_contextual === true;
-
-// Derived mental models are pushable only (they originate in architxt from a template).
-const isDerivedMentalModel = (row: any) =>
-  row?.arch?.is_derived === true || row?.hindsight?.is_derived === true;
-
-// A mental model row that should not appear in this sync UI at all.
-const isUnactionableMentalModel = (row: any) => isContextualMentalModel(row);
+// Mental models that are auto-managed (derived from templates or provisioned by
+// the contextual graph) should not be pushable/pulled from this sync page.
+const isUnactionableMentalModel = (row: any) =>
+  row?.arch?.is_derived === true ||
+  row?.hindsight?.is_derived === true ||
+  row?.arch?.is_contextual === true ||
+  row?.hindsight?.is_contextual === true;
 
 
 interface DiffResult {
@@ -142,7 +136,7 @@ export default function HindsightPage() {
     selectedBankId,
     setSelectedBankId,
   } = usePersistentServerBank(servers, banks);
-  const [selectedObject, setSelectedObject] = useState<'documents' | 'entities' | 'mental-models' | 'directives' | 'bank-settings'>('documents');
+  const [selectedObject, setSelectedObject] = useState<'documents' | 'entities' | 'mental-models' | 'directives'>('documents');
   const [loadingServers, setLoadingServers] = useState(true);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [loadingDiff, setLoadingDiff] = useState(false);
@@ -161,7 +155,6 @@ export default function HindsightPage() {
   const [entityCompareId, setEntityCompareId] = useState<string | null>(null);
   const [mentalCompareId, setMentalCompareId] = useState<string | null>(null);
   const [directiveCompareId, setDirectiveCompareId] = useState<string | null>(null);
-  const [bankSettingsCompareOpen, setBankSettingsCompareOpen] = useState(false);
 
   // ── Batch progress dialog state ────────────────────────────────────
   const [batchProgressOpen, setBatchProgressOpen] = useState(false);
@@ -176,8 +169,8 @@ export default function HindsightPage() {
     setSelectedIds(new Set());
   }, [col2Filter]);
 
-  // Contextual mental models are fully auto-managed; don't let them stay selected.
-  // Derived models remain selectable because they are pushable-only.
+  // Derived and contextual mental models are auto-managed; don't let them stay
+  // selected after a diff refresh, because they can't be pushed or pulled.
   useEffect(() => {
     if (!diffResult) return;
     const allRows = [
@@ -186,13 +179,13 @@ export default function HindsightPage() {
       ...(diffResult.only_architxt || []),
       ...(diffResult.only_hindsight || []),
     ];
-    const contextualIds = new Set(
-      allRows.filter(isContextualMentalModel).map((d) => d.ext_id)
+    const unactionableIds = new Set(
+      allRows.filter(isUnactionableMentalModel).map((d) => d.ext_id)
     );
     setSelectedIds((prev) => {
-      if ([...prev].every((id) => !contextualIds.has(id))) return prev;
+      if ([...prev].every((id) => !unactionableIds.has(id))) return prev;
       const next = new Set(prev);
-      for (const id of contextualIds) {
+      for (const id of unactionableIds) {
         next.delete(id);
       }
       return next;
@@ -307,13 +300,11 @@ export default function HindsightPage() {
 
   // ── Derived / contextual mental model detection ─────────────────────
 
-  const isContextualMentalModel = (row: any) =>
-    row?.arch?.is_contextual === true || row?.hindsight?.is_contextual === true;
-
-  const isDerivedMentalModel = (row: any) =>
-    row?.arch?.is_derived === true || row?.hindsight?.is_derived === true;
-
-  const isUnactionableMentalModel = (row: any) => isContextualMentalModel(row);
+  const isUnactionableMentalModel = (row: any) =>
+    row?.arch?.is_derived === true ||
+    row?.hindsight?.is_derived === true ||
+    row?.arch?.is_contextual === true ||
+    row?.hindsight?.is_contextual === true;
 
   // ── Selection helpers ───────────────────────────────────────────────
 
@@ -341,7 +332,7 @@ export default function HindsightPage() {
 
   // ── Mental model push helper ──────────────────────────────────────
 
-  const pushMentalModelOne = async (extId: string, create = false, refreshAfter = false) => {
+  const pushMentalModelOne = async (extId: string, create = false) => {
     if (!selectedServerId || !selectedBankId) {
       throw new Error('Select a server and bank first');
     }
@@ -352,7 +343,7 @@ export default function HindsightPage() {
     if (!item?.arch) {
       throw new Error(`Mental model ${extId} not found in diff`);
     }
-    await hindsightApi.pushMentalModel(parseInt(selectedServerId, 10), selectedBankId, item.arch, create, refreshAfter);
+    await hindsightApi.pushMentalModel(parseInt(selectedServerId, 10), selectedBankId, item.arch, create);
   };
 
   // ── Push / Pull single (documents) ────────────────────────────────
@@ -435,39 +426,9 @@ export default function HindsightPage() {
     }
   };
 
-  // ── Bank Settings Push / Pull ───────────────────────────────────────
-
-  const handlePushBankSettings = async () => {
-    if (!selectedServerId || !selectedBankId) return;
-    try {
-      const result = await hindsightApi.pushBankSettings(parseInt(selectedServerId, 10), selectedBankId);
-      toast.success(result.profile_skipped ? 'Pushed bank config to Hindsight (profile skipped)' : 'Pushed bank settings to Hindsight');
-      await fetchDiff();
-    } catch (err: any) {
-      logger.error('Bank settings push failed', err);
-      toast.error(`Bank settings push failed: ${err.message}`);
-    }
-  };
-
-  const handlePullBankSettings = async () => {
-    if (!selectedServerId || !selectedBankId) return;
-    try {
-      const result = await hindsightApi.pullBankSettings(parseInt(selectedServerId, 10), selectedBankId);
-      toast.success(result.profile_skipped ? 'Pulled bank config from Hindsight (profile skipped)' : 'Pulled bank settings from Hindsight');
-      await fetchDiff();
-    } catch (err: any) {
-      logger.error('Bank settings pull failed', err);
-      toast.error(`Bank settings pull failed: ${err.message}`);
-    }
-  };
-
   // ── Batch actions (dispatch by object mode) ───────────────────────
 
   const handlePushSelected = (extIds: string[]) => {
-    if (isBankSettingsMode) {
-      handlePushBankSettings();
-      return;
-    }
     if (isMentalModelMode) {
       const items = (diffResult?.only_architxt || []).filter((d) => extIds.includes(d.ext_id));
       const allCreate = items.every((d) => diffResult?.only_architxt?.some((o) => o.ext_id === d.ext_id));
@@ -528,13 +489,13 @@ export default function HindsightPage() {
         throw new Error(`Mental model ${extId} has no Hindsight side`);
       }
 
-      // Derived models are managed in architxt; pulling bank state over them is not allowed.
-      if (isDerivedMentalModel(row)) {
+      const isDerived = row.arch?.is_derived === true;
+      if (isDerived) {
         return [];
       }
 
-      // Contextual models are fully auto-managed; do not pull.
-      if (isContextualMentalModel(row)) {
+      const isContextual = row.arch?.is_contextual === true;
+      if (isContextual) {
         return [];
       }
 
@@ -572,10 +533,6 @@ export default function HindsightPage() {
   };
 
   const handlePullSelected = (extIds: string[]) => {
-    if (isBankSettingsMode) {
-      handlePullBankSettings();
-      return;
-    }
     if (isMentalModelMode) {
       handlePullMentalModels(extIds);
       return;
@@ -608,17 +565,13 @@ export default function HindsightPage() {
   };
 
   const handleMakeLikeArchitxt = (extIds: string[]) => {
-    if (isBankSettingsMode) {
-      handlePushBankSettings();
-      return;
-    }
     if (isMentalModelMode) {
       const items = onBoth.filter((d) => extIds.includes(d.ext_id) && d.syncStatus === 'out_of_sync');
       setBatchTitle('Pushing Mental Models to Bank');
       setBatchDescription(`${items.length} mental model${items.length !== 1 ? 's' : ''}`);
       setBatchItems(items.map((item) => ({ id: item.ext_id, label: item.ext_id })));
       setBatchOperation(() => async (item: BatchItem) => {
-        await pushMentalModelOne(String(item.id), false, true);
+        await pushMentalModelOne(String(item.id), false);
       });
       setBatchOnComplete(() => () => fetchDiff());
       setBatchProgressOpen(true);
@@ -655,10 +608,6 @@ export default function HindsightPage() {
   };
 
   const handleMakeLikeBank = (extIds: string[]) => {
-    if (isBankSettingsMode) {
-      handlePullBankSettings();
-      return;
-    }
     if (isMentalModelMode) {
       handlePullMentalModels(extIds);
       return;
@@ -696,7 +645,6 @@ export default function HindsightPage() {
   const isEntityMode = selectedObject === 'entities';
   const isMentalModelMode = selectedObject === 'mental-models';
   const isDirectiveMode = selectedObject === 'directives';
-  const isBankSettingsMode = selectedObject === 'bank-settings';
 
   const emptyCol1Text = isEntityMode
     ? 'All architxt entities exist on server'
@@ -712,8 +660,6 @@ export default function HindsightPage() {
     ? (col2Filter === 'out_of_sync' ? 'No out-of-sync mental models' : col2Filter === 'in_sync' ? 'No in-sync mental models' : 'No shared mental models')
     : isDirectiveMode
     ? (col2Filter === 'out_of_sync' ? 'No out-of-sync directives' : col2Filter === 'in_sync' ? 'No in-sync directives' : 'No shared directives')
-    : isBankSettingsMode
-    ? 'Bank settings are in sync'
     : (col2Filter === 'out_of_sync' ? 'No out-of-sync documents' : col2Filter === 'in_sync' ? 'No in-sync documents' : 'No shared documents');
 
   const emptyCol3Text = isEntityMode
@@ -791,7 +737,7 @@ export default function HindsightPage() {
   const filteredCol3 = col3Filtered.merged;
 
   const col2PullCount = filteredCol2.filter(
-    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || (!isUnactionableMentalModel(d) && !isDerivedMentalModel(d)))
+    (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d))
   ).length;
   const col2PushCount = filteredCol2.filter(
     (d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d))
@@ -846,7 +792,7 @@ export default function HindsightPage() {
           <select
             value={selectedObject}
             onChange={(e) => {
-              setSelectedObject(e.target.value as 'documents' | 'entities' | 'mental-models' | 'directives' | 'bank-settings');
+              setSelectedObject(e.target.value as 'documents' | 'entities' | 'mental-models' | 'directives');
               setDiffResult(null);
               setCounts(null);
               setSelectedIds(new Set());
@@ -857,7 +803,6 @@ export default function HindsightPage() {
             <option value="entities">Entities</option>
             <option value="mental-models">Mental Models</option>
             <option value="directives">Directives</option>
-            <option value="bank-settings">Bank Settings</option>
           </select>
         </div>
 
@@ -867,7 +812,7 @@ export default function HindsightPage() {
           className="inline-flex items-center gap-2 h-8 px-3 rounded text-sm font-medium bg-accent-primary-bg border border-accent-primary-bd text-accent-primary-fg hover:bg-accent-primary-bg-hover transition-colors disabled:opacity-50"
         >
           {loadingDiff ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
-          {loadingDiff ? 'Fetching...' : `Fetch ${selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : selectedObject === 'directives' ? 'Directives' : 'Bank Settings'}`}
+          {loadingDiff ? 'Fetching...' : `Fetch ${selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'}`}
         </Button>
 
         {counts && (
@@ -887,7 +832,7 @@ export default function HindsightPage() {
       {!diffResult && !loadingDiff && (
         <div className="text-center py-16 text-foreground-placeholder">
           <ArrowRightLeft className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">Select a server and bank, then click Fetch {selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : selectedObject === 'directives' ? 'Directives' : 'Bank Settings'} to start the comparison.</p>
+          <p className="text-sm">Select a server and bank, then click Fetch {selectedObject === 'documents' ? 'Documents' : selectedObject === 'entities' ? 'Entities' : selectedObject === 'mental-models' ? 'Mental Models' : 'Directives'} to start the comparison.</p>
         </div>
       )}
 
@@ -982,7 +927,7 @@ export default function HindsightPage() {
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                     />
                   ))
-                ) : isBankSettingsMode ? null : (
+                ) : (
                   filteredCol1.map((item) => (
                     <SyncRow
                       key={item.ext_id}
@@ -1028,7 +973,7 @@ export default function HindsightPage() {
                     if (ids.length === 0) return;
                     handleMakeLikeBank(ids);
                   }}
-                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || (!isUnactionableMentalModel(d) && !isDerivedMentalModel(d))))}
+                  disabled={!filteredCol2.some((d) => selectedIds.has(d.ext_id) && d.syncStatus === 'out_of_sync' && (!isMentalModelMode || !isUnactionableMentalModel(d)))}
                   className="inline-flex items-center justify-center gap-2 h-8 w-40 rounded text-sm font-medium bg-accent-tertiary-bg border border-accent-tertiary-bd text-accent-tertiary-fg hover:bg-accent-tertiary-bg transition-colors disabled:opacity-50 shrink-0"
                   >
                   <Download className="h-4 w-4" /> Pull from Bank{col2PullCount > 0 ? ` (${col2PullCount})` : ''}
@@ -1103,7 +1048,7 @@ export default function HindsightPage() {
                       divergence={item.divergence}
                       isSelected={isSelected(item.ext_id)}
                       onSelect={(checked) => toggleSelection(item.ext_id, checked)}
-                      showCheckbox={item.syncStatus === 'out_of_sync' && !isContextualMentalModel(item)}
+                      showCheckbox={item.syncStatus === 'out_of_sync' && !isUnactionableMentalModel(item)}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setMentalCompareId(item.ext_id)}
                     />
@@ -1121,20 +1066,6 @@ export default function HindsightPage() {
                       showCheckbox={item.syncStatus === 'out_of_sync'}
                       showCompare={item.syncStatus === 'out_of_sync'}
                       onCompare={() => setDirectiveCompareId(item.ext_id)}
-                    />
-                  ))
-                ) : isBankSettingsMode ? (
-                  filteredCol2.map((item) => (
-                    <BankSettingsSyncRow
-                      key={item.ext_id}
-                      arch={item.arch}
-                      hindsight={item.hindsight}
-                      divergence={item.divergence}
-                      isSelected={isSelected(item.ext_id)}
-                      onSelect={(checked) => toggleSelection(item.ext_id, checked)}
-                      showCheckbox={item.syncStatus === 'out_of_sync'}
-                      showCompare={item.syncStatus === 'out_of_sync'}
-                      onCompare={() => setBankSettingsCompareOpen(true)}
                     />
                   ))
                 ) : (
@@ -1237,7 +1168,7 @@ export default function HindsightPage() {
                     onSelect={(checked) => toggleSelection(item.ext_id, checked)}
                   />
                 ))
-              ) : isBankSettingsMode ? null : (
+              ) : (
                 filteredCol3.map((item) => (
                   <SyncRow
                     key={item.ext_id}
@@ -1302,20 +1233,6 @@ export default function HindsightPage() {
             isOpen={!!directiveCompareId}
             onClose={() => setDirectiveCompareId(null)}
             ext_id={directiveCompareId || ''}
-            arch={item?.arch}
-            hind={item?.hindsight}
-            divergence={item?.divergence}
-          />
-        );
-      })()}
-
-      {/* Bank Settings Compare Modal */}
-      {(() => {
-        const item = diffResult?.different?.find((d: any) => d.ext_id === 'bank-settings');
-        return (
-          <BankSettingsCompareModal
-            isOpen={bankSettingsCompareOpen}
-            onClose={() => setBankSettingsCompareOpen(false)}
             arch={item?.arch}
             hind={item?.hindsight}
             divergence={item?.divergence}

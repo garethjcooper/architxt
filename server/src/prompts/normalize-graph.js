@@ -153,8 +153,6 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
     const properties = e.properties && typeof e.properties === 'object' && !Array.isArray(e.properties)
       ? e.properties
       : undefined;
-    const evidence = normalizeEvidence(e.evidence);
-    warnIfShortEvidence(evidence, { from, to, type, label });
 
     const key = preserveParallelEdges ? `${from}|${to}|${type}|${edgeByKey.size}` : `${from}|${to}|${type}`;
     const provenance = deriveProvenance(from, to, activity, nodeById);
@@ -165,9 +163,8 @@ export function normalizeGraph(graph, { activity = 'reflect', knownCatalog = new
       existing.detail = mergeField(existing.detail, detail);
       existing.properties = mergeProperties(existing.properties, properties);
       existing.provenance = mergeProvenance(existing.provenance, provenance);
-      existing.evidence = mergeEvidence(existing.evidence, evidence);
     } else {
-      edgeByKey.set(key, { from, to, type, provenance, label, detail, properties, evidence });
+      edgeByKey.set(key, { from, to, type, provenance, label, detail, properties });
     }
   }
 
@@ -232,39 +229,6 @@ function mergeProvenance(a, b) {
   if (a === 'known' || b === 'known') return 'known';
   if (a === 'discovered' || b === 'discovered') return 'discovered';
   return a || b || 'known';
-}
-
-function normalizeEvidence(value) {
-  if (Array.isArray(value)) return value.filter((v) => typeof v === 'string' && v.length > 0);
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed ? [trimmed] : [];
-  }
-  return [];
-}
-
-const LIKELY_SHORT_ID_RE = /^[a-f0-9]{8}$/i;
-
-function warnIfShortEvidence(evidence, context) {
-  if (!Array.isArray(evidence)) return;
-  for (const id of evidence) {
-    if (typeof id === 'string' && LIKELY_SHORT_ID_RE.test(id)) {
-      logger.warn('Evidence ID looks like a truncated/short hash; model should emit the full Hindsight memory ID', { context, evidenceId: id });
-    }
-  }
-}
-
-function mergeEvidence(existing, incoming) {
-  const seen = new Set((existing || []).map((v) => String(v)));
-  const merged = Array.isArray(existing) ? existing.slice() : [];
-  for (const item of incoming || []) {
-    const s = String(item);
-    if (!seen.has(s)) {
-      merged.push(item);
-      seen.add(s);
-    }
-  }
-  return merged;
 }
 
 export function normalizeSlug(slug, fallbackName = '') {

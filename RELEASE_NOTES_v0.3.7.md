@@ -1,6 +1,6 @@
 # architxt v0.3.7 — post-v0.3.6 fixes
 
-This release contains fixes and improvements made on main after v0.3.6.
+This release contains fixes and improvements made on `main` after v0.3.6.
 
 ## Fixes
 

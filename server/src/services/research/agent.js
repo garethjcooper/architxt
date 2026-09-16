@@ -88,7 +88,7 @@ export async function runDiscoverStep(params) {
 
     const narratives = handlerResult.narratives || [];
     if (narratives.length === 0 && typeof handlerResult.narrative === 'string' && handlerResult.narrative) {
-      narratives.push({ narrative_name: '', narrative: handlerResult.narrative, evidence: [] });
+      narratives.push({ narrative_name: '', narrative: handlerResult.narrative });
     }
     const canvas = {
       ...EMPTY_CANVAS,

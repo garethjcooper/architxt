@@ -7,7 +7,7 @@
 
 import { createLogger } from '../../utils/logger.js';
 import { getServerConfig } from './config.js';
-import { createPendingOperation, findByOperationId } from '../../db/crud/pending-operations.js';
+import { createPendingOperation } from '../../db/crud/pending-operations.js';
 import {
   normaliseRefreshMode,
   normaliseTagsMatchMode,
@@ -50,13 +50,6 @@ function normalizeCsv(value) {
 function trackPendingOperation(db, serverId, bankId, extId, operationId, status, action) {
   if (!db || !operationId) {
     return { success: true, popId: null };
-  }
-
-  // Avoid duplicate rows when the same operation_id is reported by multiple
-  // Hindsight calls (e.g. push followed immediately by refresh).
-  const existing = findByOperationId(db, operationId);
-  if (existing?.success && existing.data) {
-    return { success: true, popId: existing.data.pop_id ?? null };
   }
 
   const pendingResult = createPendingOperation(db, {

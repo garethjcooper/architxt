@@ -214,8 +214,6 @@ describe('addContext', () => {
     const roles = node.cgn_properties.provenance.model_refs.map((r) => r.role).sort();
     assert.deepEqual(roles, ['sys_entity_capabilities', 'sys_entity_summary']);
     assert.equal(node.cgn_properties.provenance.source, 'contextual-graph');
-    assert.equal(node.cgn_properties.summary, undefined, 'entity-summary ref should not write summary');
-    assert.equal(node.cgn_properties.capabilities, undefined, 'entity-capabilities ref should not write capabilities');
   });
 
   it('does not queue a second discover model for a seed that already has one', async () => {

@@ -133,6 +133,7 @@ describe('cleanupOrphanedModels', () => {
 
     upsertNode(db, serverId, bankId, nodeId, ['candidate', 'active'], {
       display_name: 'Candidate Node',
+      summary: 'Generated summary',
       provenance: {
         model_refs: [
           { role: 'sys_entity_summary', ext_id: extId, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },
@@ -147,6 +148,7 @@ describe('cleanupOrphanedModels', () => {
     assert.equal(result.cleared.nodes, 1);
 
     const nodeResult = getNode(db, serverId, bankId, nodeId);
+    assert.equal(nodeResult.data.properties.summary, undefined);
     assert.equal(nodeResult.data.properties.provenance, undefined);
   });
 
@@ -211,6 +213,7 @@ describe('cleanupOrphanedModels', () => {
 
     upsertNode(db, serverId, bankId, nodeId, ['candidate', 'active'], {
       display_name: 'Candidate Node',
+      summary: 'Generated summary',
       provenance: {
         model_refs: [
           { role: 'sys_entity_summary', ext_id: extId, scope: { node_id: nodeId }, attached_at: '2026-01-01T00:00:00Z' },

@@ -1,13 +1,8 @@
 ### Graph generation rules
 
-The `graph` envelope section holds nodes and edges. Populate it only when the graph section is active; otherwise leave it exactly as `{"name":"","nodes":[],"edges":[]}`.
+The `graph` envelope section must contain a `name`, `nodes` array and `edges` array.
 
-**Exact title for this graph:** `{{ARCHITXT_GRAPH_NAME}}`. If empty, generate a short descriptive name (4–6 words) based on the content; otherwise use the exact title shown above with no changes.
-
-The `graph` object must contain:
 - `name`: a short human-readable identifier for the graph (used as its title/label when rendered). **This MUST be the exact title provided via `#graph-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If no name is provided, generate a short descriptive name (4–6 words) based on the graph's content.
-- `nodes`: array of node objects.
-- `edges`: array of edge objects.
 
 Node field rules:
 - `id`: stable working-graph id. Reuse the exact id from the topic or catalog. For genuinely new candidates not in the topic/catalog, use a lowercase hyphenated slug with no prefix.
@@ -33,7 +28,7 @@ Edge field rules:
   - `reliability`: retry, acknowledgement, idempotency, ordering, duplicate-handling, or delivery-semantics behavior.
   - `auth`: authentication / authorization mechanism (e.g., OAuth 2.0, mTLS, API key, mutual Kerberos, JWT, IP allowlist).
   - `encryption`: encryption in transit/rest, signing, or hashing (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed).
-- `evidence`: array of Hindsight memory IDs. Every emitted edge must include `evidence`; do not return edges that are not backed by at least one memory ID. Evidence IDs must be the **full, exact** Hindsight memory IDs as they appear in the source material. Do not truncate, shorten, hash, abbreviate, or invent IDs. If the source material does not support an interaction with a specific memory, omit the edge rather than returning an empty `evidence` array.
+- `evidence`: array of Hindsight memory IDs.
 - Do not include a `provenance` field on edges. The system derives edge provenance from the endpoint ids.
 - Multiple edges per node pair are allowed when the interactions differ by direction, type, or context. Do not collapse distinct interactions into a single combined edge.
 

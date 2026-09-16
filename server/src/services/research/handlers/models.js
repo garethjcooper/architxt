@@ -112,9 +112,8 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
         ? rawNarratives.map((n) => ({
           narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
           narrative: n.narrative,
-          evidence: Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [],
         }))
-        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative, evidence: [] }] : [];
+        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative }] : [];
       const tables = Array.isArray(content.tables) ? content.tables : [];
       const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
 
@@ -147,11 +146,11 @@ export async function handleModels(serverId, bankId, intentText, options = {}) {
       for (const n of item.narratives) {
         if (!n.narrative) continue;
         const name = n.narrative_name || `${item.name || item.ext_id}`;
-        narratives.push({ narrative_name: name, narrative: n.narrative, evidence: n.evidence && Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [] });
+        narratives.push({ narrative_name: name, narrative: n.narrative });
       }
     } else if (item.content) {
       const fallback = typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
-      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback, evidence: [] });
+      narratives.push({ narrative_name: item.name || item.ext_id, narrative: fallback });
     }
     if (item.graph && (item.graph.nodes.length > 0 || item.graph.edges.length > 0)) {
       graphs.push(item.graph);

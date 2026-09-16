@@ -253,17 +253,29 @@ export async function clearLocalModelData(db, serverId, bankId, removeSet, refs,
   return { nodes: nodesCleared, edges: edgesCleared };
 }
 
-function clearNodeRoleData(properties, _scopeMap, _nodeId, _disallowedRefsOnNode, _refs) {
+function clearNodeRoleData(properties, _scopeMap, nodeId, disallowedRefsOnNode, refs) {
   let changed = false;
 
-  // Legacy node-scoped roles used to produce summary and capabilities fields.
-  // Those fields are no longer persisted, but existing banks may still contain
-  // them. Remove them whenever a node is touched during cleanup.
-  const LEGACY_FIELDS = ['summary', 'capabilities'];
-  for (const field of LEGACY_FIELDS) {
-    if (properties[field] !== undefined) {
-      delete properties[field];
-      changed = true;
+  // Map node-scoped roles to the canonical fields they generate. When a role is
+  // disallowed, only the fields it owns are removed, so other allowed node
+  // scoped roles (e.g. capabilities) remain untouched.
+  const ROLE_FIELDS = {
+    sys_entity_summary: ['summary'],
+    sys_entity_capabilities: ['capabilities'],
+  };
+
+  const seenRoles = new Set(
+    disallowedRefsOnNode.map((extId) => refs.byExtId?.get(extId)?.role).filter(Boolean),
+  );
+
+  for (const role of seenRoles) {
+    const fields = ROLE_FIELDS[role];
+    if (!fields) continue;
+    for (const field of fields) {
+      if (properties[field] !== undefined) {
+        delete properties[field];
+        changed = true;
+      }
     }
   }
 

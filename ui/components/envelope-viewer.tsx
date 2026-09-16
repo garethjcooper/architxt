@@ -12,7 +12,6 @@ import { NarrativeFocusModal } from './narrative-focus-modal';
 import { TableFocusModal } from './table-focus-modal';
 import { GraphViewModal } from './graph-view-modal';
 import { DiagramFocusModal } from './diagram-focus-modal';
-import { EvidenceModal } from './evidence-modal';
 import type { NarrativeBlock } from './narrative-blocks';
 
 export type { EnvelopeCopyEvent };
@@ -40,22 +39,10 @@ export interface EnvelopeViewerProps {
   tabs?: React.ReactNode;
   /** Whether the left-hand section index sidebar is shown. */
   showIndex?: boolean;
-  /** Called when the section index visibility changes. */
-  onShowIndexChange?: (showIndex: boolean) => void;
-  /** Whether plain-text view is enabled. */
-  plain?: boolean;
-  /** Called when plain-text view is toggled. */
-  onPlainChange?: (plain: boolean) => void;
   /** Whether the floating data-controls panel is available. */
   showControls?: boolean;
-  /** Controlled sidebar width in pixels. Passed through to NarrativeViewer. */
-  sidebarWidth?: number;
-  /** Called when the sidebar width changes. Passed through to NarrativeViewer. */
-  onSidebarWidthChange?: (width: number) => void;
-  /** Optional server id used to resolve evidence. When provided with bankId and onShowEvidence, the viewer can open the evidence panel. */
-  serverId?: number;
-  /** Optional bank id used to resolve evidence. */
-  bankId?: string;
+  /** Initial rendering mode for the narrative. */
+  defaultViewMode?: 'plain' | 'markdown';
   /** Name used for downloaded file names. */
   sessionName?: string;
 }
@@ -68,14 +55,8 @@ export function EnvelopeViewer({
   keyPrefix,
   className = '',
   showIndex = false,
-  onShowIndexChange,
-  plain: plainProp,
-  onPlainChange,
   showControls = false,
-  sidebarWidth,
-  onSidebarWidthChange,
-  serverId,
-  bankId,
+  defaultViewMode = 'markdown',
   sessionName,
   onAddToPage,
   addToPageLabel,
@@ -86,29 +67,10 @@ export function EnvelopeViewer({
     const normalized = normalizeEnvelopeFromNullable(envelope);
     return buildEnvelopeMarkdown(normalized);
   }, [envelope]);
-  const [internalShowIndex, setInternalShowIndex] = useState(showIndex);
-  const [internalPlain, setInternalPlain] = useState(plainProp ?? false);
+  const [showIndexState, setShowIndexState] = useState(showIndex);
+  const [plain, setPlain] = useState(defaultViewMode === 'plain');
 
-  const effectiveShowIndex = onShowIndexChange ? showIndex : internalShowIndex;
-  const effectivePlain = onPlainChange ? (plainProp ?? false) : internalPlain;
-
-  const handleShowIndexChange = useCallback((checked: boolean) => {
-    if (onShowIndexChange) {
-      onShowIndexChange(checked);
-    } else {
-      setInternalShowIndex(checked);
-    }
-  }, [onShowIndexChange]);
-
-  const handlePlainChange = useCallback((checked: boolean) => {
-    if (onPlainChange) {
-      onPlainChange(checked);
-    } else {
-      setInternalPlain(checked);
-    }
-  }, [onPlainChange]);
-
-  const viewMode = effectivePlain ? 'plain' : 'markdown';
+  const viewMode = plain ? 'plain' : 'markdown';
   const effectiveSessionName = sessionName ?? title;
 
   const titleLabel = useMemo(() => {
@@ -126,12 +88,6 @@ export function EnvelopeViewer({
     | { kind: 'graph'; graph: { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] }; title?: string }
     | null
   >(null);
-
-  const [evidenceModal, setEvidenceModal] = useState<{ memoryIds: string[]; label: string } | null>(null);
-
-  const handleShowEvidence = useCallback((memoryIds: string[], label: string) => {
-    setEvidenceModal({ memoryIds, label });
-  }, []);
 
   const parseSyntheticHeading = useCallback((heading?: string): { kind: 'graph' | 'table' | 'diagram' | 'narrative'; name?: string } | null => {
     if (!heading) return null;
@@ -239,31 +195,6 @@ export function EnvelopeViewer({
     ? (event: EnvelopeCopyEvent) => onAddToPage(event)
     : undefined;
 
-  const resolveSectionEvidence = useCallback((heading: string): string[] => {
-    const parsed = parseSyntheticHeading(heading);
-    if (!parsed || !normalized) return [];
-    switch (parsed.kind) {
-      case 'narrative': {
-        const narrative = normalized.narratives?.find((n) => n.narrative_name?.trim() === parsed.name);
-        return narrative?.evidence ?? [];
-      }
-      case 'table': {
-        const table = normalized.tables?.find((t) => t.name === parsed.name);
-        return table?.evidence ?? [];
-      }
-      case 'diagram': {
-        const diagram = normalized.diagrams?.find((d) => d.name === parsed.name);
-        return diagram?.evidence ?? [];
-      }
-      case 'graph': {
-        const edges = normalized.graph?.edges ?? [];
-        return Array.from(new Set(edges.flatMap((e) => e.evidence ?? [])));
-      }
-      default:
-        return [];
-    }
-  }, [normalized, parseSyntheticHeading]);
-
   const resolveSectionCopy = useCallback(
     (heading: string, _level: number, contentMarkdown: string): EnvelopeCopyEvent | null => {
       const trimmed = heading.trim();
@@ -338,10 +269,10 @@ export function EnvelopeViewer({
           title={title}
           headerTitle={headerTitle}
           count={count}
-          showIndex={effectiveShowIndex}
-          onShowIndexChange={handleShowIndexChange}
-          plain={effectivePlain}
-          onPlainChange={handlePlainChange}
+          showIndex={showIndexState}
+          onShowIndexChange={setShowIndexState}
+          plain={plain}
+          onPlainChange={setPlain}
           onCopyText={handleCopy}
           onSaveMd={handleSave}
         />
@@ -352,7 +283,7 @@ export function EnvelopeViewer({
           content={markdown}
           title="Sections"
           viewMode={viewMode}
-          showIndex={effectiveShowIndex}
+          showIndex={showIndexState}
           onCopySection={handleCopySection}
           onAddToPage={handleAddSection}
           resolveSectionCopy={resolveSectionCopy}
@@ -360,11 +291,7 @@ export function EnvelopeViewer({
           addToPageLabel={addToPageLabel}
           keyPrefix={keyPrefix}
           className="h-full"
-          sidebarWidth={sidebarWidth}
-          onSidebarWidthChange={onSidebarWidthChange}
           onFocusSection={handleFocusSection}
-          resolveSectionEvidence={resolveSectionEvidence}
-          onShowEvidence={handleShowEvidence}
         />
       </div>
       {focus?.kind === 'narrative' && (
@@ -402,14 +329,6 @@ export function EnvelopeViewer({
           readOnly
         />
       )}
-      <EvidenceModal
-        open={evidenceModal != null}
-        onOpenChange={(open) => { if (!open) setEvidenceModal(null); }}
-        sectionTitle={evidenceModal?.label ?? ''}
-        serverId={serverId}
-        bankId={bankId}
-        memoryIds={evidenceModal?.memoryIds ?? []}
-      />
     </div>
   );
 }

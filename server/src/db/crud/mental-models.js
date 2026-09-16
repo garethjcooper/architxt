@@ -1323,6 +1323,14 @@ export const batchUpdateMentalModelEntities = (db, mmIds, entitiesToAdd, entitie
  */
 export const batchUpdateMentalModelConfig = (db, mmIds, config) => dbExec(() => {
   const ids = mmIds.map((id) => requireInt('mm_id', id));
+  for (const mId of ids) {
+    const guard = getMentalModelSystemTemplateGuard(db, mId, 'modified: system templates are configured by the system');
+    if (guard.blocked) {
+      const err = new Error(guard.error);
+      err.code = guard.code;
+      throw err;
+    }
+  }
 
   const updates = [];
   const values = [];

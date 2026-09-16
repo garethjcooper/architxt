@@ -121,52 +121,6 @@ const SMART_QUOTES = {
   '\uFEFF': '',  // zero-width no-break space (BOM handled separately, but be defensive)
 };
 
-const LIKELY_SHORT_ID_RE = /^[a-f0-9]{8}$/i;
-const UUID_RE = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
-const UUID_ONLY_RE = new RegExp(UUID_RE, 'gi');
-const BRACKETED_EVIDENCE_RE = new RegExp(`【\\s*(${UUID_RE})\\s*】`, 'gi');
-const PARENTHESIZED_EVIDENCE_RE = new RegExp(`\\(\\s*(?:${UUID_RE}(?:\\s*,\\s*)?)+\\s*\\)`, 'gi');
-
-function warnIfShortEvidence(evidence, context) {
-  if (!Array.isArray(evidence)) return;
-  for (const id of evidence) {
-    if (typeof id === 'string' && LIKELY_SHORT_ID_RE.test(id)) {
-      logger.warn('Evidence ID looks like a truncated/short hash; model should emit the full Hindsight memory ID', { context, evidenceId: id });
-    }
-  }
-}
-
-/**
- * Remove inline Hindsight memory IDs from narrative prose, whether bracketed
- * (【...】) or parenthesized (uuid, uuid). Any full UUIDs found inline are
- * extracted and added to the evidence array so the data is not lost.
- */
-function cleanInlineEvidence(narrative, evidence) {
-  if (typeof narrative !== 'string') return { narrative: '', evidence };
-  const found = new Set(evidence);
-  const extractBracketed = (match, id) => {
-    found.add(id.toLowerCase());
-    return '';
-  };
-  const extractParenthesized = (match) => {
-    const ids = match.match(UUID_ONLY_RE) || [];
-    for (const id of ids) {
-      found.add(id.toLowerCase());
-    }
-    return '';
-  };
-  let cleaned = narrative.replace(BRACKETED_EVIDENCE_RE, extractBracketed);
-  cleaned = cleaned.replace(PARENTHESIZED_EVIDENCE_RE, extractParenthesized);
-  // Also collapse any leftover empty brackets/parentheses or multiple spaces left behind.
-  const tidy = cleaned
-    .replace(/【\s*】/g, '')
-    .replace(/\(\s*\)/g, '')
-    .replace(/\s+([.,;:!?\)\]\}】])/g, '$1')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  return { narrative: tidy, evidence: Array.from(found) };
-}
-
 function sanitizeJsonText(text) {
   return text
     .replace(/^\uFEFF/, '')
@@ -249,6 +203,88 @@ function preprocessModelText(text) {
   return fixUnescapedControlChars(stripMarkdownHeadings(stripOuterCodeFences(text)));
 }
 
+/**
+ * Detect a Markdown table anywhere in the text.
+ */
+function looksLikeMarkdownTable(text) {
+  return /^\s*\|.*\|\s*$/m.test(text) && /^\s*\|[-:\s|]+\|\s*$/m.test(text);
+}
+
+function extractProseBeforeTable(text) {
+  const tableStart = text.search(/^\s*\|.*\|\s*$/m);
+  if (tableStart === -1) return '';
+  return text.slice(0, tableStart).replace(/^#{1,6}\s+/gm, '').trim();
+}
+
+/**
+ * Parse a Markdown table into the normalized table shape.
+ * Column names are normalized and mapped onto the canonical capability columns.
+ */
+function parseMarkdownTable(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const rows = [];
+  let rawColumns = [];
+  let foundHeader = false;
+  for (const line of lines) {
+    if (!line.startsWith('|') || !line.endsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (!foundHeader) {
+      if (cells.some((c) => /^[-:\s]+$/.test(c))) {
+        foundHeader = true;
+        continue;
+      }
+      rawColumns = cells;
+      continue;
+    }
+    if (cells.some((c) => /^[-:\s]+$/.test(c))) continue;
+
+    const row = {};
+    rawColumns.forEach((rawCol, idx) => {
+      const key = canonicalCapabilityColumn(rawCol);
+      if (!key) return;
+      const cell = cells[idx] ?? '';
+      if (key === 'evidence') {
+        row[key] = cell ? cell.split(/,\s*/).filter(Boolean) : [];
+      } else {
+        row[key] = cell;
+      }
+    });
+    rows.push(row);
+  }
+
+  if (rawColumns.length === 0 || rows.length === 0) return null;
+
+  const columns = CANONICAL_CAPABILITY_COLUMNS.filter((c) => rows.some((r) => Object.prototype.hasOwnProperty.call(r, c)));
+  if (columns.length === 0) return null;
+
+  return { name: 'capabilities', columns, rows };
+}
+
+const CANONICAL_CAPABILITY_COLUMNS = ['name', 'responsibility', 'purpose', 'business_capability_mapping', 'evidence'];
+
+const CAPABILITY_COLUMN_ALIASES = {
+  capability: 'name',
+  capability_name: 'name',
+  name: 'name',
+  responsibility: 'responsibility',
+  resp: 'responsibility',
+  purpose: 'purpose',
+  business_capability_mapping: 'business_capability_mapping',
+  business_capability: 'business_capability_mapping',
+  mapping: 'business_capability_mapping',
+  evidence: 'evidence',
+  evidence_ids: 'evidence',
+  source: 'evidence',
+};
+
+function canonicalCapabilityColumn(raw) {
+  const normalized = String(raw || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return CAPABILITY_COLUMN_ALIASES[normalized] || null;
+}
+
 function inferNarrativeName(narrative) {
   if (typeof narrative !== 'string') return '';
   // 1. First markdown heading.
@@ -301,20 +337,15 @@ export function normalizeEnvelopeForApi(envelope) {
 
 export function normalizeNarrative(n) {
   if (!n || typeof n !== 'object' || Array.isArray(n)) return null;
-  const rawNarrative = typeof n.narrative === 'string' ? n.narrative : '';
+  const narrative = typeof n.narrative === 'string' ? n.narrative : '';
   let narrative_name = typeof n.narrative_name === 'string' ? n.narrative_name : '';
-  if (!narrative_name && rawNarrative) {
-    narrative_name = inferNarrativeName(rawNarrative);
+  if (!narrative_name && narrative) {
+    narrative_name = inferNarrativeName(narrative);
   }
-  if (!narrative_name && rawNarrative) {
+  if (!narrative_name && narrative) {
     narrative_name = 'Narrative';
   }
-  const evidence = Array.isArray(n.evidence)
-    ? n.evidence.filter((id) => typeof id === 'string')
-    : [];
-  const { narrative, evidence: cleanedEvidence } = cleanInlineEvidence(rawNarrative, evidence);
-  warnIfShortEvidence(cleanedEvidence, { narrative: narrative_name || 'unnamed' });
-  return { narrative_name, narrative, evidence: cleanedEvidence };
+  return { narrative_name, narrative };
 }
 
 function normalizeNode(n) {
@@ -355,53 +386,19 @@ function normalizeTable(t) {
   const columns = Array.isArray(t.columns) ? t.columns.filter((c) => typeof c === 'string') : [];
   const rows = Array.isArray(t.rows) ? t.rows.filter((r) => r && typeof r === 'object') : [];
   if (!name) return null;
-  let evidence = Array.isArray(t.evidence)
-    ? t.evidence.filter((id) => typeof id === 'string')
-    : [];
-  // Backfill table-level evidence from row-level evidence when the model leaves
-  // the table-level array empty but rows are backed by evidence.
-  if (evidence.length === 0 && rows.length > 0) {
-    evidence = deriveTableEvidenceFromRows(rows);
-  }
-  warnIfShortEvidence(evidence, { table: name });
-  return { name, columns, rows, evidence };
-}
-
-/**
- * Derive table-level evidence as the sorted, deduplicated union of all row-level
- * evidence arrays. Returns an empty array if no rows carry evidence.
- */
-function deriveTableEvidenceFromRows(rows) {
-  const ids = new Set();
-  for (const row of rows) {
-    if (Array.isArray(row.evidence)) {
-      for (const id of row.evidence) {
-        if (typeof id === 'string') ids.add(id.toLowerCase());
-      }
-    }
-  }
-  return Array.from(ids).sort();
+  return { name, columns, rows };
 }
 
 function normalizeDiagram(d) {
   if (!d || typeof d !== 'object') return null;
   const name = typeof d.name === 'string' && d.name.length > 0 ? d.name : null;
   const type = typeof d.type === 'string' && d.type.length > 0 ? d.type : null;
-  let content = typeof d.content === 'string' ? d.content.trim() : '';
+  const content = typeof d.content === 'string' ? d.content.trim() : '';
   if (!name) return null;
   if (!type) return null;
   if (!MERMAID_DIAGRAM_TYPES.includes(type)) return null;
   if (!content) return null;
-
-  // Models sometimes emit the literal two-character sequence \n instead of real
-  // newlines. Repair that so Mermaid receives proper line breaks.
-  content = content.replace(/\\n/g, '\n');
-
-  const evidence = Array.isArray(d.evidence)
-    ? d.evidence.filter((id) => typeof id === 'string')
-    : [];
-  warnIfShortEvidence(evidence, { diagram: name });
-  return { name, type, content, evidence };
+  return { name, type, content };
 }
 
 function dropIsolatedNodes(nodes, edges) {
@@ -439,28 +436,37 @@ export function normalizeModelOutput(raw) {
 
   const preprocessed = preprocessModelText(rawString);
 
-  // 1. Try direct JSON.parse on the preprocessed text.
-  let preprocessedJsonText = null;
+  // 1. Try direct JSON.parse on the whole string (after stripping fences, headings, smart quotes).
   try {
-    preprocessedJsonText = sanitizeJsonText(preprocessed);
-    parsed = JSON.parse(preprocessedJsonText);
+    jsonText = unescapeStringifiedJson(sanitizeJsonText(preprocessed));
+    parsed = JSON.parse(jsonText);
   } catch {
-    // 2. Fallback: the model may have wrapped the JSON as a string-escaped literal.
-    const unescapedJsonText = unescapeStringifiedJson(preprocessedJsonText || sanitizeJsonText(preprocessed));
-    try {
-      parsed = JSON.parse(unescapedJsonText);
-      jsonText = unescapedJsonText;
-    } catch {
-      // 3. Last fallback: find the first balanced JSON object that actually parses.
-      const extracted = extractValidJson(unescapeStringifiedJson(sanitizeJsonText(preprocessed)));
-      if (extracted) {
-        try {
-          parsed = JSON.parse(extracted);
-          jsonText = extracted;
-        } catch (err) {
-          errors.push(`Failed to parse extracted JSON: ${err.message}`);
-        }
+    // 2. Fallback: find the first balanced JSON object that actually parses.
+    const extracted = extractValidJson(unescapeStringifiedJson(sanitizeJsonText(preprocessed)));
+    if (extracted) {
+      try {
+        parsed = JSON.parse(extracted);
+        jsonText = extracted;
+      } catch (err) {
+        errors.push(`Failed to parse extracted JSON: ${err.message}`);
       }
+    }
+  }
+
+  // 3. If still no envelope but the content looks like a Markdown table, synthesize
+  //    a minimal envelope with the table under `tables`. Log a warning because the
+  //    model ignored the required JSON envelope.
+  if (!parsed && looksLikeMarkdownTable(preprocessed)) {
+    const table = parseMarkdownTable(preprocessed);
+    if (table) {
+      logger.warn('Model output ignored JSON envelope and returned a Markdown table; synthesizing envelope', { tableName: table.name, rows: table.rows.length });
+      parsed = {
+        narratives: [{ narrative_name: '', narrative: extractProseBeforeTable(preprocessed) }],
+        graph: { nodes: [], edges: [] },
+        tables: [table],
+        diagrams: [],
+      };
+      jsonText = JSON.stringify(parsed);
     }
   }
 

@@ -50,7 +50,7 @@ describe('applyModelOutput', () => {
     db = createDb();
   });
 
-  it('applies entity summary model ref to a node without persisting summary', async () => {
+  it('applies entity summary to a node', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
     const output = normalizeModelOutput(JSON.stringify({
       narratives: [{ narrative: 'Handles customer billing.' }],
@@ -64,8 +64,7 @@ describe('applyModelOutput', () => {
     assert.equal(result.applied.nodeId, 'svc-001');
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.summary, undefined);
-    assert.equal(node.properties.capabilities, undefined);
+    assert.equal(node.properties.summary, 'Handles customer billing.');
     assert.equal(node.properties.provenance.source, 'contextual-graph');
     assert.equal(node.properties.provenance.model_refs.length, 1);
     assert.equal(node.properties.provenance.model_refs[0].role, 'sys_entity_summary');
@@ -73,7 +72,7 @@ describe('applyModelOutput', () => {
     assert.ok(node.properties.provenance.model_refs[0].content_hash);
   });
 
-  it('applies entity capabilities model ref to a node without persisting capabilities', async () => {
+  it('applies entity capabilities to a node', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
     const output = normalizeModelOutput(JSON.stringify({
       narratives: [],
@@ -90,9 +89,9 @@ describe('applyModelOutput', () => {
     assert.equal(result.applied.nodeId, 'svc-001');
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.summary, undefined);
-    assert.equal(node.properties.capabilities, undefined);
-    assert.equal(node.properties.provenance.model_refs[0].role, 'sys_entity_capabilities');
+    assert.equal(node.properties.capabilities.length, 1);
+    assert.equal(node.properties.capabilities[0].name, 'billing');
+    assert.deepEqual(node.properties.capabilities[0].evidence, ['mem-1']);
   });
 
   it('applies edge context to matching edges', async () => {
@@ -511,7 +510,7 @@ describe('applyModelOutput', () => {
     assert.equal(output.tables[0].rows[0].name, 'Adjustments');
   });
 
-  it('applies a custom node-scoped template role generically without persisting summary', async () => {
+  it('applies a custom node-scoped template role generically', async () => {
     createTemplateRole(db, { role_id: 'software_tech_stack', display_name: 'Software Tech Stack', derivation_scope: 'node' });
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], { display_name: 'Billing Service' });
 
@@ -535,7 +534,7 @@ describe('applyModelOutput', () => {
     assert.equal(result.applied.nodeId, 'svc-001');
 
     const node = getNode(db, serverId, bankId, 'svc-001').data;
-    assert.equal(node.properties.summary, undefined);
+    assert.equal(node.properties.summary, 'Node.js, PostgreSQL, Redis.');
     assert.equal(node.properties.provenance.source, 'contextual-graph');
     assert.equal(node.properties.provenance.model_refs.length, 1);
     assert.equal(node.properties.provenance.model_refs[0].role, 'software_tech_stack');

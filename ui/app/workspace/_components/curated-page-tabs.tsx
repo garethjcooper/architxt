@@ -193,10 +193,22 @@ export function CuratedPageTabs({
           type="button"
           onClick={() => onSaveActivePage?.()}
           disabled={!activeCuratedTab || !activePageDirty}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-accent-primary-fg hover:bg-accent-primary-bg-hover hover:border-accent-primary-bd disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-border-default transition-colors"
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-accent-primary-fg hover:bg-accent-primary-bg-hover hover:border-accent-primary-bd disabled:opacity-30 transition-colors"
           title="Save active page"
         >
           <Save className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!activeCuratedTab?.stepId) return;
+            setConfirmDelete({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
+          }}
+          disabled={!activeCuratedTab}
+          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 transition-colors"
+          title="Delete active page"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
@@ -209,18 +221,6 @@ export function CuratedPageTabs({
           title="Rename active page"
         >
           <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!activeCuratedTab?.stepId) return;
-            setConfirmDelete({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
-          }}
-          disabled={!activeCuratedTab}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-destructive-fg hover:bg-destructive-bg-hover hover:border-destructive-bd disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-border-default transition-colors"
-          title="Delete active page"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"

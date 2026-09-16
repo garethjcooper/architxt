@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Eye, Trash2, Undo2, Loader2, FileSearch, FileText } from 'lucide-react';
+import { Eye, Trash2, Undo2, Loader2 } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, getSectionBlockIds, buildNarrativeBlocks, type NarrativeBlock } from '@/components/narrative-blocks';
 import { GraphViewModal } from '@/components/graph-view-modal';
 import { TableFocusModal } from '@/components/table-focus-modal';
 import { NarrativeFocusModal } from '@/components/narrative-focus-modal';
-import { EvidenceModal } from '@/components/evidence-modal';
 import { DiagramFocusModal } from '@/components/diagram-focus-modal';
 import {
   Dialog,
@@ -64,24 +63,8 @@ export interface CuratedPageEditorProps {
   readOnly?: boolean;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
-  /** Optional server id used to resolve evidence. */
-  serverId?: number;
-  /** Optional bank id used to resolve evidence. */
-  bankId?: string;
   /** Optional override for the header bar title. Defaults to the page title. */
   headerTitle?: string;
-  /** Whether the section index sidebar is shown. */
-  showIndex?: boolean;
-  /** Called when the section index visibility changes. */
-  onShowIndexChange?: (showIndex: boolean) => void;
-  /** Whether plain-text view is enabled. */
-  plain?: boolean;
-  /** Called when plain-text view is toggled. */
-  onPlainChange?: (plain: boolean) => void;
-  /** Controlled sidebar width in pixels. Passed through to NarrativeViewer. */
-  sidebarWidth?: number;
-  /** Called when the sidebar width changes. Passed through to NarrativeViewer. */
-  onSidebarWidthChange?: (width: number) => void;
   /** Called when the dirty state changes so the parent can enable/disable a global Save control. */
   onDirtyChange?: (dirty: boolean) => void;
   /** Increment to trigger a save from the parent. */
@@ -105,20 +88,12 @@ export function CuratedPageEditor({
   onSave,
   readOnly = false,
   tabs,
-  serverId,
-  bankId,
   headerTitle,
   onDirtyChange,
   saveTrigger,
   initialDeletedBlockIds,
   initialDeletedStructuredKeys,
   onChange,
-  showIndex: showIndexProp,
-  onShowIndexChange,
-  plain: plainProp,
-  onPlainChange,
-  sidebarWidth,
-  onSidebarWidthChange,
 }: CuratedPageEditorProps) {
   const envelope = useMemo(() => normalizeEnvelope(page), [page]);
   const displayMarkdown = useMemo(() => buildEnvelopeMarkdown(envelope), [envelope]);
@@ -139,42 +114,13 @@ export function CuratedPageEditor({
   }, [narrativeBlocks, structuredBlocks]);
   const [deletedBlockIds, setDeletedBlockIds] = useState<Set<string>>(new Set(initialDeletedBlockIds ?? []));
   const [deletedStructuredKeys, setDeletedStructuredKeys] = useState<Set<string>>(new Set(initialDeletedStructuredKeys ?? []));
-  const [showIndex, setShowIndex] = useState(showIndexProp ?? true);
-  const [plain, setPlain] = useState(plainProp ?? false);
-
-  useEffect(() => {
-    if (showIndexProp !== undefined) setShowIndex(showIndexProp);
-  }, [showIndexProp]);
-
-  useEffect(() => {
-    if (plainProp !== undefined) setPlain(plainProp);
-  }, [plainProp]);
-
-  const effectiveShowIndex = onShowIndexChange ? (showIndexProp ?? true) : showIndex;
-  const effectivePlain = onPlainChange ? (plainProp ?? false) : plain;
-
-  const handleShowIndexChange = useCallback((checked: boolean) => {
-    if (onShowIndexChange) {
-      onShowIndexChange(checked);
-    } else {
-      setShowIndex(checked);
-    }
-  }, [onShowIndexChange]);
-
-  const handlePlainChange = useCallback((checked: boolean) => {
-    if (onPlainChange) {
-      onPlainChange(checked);
-    } else {
-      setPlain(checked);
-    }
-  }, [onPlainChange]);
-
+  const [showIndex, setShowIndex] = useState(true);
+  const [plain, setPlain] = useState(false);
   const [saving, setSaving] = useState(false);
   const [focusedDiagram, setFocusedDiagram] = useState<{ block: NarrativeBlock; name: string; content: string } | null>(null);
   const [focusedGraph, setFocusedGraph] = useState<{ block: NarrativeBlock; name?: string } | null>(null);
   const [focusedTable, setFocusedTable] = useState<{ block: NarrativeBlock; name: string } | null>(null);
   const [focusedNarrativeIndex, setFocusedNarrativeIndex] = useState<number | null>(null);
-  const [evidenceModal, setEvidenceModal] = useState<{ memoryIds: string[]; label: string } | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -263,7 +209,7 @@ export function CuratedPageEditor({
     });
   }, [workingEnvelope, isDirty, deletedBlockIds, deletedStructuredKeys, onChange]);
 
-  const viewMode = effectivePlain ? 'plain' : 'markdown';
+  const viewMode = plain ? 'plain' : 'markdown';
   const pageTitle = useMemo(() => getPageTitle(page), [page]);
 
   const handleSave = useCallback(async () => {
@@ -450,35 +396,6 @@ export function CuratedPageEditor({
     setFocusedTable({ block: b, name: table.name });
   }, [envelope.tables]);
 
-  const resolveSectionEvidence = useCallback((heading: string): string[] => {
-    const parsed = parseSyntheticHeading(heading);
-    if (!parsed) return [];
-    switch (parsed.kind) {
-      case 'narrative': {
-        const narrative = envelope.narratives?.find((n) => n.narrative_name?.trim() === parsed.name);
-        return narrative?.evidence ?? [];
-      }
-      case 'table': {
-        const table = envelope.tables?.find((t) => t.name === parsed.name);
-        return table?.evidence ?? [];
-      }
-      case 'diagram': {
-        const diagram = envelope.diagrams?.find((d) => d.name === parsed.name);
-        return diagram?.evidence ?? [];
-      }
-      case 'graph': {
-        const edges = envelope.graph?.edges ?? [];
-        return Array.from(new Set(edges.flatMap((e) => e.evidence ?? [])));
-      }
-      default:
-        return [];
-    }
-  }, [envelope]);
-
-  const handleShowEvidence = useCallback((memoryIds: string[], label: string) => {
-    setEvidenceModal({ memoryIds, label });
-  }, []);
-
   const openNarrativeFocus = useCallback((b: NarrativeBlock) => {
     const parsed = parseSyntheticHeading(b.title);
     if (parsed?.kind === 'narrative' && parsed.name) {
@@ -503,10 +420,9 @@ export function CuratedPageEditor({
     const updatedDiagrams = [...envelope.diagrams];
     const diagramIndex = updatedDiagrams.findIndex((d) => d.name === oldName);
     if (diagramIndex >= 0) {
-      const existingEvidence = updatedDiagrams[diagramIndex].evidence ?? [];
-      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], name: newName, content: newContent, evidence: existingEvidence };
+      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], name: newName, content: newContent };
     } else {
-      updatedDiagrams.push({ name: newName, type: 'flowchart', content: newContent, evidence: [] });
+      updatedDiagrams.push({ name: newName, type: 'flowchart', content: newContent });
     }
 
     // If the name changed, update the synthetic heading key so the section isn't orphaned.
@@ -531,10 +447,10 @@ export function CuratedPageEditor({
       <EnvelopeControls
         title={pageTitle}
         headerTitle={headerTitle}
-        showIndex={effectiveShowIndex}
-        onShowIndexChange={handleShowIndexChange}
-        plain={effectivePlain}
-        onPlainChange={handlePlainChange}
+        showIndex={showIndex}
+        onShowIndexChange={setShowIndex}
+        plain={plain}
+        onPlainChange={setPlain}
         onCopyText={handleCopy}
         onSaveMd={handleDownload}
         extraHeaderItems={
@@ -553,9 +469,7 @@ export function CuratedPageEditor({
           blocks={displayedBlocks}
           title="Sections"
           viewMode={viewMode}
-          showIndex={effectiveShowIndex}
-          sidebarWidth={sidebarWidth}
-          onSidebarWidthChange={onSidebarWidthChange}
+          showIndex={showIndex}
           keyPrefix="curated"
           className="h-full"
           renderSidebarRowActions={(b) => {
@@ -568,23 +482,8 @@ export function CuratedPageEditor({
             const isTable = parsed?.kind === 'table';
             const isNarrative = b.type === 'heading' && (!b.synthetic || parsed?.kind === 'narrative');
             const canFocus = isText || isNarrative || isDiagram || isGraph || isTable;
-            const evidenceIds = resolveSectionEvidence(b.title ?? '');
             return (
-              <div className="flex items-center gap-0.5 max-w-0 overflow-hidden group-hover/copy:max-w-fit focus-within:max-w-fit transition-[max-width]">
-                {evidenceIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleShowEvidence(evidenceIds, b.title || 'Section');
-                    }}
-                    className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
-                    title="Evidence"
-                    aria-label="Evidence"
-                  >
-                    <FileSearch className="h-3 w-3" />
-                  </button>
-                )}
+              <div className="flex items-center gap-0.5 opacity-0 group-hover/copy:opacity-100 focus-within:opacity-100 transition-opacity">
                 {canFocus && !isDeleted && (
                   <button
                     type="button"
@@ -647,9 +546,7 @@ export function CuratedPageEditor({
             if (ev.type === 'diagrams') {
               const parsed = JSON.parse(ev.payload);
               const existingNames = new Set(envelope.diagrams.map((d) => d.name));
-              const newDiagrams = parsed
-                .filter((d: { name: string }) => !existingNames.has(d.name))
-                .map((d: any) => ({ ...d, evidence: d.evidence ?? [] }));
+              const newDiagrams = parsed.filter((d: { name: string }) => !existingNames.has(d.name));
               if (newDiagrams.length === 0) return;
               const nextEnvelope = { ...envelope, diagrams: [...envelope.diagrams, ...newDiagrams] };
               onChange?.({
@@ -715,9 +612,9 @@ export function CuratedPageEditor({
           const existing = envelope.narratives ?? [];
           const idx = focusedNarrativeIndex ?? 0;
           const nextNarratives: UnifiedNarrativeBlock[] =
-          existing.length > 0
-            ? existing.map((n, i) => (i === idx ? { narrative_name: parsed.name, narrative: parsed.content, evidence: n.evidence ?? [] } : n))
-            : [{ narrative_name: parsed.name, narrative: parsed.content, evidence: [] }];
+            existing.length > 0
+              ? existing.map((n, i) => (i === idx ? { narrative_name: parsed.name, narrative: parsed.content } : n))
+              : [{ narrative_name: parsed.name, narrative: parsed.content }];
           const nextEnvelope = { ...envelope, narratives: nextNarratives };
           onChange?.({
             envelope: nextEnvelope,
@@ -726,14 +623,6 @@ export function CuratedPageEditor({
             deletedStructuredKeys: Array.from(deletedStructuredKeys),
           });
         }}
-      />
-      <EvidenceModal
-        open={evidenceModal != null}
-        onOpenChange={(open) => { if (!open) setEvidenceModal(null); }}
-        sectionTitle={evidenceModal?.label ?? ''}
-        serverId={serverId}
-        bankId={bankId}
-        memoryIds={evidenceModal?.memoryIds ?? []}
       />
     </div>
   );

@@ -390,7 +390,6 @@ export default function ContextManagerPage() {
     const containerWidth = containerWidthRef.current;
     if (containerWidth > 0) {
       const deltaFlex = (deltaX / containerWidth) * 5;
-      // Natural splitter: dragging the handle toward a side expands that side.
       const nextLeftFlex = Math.min(Math.max(startLeftFlexRef.current + deltaFlex, 0.5), 4.5);
       setLeftFlex(nextLeftFlex);
     }
@@ -450,10 +449,6 @@ export default function ContextManagerPage() {
     const provenance = selectedItem.properties.provenance || {};
     const rawStored = { ...selectedItem.properties };
     delete rawStored.provenance;
-    // Legacy node-scoped models produced summary/capabilities fields that we no
-    // longer persist or display. Filter them out from the "Stored data" panel.
-    delete rawStored.summary;
-    delete rawStored.capabilities;
 
     return (
       <div className="h-full overflow-y-auto p-4 space-y-4">

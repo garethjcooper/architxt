@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: architxt:0.3.8
+    image: architxt:0.3.7
     container_name: architxt
     ports:
       - "3000:3000"

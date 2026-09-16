@@ -58,14 +58,12 @@ export async function handlePrebuilt(serverId, bankId, query, options = {}) {
     finalNarratives.push({
       narrative_name: '',
       narrative: `_No mental model found for: ${missingEntityIds.join(', ')}_`,
-      evidence: [],
     });
   }
   if (finalNarratives.length === 0) {
     finalNarratives.push({
       narrative_name: '',
       narrative: `Found mental-model data for ${graph.nodes.length} nodes and ${graph.edges.length} edges.`,
-      evidence: [],
     });
   }
 
