@@ -31,8 +31,6 @@ const config: Config = {
         docs: {
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
-          editUrl:
-            'http://192.168.1.201:30142/team-oc/architxt/-/blob/feat/docv1/architxt-docs/',
         },
         blog: false,
         theme: {
@@ -91,6 +89,15 @@ const config: Config = {
             {
               label: 'GitHub',
               href: 'https://github.com/garethjcooper/architxt',
+            },
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
+            {
+              label: 'Discord',
+              href: 'https://discord.gg/qYhBhmCzmX',
             },
           ],
         },

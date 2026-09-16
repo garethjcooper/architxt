@@ -1,0 +1,284 @@
+---
+sidebar_position: 3
+---
+
+# Mental Models
+
+A mental model in architxt is a reusable query recipe. It describes what you want to know (**Source Query**), how much answer you want (**Max Tokens**), how it should be refreshed, and which documents it should draw from. Mental models are the building blocks for workspaces, curated pages, and Hindsight memory bank sync.
+
+Mental models live in the `mental_models` table in SQLite. The route layer is `server/src/routes/mental-models.js` and the CRUD layer is `server/src/db/crud/mental-models.js`.
+
+## Mental model data and settings
+
+The following fields are shown when you create or edit a mental model in the architxt UI. Each field has an internal API name in parentheses.
+
+| UI label | API name | Purpose |
+|---|---|---|
+| **External ID** | `ext_id` | Stable identifier. Must be unique and is used when syncing to Hindsight. |
+| **Name** | `name` | Display name. |
+| **Source Query** | `source_query` | The actual request text sent to the model. |
+| **Template Role** | `template_role` | Optional role for contextual-graph templates. |
+| **Refresh Mode** | `refresh_mode` | `Full` rebuild or `Delta` incremental update. |
+| **Tags Match** | `tags_match_mode` | How document tags must match the model's tags. |
+| **Refresh after consolidation** | `refresh_after_consolidation` | Run a refresh once memory consolidation completes. |
+| **Exclude All Mental Models** | `exclude_all_mental_models` | Hide every other mental model from this one during refresh. |
+| **Exclude List** | `exclude_mental_model_list` | Comma-separated list of other mental model IDs to exclude. |
+| **Max Tokens** | `max_tokens` | Answer token budget. Allowed range: 1–8192. |
+| **Entity Template** | `is_template` | Derive one mental model per related entity. |
+
+### Refresh Mode
+
+- **Full** — Rebuild the answer from scratch.
+- **Delta** — Update only what changed since the last run.
+
+### Tags Match
+
+| Mode | Meaning |
+|---|---|
+| **All Strict** | Every document must match all of the model's tags. |
+| **Any Strict** | Documents must match at least one tag, and every model tag must be represented. |
+| **All** | Documents must match all tags, but unused model tags are allowed. |
+| **Any** | Documents matching any model tag are included. |
+| **Exact** | Only documents with exactly the same tag set are included. |
+
+### Managing settings in bulk
+
+The **Mental Models** page and the **Contextual Graph → Mental Models** tab both let you select one or more models and open **Manage Model Configuration**. The dialog shows one row per setting:
+
+- **Refresh Mode**
+- **Refresh After Consolidation**
+- **Exclude All Mental Models**
+- **Tags Match**
+- **Max Tokens**
+
+Check the fields you want to change, choose the new value, and click **Save Changes**. The UI tells you how many models will change and how many derived instance overrides will be aligned.
+
+## Tags and entities
+
+A mental model can have:
+
+- **Tags** — Narrow which documents feed the model. Use the **Tags** button on the **Mental Models** page to add or remove tags in bulk.
+- **Entities** — Attach specific entities from architxt's contextual graph. Use the **Entities** button to manage them. Entities are used by templates to generate derived models per entity.
+
+Entities attached to a template carry the parent model's configuration by default, but each attachment can override:
+
+- **Refresh Mode**
+- **Refresh after consolidation**
+- **Exclude All Mental Models**
+- **Max Tokens**
+
+These overrides are stored in the `mental_model_entities` junction table and applied at derivation time. You can edit them per derived instance in the **Mental Model Details** dialog.
+
+## Assigning entities to a mental model
+
+Entities come from architxt's contextual graph, not from a separate entity store. You attach them to a mental model with the **Entities** button on the **Mental Models** page, or on the **Entities** tab inside **Mental Model Details**. What happens next depends on what kind of mental model you attach them to.
+
+### Contextual mental models
+
+You **cannot** assign entities to a contextual mental model. A contextual model is already bound to a specific node, edge, or seed in the contextual graph through its **Template Role** and its concrete **Node ID**, **Edge ID**, or **Seed ID**. The **Entities** button is disabled in the UI when a contextual-graph template role is selected, and the API rejects attempts to attach entities to a role-based model.
+
+### Derived templates
+
+When **Entity Template** is enabled and you attach architxt contextual-graph entities, architxt derives one child mental model per entity. Each derived model:
+
+- Has its own **External ID** and **Name**, with entity placeholders replaced by that entity's data.
+- Inherits all parent settings unless you set per-entity overrides.
+- Is listed in the **Derived** panel of **Mental Model Details**.
+- Appears in the **Workspace → Contextual Data** section for that entity, so anyone viewing the entity can see the derived model and its results.
+
+For example, attaching `Customer Registry` and `Payment Gateway` to a template named `"Summary for {entity-name}"` produces derived models `Summary for Customer Registry` and `Summary for Payment Gateway`, and both show up under their respective entities in the workspace.
+
+### Plain mental models
+
+For a normal mental model that does **not** have **Entity Template** enabled, attaching entities does **not** create multiple derived instances. Instead, the model itself is associated with each entity and appears in the **Workspace → Contextual Data** section for every attached entity. This is useful when a single model answers a question that is relevant to several entities without needing a separate prompt per entity.
+
+## Derived mental models
+
+When a mental model has **Entity Template** enabled and attached entities, architxt can derive one child model per entity. Derivation is performed by `deriveMentalModels` in `server/src/db/crud/mental-models.js`.
+
+For each attached entity, architxt:
+
+1. Copies the parent model's settings.
+2. Substitutes placeholder tokens in **External ID**, **Name**, and **Source Query** with entity-specific values.
+3. Applies any per-entity overrides.
+4. Marks the result as derived and records the source entity.
+
+Example: a parent template named `"Summary for {entity-name}"` with **External ID** `"summary-{entity-id}"` and two entities (`Customer Registry`, `Payment Gateway`) produces:
+
+| Derived model | External ID | Name |
+|---|---|---|
+| 1 | `summary-COMP-001` | `Summary for Customer Registry` |
+| 2 | `summary-COMP-015` | `Summary for Payment Gateway` |
+
+Derived models are not stored in the database; they are generated on demand by the **Derived** panel in **Mental Model Details** and by the Hindsight diff/push paths.
+
+### Template eligibility
+
+Not every model can become a template. Validation in `validateEntityTemplateEligibility` requires:
+
+- **Entity Template** is enabled.
+- A **Source Query** is present.
+- Either **External ID** or **Name** contains a supported entity placeholder (system templates and the built-in `User entity derived` role are exempt).
+
+## Contextual mental models
+
+Contextual mental models are templates tied to the **contextual graph**. They are identified by a **Template Role** and have a **Scope** of **Node**, **Edge**, or **Seed**.
+
+You can see contextual mental models in the **Contextual Graph → Mental Models** tab. Each row shows the role's display name, its scope, and the concrete node, edge, or seed it is bound to.
+
+### Template roles
+
+A **Template Role** is the reusable shape that a contextual mental model takes. It defines:
+
+- **Role ID** — the stable machine name, e.g. `sys_entity_summary` or `custom_component_summary`.
+- **Display Name** — the human-readable label shown in the UI.
+- **Scope** — whether the role applies to a single node, an edge between two nodes, or a seed node used for discovery.
+- **Sort order** — controls ordering in lists.
+
+You create and manage roles on the **Template Roles** page (linked from the main sidebar). Built-in roles start with `sys_` and cannot be edited except for their display name and sort order. Custom roles cannot use the `sys_` prefix or the reserved ID `user_entity_derived`.
+
+When you edit a mental model, the **Template Role** field only shows roles that match the model's purpose. In create mode, system roles are hidden because they are seeded automatically and should not be created twice.
+
+### Built-in system roles
+
+| Role | Scope | Purpose |
+|---|---|---|
+| `sys_entity_summary` | Node | Summarize a single graph node. |
+| `sys_entity_capabilities` | Node | List capabilities for a single graph node. |
+| `sys_edge_context` | Edge | Explain the relationship between two connected nodes. |
+| `sys_discovery_context` | Seed | Discover context around a seed node plus its neighbors. |
+| `user_entity_derived` | Node | Built-in role for entity-derived mental models in the main mental-model list. |
+
+These templates are seeded automatically by `server/src/db/ensure-schema.js` and are immutable through the API. The actual derivation is handled by `server/src/services/contextual-graph/template-models.js`.
+
+### Role format rules
+
+Role-based templates must follow strict naming patterns so the contextual graph service can substitute the right placeholders.
+
+| Scope | External ID must end with | Name must end with | Required query placeholders |
+|---|---|---|---|
+| **Node** | `-{entity-id}` | ` {entity-name}` | `{entity-name}`, `{entity-id}` |
+| **Edge** | `-{source-id}\|{target-id}` | ` {source-name} <-> {target-name}` | `{source-name}`, `{source-id}`, `{target-name}`, `{target-id}` |
+| **Seed** | `-{seed-id}` | ` {seed-name}` | `{seed-id}`, `{seed-name}` |
+
+Custom template roles can be created through the **Template Roles** admin page, but their role ID cannot start with `sys_` and cannot be `user_entity_derived`.
+
+## Placeholders
+
+Placeholders make a single template produce many concrete queries. They are simple text tokens replaced at derivation or composition time. Placeholders use curly braces, e.g. `{entity-name}`.
+
+### Entity placeholders
+
+Used by derived mental models and contextual-graph node templates.
+
+| Placeholder | Substituted with | Use case |
+|---|---|---|
+| `{entity-name}` | The attached entity's display name. | Derived model names and queries. |
+| `{entity-id}` | The attached entity's ID. | Derived model external IDs and queries. |
+| `{entity-type}` | The entity's type name, e.g. `Component`. | Queries that need type context. |
+| `{entity-description}` | The entity's description. | Queries that need background. |
+| `{entity-aliases}` | Comma-separated aliases, if any. | Queries that need alternate names. |
+
+### Contextual-graph placeholders
+
+Contextual-graph placeholders are only meaningful inside a **Template Role**. Each placeholder is valid for a specific **Scope** and the contextual graph service fills it in when it builds the concrete model for a node, edge, or seed.
+
+| Placeholder | Substituted with | Use case | Scope |
+|---|---|---|---|
+| `{node-id}` | The target graph node's ID. | Generic node-scope templates. | **Node** |
+| `{node-name}` | The target graph node's display name. | Generic node-scope templates. | **Node** |
+| `{source-id}` | Source node ID in an edge scope. | Edge-context templates. | **Edge** |
+| `{source-name}` | Source node display name. | Edge-context templates. | **Edge** |
+| `{target-id}` | Target node ID in an edge scope. | Edge-context templates. | **Edge** |
+| `{target-name}` | Target node display name. | Edge-context templates. | **Edge** |
+| `{seed-id}` | Seed node ID for discovery. | Discovery templates. | **Seed** |
+| `{seed-name}` | Seed node display name. | Discovery templates. | **Seed** |
+| `{batch}` | Reserved for batch identifiers. | Future batch operations. | any |
+
+Because the scope is fixed by the **Template Role**, you do not mix node and edge placeholders in the same role. The UI enforces the correct placeholder tails automatically when you create or edit a role-based template.
+
+### Runtime placeholders
+
+| Placeholder | Substituted with | Use case |
+|---|---|---|
+| `{bank-id}` | The Hindsight bank ID. | Push/pull routing context. |
+| `{server-id}` | The Hindsight server ID. | Push/pull routing context. |
+| `{now}` | Current ISO timestamp. | Queries that need a current-time anchor. |
+| `{date}` | Current ISO date (`YYYY-MM-DD`). | Queries that need a date anchor. |
+
+### How placeholders are resolved
+
+The `substitutePlaceholders` helper in `server/src/db/crud/mental-models.js` performs a straightforward `.replaceAll()` for each token. It does not throw if a token is missing; it simply leaves the placeholder in place unless the caller supplies a value. The contextual graph service (`template-models.js`) is stricter: it throws if a required placeholder has no value.
+
+When you edit a role-based template in the UI, you only type the prefix; the required placeholder tail is read-only. For example, a **Node** scope template with prefix `component-summary` automatically becomes:
+
+- **External ID**: `component-summary-{entity-id}`
+- **Name**: `component-summary {entity-name}`
+
+### Example template
+
+```text
+Name:    Summary for {entity-name}
+Ext ID:  summary-{entity-id}
+Query:   Write a concise summary of {entity-name} ({entity-type}).
+```
+
+For an entity `Customer Registry` with ID `COMP-001` and type `Component`, the derived model becomes:
+
+```text
+Name:    Summary for Customer Registry
+Ext ID:  summary-COMP-001
+Query:   Write a concise summary of Customer Registry (Component).
+```
+
+## Composing prompts
+
+Before a mental model is executed or pushed to Hindsight, its **Source Query** is composed. The **Source Query** is written in [AQL](./aql.mdx): the architxt Query Language. AQL lets a mental model request specific output shapes — graph, table, diagram, or narrative — using block directives, references, and plain intent text.
+
+Composition:
+
+1. Parses AQL block directives such as `#graph`, `#table`, `#diagram`, and `#narrative` from the **Source Query**.
+2. Resolves prompt fragments referenced by the mental model's template.
+3. Applies runtime variables, including placeholders substituted during derivation.
+4. Produces a final composed query.
+
+The `composeMentalModelPrompt` service in `server/src/prompts/template-service.js` delegates AQL parsing to `@architxt/aql` via `server/src/prompts/section-directives.js`. You can preview composition without saving via `POST /mentalmodels/compose-preview`.
+
+For details on AQL syntax and directives, see the [AQL page](./aql.mdx).
+
+## Syncing with Hindsight
+
+Mental models can be pushed to a Hindsight memory bank. The process:
+
+1. The model (or its derived variants) is fetched with relations.
+2. `composeDerivedMentalModels` generates the composed query for each derived instance.
+3. `server/src/services/hindsight/push-mental-model.js` pushes the model to Hindsight.
+4. `server/src/services/mental-model-divergence.js` compares the local composed model against Hindsight's stored model to detect drift.
+
+Divergence is checked on:
+
+- **Name**
+- Composed query vs Hindsight's source query
+- **Max Tokens**
+- **Refresh Mode**
+- **Refresh After Consolidation**
+- **Exclude All Mental Models**
+- **Exclude List** vs Hindsight's excluded model IDs
+- **Tags Match**
+- Tags
+- Response schema
+
+This comparison powers the Hindsight diff view so you can see what would change before pushing.
+
+## System vs user templates
+
+| Aspect | System templates | User templates |
+|---|---|---|
+| Role prefix | `sys_*` | Custom or `user_entity_derived` |
+| Mutability | Immutable name, role, and External ID | Fully editable |
+| Seeding | Created by `ensure-schema.js` | Created via API/UI |
+| Purpose | Drive contextual graph features | Drive derived mental models and custom queries |
+
+## Summary
+
+Mental models are query recipes. **Entity Template** mode turns one recipe into many by substituting placeholders. **Contextual** templates connect those recipes to nodes, edges, and seeds in the graph. Composition turns the raw **Source Query** into the final prompt, and divergence detection keeps architxt and Hindsight in sync.
