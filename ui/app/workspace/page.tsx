@@ -36,14 +36,14 @@ import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/pa
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
-import { type ResearchSession, type ResearchStepSummary } from '@/lib/api/client';
+import { type ResearchSession, type ResearchStepSummary, type UnifiedNarrativeBlock } from '@/lib/api/client';
 import { QueryInspectDialog } from '@/app/research-shared/query-inspect-dialog';
 import { SessionSelector } from './_components/session-selector';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
-import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab } from './_components/curated-page-tabs';
+import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab, generateNewPageName } from './_components/curated-page-tabs';
 import { CuratedPageEnvelope } from './_components/curated-page-editor';
 import { normalizeEnvelope } from '@/lib/envelope-markdown';
 import { type EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
@@ -91,9 +91,9 @@ export default function WorkspacePage() {
   // have been applied in the UI (copy/add from a view) but not yet persisted.
   const [pendingCuratedEdits, setPendingCuratedEdits] = useState<Record<number, CuratedPageEnvelope>>({});
   // Local deletion sets per curated-page id. These represent blocks/structured
-  // sections marked deleted in the editor so the revert option survives tab switches.
+  // sections/narratives marked deleted in the editor so the revert option survives tab switches.
   const [pendingCuratedDeletions, setPendingCuratedDeletions] = useState<
-    Record<number, { deletedBlockIds: string[]; deletedStructuredKeys: string[] }>
+    Record<number, { deletedBlockIds: string[]; deletedStructuredKeys: string[]; deletedNarrativeIds: string[] }>
   >({});
 
   const {
@@ -540,14 +540,11 @@ export default function WorkspacePage() {
   );
 
   const handleApplyCopyEvent = useCallback(
-    (stepId: number, event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
-      const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
-      if (!page) return;
-
+    (page: ResearchStepSummary, events: EnvelopeCopyEvent[]) => {
       // Merge into a fresh local envelope instead of persisting immediately.
       // The editor renders the updated envelope, compares it to the server
       // baseline, and enables Save so the user can persist the change.
-      const sourceEnvelope = pendingCuratedEdits[stepId] ?? normalizeEnvelope(page);
+      const sourceEnvelope = pendingCuratedEdits[page.id] ?? normalizeEnvelope(page);
       const nextEnvelope: CuratedPageEnvelope = {
         narratives: sourceEnvelope.narratives ?? [],
         graph: {
@@ -558,7 +555,6 @@ export default function WorkspacePage() {
         diagrams: [...(sourceEnvelope.diagrams ?? [])],
       };
       let toastMessage = '';
-      const events = Array.isArray(event) ? event : [event];
 
       for (const ev of events) {
         switch (ev.type) {
@@ -574,7 +570,13 @@ export default function WorkspacePage() {
             } catch {
               // Raw markdown payload: use it as-is with the event label as the name.
             }
-            const newBlock = { narrative_name: name, narrative: content, evidence: [] };
+            // Always generate a fresh id for each copied narrative so duplicates remain independent.
+            const newBlock: UnifiedNarrativeBlock = {
+              id: crypto.randomUUID(),
+              narrative_name: name,
+              narrative: content,
+              evidence: Array.isArray(ev.evidence) ? [...ev.evidence] : [],
+            };
             nextEnvelope.narratives = [...(nextEnvelope.narratives ?? []), newBlock];
             toastMessage = `Added ${name || 'narrative'} to ${page.intent_text || `Page ${page.id}`}`;
             break;
@@ -591,18 +593,15 @@ export default function WorkspacePage() {
           }
           case 'tables': {
             const parsedTables = JSON.parse(ev.payload);
-            const existingNames = new Set(nextEnvelope.tables.map((t) => t.name));
-            const newTables = (parsedTables ?? []).filter((t: { name: string }) => !existingNames.has(t.name));
+            const newTables = (parsedTables ?? []).map((t: any) => ({ ...t, id: crypto.randomUUID() }));
             nextEnvelope.tables = [...nextEnvelope.tables, ...newTables];
             toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
           }
           case 'diagrams': {
             const parsedDiagrams = JSON.parse(ev.payload);
-            const existingNames = new Set(nextEnvelope.diagrams.map((d) => d.name));
             const newDiagrams = (parsedDiagrams ?? [])
-              .filter((d: { name: string }) => !existingNames.has(d.name))
-              .map((d: any) => ({ ...d, evidence: d.evidence ?? [] }));
+              .map((d: any) => ({ ...d, id: crypto.randomUUID(), evidence: d.evidence ?? [] }));
             nextEnvelope.diagrams = [...nextEnvelope.diagrams, ...newDiagrams];
             toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
@@ -614,32 +613,74 @@ export default function WorkspacePage() {
       // becomes dirty against the server baseline.
       setPendingCuratedEdits((prev) => ({
         ...prev,
-        [stepId]: nextEnvelope,
+        [page.id]: nextEnvelope,
       }));
       // Make the target page visible so the user sees the applied change and
       // the Save button reflect the updated envelope.
       setActiveTabId((current) => {
-        const targetId = `curated-${stepId}`;
+        const targetId = `curated-${page.id}`;
         return current === targetId ? current : targetId;
       });
       if (toastMessage) toast.success(toastMessage);
     },
-    [workspaceSession.curatedPages, pendingCuratedEdits]
+    [pendingCuratedEdits]
   );
 
   const handleCopyToCuratedPage = useCallback(
     (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
       const events = Array.isArray(event) ? event : [event];
-      const firstLabel = events[0]?.label;
       if (activeCuratedPage) {
         // Apply to the currently active curated page immediately.
-        handleApplyCopyEvent(activeCuratedPage.id, events);
+        handleApplyCopyEvent(activeCuratedPage, events);
         return;
       }
       // No active curated page: show target picker.
-      setPendingSection({ events, title: firstLabel });
+      setPendingSection({ events, title: events[0]?.label });
     },
     [activeCuratedPage, handleApplyCopyEvent]
+  );
+
+  const openCuratedPage = useCallback((page: ResearchStepSummary) => {
+    const id = `curated-${page.id}`;
+    setTabs((prev) => {
+      if (prev.some((t) => t.id === id)) return prev;
+      return [
+        ...prev,
+        {
+          id,
+          kind: 'curated',
+          label: page.intent_text || `Page ${page.id}`,
+          stepId: page.id,
+        },
+      ];
+    });
+    setActiveTabId(id);
+  }, []);
+
+  const handleCreatePageAndApply = useCallback(
+    async (events: EnvelopeCopyEvent[]) => {
+      if (!activeSession) return;
+      const title = generateNewPageName(tabs, workspaceSession.curatedPages);
+      try {
+        const newPage = await researchApi.createSessionPage(activeSession.id, title);
+        await workspaceSession.fetchTrail(activeSession.id);
+        openCuratedPage(newPage);
+        handleApplyCopyEvent(newPage, events);
+      } catch (err: unknown) {
+        logger.error('Failed to create page and apply section', err);
+        toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
+      }
+    },
+    [activeSession, tabs, workspaceSession, openCuratedPage, handleApplyCopyEvent]
+  );
+
+  const handleRequestCopySection = useCallback(
+    (event: EnvelopeCopyEvent) => {
+      // Always show the target picker, even when a page is active, so the user
+      // can duplicate a section onto the same page or copy it elsewhere.
+      setPendingSection({ events: [event], title: event.label });
+    },
+    []
   );
 
   const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
@@ -834,21 +875,8 @@ export default function WorkspacePage() {
   const selectCuratedPage = useCallback((stepId: number) => {
     const page = workspaceSession.curatedPages.find((p) => p.id === stepId);
     if (!page) return;
-    const id = `curated-${stepId}`;
-    setTabs((prev) => {
-      if (prev.some((t) => t.id === id)) return prev;
-      return [
-        ...prev,
-        {
-          id,
-          kind: 'curated',
-          label: page.intent_text || `Page ${page.id}`,
-          stepId,
-        },
-      ];
-    });
-    setActiveTabId(id);
-  }, [workspaceSession.curatedPages]);
+    openCuratedPage(page);
+  }, [workspaceSession.curatedPages, openCuratedPage]);
 
   const toggleEntityExpanded = useCallback((entityId: string) => {
     setExpandedEntityIds((prev) => {
@@ -1200,17 +1228,17 @@ export default function WorkspacePage() {
               onSaveCuratedPage={handleSaveCuratedPage}
               onCuratedPageDirtyChange={setActiveCuratedPageDirty}
               saveCuratedPageTrigger={saveCuratedPageTrigger}
-              onCuratedPageChange={({ envelope, deletedBlockIds, deletedStructuredKeys, dirty }) => {
+              onCuratedPageChange={({ envelope, deletedBlockIds, deletedStructuredKeys, deletedNarrativeIds, dirty }) => {
                 if (!activeCuratedPage) return;
                 setPendingCuratedDeletions((prev) => {
-                  const hasAny = deletedBlockIds.length > 0 || deletedStructuredKeys.length > 0;
+                  const hasAny = deletedBlockIds.length > 0 || deletedStructuredKeys.length > 0 || deletedNarrativeIds.length > 0;
                   if (!hasAny) {
                     if (!prev[activeCuratedPage.id]) return prev;
                     const next = { ...prev };
                     delete next[activeCuratedPage.id];
                     return next;
                   }
-                  const next = { ...prev, [activeCuratedPage.id]: { deletedBlockIds, deletedStructuredKeys } };
+                  const next = { ...prev, [activeCuratedPage.id]: { deletedBlockIds, deletedStructuredKeys, deletedNarrativeIds } };
                   return next;
                 });
                 if (dirty) {
@@ -1229,6 +1257,7 @@ export default function WorkspacePage() {
               }}
               activeCuratedPageDeletions={activeCuratedPage ? pendingCuratedDeletions[activeCuratedPage.id] : undefined}
               onCopyToCuratedPage={handleCopyToCuratedPage}
+              onRequestCopySection={handleRequestCopySection}
               tabs={
                 <CuratedPageTabs
                   tabs={tabs}
@@ -1379,13 +1408,37 @@ export default function WorkspacePage() {
         </Dialog>
 
         {pendingSection && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setPendingSection(null);
+              }
+            }}
+            // Make the overlay focusable so it can receive keyboard events when the user clicks the backdrop.
+            tabIndex={-1}
+            ref={(el) => {
+              if (el) el.focus();
+            }}
+          >
             <div className="rounded-lg border border-border-default bg-surface-raised p-4 w-80 shadow-lg">
               <div className="text-sm font-medium text-foreground-default mb-2">Add section to page</div>
               <p className="text-xs text-foreground-faint mb-4">
                 “{pendingSection.title || 'Untitled section'}”
               </p>
               <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto mb-4">
+                {activeSession && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleCreatePageAndApply(pendingSection.events).then(() => setPendingSection(null));
+                    }}
+                    className="text-left text-xs px-2 py-1.5 rounded border border-dashed border-accent-primary-bd bg-accent-primary-bg/30 text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+                  >
+                    + New page
+                  </button>
+                )}
                 {workspaceSession.curatedPages.length === 0 && (
                   <div className="text-xs text-foreground-subtle">No curated pages yet. Create one from the Pages menu.</div>
                 )}
@@ -1394,7 +1447,7 @@ export default function WorkspacePage() {
                     key={page.id}
                     type="button"
                     onClick={() => {
-                      void handleApplyCopyEvent(page.id, pendingSection.events);
+                      void handleApplyCopyEvent(page, pendingSection.events);
                       setPendingSection(null);
                     }}
                     className="text-left text-xs px-2 py-1.5 rounded border border-border-default bg-surface-inset text-foreground-faint hover:bg-surface-card hover:text-foreground-default transition-colors"

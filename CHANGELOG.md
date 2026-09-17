@@ -2,7 +2,21 @@
 
 All notable changes to architxt are documented in this file.
 
-## [0.2.1] - 2026-06-19
+## [0.4.0] - 2026-09-17
+
+### Added
+- Workspace: "+ New page" option when adding a section to a curated page, which creates the page, opens it, and applies the section in one flow.
+- Workspace: Escape key dismisses the add-section-to-page target picker.
+- Graph evidence is copied into diagram and table sections when added to a curated page.
+
+### Changed
+- Graph and diagram focus modals now open with fit-to-page enabled by default.
+- Graph-generated Mermaid flowcharts no longer emit the deprecated `%%{init: {'layout': 'elk'}}%%` directive.
+
+### Fixed
+- Race condition when applying a copied section to a newly created curated page: the page tab is now opened immediately and the trail refreshed before applying content.
+
+## [0.3.9] - 2026-09-??
 
 ### Added
 - Hindsight sync: `Directives` as a fourth syncable object type with diff, push, pull, and side-by-side compare modal

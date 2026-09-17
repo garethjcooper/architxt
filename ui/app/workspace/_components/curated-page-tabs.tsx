@@ -31,6 +31,18 @@ export function makeAnchorTab(label = 'Preview'): WorkspaceTab {
   return { id: ANCHOR_TAB_ID, kind: 'view', label, pinned: true };
 }
 
+export function generateNewPageName(tabs: WorkspaceTab[], curatedPages: ResearchStepSummary[]): string {
+  const base = 'Page';
+  let index = 1;
+  while (
+    tabs.some((t) => t.kind === 'curated' && t.label === `${base} ${index}`) ||
+    curatedPages.some((p) => p.intent_text === `${base} ${index}`)
+  ) {
+    index++;
+  }
+  return `${base} ${index}`;
+}
+
 interface CuratedPageTabsProps {
   tabs: WorkspaceTab[];
   activeTabId: string | null;
@@ -72,15 +84,7 @@ export function CuratedPageTabs({
   );
 
   const handleCreate = useCallback(async () => {
-    const base = 'Page';
-    let index = 1;
-    while (
-      tabs.some((t) => t.kind === 'curated' && t.label === `${base} ${index}`) ||
-      curatedPages.some((p) => p.intent_text === `${base} ${index}`)
-    ) {
-      index++;
-    }
-    await onCreateCuratedPage(`${base} ${index}`);
+    await onCreateCuratedPage(generateNewPageName(tabs, curatedPages));
   }, [tabs, curatedPages, onCreateCuratedPage]);
 
   const handleConfirmRename = useCallback(async () => {

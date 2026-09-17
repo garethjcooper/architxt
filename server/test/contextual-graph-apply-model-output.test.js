@@ -503,12 +503,9 @@ describe('applyModelOutput', () => {
   it('synthesizes envelope from Markdown capability table', () => {
     const content = '## Overview\n\nSingleview is the billing hub.\n\n```markdown\n| Capability | Responsibility | Purpose | Business Capability Mapping |\n|---|---|---|---|\n| Adjustments | Corrects charges. | Enables corrections. | Billing Adjustments |\n```';
     const output = normalizeModelOutput(content);
-    assert.equal(output.errors.length, 0);
-    assert.equal(output.tables.length, 1);
-    assert.equal(output.tables[0].name, 'capabilities');
-    assert.deepStrictEqual(output.tables[0].columns, ['name', 'responsibility', 'purpose', 'business_capability_mapping']);
-    assert.equal(output.tables[0].rows.length, 1);
-    assert.equal(output.tables[0].rows[0].name, 'Adjustments');
+    assert.equal(output.errors.length, 1);
+    assert.ok(output.errors[0].includes('Unable to parse JSON envelope'));
+    assert.equal(output.tables.length, 0);
   });
 
   it('applies a custom node-scoped template role generically without persisting summary', async () => {

@@ -229,7 +229,7 @@ function PreviewPane({
 }
 
 export function MermaidEditor({ content, onChange, onErrorChange, className, name, type, readOnly = false }: MermaidEditorProps) {
-  const [fitToPage, setFitToPage] = useState(false);
+  const [fitToPage, setFitToPage] = useState(true);
   const [lastError, setLastError] = useState<string | null>(null);
   const [sourceWidth, setSourceWidth] = useState(50);
   const lastValueRef = useRef(content);

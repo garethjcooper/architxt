@@ -20,13 +20,13 @@ interface EnvelopeControlsProps {
   /** Structured data available for copy/add. */
   structuredItems?: {
     graph?: { payload: string; label?: string } | null;
-    tables?: { payload: string; label?: string } | null;
-    diagrams?: { payload: string; label?: string } | null;
+    tables?: { payload: string; label?: string; id?: string } | null;
+    diagrams?: { payload: string; label?: string; id?: string } | null;
   };
   /** Called for structured copy; when absent, structured buttons are hidden. */
-  onCopyStructured?: (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => void;
+  onCopyStructured?: (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string, id?: string) => void;
   /** Called for structured add-to-page; when absent, add buttons are hidden. */
-  onAddStructured?: (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => void;
+  onAddStructured?: (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string, id?: string) => void;
   /** Render the Controls switch/dropdown. Defaults to true. */
   showControlsToggle?: boolean;
 }
@@ -103,16 +103,16 @@ export function EnvelopeControls({
             <StructuredControlRow
               icon={<Table2 className="h-3 w-3" />}
               label={structuredItems.tables.label || 'Tables'}
-              onCopy={() => onCopyStructured?.('tables', structuredItems.tables!.payload, structuredItems.tables!.label)}
-              onAdd={onAddStructured ? () => onAddStructured('tables', structuredItems.tables!.payload, structuredItems.tables!.label) : undefined}
+              onCopy={() => onCopyStructured?.('tables', structuredItems.tables!.payload, structuredItems.tables!.label, structuredItems.tables!.id)}
+              onAdd={onAddStructured ? () => onAddStructured('tables', structuredItems.tables!.payload, structuredItems.tables!.label, structuredItems.tables!.id) : undefined}
             />
           )}
           {structuredItems?.diagrams && (
             <StructuredControlRow
               icon={<Shapes className="h-3 w-3" />}
               label={structuredItems.diagrams.label || 'Diagrams'}
-              onCopy={() => onCopyStructured?.('diagrams', structuredItems.diagrams!.payload, structuredItems.diagrams!.label)}
-              onAdd={onAddStructured ? () => onAddStructured('diagrams', structuredItems.diagrams!.payload, structuredItems.diagrams!.label) : undefined}
+              onCopy={() => onCopyStructured?.('diagrams', structuredItems.diagrams!.payload, structuredItems.diagrams!.label, structuredItems.diagrams!.id)}
+              onAdd={onAddStructured ? () => onAddStructured('diagrams', structuredItems.diagrams!.payload, structuredItems.diagrams!.label, structuredItems.diagrams!.id) : undefined}
             />
           )}
           {(structuredItems?.graph || structuredItems?.tables || structuredItems?.diagrams) && (

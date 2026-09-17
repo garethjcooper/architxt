@@ -207,19 +207,13 @@ describe('POST /api/v1/entities/info', () => {
     const typeId = seedEntityType(db, 'Service', 'SVC');
     const entId = seedEntity(db, typeId, 'SVC-005', 'Payment Service');
 
-    // Use a distinct custom role so this test model does not collide with the
-    // unique constraint on mm_template_role (the seeded system templates already
-    // occupy sys_* roles).
-    db.prepare(`
-      INSERT INTO template_roles (tr_role_id, tr_display_name, tr_derivation_scope, tr_sort_order)
-      VALUES (?, ?, ?, ?)
-    `).run('risk_profile', 'Risk profile', 'node', 10);
-
+    // Use the built-in user_entity_derived role for a plain entity-derived
+    // template; only that role is surfaced as a local derived model.
     const userTemplateId = seedMentalModel(db, {
       ext_id: 'user-template-risk-{entity-id}',
       name: 'Risk profile: {entity-name}',
       is_template: true,
-      template_role: 'risk_profile',
+      template_role: 'user_entity_derived',
       dimension: 'risk',
       returns: 'narrative',
       source_query: 'Risk profile for {entity-id}',
@@ -235,29 +229,10 @@ describe('POST /api/v1/entities/info', () => {
     });
     seedMentalModelEntity(db, plainModelId, entId);
 
-    // Use the seeded canonical system summary template to verify system roles
-    // are excluded from derived_models. Creating a second sys_entity_summary
-    // row would violate the unique mm_template_role constraint.
-    const systemTemplateRow = db.prepare(`
-      SELECT mm_id, mm_ext_id FROM mental_models WHERE mm_template_role = ?
-    `).get('sys_entity_summary');
-    assert.ok(systemTemplateRow, 'seeded sys_entity_summary template should exist');
-    seedMentalModelEntity(db, systemTemplateRow.mm_id, entId);
-
-    // The risk_profile derived model must be backed by an actual model ref on
-    // the graph node — derived user templates are not surfaced unless attached.
+    // The user_entity_derived model does not require an explicit graph ref.
     seedGraphNode(db, serverId, bankId, 'svc:SVC-005', ['grounded', 'Service'], {
       display_name: 'Payment Service',
-      provenance: {
-        model_refs: [
-          {
-            role: 'risk_profile',
-            ext_id: 'user-template-risk-SVC-005',
-            scope: 'node',
-            attached_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      },
+      provenance: { model_refs: [] },
     });
 
     const res = await makeRequest(app, {
@@ -269,7 +244,7 @@ describe('POST /api/v1/entities/info', () => {
     assert.equal(res.status, 200);
     const info = res.body.entities['svc:SVC-005'];
     assert.equal(info.derived_models.length, 1);
-    assert.equal(info.derived_models[0].template_role, 'risk_profile');
+    assert.equal(info.derived_models[0].template_role, 'user_entity_derived');
     assert.equal(info.derived_models[0].ext_id, 'user-template-risk-SVC-005');
     assert.equal(info.derived_models[0].name, 'Risk profile: Payment Service');
     assert.equal(info.derived_models[0].meta.derived_from.template_id, userTemplateId);

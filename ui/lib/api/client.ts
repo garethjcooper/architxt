@@ -1392,6 +1392,7 @@ export interface DiscoverStepResponse {
 }
 
 export interface UnifiedNarrativeBlock {
+  id?: string;
   narrative_name: string;
   narrative: string;
   evidence: string[];
@@ -1405,12 +1406,14 @@ export interface UnifiedEnvelope {
     edges: GraphEdge[];
   };
   tables: Array<{
+    id?: string;
     name: string;
     columns: string[];
     rows: Record<string, any>[];
     evidence: string[];
   }>;
   diagrams: Array<{
+    id?: string;
     name: string;
     type: string;
     content: string;

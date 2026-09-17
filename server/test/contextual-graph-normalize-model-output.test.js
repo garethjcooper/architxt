@@ -5,6 +5,10 @@ import { ensureSchema } from '../src/db/ensure-schema.js';
 import { normalizeModelOutput, contentHash } from '../src/services/contextual-graph/normalize-model-output.js';
 import { clearCache } from '../src/cache.js';
 
+function assertUuid(value) {
+  assert.match(value, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, `expected UUID, got ${value}`);
+}
+
 function createDb() {
   clearCache();
   const db = new Database(':memory:');
@@ -23,7 +27,11 @@ describe('normalizeModelOutput', () => {
       diagrams: [],
     });
     const out = normalizeModelOutput(raw);
-    assert.deepEqual(out.narratives, [{ narrative_name: 'Overview', narrative: 'A system that bills customers.', evidence: [] }]);
+    assert.equal(out.narratives.length, 1);
+    assert.equal(out.narratives[0].narrative_name, 'Overview');
+    assert.equal(out.narratives[0].narrative, 'A system that bills customers.');
+    assert.deepEqual(out.narratives[0].evidence, []);
+    assertUuid(out.narratives[0].id);
     assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.equal(out.errors.length, 0);
@@ -59,13 +67,21 @@ describe('normalizeModelOutput', () => {
       diagrams: [] });
     const raw = `Some prose before\n\n\`\`\`json\n${inner}\n\`\`\``;
     const out = normalizeModelOutput(raw);
-    assert.deepEqual(out.narratives, [{ narrative_name: 'wrapped', narrative: 'wrapped', evidence: [] }]);
+    assert.equal(out.narratives.length, 1);
+    assert.equal(out.narratives[0].narrative_name, 'wrapped');
+    assert.equal(out.narratives[0].narrative, 'wrapped');
+    assert.deepEqual(out.narratives[0].evidence, []);
+    assertUuid(out.narratives[0].id);
     assert.equal(out.errors.length, 0);
   });
 
   it('fills missing sections with defaults and records errors', () => {
     const out = normalizeModelOutput(JSON.stringify({ narratives: [{ narrative: 'only narrative' }] }));
-    assert.deepEqual(out.narratives, [{ narrative_name: 'only narrative', narrative: 'only narrative', evidence: [] }]);
+    assert.equal(out.narratives.length, 1);
+    assert.equal(out.narratives[0].narrative_name, 'only narrative');
+    assert.equal(out.narratives[0].narrative, 'only narrative');
+    assert.deepEqual(out.narratives[0].evidence, []);
+    assertUuid(out.narratives[0].id);
     assert.deepEqual(out.graph, { name: '', nodes: [], edges: [] });
     assert.deepEqual(out.tables, []);
     assert.ok(out.errors.length >= 2);

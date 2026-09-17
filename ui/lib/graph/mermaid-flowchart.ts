@@ -6,8 +6,6 @@ import type { GraphNode, GraphEdge } from '@/lib/api/client';
 export interface GraphToMermaidOptions {
   /** Flowchart direction: TB (top-bottom) or LR (left-right). */
   direction?: 'TB' | 'LR' | 'BT' | 'RL';
-  /** Optional explicit Mermaid renderer ('dagre' or 'elk'). */
-  defaultRenderer?: 'dagre' | 'elk';
   /** When true, include edge type labels. Defaults to true. */
   showEdgeLabels?: boolean;
 }
@@ -48,12 +46,11 @@ export function graphToMermaid(
   graph: { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] },
   options: GraphToMermaidOptions = {},
 ): string {
-  const { direction = 'TB', defaultRenderer = 'elk', showEdgeLabels = true } = options;
+  const { direction = 'TB', showEdgeLabels = true } = options;
   const nodeSet = new Set(graph.nodes.map((n) => n.id));
   const visibleEdges = graph.edges.filter((e) => nodeSet.has(e.from) && nodeSet.has(e.to));
 
   const lines: string[] = ['flowchart ' + direction];
-  lines.unshift(`%%{init: {'layout': '${defaultRenderer}'}}%%`);
 
   for (const node of graph.nodes) {
     const id = safeNodeId(node.id);

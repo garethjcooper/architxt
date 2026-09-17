@@ -141,11 +141,11 @@ const mermaidTheme = EditorView.theme({
   '.mmd-comment': { color: 'var(--syntax-comment)' },
 });
 
-interface PaneRatios {
+type PaneRatios = {
   source: number;
   tables: number;
   json: number;
-}
+};
 
 function PreviewPane({
   content,
@@ -236,7 +236,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
   const [sourceWidth, setSourceWidth] = useState(35);
   const [ratios, setRatios] = useState<PaneRatios>({ source: 0.5, tables: 0.25, json: 0.25 });
   const [hResizing, setHResizing] = useState<null | 'upper' | 'lower'>(null);
-  const [fitToPage, setFitToPage] = useState(false);
+  const [fitToPage, setFitToPage] = useState(true);
   const [includeDiagram, setIncludeDiagram] = useState(false);
   const [includeTables, setIncludeTables] = useState(false);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
@@ -335,16 +335,27 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
     setEdgeTableName(defaultEdgeTableName);
   }, [graphKey]);
 
-  // Always reset add-to-page toggles when the modal opens so the last session doesn't carry over.
+  // Always reset add-to-page toggles and fit-to-page when the modal opens so the last session doesn't carry over.
   useEffect(() => {
     if (open) {
       setIncludeDiagram(false);
       setIncludeTables(false);
+      setFitToPage(true);
     }
   }, [open]);
 
   const source = generatedSource;
   const isEmpty = !graph.nodes.length && !graph.edges.length;
+
+  const graphEvidence = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of graph.edges) {
+      for (const id of e.evidence || []) {
+        ids.add(id);
+      }
+    }
+    return Array.from(ids);
+  }, [graph.edges]);
 
   const extensions = useMemo(
     () => [mermaidLanguage, mermaidTheme, syntaxHighlighting(mermaidHighlightStyle)],
@@ -436,11 +447,6 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
     };
   }, [handleHResizeMove, handleHResizeEnd]);
 
-  const effectiveRenderer = useMemo(() => {
-    const init = source.match(/%%\{init:[\s\S]*?'layout':\s*'(dagre|elk)'/);
-    return init ? (init[1] as Renderer) : 'elk';
-  }, [source]);
-
   const toggleButtonClass = (active: boolean) =>
     cn(
       'px-2 py-1 rounded text-[10px] border transition-colors',
@@ -459,8 +465,9 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
         : 'flowchart';
       events.push({
         type: 'diagrams',
-        payload: JSON.stringify([{ name: diagramName, type, content: source }], null, 2),
+        payload: JSON.stringify([{ name: diagramName, type, content: source, evidence: graphEvidence }], null, 2),
         label: diagramName,
+        evidence: graphEvidence,
       });
     }
     if (includeTables && (graph.nodes.length > 0 || graph.edges.length > 0)) {
@@ -487,16 +494,17 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
       });
       const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[]; evidence: string[] }> = [];
       if (nodeRows.length > 0) {
-        tables.push({ name: nodeTableName, columns: ['id', 'type', 'label', 'name'], rows: nodeRows, evidence: [] });
+        tables.push({ name: nodeTableName, columns: ['id', 'type', 'label', 'name'], rows: nodeRows, evidence: graphEvidence });
       }
       if (edgeRows.length > 0) {
-        tables.push({ name: edgeTableName, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows, evidence: [] });
+        tables.push({ name: edgeTableName, columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'], rows: edgeRows, evidence: graphEvidence });
       }
       if (tables.length > 0) {
         events.push({
           type: 'tables',
           payload: JSON.stringify(tables, null, 2),
           label: title || graph.name || 'Graph tables',
+          evidence: graphEvidence,
         });
       }
     }
@@ -519,7 +527,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
             <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-md border border-border-default bg-surface-overlay overflow-hidden">
               <div className="px-3 py-2 border-b border-border-default text-xs font-medium text-foreground-faint flex items-center justify-between shrink-0">
                 <span>Preview</span>
-                <span className="text-[10px] text-foreground-subtle">{graph.nodes.length} nodes · {graph.edges.length} edges · {effectiveRenderer}</span>
+                <span className="text-[10px] text-foreground-subtle">{graph.nodes.length} nodes · {graph.edges.length} edges</span>
               </div>
               <div className="flex-1 min-h-0 p-2 overflow-hidden relative">
                 <PreviewPane

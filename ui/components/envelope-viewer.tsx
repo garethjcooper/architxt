@@ -154,18 +154,24 @@ export function EnvelopeViewer({
       return;
     }
     if (parsed?.kind === 'table' || resolvedEvent?.type === 'tables') {
-      const tableName = parsed?.name;
-      const table = tableName ? normalized.tables.find((t) => t.name === tableName) : normalized.tables[0];
+      const table = resolvedEvent?.id
+        ? normalized.tables.find((t) => t.id === resolvedEvent.id)
+        : parsed?.name
+          ? normalized.tables.find((t) => t.name === parsed.name)
+          : normalized.tables[0];
       if (table) {
         setFocus({ kind: 'table', table });
       }
       return;
     }
     if (parsed?.kind === 'diagram' || resolvedEvent?.type === 'diagrams') {
-      const diagramName = parsed?.name;
-      const diagram = diagramName ? normalized.diagrams.find((d) => d.name === diagramName) : normalized.diagrams[0];
+      const diagram = resolvedEvent?.id
+        ? normalized.diagrams.find((d) => d.id === resolvedEvent.id)
+        : parsed?.name
+          ? normalized.diagrams.find((d) => d.name === parsed.name)
+          : normalized.diagrams[0];
       if (diagram && typeof diagram.content === 'string') {
-        setFocus({ kind: 'diagram', name: diagram.name || diagramName || 'Diagram', content: diagram.content });
+        setFocus({ kind: 'diagram', name: diagram.name || parsed?.name || 'Diagram', content: diagram.content });
       }
       return;
     }
@@ -184,9 +190,12 @@ export function EnvelopeViewer({
     }
     const tables = normalized.tables;
     if (tables && tables.length > 0) {
+      // For top-level structured controls we use the first table's id; multi-table
+      // copies preserve all ids in the JSON payload, and add paths filter by id/name.
       items.tables = {
         payload: JSON.stringify(tables, null, 2),
         label: titleLabel,
+        id: tables[0]?.id,
       };
     }
     const diagrams = normalized.diagrams;
@@ -194,24 +203,11 @@ export function EnvelopeViewer({
       items.diagrams = {
         payload: JSON.stringify(diagrams, null, 2),
         label: titleLabel,
+        id: diagrams[0]?.id,
       };
     }
     return Object.keys(items).length > 0 ? items : undefined;
   }, [normalized, titleLabel]);
-
-  const handleCopyStructured = useCallback(
-    (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => {
-      onCopy?.({ type, payload, label });
-    },
-    [onCopy]
-  );
-
-  const handleAddStructured = useCallback(
-    (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string) => {
-      onAddToPage?.({ type, payload, label });
-    },
-    [onAddToPage]
-  );
 
   const handleCopy = () => {
     if (!markdown) return;
@@ -239,7 +235,15 @@ export function EnvelopeViewer({
     ? (event: EnvelopeCopyEvent) => onAddToPage(event)
     : undefined;
 
-  const resolveSectionEvidence = useCallback((heading: string): string[] => {
+  const resolveSectionEvidence = useCallback((heading: string, tableId?: string, diagramId?: string): string[] => {
+    if (tableId) {
+      const table = normalized?.tables.find((t) => t.id === tableId);
+      if (table) return table.evidence ?? [];
+    }
+    if (diagramId) {
+      const diagram = normalized?.diagrams.find((d) => d.id === diagramId);
+      if (diagram) return diagram.evidence ?? [];
+    }
     const parsed = parseSyntheticHeading(heading);
     if (!parsed || !normalized) return [];
     switch (parsed.kind) {
@@ -265,8 +269,9 @@ export function EnvelopeViewer({
   }, [normalized, parseSyntheticHeading]);
 
   const resolveSectionCopy = useCallback(
-    (heading: string, _level: number, contentMarkdown: string): EnvelopeCopyEvent | null => {
+    (heading: string, _level: number, contentMarkdown: string, tableId?: string, diagramId?: string): EnvelopeCopyEvent | null => {
       const trimmed = heading.trim();
+      const evidence = resolveSectionEvidence(trimmed);
 
       // Graph is rendered as a synthetic section; use the canonical envelope.graph.
       const graphHeadingMatch = trimmed.match(/^Graph(?::\s*(.+))?$/i);
@@ -277,17 +282,21 @@ export function EnvelopeViewer({
             type: 'graph',
             payload: JSON.stringify(graph, null, 2),
             label: graphHeadingMatch[1]?.trim() || titleLabel,
+            evidence,
+            id: 'graph',
           };
         }
       }
 
-      // Tables are rendered as "Table: <name>" headings; map back to envelope.tables by name.
+      // Tables are rendered as "Table: <name>" headings; map back to envelope.tables by id then name.
       const tableHeadingMatch = trimmed.match(/^Table:\s*(.+)$/i);
       if (tableHeadingMatch) {
         const tableName = tableHeadingMatch[1].trim();
-        const table = normalized?.tables?.find((t) => t.name === tableName);
+        const table = tableId
+          ? normalized?.tables?.find((t) => t.id === tableId)
+          : normalized?.tables?.find((t) => t.name === tableName);
         if (table) {
-          return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name };
+          return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name, evidence, id: table.id };
         }
       }
 
@@ -299,22 +308,51 @@ export function EnvelopeViewer({
           type: 'tables',
           payload: JSON.stringify([{ name: trimmed || 'Table', columns: parsed.columns, rows: parsed.rows }], null, 2),
           label: trimmed || 'Table',
+          evidence,
         };
       }
 
-      // Diagrams are rendered as "Diagram: <name>" headings; map back to envelope.diagrams by name.
+      // Diagrams are rendered as "Diagram: <name>" headings; map back to envelope.diagrams by id then name.
       const diagramHeadingMatch = trimmed.match(/^Diagram:\s*(.+)$/i);
       if (diagramHeadingMatch) {
         const diagramName = diagramHeadingMatch[1].trim();
-        const diagram = normalized?.diagrams?.find((d) => d.name === diagramName);
+        const diagram = diagramId
+          ? normalized?.diagrams?.find((d) => d.id === diagramId)
+          : normalized?.diagrams?.find((d) => d.name === diagramName);
         if (diagram) {
-          return { type: 'diagrams', payload: JSON.stringify([diagram], null, 2), label: diagram.name };
+          return { type: 'diagrams', payload: JSON.stringify([diagram], null, 2), label: diagram.name, evidence, id: diagram.id };
         }
       }
 
       return null;
     },
-    [normalized]
+    [normalized, resolveSectionEvidence]
+  );
+
+  const handleCopyStructured = useCallback(
+    (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string, id?: string) => {
+      const kindLabel = `${type === 'graph' ? 'Graph' : type === 'tables' ? 'Table' : 'Diagram'}${label ? `: ${label}` : ''}`;
+      const evidence = type === 'tables'
+        ? resolveSectionEvidence(kindLabel, id)
+        : type === 'diagrams'
+          ? resolveSectionEvidence(kindLabel, undefined, id)
+          : resolveSectionEvidence(kindLabel);
+      onCopy?.({ type, payload, label, evidence, id });
+    },
+    [onCopy, resolveSectionEvidence]
+  );
+
+  const handleAddStructured = useCallback(
+    (type: 'graph' | 'tables' | 'diagrams', payload: string, label?: string, id?: string) => {
+      const kindLabel = `${type === 'graph' ? 'Graph' : type === 'tables' ? 'Table' : 'Diagram'}${label ? `: ${label}` : ''}`;
+      const evidence = type === 'tables'
+        ? resolveSectionEvidence(kindLabel, id)
+        : type === 'diagrams'
+          ? resolveSectionEvidence(kindLabel, undefined, id)
+          : resolveSectionEvidence(kindLabel);
+      onAddToPage?.({ type, payload, label, evidence, id });
+    },
+    [onAddToPage, resolveSectionEvidence]
   );
 
   const handleCopyWholeDocument = useCallback(
