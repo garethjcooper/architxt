@@ -580,6 +580,10 @@ function AqlEditorComponent(props: AqlEditorProps) {
           if (notifyTimeoutRef.current) {
             clearTimeout(notifyTimeoutRef.current);
           }
+          // Debounce must outlast @uiw/react-codemirror's internal 200 ms
+          // typing latch. If we notify the parent earlier, the parent value
+          // prop updates while CodeMirror is still latched and gets queued as
+          // a stale external overwrite, which truncates text and resets cursor.
           notifyTimeoutRef.current = setTimeout(() => {
             notifyTimeoutRef.current = null;
             const pending = pendingValueRef.current;
@@ -588,7 +592,7 @@ function AqlEditorComponent(props: AqlEditorProps) {
               onChange(pending.value, pending.cursor);
               lastNotifiedValueRef.current = pending.value;
             }
-          }, 120);
+          }, 250);
         }
       }
     },
