@@ -19,13 +19,6 @@ export interface UseWorkspaceSessionOptions {
 
 export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWorkspaceSessionOptions) {
   const [autoCreating, setAutoCreating] = useState(false);
-  const research = useResearchSession({
-    serverId: serverId?.toString() ?? '',
-    bankId: bankId ?? '',
-    viewMode: 'step',
-    initialSessionId: lastSessionId,
-  });
-
   const {
     sessions,
     sessionsLoading,
@@ -46,7 +39,15 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
     runningStepId: researchRunningStepId,
     handleSubmit,
     setQueryMode,
-  } = research;
+    selectSessionById,
+    handleRerunStep,
+    handleSelectSession,
+  } = useResearchSession({
+    serverId: serverId?.toString() ?? '',
+    bankId: bankId ?? '',
+    viewMode: 'step',
+    initialSessionId: lastSessionId,
+  });
 
   // Workspace is always in Reflect mode; pin the underlying research hook so
   // submissions use the existing working discover/poll path.
@@ -120,26 +121,62 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
 
   return useMemo(
     () => ({
-      ...research,
+      sessions,
+      sessionsLoading: sessionsLoading || autoCreating,
+      activeSessionId,
       activeSession,
-      workspaceItems,
-      curatedPages,
+      trail,
+      trailLoading,
+      fetchSessions,
+      fetchTrail,
+      setActiveSessionId,
+      query,
+      setQuery,
+      queryOptions,
+      setQueryOptions,
+      loading,
+      error,
+      result,
+      activeStepId,
       runningStepId,
+      handleSubmit,
       refresh,
       autoCreating,
-      sessionsLoading: sessionsLoading || autoCreating,
-      trailLoading,
+      setQueryMode,
+      selectSessionById,
+      handleRerunStep,
+      handleSelectSession,
+      workspaceItems,
+      curatedPages,
     }),
     [
-      research,
+      sessions,
+      sessionsLoading,
+      activeSessionId,
       activeSession,
-      workspaceItems,
-      curatedPages,
+      trail,
+      trailLoading,
+      fetchSessions,
+      fetchTrail,
+      setActiveSessionId,
+      query,
+      setQuery,
+      queryOptions,
+      setQueryOptions,
+      loading,
+      error,
+      result,
+      activeStepId,
       runningStepId,
+      handleSubmit,
       refresh,
       autoCreating,
-      sessionsLoading,
-      trailLoading,
+      setQueryMode,
+      selectSessionById,
+      handleRerunStep,
+      handleSelectSession,
+      workspaceItems,
+      curatedPages,
     ],
   );
 }
