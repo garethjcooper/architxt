@@ -42,6 +42,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
     selectSessionById,
     handleRerunStep,
     handleSelectSession,
+    setResult,
   } = useResearchSession({
     serverId: serverId?.toString() ?? '',
     bankId: bankId ?? '',
@@ -148,6 +149,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
       handleSelectSession,
       workspaceItems,
       curatedPages,
+      setResult,
     }),
     [
       sessions,
@@ -177,6 +179,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
       handleSelectSession,
       workspaceItems,
       curatedPages,
+      setResult,
     ],
   );
 }

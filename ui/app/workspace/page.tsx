@@ -828,16 +828,19 @@ export default function WorkspacePage() {
   );
 
   // When the research hook produces a completed result, mirror it into the
-  // workspace's selected-view state so the result panel renders.
+  // workspace's selected-view state so the result panel renders. Clear the hook's
+  // result immediately so this effect does not keep re-selecting the new step
+  // after the user clicks a different item.
   useEffect(() => {
     if (!workspaceSession.result) return;
     const step = workspaceSession.trail.find((s) => s.id === workspaceSession.result?.step_id);
+    workspaceSession.setResult(null);
     if (step) {
       setSelectedView({ kind: 'step', step });
       updateAnchorTab(step.intent_text || step.raw_query || `Reflect ${step.id}`);
       void workspaceSession.refresh();
     }
-  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh, updateAnchorTab]);
+  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh, workspaceSession.setResult, updateAnchorTab]);
 
   const handleRerunStep = useCallback(async (stepId: number) => {
     // Delegate to the research hook's rerun path so runningStepId is set and
