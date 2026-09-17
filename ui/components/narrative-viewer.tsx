@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
 import { Plus, Eye, FileText, FileSearch, Table2, GitGraph, Workflow } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
-import { slugifyHeading } from './smart-document-editor';
+
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
@@ -82,7 +82,7 @@ export interface NarrativeViewerProps {
   /** Optional header content rendered above the sidebar/content panes. */
   header?: React.ReactNode;
   /** Optional resolver that returns the memory ids backing a section, used by the evidence action. */
-  resolveSectionEvidence?: (heading: string) => string[] | null;
+  resolveSectionEvidence?: (heading: string, narrativeId?: string, tableId?: string, diagramId?: string) => string[] | null;
   /** Optional callback when the user requests to see the evidence backing a section. Receives the section's memory ids and a human-readable label. */
   onShowEvidence?: (memoryIds: string[], label: string) => void;
   /** Optional label for the evidence action. */
@@ -103,7 +103,7 @@ export interface NarrativeViewerProps {
    * Optional resolver that turns a section (heading + content) into a structured envelope event.
    * If it returns null, the section is treated as narrative.
    */
-  resolveSectionCopy?: (heading: string, level: number, contentMarkdown: string) => EnvelopeCopyEvent | null;
+  resolveSectionCopy?: (heading: string, level: number, contentMarkdown: string, tableId?: string, diagramId?: string) => EnvelopeCopyEvent | null;
   /** Called when the user copies/adds the whole document. Decomposes into one or more envelope events. */
   onCopyWholeDocument?: (events: EnvelopeCopyEvent[]) => void;
   /** Optional callback when the user focuses a section to examine it in a dedicated modal. Receives the heading block, the section markdown, and any structured event resolved from it. */
@@ -241,15 +241,30 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
       .filter((bb) => ids.includes(bb.id))
       .map((bb) => bb.edited ?? bb.raw)
       .join('');
+    const evidence = resolveSectionEvidence?.(b.title ?? '', b.__narrativeId, b.__tableId, b.__diagramId) ?? [];
+    const base: Omit<EnvelopeCopyEvent, 'type'> & { type: 'narrative' } = {
+      type: 'narrative',
+      payload: markdown,
+      label: b.title,
+      evidence,
+      id: b.__narrativeId,
+    };
     if (resolveSectionCopy) {
-      const resolved = resolveSectionCopy(b.title ?? '', b.level ?? 0, markdown);
-      if (resolved) return resolved;
+      const resolved = resolveSectionCopy(b.title ?? '', b.level ?? 0, markdown, b.__tableId, b.__diagramId);
+      if (resolved) return { ...resolved, evidence, id: resolved.id ?? b.__narrativeId };
     }
-    if (b.synthetic) {
-      return { type: 'narrative', payload: markdown, label: b.title };
+    return base;
+  }, [blocks, resolveSectionCopy, resolveSectionEvidence]);
+
+  const makeBlockEvent = (raw: string, title?: string, narrativeId?: string, tableId?: string, diagramId?: string): EnvelopeCopyEvent => {
+    const evidence = resolveSectionEvidence?.(title ?? '', narrativeId, tableId, diagramId) ?? [];
+    const base: EnvelopeCopyEvent = { type: 'narrative', payload: raw, label: title, evidence, id: narrativeId };
+    if (resolveSectionCopy) {
+      const resolved = resolveSectionCopy(title ?? '', 0, raw, tableId, diagramId);
+      if (resolved) return { ...resolved, evidence, id: resolved.id ?? narrativeId };
     }
-    return { type: 'narrative', payload: markdown, label: b.title };
-  }, [blocks, resolveSectionCopy]);
+    return base;
+  };
 
   const handleFocusSection = useCallback((b: NarrativeBlock) => {
     if (!onFocusSection) return;
@@ -264,14 +279,6 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     }
     onFocusSection(b, markdown, resolved);
   }, [blocks, resolveSectionCopy, onFocusSection]);
-
-  const makeBlockEvent = (raw: string, title?: string): EnvelopeCopyEvent => {
-    if (resolveSectionCopy) {
-      const resolved = resolveSectionCopy(title ?? '', 0, raw);
-      if (resolved) return resolved;
-    }
-    return { type: 'narrative', payload: raw, label: title };
-  };
 
   const copyWholeDocument = useCallback(() => {
     if (!onCopyWholeDocument) return;
@@ -302,19 +309,6 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
       container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     };
 
-    if (viewMode === 'markdown') {
-      const block = blocks.find(b => b.id === id);
-      if (!block || block.type !== 'heading' || !block.title) return;
-      const slug = slugifyHeading(block.title);
-      const el = container?.querySelector(`#${CSS.escape(slug)}`) as HTMLElement | null;
-      if (el) {
-        if (!blocksProp) setInternalActiveBlockId(id);
-        scrollContainerTo(el);
-      }
-      onHeadingClick?.(id, block.title);
-      return;
-    }
-
     const rangeIds = getSectionBlockIds(blocks, id);
     if (!blocksProp) {
       setInternalActiveBlockId(id);
@@ -327,7 +321,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
       }
     }
     onHeadingClick?.(id, blocks.find(b => b.id === id)?.title);
-  }, [blocks, blocksProp, onHeadingClick, viewMode]);
+  }, [blocks, blocksProp, onHeadingClick]);
 
   useImperativeHandle(ref, () => ({ scrollToBlock }), [scrollToBlock]);
 
@@ -390,7 +384,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                const evidenceIds = resolveSectionEvidence?.(b.title ?? '') ?? [];
+                const evidenceIds = resolveSectionEvidence?.(b.title ?? '', undefined, b.__tableId, b.__diagramId) ?? [];
                 if (evidenceIds.length === 0) return;
                 onShowEvidence(evidenceIds, b.title || evidenceLabel);
               }}
@@ -481,7 +475,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAddToPage(makeBlockEvent(b.raw, b.title));
+                      onAddToPage(makeBlockEvent(b.raw, b.title, b.__narrativeId, b.__tableId, b.__diagramId));
                     }}
                     className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                     title={addToPageLabel}
@@ -499,7 +493,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddToPage(makeBlockEvent(b.raw, b.title));
+                    onAddToPage(makeBlockEvent(b.raw, b.title, b.__narrativeId, b.__tableId, b.__diagramId));
                   }}
                   className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                   title={addToPageLabel}
@@ -605,7 +599,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddToPage(makeBlockEvent(b.raw, b.title));
+                    onAddToPage(makeBlockEvent(b.raw, b.title, b.__narrativeId, b.__tableId, b.__diagramId));
                   }}
                   className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                   title={addToPageLabel}
@@ -623,7 +617,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAddToPage(makeBlockEvent(b.raw, b.title));
+                  onAddToPage(makeBlockEvent(b.raw, b.title, b.__narrativeId));
                 }}
                 className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
                 title={addToPageLabel}
@@ -701,7 +695,35 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           }`}
         >
           {viewMode === 'markdown' ? (
-            <Markdown className="text-[12px] leading-relaxed" headingIconResolver={resolveMarkdownHeadingIcon}>{renderedMarkdown}</Markdown>
+            structuralBlocks
+              .filter((b) => !b.deleted)
+              .map((section, sectionIdx) => {
+                const sectionIds = getSectionBlockIds(blocks, section.id);
+                const sectionMarkdown = blocks
+                  .filter((bb) => sectionIds.includes(bb.id) && !bb.deleted)
+                  .map((bb) => bb.edited ?? bb.raw)
+                  .join('');
+                const isLast = sectionIdx === structuralBlocks.filter((bb) => !bb.deleted).length - 1;
+                return (
+                  <div
+                    key={`${prefix}section-${section.id}`}
+                    ref={(el) => {
+                      // Register the section container itself for the heading block.
+                      blockRefs.current.set(section.id, el);
+                      // Also register the children so scrollToBlock on a sub-block works.
+                      sectionIds.forEach((id, i) => {
+                        if (i === 0) return;
+                        blockRefs.current.set(id, el);
+                      });
+                    }}
+                    className={`${isLast ? '' : 'border-b border-border-subtle pb-3 mb-3'}`}
+                  >
+                    <Markdown className="text-[12px] leading-relaxed" headingIconResolver={resolveMarkdownHeadingIcon}>
+                      {sectionMarkdown}
+                    </Markdown>
+                  </div>
+                );
+              })
           ) : (
             blocks.map(b => {
               const isActive = activeRangeIds.has(b.id);

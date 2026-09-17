@@ -1,6 +1,6 @@
 {
   "name": "@architxt/entity-matcher",
-  "version": "0.3.9",
+  "version": "0.4.0",
   "description": "Shared entity tag parsing and matching logic for architxt server and UI",
   "type": "module",
   "main": "./src/index.js",

@@ -1,8 +1,15 @@
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { createLogger } from '../../utils/logger.js';
 import { MERMAID_DIAGRAM_TYPES } from '@architxt/aql';
 
 const logger = createLogger('contextual-graph-normalize-model-output');
+
+function ensureSectionId(section) {
+  if (section && typeof section === 'object' && typeof section.id === 'string' && section.id.length > 0) {
+    return section;
+  }
+  return { ...section, id: randomUUID() };
+}
 
 /**
  * Hash the raw generated content for change detection.
@@ -162,7 +169,7 @@ function cleanInlineEvidence(narrative, evidence) {
     .replace(/【\s*】/g, '')
     .replace(/\(\s*\)/g, '')
     .replace(/\s+([.,;:!?\)\]\}】])/g, '$1')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
     .trim();
   return { narrative: tidy, evidence: Array.from(found) };
 }
@@ -288,14 +295,14 @@ export function normalizeEnvelopeForApi(envelope) {
   const diagramsInput = Array.isArray(envelope.diagrams) ? envelope.diagrams : [];
 
   return {
-    narratives: narrativesInput.map(normalizeNarrative).filter((n) => n !== null),
+    narratives: narrativesInput.map(normalizeNarrative).filter((n) => n !== null).map(ensureSectionId),
     graph: {
       name: typeof graphInput.name === 'string' ? graphInput.name : '',
       nodes: Array.isArray(graphInput.nodes) ? graphInput.nodes : [],
       edges: Array.isArray(graphInput.edges) ? graphInput.edges : [],
     },
-    tables: tablesInput,
-    diagrams: diagramsInput,
+    tables: tablesInput.map(normalizeTable).filter((t) => t !== null).map(ensureSectionId),
+    diagrams: diagramsInput.map(normalizeDiagram).filter((d) => d !== null).map(ensureSectionId),
   };
 }
 
@@ -314,7 +321,7 @@ export function normalizeNarrative(n) {
     : [];
   const { narrative, evidence: cleanedEvidence } = cleanInlineEvidence(rawNarrative, evidence);
   warnIfShortEvidence(cleanedEvidence, { narrative: narrative_name || 'unnamed' });
-  return { narrative_name, narrative, evidence: cleanedEvidence };
+  return { id: n.id, narrative_name, narrative, evidence: cleanedEvidence };
 }
 
 function normalizeNode(n) {
@@ -364,7 +371,7 @@ function normalizeTable(t) {
     evidence = deriveTableEvidenceFromRows(rows);
   }
   warnIfShortEvidence(evidence, { table: name });
-  return { name, columns, rows, evidence };
+  return { id: t.id, name, columns, rows, evidence };
 }
 
 /**
@@ -396,12 +403,11 @@ function normalizeDiagram(d) {
   // Models sometimes emit the literal two-character sequence \n instead of real
   // newlines. Repair that so Mermaid receives proper line breaks.
   content = content.replace(/\\n/g, '\n');
-
   const evidence = Array.isArray(d.evidence)
     ? d.evidence.filter((id) => typeof id === 'string')
     : [];
   warnIfShortEvidence(evidence, { diagram: name });
-  return { name, type, content, evidence };
+  return { id: d.id, name, type, content, evidence };
 }
 
 function dropIsolatedNodes(nodes, edges) {
@@ -527,14 +533,14 @@ export function normalizeModelOutput(raw) {
   }
 
   return {
-    narratives: narrativesInput.map(normalizeNarrative).filter((n) => n !== null),
+    narratives: narrativesInput.map(normalizeNarrative).filter((n) => n !== null).map(ensureSectionId),
     graph: {
       name: typeof graphInput.name === 'string' ? graphInput.name : '',
       nodes: connectedNodes,
       edges,
     },
-    tables,
-    diagrams,
+    tables: tables.map(ensureSectionId),
+    diagrams: diagrams.map(ensureSectionId),
     errors,
     raw: rawString,
   };

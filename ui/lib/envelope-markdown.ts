@@ -2,10 +2,45 @@ import type { DiscoverStepResponse, ResearchStepSummary, UnifiedEnvelope, Unifie
 
 export type EnvelopeLike = UnifiedEnvelope | null | undefined;
 
+function uuidv4(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function ensureEnvelopeIds(envelope: EnvelopeLike): UnifiedEnvelope {
+  const base = envelope ?? ({} as EnvelopeLike);
+  const narratives = (base?.narratives ?? []).map((n) => ({
+    ...n,
+    id: n.id || uuidv4(),
+  }));
+  const tables = (base?.tables ?? []).map((t) => ({
+    ...t,
+    id: t.id || uuidv4(),
+  }));
+  const diagrams = (base?.diagrams ?? []).map((d) => ({
+    ...d,
+    id: d.id || uuidv4(),
+  }));
+  return {
+    ...base,
+    narratives,
+    tables,
+    diagrams,
+    graph: base?.graph ?? { name: '', nodes: [], edges: [] },
+  } as UnifiedEnvelope;
+}
+
 function toNarratives(envelope: EnvelopeLike): UnifiedNarrativeBlock[] {
   if (!envelope || typeof envelope !== 'object') return [];
   return Array.isArray(envelope.narratives)
     ? envelope.narratives.map((n) => ({
+        id: n.id,
         narrative_name: n.narrative_name ?? '',
         narrative: n.narrative ?? '',
         evidence: n.evidence ?? [],
@@ -26,12 +61,14 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
       edges: envelope.graph?.edges ?? [],
     },
     tables: (envelope.tables ?? []).map((t) => ({
+      id: t.id,
       name: t.name,
       columns: t.columns ?? [],
       rows: t.rows,
       evidence: t.evidence ?? [],
     })),
     diagrams: (envelope.diagrams ?? []).map((d) => ({
+      id: d.id,
       name: d.name,
       type: d.type,
       content: d.content,
@@ -140,8 +177,8 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
 export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): UnifiedEnvelope {
   // The server now always returns the canonical unified envelope. If it's ever
   // missing, treat the step as empty rather than reconstructing from legacy
-  // split fields.
-  return toUnified(page.envelope);
+  // split fields. Also backfill any missing per-section ids for stable identity.
+  return ensureEnvelopeIds(toUnified(page.envelope));
 }
 
 export function normalizeEnvelopeFromNullable(

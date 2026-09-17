@@ -37,10 +37,13 @@ export interface WorkspaceResultPanelProps {
     dirty: boolean;
     deletedBlockIds: string[];
     deletedStructuredKeys: string[];
+    deletedNarrativeIds: string[];
   }) => void;
   /** Deletion sets to restore when the active curated page editor is remounted. */
-  activeCuratedPageDeletions?: { deletedBlockIds: string[]; deletedStructuredKeys: string[] };
+  activeCuratedPageDeletions?: { deletedBlockIds: string[]; deletedStructuredKeys: string[]; deletedNarrativeIds: string[] };
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
+  /** Called from inside a curated page editor to copy a section via the target picker. */
+  onRequestCopySection?: (event: EnvelopeCopyEvent) => void;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
   /** Optional override for the header bar title. Defaults to title. */
@@ -66,6 +69,7 @@ export function WorkspaceResultPanel({
   onCuratedPageChange,
   activeCuratedPageDeletions,
   onCopyToCuratedPage,
+  onRequestCopySection,
   tabs,
   headerTitle,
 }: WorkspaceResultPanelProps) {
@@ -161,12 +165,14 @@ export function WorkspaceResultPanel({
         onChange={onCuratedPageChange}
         initialDeletedBlockIds={activeCuratedPageDeletions?.deletedBlockIds}
         initialDeletedStructuredKeys={activeCuratedPageDeletions?.deletedStructuredKeys}
+        initialDeletedNarrativeIds={activeCuratedPageDeletions?.deletedNarrativeIds}
         showIndex={showIndex}
         onShowIndexChange={setShowIndex}
         plain={plain}
         onPlainChange={setPlain}
         sidebarWidth={sidebarWidth}
         onSidebarWidthChange={setSidebarWidth}
+        onRequestCopySection={onRequestCopySection}
       />
     );
   }
