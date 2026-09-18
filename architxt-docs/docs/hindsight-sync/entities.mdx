@@ -4,4 +4,86 @@ sidebar_position: 3
 
 # Entities
 
-This page describes how entity sync works between architxt and a Hindsight memory bank. Content coming soon.
+The **Entities** sync type reconciles entity labels between architxt and a Hindsight memory bank. Unlike document sync, entities are grouped by **entity type** — one sync row per type, containing all the entity ids and names for that type. This matches how Hindsight stores them in bank configuration as `entity_labels`.
+
+## What is compared
+
+When you run **Diff** with the **Entities** object type, architxt checks every entity type that exists on either side. For types that exist on both sides, it compares:
+
+| Field | Divergent if... |
+|---|---|
+| **ID field (entities)** | An entity id exists in architxt but not in Hindsight, or vice versa. These appear as "Missing on architxt" / "Missing on Bank" in the compare modal. |
+| **Name field** | For the active entity-tag format (`v1-dual`), an entity id present on both sides has a different name. The compare modal shows each mismatched id with its architxt and Hindsight names. |
+| **Description field** | The entity type's description differs between architxt and Hindsight. |
+
+:::tip[Name sync depends on the active tag format]
+architxt can run with different entity-tag formats. In the current default format (`v3-single-entity`) only the entity id is sent to Hindsight, so the name field is not compared. If the server is configured to `v1-dual`, names are part of the sync contract and will be compared. The diff UI only shows badges for the fields that are actually synced.
+:::
+
+The diff result groups rows into four columns:
+
+- **Same** — the type exists on both sides, all entity ids match, and names/descriptions match.
+- **Different** — the type exists on both sides but some ids, names, or the description diverged.
+- **Only in architxt** — the entity type exists in architxt but has no label in the Hindsight bank.
+- **Only in Hindsight** — the entity label exists in the Hindsight bank but the type is not in architxt.
+
+## Push entity types
+
+Pushing sends one or more architxt entity types to Hindsight as map labels in the bank's `entity_labels` config.
+
+In the UI:
+
+1. Select one or more rows from **Only in architxt** or **Different**.
+2. Click **Push**.
+3. architxt calls the Hindsight bank-config endpoint and merges the pushed labels with the existing `entity_labels` array. Labels for types that are not being pushed are preserved.
+4. Each pushed label has `type: multi-values`, a `key` equal to the type name, and one value entry per entity (id plus, depending on the active format, a name description).
+
+Pushing an entity type does **not** create or delete entities in Hindsight; it only updates the bank's label configuration. Hindsight uses these labels during retention and entity extraction.
+
+:::tip[Push multiple types at once]
+Selecting several rows and clicking **Push** sends all selected type names in a single request. The operation preserves existing Hindsight labels for types that are not part of the selection.
+:::
+
+## Pull entity types
+
+Pulling copies or updates entity types and entities from the Hindsight bank into architxt.
+
+In the UI:
+
+1. Select one or more rows from **Only in Hindsight** or **Different**.
+2. Click **Pull**.
+3. architxt reads the Hindsight `entity_labels` for the selected type keys.
+4. For each type key that does not exist in architxt, a new entity type is created with `generated_by: import`.
+5. For each entity value in the label, architxt creates the entity if it does not exist, or updates its name if the name differs and the active format syncs names. Pulled entities are created with `generated_by: import`.
+6. When pulling from **Different**, entities that exist in architxt but are missing from the Hindsight label for that type are deleted. When pulling from **Only in Hindsight**, architxt only adds what is present.
+
+:::caution[Pulling a type can delete architxt entities]
+Pulling from **Different** makes the selected architxt type look exactly like the Hindsight label. Entity ids that are present locally but absent from the pulled label are removed, because the Hindsight label is treated as the source of truth for that type.
+:::
+
+## Field mapping
+
+Entity sync maps to the Hindsight bank config fields described in the [memory bank entity-labels reference](https://hindsight.vectorize.io/developer/api/memory-banks#entity-labels):
+
+| architxt concept | Hindsight config field | Notes |
+|---|---|---|
+| Entity type name | `entity_labels[].key` | One label per entity type. |
+| Entity id | `entity_labels[].values[].value` | Stable id. Used in retention and extraction. |
+| Entity name | `entity_labels[].values[].description` | Only synced under `v1-dual`; under `v3-single-entity` the name stays in architxt. |
+| Entity type description | `entity_labels[].description` | Shown in the compare modal. |
+
+See the [Entities](../core-concepts/entities) core-concept page for how entity types, ids, names, aliases, and matching options work inside architxt.
+
+## Typical workflows
+
+| Situation | Action |
+|---|---|
+| You created a new entity type and entities in architxt. | Push from **Only in architxt**. |
+| You added or removed entities in an existing architxt type. | Push from **Different** to update the Hindsight label. |
+| A teammate added entity labels directly in Hindsight. | Pull from **Only in Hindsight** to import the type and its entities. |
+| A Hindsight label has a different name for a shared entity id. | Pull from **Different** if you want Hindsight's names to overwrite architxt. Push from **Different** if you want architxt's names to overwrite Hindsight. |
+| You want architxt to match the Hindsight bank exactly for a type. | Pull from **Different** for that type; absent local ids will be removed. |
+
+## Summary
+
+Entity sync operates on **types**, not individual entities. Each diff row is an entity type; divergence is checked on the set of entity ids, entity names (when the active format supports it), and the type description. Push sends architxt types to Hindsight as `multi-values` labels. Pull imports Hindsight labels into architxt as entity types and entities, optionally removing local ids that no longer exist on the bank.
