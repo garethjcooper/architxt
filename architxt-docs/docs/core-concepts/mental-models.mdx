@@ -233,7 +233,7 @@ Query:   Write a concise summary of Customer Registry (Component).
 
 ## Composing prompts
 
-Before a mental model is executed or pushed to Hindsight, its **Source Query** is composed. The **Source Query** is written in [AQL](./aql.mdx): the architxt Query Language. AQL lets a mental model request specific output shapes — graph, table, diagram, or narrative — using block directives, references, and plain intent text.
+Before a mental model is executed or pushed to Hindsight, its **Source Query** is composed. The **Source Query** is written in [AQL](./aql): the architxt Query Language. AQL lets a mental model request specific output shapes — graph, table, diagram, or narrative — using block directives, references, and plain intent text.
 
 Composition:
 
@@ -244,7 +244,7 @@ Composition:
 
 The `composeMentalModelPrompt` service in `server/src/prompts/template-service.js` delegates AQL parsing to `@architxt/aql` via `server/src/prompts/section-directives.js`. You can preview composition without saving via `POST /mentalmodels/compose-preview`.
 
-For details on AQL syntax and directives, see the [AQL page](./aql.mdx).
+For details on AQL syntax and directives, see the [AQL page](./aql).
 
 ## Syncing with Hindsight
 
