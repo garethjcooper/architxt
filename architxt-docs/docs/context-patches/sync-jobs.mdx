@@ -1,0 +1,96 @@
+---
+sidebar_position: 5
+---
+
+# Sync Jobs
+
+The **Sync Jobs** tab is the operational heart of Context Patches. It shows the history of every contextual-graph sync job for the selected server and bank, lets you inspect each stage, and gives you full logs and issue lists so you can tell what happened and why.
+
+## Job list
+
+The left panel is a filterable list of sync jobs. Each row shows:
+
+| Field | What it tells you |
+|---|---|
+| **Status** | `pending`, `running`, `completed`, `completed_with_issues`, `failed`, or `cancelled`. |
+| **Started** | When the job began, relative to now. |
+| **Duration** | How long the job ran, once it has finished. |
+| **Issue count** | Number of non-fatal issues reported by individual stages. |
+
+You can filter by status and enable auto-refresh to watch a running job update live.
+
+## Job detail
+
+Click any job to open its detail view on the right. The detail panel contains:
+
+### Summary header
+
+- Overall status badge.
+- Start and finish timestamps.
+- Total duration.
+- Top-level error message and error code, if the job failed outright.
+
+### Stages
+
+Every contextual sync job runs the same six stages in order:
+
+| Stage | What it does |
+|---|---|
+| **Import Hindsight skeleton** | Pulls entities and relationships from Hindsight into the contextual graph. |
+| **Remove disallowed models** | Deletes contextual mental models whose template role is no longer allowed by the bank config. |
+| **Remove orphaned models** | Deletes models attached to nodes or edges that no longer exist. |
+| **Deploy contextual models** | Creates or updates role-based mental models for qualifying nodes, edges, and seeds. |
+| **Sync mental-model config** | Aligns per-entity overrides and refresh settings between architxt and Hindsight. |
+| **Refresh patches** | Re-runs mental models whose config changed so their content is current. |
+
+Each stage shows a status dot and a label such as `completed`, `running`, `failed`, or `completed with issues`. A stage can finish with issues without failing the whole job.
+
+### Issues
+
+If a stage reports individual problems — for example, a model refresh that failed or a node that could not be imported — they are listed here grouped by stage. Each issue shows:
+
+- The stage and label.
+- The external ID of the affected model or item, if known.
+- Up to three error messages.
+
+Only the first 20 issues are shown inline; if there are more, the panel notes the total.
+
+### Logs
+
+Every log line captured during the job appears at the bottom of the detail panel. Each log entry shows:
+
+- **Level** — `info`, `warn`, or `error`.
+- **Timestamp** — exact time the line was emitted.
+- **Stage** — which stage produced the log, if any.
+- **Message** — the human-readable log text.
+- **Details** — optional structured data, pretty-printed as JSON.
+
+Logs are useful for tracing the exact path a job took and for sharing with support when something unexpected happens.
+
+## Actions
+
+| Action | What it does |
+|---|---|
+| **Select a job** | Opens its detail view. |
+| **Filter by status** | Narrows the list to running, completed, failed, etc. |
+| **Auto-refresh** | Polls the job list every few seconds so running jobs update live. |
+| **Cancel** | Stops a pending or running job. Cancellation is best-effort: stages already in progress may finish their current step. |
+
+## When to use this tab
+
+| Situation | What to check |
+|---|---|
+| A model is missing from the Mental Models tab | Look at the **Deploy contextual models** stage for errors or skipped items. |
+| Candidates never appear | Check the **Refresh patches** and deploy stages for discovery-model issues. |
+| The graph looks stale | Confirm the latest job completed and check whether it is set to auto or manual refresh. |
+| Something failed | Read the top-level error, stage issues, and logs in order. |
+
+## Relationship to the other tabs
+
+- **Graph** — shows the entities and edges produced by the **Import Hindsight skeleton** stage.
+- **Candidates** — shows nodes discovered by seed-scoped models deployed in the **Deploy contextual models** and **Refresh patches** stages.
+- **Mental Models** — shows the models created, updated, and cleaned up across all model-related stages.
+
+## Summary
+
+The Sync Jobs tab is where you verify that the contextual graph is being kept up to date. It exposes every stage, every issue, and every log line so you can diagnose problems without guessing about what the pipeline did.
