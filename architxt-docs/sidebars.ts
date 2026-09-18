@@ -22,12 +22,6 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Context Patches',
-      collapsed: false,
-      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates', 'context-patches/mental-models', 'context-patches/sync-jobs'],
-    },
-    {
-      type: 'category',
       label: 'Workspace',
       collapsed: false,
       items: [
@@ -42,6 +36,12 @@ const sidebars: SidebarsConfig = {
           items: ['workspace/focus-narrative', 'workspace/focus-diagram', 'workspace/focus-table', 'workspace/focus-graph', 'workspace/focus-evidence'],
         },
       ],
+    },
+    {
+      type: 'category',
+      label: 'Context Patches',
+      collapsed: false,
+      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates', 'context-patches/mental-models', 'context-patches/sync-jobs'],
     },
     {
       type: 'category',
