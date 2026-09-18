@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Contexts
 
-Contexts in architxt are short descriptive labels you attach to documents. They are a way to group content by theme, project, product area, or any other lens you want to apply consistently across the document set.
+A context in architxt is a short descriptive label you attach to a document. It is injected directly into the LLM prompt, so it actively shapes how facts are extracted. The same sentence can mean something very different depending on context: *“the project was terminated”* in a **performance review** context versus a **product roadmap** context produces different memories.
 
 A context is simply a description string, such as **Customer Domain**, **Technical Architecture**, or **Q3 Planning**. Documents can have **one context each** (or none). Contexts are managed on the **Contexts** page and applied from the **Documents** page.
 
@@ -41,7 +41,7 @@ You can also set a context at upload time. In the **Upload** dialog, choose a co
 
 The context description is included when architxt pushes a document to a Hindsight memory bank as the Hindsight `context` field. Hindsight uses that field to group and scope extracted memories.
 
-For details on how the context field is consumed during retention, see the Hindsight API documentation on [LLM request stats and retain parameters](https://hindsight.vectorize.io/developer/api/retain#tag/LLM-Traces/operation/llm_request_stats).
+For details on how the context field is consumed during retention, see the Hindsight API documentation on [retain context parameters](https://hindsight.vectorize.io/developer/api/retain#context).
 
 ## How contexts fit into architxt
 
