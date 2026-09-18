@@ -128,8 +128,7 @@ function buildRunner(deps) {
     const server = serverResult?.success ? serverResult.data : null;
     const serverName = server?.svr_name;
     const serverAddress = server?.svr_base_url;
-    const serverLabel = [serverName, serverAddress].filter(Boolean).join(' — ')
-      || `server ${serverId}`;
+    const serverLabel = [serverName, serverAddress].filter(Boolean).join(' — ');
 
     appendLog(db, jobId, {
       stage: null,
