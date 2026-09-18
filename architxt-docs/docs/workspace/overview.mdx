@@ -1,0 +1,87 @@
+---
+sidebar_position: 1
+---
+
+# Overview
+
+The **Workspace** is where you explore the contextual graph, run **Reflect** queries against a Hindsight memory bank, and assemble your findings into **curated pages**. It is designed as a persistent, multi-pane research surface: you select a server and bank, choose or create a session, and then move between querying, inspecting graph items, and composing pages.
+
+## Primary UI areas
+
+The Workspace page is divided into a top control bar, a left-hand work panel, and a right-hand result panel. Each area can be resized by dragging the handles between panes; double-click a handle to reset it.
+
+### Top bar
+
+The top bar ties the Workspace to a specific Hindsight server and memory bank, and controls the active research session.
+
+| Control | Purpose |
+|---|---|
+| **Server / Bank selectors** | Choose the Hindsight server and memory bank that feed the contextual graph and Reflect queries. |
+| **Session selector** | Pick an existing research session or start a new one. Sessions are scoped to the selected server and bank. |
+| **New / Edit / Delete session** | Create a new session, rename the active one, or delete it. Deleted sessions cannot be recovered. |
+
+Sessions are the unit of persistence in the Workspace. A session remembers your Reflect history, curated pages, and the state of your tabbed views. The last active session for a given server/bank pair is restored automatically when you return.
+
+### Left panel: scope, spine, and contextual data
+
+The left column is split vertically into a **scope/query area** on top and a **bottom split** containing the **Entity spine** and **Contextual data** panes.
+
+| Pane | Purpose |
+|---|---|
+| **Scope / Reflect query** | Write and submit AQL-based Reflect queries. Toggle query options to adjust context and directives. |
+| **Entity spine** | A filterable list of all grounded entities in the selected bank. It gives you a quick overview of what is in the graph, but is read-only here. |
+| **Contextual data** | Shows entities that have attached mental models (contextual, derived, plain, or edge-context). Expand an entity to see its models and open one in a new tab. |
+
+### Right panel: preview and curated pages
+
+The right side shows either a read-only preview or an editable curated page, depending on the active tab.
+
+| Tab type | Purpose |
+|---|---|
+| **Preview** | The default anchor tab. Displays the result of a Reflect query, a selected step from the session history, or a mental-model content preview. |
+| **View tabs** | Read-only tabs opened from the Contextual data panel, the Reflect history, or other preview actions. Each view tab isolates one result. |
+| **Curated page tabs** | Editable pages where you compose narratives, tables, diagrams, and graphs from the session. Curated pages are saved inside the session. |
+
+Curated-page tabs show a dirty indicator when they have unsaved edits. You can save, rename, or delete the active curated page from the tab bar.
+
+## Session management
+
+A session is a container for a single research thread. When you create a session, it is empty: no queries, no pages, no view tabs. As you work, the session accumulates:
+
+- Reflect query submissions and their results.
+- Curated pages you create.
+- View tabs you open from Contextual data or Reflect history.
+
+Sessions are identified by an ID and a title. The title is optional; the UI falls back to the session ID and creation date. You can rename a session at any time.
+
+:::tip[One session per server/bank pair]
+Sessions are tied to a specific server and bank. Switching banks changes which sessions are available, but your open tabs and queries adapt to the new selection through the underlying research session hook.
+:::
+
+## Reflect workflow
+
+1. Choose a server and bank.
+2. Create or select a session.
+3. Type an AQL query in the **Scope / Reflect query** pane and submit it.
+4. The result appears in the **Preview** tab as an envelope (narrative, graph, tables, diagrams).
+5. From the Reflect history or the preview, you can copy content into a curated page.
+6. Curated pages are edited, saved, and managed as tabs in the right panel.
+
+## How it fits into architxt
+
+```text
+Contextual Graph / Hindsight  ──►  Workspace
+                                        │
+            ┌───────────────────────────┼───────────────────────────┐
+            ▼                           ▼                           ▼
+       Reflect queries            Contextual data            Curated pages
+       (questions to bank)        (attached mental models)   (composed findings)
+```
+
+- **Context Patches** builds and maintains the graph and mental models that appear in the Workspace.
+- **Reflect** provides the query engine and result envelopes.
+- **Workspace** gives you a persistent place to run queries, inspect model output, and write pages.
+
+## Summary
+
+The Workspace is the user-facing research surface of architxt. Its top bar selects the data source and session; its left panel provides querying and graph browsing; and its right panel previews results and hosts editable curated pages tied to the active session.
