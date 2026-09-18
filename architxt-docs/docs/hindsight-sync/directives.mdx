@@ -4,4 +4,81 @@ sidebar_position: 5
 
 # Directives
 
-This page describes how directive sync works between architxt and a Hindsight memory bank. Content coming soon.
+The **Directives** sync type reconciles individual directives between architxt and a Hindsight memory bank. Each directive is matched by its external id (`dir_ext_id`), so a directive created in architxt can later be updated on the bank and pulled back, and vice versa.
+
+## What is compared
+
+When you run **Diff** with the **Directives** object type, architxt checks every directive that exists on either side. For directives that exist in both places, it compares these fields:
+
+| Field | Divergent if... |
+|---|---|
+| **Name** | The directive name differs between architxt and Hindsight. |
+| **Statement** | The directive statement differs. This is the body of the rule, so even small wording changes count. |
+| **Priority** | The numeric priority values are not equal. |
+| **Active** | One side has the directive active and the other does not. Inactive directives are still compared if they exist on both sides. |
+| **Tags** | The set of tags applied to the directive differs. Order does not matter. |
+
+The diff result groups rows into four columns:
+
+- **Same** — both sides present and all compared fields match.
+- **Different** — both sides present, but at least one field diverged.
+- **Only in architxt** — the directive exists in architxt but not in the Hindsight bank. This includes brand-new directives that have not yet been pushed.
+- **Only in Hindsight** — the directive exists in the Hindsight bank but not in architxt.
+
+## Push a directive
+
+Pushing sends an architxt directive to Hindsight so it can be used as a hard rule for Reflect.
+
+In the UI:
+
+1. Select one or more rows from **Only in architxt** or **Different**.
+2. Click **Push**.
+3. architxt checks whether the directive already has a Hindsight external id.
+4. If it does, architxt PATCHes the existing directive on Hindsight. If it does not, architxt POSTs a new directive and stores the returned Hindsight id in architxt as `dir_ext_id`.
+
+:::tip[Push creates new ids]
+Pushing a brand-new architxt directive creates a new directive on the Hindsight bank and writes the returned id back to architxt. That is why the same row is then treated as an existing, syncable directive on the next diff.
+:::
+
+## Pull a directive
+
+Pulling copies or updates a directive from Hindsight into architxt.
+
+In the UI:
+
+1. Select one or more rows from **Only in Hindsight** or **Different**.
+2. Click **Pull**.
+3. architxt fetches the full directive from Hindsight, including its name, statement, priority, active flag, and tags.
+4. If the Hindsight id already exists in architxt, the local row is updated.
+5. If it does not exist, a new directive is created with `generated_by: import` and its tags are synced from Hindsight.
+
+:::tip[Tags on pull]
+Pulled tags are applied to the local directive during the pull. Tags that do not exist yet in architxt are created as part of the sync.
+:::
+
+## Field mapping
+
+The values compared and transferred map to Hindsight directive fields as follows:
+
+| architxt field | Hindsight field | Notes |
+|---|---|---|
+| `dir_ext_id` | `id` | Stable identifier used on both sides. See [Hindsight `directives`](https://hindsight.vectorize.io/developer/api/memory-banks#directives). |
+| `dir_name` | `name` | Display name. |
+| `dir_statement` | `content` | The rule body. |
+| `dir_priority` | `priority` | Numeric ordering hint. |
+| `dir_is_active` | `is_active` | Active directives are used by Reflect; inactive ones are ignored. |
+| tags | `tags` | Document-style tags. See [Tags](../core-concepts/tags). |
+
+## Typical workflows
+
+| Situation | Action |
+|---|---|
+| You wrote a new directive in architxt and want it to affect Hindsight Reflect. | Push from **Only in architxt**. |
+| You edited the wording of a directive in architxt. | Push from **Different** to overwrite Hindsight's copy. |
+| A teammate added a directive directly in Hindsight. | Pull from **Only in Hindsight** to import it. |
+| A directive was updated in Hindsight. | Pull from **Different** to update the architxt copy. |
+| You want a directive to stop being used without deleting it. | Deactivate it in architxt and push from **Different**; the `is_active` change is propagated. |
+
+## Summary
+
+Directive sync is one row per directive, matched by external id, with divergence checked on name, statement, priority, active flag, and tags. Push creates or updates the directive on Hindsight and records the returned id. Pull fetches Hindsight's version and creates or updates the local directive, including its tags.
