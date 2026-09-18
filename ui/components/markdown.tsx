@@ -60,7 +60,10 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
       const content = String(children || '').replace(/\n$/, '');
 
       if (!inline && language === 'mermaid') {
-        return <MermaidDiagram content={content} />;
+        const typeMatch = content.match(
+          /^\s*(flowchart(?:-v2)?|graph(?:\s+(?:TB|TD|BT|RL|LR))?|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|mindmap|timeline|quadrantChart|xychart|sankey|block-beta|requirementDiagram|gitGraph)\b/i,
+        );
+        return <MermaidDiagram content={content} type={typeMatch?.[1]} />;
       }
 
       return <code className="bg-markdown-code-bg rounded px-1 py-0.5 text-xs" {...props}>{children}</code>;
