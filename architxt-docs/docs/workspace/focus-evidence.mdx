@@ -1,0 +1,99 @@
+---
+sidebar_position: 5
+---
+
+# Focus: evidence
+
+Every **focus** result in the Workspace can carry **evidence**: the set of source memories, entities, or documents that justify the content. Evidence is not a separate focus type like narrative, diagram, table, or graph; it is the grounding layer behind all of them. When you know where a section came from, you can verify it, cite it, or dig deeper without guessing.
+
+## What evidence is
+
+Evidence is a list of references to source data. In practice this is usually Hindsight memory IDs that architxt used when generating or selecting the section. You can think of it as a bibliography entry for a paragraph, a table row, a diagram edge, or a graph node.
+
+| Field | Purpose |
+|---|---|
+| **Memory IDs** | The stable identifiers of the Hindsight memories that support the section. |
+| **Snippet** | A short excerpt from the source memory, when available, so you can see the context at a glance. |
+| **Confidence** | Optional signal of how strongly the source memory supports the claim. |
+
+Evidence is attached at the section level. A narrative may have one evidence list per heading; a table may have evidence per row or per block; a diagram carries evidence on its edges and nodes; a graph exposes evidence on selected nodes and edges in the Details panel.
+
+## Where evidence appears
+
+### Narrative
+
+In a narrative preview, section-level actions include an evidence control. When invoked, it opens the **Evidence modal** and lists the memory IDs behind that section. If a section has no evidence, the control is disabled or hidden.
+
+### Tables
+
+Table blocks can carry evidence on the whole block or on individual rows. The Evidence modal shows the memory references that produced the columns and values you are reading.
+
+### Diagrams
+
+Diagram edges and nodes can carry evidence. When you add a graph-generated diagram to a curated page, the graph's edge evidence travels with it, so the diagram remains grounded in the same source memories.
+
+### Graphs
+
+Graph nodes and edges show evidence in the **Details** panel. Selecting a node or edge expands its properties and lists the source memories that established the relationship.
+
+:::tip[Evidence is not optional for all generated content]
+v0.4.0 and later require and preserve evidence arrays on narrative, diagram, and table envelope elements. This makes Reflect output verifiable by default.
+:::
+
+## The Evidence modal
+
+The Evidence modal matches the focus-modal layout. It has a resizable panel that lists source memories, shows snippets, and lets you inspect the original context.
+
+| Control | Behavior |
+|---|---|
+| **Memory list** | One row per supporting memory ID, with a confidence or relevance indicator. |
+| **Snippet view** | Shows the text of the selected memory so you can verify the claim without leaving the Workspace. |
+| **Copy IDs** | Copies the memory IDs to the clipboard for use in queries or external citations. |
+| **Resize** | Drag the modal footer or panel divider to make more room for long snippets. |
+
+:::tip[Open evidence from any focus section]
+If a section has evidence, the section-level actions include an evidence button. Use it to open the Evidence modal directly from the preview or curated-page editor.
+:::
+
+## How evidence travels between sections
+
+Evidence is preserved when one focus type is converted into another:
+
+| Conversion | What happens to evidence |
+|---|---|
+| **Graph → Diagram** | Edge evidence from the graph is copied into the generated Mermaid diagram section. |
+| **Graph → Table** | Graph-level evidence is copied into the node/edge table section. |
+| **Reflect result → Curated page** | Each copied section keeps its own evidence list. |
+
+This means a curated page assembled from multiple focus types remains fully traceable back to the original Hindsight memories.
+
+## Why evidence matters
+
+- **Verifiability** — Readers can inspect the source memories behind any claim.
+- **Citations** — Memory IDs can be copied and referenced in follow-up queries.
+- **Debugging** — If a Reflect answer looks wrong, check its evidence first to see what it was built from.
+- **Trust** — Grounded answers in Reflect trace back to the documents and entities that produced them.
+
+## From evidence to curated page
+
+The typical flow is:
+
+1. Run a Reflect query that produces narrative, table, diagram, or graph output.
+2. Inspect each section and open the Evidence modal to see what supports it.
+3. Copy the section into a curated page.
+4. The curated page section retains its evidence list, so readers can verify it later.
+5. If a section lacks evidence or the evidence looks wrong, refine the query or mental model and re-run Reflect.
+
+## Relationship to other focus pages
+
+Evidence underpins every focus type. The other pages describe the visible shape of the content; this page describes the invisible thread that ties that content back to source memories.
+
+- [Focus: narrative](./focus-narrative)
+- [Focus: diagram](./focus-diagram)
+- [Focus: table](./focus-table)
+- [Focus: graph](./focus-graph)
+- [Preview and curated pages](./preview-and-curated-pages)
+
+## Summary
+
+Evidence is the set of source memory references behind every focus result. It appears in the Evidence modal for narratives, tables, diagrams, and graphs, and it is preserved when those sections are copied into curated pages. Keeping evidence intact makes Workspace output verifiable, citable, and trustworthy.
