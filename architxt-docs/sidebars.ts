@@ -24,7 +24,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Context Patches',
       collapsed: false,
-      items: ['context-patches/overview'],
+      items: ['context-patches/overview', 'context-patches/graph'],
     },
     {
       type: 'category',
