@@ -102,7 +102,7 @@ Documents are stored in the `documents` table in SQLite. The schema is defined i
 | Field | UI label or concept | Purpose |
 |---|---|---|
 | `doc_id` | **Document ID** | Internal primary key. |
-| `doc_ext_id` | **External ID** | Stable identifier supplied by the user or import process. |
+| `doc_ext_id` | **External ID** | Stable identifier supplied by the user or import process. Maps to Hindsight's [`document_id`](https://hindsight.vectorize.io/developer/api/retain#document_id). |
 | `doc_status` | **Status** | Current lifecycle state. |
 | `doc_content` | **Document Content** | Extracted Markdown content produced by the extraction pipeline. |
 | `doc_content_hash` | content hash | `sha256` hash of the content used for integrity checks. |
