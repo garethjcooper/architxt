@@ -49,13 +49,13 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
     const svgEl = wrapper.querySelector('svg');
     if (!svgEl) return;
     if (fitToWidth) {
-      svgEl.style.width = '100%';
-      svgEl.style.height = 'auto';
-      svgEl.style.maxWidth = '100%';
+      svgEl.style.setProperty('width', '100%', 'important');
+      svgEl.style.setProperty('height', 'auto', 'important');
+      svgEl.style.setProperty('max-width', '100%', 'important');
     } else {
-      svgEl.style.width = '';
-      svgEl.style.height = '';
-      svgEl.style.maxWidth = '';
+      svgEl.style.removeProperty('width');
+      svgEl.style.removeProperty('height');
+      svgEl.style.removeProperty('max-width');
     }
   }, [fitToWidth, svg]);
 
