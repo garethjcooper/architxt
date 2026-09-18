@@ -18,7 +18,36 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Core Concepts',
       collapsed: false,
-      items: ['core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/aql'],
+      items: ['core-concepts/entities', 'core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/contexts', 'core-concepts/metadata', 'core-concepts/tags', 'core-concepts/bank-settings', 'core-concepts/directives', 'core-concepts/aql'],
+    },
+    {
+      type: 'category',
+      label: 'Workspace',
+      collapsed: false,
+      items: [
+        'workspace/overview',
+        'workspace/contextual-data',
+        'workspace/reflect-queries-and-session-items',
+        'workspace/preview-and-curated-pages',
+        {
+          type: 'category',
+          label: 'Focus areas',
+          collapsed: false,
+          items: ['workspace/focus-narrative', 'workspace/focus-diagram', 'workspace/focus-table', 'workspace/focus-graph', 'workspace/focus-evidence'],
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Context Patches',
+      collapsed: false,
+      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates', 'context-patches/mental-models', 'context-patches/sync-jobs'],
+    },
+    {
+      type: 'category',
+      label: 'Hindsight Sync',
+      collapsed: false,
+      items: ['hindsight-sync/overview', 'hindsight-sync/documents', 'hindsight-sync/entities', 'hindsight-sync/mental-models', 'hindsight-sync/directives', 'hindsight-sync/bank-settings'],
     },
   ],
 };

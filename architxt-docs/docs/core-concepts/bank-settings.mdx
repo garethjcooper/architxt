@@ -1,0 +1,77 @@
+---
+sidebar_position: 8
+---
+
+# Bank Settings
+
+Bank Settings in architxt are a single master configuration that controls how content is retained, observed, and reflected inside Hindsight memory banks. Think of them as a template: edit them once in architxt, then push them to one or more Hindsight banks when you are ready to sync.
+
+This page describes the settings you see in the **Bank Settings** UI and where each setting maps in the Hindsight API.
+
+## The Bank Settings page
+
+Open **Bank Settings** from the main navigation. The page shows one editable master configuration with three sections: **Missions**, **Extraction**, and **Disposition**.
+
+Click **Edit** to change values, **Reset to defaults** to restore the built-in architxt defaults, or **Save** to store the master copy. Saving does **not** automatically push the settings to Hindsight — push happens from the **Hindsight** sync page.
+
+### Missions
+
+Missions are natural-language instructions that steer the model at different stages of the Hindsight pipeline.
+
+| UI label | What it does | Hindsight reference |
+|---|---|---|
+| **Retain Mission** | Tells the model what facts to extract and how to structure them during retention. | [Steering extraction with a mission](https://hindsight.vectorize.io/developer/retain#steering-extraction-with-a-mission) |
+| **Observations Mission** | Guides how raw facts are consolidated into higher-level observations. | [Observations mission](https://hindsight.vectorize.io/developer/observations#observations-mission), [`observations_mission`](https://hindsight.vectorize.io/developer/api/memory-banks#observations_mission) |
+| **Reflect Mission** | Defines the persona and purpose used when answering Reflect queries. | [Mission natural language identity](https://hindsight.vectorize.io/developer/reflect#mission-natural-language-identity) |
+
+### Extraction
+
+Extraction settings control how Hindsight breaks up and processes source material.
+
+| UI label | What it does | Hindsight reference |
+|---|---|---|
+| **Retain Extraction Mode** | Chooses the extraction strategy: `concise`, `verbose`, `custom`, `verbatim`, or `chunks`. | [`retain_extraction_mode`](https://hindsight.vectorize.io/developer/api/memory-banks#retain_extraction_mode) |
+| **Retain Chunk Size** | Maximum chunk size, in tokens, used when splitting documents for retention. | [`retain_chunk_size`](https://hindsight.vectorize.io/developer/api/memory-banks#retain_chunk_size) |
+| **Entities Allow Free Form** | When enabled, the model can create free-form entity labels instead of only using pre-defined architxt entities. | Part of the retain configuration sent to Hindsight |
+
+### Disposition
+
+Disposition sliders shape the tone of the Reflect persona. Each trait ranges from **1** to **5**.
+
+| UI label | What it does | Hindsight reference |
+|---|---|---|
+| **Empathy** | How much the model mirrors the user's framing. | [Disposition traits](https://hindsight.vectorize.io/developer/reflect#disposition-traits) |
+| **Literalism** | How strictly the model sticks to the source text. | [Disposition traits](https://hindsight.vectorize.io/developer/reflect#disposition-traits) |
+| **Skepticism** | How willing the model is to challenge or qualify claims. | [Disposition traits](https://hindsight.vectorize.io/developer/reflect#disposition-traits) |
+
+## Applying bank settings to a Hindsight bank
+
+Bank Settings are not tied to a single bank until you sync them. From the **Hindsight** page:
+
+1. Select a Hindsight server and bank.
+2. Switch the object selector to **Bank Settings**.
+3. Run **Diff** to compare architxt's master settings with the bank's current settings.
+4. Click **Push** to overwrite the bank with the architxt master, or **Pull** to bring the bank's settings back into architxt.
+
+The diff view shows per-field divergence badges for retain mission, observations mission, reflect mission, extraction mode, chunk size, free-form entities, and disposition.
+
+## Where bank settings are used
+
+Once pushed to a Hindsight memory bank, the settings become the bank's [`retain configuration`](https://hindsight.vectorize.io/developer/api/memory-banks#retain-configuration). They influence every subsequent retain, observation, and Reflect operation against that bank.
+
+## How bank settings fit into architxt
+
+```text
+   architxt Bank Settings  (master)
+            │
+            ├──────── Push ────────►  Hindsight Memory Bank
+            │                            │
+            ▼                            ▼
+       Documents / Mental Models  ►  Retain / Observe / Reflect
+```
+
+Bank Settings sit above individual documents and mental models. They define the global behavior applied when architxt pushes content to a Hindsight bank, and they can be pulled back from a bank to update the master configuration.
+
+## Summary
+
+Bank Settings are architxt's master Hindsight configuration. Edit missions, extraction mode, chunk size, and disposition locally, then push that configuration to any connected Hindsight memory bank to keep retention and reflection behavior consistent.

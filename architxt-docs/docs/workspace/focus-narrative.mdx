@@ -1,0 +1,73 @@
+---
+sidebar_position: 1
+---
+
+# Focus: narrative
+
+A **narrative** directive asks architxt to answer a question or explore a topic in plain prose. It is the most common output type in Reflect and the simplest to turn into a curated page.
+
+## When to use a narrative focus
+
+Use narrative when you want:
+
+- A summary of entities, relationships, or documents.
+- A walkthrough of a process or argument.
+- An explanation in paragraphs with headings and lists.
+- Content that is easy to edit, reorder, and save as Markdown.
+
+## What a narrative envelope looks like
+
+A narrative envelope is a document-style result. It is composed of sections that map directly to curated-page sections:
+
+| Element | Typical content |
+|---|---|
+| **Title** | The question or topic the narrative answers. |
+| **Headings** | Logical sections such as “Overview”, “Key entities”, “Implications”. |
+| **Paragraphs** | Prose paragraphs that cite or describe the underlying data. |
+| **Lists** | Bulleted or numbered lists for grouped facts. |
+
+Narrative output is plain text first. Diagrams, tables, and graphs are produced by other directive focuses and can be combined with narrative on a curated page.
+
+## Preview mode
+
+In a Preview tab a narrative envelope is shown through the narrative viewer. The viewer renders headings, paragraphs, and lists and adds section-level controls.
+
+| Control | Behavior |
+|---|---|
+| **Index** | Adds paragraph/section numbers for easy citation. |
+| **Plain** | Strips formatting to show bare text. |
+| **Copy** | Copies the whole narrative or an individual section. |
+| **Save as Markdown** | Exports the rendered narrative as `.md`. |
+
+Narrative previews have no diagram source tab or table grid because the content is already text.
+
+## Curated-page editing
+
+When you copy a narrative section into a curated page, it becomes an editable text section. You can:
+
+- Edit the prose directly in the section editor.
+- Split or merge paragraphs.
+- Reorder sections relative to diagrams, tables, and graphs.
+- Soft-delete and restore sections until you save.
+
+:::tip[Edit with the envelope in mind]
+A narrative section remembers its source envelope. If the underlying query or mental model changes, you may want to re-copy the section rather than editing it by hand.
+:::
+
+## Consistency tips
+
+To get predictable narrative results:
+
+- Be explicit in the query about tone and depth: “summarise in three paragraphs” or “list the five most important points”.
+- Use directives to constrain the answer when the bank contains many entities.
+- Break large questions into smaller queries and combine the answers on a curated page.
+
+## Relationship to other pages
+
+- [Directives](../core-concepts/directives) explains how directives shape Reflect output.
+- [Mental models](../core-concepts/mental-models) describes the plain/derived/contextual model pipeline that feeds narratives.
+- [Preview and curated pages](./preview-and-curated-pages) covers the broader tab model this focus type fits into.
+
+## Summary
+
+The narrative focus is prose-first output from Reflect. It renders as a structured document in the Preview tab and maps cleanly to editable sections in curated pages.

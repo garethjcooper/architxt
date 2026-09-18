@@ -193,6 +193,12 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     isDraggingRef.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    // Disable pointer events on the content pane while dragging so interactive
+    // controls (e.g. the diagram fit toggle) don't receive stray clicks when the
+    // cursor passes over them during a resize.
+    if (markdownContainerRef.current) {
+      markdownContainerRef.current.style.pointerEvents = 'none';
+    }
 
     const onMove = (moveEv: MouseEvent) => {
       if (!isDraggingRef.current) return;
@@ -209,6 +215,9 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
       isDraggingRef.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (markdownContainerRef.current) {
+        markdownContainerRef.current.style.pointerEvents = '';
+      }
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };

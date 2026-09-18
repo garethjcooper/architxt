@@ -1,0 +1,102 @@
+---
+sidebar_position: 4
+---
+
+# Preview and curated pages
+
+The right-hand side of the Workspace is a tabbed surface split into two kinds of tabs: **Preview** tabs are read-only, and **curated page** tabs are editable. Both are scoped to the active research session, so what you open and save travels with the session.
+
+## Preview tabs
+
+A **Preview** tab shows the rendered output of a single Reflect result, a mental-model content preview, or any other envelope opened from the Workspace. It is read-only and exists to let you inspect a result before deciding whether to copy it into a curated page.
+
+### What a preview can contain
+
+A preview envelope may contain any combination of:
+
+| Section | Purpose |
+|---|---|
+| **Narrative** | Prose blocks, headings, and lists answering the query. |
+| **Diagram** | Mermaid diagrams rendered inline with copy/export controls. |
+| **Table** | Tabular results with column headers and row data. |
+| **Graph** | Entity/edge visualisations built from the contextual graph. |
+
+Each envelope is independent. The preview tab shows whichever directive produced it, but you do not edit the envelope here.
+
+### Preview controls
+
+| Control | What it does |
+|---|---|
+| **Index** | Show or hide paragraph/section numbers for quick reference. |
+| **Plain** | Strip formatting and view the raw text. |
+| **Copy** | Copy the full envelope or a selected section to the clipboard. |
+| **Save as Markdown** | Download the rendered content as a `.md` file. |
+
+:::tip[Copy to a curated page]
+From a preview you can copy a section directly into an open curated page. This is the fastest way to move from a Reflect answer to a composed document.
+:::
+
+## Curated pages
+
+**Curated pages** are editable documents you build inside a session. A page is a sequence of sections; each section is a discrete block such as a narrative paragraph, a diagram, a table, or a graph. Sections can be reordered, edited, removed, and restored while the page remains unsaved.
+
+### Creating and managing a page
+
+| Action | How it works |
+|---|---|
+| **New page** | Create a blank curated page from the tab bar. You can pick a title or let the UI assign one based on the first content. |
+| **Rename** | Double-click the tab title or use the tab menu. |
+| **Save** | Save the page explicitly. Until you save, changes are held in memory and the tab shows a dirty indicator. |
+| **Delete** | Remove the page from the session. This cannot be undone. |
+| **Reorder tabs** | Drag curated-page tabs to change their order. |
+
+### Curated-page sections
+
+Sections are the building blocks of a curated page. The editor shows each section with its own controls.
+
+| Section type | Editing notes |
+|---|---|
+| **Narrative** | Edit prose directly; headings, lists, and paragraphs are preserved. |
+| **Diagram** | Edit the Mermaid source; the renderer updates as you type. |
+| **Table** | Edit cells, add or remove rows and columns. |
+| **Graph** | Graph sections are currently read-only snapshots from previews. |
+
+### Soft delete and restore
+
+When you remove a section, it is not immediately discarded. The editor keeps a soft-deleted section visible until you save the page, so you can restore it if you change your mind. Once the page is saved, deleted sections are removed permanently.
+
+### Dirty state
+
+A curated-page tab shows a dirty indicator as soon as you add, edit, delete, or reorder a section. Saving clears the indicator. If you close the tab with unsaved changes, the editor prompts you to save or discard.
+
+## From preview to curated page
+
+The typical flow is:
+
+1. Run a Reflect query or open a mental-model preview.
+2. Inspect the result in a read-only Preview tab.
+3. Copy one or more sections from the preview.
+4. Paste them into a curated page, or create a new page from the copied content.
+5. Edit, reorder, and supplement the sections until the page says what you need.
+6. Save the curated page to persist it in the session.
+
+## How it fits into the Workspace
+
+```text
+Reflect query ──► Preview tab (read-only)
+                     │
+                     ▼
+             Curated page (editable, saved in session)
+                     │
+                     ▼
+           Contextual data / mental-model sources
+```
+
+- **Reflect queries** produce the content that lands in previews.
+- **Preview tabs** let you inspect and select content.
+- **Curated pages** let you compose the final document.
+- **Session items** record the query history and curated pages for later review.
+
+## Summary
+
+Preview tabs are read-only windows onto Reflect results and mental-model content. Curated pages are editable session-scoped documents made of sections that can be copied from previews, edited, reordered, and saved.

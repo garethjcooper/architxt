@@ -1,0 +1,182 @@
+---
+sidebar_position: 5
+---
+
+# Focus: evidence
+
+Every **focus** result in the Workspace can carry **evidence**: the set of source memories, entities, or documents that justify the content. Evidence is not a separate focus type like narrative, diagram, table, or graph; it is the grounding layer behind all of them. When you know where a section came from, you can verify it, cite it, or dig deeper without guessing.
+
+## What evidence is
+
+Evidence is a list of references to source data. In practice this is usually Hindsight memory IDs that architxt used when generating or selecting the section. You can think of it as a bibliography entry for a paragraph, a table row, a diagram edge, or a graph node.
+
+| Field | Purpose |
+|---|---|
+| **Memory IDs** | The stable identifiers of the Hindsight memories that support the section. |
+| **Snippet** | A short excerpt from the source memory, when available, so you can see the context at a glance. |
+| **Confidence** | Optional signal of how strongly the source memory supports the claim. |
+
+Evidence is attached at the section level. A narrative may have one evidence list per heading; a table may have evidence per row or per block; a diagram carries evidence on its edges and nodes; a graph exposes evidence on selected nodes and edges in the Details panel.
+
+## Where evidence appears
+
+### Narrative
+
+In a narrative preview, section-level actions include an evidence control. When invoked, it opens the **Evidence modal** and lists the memory IDs behind that section. If a section has no evidence, the control is disabled or hidden.
+
+### Tables
+
+Table blocks can carry evidence on the whole block or on individual rows. The Evidence modal shows the memory references that produced the columns and values you are reading.
+
+### Diagrams
+
+Diagram edges and nodes can carry evidence. When you add a graph-generated diagram to a curated page, the graph's edge evidence travels with it, so the diagram remains grounded in the same source memories.
+
+### Graphs
+
+Graph nodes and edges show evidence in the **Details** panel. Selecting a node or edge expands its properties and lists the source memories that established the relationship.
+
+:::tip[Evidence is not optional for all generated content]
+v0.4.0 and later require and preserve evidence arrays on narrative, diagram, and table envelope elements. This makes Reflect output verifiable by default.
+:::
+
+## The Evidence modal
+
+The Evidence modal matches the focus-modal layout. It has a resizable panel that lists source memories, shows snippets, and lets you inspect the original context.
+
+| Control | Behavior |
+|---|---|
+| **Source documents list** | Documents that contain one or more of the queried memories, with supporting-memory counts. |
+| **Queried memories list** | The original memory IDs from the focus result, grouped by which documents and chunks they resolved to. |
+| **Chunk detail** | The text of a selected chunk, with its chunk index and ID. |
+| **Copy IDs** | Copies the memory IDs to the clipboard for use in queries or external citations. |
+| **Resize** | Drag the modal footer or panel divider to make more room for long snippets. |
+
+:::tip[Open evidence from any focus section]
+If a section has evidence, the section-level actions include an evidence button. Use it to open the Evidence modal directly from the preview or curated-page editor.
+:::
+
+## Document metadata and real-world location
+
+One of the main benefits of the Evidence modal is that it can point you back to the actual real-world document. When you select a document, the modal loads its metadata from Hindsight and shows:
+
+| Field | What it means |
+|---|---|
+| **Title** | The human-readable document title, when available. |
+| **Document ID** | The stable Hindsight document identifier. |
+| **Hash** | A content hash that identifies the exact version of the document. |
+| **Context** | The `context` field from the original `retain` call, often describing the source or purpose. |
+| **Event date** | The date associated with the content, if one was supplied during retention. |
+| **Created / Updated** | When the document was first retained and last updated. |
+| **Tags** | Any tags attached to the document. |
+| **Extra metadata** | Custom `document_metadata` fields supplied at retention time, such as a URL, file path, or ticket reference. |
+
+If your retention pipeline stores a URL, file path, or ticket ID in `document_metadata`, that value appears here. This is how architxt bridges a generated answer back to the real-world document it came from.
+
+## The two memory-ID hierarchies
+
+The Evidence modal presents the same evidence through two complementary hierarchies.
+
+### Documents → chunks → memory IDs
+
+The **Source documents** panel starts with documents. For each document you see:
+
+- How many of the queried memories were found in it.
+- How many of those memories are flagged as supporting memories.
+- The chunks inside that document that contain those memories.
+- The individual memory IDs attached to each chunk.
+
+This view is useful when you want to ask "which documents support this section?" and then drill into the exact chunk.
+
+### Queried memories → documents → chunks
+
+The **Queried memories** panel starts with the original memory IDs from the section. For each memory ID you see:
+
+- The memory type, when known.
+- Which documents the memory resolved to.
+- Which chunks inside each document contain that memory.
+- Any decomposed "world" memory IDs and their types.
+- Observations that were skipped, if any.
+- An unresolved error, if the memory could not be fetched.
+
+This view is useful when you want to ask "where did this specific memory ID come from?" — for example, when a Reflect answer cites a memory that looks wrong.
+
+:::tip[Two views of the same data]
+Both panels resolve the same evidence payload. Use the documents-first view to browse by source document, and the memories-first view to debug a specific memory ID.
+:::
+
+## Chunk viewing and "Show in context"
+
+A chunk is a slice of a Hindsight document that contains one or more supporting memories. Each chunk shows:
+
+| Field | Purpose |
+|---|---|
+| **Chunk index** | The position of the chunk within the full document, so you can reason about ordering. |
+| **Chunk ID** | The stable identifier for the chunk. |
+| **Chunk text** | The actual text of the chunk, which you can read or copy. |
+| **Supporting memory IDs** | The memory IDs found inside this chunk. |
+| **Character count** | A quick indicator of chunk length. |
+
+By default the right panel shows the selected chunk on its own. Toggle **Context** on a document to load all of its chunks and view the selected chunk inside the full document. In context mode:
+
+- Chunks are sorted by chunk index.
+- The selected chunk is highlighted and auto-scrolled into view.
+- You can read the surrounding chunks to understand the original context.
+
+:::tip[Render Markdown]
+If a chunk contains Markdown formatting, enable the **Render** toggle to format it. Disable it to see the raw chunk text.
+:::
+
+## Recalling and viewing the document
+
+The metadata panel tells you where the document lives, and the context view lets you read it. Together they let you:
+
+1. Identify the real-world document from the title or `document_metadata`.
+2. See which chunks contributed to the section.
+3. Switch on **Context** to view the chunk inside the full retained document.
+4. Copy the memory IDs or chunk text for follow-up queries or citations.
+
+This is the main verification loop: generated content in the Workspace is traceable back to retained documents in Hindsight, and from there back to the real-world source.
+
+## How evidence travels between sections
+
+Evidence is preserved when one focus type is converted into another:
+
+| Conversion | What happens to evidence |
+|---|---|
+| **Graph → Diagram** | Edge evidence from the graph is copied into the generated Mermaid diagram section. |
+| **Graph → Table** | Graph-level evidence is copied into the node/edge table section. |
+| **Reflect result → Curated page** | Each copied section keeps its own evidence list. |
+
+This means a curated page assembled from multiple focus types remains fully traceable back to the original Hindsight memories.
+
+## Why evidence matters
+
+- **Verifiability** — Readers can inspect the source memories behind any claim.
+- **Citations** — Memory IDs can be copied and referenced in follow-up queries.
+- **Debugging** — If a Reflect answer looks wrong, check its evidence first to see what it was built from.
+- **Trust** — Grounded answers in Reflect trace back to the documents and entities that produced them.
+
+## From evidence to curated page
+
+The typical flow is:
+
+1. Run a Reflect query that produces narrative, table, diagram, or graph output.
+2. Inspect each section and open the Evidence modal to see what supports it.
+3. Copy the section into a curated page.
+4. The curated page section retains its evidence list, so readers can verify it later.
+5. If a section lacks evidence or the evidence looks wrong, refine the query or mental model and re-run Reflect.
+
+## Relationship to other focus pages
+
+Evidence underpins every focus type. The other pages describe the visible shape of the content; this page describes the invisible thread that ties that content back to source memories.
+
+- [Focus: narrative](./focus-narrative)
+- [Focus: diagram](./focus-diagram)
+- [Focus: table](./focus-table)
+- [Focus: graph](./focus-graph)
+- [Preview and curated pages](./preview-and-curated-pages)
+
+## Summary
+
+Evidence is the set of source memory references behind every focus result. It appears in the Evidence modal for narratives, tables, diagrams, and graphs, and it is preserved when those sections are copied into curated pages. Keeping evidence intact makes Workspace output verifiable, citable, and trustworthy.

@@ -42,6 +42,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
     selectSessionById,
     handleRerunStep,
     handleSelectSession,
+    setResult,
   } = useResearchSession({
     serverId: serverId?.toString() ?? '',
     bankId: bankId ?? '',
@@ -61,7 +62,11 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
   );
 
   const workspaceItems = useMemo(
-    () => trail.filter((step) => WORKSPACE_ITEM_TYPES.has(step.action_type || 'discover')),
+    () =>
+      trail
+        .filter((step) => WORKSPACE_ITEM_TYPES.has(step.action_type || 'discover'))
+        .slice()
+        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()),
     [trail]
   );
 
@@ -148,6 +153,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
       handleSelectSession,
       workspaceItems,
       curatedPages,
+      setResult,
     }),
     [
       sessions,
@@ -177,6 +183,7 @@ export function useWorkspaceSession({ serverId, bankId, lastSessionId }: UseWork
       handleSelectSession,
       workspaceItems,
       curatedPages,
+      setResult,
     ],
   );
 }

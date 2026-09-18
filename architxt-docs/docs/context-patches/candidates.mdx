@@ -1,0 +1,106 @@
+---
+sidebar_position: 3
+---
+
+# Candidates
+
+:::caution[Experimental]
+Candidate discovery is **experimental**. The rows you see here are suggestions produced by a discovery mental model, not guaranteed facts. Treat them as leads to review rather than confirmed entities or relationships.
+:::
+
+The **Candidates** tab lists nodes and edges the system has discovered but has **not yet promoted** into the grounded graph. They come from a **Discovery / Seed** contextual mental model: a model attached to a seed entity that looks at the surrounding memory bank and proposes new entities and relationships worth adding.
+
+## Where candidates come from
+
+Candidates are produced by the **`sys_discovery_context`** template role. When a contextual sync job runs, architxt deploys discovery models for configured seed nodes. Each model reads the memory bank around its seed and returns a JSON object like:
+
+```json
+{
+  "candidates": [
+    {
+      "id": "candidate-id",
+      "summary": "Candidate name or description",
+      "aliases": ["alias"],
+      "hypothesized_edges": [
+        { "target": "existing-node-id", "type": "works-with", "evidence": "brief evidence" }
+      ]
+    }
+  ]
+}
+```
+
+The sync job ingests those candidates into the graph with the `candidate` label, creates undirected `co-occurs` edges (or the hypothesized relationship type) to existing target nodes, and parks them here for review. No entity-summary, capabilities, or edge-context models are derived until a candidate is promoted.
+
+## Candidate list
+
+The Candidates tab uses the same layout as the Graph tab's left panels: discovered nodes on top and discovered edges on the bottom. You can filter by:
+
+- **All** — show both nodes and edges.
+- **Nodes** — show only discovered candidate nodes.
+- **Edges** — show only discovered candidate edges.
+
+Each row shows the same information as in the Graph tab:
+
+| Field | Meaning |
+|---|---|
+| **Label / summary** | The display name of the discovered node, or `source → target` for an edge. |
+| **Type and ID** | The candidate's type and stable ID. |
+| **Description / type** | For edges, the hypothesized relationship type or evidence. |
+| **Model-ref badges** | Any mental-model references already attached to the candidate. |
+| **Relative timestamp** | When the candidate was last seen or refreshed. |
+
+Click any candidate to inspect it in the details panel, just like a grounded entity or edge.
+
+## What "candidate" means
+
+A candidate is a graph item that:
+
+- Has the `candidate` label.
+- Was produced by a discovery model (`provenance.source: 'discover'`).
+- Has a `seed_id` in its provenance pointing back to the seed entity that produced it.
+- Is **not** marked as `canonical` or `grounded`.
+
+Candidate nodes are typically prefixed with transient discovery markers such as `found:` or `candidate:` internally, but the UI strips those and shows the cleaned display name.
+
+## How candidates relate to mental models
+
+Candidate discovery is directly tied to the **Discovery / Seed** template role. In the Mental Models tab, a discovery model has:
+
+- **Scope:** `seed:{seed_id}` — it is attached to a seed node, not a grounded node or edge.
+- **Role:** `sys_discovery_context` (or another seed-scoped role configured for the bank).
+- **External ID:** derived from the template, usually containing the seed ID.
+
+The discovery model is the only source that creates candidates. If no seed-scoped model is deployed, or if the deployed model returns no content, the Candidates tab will be empty.
+
+## Lifecycle of a candidate
+
+```text
+Seed entity  ──►  Discovery mental model runs
+                            │
+                            ▼
+                Candidates appear in Candidates tab
+                            │
+              ┌─────────────┴─────────────┐
+              │                             │
+              ▼                             ▼
+        Promoted / approved           Ignored / deleted
+              │                             │
+              ▼                             ▼
+        Becomes canonical             Removed by cleanup
+```
+
+Promotion currently happens outside the Candidates tab. Once a candidate is approved and promoted, it loses the `candidate` label, gains `canonical`/`grounded`, and moves into the **Graph** tab. At that point the normal contextual-model pipeline can derive entity-summary, capabilities, or edge-context models for it.
+
+## What you can do now
+
+Today the Candidates tab is primarily a **review surface**:
+
+- Browse discovered nodes and edges.
+- Filter by type.
+- Search by label, ID, source, or target.
+- Inspect details to see provenance, attached models, and timestamps.
+- Use the information to decide which candidates should be promoted through whatever approval flow your team uses.
+
+## Summary
+
+The Candidates tab is the experimental review queue for entities and relationships discovered by seed-scoped discovery mental models. Candidates are not yet part of the grounded graph; they are proposed additions that need validation before promotion.

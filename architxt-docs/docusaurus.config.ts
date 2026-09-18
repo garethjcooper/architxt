@@ -11,7 +11,7 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://architxt.example.com',
+  url: 'https://architxtlabs.com',
   baseUrl: '/',
 
   organizationName: 'team-oc',

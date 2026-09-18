@@ -1,0 +1,96 @@
+---
+sidebar_position: 2
+---
+
+# Graph
+
+The **Graph** tab shows the grounded entities and relationships that have been imported from a Hindsight memory bank. The left side lists entities and edges; the right side shows the details for whichever item you select.
+
+## Layout
+
+The Graph tab is split into three resizable panels:
+
+- **Entities** (top left) — grounded nodes such as people, organizations, projects, products, or any other entity type imported from Hindsight.
+- **Edges** (bottom left) — grounded relationships between those entities.
+- **Details** (right) — the full information panel for the selected entity or edge.
+
+You can drag the resize handles to change panel sizes, and double-click a handle to reset it.
+
+## Entities list
+
+Entities are displayed as rows in the top-left panel. Each row shows:
+
+| Field | What it tells you |
+|---|---|
+| **Label** | The human-readable name of the entity. |
+| **Type and ID** | The entity type (for example `person`, `project`, `product`) followed by its stable ID. |
+| **Left border color** | A color assigned to the entity type so you can scan the list quickly. |
+
+Click any entity to open its details in the right panel.
+
+## Edges list
+
+Edges are displayed in the bottom-left panel. Each row shows:
+
+| Field | What it tells you |
+|---|---|
+| **Source → Target** | The two entities connected by the relationship. |
+| **Description / type** | A short description of the relationship, or the relationship type if no description is available. |
+| **Edge count badge** | When multiple physical edges are grouped under a single edge context, the badge shows how many edges are in that group. |
+
+Click any edge to open its details in the right panel.
+
+:::tip[Why are edges grouped?]
+Mental-model-driven edge contexts can represent many concrete Hindsight relationships as one conceptual edge. The group row lets you see that an edge context exists, while the child rows beneath it show the individual physical edges.
+:::
+
+## Details panel
+
+When you select an entity or an edge, the right panel shows everything architxt knows about that item. The sections are the same for both nodes and edges unless noted below.
+
+### Header
+
+- **Title** — the entity label, or the edge description if one exists.
+- **Subtitle** — the entity ID, or the `source_id → target_id` pair for an edge.
+- **Badges** — entity labels (for nodes) or the edge type (for edges).
+
+### Mental model refs
+
+Lists any contextual mental models attached to this entity or edge. For each model you see:
+
+| Field | Meaning |
+|---|---|
+| **Scope badge** | Whether the model is attached to a node, edge, seed, or other scope. |
+| **External ID** | The stable Hindsight `ext_id` of the model. |
+| **Template role** | The template role the model was derived from. |
+| **Attached / fetched** | When the model was attached to the graph and when its content was last fetched from Hindsight. |
+| **Content hash** | A hash used to detect content changes. |
+| **Refresh status** | Whether the last refresh succeeded, was skipped, or errored — and the error if one occurred. |
+
+### Provenance
+
+Shows where the item came from — for example, whether it was imported from Hindsight, created by a sync job, or produced by a specific pipeline stage. Empty provenance means the source was not recorded.
+
+### Stored data
+
+The raw properties stored for this entity or edge, excluding provenance and legacy computed fields. This is useful when you need to see the underlying values that feed into models or sync logic.
+
+### Timestamps
+
+- **Last refreshed** — most recent mental-model content refresh across all attached models.
+- **Created** — when the item first appeared in the contextual graph.
+- **Updated** — when the item's record was last modified.
+- **Last seen** — when the item was most recently observed during a sync.
+
+## Interactions
+
+| Action | What it does |
+|---|---|
+| **Click an entity or edge** | Opens its details in the right panel. |
+| **Search** | Filters both entities and edges by label, ID, type, source, or target. |
+| **Drag resize handles** | Resizes the panels. |
+| **Double-click a resize handle** | Resets that split to its default size. |
+
+## How the Graph tab relates to the others
+
+The Graph tab contains the **grounded** items: things already imported and promoted from Hindsight. Candidate nodes and edges that have not been promoted live in the **Candidates** tab, and the contextual mental models attached to graph items are managed in the **Mental Models** tab. The background work that imports and refreshes these items is shown in **Sync Jobs**.

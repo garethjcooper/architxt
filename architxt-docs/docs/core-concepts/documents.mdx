@@ -97,22 +97,20 @@ Smart Edit is useful for cleaning up extraction artifacts: removing boilerplate 
 
 ## Document table
 
-Documents are stored in the `documents` table in SQLite. The schema is defined in `server/src/db/ensure-schema.js` and includes these key fields:
+The documents table in the architxt UI surfaces the most important facts about each document:
 
-| Field | UI label or concept | Purpose |
+| UI label | What it shows | Why it matters |
 |---|---|---|
-| `doc_id` | **Document ID** | Internal primary key. |
-| `doc_ext_id` | **External ID** | Stable identifier supplied by the user or import process. |
-| `doc_status` | **Status** | Current lifecycle state. |
-| `doc_content` | **Document Content** | Extracted Markdown content produced by the extraction pipeline. |
-| `doc_content_hash` | content hash | `sha256` hash of the content used for integrity checks. |
-| `doc_source_path` | **Full Path** | Path to the original uploaded file on disk. |
-| `doc_processing_history` | **Processing History** | JSON log of every status transition. |
-| `doc_processing_progress` | progress | Optional progress object reported by the extractor daemon. |
-| `ctxt_id` | **Context** | Optional foreign key to a context. |
-| `doc_timestamp` | **Document Date** | Optional user-facing timestamp, e.g. document publication date. |
-
-The **Status** column is a plain `TEXT` field. Allowed values are enforced by the application, not by a database `CHECK` constraint.
+| **Document ID** | Internal architxt identifier. | Used throughout the UI and API to refer to the document. |
+| **External ID** | Stable identifier you supply during upload or import. | Maps to Hindsight's [`document_id`](https://hindsight.vectorize.io/developer/api/retain#document_id), so the same id can survive re-imports. |
+| **Status** | Current lifecycle state such as **Uploaded**, **Extracting**, or **Extracted**. | Tells you whether the document is ready to use or still being processed. |
+| **Document Content** | Extracted Markdown representation of the file. | The material the contextual graph, mental models, and Reflect operate on. |
+| **Content Hash** | `sha256` fingerprint of the extracted content. | Lets architxt detect when content has changed and avoid duplicate work. |
+| **Full Path** | Stored location of the original file. | Used for re-download, re-processing, and integrity checks. |
+| **Processing History** | Log of every status transition. | Audit trail you can inspect in **Document Details**. |
+| **Progress** | Optional extraction progress object. | Shown while a document is actively being extracted. |
+| **Context** | The document's assigned context, if any. | Groups related documents and is sent to Hindsight during sync. |
+| **Document Date** | Timestamp you assign to the document itself. | Independent of upload time; useful for filtering and sorting. |
 
 ## Document states
 
