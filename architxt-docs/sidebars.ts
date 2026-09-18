@@ -20,6 +20,12 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: ['core-concepts/entities', 'core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/aql', 'core-concepts/contexts', 'core-concepts/metadata', 'core-concepts/tags', 'core-concepts/bank-settings', 'core-concepts/directives'],
     },
+    {
+      type: 'category',
+      label: 'Hindsight Sync',
+      collapsed: false,
+      items: ['hindsight-sync/overview', 'hindsight-sync/documents', 'hindsight-sync/entities', 'hindsight-sync/mental-models', 'hindsight-sync/directives', 'hindsight-sync/bank-settings'],
+    },
   ],
 };
 
