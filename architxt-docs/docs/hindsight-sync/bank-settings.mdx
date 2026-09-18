@@ -4,4 +4,79 @@ sidebar_position: 6
 
 # Bank Settings
 
-This page describes how bank settings sync works between architxt and a Hindsight memory bank. Content coming soon.
+The **Bank Settings** sync type reconciles architxt's single master bank configuration with a selected Hindsight memory bank. Unlike the other sync types, there is exactly one object: the bank settings themselves. There is no "Only in architxt" or "Only in Hindsight" column — only **Same** or **Different**.
+
+## What is compared
+
+When you run **Diff** with the **Bank Settings** object type, architxt reads the selected Hindsight bank's config and compares it against architxt's master `bank_settings` row. The diff checks these fields:
+
+| Field | Divergent if... |
+|---|---|
+| **Retain Mission** | The mission text used during retention differs. |
+| **Observations Mission** | The mission text used when consolidating observations differs. |
+| **Reflect Mission** | The mission text used by Reflect differs. |
+| **Retain Extraction Mode** | The extraction mode strings differ. Allowed values are `concise`, `verbose`, `custom`, `verbatim`, and `chunks`. |
+| **Retain Chunk Size** | The chunk sizes, in tokens, are not equal. |
+| **Entities Allow Free Form** | One side allows free-form entity labels and the other does not. |
+| **Disposition** | Any of the three disposition traits (empathy, literalism, skepticism) differ. |
+
+The diff result contains a single row with `ext_id: 'bank-settings'`:
+
+- **Same** — all fields match.
+- **Different** — at least one field diverged. The row shows a divergence badge for every field that differs, and the compare modal shows the architxt and Hindsight values side by side.
+
+## Push bank settings
+
+Pushing overwrites the selected Hindsight bank's configuration with architxt's master settings.
+
+In the UI:
+
+1. Select the **Bank Settings** row.
+2. Click **Push**.
+3. architxt sends the master settings to Hindsight as a bank-config update, including retain mission, observations mission, reflect mission, extraction mode, chunk size, free-form entities flag, and the three disposition values.
+
+:::tip[Push affects the whole bank]
+Bank settings are global. Pushing them changes how the bank retains, observes, and reflects for every subsequent operation.
+:::
+
+## Pull bank settings
+
+Pulling overwrites architxt's master settings with the selected Hindsight bank's configuration.
+
+In the UI:
+
+1. Select the **Bank Settings** row.
+2. Click **Pull**.
+3. architxt reads the bank's current config and updates the local `bank_settings` row.
+4. If a field is missing or invalid on the Hindsight side, architxt falls back to its own defaults for that field.
+
+:::caution[Pull replaces the local master]
+Pulling bank settings updates the single architxt master configuration. Any other banks you later push to will receive these newly pulled values, so make sure you want the selected bank to become the template.
+:::
+
+## Field mapping
+
+Bank settings map to the Hindsight bank config fields described in the [memory bank retain configuration reference](https://hindsight.vectorize.io/developer/api/memory-banks#retain-configuration). See the [Bank Settings](../core-concepts/bank-settings) core-concept page for details on each setting.
+
+| architxt setting | Hindsight config field | Notes |
+|---|---|---|
+| Retain Mission | `retain_mission` | Text passed to the model during retention. |
+| Observations Mission | `observations_mission` | Text passed during observation consolidation. |
+| Reflect Mission | `reflect_mission` | Reflect persona and purpose text. |
+| Retain Extraction Mode | `retain_extraction_mode` | One of `concise`, `verbose`, `custom`, `verbatim`, `chunks`. |
+| Retain Chunk Size | `retain_chunk_size` | Integer token budget. |
+| Entities Allow Free Form | `entities_allow_free_form` | Boolean. |
+| Disposition | `disposition_empathy`, `disposition_literalism`, `disposition_skepticism` | Three integer traits, typically 1–5. |
+
+## Typical workflows
+
+| Situation | Action |
+|---|---|
+| You tuned the master settings in architxt and want a bank to use them. | Push from **Different** or **Same**. |
+| A bank was configured directly in Hindsight and you want to copy its behavior. | Pull from **Different** or **Same**. |
+| You want to reset architxt's master to the built-in defaults. | Use **Reset to defaults** on the Bank Settings page, then push to any banks that should use the defaults. |
+| You want every bank to behave identically. | Pull from the reference bank, then push to the other banks. |
+
+## Summary
+
+Bank Settings sync is a single-object comparison between architxt's master configuration and a Hindsight bank's config. It checks missions, extraction mode, chunk size, free-form entities, and disposition. Push sends the master settings to the bank; pull copies the bank's settings back into the architxt master.
