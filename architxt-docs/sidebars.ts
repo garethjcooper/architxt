@@ -24,7 +24,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Context Patches',
       collapsed: false,
-      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates'],
+      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates', 'context-patches/mental-models'],
     },
     {
       type: 'category',
