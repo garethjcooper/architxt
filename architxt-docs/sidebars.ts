@@ -18,13 +18,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Core Concepts',
       collapsed: false,
-      items: ['core-concepts/entities', 'core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/contexts', 'core-concepts/metadata', 'core-concepts/tags', 'core-concepts/bank-settings', 'core-concepts/directives'],
-    },
-    {
-      type: 'category',
-      label: 'Operate',
-      collapsed: false,
-      items: ['core-concepts/aql'],
+      items: ['core-concepts/entities', 'core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/aql', 'core-concepts/contexts', 'core-concepts/metadata', 'core-concepts/tags', 'core-concepts/bank-settings', 'core-concepts/directives'],
     },
   ],
 };
