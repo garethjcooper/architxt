@@ -1,0 +1,98 @@
+---
+sidebar_position: 3
+---
+
+# Reflect queries and session items
+
+The Workspace is built around asking questions and keeping track of the answers. **Reflect queries** are how you ask Hindsight a question in natural language, and **session items** are the record of every question and its result in the current session.
+
+## Reflect query panel
+
+The **Scope / Reflect query** panel sits at the top of the left column. It is a single-purpose query surface: you type a question, adjust options if you need to, and submit it. The answer appears in the **Preview** tab as an envelope that can contain narratives, graphs, tables, and diagrams.
+
+### Writing a query
+
+Queries are plain text. The editor gives you two autocomplete helpers:
+
+- Type `#` to see base document section types.
+- Type `[[` to see the list of grounded entities and edges from the contextual graph.
+
+You can double-click an entity or edge in the autocomplete to insert it into the query. This is useful when you want the model to reason about a specific known entity rather than relying on the query text alone.
+
+### Query options
+
+Click the **Options** switch to show the Reflect-specific options. The defaults are sensible for most queries, but you can change them when you need tighter control.
+
+| Option | Default | What it does |
+|---|---|---|
+| **Fact types** | `world`, `observation` | Restricts the kinds of facts Reflect can draw on. |
+| **Budget** | `low` | How much retrieval and generation effort to spend. Options are `low`, `mid`, `high`. |
+| **Max tokens** | `4096` | Maximum length of the generated response. |
+| **Include source facts** | Off | When on, the response includes the source facts used to generate it. |
+| **Exclude mental models** | Off | When on, Reflect ignores plain and derived mental models attached to entities. |
+
+### Submitting and status
+
+Press the **Run Query** button or hit Enter to submit. While the query is running, the Preview tab shows a loading state and the session item row displays a running indicator. If the query fails, the error appears in the Preview tab and the session item shows a failed status.
+
+## Session items panel
+
+The **Session items** panel sits below the query panel in the left column. It lists every step in the current session, in chronological order. Each item represents one query or one curated page created in the session.
+
+### What each item shows
+
+| Element | Meaning |
+|---|---|
+| **Timestamp** | When the item was created. |
+| **Status dot** | `running`, `failed`, or completed. |
+| **Title or query preview** | If the item has a title, the title is shown; otherwise the first line of the query is shown. |
+| **Expand chevron** | Multi-line queries can be expanded to show the full text. |
+
+### Actions on an item
+
+| Action | What it does |
+|---|---|
+| **Click the item** | Opens the result in the active Preview tab. |
+| **Open in new tab** | Opens the result in a new read-only View tab. |
+| **Edit title** | Gives the item a readable title so you can find it later. |
+| **Re-use** | Copies the query text back into the Reflect query input so you can edit and resubmit it. |
+| **Re-run** | Submits the same query again, producing a new result. |
+| **Provenance** | Opens the query-inspection dialog to see the full request and response metadata. |
+| **Delete** | Removes the item from the session permanently. |
+
+### Item types in the list
+
+Session items are not limited to Reflect queries. The same list also includes:
+
+- **Reflect results** — the answers returned by Reflect.
+- **Curated pages** — pages you created and saved inside the session.
+- **Mental-model previews** — items opened from the Contextual data panel.
+
+The title or preview text, the status dot, and the available actions adapt to the item type.
+
+## Typical workflow
+
+1. Type a Reflect query in the top-left panel.
+2. Submit it and watch the result appear in the Preview tab.
+3. The new item appears in the Session items list.
+4. Optionally give the item a title so you can find it again.
+5. Re-use, re-run, or open the item in a new tab as needed.
+6. Copy content from the preview into a curated page.
+
+## How it fits into the Workspace
+
+```text
+Reflect query  ──►  Preview  ──►  Curated page
+     │
+     ▼
+Session items  ──►  Re-use / Re-run / Inspect
+```
+
+- The **Reflect query** panel is the input surface.
+- The **Preview** tab shows the current output.
+- **Session items** are the persistent history that let you return to, reuse, or compare earlier results.
+- **Curated pages** are where selected results become part of a composed document.
+
+## Summary
+
+Reflect queries and session items are the question-and-answer loop of the Workspace. The query panel lets you ask Hindsight anything about the selected bank; the session items list keeps every question and answer in order so you can navigate, revisit, and build on your research.
