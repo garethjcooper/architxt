@@ -1,0 +1,86 @@
+---
+sidebar_position: 2
+---
+
+# Documents
+
+The **Documents** sync type compares and reconciles individual documents between architxt and a selected Hindsight memory bank. A document is matched by its **external ID** (`document_id`), so the same document on both sides is treated as one object even if its content or attributes have changed.
+
+## What is compared
+
+When you run **Diff** with the **Documents** object type, architxt checks every document that exists on either side. For documents that exist in both places, it compares these fields:
+
+| Field | Divergent if... |
+|---|---|
+| **Content** | The `content_hash` in Hindsight does not match architxt's content hash. This catches edits to the document body, including Smart Edit changes. |
+| **Tags** | The set of tags applied to the document differs between architxt and Hindsight. Order does not matter; only the set of tag names matters. |
+| **Metadata** | Expanded metadata values on the architxt side do not match `document_metadata` stored in Hindsight. This includes user-defined metadata and computed system metadata. |
+| **Context** | The document's assigned context in architxt differs from the `context` value in the Hindsight retain params. |
+| **Event date** | The `doc_timestamp` value in architxt differs from the `event_date` value stored in Hindsight. |
+
+The diff result groups rows into four columns:
+
+- **Same** — both sides present and all compared fields match.
+- **Different** — both sides present, but at least one field diverged.
+- **Only in architxt** — the document exists in architxt but not in the Hindsight bank.
+- **Only in Hindsight** — the document exists in the Hindsight bank but not in architxt.
+
+## Push a document
+
+Pushing sends an architxt document to Hindsight so it can be retained and queried.
+
+In the UI:
+
+1. Select one or more rows from **Only in architxt** or **Different**.
+2. Click **Push**.
+3. architxt calls Hindsight's `retainMemories` endpoint with `update_mode: replace` and includes the document content, external id, context, timestamp, metadata, and tags.
+4. Hindsight starts a background retain operation. The Hindsight page tracks the operation and refreshes the diff when it completes.
+
+:::tip[What replace means]
+`update_mode: replace` tells Hindsight to overwrite any existing document with the same `document_id`. This is why pushing a document that already exists on Hindsight moves it from **Different** to **Same** once the operation finishes.
+:::
+
+Pushing requires that the document's content can be read. If architxt stores only a source path, the push reads the file from disk before sending it.
+
+## Pull a document
+
+Pulling copies or updates a document from Hindsight into architxt.
+
+In the UI:
+
+1. Select one or more rows from **Only in Hindsight** or **Different**.
+2. Click **Pull**.
+3. architxt fetches the full document from Hindsight, including its original text, content hash, tags, metadata, context, and timestamp.
+4. If the `document_id` already exists in architxt, the local row is updated.
+5. If it does not exist, a new document is created with `doc_generated_by: import`, the source file is written to storage, and tags/metadata are attached.
+
+:::tip[Tags and metadata on pull]
+Pulled tags and metadata are created with `import` provenance so they can be identified as coming from a Hindsight sync rather than user input.
+:::
+
+## Field mapping
+
+The values compared and transferred map to Hindsight retain parameters as follows:
+
+| architxt field | Hindsight retain field | Notes |
+|---|---|---|
+| `doc_ext_id` | `document_id` | Stable identifier used on both sides. See [Hindsight `document_id`](https://hindsight.vectorize.io/developer/api/retain#document_id). |
+| `doc_content` / source file | `content` | Full document text. |
+| `doc_timestamp` | `event_date` | Optional event timestamp. |
+| `context` | `context` | Injected into the LLM prompt during retention. See [Contexts](../core-concepts/contexts). |
+| expanded metadata | `metadata` | Includes user and system metadata. See [Metadata](../core-concepts/metadata). |
+| tags | `tags` | Document tags. See Hindsight docs on [tags and `document_tags`](https://hindsight.vectorize.io/developer/api/retain#tags-and-document_tags). |
+
+## Typical workflows
+
+| Situation | Action |
+|---|---|
+| You uploaded a document in architxt and want it in Hindsight. | Push from **Only in architxt**. |
+| You edited a document in architxt with Smart Edit. | Push from **Different** to overwrite Hindsight's copy. |
+| A document was added directly to Hindsight. | Pull from **Only in Hindsight** to import it into architxt. |
+| Tags or metadata were changed in architxt but content is the same. | Push from **Different**; only the tags/metadata diverged, but the push sends the full document state. |
+| A document was updated in Hindsight. | Pull from **Different** to update the architxt copy. |
+
+## Summary
+
+Document sync is the simplest object type: one row per document, matched by external id, with divergence checked on content, tags, metadata, context, and event date. Push sends architxt's version to Hindsight via `retainMemories(update_mode: replace)`. Pull fetches Hindsight's version and creates or updates the corresponding architxt document.

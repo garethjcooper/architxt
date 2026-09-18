@@ -1,0 +1,124 @@
+---
+sidebar_position: 4
+---
+
+# Entities
+
+Entities in architxt are the people, systems, components, concepts, or any other real-world items you want to recognize inside documents and connect to the contextual graph. They map closely to Hindsight's retain-time [`entities`](https://hindsight.vectorize.io/developer/api/retain#entities) and the entity labels stored in a [memory bank](https://hindsight.vectorize.io/developer/api/memory-banks#entity-labels).
+
+An entity is always created under an **Entity Type**. The type defines how the entity is matched in text and, optionally, what its **Entity ID** should look like. Entity types and entities are managed together on the **Entities** page in the architxt UI.
+
+## Entity types
+
+An **Entity Type** is a classification group such as **Application Component**, **Service**, or **Capability Area**. It carries the defaults that apply to every entity of that type unless the entity itself overrides them.
+
+The following fields are shown when you create or edit an entity type:
+
+| UI label | API name | Purpose |
+|---|---|---|
+| **Type Name** | `type_name` | Display name. Must be unique. |
+| **Description** | `description` | Optional context for administrators. |
+| **ID Label** | `id_label` | Optional label for the entity id field. |
+| **Name Label** | `name_label` | Optional label for the entity name field. |
+| **Case Match** | `case_match` | Default case matching for entity scan. |
+| **Word Boundary Match** | `word_boundary_match` | Default whole-word or substring matching. |
+| **Use Entity Id Pattern** | `uses_entity_id_pattern` | Require formatted ids such as `APP-001`. |
+| **Id Format Prefix** | `id_format_prefix` | Alphanumeric prefix for formatted ids. |
+| **Minimum Number Of Id Digits** | `min_id_digits` | Zero-padded width for the numeric suffix. Allowed range: 1–10. |
+| **Id Separator** | `id_separator` | `none` or `-` between prefix and number. |
+
+### Matching defaults
+
+| Field | Option | Meaning |
+|---|---|---|
+| **Case Match** | `insensitive` (default) | Match upper- and lower-case variants. |
+| **Case Match** | `sensitive` | Only match exact case. |
+| **Word Boundary Match** | `boundaries` (default) | Match whole words only. |
+| **Word Boundary Match** | `no-boundaries` | Match any substring. |
+
+These defaults apply to every entity of the type. Individual entities can override them per-entity; the UI highlights overrides with a subtle ring on the entity row.
+
+### Entity ID patterns
+
+When **Use Entity Id Pattern** is enabled, the type requires every entity of that type to have an id matching:
+
+```text
+<prefix><separator><zero-padded-number>
+```
+
+For example, prefix `APP`, separator `-`, and 3 digits produces ids such as `APP-001` and `APP-042`. The UI shows the expected pattern next to the entity id input and offers a **Next ID** button that picks the next unused numeric suffix.
+
+## Entities
+
+An **Entity** is a concrete instance of a type: a specific application, service, team, or concept.
+
+The following fields are shown when you create or edit an entity:
+
+| UI label | API name | Purpose |
+|---|---|---|
+| **Entity ID** | `entity_id` | Stable identifier. Must be unique across all entities. |
+| **Name** | `name` | Display name. Must be unique across all entities. |
+| **Type** | `type_id` | The entity type this entity belongs to. |
+| **Description** | `description` | Optional background text. |
+| **Aliases** | `aliases` | Alternate names and abbreviations recognized during scanning. |
+| **Case Match** | `case_match` | Override the type's case matching. |
+| **Word Boundary Match** | `word_boundary_match` | Override the type's boundary matching. |
+
+### What makes an entity findable
+
+During document processing and full-text search, architxt recognizes an entity by any of the following strings:
+
+- its **Entity ID**
+- its **Name**
+- any string in its **Aliases** list
+
+This means aliases such as abbreviations, nicknames, or legacy names all count as references to the same entity. The entity table's **Documents** column shows how many documents mention the entity through any of these strings.
+
+### Uniqueness
+
+Entity ids, names, and aliases are checked for collisions at creation and update. An id, name, or alias cannot match an existing id, name, or alias of another entity. This keeps detection unambiguous: a single string always resolves to exactly one entity.
+
+## The Entities page
+
+The **Entities** page has two tabs: **Entities** and **Entity Types**.
+
+### Entities tab
+
+The tab shows every entity in a table with columns for **Entity ID**, **Pattern**, **Name**, **Type**, **Case**, **Boundary**, **Documents**, **Aliases**, and **Created**. You can:
+
+- Filter by entity type.
+- Search across entity id, name, aliases, and type name.
+- Select one or more rows and click **Config** to batch-change type, case match, and word-boundary match.
+- Click **Documents** to find the documents that mention the selected entities.
+- Delete selected entities. Deletion removes the entity; document text itself is unchanged, but any references derived from that entity are removed.
+- Click **Import** to paste a CSV of entities. Required columns include `entity_id`, `entity_name`, and `entity_type`; optional columns include `entity_description`, `entity_aliases`, `case_match`, and `word_boundary_match`.
+
+### Entity Types tab
+
+The tab lists all types with columns for **Type Name**, **Description**, **Pattern**, **Case**, **Boundary**, and **Created**. You can:
+
+- Add a new type.
+- Delete selected types. Deleting a type is blocked by the database if entities of that type still exist because `entity_types` has an `ON DELETE RESTRICT` foreign key from `entities`.
+- Click a type row to edit its fields in the **Entity Type Details** dialog.
+
+## How entities fit into architxt
+
+```text
+  Entity Types              Documents
+       │                        │
+       ▼                        ▼
+   Entities  ◄──── mentions ────
+       │
+       ├──────────────► Contextual Graph
+       │                        │
+       │     Mental Models / Reflect
+       │       ▲
+       │       │
+       └───────┴──────► Hindsight Memory Bank
+```
+
+Entity types define the shape. Entities are the instances. Document content is scanned for entity ids, names, and aliases, producing references that feed the contextual graph, mental models, Reflect, and Hindsight memory bank sync. Entities can also be attached directly to mental models as evidence or derivation inputs.
+
+## Summary
+
+Entity types classify. Entities identify the concrete items you care about. Aliases, case matching, and word-boundary settings control how architxt recognizes them in documents, and the formatted id pattern keeps entity ids consistent within a type.

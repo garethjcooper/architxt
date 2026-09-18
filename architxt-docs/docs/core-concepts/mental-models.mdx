@@ -6,7 +6,7 @@ sidebar_position: 3
 
 A mental model in architxt is a reusable query recipe. It describes what you want to know (**Source Query**), how much answer you want (**Max Tokens**), how it should be refreshed, and which documents it should draw from. Mental models are the building blocks for workspaces, curated pages, and Hindsight memory bank sync.
 
-Mental models live in the `mental_models` table in SQLite. The route layer is `server/src/routes/mental-models.js` and the CRUD layer is `server/src/db/crud/mental-models.js`.
+For background on how Hindsight uses mental models, see the [Hindsight mental models guide](https://hindsight.vectorize.io/developer/mental-models). For the API surface, see the [Hindsight mental models API](https://hindsight.vectorize.io/developer/api/mental-models).
 
 ## Mental model data and settings
 
@@ -18,13 +18,13 @@ The following fields are shown when you create or edit a mental model in the arc
 | **Name** | `name` | Display name. |
 | **Source Query** | `source_query` | The actual request text sent to the model. |
 | **Template Role** | `template_role` | Optional role for contextual-graph templates. |
-| **Refresh Mode** | `refresh_mode` | `Full` rebuild or `Delta` incremental update. |
-| **Tags Match** | `tags_match_mode` | How document tags must match the model's tags. |
-| **Refresh after consolidation** | `refresh_after_consolidation` | Run a refresh once memory consolidation completes. |
-| **Exclude All Mental Models** | `exclude_all_mental_models` | Hide every other mental model from this one during refresh. |
-| **Exclude List** | `exclude_mental_model_list` | Comma-separated list of other mental model IDs to exclude. |
-| **Max Tokens** | `max_tokens` | Answer token budget. Allowed range: 1–8192. |
-| **Entity Template** | `is_template` | Derive one mental model per related entity. |
+| **Refresh Mode** | `refresh_mode` | `Full` rebuild or `Delta` incremental update. | [Refresh mode](https://hindsight.vectorize.io/developer/api/mental-models#refresh-mode) |
+| **Tags Match** | `tags_match_mode` | How document tags must match the model's tags. | [Tags and visibility](https://hindsight.vectorize.io/developer/api/mental-models#tags-and-visibility) |
+| **Refresh after consolidation** | `refresh_after_consolidation` | Run a refresh once memory consolidation completes. | [Automatic refresh](https://hindsight.vectorize.io/developer/api/mental-models#automatic-refresh) |
+| **Exclude All Mental Models** | `exclude_all_mental_models` | Hide every other mental model from this one during refresh. | [Tags and visibility](https://hindsight.vectorize.io/developer/api/mental-models#tags-and-visibility) |
+| **Exclude List** | `exclude_mental_model_list` | Comma-separated list of other mental model IDs to exclude. | [Tags and visibility](https://hindsight.vectorize.io/developer/api/mental-models#tags-and-visibility) |
+| **Max Tokens** | `max_tokens` | Answer token budget. Allowed range: 1–8192. | [Structured output](https://hindsight.vectorize.io/developer/api/mental-models#structured-output) |
+| **Entity Template** | `is_template` | Derive one mental model per related entity. | |
 
 ### Refresh Mode
 
@@ -233,7 +233,7 @@ Query:   Write a concise summary of Customer Registry (Component).
 
 ## Composing prompts
 
-Before a mental model is executed or pushed to Hindsight, its **Source Query** is composed. The **Source Query** is written in [AQL](./aql.mdx): the architxt Query Language. AQL lets a mental model request specific output shapes — graph, table, diagram, or narrative — using block directives, references, and plain intent text.
+Before a mental model is executed or pushed to Hindsight, its **Source Query** is composed. The **Source Query** is written in [AQL](./aql): the architxt Query Language. AQL lets a mental model request specific output shapes — graph, table, diagram, or narrative — using block directives, references, and plain intent text.
 
 Composition:
 
@@ -244,7 +244,7 @@ Composition:
 
 The `composeMentalModelPrompt` service in `server/src/prompts/template-service.js` delegates AQL parsing to `@architxt/aql` via `server/src/prompts/section-directives.js`. You can preview composition without saving via `POST /mentalmodels/compose-preview`.
 
-For details on AQL syntax and directives, see the [AQL page](./aql.mdx).
+For details on AQL syntax and directives, see the [AQL page](./aql).
 
 ## Syncing with Hindsight
 

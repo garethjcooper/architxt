@@ -1,0 +1,76 @@
+---
+sidebar_position: 1
+---
+
+# Overview
+
+Hindsight Sync is how architxt pushes and pulls data with a connected [Hindsight](https://hindsight.vectorize.io) memory bank. It keeps the documents, entities, mental models, directives, and bank settings in architxt aligned with the live bank that Hindsight uses for retention, observations, and Reflect.
+
+## What Hindsight Sync does
+
+From the **Hindsight** page you can:
+
+- Compare architxt's local state against a selected Hindsight server and bank.
+- Push architxt-only or out-of-sync items to Hindsight.
+- Pull Hindsight-only or out-of-sync items back into architxt.
+- Track pending operations and refresh the diff once they complete.
+
+The sync is object-type based: you switch between **Documents**, **Entities**, **Mental Models**, **Directives**, and **Bank Settings** and manage each one separately.
+
+## Connecting a server and bank
+
+Before anything can sync, you need a Hindsight server configured in architxt. See [Configuration](../getting-started/configuration) for how to set `HINDSIGHT_*` environment variables. Once configured, the server appears in the **Server** selector on the Hindsight page and its banks appear in the **Bank** selector.
+
+The basic flow is:
+
+1. Choose a **Server**.
+2. Choose a **Bank** on that server.
+3. Choose the **Object type** you want to sync.
+4. Click **Diff** to see what differs.
+5. Select the rows you want to sync, then click **Push** or **Pull**.
+
+## The diff view
+
+After running a diff, the page shows three columns:
+
+| Column | What it shows |
+|---|---|
+| **In Sync / Only in architxt** | Items that are identical, or exist only in architxt. |
+| **Different** | Items that exist on both sides but have diverged fields. |
+| **Only in Hindsight** | Items that exist only in the Hindsight bank. |
+
+Each row shows the item's external id, key identifying fields, and small divergence badges for the fields that differ. Selecting a row lets you push or pull it. Selecting all rows in a column lets you bulk-sync them.
+
+## Operations and status
+
+Syncing is not always instant. When you push or pull many items, architxt creates background operations on the Hindsight server. The Hindsight page polls these operations and refreshes the diff automatically once they finish. A row may show a pending status while its operation is still running.
+
+## Object types you can sync
+
+The Hindsight Sync section covers each object type in detail:
+
+- [Documents](./documents)
+- [Entities](./entities)
+- [Mental Models](./mental-models)
+- [Directives](./directives)
+- [Bank Settings](./bank-settings)
+
+Each page explains the fields that are compared, the typical push/pull behavior, and any object-specific warnings or constraints.
+
+## How Hindsight Sync fits into architxt
+
+```text
+   architxt
+      │
+      ├── Documents          ──┐
+      ├── Entities             │
+      ├── Mental Models        ├──►  Hindsight Sync  ◄──►  Hindsight Memory Bank
+      ├── Directives           │
+      └── Bank Settings      ──┘
+```
+
+Hindsight Sync is the bridge. It does not change how architxt stores its own data, but it makes sure the data that reaches Hindsight is the data you intended.
+
+## Summary
+
+Hindsight Sync lets you compare, push, and pull documents, entities, mental models, directives, and bank settings between architxt and a Hindsight memory bank. Start by selecting a server and bank, run a diff, and sync the rows that matter.

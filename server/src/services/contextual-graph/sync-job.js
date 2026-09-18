@@ -17,6 +17,7 @@ import { refreshContextualGraphPatches as defaultRefreshPatches } from './refres
 import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from './sync-mental-model-config.js';
 import { cleanupDisallowedModels as defaultCleanupDisallowedModels } from './cleanup-disallowed-models.js';
 import { cleanupOrphanedModels as defaultCleanupOrphanedModels } from './cleanup-orphaned-models.js';
+import { getServer as defaultGetServer } from '../../db/crud/servers.js';
 
 const logger = createLogger('contextual-graph-sync-job');
 
@@ -117,14 +118,22 @@ function buildRunner(deps) {
   const addContext = deps.addContext || defaultAddContext;
   const syncMentalModelConfig = deps.syncMentalModelConfig || defaultSyncMentalModelConfig;
   const refreshPatches = deps.refreshPatches || defaultRefreshPatches;
+  const getServer = deps.getServer || defaultGetServer;
 
   return async function run(db, jobId, serverId, bankId, options) {
     const start = new Date().toISOString();
     updateJob(db, jobId, { status: 'running', started_at: start });
+
+    const serverResult = getServer(db, serverId);
+    const server = serverResult?.success ? serverResult.data : null;
+    const serverName = server?.svr_name;
+    const serverAddress = server?.svr_base_url;
+    const serverLabel = [serverName, serverAddress].filter(Boolean).join(' — ');
+
     appendLog(db, jobId, {
       stage: null,
       level: 'info',
-      message: `Sync job started for ${bankId} on server ${serverId}`,
+      message: `Sync job started for ${bankId} on ${serverLabel}`,
       details: { options },
     });
 

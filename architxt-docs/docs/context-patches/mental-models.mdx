@@ -1,0 +1,89 @@
+---
+sidebar_position: 4
+---
+
+# Mental Models
+
+The **Mental Models** tab is the place to view and manage the **contextual mental models** attached to a bank's graph. These are not the general mental models you edit on the main **Mental Models** page — they are the role-based models derived from the contextual graph: summaries, capabilities, edge context, and discovery/seed models. Any custom role types you create on the **Template Roles** page also appear here, so this tab is the complete inventory of role-based models for the current bank.
+
+:::tip[Let the sync pipeline do the work]
+The expectation is that the contextual sync job creates, updates, refreshes, and cleans up these models automatically. You do not need to manage them by hand. This tab is for visibility and occasional manual intervention, not day-to-day operation.
+:::
+
+## What you see
+
+The tab is split into two panels:
+
+- **Left:** a table of all mental-model refs found across the current graph.
+- **Right:** the fetched content of the selected model, rendered as an envelope or plain text.
+
+You can resize the two panels by dragging the handle between them, and double-click it to reset the split.
+
+## Model table columns
+
+| Column | What it shows |
+|---|---|
+| **Template Role** | The display name of the model's role, such as `Entity Summary`, `Edge Context`, or `Discovery Context`. |
+| **Scope** | Whether the model is scoped to a **Node**, **Edge**, or **Seed**. |
+| **Target** | The concrete node, edge pair, or seed the model is bound to. |
+| **External ID** | The stable Hindsight `ext_id` of the model. |
+| **Fetched** | How long ago the content was last fetched from Hindsight. |
+| **Refresh state** | Whether the last refresh is still running, completed successfully, was skipped, or errored. |
+
+Click any row to load and display its content on the right. Hover over the refresh-state cell to see the error message if a refresh failed.
+
+## Available actions
+
+| Action | What it does | When to use it |
+|---|---|---|
+| **Select rows** | Use the checkboxes to pick one or more models for batch action. | Before refreshing or deleting multiple models. |
+| **Refresh selected** | Queues a content refresh for the selected models in Hindsight. | When a model's content looks stale and you do not want to wait for the next sync job. |
+| **Delete selected** | Permanently removes the selected models from Hindsight. | When a model was created in error or is no longer wanted. The next sync job may recreate it if the graph still qualifies for it. |
+| **Preview composed query** | Shows the final composed AQL query for a system-template role. | When you want to understand exactly what query the model sends to Hindsight. |
+
+:::caution[Refresh can be expensive]
+Refreshing many models at once can put significant load on the Hindsight server. Use batch refresh sparingly.
+:::
+
+## Content panel
+
+When you select a model, the right panel shows its fetched content:
+
+- **Envelope view** (default) — renders the content through the standard envelope viewer, preserving sections such as narratives, tables, and diagrams.
+- **Plain view** — shows the raw content as text or pretty-printed JSON.
+- **Copy** — copies the content text to the clipboard.
+- **Save as Markdown** — downloads the content as a `.md` file.
+
+If the model has no content yet, the panel prompts you to select a model. If fetching failed, it shows the error instead.
+
+## How models get here
+
+Contextual models are derived automatically from the graph by the sync pipeline:
+
+| Role | Scope | Created for |
+|---|---|---|
+| `sys_entity_summary` | Node | Summarizing a grounded entity. |
+| `sys_entity_capabilities` | Node | Listing capabilities for a grounded entity. |
+| `sys_edge_context` | Edge | Explaining the relationship between two entities. |
+| `sys_discovery_context` | Seed | Discovering candidates around a seed node. |
+| Custom template roles | Node / Edge / Seed | Whatever behavior you configured on the **Template Roles** page. |
+
+The deploy stage of a sync job creates specs for each qualifying node, edge, and seed, pushes them to Hindsight, and stores the resulting `ext_id` back on the graph item. The Mental Models tab simply collects all of those model refs and lets you browse them.
+
+## Refresh lifecycle
+
+1. A model is deployed during the sync job.
+2. Its content is fetched from Hindsight and displayed.
+3. The refresh state shows when it last ran.
+4. If you (or the sync job) queue a refresh, a Hindsight operation is created and the table updates while it runs.
+5. When the refresh completes, the content is re-fetched automatically.
+
+## Relationship to other tabs
+
+- **Graph** — the nodes and edges these models are attached to.
+- **Candidates** — discovered nodes produced by seed-scoped `sys_discovery_context` models.
+- **Sync Jobs** — the background jobs that create, refresh, and clean up the models listed here.
+
+## Summary
+
+The Mental Models tab gives you a read-mostly view of every contextual mental model on the current bank. You can inspect content, refresh stale models, and delete unwanted ones, but the normal flow is to let the contextual sync job keep them in sync automatically.

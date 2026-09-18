@@ -184,7 +184,7 @@ pre {
 }
 
 .theme-doc-sidebar-menu .menu__link--active {
-  background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light));
+  background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light)) !important;
   color: var(--atx-text-on-dark);
   font-weight: 500;
   border: none;
@@ -192,12 +192,13 @@ pre {
 }
 
 .theme-doc-sidebar-menu .menu__link--active:hover {
-  background: linear-gradient(90deg, var(--atx-brand-dark), var(--atx-brand-bd) 60%, var(--atx-brand));
+  background: linear-gradient(90deg, var(--atx-brand-dark), var(--atx-brand-bd) 60%, var(--atx-brand)) !important;
   color: var(--atx-text-on-dark);
 }
 
+/* Level-1 category active header gets the same treatment explicitly. */
 .theme-doc-sidebar-menu .theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link--active {
-  background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light));
+  background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light)) !important;
   color: var(--atx-text-on-dark);
   border: none;
   box-shadow: var(--atx-shadow-sm);
@@ -214,15 +215,42 @@ pre {
 }
 
 /* Sidebar category labels */
-.theme-doc-sidebar-menu .theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link {
+.theme-doc-sidebar-menu .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link {
   color: var(--atx-text);
   font-weight: 500;
   font-size: 0.875rem;
   letter-spacing: 0.01em;
 }
 
+.theme-doc-sidebar-menu .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link--active {
+  background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light)) !important;
+  color: var(--atx-text-on-dark);
+  border: none;
+  box-shadow: var(--atx-shadow-sm);
+}
+
+.theme-doc-sidebar-menu .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link--active:hover {
+  background: linear-gradient(90deg, var(--atx-brand-dark), var(--atx-brand-bd) 60%, var(--atx-brand)) !important;
+  color: var(--atx-text-on-dark);
+}
+
 .theme-doc-sidebar-menu .menu__list-item-collapsible > .menu__link:hover {
   background-color: var(--atx-surface-bg-hover);
+}
+
+/* Override Docusaurus/Infima layer that zeros out active category backgrounds. */
+@layer docusaurus.infima {
+  .theme-doc-sidebar-menu .menu__list-item-collapsible .menu__link--active,
+  .theme-doc-sidebar-menu .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link--active,
+  .theme-doc-sidebar-menu .theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link--active {
+    background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light)) !important;
+  }
+
+  .theme-doc-sidebar-menu .menu__list-item-collapsible .menu__link--active:hover,
+  .theme-doc-sidebar-menu .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link--active:hover,
+  .theme-doc-sidebar-menu .theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link--active:hover {
+    background: linear-gradient(90deg, var(--atx-brand-dark), var(--atx-brand-bd) 60%, var(--atx-brand)) !important;
+  }
 }
 
 /* === Main content === */

@@ -1,0 +1,81 @@
+---
+sidebar_position: 2
+---
+
+# Contextual data
+
+The **Contextual data** panel in the Workspace brings every mental model related to an entity into one place. It does not distinguish between where a model lives in architxt — plain, derived, or contextual — it simply shows what is available for the selected entity and lets you open it.
+
+## What the panel shows
+
+The panel lists entities that have at least one attached mental model. Each row is an entity; expanding the row reveals the models attached to it. The same entity can appear because it has:
+
+- A **plain** mental model stored directly on the entity in architxt.
+- A **derived** mental model produced by a template role applied to the entity's catalog record.
+- A **contextual** mental model generated from the contextual graph node.
+- An **edge-context** model that explains relationships between this entity and others.
+
+All of these are grouped under the entity's identity. The panel uses the entity name from the catalog or contextual graph, and shows the underlying entity ID in a monospace label so you can always see which object the models belong to.
+
+## Model scope badges
+
+Each attached model shows a scope badge that tells you how it is attached:
+
+| Badge | Meaning |
+|---|---|
+| **PLAIN** | A plain mental model stored directly on the architxt entity. |
+| **DERIVED** | A template-derived mental model from the entity's catalog record. |
+| **NODE** | A contextual mental model generated for this graph node. |
+| **EDGE** | An edge-context model describing a relationship to another entity. |
+| **SEED** | A discovery/seed contextual model around this entity. |
+
+The badge tells you how the model was produced; the role label next to it tells you what kind of model it is — for example, summary, capabilities, edge context, or a custom template role.
+
+## Interaction model
+
+| Action | What happens |
+|---|---|
+| **Click a model** | Opens the model content in the active **Preview** tab (or replaces the current view tab). |
+| **Open in new tab** | Opens the model in a new read-only **View** tab, so you can keep the current tab open. |
+| **Expand / collapse entity** | Shows or hides the attached models for that entity. |
+
+Clicking or opening a model loads its content and renders it as an envelope preview: narrative, graph, tables, and diagrams, depending on what the model produced. Edge-context models render a title like `Source → Target` so you can see which relationship they describe.
+
+## Why this matters
+
+In other parts of architxt, mental models are managed in different places:
+
+- **Plain and derived** models are created and edited on the main **Mental Models** page and in the Hindsight sync flows.
+- **Contextual** models are produced automatically by the Context Patches sync job.
+- **Edge-context** models are built from the relationships in the contextual graph.
+
+The Contextual data panel is the only place where all of these are brought together under the entity they describe. This makes it the right surface for:
+
+- Checking whether an entity has a summary before running a Reflect query.
+- Comparing how the same entity is described by different model types.
+- Opening a model in a new tab for side-by-side reading.
+- Finding the edge context for a relationship you want to include in a curated page.
+
+## Example
+
+Consider an entity labeled **Acme Corp**.
+
+| Model | Scope | Role | How you see it |
+|---|---|---|---|
+| `Acme Corp summary` | DERIVED | `sys_entity_summary` | From the catalog-derived models. |
+| `Acme Corp capabilities` | NODE | `sys_entity_capabilities` | From the contextual graph node. |
+| `Acme Corp → Products division` | EDGE | `sys_edge_context` | From a graph relationship. |
+| `Acme Corp strategy` | PLAIN | Custom template role | Created directly in architxt. |
+
+All four rows appear when you expand **Acme Corp** in the Contextual data panel, even though they came from different sources.
+
+## Relationship to other surfaces
+
+- **Context Patches → Mental Models tab** shows every contextual/role-based model for the bank at once. The Contextual data panel filters that same information to a single entity and mixes in plain and derived models.
+- **Mental Models (main page)** is where you create and edit plain and derived models; their content flows here.
+- **Workspace → Preview / View tabs** is where you land when you click or open a model from this panel.
+- **Curated pages** let you copy content from previewed models into a composed page.
+
+## Summary
+
+The Contextual data panel is the collation point for everything an entity knows. It gathers plain, derived, contextual, and edge-context models under one identity, lets you preview them in place or open them in a new tab, and connects directly to the rest of the Workspace for reading and composition.
