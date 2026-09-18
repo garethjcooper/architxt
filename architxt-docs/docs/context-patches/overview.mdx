@@ -1,0 +1,85 @@
+---
+sidebar_position: 1
+---
+
+# Overview
+
+**Context Patches** is the part of architxt that builds and maintains a **contextual graph** on top of a Hindsight memory bank. It imports the bank's skeleton, discovers candidate nodes and edges, deploys contextual mental models, and keeps everything in sync through background jobs.
+
+Think of it as the ongoing bridge between Hindsight's raw memory data and architxt's structured graph view. While Hindsight Sync moves documents, entities, mental models, directives, and settings between architxt and a bank, Context Patches keeps the graph itself alive: importing what Hindsight knows, proposing new candidates, deploying role-based models, and rerunning patches when config changes.
+
+## What Context Patches does
+
+When you open the **Context Patches** page and choose a server and bank, you can:
+
+- Inspect the grounded **Graph** of entities and relationships already imported from Hindsight.
+- Review **Candidates** — nodes and edges the system discovered but has not yet promoted into the graph.
+- Manage **Mental Models** that are attached to graph nodes, edges, or seeds.
+- Monitor and trigger **Sync Jobs** that run the import, deploy, and refresh pipeline.
+
+## Page components
+
+### Server and bank selectors
+
+At the top of the page you choose the Hindsight **server** and **bank** you want to work with. Everything on the page — the graph, candidates, models, and jobs — is scoped to that server and bank.
+
+### Config badges
+
+Once a bank is selected, a row of badges describes how the bank is configured for contextual-graph operations:
+
+| Badge | Meaning |
+|---|---|
+| **Auto refresh** | The bank is configured to run the contextual sync pipeline automatically. |
+| **Manual refresh** | Sync jobs must be started manually with the **Run sync job** button. |
+| **Unmanaged** | The bank has no contextual-graph configuration yet. |
+| **Import top N nodes** | Only the top N nodes from Hindsight are imported into the graph. |
+| **Deploy max N** | Each sync run deploys at most N contextual mental models. |
+| **Model type** / **All types** | Which template-role types are allowed for deployment. |
+
+These values come from the server's `contextual_graph_banks` configuration and determine what the sync job is allowed to do.
+
+### Run sync job
+
+When the bank is in **Manual refresh** mode, a **Run sync job** button appears. Clicking it starts a full contextual-graph sync job in the background. In **Auto refresh** mode the button is hidden because jobs are triggered automatically.
+
+A sync job runs these stages in order:
+
+1. **Import Hindsight skeleton** — pull entities and relationships from Hindsight into the contextual graph.
+2. **Remove disallowed models** — delete contextual mental models whose template role is no longer allowed.
+3. **Remove orphaned models** — delete models that are no longer attached to existing graph nodes or edges.
+4. **Deploy contextual models** — create or update role-based mental models for nodes, edges, and seeds.
+5. **Sync mental-model config** — align per-entity overrides and refresh settings between architxt and Hindsight.
+6. **Refresh patches** — rerun mental models whose config changed so their content stays current.
+
+The **Sync Jobs** tab shows the status of each stage, any issues, and the full log.
+
+## Tabs
+
+The page is organized into four tabs. Each tab will be covered in its own section:
+
+- **Graph** — grounded entities and relationships imported from Hindsight.
+- **Candidates** — discovered nodes and edges waiting to be promoted.
+- **Mental Models** — contextual mental models attached to the graph and their content.
+- **Sync Jobs** — history, status, and manual triggers for contextual sync jobs.
+
+## How Context Patches fits into architxt
+
+```text
+   Hindsight Memory Bank
+          │
+          │  skeleton (entities / relationships)
+          ▼
+   Context Patches  ──►  Contextual Graph
+          │                     │
+          │                     ▼
+          │            Contextual Mental Models
+          │                     │
+          ▼                     ▼
+   Sync Jobs  ◄──────────  Retain / Observe / Reflect
+```
+
+Context Patches takes the bank's skeleton, builds the graph, proposes candidates, and deploys the contextual models that feed back into Hindsight's retention, observation, and reflection pipeline.
+
+## Summary
+
+Context Patches is where you manage the living graph on top of a Hindsight bank. Choose a server and bank, read the config badges, run or monitor sync jobs, and inspect the graph, candidates, mental models, and job history across the four tabs.
