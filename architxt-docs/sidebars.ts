@@ -30,7 +30,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Workspace',
       collapsed: false,
-      items: ['workspace/overview', 'workspace/contextual-data'],
+      items: ['workspace/overview', 'workspace/contextual-data', 'workspace/reflect-queries-and-session-items'],
     },
     {
       type: 'category',
