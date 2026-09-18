@@ -39,7 +39,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Focus areas',
           collapsed: false,
-          items: ['workspace/focus-narrative', 'workspace/focus-diagram', 'workspace/focus-table'],
+          items: ['workspace/focus-narrative', 'workspace/focus-diagram', 'workspace/focus-table', 'workspace/focus-graph'],
         },
       ],
     },
