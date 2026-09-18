@@ -30,7 +30,18 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Workspace',
       collapsed: false,
-      items: ['workspace/overview', 'workspace/contextual-data', 'workspace/reflect-queries-and-session-items'],
+      items: [
+        'workspace/overview',
+        'workspace/contextual-data',
+        'workspace/reflect-queries-and-session-items',
+        'workspace/preview-and-curated-pages',
+        {
+          type: 'category',
+          label: 'Focus areas',
+          collapsed: false,
+          items: ['workspace/focus-narrative'],
+        },
+      ],
     },
     {
       type: 'category',
