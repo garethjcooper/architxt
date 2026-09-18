@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Mental Models
 
-The **Mental Models** tab is the place to view and manage the **contextual mental models** attached to a bank's graph. These are not the general mental models you edit on the main **Mental Models** page — they are the role-based models derived from the contextual graph: summaries, capabilities, edge context, and discovery/seed models.
+The **Mental Models** tab is the place to view and manage the **contextual mental models** attached to a bank's graph. These are not the general mental models you edit on the main **Mental Models** page — they are the role-based models derived from the contextual graph: summaries, capabilities, edge context, and discovery/seed models. Any custom role types you create on the **Template Roles** page also appear here, so this tab is the complete inventory of role-based models for the current bank.
 
 :::tip[Let the sync pipeline do the work]
 The expectation is that the contextual sync job creates, updates, refreshes, and cleans up these models automatically. You do not need to manage them by hand. This tab is for visibility and occasional manual intervention, not day-to-day operation.
@@ -66,7 +66,7 @@ Contextual models are derived automatically from the graph by the sync pipeline:
 | `sys_entity_capabilities` | Node | Listing capabilities for a grounded entity. |
 | `sys_edge_context` | Edge | Explaining the relationship between two entities. |
 | `sys_discovery_context` | Seed | Discovering candidates around a seed node. |
-| Custom template roles | Node / Edge / Seed | Whatever behavior your organization has configured. |
+| Custom template roles | Node / Edge / Seed | Whatever behavior you configured on the **Template Roles** page. |
 
 The deploy stage of a sync job creates specs for each qualifying node, edge, and seed, pushes them to Hindsight, and stores the resulting `ext_id` back on the graph item. The Mental Models tab simply collects all of those model refs and lets you browse them.
 
