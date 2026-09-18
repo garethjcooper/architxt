@@ -8,8 +8,6 @@ Entities in architxt are the people, systems, components, concepts, or any other
 
 An entity is always created under an **Entity Type**. The type defines how the entity is matched in text and, optionally, what its **Entity ID** should look like. Entity types and entities are managed together on the **Entities** page in the architxt UI.
 
-Entities live in the `entities` table in SQLite. Their types live in `entity_types`. The route layer is `server/src/routes/entities.js` and the CRUD layers are `server/src/db/crud/entities.js` and `server/src/db/crud/entity-types.js`.
-
 ## Entity types
 
 An **Entity Type** is a classification group such as **Application Component**, **Service**, or **Capability Area**. It carries the defaults that apply to every entity of that type unless the entity itself overrides them.
@@ -111,34 +109,15 @@ The tab lists all types with columns for **Type Name**, **Description**, **Patte
        ▼                        ▼
    Entities  ◄──── mentions ────
        │
-       ▼
-Contextual Graph
-       │
-       ▼
- Mental Models / Reflect
+       ├──────────────► Contextual Graph
+       │                        │
+       │     Mental Models / Reflect
+       │       ▲
+       │       │
+       └───────┴──────► Hindsight Memory Bank
 ```
 
-Entity types define the shape. Entities are the instances. Document content is scanned for entity ids, names, and aliases, producing references that feed the contextual graph, mental models, and Reflect answers.
-
-## API endpoints
-
-Entity and entity-type operations are grouped under `/entities`:
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/entities/types` | List all entity types. |
-| POST | `/entities/types` | Create an entity type. |
-| PUT | `/entities/types/:id` | Update an entity type. |
-| DELETE | `/entities/types/:id` | Delete an entity type. |
-| GET | `/entities/types/:id/next-id` | Get the next formatted id for a type. |
-| GET | `/entities` | List all entities with type and usage count. |
-| GET | `/entities/:id` | Get a single entity. |
-| POST | `/entities` | Create an entity. |
-| PUT | `/entities/:id` | Update an entity. |
-| DELETE | `/entities/:id` | Delete an entity. |
-| POST | `/entities/batch/updateconfig` | Batch update entity configuration. |
-| POST | `/entities/documents` | Find documents mentioning the given entities. |
-| POST | `/entities/info` | Consolidated contextual-graph info for one or more graph ids. |
+Entity types define the shape. Entities are the instances. Document content is scanned for entity ids, names, and aliases, producing references that feed the contextual graph, mental models, Reflect, and Hindsight memory bank sync. Entities can also be attached directly to mental models as evidence or derivation inputs.
 
 ## Summary
 
