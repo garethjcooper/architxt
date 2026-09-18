@@ -699,7 +699,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
 
         <div
           ref={markdownContainerRef}
-          className={`flex-1 min-w-0 min-h-0 rounded-md border border-border-default bg-surface-overlay overflow-y-auto custom-scrollbar ${
+          className={`flex-1 min-h-0 rounded-md border border-border-default bg-surface-overlay overflow-y-auto custom-scrollbar ${
             viewMode === 'plain' ? 'py-3 pl-3 pr-5 text-[13px] leading-relaxed font-mono' : 'p-4'
           }`}
         >

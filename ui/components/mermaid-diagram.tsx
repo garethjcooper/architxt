@@ -46,27 +46,17 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
     }
     const wrapper = svgWrapperRef.current;
     if (!wrapper) return;
-    // Constrain the wrapper so Mermaid’s intermediate divs cannot expand the
-    // scroll width beyond the card body.
-    wrapper.style.width = '100%';
-    wrapper.style.maxWidth = '100%';
-    wrapper.style.display = 'block';
-    wrapper.style.overflow = 'hidden';
-
-    const svgEls = wrapper.querySelectorAll('svg');
-    svgEls.forEach((svgEl) => {
-      if (fitToWidth) {
-        svgEl.style.setProperty('width', '100%', 'important');
-        svgEl.style.setProperty('height', 'auto', 'important');
-        svgEl.style.setProperty('max-width', '100%', 'important');
-        svgEl.removeAttribute('width');
-        svgEl.removeAttribute('height');
-      } else {
-        svgEl.style.removeProperty('width');
-        svgEl.style.removeProperty('height');
-        svgEl.style.removeProperty('max-width');
-      }
-    });
+    const svgEl = wrapper.querySelector('svg');
+    if (!svgEl) return;
+    if (fitToWidth) {
+      svgEl.style.setProperty('width', '100%', 'important');
+      svgEl.style.setProperty('height', 'auto', 'important');
+      svgEl.style.setProperty('max-width', '100%', 'important');
+    } else {
+      svgEl.style.removeProperty('width');
+      svgEl.style.removeProperty('height');
+      svgEl.style.removeProperty('max-width');
+    }
   }, [fitToWidth, svg]);
 
   useEffect(() => {
@@ -124,7 +114,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
           </label>
         </div>
       )}
-      <div className={`p-3 ${fitToWidth ? 'overflow-hidden' : 'overflow-x-auto'}`}>
+      <div className="p-3 overflow-x-auto">
         {error ? (
           <div className="text-xs text-destructive-fg/90 font-mono whitespace-pre-wrap">{error}</div>
         ) : svg ? (
