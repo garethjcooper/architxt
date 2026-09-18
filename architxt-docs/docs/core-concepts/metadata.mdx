@@ -1,0 +1,79 @@
+---
+sidebar_position: 6
+---
+
+# Metadata
+
+Metadata in architxt are key/value pairs you attach to documents. They are user-defined labels — things like `author=Jane Doe`, `source=internal wiki`, or `domain=Billing` — that travel with the document into Hindsight as [`metadata`](https://hindsight.vectorize.io/developer/api/retain#metadata).
+
+Unlike **Contexts** (a single theme per document) or **Tags** (a badge-style label), metadata entries are free-form pairs. They are useful when you need structured, named facts for filtering, syncing, or scoping downstream work.
+
+## Creating and managing metadata
+
+Open the **Metadata** page from the main navigation. The page lists every metadata entry with its **Key**, **Value**, **Documents** count, **Source**, and creation time.
+
+You can:
+
+- Click **Add** to create a metadata entry. Only **Key** is required; **Value** is optional.
+- Click **Import** to paste a CSV of `key,value` pairs. The optional header is `key,value`; one entry per row.
+- Select one or more user-created entries and click **Delete**. System presets are protected and cannot be deleted.
+- Search by key, value, source, or id.
+
+Click a metadata row to open **Metadata Details**. From there you can edit the key and value. If the metadata is assigned to any documents that have already been synced to Hindsight, the dialog warns you that renaming it may cause a mismatch on the next sync.
+
+### System metadata presets
+
+architxt seeds a set of read-only metadata keys automatically. These keys are populated from document attributes during extraction and are sent to Hindsight as part of the retain payload.
+
+| System key | Populated from | Example value |
+|---|---|---|
+| `architxt-tags` | The document's assigned tags. | `Billing, Project-Alpha` |
+| `architxt-entities` | Entities recognized in the document. | `Payment Gateway, Customer Registry` |
+| `architxt-entity-match-pattern` | The detection pattern used for entity matching. | `APP-{id}` |
+| `architxt-document-size` | The document's size in bytes. | `1048576` |
+| `architxt-document-full-path` | The stored location of the source file. | `/data/docs/invoice.pdf` |
+| `architxt-file-name` | The original uploaded file name. | `invoice.pdf` |
+| `architxt-document-date` | The user-defined document date. | `2024-01-15` |
+| `architxt-author` | Authors parsed from the document. | `Jane Doe` |
+
+System metadata rows are highlighted in the table and labeled **System Preset — Read Only**. You cannot edit or delete them, but you can see them when assigning metadata to documents.
+
+## Applying metadata to documents
+
+Metadata is assigned from the **Documents** page:
+
+1. Select one or more documents.
+2. Click the **Metadata** button.
+3. The **Manage Metadata** dialog shows four sections:
+   - **On All Documents** — metadata currently shared by every selected document.
+   - **On Some Documents** — metadata that applies to only a subset of the selection, with a count such as `(2/3)`.
+   - **Marked for Removal** — metadata that will be removed when you save.
+   - **Available to Add** — metadata not currently on any selected document.
+
+Click an item to move it between sections; click the **X** on a common item to mark it for removal. Click **Save Changes** to apply the result to all selected documents.
+
+A document can have **many metadata entries** at once, and the same metadata value can be shared across many documents.
+
+## Where metadata is used
+
+Metadata key/value pairs are included when architxt pushes a document to a Hindsight memory bank. Hindsight receives them as the retain-time `metadata` object, so they become searchable, filterable context for every memory extracted from that document.
+
+For details on how the metadata object is structured and consumed, see the Hindsight API documentation on [retain metadata parameters](https://hindsight.vectorize.io/developer/api/retain#metadata).
+
+## How metadata fits into architxt
+
+```text
+        Metadata
+            │
+            ▼
+       Documents  ──────►  Hindsight Memory Bank
+            │
+            ▼
+   Contextual Graph / Mental Models / Reflect
+```
+
+Metadata is not part of the document text, but it rides along with the document. Used consistently, it becomes a powerful way to slice the corpus by source, author, domain, date, or any other dimension you define.
+
+## Summary
+
+Metadata is a flexible key/value layer for documents. Create your own pairs, import them in bulk, apply them to many documents, and architxt forwards them to Hindsight as part of every retain request.
