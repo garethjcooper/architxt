@@ -26,7 +26,7 @@ A graph envelope contains one or more graph blocks. Each block has:
 | **Edges** | The relationships between entities. Edge labels describe the relationship type or role. |
 | **Details panel** | A side panel that opens when you select a node or edge. It shows properties, evidence, and attached mental models. |
 
-Graph blocks are rendered inside an interactive canvas in the Preview tab and in the curated-page editor.
+Graph blocks are rendered inside an interactive canvas in the Preview tab. They are exploration-first views: you cannot directly edit the graph nodes and edges. The graph changes only when the underlying query or merged mental-model graph changes.
 
 ## Preview controls
 
@@ -38,26 +38,21 @@ Graph previews share the common envelope controls and add graph-specific explora
 | **Filter** | Hide nodes by type, edge label, or entity count to reduce visual noise. |
 | **Search** | Jump to and highlight a node by name or entity type. |
 | **Details** | Opens a panel with full properties and evidence for the selected node or edge. |
-| **Focus** | Opens the graph in a modal with the source visible and, when the source is editable, an **Apply** button. |
+| **Focus** | Opens the graph in a modal where you can add its content to a curated page. |
 
-:::tip[From graph to diagram]
-Once the graph shows the relationships you care about, you can copy it as a Mermaid source and paste it into a diagram section for a static, exportable visual.
-:::
+## The Focus modal
 
-## Editing graphs in curated pages
+The **Focus** modal is the main action surface for a graph. It opens the graph in a larger view and exposes controls for turning the graph into other section types.
 
-When you add a graph to a curated page it becomes an editable graph section. The section editor preserves the interactive canvas and lets you adjust the graph definition.
-
-| Action | How it works |
+| Action | Result |
 |---|---|
-| **Edit source** | Change the node and edge list that defines the graph; the canvas updates as you type. |
-| **Filter defaults** | Set which node types or edges are visible when the page first loads. |
-| **Rename** | Edit the graph name in the modal or section header. |
-| **Apply** | Save the edited graph definition back to the curated page. |
-| **Soft delete** | Remove the section; restore it before saving if you change your mind. |
+| **Add diagram to page** | Converts the graph into a Mermaid diagram section on the active curated page. Evidence attached to nodes and edges is carried over to the diagram. |
+| **Add table to page** | Converts the graph into a table section on the active curated page, giving you a structured view of nodes, edges, or both. |
+| **Copy** | Copies the graph source or image, depending on the control you use. |
+| **Fit to page** | The modal opens with fit-to-page enabled so the whole graph is visible at a glance. |
 
-:::tip[Graphs stay interactive on curated pages]
-A graph section in a curated page keeps the same pan, zoom, filter, and details behaviour as the Preview tab. Readers can explore it directly.
+:::tip[Graphs become diagrams or tables, not editable graph sections]
+A curated page cannot hold a live graph section. Instead, the Focus modal lets you add a **diagram** (static Mermaid flowchart) or a **table** derived from the graph. The graph itself stays read-only in the Preview tab.
 :::
 
 ## From graph to curated page
@@ -68,8 +63,8 @@ The typical flow is:
 2. Inspect the interactive canvas in the Preview tab.
 3. Pan, zoom, and filter until the important relationships are visible.
 4. Select nodes to read their details and evidence.
-5. Copy the graph as a section into a curated page, or convert it to a diagram for a static export.
-6. In the curated page, refine filters or the node/edge source, then save the page.
+5. Open the **Focus** modal and choose **Add diagram to page** or **Add table to page**.
+6. In the curated page, edit the generated diagram source or table cells, then save the page.
 
 ## Relationship to other focus pages
 
