@@ -6,8 +6,6 @@ sidebar_position: 3
 
 A mental model in architxt is a reusable query recipe. It describes what you want to know (**Source Query**), how much answer you want (**Max Tokens**), how it should be refreshed, and which documents it should draw from. Mental models are the building blocks for workspaces, curated pages, and Hindsight memory bank sync.
 
-Mental models live in the `mental_models` table in SQLite. The route layer is `server/src/routes/mental-models.js` and the CRUD layer is `server/src/db/crud/mental-models.js`.
-
 ## Mental model data and settings
 
 The following fields are shown when you create or edit a mental model in the architxt UI. Each field has an internal API name in parentheses.
