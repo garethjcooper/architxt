@@ -28,6 +28,12 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Workspace',
+      collapsed: false,
+      items: ['workspace/overview'],
+    },
+    {
+      type: 'category',
       label: 'Hindsight Sync',
       collapsed: false,
       items: ['hindsight-sync/overview', 'hindsight-sync/documents', 'hindsight-sync/entities', 'hindsight-sync/mental-models', 'hindsight-sync/directives', 'hindsight-sync/bank-settings'],
