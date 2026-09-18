@@ -24,7 +24,6 @@ export interface MermaidDiagramProps {
  */
 export function MermaidDiagram({ content, className = '', name, type, defaultRenderer }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const svgWrapperRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fitToWidth, setFitToWidth] = useState(() => {
@@ -36,7 +35,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
     }
   });
 
-  // Persist fit-to-width preference and apply it to the rendered SVG.
+  // Persist fit-to-width preference and keep the wrapper class in sync.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -44,20 +43,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
     } catch {
       // ignore storage errors
     }
-    const wrapper = svgWrapperRef.current;
-    if (!wrapper) return;
-    const svgEl = wrapper.querySelector('svg');
-    if (!svgEl) return;
-    if (fitToWidth) {
-      svgEl.style.setProperty('width', '100%', 'important');
-      svgEl.style.setProperty('height', 'auto', 'important');
-      svgEl.style.setProperty('max-width', '100%', 'important');
-    } else {
-      svgEl.style.removeProperty('width');
-      svgEl.style.removeProperty('height');
-      svgEl.style.removeProperty('max-width');
-    }
-  }, [fitToWidth, svg]);
+  }, [fitToWidth]);
 
   useEffect(() => {
     ensureMermaidInitialized(defaultRenderer);
@@ -75,7 +61,14 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`;
         const { svg: rendered } = await renderMermaid(id, source, defaultRenderer);
         if (!cancelled) {
-          setSvg(rendered);
+          // Embed a scoped style rule inside the SVG so fit-to-width survives React
+          // re-renders and remounts that would otherwise drop inline styles set by a
+          // useEffect. The wrapper div toggles the `mermaid-fit` class to enable it.
+          const styled = rendered.replace(
+            /(<svg[^>]*>)([\s\S]*)/i,
+            '$1\u003cstyle>.mermaid-fit svg{width:100% !important;height:auto !important;max-width:100% !important;}</style>$2',
+          );
+          setSvg(styled);
           setError(null);
         }
       } catch (err) {
@@ -118,7 +111,7 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
         {error ? (
           <div className="text-xs text-destructive-fg/90 font-mono whitespace-pre-wrap">{error}</div>
         ) : svg ? (
-          <div ref={svgWrapperRef} dangerouslySetInnerHTML={{ __html: svg }} className="mermaid-diagram" />
+          <div dangerouslySetInnerHTML={{ __html: svg }} className={`mermaid-diagram ${fitToWidth ? 'mermaid-fit' : ''}`} />
         ) : (
           <div className="text-xs text-foreground-placeholder">Rendering diagram…</div>
         )}
