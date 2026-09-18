@@ -58,9 +58,24 @@ When you add a diagram to a curated page it becomes an editable diagram section.
 The editor validates the Mermaid source and disables **Apply** while the diagram contains syntax errors. Fix the error first, then apply your changes.
 :::
 
-## Renderer choice
+## Renderer override
 
-The Preview tab can render Mermaid flowcharts with the default `dagre` renderer or the `elk` renderer. The `elk` renderer is useful for complex diagrams with many crossing edges, because it produces a tidier layout. You can switch renderers in the diagram controls without changing the source.
+Mermaid chooses the layout renderer from frontmatter in the diagram source. You can override the default renderer by adding a `config` block at the top of the source.
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TD
+  A --> B
+```
+
+`dagre` is the default layout. `elk` can be useful for complex diagrams with many crossing edges, because it often produces a tidier layout. The renderer is part of the source, so it travels with the diagram when you copy or save it.
+
+:::tip[Use frontmatter, not a control]
+The Preview tab does not provide a renderer switch in its control panel. To use `elk`, edit the Mermaid source directly in the Focus modal or curated-page section editor and add the `config: layout: elk` frontmatter block.
+:::
 
 ## From diagram to curated page
 
