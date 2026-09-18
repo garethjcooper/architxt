@@ -1,0 +1,83 @@
+---
+sidebar_position: 3
+---
+
+# Focus: table
+
+A **table** directive asks architxt to organise information into rows and columns. Tables are useful when you need a compact, scannable answer that compares entities, lists properties, or enumerates values. Like other focus types, a table can stand alone or be combined with narrative, diagram, and graph sections on a curated page.
+
+## When to use a table focus
+
+Use a table focus when you want:
+
+- A side-by-side comparison of entities or concepts.
+- A property grid: each entity as a row, each attribute as a column.
+- A ranked or enumerated list with multiple fields per item.
+- Output that is easy to paste into a spreadsheet or report.
+
+## What a table envelope looks like
+
+A table envelope contains one or more table blocks. Each block has:
+
+| Field | Purpose |
+|---|---|
+| **Name** | The title shown above the table. |
+| **Columns** | The column headers that define what each cell means. |
+| **Rows** | The data values, one row per record or entity. |
+| **Evidence** | Optional references to source data that informed the table. |
+
+Table blocks are rendered as a scrollable grid in the Preview tab and in the curated-page editor.
+
+## Preview controls
+
+Table previews share the common envelope controls and add a few table-specific ones.
+
+| Control | Behavior |
+|---|---|
+| **Copy** | Copies the table as CSV, Markdown, or a plain text grid. |
+| **Search** | Filters rows by typing a substring match across all cells. |
+| **Sort** | Sorts rows by a selected column in ascending or descending order. |
+| **Focus** | Opens the table in a modal with the source visible and, when the source is editable, an **Apply** button. |
+
+:::tip[Copy formats]
+From the table header you can copy CSV for spreadsheets, Markdown for documentation, or a plain grid for quick notes.
+:::
+
+## Editing tables in curated pages
+
+When you add a table to a curated page it becomes an editable table section. The section editor shows a spreadsheet-like grid on one side and a compact source panel on the other.
+
+| Action | How it works |
+|---|---|
+| **Edit cells** | Click any cell to change its value. |
+| **Add / remove rows** | Insert rows above or below the current selection, or delete selected rows. |
+| **Add / remove columns** | Rename headers, insert columns, or remove columns that are no longer needed. |
+| **Reorder columns** | Drag column headers to reorder the grid. |
+| **Apply** | Save the edited table back to the curated page. |
+| **Soft delete** | Remove the section; restore it before saving if you change your mind. |
+
+:::tip[Large tables scroll, they do not paginate]
+Tables in the curated-page editor and Preview tab scroll horizontally and vertically. They are not paginated, so long tables stay intact and searchable.
+:::
+
+## From table to curated page
+
+The typical flow is:
+
+1. Ask a Reflect question that requests a table, or open a mental model whose output is a table.
+2. Inspect the rendered grid in the Preview tab.
+3. Sort, search, or copy the table while you decide what to keep.
+4. Copy the table (CSV, Markdown, or as a section) into a curated page.
+5. In the curated page, refine cell values, add or remove rows, then save the page.
+
+## Relationship to other focus pages
+
+Tables often appear alongside narrative, diagram, and graph sections in the same envelope. A single Reflect result can contain a short narrative followed by a table that enumerates the details. You can mix all of these section types on one curated page.
+
+- [Focus: narrative](./focus-narrative) for prose sections.
+- [Focus: diagram](./focus-diagram) for visual flowchart sections.
+- [Preview and curated pages](./preview-and-curated-pages) for the tab model this focus type fits into.
+
+## Summary
+
+The table focus turns Reflect output into editable grids. Previews give you copy, search, and sort controls; curated-page sections let you edit cells, rows, and columns live and save the result.
