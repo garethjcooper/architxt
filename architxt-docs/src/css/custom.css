@@ -214,11 +214,23 @@ pre {
 }
 
 /* Sidebar category labels */
-.theme-doc-sidebar-menu .theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link {
+.theme-doc-sidebar-menu [class*='theme-doc-sidebar-item-category'] > .menu__list-item-collapsible > .menu__link {
   color: var(--atx-text);
   font-weight: 500;
   font-size: 0.875rem;
   letter-spacing: 0.01em;
+}
+
+.theme-doc-sidebar-menu [class*='theme-doc-sidebar-item-category'] > .menu__list-item-collapsible > .menu__link--active {
+  background: linear-gradient(90deg, var(--atx-brand-bd), var(--atx-brand) 60%, var(--atx-brand-light));
+  color: var(--atx-text-on-dark);
+  border: none;
+  box-shadow: var(--atx-shadow-sm);
+}
+
+.theme-doc-sidebar-menu [class*='theme-doc-sidebar-item-category'] > .menu__list-item-collapsible > .menu__link--active:hover {
+  background: linear-gradient(90deg, var(--atx-brand-dark), var(--atx-brand-bd) 60%, var(--atx-brand));
+  color: var(--atx-text-on-dark);
 }
 
 .theme-doc-sidebar-menu .menu__list-item-collapsible > .menu__link:hover {
