@@ -57,12 +57,10 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   logger.info('Reflect research query', { serverId, bankId, queryLength: query.length });
 
   const focus = options.section_focus || {};
-  const requestedGraph = Boolean(focus.graph && (typeof focus.graph === 'string' ? focus.graph.trim() : focus.graph.content?.trim()));
+  const requestedGraph = Array.isArray(focus.graph) && focus.graph.some((g) => (typeof g === 'string' ? g.trim() : g.content?.trim()));
   const requestedTables = Array.isArray(focus.table) && focus.table.length > 0;
   const requestedDiagrams = Array.isArray(focus.diagram) && focus.diagram.length > 0;
-  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
-    ? focus.narrative.trim().length > 0
-    : focus.narrative.content?.trim().length > 0);
+  const requestedNarrative = Array.isArray(focus.narrative) && focus.narrative.some((n) => (typeof n === 'string' ? n.trim().length > 0 : n.content?.trim().length > 0));
   const requestedStructured = requestedGraph || requestedTables || requestedDiagrams;
   const hasAnyDirective = requestedNarrative || requestedStructured;
   let composedQuery;

@@ -397,6 +397,7 @@ CREATE TABLE research_sessions (
   rs_scope_entity_ids JSON,
   rs_status TEXT NOT NULL DEFAULT 'active',
   rs_current_step_id INTEGER,
+  rs_agent_context JSON,
   rs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   rs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (rs_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL,
@@ -413,6 +414,35 @@ CREATE TABLE research_session_tags (
   FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
 );
 
+CREATE TABLE agent_chat_threads (
+  act_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rs_id INTEGER NOT NULL,
+  act_title TEXT NOT NULL,
+  act_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  act_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_agent_chat_threads_session ON agent_chat_threads(rs_id, act_updated_at DESC);
+
+CREATE TABLE agent_chat_messages (
+  acm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  act_id INTEGER NOT NULL,
+  rs_id INTEGER NOT NULL,
+  acm_role TEXT NOT NULL CHECK (acm_role IN ('user', 'agent', 'system')),
+  acm_content TEXT NOT NULL,
+  acm_context_snapshot JSON,
+  acm_tool_log JSON,
+  acm_envelope JSON,
+  acm_contextual_items JSON,
+  acm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (act_id) REFERENCES agent_chat_threads(act_id) ON DELETE CASCADE,
+  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_agent_chat_messages_thread ON agent_chat_messages(act_id, acm_created_at);
+CREATE INDEX idx_agent_chat_messages_session ON agent_chat_messages(rs_id, acm_created_at);
+
 CREATE TABLE research_steps (
   rstep_id INTEGER PRIMARY KEY AUTOINCREMENT,
   rs_id INTEGER NOT NULL,
@@ -421,6 +451,7 @@ CREATE TABLE research_steps (
   rstep_raw_query TEXT,
   rstep_selections JSON,
   rstep_action_type TEXT NOT NULL,
+  rstep_origin TEXT NOT NULL DEFAULT 'user',
   rstep_parameters JSON,
   rstep_viewpoint_ids JSON,
   rstep_envelope JSON,
@@ -430,12 +461,13 @@ CREATE TABLE research_steps (
   rstep_calls JSON,
   rstep_title TEXT,
   rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  rstep_visible_to_user INTEGER DEFAULT 1,
   FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
   FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_research_steps_session ON research_steps(rs_id);
-CREATE INDEX idx_research_steps_parent ON research_steps(rstep_parent_step_id);
+CREATE INDEX idx_research_steps_session_origin ON research_steps(rs_id, rstep_origin);
+CREATE INDEX idx_research_steps_session_visible ON research_steps(rs_id, rstep_visible_to_user);
 
 CREATE TABLE research_tasks (
   rt_id TEXT PRIMARY KEY,

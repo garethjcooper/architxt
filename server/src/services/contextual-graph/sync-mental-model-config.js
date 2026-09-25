@@ -138,7 +138,7 @@ export async function syncContextualMentalModelConfig(db, serverId, bankId, opti
         const divergence = buildMentalModelDivergence(archCandidate, hindCandidate);
         const shouldPush = hasDivergence(divergence);
 
-        logger.info('Checked contextual mental model config', {
+        logger.debug('Checked contextual mental model config', {
           extId,
           role,
           shouldPush,

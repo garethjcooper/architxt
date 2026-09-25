@@ -44,6 +44,18 @@ Arrows:
 - `a --> b` — default arrow
 - `a -->|label| b` — labeled arrow
 
+### Arrow-label quoting rule (MANDATORY)
+
+For any arrow label written as `a -->|label| b`, the label MUST be wrapped in double quotes if it contains any character other than letters, digits, single spaces, or hyphens. This includes parentheses `()`, brackets `[]`, braces `{}`, slashes `/`, backslashes `\`, commas, periods, ampersands, or pipe characters.
+
+- Correct: `a -->|"POST /convert (raw file bytes, target format)"| b`
+- Correct: `a -->|"IDoc payload (HTTPS/TLS)"| b`
+- Correct: `a -->|simple payload| b`
+- Wrong: `a -->|POST /convert (raw file bytes, target format)| b` — the unquoted `)` terminates the label and breaks the parser.
+- Wrong: `a -->|IDoc payload (HTTPS/TLS)| b` — the unquoted `/` and `()` cause a parse error.
+
+If the label itself contains a double-quote character, use single quotes to wrap it instead, or remove/replace the double quote. Never leave a label that needs quoting unquoted.
+
 Example:
 
 ```json

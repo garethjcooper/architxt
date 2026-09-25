@@ -61,9 +61,9 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
 
       if (!inline && language === 'mermaid') {
         const typeMatch = content.match(
-          /^\s*(flowchart(?:-v2)?|graph(?:\s+(?:TB|TD|BT|RL|LR))?|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|mindmap|timeline|quadrantChart|xychart|sankey|block-beta|requirementDiagram|gitGraph)\b/i,
+          /^\s*(flowchart(?:-v2)?|graph(?:\s+(?:TB|TD|BT|RL|LR))?|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|requirementDiagram|gantt|pie|mindmap|timeline|quadrantChart|xychart|sankey|block-beta|gitGraph|C4Context|C4Container|C4Component|C4Dynamic|packet(?:-beta)?|kanban|architecture(?:-beta)?|user[-_]?(?:journey|Journey))\b/i,
         );
-        return <MermaidDiagram content={content} type={typeMatch?.[1]} />;
+        return <MermaidDiagram content={content} type={typeMatch?.[1] ?? 'diagram'} />;
       }
 
       return <code className="bg-markdown-code-bg rounded px-1 py-0.5 text-xs" {...props}>{children}</code>;

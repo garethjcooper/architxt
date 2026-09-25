@@ -147,6 +147,8 @@ function EvidenceModalBody({
 
   // Chunk cache per document for "Show in context".
   const [contextDocs, setContextDocs] = useState<Record<string, HindsightChunk[]>>({});
+  // Lazy chunk-text cache for individual chunk clicks outside context mode.
+  const [chunkTextDocs, setChunkTextDocs] = useState<Record<string, HindsightChunk[]>>({});
   // Track which documents are in context mode.
   const [contextEnabled, setContextEnabled] = useState<Record<string, boolean>>({});
   // Document metadata cache (without content).
@@ -156,6 +158,7 @@ function EvidenceModalBody({
   useEffect(() => {
     setSelection(null);
     setContextDocs({});
+    setChunkTextDocs({});
     setContextEnabled({});
     setDocumentMeta({});
   }, [data]);
@@ -318,6 +321,8 @@ function EvidenceModalBody({
           contextEnabled={contextEnabled}
           contextDocs={contextDocs}
           documentMeta={documentMeta}
+          serverId={serverId}
+          bankId={bankId}
         />
       </div>
     </div>
@@ -345,7 +350,7 @@ function DocumentTreeNode({
   onLoadMeta: (documentId: string) => Promise<void> | void;
   meta?: HindsightDocument | 'loading' | 'error';
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const ratio =
     doc.supporting_memory_count > 0
       ? `${doc.queried_memory_count} / ${doc.supporting_memory_count}`
@@ -354,8 +359,10 @@ function DocumentTreeNode({
   const isDocSelected = selected?.kind === 'document' && selected.documentId === doc.document_id;
 
   useEffect(() => {
-    onLoadMeta(doc.document_id);
-  }, [doc.document_id, onLoadMeta]);
+    if (expanded || isDocSelected) {
+      onLoadMeta(doc.document_id);
+    }
+  }, [doc.document_id, expanded, isDocSelected, onLoadMeta]);
 
   return (
     <div className="rounded border border-border-subtle bg-surface-inset overflow-hidden">
@@ -662,12 +669,16 @@ function DetailPanel({
   contextEnabled,
   contextDocs,
   documentMeta,
+  serverId,
+  bankId,
 }: {
   selection: EvidenceTreeSelection | null;
   documents: HindsightMemoryEvidenceResponse['documents'];
   contextEnabled: Record<string, boolean>;
   contextDocs: Record<string, HindsightChunk[]>;
   documentMeta: Record<string, HindsightDocument | 'loading' | 'error'>;
+  serverId?: number | null;
+  bankId?: string | null;
 }) {
   const doc = selection ? documents.find((d) => d.document_id === selection.documentId) : undefined;
   const chunk =
@@ -678,7 +689,62 @@ function DetailPanel({
   const showContext = documentId ? !!contextEnabled[documentId] : false;
   const contextChunks = documentId ? contextDocs[documentId] : undefined;
   const meta = documentId ? documentMeta[documentId] : undefined;
-  const [renderMarkdown, setRenderMarkdown] = useState(false);
+  const [renderMarkdown, setRenderMarkdown] = useState(true);
+  // Lazy chunk-text cache for non-context chunk clicks.
+  const [chunkTextDocs, setChunkTextDocs] = useState<Record<string, HindsightChunk[]>>({});
+  const chunkTextLoadingRef = useRef<Set<string>>(new Set());
+
+  // When a chunk is selected or a document is selected, fetch full chunk
+  // text if it isn't already available (context mode handles this itself).
+  useEffect(() => {
+    if (!serverId || !bankId || !documentId) return;
+    if (!!contextEnabled[documentId]) return; // context mode already loads all chunks
+    if (chunkTextDocs[documentId]) return;
+    if (chunkTextLoadingRef.current.has(documentId)) return;
+
+    // Only fetch if some chunks in this document are missing text.
+    const needsFetch = doc?.chunks.some((c) => !c.chunk_text);
+    if (!needsFetch) return;
+
+    chunkTextLoadingRef.current.add(documentId);
+
+    hindsightApi
+      .getHindsightDocumentChunks(serverId, bankId, documentId)
+      .then((result) => {
+        setChunkTextDocs((prev) => ({ ...prev, [documentId]: result.items }));
+      })
+      .catch(() => {
+        setChunkTextDocs((prev) => ({ ...prev, [documentId]: [] }));
+      })
+      .finally(() => {
+        chunkTextLoadingRef.current.delete(documentId);
+      });
+  }, [serverId, bankId, documentId, doc?.chunks, contextEnabled, chunkTextDocs]);
+
+  const resolveChunkText = useCallback(
+    (chunkId: string) => {
+      if (!documentId) return undefined;
+      const fromContext = contextDocs[documentId]?.find((c) => c.chunk_id === chunkId)?.chunk_text;
+      if (fromContext) return fromContext;
+      const fromLazy = chunkTextDocs[documentId]?.find((c) => c.chunk_id === chunkId)?.chunk_text;
+      return fromLazy;
+    },
+    [contextDocs, chunkTextDocs, documentId]
+  );
+
+  const chunkWithText = useMemo(() => {
+    if (!chunk) return undefined;
+    const text = chunk.chunk_text ?? resolveChunkText(chunk.chunk_id);
+    return text ? { ...chunk, chunk_text: text } : chunk;
+  }, [chunk, resolveChunkText]);
+
+  const chunksWithText = useMemo(() => {
+    if (!doc) return [];
+    return doc.chunks.map((c) => {
+      const text = c.chunk_text ?? resolveChunkText(c.chunk_id);
+      return text ? { ...c, chunk_text: text } : c;
+    });
+  }, [doc, resolveChunkText]);
 
   return (
     <div className="flex flex-col h-full">
@@ -714,10 +780,10 @@ function DetailPanel({
           />
         )}
 
-        {doc && !showContext && chunk && (
+        {doc && !showContext && chunkWithText && (
           <div className="space-y-3">
             <DocumentMetaPanel docId={doc.document_id} meta={meta} />
-            <ChunkPane chunk={chunk} selected expanded renderMarkdown={renderMarkdown} />
+            <ChunkPane chunk={chunkWithText} selected expanded renderMarkdown={renderMarkdown} />
           </div>
         )}
 
@@ -725,11 +791,11 @@ function DetailPanel({
           <div className="space-y-2">
             <DocumentMetaPanel docId={doc.document_id} meta={meta} />
             <div className="text-[10px] uppercase tracking-wider text-foreground-subtle">Chunks</div>
-            {doc.chunks.length === 0 ? (
+            {chunksWithText.length === 0 ? (
               <div className="text-xs text-foreground-subtle">No chunks available.</div>
             ) : (
               <div className="space-y-1">
-                {doc.chunks.map((c) => (
+                {chunksWithText.map((c) => (
                   <ChunkPane key={c.chunk_id} chunk={c} renderMarkdown={renderMarkdown} />
                 ))}
               </div>

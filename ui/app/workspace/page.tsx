@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Loader2, Pencil, LayoutPanelLeft, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ import {
   type ModelContentCacheEntry,
 } from './_components/model-content-utils';
 import { Panel, PanelHeader, PanelContent, ResizeHandle } from './_components/panel-layout';
+import { cn } from '@/lib/utils';
 import { ReflectQueryPanel } from './_components/reflect-query-panel';
 import { AttachedEntitiesPanel, type ModelItem } from './_components/attached-entities-panel';
 import { SessionItemsPanel } from './_components/session-items-panel';
@@ -40,6 +41,7 @@ import { type ResearchSession, type ResearchStepSummary, type UnifiedNarrativeBl
 import { QueryInspectDialog } from '@/app/research-shared/query-inspect-dialog';
 import { SessionSelector } from './_components/session-selector';
 import { WorkspaceResultPanel } from './_components/workspace-result-panel';
+import { AgentChatPanel } from './_components/agent-chat-panel';
 
 import { useWorkspaceSession } from './_components/use-workspace-session';
 
@@ -233,9 +235,6 @@ export default function WorkspacePage() {
   const reflectLoading = workspaceSession.loading;
   const reflectError = workspaceSession.error;
 
-  // Local cursor is managed by the AQL editor component.
-  const [reflectCursor, setReflectCursor] = useState(0);
-
   const groundedNodeIds = useMemo(() => {
     return entities.map((n) => n.id);
   }, [entities]);
@@ -301,17 +300,62 @@ export default function WorkspacePage() {
 
   // Layout sizing: two vertical columns.
   const mainRowRef = useRef<HTMLDivElement>(null);
-  const [columnWidths, setColumnWidths] = useState({ left: 0.42, right: 0.58 });
+  const [columnWidths, setColumnWidths] = useState({ left: 0.28, right: 0.44, chat: 0.28 });
 
-  const [resizing, setResizing] = useState<null | 'col1'>(null);
+  // Column visibility toggles for the left data column and the right chat column.
+  const [showLeftColumn, setShowLeftColumn] = useState(true);
+  const [showChatColumn, setShowChatColumn] = useState(true);
+
+  // Normalize flex values so visible columns fill the entire row. Stored widths are kept
+  // as raw proportions so toggling a column back on restores its prior share.
+  const visibleColumnFlex = useMemo(() => {
+    let left = columnWidths.left;
+    let right = columnWidths.right;
+    let chat = columnWidths.chat;
+    if (!showLeftColumn) left = 0;
+    if (!showChatColumn) chat = 0;
+    const total = left + right + chat;
+    return {
+      left: total > 0 ? left / total : 0,
+      right: total > 0 ? right / total : 0,
+      chat: total > 0 ? chat / total : 0,
+    };
+  }, [columnWidths, showLeftColumn, showChatColumn]);
+
+  const [resizing, setResizing] = useState<null | 'col1' | 'col2'>(null);
   const resizeStartRef = useRef({
     x: 0,
     width: 0,
-    widths: { left: 0.42, right: 0.58 },
+    widths: { left: 0.28, right: 0.44, chat: 0.28 },
   });
+  // Throttle drag state updates to one per animation frame so resizing a panel
+  // does not re-render the entire workspace (including long contextual-item lists)
+  // on every mouse-move pixel.
+  const pendingColumnWidths = useRef<{ left: number; right: number; chat: number } | null>(null);
+  const flushColumnWidthsRef = useRef<number | null>(null);
+
+  const flushColumnWidths = useCallback(() => {
+    flushColumnWidthsRef.current = null;
+    const next = pendingColumnWidths.current;
+    if (next) {
+      pendingColumnWidths.current = null;
+      setColumnWidths(next);
+    }
+  }, []);
+
+  const scheduleFlushColumnWidths = useCallback(() => {
+    if (flushColumnWidthsRef.current != null) return;
+    flushColumnWidthsRef.current = requestAnimationFrame(() => {
+      flushColumnWidths();
+      // Schedule another frame if more drag events arrived during this frame.
+      if (pendingColumnWidths.current != null) {
+        scheduleFlushColumnWidths();
+      }
+    });
+  }, [flushColumnWidths]);
 
   const handleResizeStart = useCallback(
-    (pane: 'col1') => (e: React.MouseEvent) => {
+    (pane: 'col1' | 'col2') => (e: React.MouseEvent) => {
       setResizing(pane);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
@@ -330,25 +374,43 @@ export default function WorkspacePage() {
       const { x, width, widths } = resizeStartRef.current;
       if (width <= 0) return;
       const delta = (e.clientX - x) / width;
-      const MIN = 0.15;
+      const MIN = 0.12;
 
       if (resizing === 'col1') {
         const nextLeft = Math.max(MIN, Math.min(widths.left + delta, 1 - MIN));
         const nextRight = Math.max(MIN, widths.right - (nextLeft - widths.left));
-        setColumnWidths((prev) => ({ ...prev, left: nextLeft, right: nextRight }));
+        const nextChat = Math.max(MIN, 1 - nextLeft - nextRight);
+        pendingColumnWidths.current = { left: nextLeft, right: nextRight, chat: nextChat };
+      } else if (resizing === 'col2') {
+        const nextRight = Math.max(MIN, Math.min(widths.right + delta, 1 - MIN));
+        const nextChat = Math.max(MIN, widths.chat - (nextRight - widths.right));
+        const nextLeft = Math.max(MIN, 1 - nextRight - nextChat);
+        pendingColumnWidths.current = { left: nextLeft, right: nextRight, chat: nextChat };
       }
+      scheduleFlushColumnWidths();
     },
-    [resizing]
+    [resizing, scheduleFlushColumnWidths]
   );
 
   const handleResizeEnd = useCallback(() => {
     setResizing(null);
+    if (flushColumnWidthsRef.current != null) {
+      cancelAnimationFrame(flushColumnWidthsRef.current);
+      flushColumnWidthsRef.current = null;
+    }
+    flushColumnWidths();
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-  }, []);
+  }, [flushColumnWidths]);
 
   const handleResizeReset = useCallback(() => {
-    setColumnWidths({ left: 0.42, right: 0.58 });
+    setColumnWidths({ left: 0.28, right: 0.47, chat: 0.25 });
+  }, []);
+
+  const handleResizeResetAll = useCallback(() => {
+    setColumnWidths({ left: 0.28, right: 0.47, chat: 0.25 });
+    setShowLeftColumn(true);
+    setShowChatColumn(true);
   }, []);
 
   const handleInnerResizeReset = useCallback(() => {
@@ -368,6 +430,27 @@ export default function WorkspacePage() {
     height: 0,
     heights: { top: 0.4, bottom: 0.6 },
   });
+  const pendingLeftPaneHeights = useRef<{ top: number; bottom: number } | null>(null);
+  const flushLeftPaneHeightsRef = useRef<number | null>(null);
+
+  const flushLeftPaneHeights = useCallback(() => {
+    flushLeftPaneHeightsRef.current = null;
+    const next = pendingLeftPaneHeights.current;
+    if (next) {
+      pendingLeftPaneHeights.current = null;
+      setLeftPaneHeights(next);
+    }
+  }, []);
+
+  const scheduleFlushLeftPaneHeights = useCallback(() => {
+    if (flushLeftPaneHeightsRef.current != null) return;
+    flushLeftPaneHeightsRef.current = requestAnimationFrame(() => {
+      flushLeftPaneHeights();
+      if (pendingLeftPaneHeights.current != null) {
+        scheduleFlushLeftPaneHeights();
+      }
+    });
+  }, [flushLeftPaneHeights]);
 
   // Inner horizontal split within the left-column bottom pane.
   const leftBottomRef = useRef<HTMLDivElement>(null);
@@ -378,12 +461,54 @@ export default function WorkspacePage() {
     width: 0,
     widths: { left: 0.5, right: 0.5 },
   });
+  const pendingInnerWidths = useRef<{ left: number; right: number } | null>(null);
+  const flushInnerWidthsRef = useRef<number | null>(null);
+
+  const flushInnerWidths = useCallback(() => {
+    flushInnerWidthsRef.current = null;
+    const next = pendingInnerWidths.current;
+    if (next) {
+      pendingInnerWidths.current = null;
+      setInnerWidths(next);
+    }
+  }, []);
+
+  const scheduleFlushInnerWidths = useCallback(() => {
+    if (flushInnerWidthsRef.current != null) return;
+    flushInnerWidthsRef.current = requestAnimationFrame(() => {
+      flushInnerWidths();
+      if (pendingInnerWidths.current != null) {
+        scheduleFlushInnerWidths();
+      }
+    });
+  }, [flushInnerWidths]);
 
   // Narrative / graph resize within the right-hand result panel.
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const [narrativeWidth, setNarrativeWidth] = useState(40);
   const [isDraggingNarrativeWidth, setIsDraggingNarrativeWidth] = useState(false);
   const narrativeResizeStartRef = useRef({ x: 0, containerWidth: 0, startWidth: 40 });
+  const pendingNarrativeWidth = useRef<number | null>(null);
+  const flushNarrativeWidthRef = useRef<number | null>(null);
+
+  const flushNarrativeWidth = useCallback(() => {
+    flushNarrativeWidthRef.current = null;
+    const next = pendingNarrativeWidth.current;
+    if (next != null) {
+      pendingNarrativeWidth.current = null;
+      setNarrativeWidth(next);
+    }
+  }, []);
+
+  const scheduleFlushNarrativeWidth = useCallback(() => {
+    if (flushNarrativeWidthRef.current != null) return;
+    flushNarrativeWidthRef.current = requestAnimationFrame(() => {
+      flushNarrativeWidth();
+      if (pendingNarrativeWidth.current != null) {
+        scheduleFlushNarrativeWidth();
+      }
+    });
+  }, [flushNarrativeWidth]);
 
   const handleInnerResizeStart = useCallback(
     (pane: 'innerCol') => (e: React.MouseEvent) => {
@@ -406,20 +531,26 @@ export default function WorkspacePage() {
       if (width <= 0) return;
       const delta = (e.clientX - x) / width;
       const MIN = 0.15;
+
       const nextLeft = Math.max(MIN, Math.min(widths.left + delta, 1 - MIN));
-      const nextRight = Math.max(MIN, widths.right - (nextLeft - widths.left));
-      setInnerWidths((prev) => ({ ...prev, left: nextLeft, right: nextRight }));
+      pendingInnerWidths.current = { left: nextLeft, right: 1 - nextLeft };
+      scheduleFlushInnerWidths();
     },
-    [innerResizing]
+    [innerResizing, scheduleFlushInnerWidths]
   );
 
   const handleInnerResizeEnd = useCallback(() => {
     setInnerResizing(null);
+    if (flushInnerWidthsRef.current != null) {
+      cancelAnimationFrame(flushInnerWidthsRef.current);
+      flushInnerWidthsRef.current = null;
+    }
+    flushInnerWidths();
     if (!resizing) {
       document.body.style.cursor = '';
     }
     document.body.style.userSelect = '';
-  }, [resizing]);
+  }, [resizing, flushInnerWidths]);
 
   const handleNarrativeResizeStart = useCallback((e: React.MouseEvent) => {
     setIsDraggingNarrativeWidth(true);
@@ -437,17 +568,22 @@ export default function WorkspacePage() {
     const { x, containerWidth, startWidth } = narrativeResizeStartRef.current;
     if (containerWidth <= 0) return;
     const deltaPct = ((e.clientX - x) / containerWidth) * 100;
-    const nextWidth = Math.min(Math.max(startWidth + deltaPct, 20), 70);
-    setNarrativeWidth(nextWidth);
-  }, [isDraggingNarrativeWidth]);
+    pendingNarrativeWidth.current = Math.min(Math.max(startWidth + deltaPct, 20), 70);
+    scheduleFlushNarrativeWidth();
+  }, [isDraggingNarrativeWidth, scheduleFlushNarrativeWidth]);
 
   const handleNarrativeResizeEnd = useCallback(() => {
     setIsDraggingNarrativeWidth(false);
+    if (flushNarrativeWidthRef.current != null) {
+      cancelAnimationFrame(flushNarrativeWidthRef.current);
+      flushNarrativeWidthRef.current = null;
+    }
+    flushNarrativeWidth();
     if (!resizing && !innerResizing && !hResizing) {
       document.body.style.cursor = '';
     }
     document.body.style.userSelect = '';
-  }, [resizing, innerResizing, hResizing]);
+  }, [resizing, innerResizing, hResizing, flushNarrativeWidth]);
 
   const handleNarrativeResizeReset = useCallback(() => {
     setNarrativeWidth(40);
@@ -477,20 +613,25 @@ export default function WorkspacePage() {
 
       if (hResizing === 'row1') {
         const nextTop = Math.max(MIN, Math.min(heights.top + delta, 1 - MIN));
-        const nextBottom = Math.max(MIN, 1 - nextTop);
-        setLeftPaneHeights((prev) => ({ ...prev, top: nextTop, bottom: nextBottom }));
+        pendingLeftPaneHeights.current = { top: nextTop, bottom: 1 - nextTop };
+        scheduleFlushLeftPaneHeights();
       }
     },
-    [hResizing]
+    [hResizing, scheduleFlushLeftPaneHeights]
   );
 
   const handleHResizeEnd = useCallback(() => {
     setHResizing(null);
+    if (flushLeftPaneHeightsRef.current != null) {
+      cancelAnimationFrame(flushLeftPaneHeightsRef.current);
+      flushLeftPaneHeightsRef.current = null;
+    }
+    flushLeftPaneHeights();
     if (!resizing) {
       document.body.style.cursor = '';
     }
     document.body.style.userSelect = '';
-  }, [resizing]);
+  }, [resizing, flushLeftPaneHeights]);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
@@ -629,15 +770,11 @@ export default function WorkspacePage() {
   const handleCopyToCuratedPage = useCallback(
     (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => {
       const events = Array.isArray(event) ? event : [event];
-      if (activeCuratedPage) {
-        // Apply to the currently active curated page immediately.
-        handleApplyCopyEvent(activeCuratedPage, events);
-        return;
-      }
-      // No active curated page: show target picker.
+      // Always show the target picker so the user chooses the destination page,
+      // even when a curated page is currently active.
       setPendingSection({ events, title: events[0]?.label });
     },
-    [activeCuratedPage, handleApplyCopyEvent]
+    []
   );
 
   const openCuratedPage = useCallback((page: ResearchStepSummary) => {
@@ -815,6 +952,8 @@ export default function WorkspacePage() {
     }));
   }, [edges]);
 
+  const workspaceItems = workspaceSession.workspaceItems;
+
   const handleReflect = useCallback(
     async (e?: React.FormEvent) => {
       e?.preventDefault();
@@ -838,9 +977,8 @@ export default function WorkspacePage() {
     if (step) {
       setSelectedView({ kind: 'step', step });
       updateAnchorTab(step.intent_text || step.raw_query || `Reflect ${step.id}`);
-      void workspaceSession.refresh();
     }
-  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.refresh, workspaceSession.setResult, updateAnchorTab]);
+  }, [workspaceSession.result, workspaceSession.trail, workspaceSession.setResult, updateAnchorTab]);
 
   const handleRerunStep = useCallback(async (stepId: number) => {
     // Delegate to the research hook's rerun path so runningStepId is set and
@@ -1100,6 +1238,32 @@ export default function WorkspacePage() {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
+              onClick={() => setShowLeftColumn((v) => !v)}
+              className={cn(
+                'h-7 w-7 inline-flex items-center justify-center rounded border transition-colors',
+                showLeftColumn
+                  ? 'bg-accent-primary-bg/30 border-accent-primary-bd text-accent-primary-fg'
+                  : 'bg-surface-panel border-border-default text-foreground-faint hover:text-foreground-default hover:bg-surface-card'
+              )}
+              title={showLeftColumn ? 'Hide left column' : 'Show left column'}
+            >
+              <LayoutPanelLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowChatColumn((v) => !v)}
+              className={cn(
+                'h-7 w-7 inline-flex items-center justify-center rounded border transition-colors',
+                showChatColumn
+                  ? 'bg-accent-primary-bg/30 border-accent-primary-bd text-accent-primary-fg'
+                  : 'bg-surface-panel border-border-default text-foreground-faint hover:text-foreground-default hover:bg-surface-card'
+              )}
+              title={showChatColumn ? 'Hide chat column' : 'Show chat column'}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => void handleEditSession()}
               disabled={activeSession?.id == null}
               className="h-7 w-7 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-foreground-faint hover:bg-surface-panel hover:text-foreground-default disabled:opacity-30 transition-colors"
@@ -1127,94 +1291,99 @@ export default function WorkspacePage() {
             </button>
           </div>
         </div>
-
-        {/* Main two-column workbench */}
         <div ref={mainRowRef} className="flex-1 min-h-0 flex">
-          {/* Column 1: scope + query | session items | contextual data */}
-          <div ref={leftColumnRef} className="flex flex-col min-h-0" style={{ flex: columnWidths.left, minWidth: 220 }}>
-            <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
-              <ReflectQueryPanel
-                query={reflectQuery}
-                cursor={reflectCursor}
-                setQuery={setReflectQuery}
-                setCursor={setReflectCursor}
-                onSubmit={handleReflect}
-                aqlEntities={aqlEntities}
-                aqlEdges={aqlEdges}
-                loading={reflectLoading}
-                queryOptions={queryOptions}
-                onQueryOptionsChange={setQueryOptions}
-                className="flex-1 min-h-0"
-              />
+          {showLeftColumn && (
+            <div
+              ref={leftColumnRef}
+              className="flex flex-col min-h-0"
+              style={{ flex: visibleColumnFlex.left, minWidth: 220 }}
+            >
+              <div className="flex flex-col min-h-0" style={{ flex: leftPaneHeights.top, minHeight: 120 }}>
+                <ReflectQueryPanel
+                  query={reflectQuery}
+                  setQuery={setReflectQuery}
+                  onSubmit={handleReflect}
+                  aqlEntities={aqlEntities}
+                  aqlEdges={aqlEdges}
+                  loading={reflectLoading}
+                  queryOptions={queryOptions}
+                  onQueryOptionsChange={setQueryOptions}
+                  className="flex-1 min-h-0"
+                />
+              </div>
+
+              <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} onDoubleClick={handleHResizeReset} title="Drag to resize query / lower panels; double-click to reset" />
+
+              <div ref={leftBottomRef} className="flex min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 140 }}>
+                {serverId && bankId ? (
+                  <>
+                    <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
+                      <AttachedEntitiesPanel
+                        entityIds={groundedNodeIds}
+                        entityInfoMap={entityInfoMap}
+                        entities={architxtEntities}
+                        contextualNodes={entities}
+                        modelContentCache={modelContentCache}
+                        loading={loadingEntityInfo}
+                        expandedEntityIds={expandedEntityIds}
+                        selectedModel={selectedModel}
+                        onToggleExpand={toggleEntityExpanded}
+                        onSelectModel={selectEntityModel}
+                      />
+                    </div>
+
+                    <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} onDoubleClick={handleInnerResizeReset} title="Drag to resize contextual data / session items; double-click to reset" />
+
+                    <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
+                      <SessionItemsPanel
+                        session={workspaceSession.activeSession}
+                        items={workspaceItems}
+                        loading={workspaceSession.sessionsLoading || workspaceSession.trailLoading}
+                        activeStepId={selectedStep?.id}
+                        runningStepId={workspaceSession.runningStepId}
+                        onSelectStep={handleSelectStep}
+                        onReuseStep={handleReuseStep}
+                        onRerunStep={handleRerunStep}
+                        onInspectStep={handleInspectStep}
+                        onRefresh={workspaceSession.refresh}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
+                      <Panel className="flex-1 min-h-0">
+                        <PanelHeader title="Contextual data" />
+                        <PanelContent className="p-3">
+                          <div className="text-foreground-subtle text-xs">Select a server and bank to load contextual data.</div>
+                        </PanelContent>
+                      </Panel>
+                    </div>
+
+                    <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} onDoubleClick={handleInnerResizeReset} title="Drag to resize contextual data / session items; double-click to reset" />
+
+                    <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
+                      <Panel className="flex-1 min-h-0">
+                        <PanelHeader title="Session items" />
+                        <PanelContent className="p-3">
+                          <div className="text-foreground-subtle text-xs">Select a server and bank to load sessions.</div>
+                        </PanelContent>
+                      </Panel>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+          )}
 
-            <ResizeHandle direction="horizontal" onMouseDown={handleHResizeStart('row1')} onDoubleClick={handleHResizeReset} title="Drag to resize query / lower panels; double-click to reset" />
-
-            <div ref={leftBottomRef} className="flex min-h-0" style={{ flex: leftPaneHeights.bottom, minHeight: 140 }}>
-              {serverId && bankId ? (
-                <>
-                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
-                    <AttachedEntitiesPanel
-                      entityIds={groundedNodeIds}
-                      entityInfoMap={entityInfoMap}
-                      entities={architxtEntities}
-                      contextualNodes={entities}
-                      modelContentCache={modelContentCache}
-                      loading={loadingEntityInfo}
-                      expandedEntityIds={expandedEntityIds}
-                      selectedModel={selectedModel}
-                      onToggleExpand={toggleEntityExpanded}
-                      onSelectModel={selectEntityModel}
-                    />
-                  </div>
-
-                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} onDoubleClick={handleInnerResizeReset} title="Drag to resize contextual data / session items; double-click to reset" />
-
-                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
-                    <SessionItemsPanel
-                      session={workspaceSession.activeSession}
-                      items={workspaceSession.workspaceItems}
-                      loading={workspaceSession.sessionsLoading || workspaceSession.trailLoading}
-                      activeStepId={selectedStep?.id}
-                      runningStepId={workspaceSession.runningStepId}
-                      onSelectStep={handleSelectStep}
-                      onReuseStep={handleReuseStep}
-                      onRerunStep={handleRerunStep}
-                      onInspectStep={handleInspectStep}
-                      onRefresh={workspaceSession.refresh}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.left, minWidth: 160 }}>
-                    <Panel className="flex-1 min-h-0">
-                      <PanelHeader title="Contextual data" />
-                      <PanelContent className="p-3">
-                        <div className="text-foreground-subtle text-xs">Select a server and bank to load contextual data.</div>
-                      </PanelContent>
-                    </Panel>
-                  </div>
-
-                  <ResizeHandle direction="vertical" onMouseDown={handleInnerResizeStart('innerCol')} onDoubleClick={handleInnerResizeReset} title="Drag to resize contextual data / session items; double-click to reset" />
-
-                  <div className="flex flex-col min-h-0" style={{ flex: innerWidths.right, minWidth: 160 }}>
-                    <Panel className="flex-1 min-h-0">
-                      <PanelHeader title="Session items" />
-                      <PanelContent className="p-3">
-                        <div className="text-foreground-subtle text-xs">Select a server and bank to load sessions.</div>
-                      </PanelContent>
-                    </Panel>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} onDoubleClick={handleResizeReset} title="Drag to resize left/right columns; double-click to reset" />
+          {showLeftColumn && <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col1')} onDoubleClick={handleResizeReset} title="Drag to resize left/right columns; double-click to reset" />}
 
           {/* Column 2: result viewer */}
-          <div ref={rightPanelRef} className="flex flex-col min-h-0 rounded-md border border-border-default bg-surface-card overflow-hidden" style={{ flex: columnWidths.right, minWidth: 280 }}>
+          <div
+            ref={rightPanelRef}
+            className="flex flex-col min-h-0 rounded-md border border-border-default bg-surface-card overflow-hidden"
+            style={{ flex: visibleColumnFlex.right, minWidth: 280 }}
+          >
             <WorkspaceResultPanel
               result={previewResult}
               title={previewTitle}
@@ -1294,7 +1463,6 @@ export default function WorkspacePage() {
                     const tab = tabs.find((t) => t.id === tabId);
                     if (!tab || tab.pinned) return;
                     if (kind === 'curated') {
-                      // Closing a curated tab only deletes the page if it is empty.
                       if (isEmpty) {
                         if (tab.stepId != null) {
                           void researchApi.deleteStep(tab.stepId).then(() => workspaceSession.refresh());
@@ -1335,6 +1503,24 @@ export default function WorkspacePage() {
               }
             />
           </div>
+          {showChatColumn && <ResizeHandle direction="vertical" onMouseDown={handleResizeStart('col2')} onDoubleClick={handleResizeResetAll} title="Drag to resize preview / chat; double-click to reset" />}
+
+          {/* Column 3: agent chat */}
+          {showChatColumn && (
+            <div
+              className="flex flex-col min-h-0 rounded-md border border-border-default bg-surface-card overflow-hidden"
+              style={{ flex: visibleColumnFlex.chat, minWidth: 220 }}
+            >
+              <AgentChatPanel
+                key={activeSession?.id ?? 'none'}
+                sessionId={activeSession?.id ?? null}
+                availableEntities={aqlEntities}
+                availableEdges={aqlEdges}
+                onCopyToCuratedPage={handleCopyToCuratedPage}
+                onSelectModel={selectEntityModel}
+              />
+            </div>
+          )}
         </div>
 
         <QueryInspectDialog

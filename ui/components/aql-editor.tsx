@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import CodeMirror, { ExternalChange } from '@uiw/react-codemirror';
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { StreamLanguage, LanguageSupport, syntaxHighlighting } from '@codemirror/language';
@@ -15,30 +15,21 @@ import {
 } from '@codemirror/autocomplete';
 import { Tag, tagHighlighter } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
+import { parseAql } from '@architxt/aql';
 import {
-  formatEntityToken,
-  formatEdgeToken,
-  MERMAID_DIAGRAM_TYPES,
+  buildDirectiveCompletions,
+  buildEntityCompletions,
+  buildTypeCompletions,
+  completionInputHandler,
+  getCurrentBlockKind,
   BLOCK_DIRECTIVES,
   SUB_DIRECTIVE_KEYS,
   ALLOWED_KEYS_BY_BLOCK,
-  parseAql,
-} from '@architxt/aql';
+  type EntityLike,
+  type EdgeLike,
+} from './aql-editor-completions';
 
-export interface EntityLike {
-  id: string;
-  entity_id?: string | null;
-  name?: string | null;
-  label?: string | null;
-  type?: string | null;
-}
-
-export interface EdgeLike {
-  from: string;
-  to: string;
-  label?: string | null;
-  type?: string | null;
-}
+export type { EntityLike, EdgeLike } from './aql-editor-completions';
 
 export interface AqlEditorProps {
   id?: string;
@@ -278,198 +269,6 @@ const aqlLinter = linter((view) => {
   return diagnostics;
 });
 
-function getCurrentBlockKind(state: EditorState): string | null {
-  const text = state.doc.toString();
-  let currentBlock: string | null = null;
-  let i = 0;
-  while (i < text.length) {
-    const nl = text.indexOf('\n', i);
-    const lineEnd = nl === -1 ? text.length : nl;
-    const line = text.slice(i, lineEnd);
-    const blockMatch = line.match(/^#(diagram|table|graph|narrative)\b/);
-    if (blockMatch) {
-      currentBlock = blockMatch[1];
-    } else if (/^#end\b/.test(line)) {
-      currentBlock = null;
-    }
-    i = lineEnd + 1;
-  }
-  return currentBlock;
-}
-
-const DIRECTIVE_KEYWORDS = [
-  'diagram',
-  'table',
-  'graph',
-  'narrative',
-  'diagram-name',
-  'diagram-type',
-  'table-name',
-  'graph-name',
-  'narrative-name',
-  'end',
-];
-
-function buildDirectiveCompletions(filter: string, state: EditorState): Completion[] {
-  const term = filter.toLowerCase();
-  const blockKind = getCurrentBlockKind(state);
-  const allowed = new Set<string>(['end']);
-  if (blockKind) {
-    const blockAllowed = ALLOWED_KEYS_BY_BLOCK[blockKind as keyof typeof ALLOWED_KEYS_BY_BLOCK];
-    if (blockAllowed) {
-      blockAllowed.forEach((k) => allowed.add(k));
-    }
-  } else {
-    BLOCK_DIRECTIVES.forEach((k) => allowed.add(k));
-  }
-  const keywords = DIRECTIVE_KEYWORDS.filter((kw) => allowed.has(kw));
-
-  // If the user has typed an exact block-directive prefix, exclude longer
-  // sub-directives that merely happen to start with the same text so that
-  // #table does not jump to #table-name.
-  const typedExactBlock = BLOCK_DIRECTIVES.includes(term);
-  const filteredKeywords = keywords.filter((kw) => {
-    if (!kw.startsWith(term)) return false;
-    if (typedExactBlock) return BLOCK_DIRECTIVES.includes(kw) || kw === term;
-    return true;
-  });
-
-  return filteredKeywords.map((kw) => {
-    let apply: Completion['apply'];
-    let boost = 0;
-    if (kw === 'diagram') {
-      apply = (view, _completion, from, to) => {
-        const text = '#diagram\n#diagram-name \n#diagram-type \n#end';
-        const cursor = from + '#diagram\n#diagram-name '.length;
-        view.dispatch({
-          changes: { from, to, insert: text },
-          selection: { anchor: cursor, head: cursor },
-        });
-      };
-      boost = 99;
-    } else if (kw === 'table') {
-      apply = (view, _completion, from, to) => {
-        const text = '#table\n#table-name \n#end';
-        const cursor = from + '#table\n#table-name '.length;
-        view.dispatch({
-          changes: { from, to, insert: text },
-          selection: { anchor: cursor, head: cursor },
-        });
-      };
-      boost = 99;
-    } else if (kw === 'graph') {
-      apply = (view, _completion, from, to) => {
-        const text = '#graph\n#graph-name \n#end';
-        const cursor = from + '#graph\n#graph-name '.length;
-        view.dispatch({
-          changes: { from, to, insert: text },
-          selection: { anchor: cursor, head: cursor },
-        });
-      };
-      boost = 99;
-    } else if (kw === 'narrative') {
-      apply = (view, _completion, from, to) => {
-        const text = '#narrative\n#narrative-name \n#end';
-        const cursor = from + '#narrative\n#narrative-name '.length;
-        view.dispatch({
-          changes: { from, to, insert: text },
-          selection: { anchor: cursor, head: cursor },
-        });
-      };
-      boost = 99;
-    } else if (kw === 'end') {
-      apply = '#end';
-    } else if (kw === 'diagram-name' || kw === 'diagram-type' || kw === 'table-name' || kw === 'graph-name' || kw === 'narrative-name') {
-      apply = `#${kw} `;
-    } else {
-      apply = `#${kw}`;
-    }
-    return { label: `#${kw}`, apply, type: 'keyword', boost };
-  });
-}
-
-function buildTypeCompletions(filter: string): Completion[] {
-  const term = filter.toLowerCase();
-  return MERMAID_DIAGRAM_TYPES.filter(
-    (t) => t.toLowerCase().startsWith(term) || t.toLowerCase().includes(term),
-  ).map((t) => ({ label: t, apply: t, type: 'type' }));
-}
-
-function buildEntityCompletions(
-  entities: EntityLike[],
-  edges: EdgeLike[],
-  includeEdges: boolean,
-  filter: string,
-): Completion[] {
-  const rawTerm = filter.toLowerCase().trim();
-  const termTokens = rawTerm.split(/[^a-z0-9]+/).filter(Boolean);
-  const matchesTokens = (hay: string) => {
-    if (termTokens.length === 0) return true;
-    const words = hay.split(/[^a-z0-9]+/).filter(Boolean);
-    return termTokens.every((t) => words.some((w) => w.startsWith(t)));
-  };
-
-  const options: Completion[] = [];
-  for (const e of entities) {
-    const hay = `${e.type || ''} ${e.label || ''} ${e.id || ''}`.toLowerCase();
-    if (!matchesTokens(hay)) continue;
-    const qualified = e.type && !e.id.startsWith(`${e.type}:`) ? `${e.type}:${e.id}` : e.id;
-    const insertText = formatEntityToken(e.label || e.id, e.id, e.type);
-    options.push({
-      label: e.label || e.id,
-      detail: qualified,
-      apply: (view, _completion, from, to) => {
-        view.dispatch(insertCompletionText(view.state, insertText, from, to));
-      },
-      type: 'property',
-    });
-  }
-
-  if (includeEdges) {
-    const entityLabelMap = new Map(entities.map((e) => [e.id, e.label || e.id]));
-    for (const edge of edges) {
-      const sourceLabel = entityLabelMap.get(edge.from) || edge.from;
-      const targetLabel = entityLabelMap.get(edge.to) || edge.to;
-      const rel = edge.label || edge.type || 'edge';
-      const hay = `${sourceLabel} ${edge.from} ${targetLabel} ${edge.to} ${rel}`.toLowerCase();
-      if (!matchesTokens(hay)) continue;
-      const insertText = formatEdgeToken(edge.from, edge.to, rel);
-      options.push({
-        label: `${sourceLabel} — ${rel} → ${targetLabel}`,
-        detail: `${edge.from} → ${edge.to}`,
-        apply: (view, _completion, from, to) => {
-          view.dispatch(insertCompletionText(view.state, insertText, from, to));
-        },
-        type: 'enum',
-      });
-    }
-  }
-
-  if (options.length === 0) {
-    options.push({
-      label: 'No matching entities or edges',
-      apply: () => {},
-      type: 'text',
-    });
-  } else {
-    options.sort((a, b) => a.label.length - b.label.length);
-  }
-
-  return options;
-}
-
-const completionInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (text !== '[' && text !== '#') return false;
-  // For '[', only trigger when the user is typing [[ (previous char is [).
-  if (text === '[') {
-    const prev = view.state.doc.sliceString(Math.max(0, from - 1), from);
-    if (prev !== '[') return false;
-  }
-
-  Promise.resolve().then(() => startCompletion(view));
-  return false;
-});
-
 function aqlCompletions(
   propsRef: React.MutableRefObject<{
     entities: EntityLike[];
@@ -548,52 +347,71 @@ function AqlEditorComponent(props: AqlEditorProps) {
     propsRef.current = { entities: availableEntities, edges: availableEdges, includeEdges };
   }, [availableEntities, availableEdges, includeEdges]);
 
+  // CONTROLLED/UNCONTROLLED BOUNDARY
+  // The editor's own document is the source of truth while the user is typing.
+  // We render CodeMirror with a local value state so parent re-renders never pass
+  // a stale controlled value back while @uiw/react-codemirror's 200 ms typing
+  // latch is active, which is what truncates text and resets the cursor.
+  // Parent-initiated changes are detected by comparing the value prop to the local
+  // value and applied imperatively to the CodeMirror view.
+  const viewRef = useRef<EditorView | null>(null);
+  const [localValue, setLocalValue] = useState(value);
+  const localValueRef = useRef(value);
+  useLayoutEffect(() => {
+    if (value !== localValueRef.current) {
+      localValueRef.current = value;
+      setLocalValue(value);
+      const view = viewRef.current;
+      if (view && value !== view.state.doc.toString()) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: value },
+          annotations: [ExternalChange.of(true)],
+        });
+      }
+    }
+  }, [value]);
+
   const lastCursorRef = useRef(0);
-  const lastValueRef = useRef(value);
   const lastNotifiedValueRef = useRef(value);
   useEffect(() => {
-    lastValueRef.current = value;
     lastNotifiedValueRef.current = value;
   }, [value]);
 
   const notifyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingValueRef = useRef<{ value: string; cursor: number } | null>(null);
 
-  // Keep the change callback stable so CodeMirror doesn't rebind on every
-  // keystroke. We still suppress duplicate notifications with value/cursor refs.
   const handleChange = useCallback(
     (newValue: string, viewUpdate: ViewUpdate) => {
       const cursor = viewUpdate.state.selection.main.head;
-      const valueChanged = newValue !== lastValueRef.current;
+      const valueChanged = newValue !== localValueRef.current;
       const cursorChanged = cursor !== lastCursorRef.current;
-      if (valueChanged || cursorChanged) {
-        lastValueRef.current = newValue;
-        if (cursorChanged) {
-          lastCursorRef.current = cursor;
+      if (!valueChanged && !cursorChanged) return;
+
+      // Keep local value in sync with the document so parent re-renders never
+      // feed a stale value back into CodeMirror while the typing latch is open.
+      if (valueChanged) {
+        localValueRef.current = newValue;
+        setLocalValue(newValue);
+      }
+      if (cursorChanged) {
+        lastCursorRef.current = cursor;
+      }
+
+      // Notify parent on value changes only, debounced to avoid spam.
+      if (valueChanged) {
+        pendingValueRef.current = { value: newValue, cursor };
+        if (notifyTimeoutRef.current) {
+          clearTimeout(notifyTimeoutRef.current);
         }
-        // Notify parent whenever the document value changes, but not for
-        // pure cursor/selection movements. Debounce the notification slightly
-        // so rapid typing doesn't trigger a parent re-render on every keystroke,
-        // which can make CodeMirror's external-value sync compete with the user.
-        if (valueChanged) {
-          pendingValueRef.current = { value: newValue, cursor };
-          if (notifyTimeoutRef.current) {
-            clearTimeout(notifyTimeoutRef.current);
+        notifyTimeoutRef.current = setTimeout(() => {
+          notifyTimeoutRef.current = null;
+          const pending = pendingValueRef.current;
+          pendingValueRef.current = null;
+          if (pending != null && pending.value !== lastNotifiedValueRef.current) {
+            onChange(pending.value, pending.cursor);
+            lastNotifiedValueRef.current = pending.value;
           }
-          // Debounce must outlast @uiw/react-codemirror's internal 200 ms
-          // typing latch. If we notify the parent earlier, the parent value
-          // prop updates while CodeMirror is still latched and gets queued as
-          // a stale external overwrite, which truncates text and resets cursor.
-          notifyTimeoutRef.current = setTimeout(() => {
-            notifyTimeoutRef.current = null;
-            const pending = pendingValueRef.current;
-            pendingValueRef.current = null;
-            if (pending != null && pending.value !== lastNotifiedValueRef.current) {
-              onChange(pending.value, pending.cursor);
-              lastNotifiedValueRef.current = pending.value;
-            }
-          }, 250);
-        }
+        }, 250);
       }
     },
     [onChange],
@@ -623,7 +441,7 @@ function AqlEditorComponent(props: AqlEditorProps) {
       syntaxHighlighting(aqlHighlightStyle),
       autocompletion({ override: [aqlCompletions(propsRef)] }),
       aqlLinter,
-      completionInputHandler,
+      completionInputHandler({ directive: true, entity: true }),
       keymap.of([
         {
           key: 'Mod-Enter',
@@ -640,8 +458,9 @@ function AqlEditorComponent(props: AqlEditorProps) {
   return (
     <div id={id} className={cn('flex flex-col flex-1 min-h-0 relative', className)} style={style}>
       <CodeMirror
-        value={value}
+        value={localValue}
         onChange={handleChange}
+        onCreateEditor={(view) => { viewRef.current = view; }}
         extensions={extensions}
         editable={!disabled}
         placeholder={placeholder}

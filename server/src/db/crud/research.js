@@ -8,6 +8,7 @@ const SESSION_PK = 'rs_id';
 const SESSION_JSON_FIELDS = [
   'rs_viewpoint_ids',
   'rs_scope_entity_ids',
+  'rs_agent_context',
 ];
 
 // research_steps
@@ -174,13 +175,18 @@ export const createStep = (db, data) => dbExec(() => {
   requireString('rstep_intent_text', data.rstep_intent_text);
   requireField(data, 'rstep_action_type');
 
+  const origin = data.rstep_origin ?? 'user';
+  if (origin !== 'user') {
+    throw new Error(`rstep_origin must be 'user'; got: ${origin}`);
+  }
+
   const prepared = toJson(data, STEP_JSON_FIELDS);
   const sql = `INSERT INTO ${STEP_TABLE} (
     rs_id, rstep_parent_step_id, rstep_intent_text, rstep_raw_query, rstep_selections,
-    rstep_action_type, rstep_parameters, rstep_viewpoint_ids,
+    rstep_action_type, rstep_origin, rstep_parameters, rstep_viewpoint_ids,
     rstep_status, rstep_error_message,
-    rstep_tool_calls_used, rstep_calls
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    rstep_tool_calls_used, rstep_calls, rstep_visible_to_user
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     prepared.rs_id,
@@ -189,12 +195,14 @@ export const createStep = (db, data) => dbExec(() => {
     prepared.rstep_raw_query ?? null,
     prepared.rstep_selections ?? null,
     prepared.rstep_action_type,
+    origin,
     prepared.rstep_parameters ?? null,
     prepared.rstep_viewpoint_ids ?? null,
     data.rstep_status ?? 'running',
     data.rstep_error_message ?? null,
     prepared.rstep_tool_calls_used ?? 0,
-    prepared.rstep_calls ?? null
+    prepared.rstep_calls ?? null,
+    data.rstep_visible_to_user !== undefined ? (data.rstep_visible_to_user ? 1 : 0) : 1
   );
   return result.lastInsertRowid;
 }, 'research.createStep');

@@ -8,9 +8,7 @@ import { Panel, PanelHeader, PanelContent } from './panel-layout';
 
 interface ReflectQueryPanelProps {
   query: string;
-  cursor: number;
   setQuery: (q: string) => void;
-  setCursor: (c: number) => void;
   onSubmit: (e?: React.FormEvent) => void;
   aqlEntities: EntityLike[];
   aqlEdges: EdgeLike[];
@@ -23,9 +21,7 @@ interface ReflectQueryPanelProps {
 
 export function ReflectQueryPanel({
   query,
-  cursor,
   setQuery,
-  setCursor,
   onSubmit,
   aqlEntities,
   aqlEdges,
@@ -58,8 +54,6 @@ export function ReflectQueryPanel({
           <QueryForm
             query={query}
             setQuery={setQuery}
-            cursor={cursor}
-            setCursor={setCursor}
             loading={loading}
             isRunning={loading}
             availableEntities={aqlEntities}

@@ -2,10 +2,12 @@
 
 The `graph` envelope section holds nodes and edges. Populate it only when the graph section is active; otherwise leave it exactly as `{"name":"","nodes":[],"edges":[]}`.
 
+The current API shape only supports a single `graph` object. Emit exactly one graph object using the first graph bullet's title. Do not create narrative prose, table entries, or diagram entries for the other graph bullets; simply omit them from the response.
+
 **Exact title for this graph:** `{{ARCHITXT_GRAPH_NAME}}`. If empty, generate a short descriptive name (4–6 words) based on the content; otherwise use the exact title shown above with no changes.
 
 The `graph` object must contain:
-- `name`: a short human-readable identifier for the graph (used as its title/label when rendered). **This MUST be the exact title provided via `#graph-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If no name is provided, generate a short descriptive name (4–6 words) based on the graph's content.
+- `name`: a short human-readable identifier for the graph (used as its title/label when rendered). **This MUST be the exact title provided via `#graph-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** `name` is required and must not be omitted.
 - `nodes`: array of node objects.
 - `edges`: array of edge objects.
 

@@ -26,7 +26,8 @@ describe('parseAql', () => {
     assert.equal(q.intentText, '');
     const focus = toSectionFocus(q);
     assert.equal(focus.intentText, 'CRM, Billing');
-    assert.equal(focus.sectionFocus.graph.content, 'CRM, Billing');
+    assert.equal(focus.sectionFocus.graph.length, 1);
+    assert.equal(focus.sectionFocus.graph[0].content, 'CRM, Billing');
     assert.equal(q.blocks.length, 1);
     assert.equal(q.blocks[0].kind, 'graph');
     assert.equal(q.blocks[0].body, 'CRM, Billing');
@@ -40,8 +41,9 @@ describe('parseAql', () => {
     assert.equal(q.blocks[0].name, 'Integration flows');
     assert.equal(q.blocks[0].body, 'CRM, Billing');
     const focus = toSectionFocus(q);
-    assert.equal(focus.sectionFocus.graph.name, 'Integration flows');
-    assert.equal(focus.sectionFocus.graph.content, 'CRM, Billing');
+    assert.equal(focus.sectionFocus.graph.length, 1);
+    assert.equal(focus.sectionFocus.graph[0].name, 'Integration flows');
+    assert.equal(focus.sectionFocus.graph[0].content, 'CRM, Billing');
   });
 
   it('parses a narrative block with name', () => {
@@ -51,8 +53,17 @@ describe('parseAql', () => {
     assert.equal(q.blocks[0].name, 'Summary');
     assert.equal(q.blocks[0].body, 'Describe the impact.');
     const focus = toSectionFocus(q);
-    assert.equal(focus.sectionFocus.narrative.name, 'Summary');
-    assert.equal(focus.sectionFocus.narrative.content, 'Describe the impact.');
+    assert.equal(focus.sectionFocus.narrative.length, 1);
+    assert.equal(focus.sectionFocus.narrative[0].name, 'Summary');
+    assert.equal(focus.sectionFocus.narrative[0].content, 'Describe the impact.');
+  });
+
+  it('keeps intent text outside blocks', () => {
+    const q = parseAql('compare current and desired state\n#graph\nCRM\n#end');
+    assert.equal(q.intentText, 'compare current and desired state');
+    const focus = toSectionFocus(q);
+    assert.equal(focus.intentText, 'compare current and desired state');
+    assert.equal(focus.sectionFocus.graph[0].content, 'CRM');
   });
 
   it('parses a table block with name', () => {
@@ -66,6 +77,32 @@ describe('parseAql', () => {
     assert.equal(focus.sectionFocus.table[0].name, 'Dependencies');
   });
 
+  it('parses multiple narrative blocks', () => {
+    const q = parseAql(`#narrative
+#narrative-name "Extract Daemon Capabilities"
+Describe the capabilities of the Extract Daemon component.
+#end
+
+#narrative
+#narrative-name "Docling Capabilities"
+Describe the capabilities of the Docling component.
+#end
+
+#diagram
+#diagram-name "Docling and Extract Daemon Interactions"
+#diagram-type flowchart
+Show a diagram of the interactions between Docling and Extract Daemon, including data flow direction and type.
+#end`);
+
+    assert.equal(q.blocks.length, 3);
+    const focus = toSectionFocus(q);
+    assert.equal(focus.sectionFocus.narrative.length, 2);
+    assert.equal(focus.sectionFocus.narrative[0].name, 'Extract Daemon Capabilities');
+    assert.equal(focus.sectionFocus.narrative[1].name, 'Docling Capabilities');
+    assert.equal(focus.sectionFocus.diagram.length, 1);
+    assert.equal(focus.sectionFocus.diagram[0].name, 'Docling and Extract Daemon Interactions');
+  });
+
   it('parses a diagram block with quoted name and type', () => {
     const q = parseAql('#diagram\n#diagram-name "Entity lifecycle"\n#diagram-type sequenceDiagram\nAlice->>Bob: Hello\n#end');
     assert.equal(q.blocks.length, 1);
@@ -75,14 +112,6 @@ describe('parseAql', () => {
     assert.equal(q.blocks[0].body, 'Alice->>Bob: Hello');
     const focus = toSectionFocus(q);
     assert.equal(focus.intentText, 'Entity lifecycle (sequenceDiagram)');
-  });
-
-  it('keeps intent text outside blocks', () => {
-    const q = parseAql('compare current and desired state\n#graph\nCRM\n#end');
-    assert.equal(q.intentText, 'compare current and desired state');
-    const focus = toSectionFocus(q);
-    assert.equal(focus.intentText, 'compare current and desired state');
-    assert.equal(focus.sectionFocus.graph.content, 'CRM');
   });
 
   it('returns errors for unclosed blocks', () => {
@@ -119,6 +148,18 @@ describe('parseAql', () => {
     const q = parseAql('#table\n#table-name ""\ncontent\n#end');
     assert.equal(q.blocks[0].name, '');
     assert.equal(q.errors, undefined);
+  });
+
+  it('returns an error for multiple graph blocks', () => {
+    const q = parseAql(`#graph
+CRM, Billing
+#end
+#graph
+ERP, Shipping
+#end`);
+    assert.ok(q.errors);
+    assert.ok(q.errors.some((e) => /Only one #graph block is allowed/.test(e.message)));
+    assert.equal(q.errors.length, 1);
   });
 });
 

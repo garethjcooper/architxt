@@ -15,7 +15,7 @@ describe('parseSectionDirectives', () => {
   it('parses a single graph block', () => {
     const result = parseSectionDirectives('Analyze billing\n#graph\nCRM, ERP\n#end');
     assert.equal(result.intentText, 'Analyze billing');
-    assert.deepEqual(result.sectionFocus?.graph, { name: undefined, content: 'CRM, ERP' });
+    assert.deepEqual(result.sectionFocus?.graph, [{ name: undefined, content: 'CRM, ERP' }]);
   });
 
   it('parses a table block with explicit #table-name', () => {
@@ -82,13 +82,17 @@ describe('parseSectionDirectives', () => {
     const raw = 'Q\n#narrative\nBusiness impact\n#end\n#graph\nCRM, ERP\n#end';
     const result = parseSectionDirectives(raw);
     assert.equal(result.intentText, 'Q');
-    assert.deepEqual(result.sectionFocus?.narrative, { name: undefined, content: 'Business impact' });
-    assert.deepEqual(result.sectionFocus?.graph, { name: undefined, content: 'CRM, ERP' });
+    assert.deepEqual(result.sectionFocus?.narrative, [{ name: undefined, content: 'Business impact' }]);
+    assert.deepEqual(result.sectionFocus?.graph, [{ name: undefined, content: 'CRM, ERP' }]);
   });
 
-  it('concatenates multiple graph blocks', () => {
+  it('rejects multiple graph blocks because only one graph is supported', () => {
     const result = parseSectionDirectives('Q\n#graph\nA\n#end\n#graph\nB\n#end');
-    assert.deepEqual(result.sectionFocus?.graph, { name: undefined, content: 'A\nB' });
+    // The AQL parser rejects multiple #graph blocks, so the server shim returns
+    // an empty sectionFocus. Callers that need the raw error should use @architxt/aql
+    // directly; this test only verifies the server-level outcome.
+    assert.deepEqual(result.sectionFocus, {});
+    assert.equal(result.sectionFocus?.graph, undefined);
   });
 
   it('rejects unknown directives as invalid AQL', () => {
@@ -108,20 +112,20 @@ describe('parseSectionDirectives', () => {
   it('does not create implicit narrative when an explicit directive is present', () => {
     const result = parseSectionDirectives('Analyze billing\n#graph\nCRM, ERP\n#end');
     assert.equal(result.intentText, 'Analyze billing');
-    assert.deepEqual(result.sectionFocus?.graph, { name: undefined, content: 'CRM, ERP' });
+    assert.deepEqual(result.sectionFocus?.graph, [{ name: undefined, content: 'CRM, ERP' }]);
     assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
   it('topic fallback when all text is inside a narrative block', () => {
     const result = parseSectionDirectives('#narrative\nTell me about CRM integrations\n#end');
     assert.equal(result.intentText, 'Tell me about CRM integrations');
-    assert.deepEqual(result.sectionFocus?.narrative, { name: undefined, content: 'Tell me about CRM integrations' });
+    assert.deepEqual(result.sectionFocus?.narrative, [{ name: undefined, content: 'Tell me about CRM integrations' }]);
   });
 
   it('topic fallback when all text is inside a graph block', () => {
     const result = parseSectionDirectives('#graph\nshow data flows\n#end');
     assert.equal(result.intentText, 'show data flows');
-    assert.deepEqual(result.sectionFocus?.graph, { name: undefined, content: 'show data flows' });
+    assert.deepEqual(result.sectionFocus?.graph, [{ name: undefined, content: 'show data flows' }]);
     assert.equal(result.sectionFocus?.narrative, undefined);
   });
 
@@ -137,7 +141,7 @@ describe('parseSectionDirectives', () => {
     const raw = 'Analyze billing\n#graph\nCRM, ERP\n#end\n#table\n#table-name Gaps\nlist gaps\n#end';
     const result = parseSectionDirectives(raw);
     assert.equal(result.intentText, 'Analyze billing');
-    assert.deepEqual(result.sectionFocus?.graph, { name: undefined, content: 'CRM, ERP' });
+    assert.deepEqual(result.sectionFocus?.graph, [{ name: undefined, content: 'CRM, ERP' }]);
     assert.equal(result.sectionFocus?.table?.length, 1);
     // This test documents why the synthesize route must store `intent_text`
     // (raw) rather than `parsed.intentText` — otherwise "Use details" would

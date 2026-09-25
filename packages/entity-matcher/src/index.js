@@ -257,7 +257,11 @@ export function scanForEntityMatches(format, entities, content) {
   const eligibility = [];
   const seen = new Set();
   for (const entity of entities) {
-    const texts = [entity.name, ...(entity.aliases || [])].filter(Boolean);
+    const texts = [
+      entity.name,
+      entity.entity_id,
+      ...(entity.aliases || []),
+    ].filter(Boolean);
     for (const text of texts) {
       if (!text || !text.trim()) continue;
       const key = `${entity.id}:${text}`;
@@ -315,15 +319,17 @@ export function scanForEntityMatches(format, entities, content) {
     }
   }
 
-  // Prepend instant tag matches, preserving raw offsets.
+  // Prepend instant tag matches, preserving raw offsets. Only keep tags that
+  // reference entities actually present in the supplied catalog.
   const tagMatches = existingTags
     .filter((tag) => tag.id)
     .map((tag) => {
-      const matchedEntity = entities.find((e) => e.entity_id === tag.id) || {};
+      const matchedEntity = entities.find((e) => e.entity_id === tag.id);
+      if (!matchedEntity) return null;
       return {
         dbId: matchedEntity.id,
         entity_id: tag.id,
-        name: tag.name,
+        name: matchedEntity.name,
         type_name: matchedEntity.type_name,
         matchedText: tag.text,
         start: tag.start,
@@ -333,7 +339,8 @@ export function scanForEntityMatches(format, entities, content) {
         rawStartIndex: tag.start,
         rawEndIndex: tag.end,
       };
-    });
+    })
+    .filter(Boolean);
 
   return [...tagMatches, ...matches].sort((a, b) => a.start - b.start);
 }

@@ -77,6 +77,8 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   };
 }
 
+export { ensureEnvelopeIds };
+
 export function escapeMarkdownCell(val: unknown): string {
   if (val === undefined || val === null) return '';
   const str = typeof val === 'string' ? val : JSON.stringify(val);
@@ -171,7 +173,10 @@ export function buildEnvelopeMarkdown(envelope: EnvelopeLike): string {
     parts.push(`\n\n${heading}\n\n\`\`\`json\n${rawGraphJson}\n\`\`\``);
   }
 
-  return parts.join('').trim();
+  return parts
+    .map((p) => p.replace(/^\n+/, '').replace(/\n+$/, ''))
+    .join('\n\n')
+    .trim();
 }
 
 export function normalizeEnvelope(page: ResearchStepSummary | DiscoverStepResponse): UnifiedEnvelope {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import { PageShell } from '@/app/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +14,7 @@ import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SyncJobsTab } from './sync-jobs-tab';
 import { MentalModelsTab } from './mental-models-tab';
@@ -35,9 +35,6 @@ import {
   isCandidateNode,
   isCandidateEdge,
   isGroundedEdge,
-  isUndirectedEdge,
-  hasEdgeContextRef,
-  getEdgeContextPairKey,
   getEdgeSortGroup,
   getEdgeSortRank,
   Section,
@@ -48,6 +45,7 @@ import {
   getRoleScopeLabel,
   getRoleLabel,
 } from '@/lib/contextual-graph/display';
+import { VirtualList } from '@/components/ui/virtual-list';
 export type { BackendNode, BackendEdge, ModelRef, DisplayNode, DisplayEdge } from '@/lib/contextual-graph/display';
 
 const logger = createLogger('ContextManagerPage');
@@ -212,6 +210,8 @@ export default function ContextManagerPage() {
     }
   }, [serverId, bankId]);
 
+  const deferredGraphSearch = useDeferredValue(graphSearch);
+
   const sortedNodes = useMemo(() => {
     return [...nodes]
       .filter((n) => isGroundedNode(n) && !isCandidateNode(n))
@@ -241,7 +241,7 @@ export default function ContextManagerPage() {
   }, [nodes]);
 
   const filteredSortedNodes = useMemo(() => {
-    const q = graphSearch.trim().toLowerCase();
+    const q = deferredGraphSearch.trim().toLowerCase();
     if (!q) return sortedNodes;
     return sortedNodes.filter(
       (n) =>
@@ -249,10 +249,10 @@ export default function ContextManagerPage() {
         n.id.toLowerCase().includes(q) ||
         n.type.toLowerCase().includes(q)
     );
-  }, [sortedNodes, graphSearch]);
+  }, [sortedNodes, deferredGraphSearch]);
 
   const filteredSortedEdges = useMemo(() => {
-    const q = graphSearch.trim().toLowerCase();
+    const q = deferredGraphSearch.trim().toLowerCase();
     if (!q) return sortedEdges;
     return sortedEdges.filter((e) => {
       const source = nodeById.get(e.source_id)?.label || e.source_id;
@@ -260,7 +260,7 @@ export default function ContextManagerPage() {
       const text = `${e.detail || ''} ${e.label || ''} ${e.type || ''} ${source} ${target}`.toLowerCase();
       return text.includes(q);
     });
-  }, [sortedEdges, graphSearch, nodeById]);
+  }, [sortedEdges, deferredGraphSearch, nodeById]);
 
   const groupedEdgeRows = useMemo(() => {
     // Group all filtered edges by their canonical relationship.
@@ -651,6 +651,11 @@ export default function ContextManagerPage() {
             <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded ml-auto">
               {filteredSortedNodes.length} node{filteredSortedNodes.length !== 1 ? 's' : ''} / {filteredSortedEdges.length} edge
               {filteredSortedEdges.length !== 1 ? 's' : ''}
+              {graphSearch !== deferredGraphSearch && (
+                <span className="ml-1 inline-flex items-center">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                </span>
+              )}
             </span>
           </div>
           <div className="flex-1 min-h-0 flex mt-2">
@@ -666,7 +671,7 @@ export default function ContextManagerPage() {
                     {filteredSortedNodes.length}
                   </span>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
+                <div className="flex-1 min-h-0 overflow-hidden p-1.5">
                   {graphLoading ? (
                     <div className="p-3 space-y-2">
                       <Skeleton className="h-10 w-full bg-surface-panel" />
@@ -676,14 +681,21 @@ export default function ContextManagerPage() {
                   ) : filteredSortedNodes.length === 0 ? (
                     <div className="text-[11px] text-foreground-subtle px-2 py-3">No grounded entities loaded.</div>
                   ) : (
-                    filteredSortedNodes.map((node) => (
-                      <EntityListRow
-                        key={node.id}
-                        node={node}
-                        active={selectedNodeId === node.id}
-                        onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
-                      />
-                    ))
+                    <VirtualList
+                      items={filteredSortedNodes}
+                      estimateSize={46}
+                      overscan={10}
+                      getItemKey={(_, node) => node.id}
+                      className="h-full"
+                      itemClassName="px-0.5 py-0.5"
+                      renderItem={(node) => (
+                        <EntityListRow
+                          node={node}
+                          active={selectedNodeId === node.id}
+                          onClick={() => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
+                        />
+                      )}
+                    />
                   )}
                 </div>
               </div>
@@ -704,21 +716,35 @@ export default function ContextManagerPage() {
                     {filteredSortedEdges.length}
                   </span>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
-                  {groupedEdgeRows.length === 0 && (
+                <div className="flex-1 min-h-0 overflow-hidden p-1.5">
+                  {graphLoading ? (
+                    <div className="p-3 space-y-2">
+                      <Skeleton className="h-10 w-full bg-surface-panel" />
+                      <Skeleton className="h-10 w-full bg-surface-panel" />
+                      <Skeleton className="h-10 w-full bg-surface-panel" />
+                    </div>
+                  ) : groupedEdgeRows.length === 0 ? (
                     <div className="text-[11px] text-foreground-subtle px-2 py-3">No grounded edges loaded.</div>
-                  )}
-                  {groupedEdgeRows.map(({ edge, count, key, isGroup }) => (
-                    <EdgeListRow
-                      key={key}
-                      edge={edge}
-                      active={selectedEdgeId === edge.id}
-                      sourceLabel={nodeById.get(edge.source_id)?.label}
-                      targetLabel={nodeById.get(edge.target_id)?.label}
-                      edgeContextCount={count > 0 && isGroup ? count : undefined}
-                      onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
+                  ) : (
+                    <VirtualList
+                      items={groupedEdgeRows}
+                      estimateSize={48}
+                      overscan={10}
+                      getItemKey={(_, row) => row.key}
+                      className="h-full"
+                      itemClassName="px-0.5 py-0.5"
+                      renderItem={({ edge, count, isGroup }) => (
+                        <EdgeListRow
+                          edge={edge}
+                          active={selectedEdgeId === edge.id}
+                          sourceLabel={nodeById.get(edge.source_id)?.label}
+                          targetLabel={nodeById.get(edge.target_id)?.label}
+                          edgeContextCount={count > 0 && isGroup ? count : undefined}
+                          onClick={() => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
+                        />
+                      )}
                     />
-                  ))}
+                  )}
                 </div>
               </div>
             </div>

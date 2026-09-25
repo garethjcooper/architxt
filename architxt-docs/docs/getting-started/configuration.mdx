@@ -173,6 +173,20 @@ These toggles are independent of the LLM denoiser and run rule-based cleanup on 
 | `ARCHITXT_HINDSIGHT_POLL_INTERVAL_MS` | `5000` | How often the Hindsight poller checks pending operations. |
 | `ARCHITXT_HINDSIGHT_STALE_THRESHOLD_MS` | `300000` | Milliseconds before a pending Hindsight operation is marked stale. |
 
+## Workspace agent chat
+
+These settings control the LLM used by the Workspace **Chat** panel when it classifies intent, recalls memories, and synthesizes answers.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_AGENT_PROVIDER` | `ollama_cloud` | Provider name for chat agent calls. |
+| `ARCHITXT_AGENT_API_KEY` | *(empty)* | API key. Only needed if the selected provider requires one. |
+| `ARCHITXT_AGENT_BASE_URL` | *(empty)* | Override the provider's base URL. |
+| `ARCHITXT_AGENT_MODEL` | *(provider default)* | Model used for chat intent classification and synthesis. |
+| `ARCHITXT_AGENT_TEMPERATURE` | `0.7` | Sampling temperature. |
+| `ARCHITXT_AGENT_TIMEOUT_MS` | `300000` | Request timeout in milliseconds (5 minutes). |
+| `ARCHITXT_AGENT_CLASSIFY_INTENT_MAX_TOKENS` | `2048` | Maximum tokens when the agent classifies the intent of a chat message. Reasoning models consume tokens before emitting JSON, so low limits can cause empty responses. |
+
 ## Contextual graph sync daemon
 
 | Variable | Default | Purpose |

@@ -28,16 +28,20 @@ A diagram envelope contains one or more diagram blocks. Each block has:
 
 Diagram blocks are rendered inline in the Preview tab and in the curated-page editor.
 
-## Preview controls
+### Preview controls
 
 Diagram previews share the common envelope controls and add a few diagram-specific ones.
 
 | Control | Behavior |
 |---|---|
 | **Copy** | Copies the Mermaid source, the rendered SVG, or a PNG image of the diagram. |
-| **Fit** | Toggles fit-to-width so large diagrams shrink to the panel width. |
+| **Fit** | Toggles fit-to-width so large diagrams shrink to the panel width. The modal opens with fit enabled. |
 | **Zoom / Pan** | Floating controls let you zoom in, zoom out, and drag the diagram around. |
 | **Focus** | Opens the diagram in a modal with the source visible and, when the source is editable, an **Apply** button. |
+
+:::tip[Fit toggle style]
+The Fit control is rendered as a slider+label and follows the same style as other toggle controls in the Workspace.
+:::
 
 :::tip[Copy formats]
 From the diagram header you can copy the raw Mermaid source, copy the SVG, or copy a PNG image. This makes it easy to paste into Slack, Notion, GitHub, or another document.
@@ -58,7 +62,7 @@ When you add a diagram to a curated page it becomes an editable diagram section.
 The editor validates the Mermaid source and disables **Apply** while the diagram contains syntax errors. Fix the error first, then apply your changes.
 :::
 
-## Renderer override
+### Renderer override
 
 Mermaid chooses the layout renderer from frontmatter in the diagram source. You can override the default renderer by adding a `config` block at the top of the source. See the [Mermaid configuration syntax reference](https://mermaid.ai/open-source/intro/syntax-reference.html#configuration) for full details.
 
@@ -75,6 +79,10 @@ flowchart TD
 
 :::tip[Use frontmatter, not a control]
 The Preview tab does not provide a renderer switch in its control panel. To use `elk`, edit the Mermaid source directly in the Focus modal or curated-page section editor and add the `config: layout: elk` frontmatter block.
+:::
+
+:::tip[Mermaid type detection]
+Diagram sources that include a type directive after the frontmatter are detected automatically, and the Fit header is shown consistently regardless of how the type is declared.
 :::
 
 ## From diagram to curated page

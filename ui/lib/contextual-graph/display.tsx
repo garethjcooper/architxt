@@ -63,6 +63,7 @@ export type ModelRef = {
   last_refresh_status?: 'ok' | 'error' | 'skipped' | string;
   last_refresh_at?: string;
   last_refresh_error?: string;
+  last_refresh_empty_envelope?: boolean;
 };
 
 export type DisplayNode = {
@@ -297,6 +298,7 @@ export function getRoleScope(role?: string, roleScopeMap?: Record<string, string
 
 let globalRoleScopeMap: Record<string, string> | null = null;
 let globalRoleLabelMap: Record<string, string> | null = null;
+let roleScopeMapPromise: Promise<RoleScopeMaps> | null = null;
 
 export type RoleScopeMaps = {
   roleScopeMap: Record<string, string>;
@@ -304,21 +306,28 @@ export type RoleScopeMaps = {
 };
 
 export async function loadRoleScopeMap(): Promise<RoleScopeMaps> {
-  // Always refetch: different consumers need different subsets, and a cached
-  // subset (e.g. "available only") must not poison later callers.
-  try {
-    const roles = await mentalModelsApi.listTemplateRoles();
-    globalRoleScopeMap = Object.fromEntries(
-      (roles || []).map((r: { value: string; label?: string; derivation_scope?: string }) => [r.value, (r.derivation_scope || '').toUpperCase()]),
-    );
-    globalRoleLabelMap = Object.fromEntries(
-      (roles || []).map((r: { value: string; label?: string }) => [r.value, r.label || '']),
-    );
-  } catch {
-    globalRoleScopeMap = { ...MODEL_ROLE_LABELS };
-    globalRoleLabelMap = { ...MODEL_ROLE_LABEL_NAMES };
-  }
-  return { roleScopeMap: globalRoleScopeMap, roleLabelMap: globalRoleLabelMap };
+  // Deduplicate concurrent calls across all consumers. The full template role
+  // list is the same for every caller, so sharing one in-flight request avoids
+  // the request storm when many chat cards mount at once.
+  if (roleScopeMapPromise) return roleScopeMapPromise;
+
+  roleScopeMapPromise = (async () => {
+    try {
+      const roles = await mentalModelsApi.listTemplateRoles();
+      globalRoleScopeMap = Object.fromEntries(
+        (roles || []).map((r: { value: string; label?: string; derivation_scope?: string }) => [r.value, (r.derivation_scope || '').toUpperCase()]),
+      );
+      globalRoleLabelMap = Object.fromEntries(
+        (roles || []).map((r: { value: string; label?: string }) => [r.value, r.label || '']),
+      );
+    } catch {
+      globalRoleScopeMap = { ...MODEL_ROLE_LABELS };
+      globalRoleLabelMap = { ...MODEL_ROLE_LABEL_NAMES };
+    }
+    return { roleScopeMap: globalRoleScopeMap, roleLabelMap: globalRoleLabelMap };
+  })();
+
+  return roleScopeMapPromise;
 }
 
 /** @deprecated Prefer consuming the maps returned by loadRoleScopeMap(). */
@@ -411,7 +420,7 @@ export function EdgeListRow({
           className="text-[9px] text-foreground-faint px-1 py-0.5 rounded border border-border-default bg-surface-subtle shrink-0"
           title={`${edgeContextCount} physical edge${edgeContextCount === 1 ? '' : 's'} in this edge context`}
         >
-          {edgeContextCount} edge{edgeContextCount === 1 ? '' : 's'}
+          {edgeContextCount}
         </span>
       )}
     </button>

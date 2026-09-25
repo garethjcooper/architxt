@@ -31,6 +31,22 @@ Each attached model shows a scope badge that tells you how it is attached:
 
 The badge tells you how the model was produced; the role label next to it tells you what kind of model it is — for example, summary, capabilities, edge context, or a custom template role.
 
+## Filtering and search
+
+The panel header contains controls that help you find the right model quickly when the entity list is large.
+
+| Control | Purpose |
+|---|---|
+| **ALL / NODES / EDGES** | Scope filter. **ALL** shows every attached model. **NODES** limits the list to entity-level models (plain, derived, and node/seed scopes). **EDGES** shows only edge-context models that describe a relationship. |
+| **Search box** | Freetext filter across entity names, entity IDs, scope badges, role labels, and model titles. Typing multiple words performs an AND search, so `acme products` only keeps rows that contain both words somewhere in their visible fields. |
+| **Counter** | Shows the total number of items in scope and how many match the current filter, for example `12 (4)`. |
+
+The search applies to every item in the panel, including models inside collapsed entities. If an entity has no matching models under the current filter, it is hidden entirely.
+
+## Deduplicated edge-context items
+
+Edge-context models can be discovered from both endpoints of a relationship. The panel deduplicates these so a single edge appears only once, sorted with the alphabetically earlier endpoint first. This keeps the list compact and avoids mirror duplicates when both entities are in scope.
+
 ## Interaction model
 
 | Action | What happens |
@@ -38,8 +54,7 @@ The badge tells you how the model was produced; the role label next to it tells 
 | **Click a model** | Opens the model content in the active **Preview** tab (or replaces the current view tab). |
 | **Open in new tab** | Opens the model in a new read-only **View** tab, so you can keep the current tab open. |
 | **Expand / collapse entity** | Shows or hides the attached models for that entity. |
-
-Clicking or opening a model loads its content and renders it as an envelope preview: narrative, graph, tables, and diagrams, depending on what the model produced. Edge-context models render a title like `Source → Target` so you can see which relationship they describe.
+| **Filter by scope or search** | Narrows the visible items without changing what is attached to each entity. |
 
 ## Why this matters
 
@@ -71,9 +86,10 @@ All four rows appear when you expand **Acme Corp** in the Contextual data panel,
 
 ## Relationship to other surfaces
 
-- **Context Patches → Mental Models tab** shows every contextual/role-based model for the bank at once. The Contextual data panel filters that same information to a single entity and mixes in plain and derived models.
+- **Context Patches → Mental Models tab** shows every contextual/role-based model for the bank at once. The Contextual data panel filters that same information to a single entity and mixes in plain and derived models. That tab now also supports scope filters (**All / Empty / Failed**) and search, which mirrors the filtering behavior in the Contextual data panel.
 - **Mental Models (main page)** is where you create and edit plain and derived models; their content flows here.
 - **Workspace → Preview / View tabs** is where you land when you click or open a model from this panel.
+- **Workspace → Chat** reuses the same contextual-item list, scoped to the entities the agent resolved in a reply.
 - **Curated pages** let you copy content from previewed models into a composed page.
 
 ## Summary

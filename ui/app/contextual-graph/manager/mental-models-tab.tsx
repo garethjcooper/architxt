@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Search, AlertCircle, CheckCircle2, Loader2, MessageSquareText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -21,6 +20,22 @@ import { getRoleScopeLabel, getRoleLabel, getDerivationScope, type ModelRef, typ
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import type { MentalModelEnvelope } from '@/lib/api/client';
 import { SystemTemplateQueryPreviewDialog } from './system-template-query-preview-dialog';
+import { VirtualList } from '@/components/ui/virtual-list';
+
+const STATUS_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'empty', label: 'Empty' },
+  { value: 'failed', label: 'Failed' },
+] as const;
+
+type StatusFilter = (typeof STATUS_FILTERS)[number]['value'];
+
+function getRefStatus(ref: ModelRef): 'empty' | 'failed' | 'ok' | 'other' {
+  if (ref.last_refresh_status === 'error') return 'failed';
+  if (ref.last_refresh_status === 'ok' && ref.last_refresh_empty_envelope) return 'empty';
+  if (ref.last_refresh_status === 'ok') return 'ok';
+  return 'other';
+}
 
 function getScopeLabel(ref: ModelRef, nodes?: DisplayNode[], edges?: DisplayEdge[]): string {
   const scope = ref.scope;
@@ -72,6 +87,7 @@ export interface MentalModelsTabProps {
 
 export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isActive }: MentalModelsTabProps) {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [loading, setLoading] = useState(false);
   const [contents, setContents] = useState<Record<string, ContentResult>>({});
   const [contentErrors, setContentErrors] = useState<Record<string, string>>({});
@@ -129,17 +145,38 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
     return Array.from(byId.values());
   }, [modelRefs]);
 
+  const deferredSearch = useDeferredValue(search);
+  const isSearchPending = search !== deferredSearch;
+
   const filteredRefs = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return refs;
-    return refs.filter((r) => {
-      const id = (r.ext_id || '').toLowerCase();
-      const role = (r.role || '').toLowerCase();
-      const roleLabel = getRoleLabel(r.role, roleLabelMap).toLowerCase();
-      const scopeLabel = getRoleScopeLabel(r.role, roleScopeMap).toLowerCase();
-      return id.includes(q) || role.includes(q) || roleLabel.includes(q) || scopeLabel.includes(q);
-    });
-  }, [refs, search]);
+    let list = refs;
+    const q = deferredSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((r) => {
+        const id = (r.ext_id || '').toLowerCase();
+        const role = (r.role || '').toLowerCase();
+        const roleLabel = getRoleLabel(r.role, roleLabelMap).toLowerCase();
+        const roleScopeLabel = getRoleScopeLabel(r.role, roleScopeMap).toLowerCase();
+        const scopeLabel = getScopeLabel(r, nodes, edges).toLowerCase();
+        const errorMessage = (r.last_refresh_error || '').toLowerCase();
+        return (
+          id.includes(q) ||
+          role.includes(q) ||
+          roleLabel.includes(q) ||
+          roleScopeLabel.includes(q) ||
+          scopeLabel.includes(q) ||
+          errorMessage.includes(q)
+        );
+      });
+    }
+    if (statusFilter !== 'all') {
+      list = list.filter((r) => {
+        const status = getRefStatus(r);
+        return statusFilter === 'empty' ? status === 'empty' : status === 'failed';
+      });
+    }
+    return list;
+  }, [refs, deferredSearch, roleLabelMap, roleScopeMap, statusFilter, nodes, edges]);
 
   const selectedRef = useMemo(() => filteredRefs.find((r) => (r.ext_id || null) === selectedExtId) || null, [filteredRefs, selectedExtId]);
   const selectedContent = selectedExtId ? contents[selectedExtId] || null : null;
@@ -489,17 +526,15 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
   return (
     <div ref={containerRef} className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between gap-2 border-b border-border-default pb-2 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="relative w-64">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-subtle pointer-events-none" />
-            <Input
-              type="search"
-              placeholder="Search by ext id or role..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 pr-2 bg-surface-inset border-border-default text-foreground-muted placeholder:text-foreground-subtle text-xs"
-            />
-          </div>
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle pointer-events-none" />
+          <Input
+            type="search"
+            placeholder="Search by id, role, entity name or error..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 pl-8 pr-2 bg-surface-card border-border-default text-foreground-default placeholder:text-foreground-subtle text-xs"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -533,93 +568,115 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
         >
           <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0">
             <span className="font-medium text-sm">Mental Models</span>
-            <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
-              {filteredRefs.length} ({selectedRefIds.size})
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {STATUS_FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setStatusFilter(f.value)}
+                    className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                      statusFilter === f.value
+                        ? 'bg-accent-secondary-bg border-accent-secondary-bd text-accent-secondary-fg'
+                        : 'bg-surface-card border-border-default text-foreground-subtle hover:bg-surface-panel'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded">
+                {filteredRefs.length} ({selectedRefIds.size})
+                {isSearchPending && (
+                  <span className="ml-1 inline-flex items-center">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-auto p-0">
-            <Table className="w-full caption-bottom text-sm">
-              <TableHeader>
-                <TableRow className="border-b border-border-default hover:bg-transparent">
-                  <TableHead className="w-8 py-2 px-2">
-                    <Checkbox
-                      checked={isAllVisibleRefsSelected}
-                      indeterminate={isSomeVisibleRefsSelected}
-                      onCheckedChange={toggleAllVisibleRefs}
-                      aria-label="Select all visible mental models"
-                    />
-                  </TableHead>
-                  <TableHead className="w-[16%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Template Role</TableHead>
-                  <TableHead className="w-[8%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Scope</TableHead>
-                  <TableHead className="w-[16%] text-xs uppercase text-foreground-faint font-medium py-2 px-3">Target</TableHead>
-                  <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-3">External ID</TableHead>
-                  <TableHead className="w-28 text-xs uppercase text-foreground-faint font-medium py-2 px-3">Fetched</TableHead>
-                  <TableHead className="w-28 text-xs uppercase text-foreground-faint font-medium py-2 px-3">Refresh state</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && filteredRefs.length === 0 ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i} className="border-b border-border-subtle">
-                      <TableCell className="py-2 px-2"><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-10" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="py-2 px-3"><Skeleton className="h-4 w-20" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredRefs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-xs text-foreground-subtle">
-                      {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <>
-                    {filteredRefs.map((ref) => {
-                      const extId = ref.ext_id || '';
-                      const roleLabel = getRoleLabel(ref.role, roleLabelMap);
-                      const scopeBadge = getDerivationScope(ref.role, ref.scope, roleScopeMap);
-                      const scopeDetail = getScopeLabel(ref, nodes, edges);
-                      const op = getOperationForRow(extId);
-                      const isRefreshing = Boolean(op) || refreshingIds.has(extId);
-                      const isRowSelected = selectedExtId === extId;
-                      return (
-                      <TableRow
-                        key={extId || `${ref.role}-${Math.random()}`}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-0">
+            <div className="shrink-0 border-b border-border-default hover:bg-transparent px-2 py-2 flex text-xs uppercase text-foreground-faint font-medium">
+              <div className="w-10 px-0.5">
+                <Checkbox
+                  checked={isAllVisibleRefsSelected}
+                  indeterminate={isSomeVisibleRefsSelected}
+                  onCheckedChange={toggleAllVisibleRefs}
+                  aria-label="Select all visible mental models"
+                />
+              </div>
+              <div className="w-[16%] px-3">Template Role</div>
+              <div className="w-[8%] px-3">Scope</div>
+              <div className="w-[16%] px-3">Target</div>
+              <div className="flex-1 px-3">External ID</div>
+              <div className="w-28 px-3">Fetched</div>
+              <div className="w-28 px-3">Refresh state</div>
+              <div className="w-10 px-3" />
+            </div>
+            <div className="flex-1 min-h-0">
+              {loading && filteredRefs.length === 0 ? (
+                <div className="p-3 space-y-2">
+                  <Skeleton className="h-10 w-full bg-surface-panel" />
+                  <Skeleton className="h-10 w-full bg-surface-panel" />
+                  <Skeleton className="h-10 w-full bg-surface-panel" />
+                  <Skeleton className="h-10 w-full bg-surface-panel" />
+                  <Skeleton className="h-10 w-full bg-surface-panel" />
+                </div>
+              ) : filteredRefs.length === 0 ? (
+                <div className="text-center py-8 text-xs text-foreground-subtle">
+                  {search.trim() ? 'No model refs match your search.' : 'No mental-model refs attached to this bank.'}
+                </div>
+              ) : (
+                <VirtualList
+                  items={filteredRefs}
+                  estimateSize={52}
+                  overscan={10}
+                  getItemKey={(_, ref) => ref.ext_id || `${ref.role}-${Math.random()}`}
+                  className="h-full"
+                  itemClassName="border-b border-border-subtle"
+                  renderItem={(ref) => {
+                    const extId = ref.ext_id || '';
+                    const roleLabel = getRoleLabel(ref.role, roleLabelMap);
+                    const scopeBadge = getDerivationScope(ref.role, ref.scope, roleScopeMap);
+                    const scopeDetail = getScopeLabel(ref, nodes, edges);
+                    const op = getOperationForRow(extId);
+                    const isRefreshing = Boolean(op) || refreshingIds.has(extId);
+                    const isRowSelected = selectedExtId === extId;
+                    return (
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSelectRow(ref)}
                         className={cn(
-                          'border-b border-border-subtle cursor-pointer transition-colors',
+                          'w-full text-left cursor-pointer transition-colors flex items-stretch',
                           isRowSelected ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
                         )}
                       >
-                        <TableCell className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="py-2 px-2 w-10 shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedRefIds.has(extId)}
                             onCheckedChange={() => toggleRefSelection(extId)}
                             aria-label={`Select ${extId || 'model ref'}`}
                           />
-                        </TableCell>
-                        <TableCell className="py-2 px-3">
+                        </div>
+                        <div className="py-2 px-3 w-[16%] shrink-0 flex items-center">
                           <span className="text-xs text-foreground-default truncate" title={ref.role}>{roleLabel}</span>
-                        </TableCell>
-                        <TableCell className="py-2 px-3">
+                        </div>
+                        <div className="py-2 px-3 w-[8%] shrink-0 flex items-center">
                           <Badge className="text-[10px] bg-badge-neutral-bg text-badge-neutral-fg border-badge-neutral-bd w-fit">
                             {scopeBadge}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="py-2 px-3 text-xs text-foreground-faint truncate" title={scopeDetail}>
+                        </div>
+                        <div className="py-2 px-3 w-[16%] shrink-0 text-xs text-foreground-faint truncate flex items-center" title={scopeDetail}>
                           {scopeDetail}
-                        </TableCell>
-                        <TableCell className="py-2 px-3 font-mono text-xs text-foreground-muted truncate" title={extId || '-'}>
+                        </div>
+                        <div className="py-2 px-3 flex-1 min-w-0 font-mono text-xs text-foreground-muted truncate flex items-center" title={extId || '-'}>
                           {extId || '-'}
-                        </TableCell>
-                        <TableCell className="py-2 px-3 text-xs text-foreground-faint">
+                        </div>
+                        <div className="py-2 px-3 w-28 shrink-0 text-xs text-foreground-faint flex items-center">
                           {ref.fetched_at ? formatDistanceToNow(new Date(ref.fetched_at), { addSuffix: true }) : 'never'}
-                        </TableCell>
-                        <TableCell className="py-2 px-3 text-xs">
+                        </div>
+                        <div className="py-2 px-3 w-28 shrink-0 text-xs flex items-center">
                           {isRefreshing ? (
                             <span className="inline-flex items-center gap-1 text-accent-tertiary-fg">
                               <Loader2 className="h-3 w-3 animate-spin" /> refreshing
@@ -627,6 +684,11 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           ) : ref.last_refresh_status === 'error' ? (
                             <span className="inline-flex items-center gap-1 text-destructive-fg" title={ref.last_refresh_error || ''}>
                               <AlertCircle className="h-3 w-3" /> error
+                            </span>
+                          ) : ref.last_refresh_status === 'ok' && ref.last_refresh_empty_envelope ? (
+                            <span className="inline-flex items-center gap-1 text-badge-caution-fg" title="Refresh succeeded but returned an empty envelope">
+                              <CheckCircle2 className="h-3 w-3" /> ok
+                              {ref.last_refresh_at ? ` ${formatDistanceToNow(new Date(ref.last_refresh_at), { addSuffix: true })}` : ''}
                             </span>
                           ) : ref.last_refresh_status === 'ok' ? (
                             <span className="inline-flex items-center gap-1 text-accent-primary-fg">
@@ -638,8 +700,8 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                           ) : (
                             <span className="text-foreground-subtle">−</span>
                           )}
-                        </TableCell>
-                        <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                        </div>
+                        <div className="py-2 px-3 w-10 shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-1">
                             <Button
                               variant="ghost"
@@ -655,14 +717,13 @@ export function MentalModelsTab({ serverId, bankId, modelRefs, nodes, edges, isA
                               <MessageSquareText className="h-3.5 w-3.5" />
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
-                  </>
-                )}
-              </TableBody>
-            </Table>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
 

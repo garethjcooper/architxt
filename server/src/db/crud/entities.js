@@ -199,7 +199,7 @@ export const listEntitiesWithType = (db) => dbExec(() => {
  */
 export const listEntitiesForDetection = (db) => dbExec(() => {
   const rows = stmt(db, `
-    SELECT e.*, t.et_case_match AS type_case_match, t.et_word_boundary_match AS type_word_boundary_match
+    SELECT e.*, t.et_type_name, t.et_case_match AS type_case_match, t.et_word_boundary_match AS type_word_boundary_match
     FROM ${TABLE} e
     JOIN entity_types t ON e.ent_type_id = t.et_id
   `).all();
@@ -209,6 +209,7 @@ export const listEntitiesForDetection = (db) => dbExec(() => {
     name: r.ent_name,
     aliases: JSON.parse(r.ent_aliases || '[]'),
     type_id: r.ent_type_id,
+    type_name: r.et_type_name,
     type_case_match: r.type_case_match,
     type_word_boundary_match: r.type_word_boundary_match,
     case_match: r.ent_case_match,

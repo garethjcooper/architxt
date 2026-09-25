@@ -9,6 +9,17 @@ import { isContextualGraphRole } from '../../db/crud/template-roles.js';
 
 const logger = createLogger('contextual-graph-refresh-patches');
 
+function isEnvelopeEmpty(output) {
+  const hasNarrative = Array.isArray(output.narratives) && output.narratives.some(
+    (n) => n && typeof n === 'object' && typeof n.narrative === 'string' && n.narrative.trim().length > 0,
+  );
+  const hasNodes = Array.isArray(output.graph?.nodes) && output.graph.nodes.length > 0;
+  const hasEdges = Array.isArray(output.graph?.edges) && output.graph.edges.length > 0;
+  const hasTables = Array.isArray(output.tables) && output.tables.length > 0;
+  const hasDiagrams = Array.isArray(output.diagrams) && output.diagrams.length > 0;
+  return !hasNarrative && !hasNodes && !hasEdges && !hasTables && !hasDiagrams;
+}
+
 function getModelContent(model) {
   const reflectResponse = model?.reflect_response;
   if (!reflectResponse) {
@@ -146,7 +157,7 @@ export function extractModelRefsFromDb(db, serverId, bankId) {
 }
 
 function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshState = {}) {
-  const { status, error } = refreshState;
+  const { status, error, emptyEnvelope } = refreshState;
   const updatedRef = {
     ...ref,
     fetched_at: timestamp,
@@ -157,8 +168,12 @@ function updateRefOnScope(db, serverId, bankId, scope, ref, timestamp, refreshSt
     updatedRef.last_refresh_status = status;
     if (status === 'ok') {
       delete updatedRef.last_refresh_error;
-    } else if (error) {
-      updatedRef.last_refresh_error = error;
+      updatedRef.last_refresh_empty_envelope = emptyEnvelope === true;
+    } else {
+      delete updatedRef.last_refresh_empty_envelope;
+      if (error) {
+        updatedRef.last_refresh_error = error;
+      }
     }
   }
   if (ref.content_hash) updatedRef.content_hash = ref.content_hash;
@@ -441,16 +456,16 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
       const newHash = contentHash(getModelContentHashSource(model));
 
-      // Dry-run still fetches and normalizes, but never applies.
-      if (dryRun) {
-        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp, { status: 'ok' });
-        continue;
-      }
-
       // Pass a consistent envelope to applyModelOutput so the content_hash it
       // stores matches the hash we compute above from reflect_response.structured_output.
       const raw = JSON.stringify(content);
       const output = { ...content, raw };
+
+      // Dry-run still fetches and normalizes, but never applies.
+      if (dryRun) {
+        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash }, timestamp, { status: 'ok', emptyEnvelope: isEnvelopeEmpty(output) });
+        continue;
+      }
       if (!output.graph || typeof output.graph !== 'object') {
         stats.failed += 1;
         const error = 'Mental model structured output is missing a valid graph';
@@ -469,7 +484,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         // status) without re-running applyModelOutput. This keeps the stats honest
         // so "applied" only counts actual graph mutations.
         stats.skippedUnchanged += 1;
-        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash, fetched_at: timestamp }, timestamp, { status: 'ok' });
+        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash, fetched_at: timestamp }, timestamp, { status: 'ok', emptyEnvelope: isEnvelopeEmpty(output) });
         continue;
       }
 
@@ -504,7 +519,7 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
 
       // Record the new content hash + fetched_at on the scope.
       const updatedRef = { ...scope.ref, content_hash: newHash, fetched_at: timestamp, attached_at: scope.ref.attached_at || timestamp };
-      updateRefOnScope(db, serverId, bankId, scope, updatedRef, timestamp, { status: 'ok' });
+      updateRefOnScope(db, serverId, bankId, scope, updatedRef, timestamp, { status: 'ok', emptyEnvelope: isEnvelopeEmpty(output) });
       stats.applied += 1;
     }
 
