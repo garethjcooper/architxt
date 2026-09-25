@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Play } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { colorForType } from '@/lib/graph/render-utils';
 import { type ResearchQueryOptions } from './use-research-session';
 import { type ResearchStepSummary } from '@/lib/api/client';
@@ -25,8 +25,6 @@ export type Bank = {
 export interface QueryFormProps {
   query: string;
   setQuery: (q: string) => void;
-  cursor: number;
-  setCursor: (c: number) => void;
   loading: boolean;
   isRunning?: boolean;
   availableEntities: EntityLike[];
@@ -80,8 +78,6 @@ export function QueryForm(props: QueryFormProps) {
   const {
     query,
     setQuery,
-    cursor,
-    setCursor,
     loading,
     isRunning,
     availableEntities,
@@ -179,11 +175,10 @@ export function QueryForm(props: QueryFormProps) {
   }, [availableEntities]);
 
   const handleEditorChange = useCallback(
-    (value: string, newCursor: number) => {
+    (value: string) => {
       setQuery(value);
-      setCursor(newCursor);
     },
-    [setQuery, setCursor],
+    [setQuery],
   );
 
   return (
@@ -531,7 +526,7 @@ export function QueryForm(props: QueryFormProps) {
         >
           {isRunning ? 'Running…' : (
             <>
-              <Play className="w-4 h-4 mr-2" />
+              <Send className="w-4 h-4 mr-2" />
               {queryMode === 'synthesize' ? 'Synthesize' : queryMode === 'models' ? 'Run Models' : queryMode === 'templates' ? 'Run Templates' : 'Run Query'}
             </>
           )}

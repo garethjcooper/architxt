@@ -370,16 +370,79 @@ export const metadataApi = {
 };
 
 // Entity info API
+interface EntityInfoCacheEntry {
+  promise: Promise<{
+    entities: Record<string, EntityInfo>;
+    content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
+    meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
+  }>;
+  result?: {
+    entities: Record<string, EntityInfo>;
+    content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
+    meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
+  };
+  expiresAt: number;
+}
+
+const entityInfoCache = new Map<string, EntityInfoCacheEntry>();
+const ENTITY_INFO_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const ENTITY_INFO_CACHE_MAX_ENTRIES = 50;
+
+function makeEntityInfoCacheKey(serverId: number, bankId: string, entityIds: string[], includeContent: boolean): string {
+  const sortedIds = [...entityIds].sort().join(',');
+  return `${serverId}:${bankId}:${includeContent}:${sortedIds}`;
+}
+
+function trimEntityInfoCache() {
+  while (entityInfoCache.size > ENTITY_INFO_CACHE_MAX_ENTRIES) {
+    const firstKey = entityInfoCache.keys().next().value;
+    if (firstKey != null) {
+      entityInfoCache.delete(firstKey);
+    }
+  }
+}
+
 export const entityInfoApi = {
-  info: (serverId: number, bankId: string, entityIds: string[], includeContent = true) =>
-    fetchApi<{
+  info: (serverId: number, bankId: string, entityIds: string[], includeContent = true) => {
+    // Deduplicate calls across re-renders, resizes, and repeated mounts. Entity
+    // names rarely change, so cache completed results for 5 minutes with LRU
+    // eviction so the same set of IDs does not keep hitting the server.
+    const key = makeEntityInfoCacheKey(serverId, bankId, entityIds, includeContent);
+    const now = Date.now();
+    const cached = entityInfoCache.get(key);
+
+    if (cached != null && cached.expiresAt > now) {
+      if (cached.result != null) {
+        return Promise.resolve(cached.result);
+      }
+      return cached.promise;
+    }
+
+    const promise = fetchApi<{
       entities: Record<string, EntityInfo>;
       content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
       meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
     }>('/entities/info', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, entity_ids: entityIds, include_content: includeContent }),
-    }),
+    });
+
+    const entry: EntityInfoCacheEntry = { promise, expiresAt: now + ENTITY_INFO_CACHE_TTL_MS };
+    entityInfoCache.set(key, entry);
+    trimEntityInfoCache();
+
+    promise.then(
+      (result) => {
+        entry.result = result;
+      },
+      () => {
+        // On failure, clear the cache entry so the next caller retries.
+        entityInfoCache.delete(key);
+      },
+    );
+
+    return promise;
+  },
 };
 
 // Entities API
@@ -425,6 +488,22 @@ export const entitiesApi = {
     fetchApi<Array<{ id: number; ext_id: string | null; filename: string | null }>>('/entities/documents', {
       method: 'POST',
       body: JSON.stringify({ entity_ids: entIds, limit }),
+    }),
+  resolveFromText: (text: string) =>
+    fetchApi<{
+      entities: Array<{
+        id: number;
+        entity_id: string;
+        name: string;
+        type_id: number;
+        type_name: string;
+        canonical_reference: string;
+        from_tag: boolean;
+        ranges: Array<{ start: number; end: number }>;
+      }>;
+    }>('/entities/resolve-from-text', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
     }),
 };
 
@@ -1341,13 +1420,10 @@ export interface PrebuiltRoleResult {
 }
 
 export interface PrebuiltResponse {
-  success: boolean;
-  error?: string;
-  entities: string[];
-  entity_summary: Array<{ entity: string; role: string; found: boolean }>;
-  roles: PrebuiltRoleResult[];
-  session_id?: number;
-  step_id?: number;
+  step_id: number;
+  session_id: number;
+  status: 'running';
+  action_type: 'prebuilt';
 }
 
 export interface ResearchSession {
@@ -1362,6 +1438,151 @@ export interface ResearchSession {
   current_step_id: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AgentChatThread {
+  act_id: number;
+  rs_id: number;
+  title: string;
+  message_count: number;
+  act_created_at: string;
+  act_updated_at: string;
+}
+
+export interface AgentChatMessage {
+  acm_id: number;
+  act_id: number;
+  rs_id: number;
+  role: 'user' | 'agent';
+  content: string;
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+  /** Hindsight memory ids the synthesis cited as sources, if any. */
+  evidence?: string[];
+  /** Unified envelope containing the agent response narrative and optional graph. */
+  envelope?: UnifiedEnvelope;
+  /** Existing contextual/session items attached to the entities in this message, persisted with the message. */
+  contextual_items?: Array<{
+    ext_id: string;
+    name: string;
+    role: string;
+    template_role?: string;
+    kind: 'contextual_ref' | 'derived_model' | 'plain_model' | 'edge_context' | string;
+    entity_id?: string | null;
+    source_id?: string | null;
+    target_id?: string | null;
+  }>;
+  acm_created_at: string;
+  acm_updated_at: string;
+}
+
+export interface AgentChatHistory {
+  thread: AgentChatThread;
+  messages: AgentChatMessage[];
+  provider: string;
+  model: string;
+  server_id: number | null;
+  bank_id: string | null;
+}
+
+export interface AgentChatList {
+  threads: AgentChatThread[];
+  provider: string;
+  model: string;
+}
+
+export interface AgentChatOutputIntent {
+  focus: string[];
+  reason: string;
+  explicit: boolean;
+  names: Record<string, string>;
+  queries: Record<string, string>;
+  sections?: Array<{
+    focus: string;
+    name: string;
+    query: string;
+    diagram_type?: string;
+    table?: { columns: string[] };
+  }>;
+  aql?: string;
+  table?: {
+    columns: string[];
+  };
+  diagram_type?: string;
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
+export interface AgentChatQueryState {
+  intent?: AgentChatOutputIntent | null;
+  aql?: string | null;
+  resolved_entity_refs?: string[];
+  resolved_entities?: Array<{
+    db_id: number;
+    entity_id: string;
+    name: string;
+    type_name: string;
+    canonical_reference: string;
+    matched_text?: string;
+    from_tag?: boolean;
+    ranges?: Array<{ start: number; end: number }>;
+  }>;
+  contextual_items?: Array<{
+    ext_id: string;
+    name: string;
+    role: string;
+    template_role?: string;
+    kind: 'contextual_ref' | 'derived_model' | 'plain_model' | 'edge_context' | string;
+    entity_id?: string | null;
+    source_id?: string | null;
+    target_id?: string | null;
+  }>;
+  created_at: string;
+}
+
+export interface AgentChatSendResponse {
+  session_id: number;
+  thread_id: number;
+  user_message_id: number;
+  agent_message_id: number;
+  reply: AgentChatMessage;
+  query_state?: AgentChatQueryState;
+  /** Unified envelope returned by the agent response. */
+  envelope?: UnifiedEnvelope;
+  server_id?: number | null;
+  bank_id?: string | null;
+}
+
+export interface ContextRelatedEntityHit {
+  kind: 'node' | 'edge_source' | 'edge_target' | 'narrative' | string;
+  ref?: string | null;
+  id?: string | null;
+  name?: string | null;
+  matched?: Array<{ ref: string; name: string }>;
+  edge_type?: string | null;
+  edge_label?: string | null;
+}
+
+export interface ContextEnvelopeItem {
+  id: number | string;
+  name: string;
+  query?: string | null;
+  envelope: UnifiedEnvelope;
+  scope?: Record<string, any> | null;
+  node_id?: string | null;
+  entity_id?: string | null;
+  template_role?: string | null;
+  derivation_type?: string | null;
+  related_entity_refs?: string[];
+  related_entity_hits?: ContextRelatedEntityHit[];
 }
 
 export interface DiscoverStepResponse {
@@ -1638,6 +1859,46 @@ export const researchApi = {
 
   deleteSession: (sessionId: number) =>
     fetchApi<{ deleted: true; session_id: number }>(`/research/sessions/${sessionId}`, {
+      method: 'DELETE',
+    }),
+
+  // Agent chat within a research session
+  listChatThreads: (sessionId: number) =>
+    fetchApi<AgentChatList>(`/research/sessions/${sessionId}/chats`),
+
+  createChatThread: (sessionId: number, title?: string) =>
+    fetchApi<AgentChatThread>(`/research/sessions/${sessionId}/chats`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }),
+
+  renameChatThread: (sessionId: number, threadId: number, title: string) =>
+    fetchApi<AgentChatThread>(`/research/sessions/${sessionId}/chats/${threadId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title }),
+    }),
+
+  deleteChatThread: (sessionId: number, threadId: number) =>
+    fetchApi<{ success: boolean; deleted: boolean }>(`/research/sessions/${sessionId}/chats/${threadId}`, {
+      method: 'DELETE',
+    }),
+
+  getChatHistory: (sessionId: number, threadId: number) =>
+    fetchApi<AgentChatHistory>(`/research/sessions/${sessionId}/chats/${threadId}/messages`),
+
+  sendChatMessage: (sessionId: number, threadId: number, message: string) =>
+    fetchApi<AgentChatSendResponse>(`/research/sessions/${sessionId}/chats/${threadId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }, { timeoutMs: 300000 }),
+
+  deleteChatMessage: (sessionId: number, threadId: number, messageId: number) =>
+    fetchApi<{ success: boolean; deleted: boolean }>(`/research/sessions/${sessionId}/chats/${threadId}/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+
+  clearChatHistory: (sessionId: number, threadId: number) =>
+    fetchApi<{ success: boolean; deleted: number }>(`/research/sessions/${sessionId}/chats/${threadId}/messages`, {
       method: 'DELETE',
     }),
 };

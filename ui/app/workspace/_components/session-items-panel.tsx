@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   MoreHorizontal,
   ChevronDown,
@@ -11,6 +11,8 @@ import {
   RefreshCw,
   ExternalLink,
   Type,
+  Search,
+  X,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -86,6 +88,28 @@ export function SessionItemsPanel({
   const [editTitleStep, setEditTitleStep] = useState<ResearchStepSummary | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
   const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [filterText, setFilterText] = useState('');
+
+  const filteredItems = useMemo(() => {
+    const rawQuery = filterText.trim().toLowerCase();
+    const tokens = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    if (tokens.length === 0) return items;
+    return items.filter((step) => {
+      const text = [
+        step.title,
+        step.raw_query,
+        step.intent_text,
+        step.status,
+        step.created_at ? new Date(step.created_at).toLocaleString() : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return tokens.every((t) => text.includes(t));
+    });
+  }, [items, filterText]);
+
+  const count = items.length > 0 ? `${items.length} (${filteredItems.length})` : undefined;
 
   const toggleExpanded = (stepId: number) => {
     setExpandedIds((prev) => {
@@ -148,11 +172,31 @@ export function SessionItemsPanel({
 
   return (
     <Panel className="flex-1 min-h-0">
-      <PanelHeader title="Session items" count={items.length} />
+      <PanelHeader title="Session items" count={count} />
+      <div className="px-2 py-1 border-b border-border-default bg-surface-card shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
+          <Input
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="Search..."
+            className="h-7 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
+          />
+          {filterText && (
+            <button
+              type="button"
+              onClick={() => setFilterText('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
       <PanelContent className="p-0">
         <div className="absolute inset-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1">
-            {items.map((step) => {
+            {filteredItems.map((step) => {
               const isActive = activeStepId === step.id;
               const isExpanded = expandedIds.has(step.id);
               const isRunning = step.status === 'running' || runningStepId === step.id;
@@ -327,7 +371,7 @@ export function SessionItemsPanel({
 
             {items.length === 0 && !loading && (
               <div className="text-foreground-subtle text-xs px-3 py-2">
-                No workspace items yet. Run Reflect to add results.
+                No workspace items yet.
               </div>
             )}
             {loading && items.length === 0 && (

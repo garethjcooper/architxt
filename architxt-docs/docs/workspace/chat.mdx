@@ -1,0 +1,89 @@
+---
+sidebar_position: 2
+---
+
+# Chat
+
+The **Chat** panel is the third column in the Workspace. It lets you have a focused, threaded conversation with the architxt agent about the entities, memories, and relationships in the active Hindsight bank. Each research session can contain multiple isolated chat threads, so you can keep separate conversations for different questions.
+
+## Where it lives
+
+The Chat panel sits to the right of the curated-page area in the Workspace. You can show or hide it with the **Chat** toggle in the top control bar, and you can resize it by dragging the handle between the page area and the chat column.
+
+## Chat threads
+
+A thread is an independent conversation inside a research session. The thread bar at the top of the chat column lists open threads and provides controls for managing them.
+
+| Action | How to use it |
+|---|---|
+| **Create a thread** | Click the **+** button. New threads are named `Chat 1`, `Chat 2`, and so on. |
+| **Switch threads** | Click a tab, or choose a thread from the dropdown. The dropdown also lists threads that have been closed but still exist. |
+| **Rename a thread** | Click the pencil button and type a new name. |
+| **Delete a thread** | Click the trash button. Deleting a thread removes all of its messages. |
+| **Close other tabs** | Click the **X** button to close every thread tab except the active one. The threads themselves remain available from the dropdown. |
+
+Threads are tied to the selected research session. Switching sessions switches to that session's set of threads.
+
+## Sending a message
+
+The chat input is a CodeMirror editor that behaves like a small text area with autocomplete:
+
+Type a plain-language question about the bank, for example "What depends on the billing service?" or "Explain the customer onboarding flow."
+- `[[` opens the entity/edge reference completer. Choose an entity to insert a canonical reference such as `[[Billing Service (Component:EXAMPLE-001)]]`.
+- `##` opens the block-reference completer if the current chat turn produced an AQL query with named blocks.
+- Press **Enter** to send.
+- Press **Alt+Enter** or **Shift+Enter** to insert a new line without sending.
+
+Messages are saved as you send them, so reloading the page or returning later restores the thread history.
+
+## How the agent responds
+
+When you send a message, the agent follows a deterministic pipeline:
+
+1. **Entity resolution** — extracts any entity or edge references from your message and resolves them to canonical `type:entity_id` form.
+2. **Recall from Hindsight** — when the session is backed by a Hindsight bank, the agent runs a recall query against world facts and observations, weighted toward the resolved entities.
+3. **Synthesis** — a reasoning model summarizes the recalled memories as a concise IT-architect-style answer. The response is plain prose; inline source markers such as `[1]` or `【...】` are forbidden.
+4. **Graph merge** — edge-context graphs for the resolved and synthesized entities are merged into a single graph you can inspect.
+5. **Contextual items** — attached mental models for the same entities are collected and shown below the response.
+
+The final reply is rendered as a unified envelope: narrative, graph, and contextual items in one place.
+
+## Reading the response
+
+| Part | What it shows |
+|---|---|
+| **Agent response card** | The synthesized answer, collapsed to a fixed height by default. Click **Show more** to expand it, or **Show less** to collapse it. |
+| **Envelope viewer** | If the response has structured sections, the card renders the full `EnvelopeViewer` with the usual controls. Use **Add to page** to copy a section into the active curated page. |
+| **Graph button / evidence icon** | Opens the merged edge-context graph. Evidence collected from the graph edges is available in the evidence modal. |
+| **Contextual data card** | Lists mental models attached to the entities in the response: node summaries, capability models, discovery models, and edge-context models. Each item shows the entity name, model role, and title. |
+
+The agent response card shows the model name and token count at the bottom when the reply came from the LLM synthesizer.
+
+## Contextual data card
+
+The card below an agent reply works like a compact version of the main Contextual data panel:
+
+- **ALL / NODES / EDGES** toggles filter the list by scope.
+- Type in the search box to filter by entity name, id, role, or model title. Searches are multi-word AND, so `ime charging` matches items that contain both words somewhere in their visible fields.
+- Click an item to open its model in the current curated-page tab, or click the external-link icon to open it in a new tab.
+- Items are deduplicated and sorted by role scope: entity summaries first, then capability models, discovery models, and edge-context models.
+
+## How it fits into the Workspace
+
+```text
+Research session
+        │
+        ├── Reflect queries ──► Preview / results
+        ├── Curated pages ──► Editable findings
+        └── Chat threads ─────► Agent-driven Q&A with recall + graph
+```
+
+Chat reuses the same entity resolver, recall, and contextual-data paths as Reflect and the Contextual Graph Manager. The difference is that Chat wraps them in a conversational thread with synthesized answers and a merged evidence graph.
+
+## Summary
+
+- Chat is a third Workspace column with threaded conversations per session.
+- Threads can be created, renamed, deleted, and reopened from the dropdown.
+- The agent resolves entities, recalls memories, synthesizes an answer, and merges edge-context graphs.
+- Replies render as unified envelopes with narrative, graph, evidence, and attached mental models.
+- Use the response controls to add sections directly to a curated page.

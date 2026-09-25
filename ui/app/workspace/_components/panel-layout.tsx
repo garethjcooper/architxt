@@ -3,10 +3,10 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-function PanelHeader({ title, count, actions }: { title: string; count?: number; actions?: React.ReactNode }) {
+function PanelHeader({ title, count, actions }: { title: string; count?: number | string; actions?: React.ReactNode }) {
   return (
-    <div className="h-10 px-3 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0 overflow-hidden">
-      <div className="text-xs font-medium truncate">{title}</div>
+    <div className="px-3 py-2 border-b border-border-default bg-accent-primary-bg text-accent-primary-fg flex items-center justify-between shrink-0 overflow-hidden">
+      <div className="text-sm font-medium truncate">{title}</div>
       <div className="flex items-center gap-2 shrink-0">
         {actions}
         {count !== undefined && (
@@ -19,7 +19,7 @@ function PanelHeader({ title, count, actions }: { title: string; count?: number;
   );
 }
 
-
+export type PanelHeaderCount = number | string;
 function Panel({
   children,
   className,
@@ -32,7 +32,7 @@ function Panel({
   return (
     <Card
       className={cn(
-        'min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden pt-0',
+        'min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden gap-0 py-0',
         className
       )}
       style={style}

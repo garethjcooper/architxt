@@ -96,6 +96,7 @@ function ensureMissingTables(db) {
         rstep_raw_query TEXT,
         rstep_selections JSON,
         rstep_action_type TEXT NOT NULL,
+        rstep_origin TEXT NOT NULL DEFAULT 'user',
         rstep_parameters JSON,
         rstep_viewpoint_ids JSON,
         rstep_envelope JSON,
@@ -104,6 +105,7 @@ function ensureMissingTables(db) {
         rstep_error_message TEXT,
         rstep_calls JSON,
         rstep_title TEXT,
+        rstep_visible_to_user INTEGER DEFAULT 1,
         rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
         FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
@@ -136,6 +138,34 @@ function ensureMissingTables(db) {
         rs_tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         PRIMARY KEY (tag_id, rs_id),
         FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'agent_chat_threads',
+      ddl: `CREATE TABLE IF NOT EXISTS agent_chat_threads (
+        act_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rs_id INTEGER NOT NULL,
+        act_title TEXT NOT NULL,
+        act_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        act_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
+      )`
+    },
+    {
+      name: 'agent_chat_messages',
+      ddl: `CREATE TABLE IF NOT EXISTS agent_chat_messages (
+        acm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        act_id INTEGER NOT NULL,
+        rs_id INTEGER NOT NULL,
+        acm_role TEXT NOT NULL CHECK (acm_role IN ('user', 'agent', 'system')),
+        acm_content TEXT NOT NULL,
+        acm_context_snapshot JSON,
+        acm_tool_log JSON,
+        acm_envelope JSON,
+        acm_contextual_items JSON,
+        acm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (act_id) REFERENCES agent_chat_threads(act_id) ON DELETE CASCADE,
         FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
       )`
     },
@@ -860,10 +890,10 @@ function relaxResearchStepsParentCascade(db) {
   // table when adding a column. Existing columns are preserved.
   const columns = [
     'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
-    'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
+    'rstep_action_type', 'rstep_origin', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
     'rstep_status', 'rstep_error_message',
     'rstep_tool_calls_used', 'rstep_tool_tokens_used', 'rstep_synthesis_tokens_used',
-    'rstep_truncated_by', 'rstep_created_at'
+    'rstep_truncated_by', 'rstep_visible_to_user', 'rstep_created_at'
   ];
   const colList = columns.join(', ');
 
@@ -878,6 +908,7 @@ function relaxResearchStepsParentCascade(db) {
       rstep_raw_query TEXT,
       rstep_selections JSON,
       rstep_action_type TEXT NOT NULL,
+      rstep_origin TEXT,
       rstep_parameters JSON,
       rstep_viewpoint_ids JSON,
       rstep_envelope JSON,
@@ -885,6 +916,7 @@ function relaxResearchStepsParentCascade(db) {
       rstep_error_message TEXT,
       rstep_tool_calls_used INTEGER DEFAULT 0,
       rstep_calls JSON,
+      rstep_visible_to_user INTEGER,
       rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
       FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
@@ -1229,6 +1261,44 @@ function ensureDocumentsFts(db) {
   return result.success ? result.data : false;
 }
 
+/**
+ * Ensure agent_chat_messages index exists for existing tables created before
+ * the index was added to the schema DDL.
+ */
+function ensureAgentChatIndexes(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_messages'").get();
+  if (!tableExists) return 0;
+  const existing = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='agent_chat_messages' AND name='idx_agent_chat_messages_session'").get();
+  if (existing) return 0;
+  db.exec('CREATE INDEX idx_agent_chat_messages_session ON agent_chat_messages(rs_id, acm_created_at)');
+  logger.info('Created idx_agent_chat_messages_session index');
+  return 1;
+}
+
+function migrateAgentChatThreads(db) {
+  const threadsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_threads'").get();
+  const messagesTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_messages'").get();
+  if (!threadsTableExists || !messagesTableExists) return 0;
+
+  const hasActId = db.prepare("SELECT name FROM pragma_table_info('agent_chat_messages') WHERE name = 'act_id'").get();
+  if (!hasActId) return 0;
+
+  const legacyCount = db.prepare('SELECT COUNT(*) AS cnt FROM agent_chat_messages WHERE act_id IS NULL').get();
+  if (!legacyCount || legacyCount.cnt === 0) return 0;
+
+  const sessions = db.prepare('SELECT DISTINCT rs_id FROM agent_chat_messages WHERE act_id IS NULL').all();
+  let migrated = 0;
+  for (const { rs_id } of sessions) {
+    const title = 'Chat 1';
+    const threadResult = db.prepare('INSERT INTO agent_chat_threads (rs_id, act_title) VALUES (?, ?)').run(rs_id, title);
+    const actId = threadResult.lastInsertRowid;
+    const updated = db.prepare('UPDATE agent_chat_messages SET act_id = ? WHERE rs_id = ? AND act_id IS NULL').run(actId, rs_id);
+    migrated += updated.changes;
+  }
+  logger.info(`Migrated ${migrated} legacy agent chat message(s) into default threads`);
+  return migrated;
+}
+
 function ensureMissingColumns(db) {
   const migrations = [
     {
@@ -1263,6 +1333,31 @@ function ensureMissingColumns(db) {
         {
           name: 'rs_scope_entity_ids',
           ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_scope_entity_ids JSON'
+        },
+        {
+          name: 'rs_agent_context',
+          ddl: 'ALTER TABLE research_sessions ADD COLUMN rs_agent_context JSON'
+        }
+      ]
+    },
+    {
+      table: 'agent_chat_messages',
+      columns: [
+        {
+          name: 'act_id',
+          ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN act_id INTEGER REFERENCES agent_chat_threads(act_id) ON DELETE CASCADE'
+        },
+        {
+          name: 'acm_tool_log',
+          ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN acm_tool_log JSON'
+        },
+        {
+          name: 'acm_envelope',
+          ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN acm_envelope JSON'
+        },
+        {
+          name: 'acm_contextual_items',
+          ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN acm_contextual_items JSON'
         }
       ]
     },
@@ -1292,6 +1387,14 @@ function ensureMissingColumns(db) {
         {
           name: 'rstep_title',
           ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_title TEXT'
+        },
+        {
+          name: 'rstep_origin',
+          ddl: "ALTER TABLE research_steps ADD COLUMN rstep_origin TEXT NOT NULL DEFAULT 'user'"
+        },
+        {
+          name: 'rstep_visible_to_user',
+          ddl: 'ALTER TABLE research_steps ADD COLUMN rstep_visible_to_user INTEGER DEFAULT 1'
         }
       ]
     },
@@ -1598,6 +1701,7 @@ function migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db) {
       rstep_raw_query TEXT,
       rstep_selections JSON,
       rstep_action_type TEXT NOT NULL,
+      rstep_origin TEXT,
       rstep_parameters JSON,
       rstep_viewpoint_ids JSON,
       rstep_envelope JSON,
@@ -1605,6 +1709,7 @@ function migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db) {
       rstep_status TEXT,
       rstep_error_message TEXT,
       rstep_calls JSON,
+      rstep_visible_to_user INTEGER,
       rstep_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE,
       FOREIGN KEY (rstep_parent_step_id) REFERENCES research_steps(rstep_id) ON DELETE SET NULL
@@ -1612,8 +1717,8 @@ function migrateLegacyStepsToEnvelopeAndDropLegacyColumns(db) {
 
     const columns = [
       'rstep_id', 'rs_id', 'rstep_parent_step_id', 'rstep_intent_text', 'rstep_raw_query', 'rstep_selections',
-      'rstep_action_type', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
-      'rstep_tool_calls_used', 'rstep_status', 'rstep_error_message', 'rstep_calls', 'rstep_created_at'
+      'rstep_action_type', 'rstep_origin', 'rstep_parameters', 'rstep_viewpoint_ids', 'rstep_envelope',
+      'rstep_tool_calls_used', 'rstep_status', 'rstep_error_message', 'rstep_calls', 'rstep_visible_to_user', 'rstep_created_at'
     ];
     const colList = columns.join(', ');
     db.exec(`INSERT INTO _research_steps_new (${colList}) SELECT ${colList} FROM research_steps`);
@@ -1867,12 +1972,14 @@ export function ensureSchema(db) {
     const templateRoleUniqueIndex = ensureTemplateRoleUniqueIndex(db);
     const bankSettingsSeeded = ensureBankSettingsDefaults(db);
     const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
-    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || idPlaceholderMigrated > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, id placeholder migrated: ${idPlaceholderMigrated}`);
+    const agentChatIndexes = ensureAgentChatIndexes(db);
+    migrateAgentChatThreads(db);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0;
+    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0 || agentChatIndexes > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

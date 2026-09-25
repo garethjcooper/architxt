@@ -1,6 +1,7 @@
 import { createLogger } from '../../utils/logger.js';
 import { dispatchHandler } from './handlers/index.js';
 import { updateStep } from '../../db/crud/research.js';
+import { updatePendingOperationStatusByResearchStep } from '../../db/crud/pending-operations.js';
 
 const logger = createLogger('research-agent');
 
@@ -61,6 +62,10 @@ export async function runDiscoverStep(params) {
           rstep_error_message: error,
           rstep_calls: calls,
         });
+        await updatePendingOperationStatusByResearchStep(db, rstepId, {
+          pop_status: 'failed',
+          pop_error_message: error,
+        });
       }
     } catch (updateErr) {
       logger.error('Failed to mark step failed', { error: updateErr.message, rstepId });
@@ -111,6 +116,11 @@ export async function runDiscoverStep(params) {
       rstep_error_message: null,
     });
 
+    await updatePendingOperationStatusByResearchStep(db, rstepId, {
+      pop_status: 'completed',
+      pop_error_message: null,
+    });
+
     return {
       success: true,
       data: {
@@ -126,6 +136,10 @@ export async function runDiscoverStep(params) {
         rstep_status: 'failed',
         rstep_error_message: err.message || 'Unknown agent error',
         rstep_calls: calls,
+      });
+      await updatePendingOperationStatusByResearchStep(db, rstepId, {
+        pop_status: 'failed',
+        pop_error_message: err.message || 'Unknown agent error',
       });
     } catch (updateErr) {
       logger.error('Failed to update step status after error', { error: updateErr.message, rstepId });

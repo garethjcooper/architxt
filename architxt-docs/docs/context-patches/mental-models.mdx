@@ -19,7 +19,17 @@ The tab is split into two panels:
 
 You can resize the two panels by dragging the handle between them, and double-click it to reset the split.
 
-## Model table columns
+## Model table columns and filters
+
+The left panel lists every contextual mental-model ref for the current graph. Above the table is a search input and scope filter chips that work like the ones in the Workspace Contextual data panel.
+
+| Control | Purpose |
+|---|---|
+| **Search** | Freetext filter across role, scope, target, and external ID. Multi-word input performs an AND search. |
+| **All / Empty / Failed** | Scope filter. **All** shows every model. **Empty** shows models whose last refresh produced an empty envelope. **Failed** shows models whose last refresh errored or produced an empty-envelope failure state. |
+| **Counter** | Shows total models in scope and how many match the current filter. |
+
+The table columns are:
 
 | Column | What it shows |
 |---|---|
@@ -28,9 +38,11 @@ You can resize the two panels by dragging the handle between them, and double-cl
 | **Target** | The concrete node, edge pair, or seed the model is bound to. |
 | **External ID** | The stable Hindsight `ext_id` of the model. |
 | **Fetched** | How long ago the content was last fetched from Hindsight. |
-| **Refresh state** | Whether the last refresh is still running, completed successfully, was skipped, or errored. |
+| **Refresh state** | Whether the last refresh is still running, completed successfully, was skipped, errored, or produced an empty envelope. |
 
-Click any row to load and display its content on the right. Hover over the refresh-state cell to see the error message if a refresh failed.
+Hover over the refresh-state cell to see the error message if a refresh failed. An empty envelope now shows an amber **OK** state rather than a failure, because an empty result can be valid when the underlying data simply has no content to synthesize.
+
+Click any row to load and display its content on the right.
 
 ## Available actions
 

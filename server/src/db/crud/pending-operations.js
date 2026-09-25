@@ -130,6 +130,35 @@ export const updatePendingOperationStatus = (db, id, data) => dbExec(() => {
 }, `${TABLE}.updateStatus`);
 
 /**
+ * Update the pending operation tied to a research step.
+ * Used by local async research runners to mirror step completion/failure
+ * into the global Hindsight operation indicator.
+ * @param {Object} db
+ * @param {number} rstepId
+ * @param {Object} data - { pop_status, pop_error_message }
+ * @returns {{success: boolean, data?: boolean, error?: string, code?: string}}
+ */
+export const updatePendingOperationStatusByResearchStep = (db, rstepId, data) => dbExec(() => {
+  const status = data.pop_status;
+  if (!status) throw new Error('Internal: pop_status is required');
+  const errorMsg = data.pop_error_message;
+
+  let setClause = 'pop_status = ?';
+  let values = [status];
+
+  if (errorMsg !== undefined) {
+    setClause += ', pop_error_message = ?';
+    values.push(errorMsg);
+  }
+
+  const sql = `UPDATE ${TABLE} SET ${setClause}, pop_updated_at = CURRENT_TIMESTAMP WHERE pop_rstep_id = ?`;
+  values.push(requireInt('rstepId', rstepId));
+
+  const result = stmt(db, sql).run(...values);
+  return result.changes > 0;
+}, `${TABLE}.updateStatusByResearchStep`);
+
+/**
  * Dismiss a failed/completed operation by setting status to 'acknowledged'.
  * Removes it from active overlays on the frontend.
  * @param {Object} db

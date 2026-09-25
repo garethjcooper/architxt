@@ -151,6 +151,7 @@ function extractContextualRefs(properties, knownRoleIds) {
       last_refresh_status: ref.last_refresh_status || null,
       last_refresh_at: ref.last_refresh_at || null,
       last_refresh_error: ref.last_refresh_error || null,
+      last_refresh_empty_envelope: ref.last_refresh_empty_envelope || null,
     }));
 }
 

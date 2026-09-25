@@ -22,11 +22,17 @@ import {
   createSessionPage,
   updateCuratedPage,
 } from '../db/crud/research.js';
+import * as agentChatService from '../services/agent/chat-service.js';
 
 import { discoverMentalModelsByRoles } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
 import { findEligibleTemplateModels } from '../services/research/template-eligibility.js';
 import { getMentalModel as getHindsightMentalModel, refreshMentalModel as refreshHindsightMentalModel } from '../services/hindsight/mental-models.js';
+import {
+  createPendingOperation,
+  updatePendingOperationStatus,
+  updatePendingOperationStatusByResearchStep,
+} from '../db/crud/pending-operations.js';
 import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
 import { normalizeEnvelopeForApi } from '../services/contextual-graph/normalize-model-output.js';
 import { parseJsonString } from '../prompts/graph-parser.js';
@@ -78,6 +84,164 @@ import { parseSectionDirectives } from '../prompts/section-directives.js';
 const logger = createLogger('research-route');
 const router = Router();
 
+/**
+ * Create a pending_operations row for a local async research step so it shows
+ * up in the global Hindsight operation indicator.
+ */
+async function trackResearchOperation(db, { serverId, bankId, rsId, rstepId, action = 'research' }) {
+  if (!serverId || !bankId || !rsId || !rstepId) return;
+  try {
+    createPendingOperation(db, {
+      pop_operation_id: `research:${rstepId}`,
+      pop_server_id: serverId,
+      pop_bank_id: bankId,
+      pop_rs_id: rsId,
+      pop_rstep_id: rstepId,
+      pop_action: action,
+      pop_status: 'pending',
+    });
+  } catch (err) {
+    logger.error('Failed to create pending operation for research step', {
+      error: err.message,
+      rsId,
+      rstepId,
+    });
+  }
+}
+
+async function completeResearchOperation(db, rstepId, { status, errorMessage }) {
+  try {
+    updatePendingOperationStatusByResearchStep(db, rstepId, {
+      pop_status: status,
+      pop_error_message: errorMessage || null,
+    });
+  } catch (err) {
+    logger.error('Failed to update pending operation for research step', {
+      error: err.message,
+      rstepId,
+      status,
+    });
+  }
+}
+
+/**
+ * Submit a long-running research operation from server-side code.
+ *
+ * Creates a running research step (and session if needed), launches the same
+ * runner used by POST /research/discover off-request, and returns the step id
+ * immediately. The result is captured in the step row and can be polled via
+ * GET /research/steps/:id/status.
+ *
+ * @param {object} params
+ * @param {object} params.db
+ * @param {number} params.serverId
+ * @param {string} params.bankId
+ * @param {string} params.intentText
+ * @param {'prebuilt'|'recall'|'reflect'|'synthesize'|'models'|'templates'} params.queryDepth
+ * @param {number|null} [params.sessionId]
+ * @param {string[]} [params.viewpointIds]
+ * @param {Array} [params.selections]
+ * @param {object} [params.options]
+ * @returns {Promise<{success: boolean, step_id?: number, session_id?: number, error?: string, code?: string}>}
+ */
+export async function submitDiscoverOperation(params) {
+  const {
+    db: dbConn,
+    serverId,
+    bankId,
+    intentText,
+    queryDepth = 'reflect',
+    sessionId,
+    viewpointIds = [],
+    selections = [],
+    options = {},
+    rawQuery,
+  } = params;
+
+  const effectiveDepth = isValidQueryDepth(queryDepth) ? queryDepth : 'reflect';
+
+  let rsId = sessionId;
+  let parentStepId = null;
+  if (!rsId) {
+    const sessionResult = await createSession(dbConn, {
+      rs_title: intentText.slice(0, 120),
+      rs_description: null,
+      rs_bank_id: bankId,
+      rs_viewpoint_ids: viewpointIds,
+      rs_status: 'active',
+      rs_current_step_id: null,
+    });
+    if (!sessionResult.success) {
+      return { success: false, error: sessionResult.error, code: sessionResult.code || 'DATABASE_ERROR' };
+    }
+    rsId = sessionResult.data;
+  } else {
+    const sessionResult = await getSessionWithCurrentStep(dbConn, rsId);
+    if (!sessionResult.success || !sessionResult.data) {
+      return { success: false, error: 'Research session not found', code: 'NOT_FOUND' };
+    }
+    parentStepId = sessionResult.data.current_step?.rstep_id || null;
+  }
+
+  const stepResult = await createStep(dbConn, {
+    rs_id: rsId,
+    rstep_parent_step_id: parentStepId,
+    rstep_intent_text: intentText,
+    rstep_raw_query: rawQuery || intentText,
+    rstep_selections: selections,
+    rstep_action_type: effectiveDepth,
+    rstep_parameters: options,
+    rstep_viewpoint_ids: viewpointIds,
+    rstep_tool_calls_used: 0,
+    rstep_status: 'running',
+    rstep_error_message: null,
+    rstep_calls: [],
+  });
+
+  if (!stepResult.success) {
+    return { success: false, error: stepResult.error, code: stepResult.code || 'DATABASE_ERROR' };
+  }
+
+  const stepId = stepResult.data;
+
+  const updateSessionResult = await updateSessionCurrentStep(dbConn, rsId, stepId);
+  if (!updateSessionResult.success) {
+    return { success: false, error: updateSessionResult.error, code: updateSessionResult.code || 'DATABASE_ERROR' };
+  }
+
+  // Surface the local async operation in the global Hindsight indicator.
+  await trackResearchOperation(dbConn, {
+    serverId,
+    bankId,
+    rsId,
+    rstepId: stepId,
+    action: effectiveDepth === 'prebuilt' ? 'research:prebuilt' : 'research',
+  });
+
+  setImmediate(() => {
+    runDiscoverStep({
+      db: dbConn,
+      serverId,
+      bankId,
+      queryDepth: effectiveDepth,
+      intentText,
+      selections,
+      options,
+      rsId,
+      rstepId: stepId,
+    }).catch((agentErr) => {
+      logger.error('Discover agent runner failed outside request', { error: agentErr.message, stack: agentErr.stack, rsId, stepId });
+    });
+  });
+
+  return {
+    success: true,
+    step_id: stepId,
+    session_id: rsId,
+    status: 'running',
+  };
+}
+
 async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, errorMessage = null } = {}) {
   return updateStep(db, stepId, {
     rstep_calls: snapshot.rstep_calls,
@@ -87,51 +251,7 @@ async function restoreStepSnapshot(db, stepId, snapshot, { keepFailed = true, er
   });
 }
 
-async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
-  const parameters = step.rstep_parameters || {};
-  const roles = parameters.roles || [];
-  const selections = step.rstep_selections || [];
-  const entities = selections
-    .filter((s) => s.kind === 'entity')
-    .map((s) => (s.id ? String(s.id) : undefined))
-    .filter(Boolean);
-
-  if (!entities.length || !roles.length) {
-    await updateStep(db, step.rstep_id, {
-      rstep_status: 'failed',
-      rstep_error_message: 'Prebuilt step is missing entities or roles',
-      rstep_calls: [],
-      rstep_tool_calls_used: 0,
-    });
-    return;
-  }
-
-  const prebuiltStart = Date.now();
-  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, roles });
-  const prebuiltDuration = Date.now() - prebuiltStart;
-  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, roles };
-  const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
-
-  const buildPrebuiltCall = (status, extra = {}) => ({
-    tool: 'prebuilt_research',
-    mode: 'prebuilt',
-    status,
-    duration_ms: prebuiltDuration,
-    request_payload_chars: prebuiltPayloadChars,
-    request: {
-      method: 'POST',
-      url: '/research/prebuilt',
-      body: prebuiltRequestBody,
-    },
-    ...extra,
-  });
-
-  if (!result.success) {
-    logger.warn('Prebuilt re-run failed; restoring step snapshot', { stepId: step.rstep_id, error: result.error, code: result.code });
-    await restoreStepSnapshot(db, step.rstep_id, snapshot, { errorMessage: result.error });
-    return;
-  }
-
+function buildPrebuiltMerge(result, { serverId, bankId, entities, roles, durationMs }) {
   const mergedGraph = { nodes: [], edges: [] };
   const mergedTables = [];
   const mergedDiagrams = [];
@@ -180,18 +300,31 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
 
   const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
   const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
+  const prebuiltRequestBody = { server_id: serverId, bank_id: bankId, entities, roles };
+  const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
 
-  await updateStep(db, step.rstep_id, {
-    rstep_envelope: {
+  const buildPrebuiltCall = (status, extra = {}) => ({
+    tool: 'prebuilt_research',
+    mode: 'prebuilt',
+    status,
+    duration_ms: durationMs,
+    request_payload_chars: prebuiltPayloadChars,
+    request: {
+      method: 'POST',
+      url: '/research/prebuilt',
+      body: prebuiltRequestBody,
+    },
+    ...extra,
+  });
+
+  return {
+    envelope: {
       narratives: narratives.map((body) => ({ narrative_name: '', narrative: body, evidence: [] })),
       graph: mergedGraph,
       tables: mergedTables,
       diagrams: mergedDiagrams,
     },
-    rstep_status: 'completed',
-    rstep_error_message: null,
-    rstep_tool_calls_used: 1,
-    rstep_calls: [
+    calls: [
       buildPrebuiltCall('success', {
         response_summary: {
           roles: (result.roles || []).map((r) => r.role),
@@ -201,7 +334,72 @@ async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
         },
       }),
     ],
+  };
+}
+
+async function finalizePrebuiltStep(db, stepId, result, { serverId, bankId, entities, roles, durationMs }) {
+  const { envelope, calls } = buildPrebuiltMerge(result, { serverId, bankId, entities, roles, durationMs });
+  await updateStep(db, stepId, {
+    rstep_envelope: envelope,
+    rstep_status: 'completed',
+    rstep_error_message: null,
+    rstep_tool_calls_used: 1,
+    rstep_calls: calls,
   });
+}
+
+async function runPrebuiltStep(db, serverId, bankId, step) {
+  const parameters = step.rstep_parameters || {};
+  const roles = parameters.roles || [];
+  const selections = step.rstep_selections || [];
+  const entities = selections
+    .filter((s) => s.kind === 'entity')
+    .map((s) => (s.id ? String(s.id) : undefined))
+    .filter(Boolean);
+
+  if (!entities.length || !roles.length) {
+    await updateStep(db, step.rstep_id, {
+      rstep_status: 'failed',
+      rstep_error_message: 'Prebuilt step is missing entities or roles',
+      rstep_calls: [],
+      rstep_tool_calls_used: 0,
+    });
+    await completeResearchOperation(db, step.rstep_id, {
+      status: 'failed',
+      errorMessage: 'Prebuilt step is missing entities or roles',
+    });
+    return { success: false, error: 'Prebuilt step is missing entities or roles', code: 'VALIDATION_ERROR' };
+  }
+
+  const prebuiltStart = Date.now();
+  const result = await runPrebuiltResearch(db, serverId, bankId, { entities, roles });
+  const prebuiltDuration = Date.now() - prebuiltStart;
+
+  if (!result.success) {
+    logger.warn('Prebuilt run failed', { stepId: step.rstep_id, error: result.error, code: result.code });
+    await updateStep(db, step.rstep_id, {
+      rstep_status: 'failed',
+      rstep_error_message: result.error || 'Prebuilt research failed',
+      rstep_calls: [],
+      rstep_tool_calls_used: 0,
+    });
+    await completeResearchOperation(db, step.rstep_id, {
+      status: 'failed',
+      errorMessage: result.error || 'Prebuilt research failed',
+    });
+    return result;
+  }
+
+  await finalizePrebuiltStep(db, step.rstep_id, result, { serverId, bankId, entities, roles, durationMs: prebuiltDuration });
+  await completeResearchOperation(db, step.rstep_id, { status: 'completed' });
+  return { success: true };
+}
+
+async function rerunPrebuiltStep(db, serverId, bankId, step, snapshot) {
+  const result = await runPrebuiltStep(db, serverId, bankId, step);
+  if (!result.success) {
+    await restoreStepSnapshot(db, step.rstep_id, snapshot, { errorMessage: result.error });
+  }
 }
 
 const toApiSession = (dbRow) => ({
@@ -241,7 +439,6 @@ const toApiStepSummary = (dbRow) => {
     raw_query: dbRow.rstep_raw_query || null,
     action_type: dbRow.rstep_action_type,
     parameters: dbRow.rstep_parameters,
-    created_at: dbRow.rstep_created_at,
     selections: dbRow.rstep_selections,
     viewpoint_ids: dbRow.rstep_viewpoint_ids,
     envelope: toApiEnvelope(dbRow),
@@ -249,6 +446,7 @@ const toApiStepSummary = (dbRow) => {
     calls: dbRow.rstep_calls,
     status: dbRow.rstep_status || 'completed',
     error_message: dbRow.rstep_error_message || null,
+    created_at: dbRow.rstep_created_at,
   };
 };
 
@@ -461,6 +659,15 @@ router.post('/discover', async (req, res) => {
       sendResponse({ res, status: 500, error: updateSessionResult.error, code: updateSessionResult.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/discover', duration: Date.now() - start });
       return;
     }
+
+    // Surface the local async operation in the global Hindsight indicator.
+    await trackResearchOperation(db, {
+      serverId: server_id,
+      bankId: bank_id,
+      rsId,
+      rstepId: stepId,
+      action: effectiveDepth === 'prebuilt' ? 'research:prebuilt' : 'research',
+    });
 
     // Run the agent outside the request lifecycle. The agent updates the step
     // row when it completes, and Hindsight operations are tracked in
@@ -693,122 +900,43 @@ router.post('/prebuilt', async (req, res) => {
       return;
     }
 
-    const prebuiltStart = Date.now();
-    const result = await runPrebuiltResearch(db, server_id, bank_id, { entities, roles });
-    const prebuiltDuration = Date.now() - prebuiltStart;
-    const prebuiltRequestBody = { server_id, bank_id, entities, roles, session_id: rsId };
-    const prebuiltPayloadChars = JSON.stringify(prebuiltRequestBody).length;
-
-    const buildPrebuiltCall = (status, extra = {}) => ({
-      tool: 'prebuilt_research',
-      mode: 'prebuilt',
-      status,
-      duration_ms: prebuiltDuration,
-      request_payload_chars: prebuiltPayloadChars,
-      request: {
-        method: 'POST',
-        url: '/research/prebuilt',
-        body: prebuiltRequestBody,
-      },
-      ...extra,
+    // Surface the local async operation in the global Hindsight indicator.
+    await trackResearchOperation(db, {
+      serverId: server_id,
+      bankId,
+      rsId,
+      rstepId: stepId,
+      action: 'research:prebuilt',
     });
 
-    if (!result.success) {
-      await updateStep(db, stepId, {
-        rstep_status: 'failed',
-        rstep_error_message: result.error || 'Prebuilt research failed',
-        rstep_tool_calls_used: 1,
-        rstep_calls: [buildPrebuiltCall('failure', { error: result.error, code: result.code })],
+    // Run the prebuilt research off-request so long-running work survives client disconnects.
+    setImmediate(() => {
+      runPrebuiltStep(db, server_id, bankId, {
+        rstep_id: stepId,
+        rstep_parameters: { roles },
+        rstep_selections: entities.map((id) => ({ id, kind: 'entity' })),
+      }).catch((err) => {
+        logger.error('Prebuilt runner error', { stepId, error: err.message, stack: err.stack });
+        updateStep(db, stepId, {
+          rstep_status: 'failed',
+          rstep_error_message: err.message || 'Prebuilt runner error',
+          rstep_calls: [],
+          rstep_tool_calls_used: 0,
+        }).catch((updateErr) => {
+          logger.error('Failed to persist prebuilt runner error', { stepId, error: updateErr.message });
+        });
       });
-      sendResponse({ res, status: mapErrorToStatus(result.code), error: result.error, code: result.code, logger, method: 'POST', path: '/research/prebuilt', duration: Date.now() - start });
-      return;
-    }
-
-    // Derive a merged canvas/synthesis for the step so it works in the trail.
-    const mergedGraph = { nodes: [], edges: [] };
-    const mergedTables = [];
-    const mergedDiagrams = [];
-    const narratives = [];
-    const parseErrors = [];
-    for (const roleResult of result.roles || []) {
-      const found = (roleResult.entities || [])
-        .filter((e) => e.found)
-        .map((e) => e.entity);
-      const modelNames = (roleResult.entities || [])
-        .flatMap((e) => (e.model_results || []).filter((m) => m.found).map((m) => m.name))
-        .filter((v, i, a) => a.indexOf(v) === i);
-      const roleLabel = roleResult.role.replace(/^sys_/, '').replace(/_/g, ' ');
-      const lines = [`## ${roleLabel}`, ''];
-      const roleNarratives = roleResult.result?.narratives;
-      if (roleNarratives && roleNarratives.length > 0) {
-        lines.push(roleNarratives.map((n) => n.narrative).join('\n\n'));
-      } else {
-        lines.push(`- Entities covered: ${found.join(', ') || 'none'}`);
-        lines.push(`- Models applied: ${modelNames.join(', ') || 'none'}`);
-      }
-      if (roleResult.result?.errors && roleResult.result.errors.length > 0) {
-        lines.push('');
-        lines.push('Errors:');
-        for (const err of roleResult.result.errors) {
-          lines.push(`- ${err.model}: ${err.error}`);
-        }
-        parseErrors.push(...roleResult.result.errors);
-      }
-      narratives.push(lines.join('\n'));
-
-      const jsonResult = roleResult.result?.json_result;
-      if (jsonResult) {
-        const graphs = Array.isArray(jsonResult) ? jsonResult : [jsonResult];
-        for (const g of graphs) {
-          if (!g || !Array.isArray(g.nodes)) continue;
-          for (const n of g.nodes) {
-            if (!mergedGraph.nodes.some((x) => x.id === n.id)) mergedGraph.nodes.push(n);
-          }
-          for (const e of g.edges || []) {
-            const key = e.id || `${e.from}|${e.to}|${e.type}`;
-            if (!mergedGraph.edges.some((x) => (x.id || `${x.from}|${x.to}|${x.type}`) === key)) {
-              mergedGraph.edges.push(e);
-            }
-          }
-        }
-      }
-      if (roleResult.result?.tables && roleResult.result.tables.length > 0) {
-        mergedTables.push(...roleResult.result.tables);
-      }
-      if (roleResult.result?.diagrams && roleResult.result.diagrams.length > 0) {
-        mergedDiagrams.push(...roleResult.result.diagrams);
-      }
-    }
-
-    const foundCount = (result.roles || []).reduce((sum, r) => sum + (r.found_count || 0), 0);
-    const missingCount = (result.roles || []).reduce((sum, r) => sum + (r.missing_count || 0), 0);
-
-    await updateStep(db, stepId, {
-      rstep_envelope: {
-        narratives: narratives.map((body) => ({ narrative_name: '', narrative: body, evidence: [] })),
-        graph: mergedGraph,
-        tables: mergedTables,
-        diagrams: mergedDiagrams,
-      },
-      rstep_status: 'completed',
-      rstep_error_message: parseErrors.length > 0 ? `Some mental models could not be parsed. ${parseErrors.map((e) => `${e.model}: ${e.error}`).join('; ')}` : null,
-      rstep_tool_calls_used: 1,
-      rstep_calls: [
-        buildPrebuiltCall('success', {
-          response_summary: {
-            roles: (result.roles || []).map((r) => r.role),
-            entity_count: entities.length,
-            found_count: foundCount,
-            missing_count: missingCount,
-          },
-        }),
-      ],
     });
 
     sendResponse({
       res,
-      status: 200,
-      data: { ...result, session_id: rsId, step_id: stepId },
+      status: 202,
+      data: {
+        step_id: stepId,
+        session_id: rsId,
+        status: 'running',
+        action_type: 'prebuilt',
+      },
       logger,
       method: 'POST',
       path: '/research/prebuilt',
@@ -1277,6 +1405,429 @@ router.get('/mental-models/content', async (req, res) => {
     res.status(500).json({ error: err.message, code: 'INTERNAL_ERROR' });
   }
 });
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats:
+ *   get:
+ *     summary: List agent chat threads for a research session
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Chat threads and agent config
+ */
+router.get('/sessions/:id/chats', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats', start });
+  if (!idCheck.valid) return;
+
+  try {
+    const result = await agentChatService.listChatThreads(db, idCheck.id);
+    sendResponse({ res, status: 200, data: result, logger, method: 'GET', path: '/research/sessions/:id/chats', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('List agent chat threads error', { sessionId: idCheck.id, error: err.message });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/sessions/:id/chats', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats:
+ *   post:
+ *     summary: Create a new agent chat thread for a research session
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Created chat thread
+ */
+router.post('/sessions/:id/chats', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats', start });
+  if (!idCheck.valid) return;
+
+  try {
+    const result = await agentChatService.createChatThread(db, idCheck.id, req.body?.title);
+    sendResponse({ res, status: 201, data: result, logger, method: 'POST', path: '/research/sessions/:id/chats', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Create agent chat thread error', { sessionId: idCheck.id, error: err.message, code: err.code });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'POST', path: '/research/sessions/:id/chats', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats/{chatId}:
+ *   put:
+ *     summary: Rename an agent chat thread
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title]
+ *             properties:
+ *               title:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Updated chat thread
+ */
+router.put('/sessions/:id/chats/:chatId', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats/:chatId', start });
+  if (!idCheck.valid) return;
+  const chatIdCheck = validateId({ req, res, paramName: 'chatId', logger, path: '/research/sessions/:id/chats/:chatId', start });
+  if (!chatIdCheck.valid) return;
+
+  const { title } = req.body;
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    sendResponse({ res, status: 400, error: 'title is required and must be a non-empty string', code: 'VALIDATION_ERROR', logger, method: 'PUT', path: '/research/sessions/:id/chats/:chatId', duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await agentChatService.renameChatThread(db, idCheck.id, chatIdCheck.id, title.trim());
+    sendResponse({ res, status: 200, data: result, logger, method: 'PUT', path: '/research/sessions/:id/chats/:chatId', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Rename agent chat thread error', { sessionId: idCheck.id, chatId: chatIdCheck.id, error: err.message, code: err.code });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'PUT', path: '/research/sessions/:id/chats/:chatId', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats/{chatId}:
+ *   delete:
+ *     summary: Delete an agent chat thread and all its messages
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.delete('/sessions/:id/chats/:chatId', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats/:chatId', start });
+  if (!idCheck.valid) return;
+  const chatIdCheck = validateId({ req, res, paramName: 'chatId', logger, path: '/research/sessions/:id/chats/:chatId', start });
+  if (!chatIdCheck.valid) return;
+
+  try {
+    const result = await agentChatService.deleteChatThread(db, idCheck.id, chatIdCheck.id);
+    sendResponse({ res, status: 200, data: result, logger, method: 'DELETE', path: '/research/sessions/:id/chats/:chatId', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Delete agent chat thread error', { sessionId: idCheck.id, chatId: chatIdCheck.id, error: err.message });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'DELETE', path: '/research/sessions/:id/chats/:chatId', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats/{chatId}/messages:
+ *   get:
+ *     summary: List agent chat messages for a thread
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Chat messages and session context
+ */
+router.get('/sessions/:id/chats/:chatId/messages', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats/:chatId/messages', start });
+  if (!idCheck.valid) return;
+  const chatIdCheck = validateId({ req, res, paramName: 'chatId', logger, path: '/research/sessions/:id/chats/:chatId/messages', start });
+  if (!chatIdCheck.valid) return;
+
+  try {
+    const result = await agentChatService.getChatHistory(db, idCheck.id, chatIdCheck.id);
+    sendResponse({ res, status: 200, data: result, logger, method: 'GET', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Get agent chat history error', { sessionId: idCheck.id, chatId: chatIdCheck.id, error: err.message });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats/{chatId}/messages:
+ *   post:
+ *     summary: Send a message to the agent in a chat thread
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Agent reply
+ */
+router.post('/sessions/:id/chats/:chatId/messages', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats/:chatId/messages', start });
+  if (!idCheck.valid) return;
+  const chatIdCheck = validateId({ req, res, paramName: 'chatId', logger, path: '/research/sessions/:id/chats/:chatId/messages', start });
+  if (!chatIdCheck.valid) return;
+
+  const { message } = req.body;
+  if (!message || typeof message !== 'string' || message.trim().length === 0) {
+    sendResponse({ res, status: 400, error: 'message is required and must be a non-empty string', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+    return;
+  }
+
+  try {
+    const result = await agentChatService.sendChatMessage(db, idCheck.id, chatIdCheck.id, message.trim());
+    sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Send agent chat message error', { sessionId: idCheck.id, chatId: chatIdCheck.id, error: err.message, code: err.code });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'POST', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats/{chatId}/messages/{messageId}:
+ *   delete:
+ *     summary: Delete a single agent chat message
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.delete('/sessions/:id/chats/:chatId/messages/:messageId', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats/:chatId/messages/:messageId', start });
+  if (!idCheck.valid) return;
+  const chatIdCheck = validateId({ req, res, paramName: 'chatId', logger, path: '/research/sessions/:id/chats/:chatId/messages/:messageId', start });
+  if (!chatIdCheck.valid) return;
+  const messageIdCheck = validateId({ req, res, paramName: 'messageId', logger, path: '/research/sessions/:id/chats/:chatId/messages/:messageId', start });
+  if (!messageIdCheck.valid) return;
+
+  try {
+    const result = await agentChatService.deleteChatMessage(db, idCheck.id, chatIdCheck.id, messageIdCheck.id);
+    sendResponse({ res, status: 200, data: result, logger, method: 'DELETE', path: '/research/sessions/:id/chats/:chatId/messages/:messageId', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Delete agent chat message error', { sessionId: idCheck.id, chatId: chatIdCheck.id, messageId: messageIdCheck.id, error: err.message });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'DELETE', path: '/research/sessions/:id/chats/:chatId/messages/:messageId', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chats/{chatId}/messages:
+ *   delete:
+ *     summary: Clear all agent chat messages for a thread
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.delete('/sessions/:id/chats/:chatId/messages', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/sessions/:id/chats/:chatId/messages', start });
+  if (!idCheck.valid) return;
+  const chatIdCheck = validateId({ req, res, paramName: 'chatId', logger, path: '/research/sessions/:id/chats/:chatId/messages', start });
+  if (!chatIdCheck.valid) return;
+
+  try {
+    const result = await agentChatService.clearChatHistory(db, idCheck.id, chatIdCheck.id);
+    sendResponse({ res, status: 200, data: result, logger, method: 'DELETE', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Clear agent chat history error', { sessionId: idCheck.id, chatId: chatIdCheck.id, error: err.message });
+    const status = mapErrorToStatus(err) || 500;
+    sendResponse({ res, status, error: err.message, code: err.code || 'INTERNAL_ERROR', logger, method: 'DELETE', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chat:
+ *   get:
+ *     summary: List agent chat messages for a research session
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Chat messages and session context
+ */
+router.get('/sessions/:id/chat', async (req, res) => {
+  const start = Date.now();
+  sendResponse({ res, status: 410, error: 'Single-session chat is no longer supported. Use /research/sessions/:id/chats.', code: 'GONE', logger, method: 'GET', path: '/research/sessions/:id/chat', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chat:
+ *   post:
+ *     summary: Send a message to the agent in the context of a research session
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Agent reply
+ */
+router.post('/sessions/:id/chat', async (req, res) => {
+  const start = Date.now();
+  sendResponse({ res, status: 410, error: 'Single-session chat is no longer supported. Use /research/sessions/:id/chats/:chatId/messages.', code: 'GONE', logger, method: 'POST', path: '/research/sessions/:id/chat', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chat/messages/{messageId}:
+ *   delete:
+ *     summary: Delete a single agent chat message
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.delete('/sessions/:id/chat/messages/:messageId', async (req, res) => {
+  const start = Date.now();
+  sendResponse({ res, status: 410, error: 'Single-session chat is no longer supported. Use /research/sessions/:id/chats/:chatId/messages/:messageId.', code: 'GONE', logger, method: 'DELETE', path: '/research/sessions/:id/chat/messages/:messageId', duration: Date.now() - start });
+});
+
+/**
+ * @openapi
+ * /research/sessions/{id}/chat:
+ *   delete:
+ *     summary: Clear all agent chat messages for a session
+ *     tags: [Research]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.delete('/sessions/:id/chat', async (req, res) => {
+  const start = Date.now();
+  sendResponse({ res, status: 410, error: 'Single-session chat is no longer supported. Use /research/sessions/:id/chats/:chatId/messages.', code: 'GONE', logger, method: 'DELETE', path: '/research/sessions/:id/chat', duration: Date.now() - start });
+});
+
 
 /**
  * @openapi
@@ -1840,6 +2391,57 @@ router.delete('/steps/:id', async (req, res) => {
 
 /**
  * @openapi
+ * /research/steps/{id}/status:
+ *   get:
+ *     summary: Get the current status of a research step
+ *     tags: [Research]
+ *     description: |
+ *       Lightweight endpoint for polling a long-running step. Returns only the
+ *       status, error state, and the current envelope snapshot so clients can
+ *       refresh without loading the whole session trail.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Step status snapshot
+ *       404:
+ *         description: Step not found
+ */
+router.get('/steps/:id/status', async (req, res) => {
+  const start = Date.now();
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/research/steps/:id/status', start });
+  if (!idCheck.valid) return;
+
+  const result = await getStep(db, idCheck.id);
+  if (!result.success || !result.data) {
+    sendResponse({ res, status: 404, error: 'Research step not found', code: 'NOT_FOUND', logger, method: 'GET', path: '/research/steps/:id/status', duration: Date.now() - start });
+    return;
+  }
+
+  const step = result.data;
+  sendResponse({
+    res,
+    status: 200,
+    data: {
+      step_id: step.rstep_id,
+      session_id: step.rs_id,
+      status: step.rstep_status || 'completed',
+      error_message: step.rstep_error_message || null,
+      envelope: toApiEnvelope(step),
+    },
+    logger,
+    method: 'GET',
+    path: '/research/steps/:id/status',
+    duration: Date.now() - start,
+  });
+});
+
+/**
+ * @openapi
  * /research/steps/{id}/rerun:
  *   post:
  *     summary: Re-run an existing research step in place
@@ -1920,6 +2522,10 @@ router.post('/steps/:id/rerun', async (req, res) => {
     sendResponse({ res, status: 500, error: runningUpdate.error, code: runningUpdate.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
     return;
   }
+
+  // Reactivate the linked Hindsight pending operation so the global indicator
+  // shows the re-run as in progress.
+  await completeResearchOperation(db, step.rstep_id, { status: 'pending' });
 
   setImmediate(() => {
     if (step.rstep_action_type === 'prebuilt') {

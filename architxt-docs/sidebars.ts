@@ -26,6 +26,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'workspace/overview',
+        'workspace/chat',
         'workspace/contextual-data',
         'workspace/reflect-queries-and-session-items',
         'workspace/preview-and-curated-pages',

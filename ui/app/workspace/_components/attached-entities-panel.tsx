@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, FileText, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, ExternalLink, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { colorForType } from '@/lib/graph/render-utils';
 
 import { PanelHeader, Panel, PanelContent } from './panel-layout';
+import { Input } from '@/components/ui/input';
 import { type EntityInfo, type Entity } from '@/lib/api/client';
 import {
   type DisplayNode,
@@ -23,7 +24,16 @@ export interface ModelItem {
   title: string;
   extId: string;
   edgeCount: number;
+  kind: string;
 }
+
+const KIND_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'nodes', label: 'Nodes' },
+  { value: 'edges', label: 'Edges' },
+] as const;
+
+type KindFilter = (typeof KIND_FILTERS)[number]['value'];
 
 export interface AttachedEntitiesPanelProps {
   entityIds: string[];
@@ -36,6 +46,7 @@ export interface AttachedEntitiesPanelProps {
   onToggleExpand: (entityId: string) => void;
   onSelectModel: (entityId: string, item: ModelItem, openInNewTab?: boolean) => void;
   modelContentCache?: Record<string, ModelContentCacheEntry>;
+  filterText?: string;
 }
 
 function getEntityModelItems(
@@ -73,6 +84,7 @@ function getEntityModelItems(
       title,
       extId: ref.ext_id,
       edgeCount: 0,
+      kind: 'node',
     });
   });
 
@@ -86,6 +98,7 @@ function getEntityModelItems(
       title: m.name || extId,
       extId,
       edgeCount: 0,
+      kind: 'node',
     });
   });
 
@@ -99,6 +112,7 @@ function getEntityModelItems(
       title: m.name || extId,
       extId,
       edgeCount: 0,
+      kind: 'node',
     });
   });
 
@@ -147,6 +161,7 @@ function getEntityModelItems(
       title,
       extId,
       edgeCount: physicalEdgeIds.size,
+      kind: 'edge',
     });
   });
 
@@ -165,6 +180,9 @@ export function AttachedEntitiesPanel({
   onSelectModel,
   modelContentCache,
 }: AttachedEntitiesPanelProps) {
+  const [filterText, setFilterText] = useState('');
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all');
+
   const entityNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const entity of entities) {
@@ -190,24 +208,96 @@ export function AttachedEntitiesPanel({
   }, []);
 
   const visibleRows = useMemo(() => {
+    const rawQuery = filterText.trim().toLowerCase();
+    const tokens = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    const matchesQuery = (haystack: string) => {
+      if (tokens.length === 0) return true;
+      const h = haystack.toLowerCase();
+      return tokens.every((t) => h.includes(t));
+    };
+
     return entityIds
       .map((entityId) => {
         const info = entityInfoMap?.[entityId];
-        const items = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById, modelContentCache, roleMaps) : [];
+        const allItems = info ? getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById, modelContentCache, roleMaps) : [];
         const node = contextualNodes.find((n) => n.id === entityId);
         const displayName = info?.catalog?.name || info?.graph_node?.display_name || node?.label || entityId;
-        return { entityId, info, items, displayName, hasItems: items.length > 0 };
+
+        const groupMatches = matchesQuery(`${displayName} ${entityId}`);
+        let filteredItems = groupMatches
+          ? allItems
+          : allItems.filter((item) =>
+              matchesQuery(
+                `${item.title} ${item.extId} ${item.scopeLabel} ${item.roleLabel || ''}`,
+              ),
+            );
+
+        if (kindFilter !== 'all') {
+          filteredItems = filteredItems.filter((item) => item.kind === (kindFilter === 'nodes' ? 'node' : 'edge'));
+        }
+
+        return { entityId, info, items: filteredItems, allItemCount: allItems.length, displayName, hasItems: filteredItems.length > 0 };
       })
       .filter((row) => row.hasItems)
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, modelContentCache, roleMaps]);
+  }, [entityIds, entityInfoMap, entityNameById, contextualNodeNameById, contextualNodes, modelContentCache, roleMaps, filterText, kindFilter]);
+
+  const totalItemCount = entityIds.length > 0
+    ? entityIds.reduce((sum, entityId) => {
+        const info = entityInfoMap?.[entityId];
+        if (!info) return sum;
+        const allItems = getEntityModelItems(info, entityInfoMap, entityNameById, contextualNodeNameById, modelContentCache, roleMaps);
+        return sum + allItems.length;
+      }, 0)
+    : 0;
+  const visibleItemCount = visibleRows.reduce((sum, row) => sum + row.items.length, 0);
+
+  const count = entityIds.length > 0 ? `${totalItemCount} (${visibleItemCount})` : undefined;
 
   return (
     <Panel className="flex-1">
       <PanelHeader
         title="Contextual data"
-        count={entityIds.length > 0 ? visibleRows.length : undefined}
+        count={count}
+        actions={
+          <div className="flex items-center gap-1">
+            {KIND_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setKindFilter(f.value)}
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                  kindFilter === f.value
+                    ? 'bg-accent-secondary-bg border-accent-secondary-bd text-accent-secondary-fg'
+                    : 'bg-surface-card border-border-default text-foreground-subtle hover:bg-surface-panel'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        }
       />
+      <div className="px-2 py-1 border-b border-border-default bg-surface-card shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-subtle" />
+          <Input
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="Search..."
+            className="h-7 pl-7 pr-7 text-xs rounded-full bg-surface-card border-2 border-border-default text-foreground-default placeholder:text-foreground-placeholder focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
+          />
+          {filterText && (
+            <button
+              type="button"
+              onClick={() => setFilterText('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-faint"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
       <PanelContent className="p-0">
         <div className="absolute inset-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
@@ -226,10 +316,10 @@ export function AttachedEntitiesPanel({
             ) : entityInfoMap ? (
               visibleRows.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-foreground-subtle text-xs px-6 text-center gap-2">
-                  <p>No contextual models attached yet.</p>
+                  <p>{filterText.trim() ? 'No matching contextual data.' : 'No contextual models attached yet.'}</p>
                 </div>
               ) : (
-                visibleRows.map(({ entityId, info, items, displayName, hasItems }) => {
+                visibleRows.map(({ entityId, info, items, allItemCount, displayName, hasItems }) => {
                   const expanded = expandedEntityIds.has(entityId);
                   const typeName = info?.catalog?.type_name || (entityId.includes(':') ? entityId.split(':')[0] : undefined);
                   const color = colorForType(typeName);
@@ -259,6 +349,9 @@ export function AttachedEntitiesPanel({
                         </div>
                         <span className="text-[10px] text-foreground-subtle px-1.5 py-0.5 rounded border border-border-default bg-surface-card">
                           {items.length}
+                          {allItemCount !== items.length && (
+                            <span className="text-foreground-faint"> / {allItemCount}</span>
+                          )}
                         </span>
                       </button>
 
@@ -295,7 +388,7 @@ export function AttachedEntitiesPanel({
                                     className="text-[9px] text-foreground-subtle px-1 py-0.5 rounded border border-border-default bg-surface-card shrink-0"
                                     title={`${item.edgeCount} physical edge${item.edgeCount === 1 ? '' : 's'} in this edge context`}
                                   >
-                                    {item.edgeCount} edge{item.edgeCount === 1 ? '' : 's'}
+                                    {item.edgeCount}
                                   </span>
                                 )}
                                 <button

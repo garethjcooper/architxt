@@ -252,6 +252,11 @@ async function pollOnce() {
     // 5. Match local ops to remote states found in active lists
     const missingFromActive = [];
     for (const localOp of ops) {
+      // Local research operations are managed by the research runners themselves.
+      if (localOp.pop_action === 'research' || localOp.pop_action === 'research:prebuilt') {
+        continue;
+      }
+
       const remoteOp = activeMap.get(localOp.pop_operation_id);
 
       if (remoteOp) {

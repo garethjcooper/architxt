@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useDeferredValue, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { formatRelative, getLastRefreshedAt, getRoleScopeLabel, isCandidateNode, isCandidateEdge, loadRoleScopeMap, type RoleScopeMaps } from '@/lib/contextual-graph/display';
+import { VirtualList } from '@/components/ui/virtual-list';
 import type { DisplayNode, DisplayEdge } from './page';
 
 export interface CandidatesTabProps {
@@ -42,6 +43,9 @@ export function CandidatesTab({
     });
   }, []);
 
+  const deferredSearch = useDeferredValue(search);
+  const isSearchPending = search !== deferredSearch;
+
   const discoveredNodes = useMemo(
     () => nodes.filter((n) => isCandidateNode(n)).sort((a, b) => a.label.localeCompare(b.label)),
     [nodes]
@@ -59,7 +63,7 @@ export function CandidatesTab({
   );
 
   const filteredNodes = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     if (!q) return discoveredNodes;
     return discoveredNodes.filter(
       (n) =>
@@ -67,10 +71,10 @@ export function CandidatesTab({
         n.id.toLowerCase().includes(q) ||
         n.type.toLowerCase().includes(q)
     );
-  }, [discoveredNodes, search]);
+  }, [discoveredNodes, deferredSearch]);
 
   const filteredEdges = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     if (!q) return discoveredEdges;
     return discoveredEdges.filter((e) => {
       const source = nodeById.get(e.source_id)?.label || e.source_id;
@@ -78,7 +82,7 @@ export function CandidatesTab({
       const text = `${e.detail || ''} ${e.label || ''} ${e.type || ''} ${source} ${target}`.toLowerCase();
       return text.includes(q);
     });
-  }, [discoveredEdges, search, nodeById]);
+  }, [discoveredEdges, deferredSearch, nodeById]);
 
   const showNodes = filter === 'all' || filter === 'nodes';
   const showEdges = filter === 'all' || filter === 'edges';
@@ -107,6 +111,11 @@ export function CandidatesTab({
         <span className="text-xs font-mono text-accent-tertiary-fg bg-surface-inset border border-accent-tertiary-bd px-2 py-0.5 rounded ml-auto">
           {filteredNodes.length} node{filteredNodes.length !== 1 ? 's' : ''} / {filteredEdges.length} edge
           {filteredEdges.length !== 1 ? 's' : ''}
+          {isSearchPending && (
+            <span className="ml-1 inline-flex items-center">
+              <Loader2 className="h-3 w-3 animate-spin" />
+            </span>
+          )}
         </span>
       </div>
 
@@ -120,7 +129,7 @@ export function CandidatesTab({
                   {filteredNodes.length}
                 </span>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
+              <div className="flex-1 min-h-0 overflow-hidden p-1.5">
                 {loading ? (
                   <div className="p-3 space-y-2">
                     <Skeleton className="h-10 w-full bg-surface-panel" />
@@ -129,39 +138,46 @@ export function CandidatesTab({
                 ) : filteredNodes.length === 0 ? (
                   <div className="text-[11px] text-foreground-subtle px-2 py-3">No discovered nodes.</div>
                 ) : (
-                  filteredNodes.map((node) => {
-                    const active = selectedNodeId === node.id;
-                    const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
-                    const lastRefreshed = getLastRefreshedAt(node.modelRefs);
-                    return (
-                      <button
-                        key={node.id}
-                        type="button"
-                        onClick={() => onSelectNode(node.id)}
-                        className={cn(
-                          'w-full rounded border bg-overlay px-1.5 py-1 text-left transition-colors',
-                          active ? 'border-accent-tertiary-bd bg-accent-tertiary-bg' : 'border-border-subtle hover:bg-surface-card'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex flex-col gap-0 min-w-0">
-                            <div className="text-xs text-foreground-default truncate">{node.label}</div>
-                            <div className="text-[10px] text-foreground-subtle truncate">{typeLine}</div>
+                  <VirtualList
+                    items={filteredNodes}
+                    estimateSize={58}
+                    overscan={10}
+                    getItemKey={(_, node) => node.id}
+                    className="h-full"
+                    itemClassName="px-0.5 py-0.5"
+                    renderItem={(node) => {
+                      const active = selectedNodeId === node.id;
+                      const typeLine = node.type && !node.id.startsWith(`${node.type}:`) ? `${node.type}:${node.id}` : node.id;
+                      const lastRefreshed = getLastRefreshedAt(node.modelRefs);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onSelectNode(node.id)}
+                          className={cn(
+                            'w-full rounded border bg-overlay px-1.5 py-1 text-left transition-colors',
+                            active ? 'border-accent-tertiary-bd bg-accent-tertiary-bg' : 'border-border-subtle hover:bg-surface-card'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-col gap-0 min-w-0">
+                              <div className="text-xs text-foreground-default truncate">{node.label}</div>
+                              <div className="text-[10px] text-foreground-subtle truncate">{typeLine}</div>
+                            </div>
+                            <span className="text-[10px] text-foreground-placeholder shrink-0">{formatRelative(lastRefreshed)}</span>
                           </div>
-                          <span className="text-[10px] text-foreground-placeholder shrink-0">{formatRelative(lastRefreshed)}</span>
-                        </div>
-                        {node.modelRefs.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                            {node.modelRefs.map((ref, i) => (
-                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
-                                {getRoleScopeLabel(ref.role, roleMaps.roleScopeMap)}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })
+                          {node.modelRefs.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                              {node.modelRefs.map((ref, i) => (
+                                <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
+                                  {getRoleScopeLabel(ref.role, roleMaps.roleScopeMap)}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    }}
+                  />
                 )}
               </div>
             </>
@@ -176,7 +192,7 @@ export function CandidatesTab({
                   {filteredEdges.length}
                 </span>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1">
+              <div className="flex-1 min-h-0 overflow-hidden p-1.5">
                 {loading ? (
                   <div className="p-3 space-y-2">
                     <Skeleton className="h-10 w-full bg-surface-panel" />
@@ -185,42 +201,49 @@ export function CandidatesTab({
                 ) : filteredEdges.length === 0 ? (
                   <div className="text-[11px] text-foreground-subtle px-2 py-3">No discovered edges.</div>
                 ) : (
-                  filteredEdges.map((edge) => {
-                    const active = selectedEdgeId === edge.id;
-                    const source = nodeById.get(edge.source_id);
-                    const target = nodeById.get(edge.target_id);
-                    const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
-                    return (
-                      <button
-                        key={edge.id}
-                        type="button"
-                        onClick={() => onSelectEdge(edge.id)}
-                        className={cn(
-                          'w-full text-left rounded border px-1.5 py-1 transition-colors',
-                          active ? 'bg-accent-tertiary-bg border-accent-tertiary-bd' : 'bg-overlay border-border-subtle hover:bg-surface-card'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-xs text-foreground-default truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
-                            <div className="text-[10px] text-foreground-subtle truncate">
-                              {source?.label || edge.source_id} → {target?.label || edge.target_id}
+                  <VirtualList
+                    items={filteredEdges}
+                    estimateSize={58}
+                    overscan={10}
+                    getItemKey={(_, edge) => edge.id}
+                    className="h-full"
+                    itemClassName="px-0.5 py-0.5"
+                    renderItem={(edge) => {
+                      const active = selectedEdgeId === edge.id;
+                      const source = nodeById.get(edge.source_id);
+                      const target = nodeById.get(edge.target_id);
+                      const lastRefreshed = getLastRefreshedAt(edge.modelRefs);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onSelectEdge(edge.id)}
+                          className={cn(
+                            'w-full text-left rounded border px-1.5 py-1 transition-colors',
+                            active ? 'bg-accent-tertiary-bg border-accent-tertiary-bd' : 'bg-overlay border-border-subtle hover:bg-surface-card'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs text-foreground-default truncate">{edge.detail || edge.label || edge.type || 'Edge'}</div>
+                              <div className="text-[10px] text-foreground-subtle truncate">
+                                {source?.label || edge.source_id} → {target?.label || edge.target_id}
+                              </div>
                             </div>
+                            <span className="text-[10px] text-foreground-placeholder shrink-0">{formatRelative(lastRefreshed)}</span>
                           </div>
-                          <span className="text-[10px] text-foreground-placeholder shrink-0">{formatRelative(lastRefreshed)}</span>
-                        </div>
-                        {edge.modelRefs.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                            {edge.modelRefs.map((ref, i) => (
-                              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
-                                {getRoleScopeLabel(ref.role, roleMaps.roleScopeMap)}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })
+                          {edge.modelRefs.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                              {edge.modelRefs.map((ref, i) => (
+                                <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 border-border-default text-foreground-subtle">
+                                  {getRoleScopeLabel(ref.role, roleMaps.roleScopeMap)}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    }}
+                  />
                 )}
               </div>
             </>

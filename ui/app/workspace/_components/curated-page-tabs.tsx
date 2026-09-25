@@ -106,7 +106,7 @@ export function CuratedPageTabs({
 
   const tabList = (
     <>
-      <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto custom-scrollbar">
+      <div className="flex-1 min-w-0 flex items-start gap-1 overflow-x-auto custom-scrollbar pt-2 pb-2">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
           const isCurated = tab.kind === 'curated';
@@ -123,7 +123,7 @@ export function CuratedPageTabs({
             >
               <span
                 className={cn(
-                  'absolute left-0 top-1 bottom-1 w-[3px] rounded-l shrink-0',
+                  'absolute left-0 top-0 bottom-0 w-[3px] rounded-l shrink-0',
                   isCurated ? 'bg-accent-primary-fg' : 'bg-surface-overlay'
                 )}
               />
@@ -282,7 +282,7 @@ export function CuratedPageTabs({
   );
 
   return (
-    <div className="flex items-center gap-1 px-2 h-10 border-b border-border-default bg-surface-overlay">
+    <div className="flex items-stretch gap-1 px-2 h-12 border-b border-border-default bg-surface-overlay">
       {tabList}
     </div>
   );

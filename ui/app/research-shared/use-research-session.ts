@@ -4,7 +4,6 @@ import {
   type DiscoverStepResponse,
   type ResearchSession,
   type ResearchStepSummary,
-  type PrebuiltResponse,
   type GraphNode,
   type GraphEdge,
   ApiError,
@@ -14,7 +13,6 @@ import {
   toSectionFocus,
   parseReferences,
 } from '@architxt/aql';
-import { transformPrebuiltToDiscoverResponse } from '@/app/research-shared/prebuilt';
 import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 
@@ -197,7 +195,7 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
   },
   reflect: {
     includeSourceFacts: false,
-    budget: 'low',
+    budget: 'high',
     maxTokens: 4096,
     factTypes: ['world', 'observation'],
     excludeMentalModels: false,
@@ -245,6 +243,7 @@ export function useResearchSession({
   const hasSeededSelectionRef = useRef(false);
   const initialSessionIdRef = useRef(initialSessionId);
   initialSessionIdRef.current = initialSessionId;
+  const inFlightPollsRef = useRef(new Map<number, Promise<ResearchStepSummary | null>>());
 
   // Focus entities are derived from selected step canvases so the hook can
   // compute them internally without a circular dependency on useResearchGraph.
@@ -274,8 +273,10 @@ export function useResearchSession({
     }
   }, []);
 
-  const fetchTrail = useCallback(async (sessionId: number) => {
-    setTrailLoading(true);
+  const fetchTrail = useCallback(async (sessionId: number, options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setTrailLoading(true);
+    }
     try {
       const steps = await researchApi.getSessionSteps(sessionId);
       const normalized = Array.isArray(steps) ? steps : [];
@@ -289,7 +290,9 @@ export function useResearchSession({
       logger.error('Failed to fetch trail', err);
       return [];
     } finally {
-      setTrailLoading(false);
+      if (!options?.silent) {
+        setTrailLoading(false);
+      }
     }
   }, []);
   useEffect(() => {
@@ -349,57 +352,86 @@ export function useResearchSession({
   }, [trail, activeStepId, sessions, activeSessionId]);
 
   const pollForStepCompletion = useCallback(async (sessionId: number, stepId: number): Promise<ResearchStepSummary | null> => {
-    setRunningStepId(stepId);
-    const start = Date.now();
-    try {
-      while (Date.now() - start < MAX_POLL_MS) {
-        const steps = await fetchTrail(sessionId);
-        const step = steps.find((s) => s.id === stepId);
-        if (!step) {
+    const existing = inFlightPollsRef.current.get(stepId);
+    if (existing) return existing;
+
+    const pollPromise = (async () => {
+      setRunningStepId(stepId);
+      const start = Date.now();
+      try {
+        while (Date.now() - start < MAX_POLL_MS) {
+          const steps = await fetchTrail(sessionId, { silent: true });
+          const step = steps.find((s) => s.id === stepId);
+          if (!step) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            continue;
+          }
+          if (step.status === 'completed') {
+            if (step.error_message) {
+              toast.warning(`Research completed with warnings: ${step.error_message}`);
+            }
+            if (viewMode === 'step') {
+              setSelectedStepIds(new Set([stepId]));
+              setActiveStepId(stepId);
+            } else {
+              setSelectedStepIds((prev) => new Set([...prev, stepId]));
+            }
+            if (step.envelope) {
+              setResult({
+                step_id: step.id,
+                session_id: step.session_id,
+                status: 'completed',
+                bank_id: bankId,
+                viewpoint_ids: step.viewpoint_ids || [],
+                query_depth: step.action_type,
+                action_type: step.action_type,
+                parameters: step.parameters,
+                envelope: step.envelope,
+                tool_calls_used: step.tool_calls_used,
+                error_message: step.error_message || null,
+              });
+            }
+            return step;
+          }
+          if (step.status === 'failed') {
+            setError(step.error_message || 'Research step failed');
+            toast.error(`Research failed: ${step.error_message || 'Unknown error'}`);
+            return step;
+          }
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-          continue;
         }
-        if (step.status === 'completed') {
-          if (step.error_message) {
-            toast.warning(`Research completed with warnings: ${step.error_message}`);
-          }
-          if (viewMode === 'step') {
-            setSelectedStepIds(new Set([stepId]));
-            setActiveStepId(stepId);
-          } else {
-            setSelectedStepIds((prev) => new Set([...prev, stepId]));
-          }
-          if (step.envelope) {
-            setResult({
-              step_id: step.id,
-              session_id: step.session_id,
-              status: 'completed',
-              bank_id: bankId,
-              viewpoint_ids: step.viewpoint_ids || [],
-              query_depth: step.action_type,
-              action_type: step.action_type,
-              parameters: step.parameters,
-              envelope: step.envelope,
-              tool_calls_used: step.tool_calls_used,
-              error_message: step.error_message || null,
-            });
-          }
-          return step;
-        }
-        if (step.status === 'failed') {
-          setError(step.error_message || 'Research step failed');
-          toast.error(`Research failed: ${step.error_message || 'Unknown error'}`);
-          return step;
-        }
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        setError('Timed out waiting for research step to complete');
+        toast.error('Research step timed out');
+        return null;
+      } finally {
+        setRunningStepId((prev) => (prev === stepId ? null : prev));
+        inFlightPollsRef.current.delete(stepId);
       }
-      setError('Timed out waiting for research step to complete');
-      toast.error('Research step timed out');
-      return null;
-    } finally {
-      setRunningStepId((prev) => (prev === stepId ? null : prev));
-    }
+    })();
+
+    inFlightPollsRef.current.set(stepId, pollPromise);
+    return pollPromise;
   }, [bankId, fetchTrail, viewMode]);
+
+  // Resume polling for any step still marked running after a trail load or
+  // session switch. This makes long-running reflects/prebuilt durable across
+  // page reloads and navigation. Skip steps that are already being polled.
+  useEffect(() => {
+    if (!activeSessionId || trail.length === 0) return;
+    const runningSteps = trail.filter((s) => s.status === 'running').map((s) => s.id);
+    const stepsToResume = runningSteps.filter((id) => !inFlightPollsRef.current.has(id));
+    if (stepsToResume.length === 0) return;
+    logger.info('Resuming polling for running steps', { session_id: activeSessionId, running_steps: stepsToResume });
+    for (const stepId of stepsToResume) {
+      void pollForStepCompletion(activeSessionId, stepId);
+    }
+  }, [activeSessionId, trail, pollForStepCompletion]);
+
+  // Clear in-flight poll tracking when switching sessions so stale promises from
+  // the previous session cannot suppress new polls.
+  useEffect(() => {
+    inFlightPollsRef.current.clear();
+  }, [activeSessionId]);
 
   const handleCreateSession = useCallback(async (title: string) => {
     try {
@@ -732,19 +764,17 @@ export function useResearchSession({
           session_id: activeSessionId ?? undefined,
           raw_query: query.trim() || undefined,
         });
-        if (!prebuilt.success) {
-          throw new Error(prebuilt.error || 'Prebuilt research failed');
-        }
-        setResult(transformPrebuiltToDiscoverResponse(prebuilt, bankId));
-        if (prebuilt.session_id) {
-          setActiveSessionId(prebuilt.session_id);
-          if (viewMode === 'step') {
-            setActiveStepId(prebuilt.step_id ?? null);
-            setSelectedStepIds(prebuilt.step_id ? new Set([prebuilt.step_id]) : new Set());
-          }
-          await fetchSessions(parseInt(serverId, 10), bankId);
-          await fetchTrail(prebuilt.session_id);
-        }
+        setActiveSessionId(prebuilt.session_id);
+        onViewModeChange?.('step');
+        setActiveStepId(prebuilt.step_id);
+        setSelectedStepIds(prebuilt.step_id ? new Set([prebuilt.step_id]) : new Set());
+        await fetchSessions(parseInt(serverId, 10), bankId);
+        await fetchTrail(prebuilt.session_id);
+        await pollForStepCompletion(prebuilt.session_id, prebuilt.step_id);
+        logger.info('Prebuilt step completed', {
+          session_id: prebuilt.session_id,
+          step_id: prebuilt.step_id,
+        });
       } catch (err) {
         const message = err instanceof ApiError ? err.message : String(err);
         logger.error('Prebuilt research failed', err);
@@ -789,13 +819,26 @@ export function useResearchSession({
     setLoading(true);
     setError(null);
     try {
-      const parsed = toSectionFocus(parseAql(
+      const aqlQuery = parseAql(
         queryMode === 'models'
           ? 'Mental models: ' + (queryOptions.models?.selections?.map((s) => s.name || s.ext_id || `model:${s.id}`).join(', ') || '')
           : queryMode === 'templates'
             ? 'Templates: ' + (queryOptions.templates?.selections?.map((s) => s.name || s.ext_id).join(', ') || '')
             : query.trim(),
-      ));
+      );
+      if (aqlQuery.errors && aqlQuery.errors.length > 0) {
+        const first = aqlQuery.errors[0];
+        const message = first.line
+          ? `AQL syntax error on line ${first.line}: ${first.message}`
+          : `AQL syntax error: ${first.message}`;
+        logger.warn('AQL validation failed', { errors: aqlQuery.errors });
+        setError(message);
+        toast.error(message);
+        setLoading(false);
+        return;
+      }
+
+      const parsed = toSectionFocus(aqlQuery);
 
       const response = await researchApi.discover({
         server_id: parseInt(serverId, 10),

@@ -1,0 +1,60 @@
+# architxt documentation
+
+Documentation for architxt, a knowledge workbench that turns documents into contextual graphs.
+
+Base URL: https://architxtlabs.com/
+Full plain-text dump: https://architxtlabs.com/llms-full.txt
+
+## Getting started
+- Introduction: https://architxtlabs.com/
+
+## Getting Started
+- Prerequisites: https://architxtlabs.com/getting-started/prerequisites
+- Installation: https://architxtlabs.com/getting-started/installation
+- Configuration: https://architxtlabs.com/getting-started/configuration
+- Quick Start: https://architxtlabs.com/getting-started/quick-start
+
+## Core Concepts
+- Entities: https://architxtlabs.com/core-concepts/entities
+- Documents: https://architxtlabs.com/core-concepts/documents
+- Mental Models: https://architxtlabs.com/core-concepts/mental-models
+- Contexts: https://architxtlabs.com/core-concepts/contexts
+- Metadata: https://architxtlabs.com/core-concepts/metadata
+- Tags: https://architxtlabs.com/core-concepts/tags
+- Bank Settings: https://architxtlabs.com/core-concepts/bank-settings
+- Directives: https://architxtlabs.com/core-concepts/directives
+- AQL: architxt Query Language: https://architxtlabs.com/core-concepts/aql
+
+## Workspace
+- Overview: https://architxtlabs.com/workspace/overview
+- Chat: https://architxtlabs.com/workspace/chat
+- Contextual data: https://architxtlabs.com/workspace/contextual-data
+- Reflect queries and session items: https://architxtlabs.com/workspace/reflect-queries-and-session-items
+- Preview and curated pages: https://architxtlabs.com/workspace/preview-and-curated-pages
+- Focus: narrative: https://architxtlabs.com/workspace/focus-narrative
+- Focus: diagram: https://architxtlabs.com/workspace/focus-diagram
+- Focus: table: https://architxtlabs.com/workspace/focus-table
+- Focus: graph: https://architxtlabs.com/workspace/focus-graph
+- Focus: evidence: https://architxtlabs.com/workspace/focus-evidence
+
+## Context Patches
+- Overview: https://architxtlabs.com/context-patches/overview
+- Graph: https://architxtlabs.com/context-patches/graph
+- Candidates: https://architxtlabs.com/context-patches/candidates
+- Mental Models: https://architxtlabs.com/context-patches/mental-models
+- Sync Jobs: https://architxtlabs.com/context-patches/sync-jobs
+
+## Hindsight Sync
+- Overview: https://architxtlabs.com/hindsight-sync/overview
+- Documents: https://architxtlabs.com/hindsight-sync/documents
+- Entities: https://architxtlabs.com/hindsight-sync/entities
+- Mental Models: https://architxtlabs.com/hindsight-sync/mental-models
+- Directives: https://architxtlabs.com/hindsight-sync/directives
+- Bank Settings: https://architxtlabs.com/hindsight-sync/bank-settings
+
+## Notes for agents
+
+- Product name is lowercase: architxt.
+- Docs are written from the user/UI perspective.
+- For implementation details, pair these docs with the architxt repository source.
+- Use /llms-full.txt for a single-file concatenation of all pages.

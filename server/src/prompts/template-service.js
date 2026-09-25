@@ -120,25 +120,46 @@ export function loadAndCompose(db, name, variables) {
 /**
  * Compose a full prompt for a derived mental model.
  *
- * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} sectionFocus
+ * @param {{graph?:Array<{name?:string,content:string}>, table?:Array, diagram?:Array, narrative?:Array<{name?:string,content:string}>}} sectionFocus
  * @returns {{active: string[], empty: string[]}}
  */
 function computeSectionState(sectionFocus) {
   const active = [];
   const empty = [];
-  if (sectionFocus?.graph) active.push('graph');
+  const hasGraph = Array.isArray(sectionFocus?.graph) && sectionFocus.graph.length > 0;
+  const hasTables = Array.isArray(sectionFocus?.table) && sectionFocus.table.length > 0;
+  const hasDiagrams = Array.isArray(sectionFocus?.diagram) && sectionFocus.diagram.length > 0;
+  const hasNarrative = Array.isArray(sectionFocus?.narrative) && sectionFocus.narrative.length > 0;
+  if (hasGraph) active.push('graph');
   else empty.push('graph');
-  if (sectionFocus?.table?.length) active.push('tables');
+  if (hasTables) active.push('tables');
   else empty.push('tables');
-  if (sectionFocus?.diagram?.length) active.push('diagrams');
+  if (hasDiagrams) active.push('diagrams');
   else empty.push('diagrams');
-  if (sectionFocus?.narrative) active.push('narrative');
+  if (hasNarrative) active.push('narrative');
   else empty.push('narrative');
   // If no directives at all, narrative is the default fallback.
   if (active.length === 0) {
     return { active: ['narrative'], empty: ['graph', 'tables', 'diagrams'] };
   }
   return { active, empty };
+}
+
+function countForSection(activeSection, sectionFocus) {
+  // Map active section label back to the focus array key and length.
+  const keyMap = {
+    graph: 'graph',
+    tables: 'table',
+    diagrams: 'diagram',
+    narrative: 'narrative',
+  };
+  const key = keyMap[activeSection];
+  const arr = sectionFocus?.[key];
+  const count = Array.isArray(arr) ? arr.length : 0;
+  const unit = activeSection === 'graph'
+    ? `graph object${count === 1 ? '' : 's'}`
+    : `${activeSection.replace(/s$/, '')} output item${count === 1 ? '' : 's'}`;
+  return `${count} ${unit}`;
 }
 
 function formatNodeExamples({ include, exclude }) {
@@ -175,24 +196,26 @@ const DIAGRAM_TYPE_TO_FRAGMENT = {
  * keeping prompt size minimal and preventing the LLM from hallucinating
  * unrequested sections.
  *
- * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} sectionFocus
+ * @param {{graph?:Array<{name?:string,content:string}>, table?:Array, diagram?:Array, narrative?:Array<{name?:string,content:string}>}} sectionFocus
  * @returns {string[]}
  */
 export function buildConditionalFragments(sectionFocus) {
   const extra = [];
-  // If no directives are present at all, narrative is the default fallback.
-  // Include it explicitly so the model still sees the per-section rules.
-  const hasAnyDirective = sectionFocus?.graph || sectionFocus?.table || sectionFocus?.diagram?.length || sectionFocus?.narrative;
-  if (!hasAnyDirective || sectionFocus?.narrative) {
+  const hasAnyDirective =
+    (Array.isArray(sectionFocus?.graph) && sectionFocus.graph.length > 0) ||
+    (Array.isArray(sectionFocus?.table) && sectionFocus.table.length > 0) ||
+    (Array.isArray(sectionFocus?.diagram) && sectionFocus.diagram.length > 0) ||
+    (Array.isArray(sectionFocus?.narrative) && sectionFocus.narrative.length > 0);
+  if (!hasAnyDirective || (Array.isArray(sectionFocus?.narrative) && sectionFocus.narrative.length > 0)) {
     extra.push('output-format-narrative-contextual.md');
   }
-  if (sectionFocus?.graph) {
+  if (Array.isArray(sectionFocus?.graph) && sectionFocus.graph.length > 0) {
     extra.push('output-format-graph-contextual.md');
   }
-  if (sectionFocus?.table) {
+  if (Array.isArray(sectionFocus?.table) && sectionFocus.table.length > 0) {
     extra.push('output-format-table-contextual.md');
   }
-  if (sectionFocus?.diagram?.length) {
+  if (Array.isArray(sectionFocus?.diagram) && sectionFocus.diagram.length > 0) {
     extra.push('output-format-diagram-contextual.md');
     const requestedTypes = new Set(
       sectionFocus.diagram
@@ -237,34 +260,58 @@ function extractFocusName(rendered) {
 /**
  * Compose a set of extra name variables from the effective section focus.
  *
- * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} effectiveFocus
+ * @param {{graph?:Array<{name?:string,content:string}>, table?:Array, diagram?:Array, narrative?:Array<{name?:string,content:string}>}} effectiveFocus
  * @param {Record<string,string>} baseVariables
  * @returns {Record<string,string>}
  */
 function buildNameVariables(effectiveFocus, baseVariables) {
+  // When multiple entries of the same type are requested, leave the scalar name
+  // variable empty. The per-section fragment then derives each item's exact title
+  // from the corresponding bullet in ARCHITXT_*_FOCUS instead of anchoring on
+  // the first name.
+  const narrativeCount = Array.isArray(effectiveFocus?.narrative) ? effectiveFocus.narrative.length : 0;
+  const graphCount = Array.isArray(effectiveFocus?.graph) ? effectiveFocus.graph.length : 0;
+  const tableCount = Array.isArray(effectiveFocus?.table) ? effectiveFocus.table.length : 0;
+  const diagramCount = Array.isArray(effectiveFocus?.diagram) ? effectiveFocus.diagram.length : 0;
   const names = {
-    ARCHITXT_NARRATIVE_NAME: effectiveFocus?.narrative?.name || extractFocusName(baseVariables.ARCHITXT_NARRATIVE_FOCUS || ''),
-    ARCHITXT_GRAPH_NAME: effectiveFocus?.graph?.name || extractFocusName(baseVariables.ARCHITXT_GRAPH_FOCUS || ''),
-    ARCHITXT_TABLE_NAME: '',
-    ARCHITXT_DIAGRAM_NAME: '',
+    ARCHITXT_NARRATIVE_NAME: narrativeCount <= 1
+      ? ((effectiveFocus?.narrative?.[0]?.name) || extractFocusName(baseVariables.ARCHITXT_NARRATIVE_FOCUS || ''))
+      : '',
+    ARCHITXT_GRAPH_NAME: graphCount <= 1
+      ? ((effectiveFocus?.graph?.[0]?.name) || extractFocusName(baseVariables.ARCHITXT_GRAPH_FOCUS || ''))
+      : '',
+    ARCHITXT_TABLE_NAME: tableCount <= 1
+      ? ((effectiveFocus?.table?.[0]?.name) || extractFocusName(baseVariables.ARCHITXT_TABLE_FOCUS || ''))
+      : '',
+    ARCHITXT_DIAGRAM_NAME: diagramCount <= 1
+      ? ((effectiveFocus?.diagram?.[0]?.name) || extractFocusName(baseVariables.ARCHITXT_DIAGRAM_FOCUS || ''))
+      : '',
   };
 
-  const firstTable = effectiveFocus?.table?.[0];
-  if (firstTable?.name) {
-    names.ARCHITXT_TABLE_NAME = firstTable.name;
-  } else {
-    const tableFocus = baseVariables.ARCHITXT_TABLE_FOCUS || '';
-    const firstLine = tableFocus.split('\n').find((l) => l.trim()) || '';
-    names.ARCHITXT_TABLE_NAME = extractFocusName(firstLine);
+  if (tableCount > 1) {
+    names.ARCHITXT_TABLE_NAME = '';
+  } else if (!names.ARCHITXT_TABLE_NAME) {
+    const firstTable = effectiveFocus?.table?.[0];
+    if (firstTable?.name) {
+      names.ARCHITXT_TABLE_NAME = firstTable.name;
+    } else {
+      const tableFocus = baseVariables.ARCHITXT_TABLE_FOCUS || '';
+      const firstLine = tableFocus.split('\n').find((l) => l.trim()) || '';
+      names.ARCHITXT_TABLE_NAME = extractFocusName(firstLine);
+    }
   }
 
-  const firstDiagram = effectiveFocus?.diagram?.[0];
-  if (firstDiagram?.name) {
-    names.ARCHITXT_DIAGRAM_NAME = firstDiagram.name;
-  } else {
-    const diagramFocus = baseVariables.ARCHITXT_DIAGRAM_FOCUS || '';
-    const firstLine = diagramFocus.split('\n').find((l) => l.trim()) || '';
-    names.ARCHITXT_DIAGRAM_NAME = extractFocusName(firstLine);
+  if (diagramCount > 1) {
+    names.ARCHITXT_DIAGRAM_NAME = '';
+  } else if (!names.ARCHITXT_DIAGRAM_NAME) {
+    const firstDiagram = effectiveFocus?.diagram?.[0];
+    if (firstDiagram?.name) {
+      names.ARCHITXT_DIAGRAM_NAME = firstDiagram.name;
+    } else {
+      const diagramFocus = baseVariables.ARCHITXT_DIAGRAM_FOCUS || '';
+      const firstLine = diagramFocus.split('\n').find((l) => l.trim()) || '';
+      names.ARCHITXT_DIAGRAM_NAME = extractFocusName(firstLine);
+    }
   }
 
   return names;
@@ -289,20 +336,28 @@ function mergeFragments(template, extraFragments) {
 
   if (hasFocus) {
     // Remove section-focus.md from its current position; it will be reinserted
-    // right after contextual-patch.md.
+    // right after contextual-patch.md, followed by the mapping rules.
     base.splice(focusIndex, 1);
   }
 
-  if (patchIndex !== -1 && extraFragments.length > 0) {
-    base.splice(patchIndex + 1, 0, ...extraFragments);
-  } else {
-    base.push(...extraFragments);
+  // Deduplicate extra fragments against the base list.
+  const uniqueExtra = extraFragments.filter((f) => !base.includes(f));
+
+  if (patchIndex !== -1 && uniqueExtra.length > 0) {
+    base.splice(patchIndex + 1, 0, ...uniqueExtra);
+  } else if (uniqueExtra.length > 0) {
+    base.push(...uniqueExtra);
   }
 
   if (hasFocus) {
     const newPatchIndex = base.indexOf('contextual-patch.md');
     const insertAt = newPatchIndex !== -1 ? newPatchIndex + 1 : 0;
     base.splice(insertAt, 0, 'section-focus.md');
+    // Insert mapping rules immediately after section-focus.md so the model
+    // knows exactly which envelope array each requested section belongs to.
+    if (!base.includes('section-mapping.md')) {
+      base.splice(insertAt + 1, 0, 'section-mapping.md');
+    }
   }
 
   return {
@@ -317,18 +372,20 @@ function mergeFragments(template, extraFragments) {
  * @param {{active: string[], empty: string[]}} sectionState
  * @returns {string}
  */
-function formatSectionInstructions({ active, empty }) {
+function formatSectionInstructions({ active, empty, sectionFocus }) {
   const lines = [];
   lines.push('### Section rules');
   lines.push('');
   lines.push(`Active output sections: ${active.map((s) => `\`${s}\``).join(', ')}.`);
   lines.push(`Empty output sections (must remain exactly as shown in the envelope example): ${empty.map((s) => `\`${s}\``).join(', ')}.`);
   lines.push('');
+  lines.push(`You MUST emit exactly ${active.length > 0 ? active.map((s) => `${countForSection(s, sectionFocus)}`).join(', ') : 'the sections listed above'}. Do not emit more or fewer items than requested.`);
+  lines.push('');
   if (!active.includes('narrative')) {
     lines.push('Do not answer the topic in narrative prose. Set `narrative` to an empty string and express all findings through the structured output sections above.');
     lines.push('');
   } else {
-    lines.push('Narrative is active: you may use it for concise human-readable prose.');
+    lines.push('Narrative is active: you may use it for concise human-readable prose, but only for bullets listed under ARCHITXT_NARRATIVE_FOCUS. Graph, table, and diagram bullets produce their own structured sections; do not create extra narrative entries summarising them.');
     lines.push('');
   }
   return lines.join('\n');
@@ -352,14 +409,28 @@ function injectBeforeOutputDirectives(prompt, instructions) {
 }
 function buildFocusFromDirectives(topic) {
   const { intentText, sectionFocus } = parseSectionDirectives(topic || '');
+  // AQL's fallback for a bare topic returns a string in sectionFocus.narrative.
+  // The rest of the pipeline expects arrays, so normalize strings to a single-item
+  // array so counts and cardinality rules work correctly.
+  const normalizeFocus = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim()) return [{ content: raw.trim() }];
+    return undefined;
+  };
+  const normalizedFocus = {
+    graph: normalizeFocus(sectionFocus?.graph),
+    table: normalizeFocus(sectionFocus?.table),
+    diagram: normalizeFocus(sectionFocus?.diagram),
+    narrative: normalizeFocus(sectionFocus?.narrative),
+  };
   return {
     topic: intentText,
-    sectionFocus,
+    sectionFocus: normalizedFocus,
     focusVariables: {
-      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(sectionFocus?.graph || ''),
-      ARCHITXT_TABLE_FOCUS: formatFocusVariable(sectionFocus?.table || ''),
-      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(sectionFocus?.diagram || ''),
-      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(sectionFocus?.narrative || ''),
+      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(normalizedFocus.graph || ''),
+      ARCHITXT_TABLE_FOCUS: formatFocusVariable(normalizedFocus.table || ''),
+      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(normalizedFocus.diagram || ''),
+      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(normalizedFocus.narrative || ''),
     },
   };
 }
@@ -375,7 +446,7 @@ const PARENTHETICAL_ID_RE = /\s*\([^)]*\)/g;
  * matched text (`Singleview`). Any remaining parenthetical identifiers, such as
  * catalog names that include `(COM-001)`, are also removed.
  */
-function sanitizeOutputTokens(str) {
+export function sanitizeOutputTokens(str) {
   if (typeof str !== 'string') return str;
   return str
     .replace(ENTITY_TAG_RE, (_, matchedText) => matchedText.trim())
@@ -396,14 +467,12 @@ function stripEntityTags(str) {
  * or blank.
  *
  * When an array of strings is provided, each item becomes its own bullet line.
- * When an array of table directives is provided, each renders as:
+ * When an array of table/narrative/graph directives is provided, each renders as:
  *   - **Name** — description  (if name is present)
  *   - description               (if name is omitted; LLM should generate one)
  *
  * This aligns with SECTION_DIRECTIVE_CONFIG cardinality rules in the frontend:
- *   - #graph, #narrative -> { name?, content }
- *   - #table             -> TableDirective[] (one per table, with optional #table-name)
- *   - #diagram           -> DiagramDirective[] with #diagram-name, #diagram-type, and content
+ *   - #graph, #narrative, #table, #diagram -> arrays of directives
  *
  * @param {string|{name?:string,content:string}|string[]|{name?:string,content:string}[]|{name:string,type:string,content:string}[]} [raw]
  * @returns {string}
@@ -468,22 +537,21 @@ export function formatFocusVariable(raw) {
  * focus variables (synthesize handler). We take the union of both so that
  * callers who supply section_focus as variables still get the right fragments.
  *
- * @param {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}} parsedSectionFocus
+ * @param {{graph?:Array<{name?:string,content:string}>, table?:Array, diagram?:Array, narrative?:Array<{name?:string,content:string}>}} parsedSectionFocus
  * @param {{ARCHITXT_GRAPH_FOCUS?:string, ARCHITXT_TABLE_FOCUS?:string, ARCHITXT_DIAGRAM_FOCUS?:string, ARCHITXT_NARRATIVE_FOCUS?:string}} merged
- * @returns {{graph?:{name?:string,content:string}, table?:Array, diagram?:Array, narrative?:{name?:string,content:string}}}
+ * @returns {{graph?:Array<{name?:string,content:string}>, table?:Array, diagram?:Array, narrative?:Array<{name?:string,content:string}>}}
  */
 function computeEffectiveFocus(parsedSectionFocus, merged) {
   const effectiveFocus = {
     ...parsedSectionFocus,
   };
   if (merged.ARCHITXT_GRAPH_FOCUS?.trim()) {
-    const graphLine = merged.ARCHITXT_GRAPH_FOCUS.trim().replace(/^- /, '');
-    const namedMatch = graphLine.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
-    if (namedMatch) {
-      effectiveFocus.graph = { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
-    } else {
-      effectiveFocus.graph = { content: graphLine };
-    }
+    const lines = merged.ARCHITXT_GRAPH_FOCUS.trim().split('\n').filter((l) => l.trim());
+    effectiveFocus.graph = lines.map((line) => {
+      const namedMatch = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+      if (namedMatch) return { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
   }
   if (merged.ARCHITXT_TABLE_FOCUS?.trim()) {
     const lines = merged.ARCHITXT_TABLE_FOCUS.trim().split('\n').filter((l) => l.trim());
@@ -504,13 +572,12 @@ function computeEffectiveFocus(parsedSectionFocus, merged) {
     });
   }
   if (merged.ARCHITXT_NARRATIVE_FOCUS?.trim()) {
-    const narrativeLine = merged.ARCHITXT_NARRATIVE_FOCUS.trim().replace(/^- /, '');
-    const namedMatch = narrativeLine.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
-    if (namedMatch) {
-      effectiveFocus.narrative = { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
-    } else {
-      effectiveFocus.narrative = { content: narrativeLine };
-    }
+    const lines = merged.ARCHITXT_NARRATIVE_FOCUS.trim().split('\n').filter((l) => l.trim());
+    effectiveFocus.narrative = lines.map((line) => {
+      const namedMatch = line.match(/^\*\*(.+?)\*\*\s*—\s*(.+)$/);
+      if (namedMatch) return { name: namedMatch[1].trim(), content: namedMatch[2].trim() };
+      return { content: line.replace(/^- /, '').trim() };
+    });
   }
   return effectiveFocus;
 }
@@ -558,7 +625,7 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
   const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
   const { prompt } = composePrompt(effectiveTemplate, variablesWithNames);
   const sectionState = computeSectionState(effectiveFocus);
-  const instructions = formatSectionInstructions(sectionState);
+  const instructions = formatSectionInstructions({ ...sectionState, sectionFocus: effectiveFocus });
   return injectBeforeOutputDirectives(prompt, instructions).trimEnd();
 }
 
@@ -620,7 +687,7 @@ export async function composeMentalModelPromptBatch(db, items) {
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
       const { prompt } = composePrompt(effectiveTemplate, variablesWithNames);
       const sectionState = computeSectionState(effectiveFocus);
-      const instructions = formatSectionInstructions(sectionState);
+      const instructions = formatSectionInstructions({ ...sectionState, sectionFocus: effectiveFocus });
       const finalPrompt = injectBeforeOutputDirectives(prompt, instructions).trimEnd();
       results.push({ composed_query: finalPrompt });
     } catch (err) {

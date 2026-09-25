@@ -164,12 +164,12 @@ function isObservationMemory(memory) {
  * @param {string} memoryId
  * @returns {Promise<{success: boolean, worldIds: Set<string>, observationsSkipped: string[], error?: string}>}
  */
-async function resolveWorldIds(serverId, bankId, memoryId) {
+async function resolveWorldIds(serverId, bankId, memoryId, { getMemoryMemo }) {
   const worldIds = new Set();
   const observationsSkipped = [];
   let memoryType = null;
 
-  const memoryResult = await getMemory(serverId, bankId, memoryId);
+  const memoryResult = await getMemoryMemo(memoryId);
   if (memoryResult.success) {
     const memory = memoryResult.memory;
     memoryType = memory.type || null;
@@ -177,8 +177,10 @@ async function resolveWorldIds(serverId, bankId, memoryId) {
       worldIds.add(memoryId);
     } else if (isObservationMemory(memory)) {
       const sourceIds = Array.isArray(memory.source_memory_ids) ? memory.source_memory_ids : [];
-      for (const sourceId of sourceIds) {
-        const sourceResult = await getMemory(serverId, bankId, sourceId);
+      const sourceResults = await Promise.all(sourceIds.map((id) => getMemoryMemo(id)));
+      for (let i = 0; i < sourceIds.length; i++) {
+        const sourceId = sourceIds[i];
+        const sourceResult = sourceResults[i];
         if (sourceResult.success && isWorldMemory(sourceResult.memory)) {
           worldIds.add(sourceId);
         } else if (sourceResult.success && isObservationMemory(sourceResult.memory)) {
@@ -210,14 +212,18 @@ async function resolveWorldIds(serverId, bankId, memoryId) {
   }
 
   const observationIds = Array.isArray(basedOn.observation) ? basedOn.observation : [];
-  for (const observationId of observationIds) {
-    const obsResult = await getMemory(serverId, bankId, observationId);
+  const observationResults = await Promise.all(observationIds.map((id) => getMemoryMemo(id)));
+  for (let i = 0; i < observationIds.length; i++) {
+    const observationId = observationIds[i];
+    const obsResult = observationResults[i];
     if (obsResult.success && isWorldMemory(obsResult.memory)) {
       worldIds.add(observationId);
     } else if (obsResult.success && isObservationMemory(obsResult.memory)) {
       const sourceIds = Array.isArray(obsResult.memory.source_memory_ids) ? obsResult.memory.source_memory_ids : [];
-      for (const sourceId of sourceIds) {
-        const sourceResult = await getMemory(serverId, bankId, sourceId);
+      const sourceResults = await Promise.all(sourceIds.map((id) => getMemoryMemo(id)));
+      for (let j = 0; j < sourceIds.length; j++) {
+        const sourceId = sourceIds[j];
+        const sourceResult = sourceResults[j];
         if (sourceResult.success && isWorldMemory(sourceResult.memory)) {
           worldIds.add(sourceId);
         } else if (sourceResult.success && isObservationMemory(sourceResult.memory)) {
@@ -265,8 +271,30 @@ export async function resolveMemoryEvidence(serverId, bankId, memoryIds) {
   const errors = [];
   const evidence = [];
 
-  for (const memoryId of memoryIds) {
-    const resolved = await resolveWorldIds(serverId, bankId, memoryId);
+  // Request-scoped memoization so the same memory/chunk is fetched once
+  // even when multiple queried ids reference the same sources.
+  const memoryCache = new Map();
+  const chunkCache = new Map();
+  const getMemoryMemo = async (memoryId) => {
+    if (memoryCache.has(memoryId)) return memoryCache.get(memoryId);
+    const promise = getMemory(serverId, bankId, memoryId);
+    memoryCache.set(memoryId, promise);
+    return promise;
+  };
+  const getChunkMemo = async (chunkId) => {
+    if (chunkCache.has(chunkId)) return chunkCache.get(chunkId);
+    const promise = getChunk(serverId, chunkId);
+    chunkCache.set(chunkId, promise);
+    return promise;
+  };
+
+  const resolvedEntries = await Promise.all(
+    memoryIds.map((memoryId) => resolveWorldIds(serverId, bankId, memoryId, { getMemoryMemo, getChunkMemo }))
+  );
+
+  for (let idx = 0; idx < memoryIds.length; idx++) {
+    const memoryId = memoryIds[idx];
+    const resolved = resolvedEntries[idx];
 
     const perQueryEvidence = {
       memory_id: memoryId,
@@ -291,9 +319,15 @@ export async function resolveMemoryEvidence(serverId, bankId, memoryIds) {
     const documentMap = new Map(); // document_id -> { referencedCount, chunkMap }
     const chunkTextCache = new Map(); // chunk_id -> { chunk_index, chunk_text }
 
-    for (const worldId of resolved.worldIds) {
-      const worldResult = await getMemory(serverId, bankId, worldId);
+    const worldResults = await Promise.all(
+      Array.from(resolved.worldIds).map((worldId) => getMemoryMemo(worldId))
+    );
+
+    const chunkFetches = [];
+    for (let i = 0; i < worldResults.length; i++) {
+      const worldResult = worldResults[i];
       if (!worldResult.success) {
+        const worldId = Array.from(resolved.worldIds)[i];
         logger.warn('Failed to fetch resolved world memory', { serverId, bankId, memoryId, worldId, error: worldResult.error });
         continue;
       }
@@ -302,6 +336,7 @@ export async function resolveMemoryEvidence(serverId, bankId, memoryIds) {
       const documentId = world.document_id;
       const chunkId = world.chunk_id;
       if (!documentId || !chunkId) {
+        const worldId = Array.from(resolved.worldIds)[i];
         logger.warn('World memory missing document_id or chunk_id', { serverId, bankId, memoryId, worldId });
         continue;
       }
@@ -313,40 +348,43 @@ export async function resolveMemoryEvidence(serverId, bankId, memoryIds) {
       docEntry.referencedCount += 1;
 
       if (!docEntry.chunkMap.has(chunkId)) {
-        let chunkIndex = null;
-        let chunkText = '';
-        if (chunkTextCache.has(chunkId)) {
-          const cached = chunkTextCache.get(chunkId);
-          chunkIndex = cached.chunk_index;
-          chunkText = cached.chunk_text;
-        } else {
-          const chunkResult = await getChunk(serverId, chunkId);
-          if (chunkResult.success) {
-            chunkIndex = chunkResult.chunk.chunk_index ?? null;
-            chunkText = chunkResult.chunk.chunk_text ?? '';
-            chunkTextCache.set(chunkId, { chunk_index: chunkIndex, chunk_text: chunkText });
-          } else {
-            logger.warn('Failed to fetch chunk', { serverId, memoryId, worldId, chunkId, error: chunkResult.error });
-          }
+        if (!chunkTextCache.has(chunkId)) {
+          const memoPromise = getChunkMemo(chunkId).then((chunkResult) => {
+            if (chunkResult.success) {
+              chunkTextCache.set(chunkId, {
+                chunk_index: chunkResult.chunk.chunk_index ?? null,
+                chunk_text: chunkResult.chunk.chunk_text ?? '',
+              });
+            } else {
+              logger.warn('Failed to fetch chunk', { serverId, memoryId, worldId: world.id, chunkId, error: chunkResult.error });
+              chunkTextCache.set(chunkId, { chunk_index: null, chunk_text: '' });
+            }
+            return chunkResult;
+          });
+          chunkTextCache.set(chunkId, memoPromise);
+          chunkFetches.push(memoPromise);
         }
 
+        const cached = await (chunkTextCache.get(chunkId) instanceof Promise ? chunkTextCache.get(chunkId) : Promise.resolve(chunkTextCache.get(chunkId)));
         docEntry.chunkMap.set(chunkId, {
           chunk_id: chunkId,
-          chunk_index: chunkIndex,
-          chunk_text: chunkText,
+          chunk_index: cached.chunk_index,
+          chunk_text: cached.chunk_text,
           memory_ids: [],
           memory_types: {},
         });
       }
 
       const chunkEntry = docEntry.chunkMap.get(chunkId);
-      if (!chunkEntry.memory_ids.includes(worldId)) {
-        chunkEntry.memory_ids.push(worldId);
+      if (!chunkEntry.memory_ids.includes(world.id)) {
+        chunkEntry.memory_ids.push(world.id);
       }
       if (world.type) {
-        chunkEntry.memory_types[worldId] = world.type;
+        chunkEntry.memory_types[world.id] = world.type;
       }
     }
+
+    await Promise.all(chunkFetches);
 
     const documentList = [];
     const documents = [];

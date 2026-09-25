@@ -134,13 +134,20 @@ const UUID_ONLY_RE = new RegExp(UUID_RE, 'gi');
 const BRACKETED_EVIDENCE_RE = new RegExp(`【\\s*(${UUID_RE})\\s*】`, 'gi');
 const PARENTHESIZED_EVIDENCE_RE = new RegExp(`\\(\\s*(?:${UUID_RE}(?:\\s*,\\s*)?)+\\s*\\)`, 'gi');
 
+const warnedShortIds = new Set();
+
 function warnIfShortEvidence(evidence, context) {
   if (!Array.isArray(evidence)) return;
   for (const id of evidence) {
-    if (typeof id === 'string' && LIKELY_SHORT_ID_RE.test(id)) {
+    if (typeof id === 'string' && LIKELY_SHORT_ID_RE.test(id) && !warnedShortIds.has(id)) {
+      warnedShortIds.add(id);
       logger.warn('Evidence ID looks like a truncated/short hash; model should emit the full Hindsight memory ID', { context, evidenceId: id });
     }
   }
+}
+
+export function resetShortEvidenceWarnings() {
+  warnedShortIds.clear();
 }
 
 /**

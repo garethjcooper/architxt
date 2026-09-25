@@ -191,11 +191,9 @@ export async function handleSynthesize(serverId, bankId, query, options = {}, db
   });
 
   const focus = options?.section_focus || {};
-  const requestedNarrative = focus.narrative && (typeof focus.narrative === 'string'
-    ? focus.narrative.trim().length > 0
-    : focus.narrative.content?.trim().length > 0);
+  const requestedNarrative = Array.isArray(focus.narrative) && focus.narrative.some((n) => (typeof n === 'string' ? n.trim().length > 0 : n.content?.trim().length > 0));
   const activeSections = [
-    focus.graph && 'graph',
+    Array.isArray(focus.graph) && focus.graph.length > 0 && 'graph',
     focus.table?.length && 'tables',
     focus.diagram?.length && 'diagrams',
     requestedNarrative && 'narrative',

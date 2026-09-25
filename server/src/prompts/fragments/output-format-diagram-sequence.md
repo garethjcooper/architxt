@@ -33,6 +33,18 @@ Messages (arrows):
 - `A->>>B: text` — filled arrowhead
 - `A-->>>B: text` — dashed filled arrowhead
 
+### Message-label quoting rule (MANDATORY)
+
+For any message text after `:`, the text MUST be wrapped in double quotes if it contains any character other than letters, digits, single spaces, or hyphens. This includes parentheses `()`, brackets `[]`, braces `{}`, slashes `/`, backslashes `\`, commas, periods, ampersands, or pipe characters.
+
+- Correct: `A->>B: "POST /convert (raw file bytes, target format)"`
+- Correct: `A->>B: "IDoc payload (HTTPS/TLS)"`
+- Correct: `A->>B: simple payload`
+- Wrong: `A->>B: POST /convert (raw file bytes, target format)` — the unquoted `)` and `/` break the parser.
+- Wrong: `A->>B: IDoc payload (HTTPS/TLS)` — the unquoted `/` and `()` cause a parse error.
+
+If the message text itself contains a double-quote character, use single quotes to wrap it instead, or remove/replace the double quote. Never leave a message text that needs quoting unquoted.
+
 Activations:
 
 - `activate A`

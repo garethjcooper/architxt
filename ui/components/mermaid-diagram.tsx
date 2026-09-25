@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
-import { Maximize2 } from 'lucide-react';
 import { ensureMermaidInitialized, renderMermaid } from '@/lib/mermaid-init';
 
 export interface MermaidDiagramProps {
@@ -24,6 +23,13 @@ export interface MermaidDiagramProps {
  */
 export function MermaidDiagram({ content, className = '', name, type, defaultRenderer }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const detectedType = type || (() => {
+    const match = content.match(
+      /^\s*(?:%%(?:\{[\s\S]*?\})?%%\s*)*(flowchart(?:-v2)?|graph(?:\s+(?:TB|TD|BT|RL|LR))?|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|requirementDiagram|gantt|pie|mindmap|timeline|quadrantChart|xychart|sankey|block-beta|gitGraph|C4Context|C4Container|C4Component|C4Dynamic|packet(?:-beta)?|kanban|architecture(?:-beta)?|user[-_]?(?:journey|Journey))\b/mi,
+    );
+    return match?.[1] ?? 'diagram';
+  })();
+  const displayName = name || detectedType;
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fitToWidth, setFitToWidth] = useState(() => {
@@ -85,28 +91,25 @@ export function MermaidDiagram({ content, className = '', name, type, defaultRen
 
   return (
     <div className={`rounded-md border border-border-default bg-surface-overlay overflow-hidden ${className}`}>
-      {(name || type) && (
-        <div className="px-3 py-2 border-b border-border-default bg-accent-primary-bg flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {name && <span className="text-sm font-medium text-accent-primary-fg truncate">{name}</span>}
-            {type && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded border border-border-default bg-surface-inset text-foreground-subtle whitespace-nowrap">
-                {type}
-              </span>
-            )}
-          </div>
-          <label className="flex items-center gap-1.5 text-[10px] text-accent-primary-fg/80 cursor-pointer shrink-0">
-            <Maximize2 className="h-3 w-3" />
-            <span>Fit</span>
-            <Switch
-              checked={fitToWidth}
-              onCheckedChange={setFitToWidth}
-              size="sm"
-              aria-label="Fit diagram to page width"
-            />
-          </label>
+      <div className="px-3 py-2 border-b border-border-default bg-accent-primary-bg flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {<span className="text-sm font-medium text-accent-primary-fg truncate">{displayName}</span>}
+          {detectedType && displayName !== detectedType && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-border-default bg-surface-inset text-foreground-subtle whitespace-nowrap">
+              {detectedType}
+            </span>
+          )}
         </div>
-      )}
+        <label className="flex items-center gap-1.5 text-[10px] text-foreground-faint cursor-pointer shrink-0">
+          <Switch
+            checked={fitToWidth}
+            onCheckedChange={setFitToWidth}
+            size="sm"
+            aria-label="Fit diagram to page width"
+          />
+          <span>Fit</span>
+        </label>
+      </div>
       <div className="p-3 overflow-x-auto">
         {error ? (
           <div className="text-xs text-destructive-fg/90 font-mono whitespace-pre-wrap">{error}</div>

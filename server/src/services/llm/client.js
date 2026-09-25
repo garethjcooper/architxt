@@ -82,8 +82,11 @@ function buildRequestBody(messages, options, chat_style) {
 function parseResponse(responseData, chat_style) {
   // OpenAI-compatible response formats
   if (chat_style === 'openai') {
+    const message = responseData.choices?.[0]?.message;
     return {
-      content: responseData.choices?.[0]?.message?.content || '',
+      content: message?.content || '',
+      toolCalls: normalizeToolCalls(message?.tool_calls),
+      message,
       usage: responseData.usage || null,
       model: responseData.model,
       finishReason: responseData.choices?.[0]?.finish_reason,
@@ -91,8 +94,11 @@ function parseResponse(responseData, chat_style) {
   }
 
   // Ollama local format
+  const message = responseData.message;
   return {
-    content: responseData.message?.content || '',
+    content: message?.content || '',
+    toolCalls: normalizeToolCalls(message?.tool_calls),
+    message,
     usage: responseData.eval_count ? {
       prompt_tokens: responseData.prompt_eval_count,
       completion_tokens: responseData.eval_count,
@@ -101,6 +107,18 @@ function parseResponse(responseData, chat_style) {
     model: responseData.model,
     finishReason: responseData.done ? 'stop' : null,
   };
+}
+
+function normalizeToolCalls(toolCalls) {
+  if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null;
+  return toolCalls.map((call) => ({
+    id: call.id || `call_${Math.random().toString(36).slice(2)}`,
+    type: call.type || 'function',
+    function: {
+      name: call.function?.name,
+      arguments: call.function?.arguments,
+    },
+  }));
 }
 
 /**
@@ -149,6 +167,7 @@ export async function generateCompletion(messages, options = {}) {
     provider: providerName,
     model: requestOptions.model,
     messageCount: messages.length,
+    bodyTail: JSON.stringify(body).slice(-4000),
   });
 
   const startTime = Date.now();
@@ -231,7 +250,12 @@ export async function generateCompletion(messages, options = {}) {
 
     return {
       success: true,
-      data: parsed,
+      data: {
+        ...parsed,
+        toolCalls: parsed.toolCalls,
+        message,
+        duration_ms: duration,
+      },
     };
 
   } catch (error) {

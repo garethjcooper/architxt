@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Preview and curated pages
 
-The right-hand side of the Workspace is a tabbed surface split into two kinds of tabs: **Preview** tabs are read-only, and **curated page** tabs are editable. Both are scoped to the active research session, so what you open and save travels with the session.
+The middle of the Workspace is a tabbed surface split into two kinds of tabs: **Preview** tabs are read-only, and **curated page** tabs are editable. Both are scoped to the active research session, so what you open and save travels with the session. The Chat column on the far right also produces envelope-like responses that can be copied into curated pages.
 
 ## Preview tabs
 
@@ -31,9 +31,14 @@ Each envelope is independent. The preview tab shows whichever directive produced
 | **Plain** | Strip formatting and view the raw text. |
 | **Copy** | Copy the full envelope or a selected section to the clipboard. |
 | **Save as Markdown** | Download the rendered content as a `.md` file. |
+| **Render Markdown** | Toggle inline Markdown rendering for source blocks. Defaults to on. |
 
 :::tip[Copy to a curated page]
-From a preview you can copy a section directly into an open curated page. This is the fastest way to move from a Reflect answer to a composed document.
+From a preview or from a Chat agent response you can copy a section directly into an open curated page. This is the fastest way to move from a Reflect answer or chat result to a composed document.
+:::
+
+:::tip[Markdown spacing]
+When a preview or chat response contains multiple envelope sections, the renderer inserts blank lines between sections so that headings and prose do not run together.
 :::
 
 ## Curated pages
@@ -59,7 +64,7 @@ Sections are the building blocks of a curated page. The editor shows each sectio
 | **Narrative** | Edit prose directly; headings, lists, and paragraphs are preserved. |
 | **Diagram** | Edit the Mermaid source; the renderer updates as you type. |
 | **Table** | Edit cells, add or remove rows and columns. |
-| **Graph** | Graph sections are currently read-only snapshots from previews. |
+| **Graph** | Graph sections are read-only snapshots from previews. |
 
 ### Soft delete and restore
 
@@ -69,34 +74,46 @@ When you remove a section, it is not immediately discarded. The editor keeps a s
 
 A curated-page tab shows a dirty indicator as soon as you add, edit, delete, or reorder a section. Saving clears the indicator. If you close the tab with unsaved changes, the editor prompts you to save or discard.
 
-## From preview to curated page
+## Evidence modal
+
+When a preview or chat graph includes evidence, you can open the evidence modal to inspect the source documents and memories behind it.
+
+| Control | Behavior |
+|---|---|
+| **Source documents** | Collapsed by default. Expand a document to see its metadata and the chunks that support the selected evidence. |
+| **Chunk text** | The text of a chunk appears when you expand it. Selecting a document loads all of its chunks at once. |
+| **Document metadata** | Document details appear when you expand a source document. |
+
+## From preview or chat to curated page
 
 The typical flow is:
 
-1. Run a Reflect query or open a mental-model preview.
-2. Inspect the result in a read-only Preview tab.
-3. Copy one or more sections from the preview.
+1. Run a Reflect query, open a mental-model preview, or ask the Chat agent a question.
+2. Inspect the result in a read-only Preview tab or in the Chat column.
+3. Copy one or more sections from the preview or chat response.
 4. Paste them into a curated page, or create a new page from the copied content.
 5. Edit, reorder, and supplement the sections until the page says what you need.
 6. Save the curated page to persist it in the session.
 
+Agent responses in Chat also expose an **Add to page** action on each envelope section, so you can move a chat result into a curated page without switching tabs.
+
 ## How it fits into the Workspace
 
 ```text
-Reflect query ──► Preview tab (read-only)
-                     │
-                     ▼
-             Curated page (editable, saved in session)
-                     │
-                     ▼
-           Contextual data / mental-model sources
+Reflect query / Chat reply ──► Preview tab (read-only)
+                                    │
+                                    ▼
+                         Curated page (editable, saved in session)
+                                    │
+                                    ▼
+                      Contextual data / mental-model sources
 ```
 
-- **Reflect queries** produce the content that lands in previews.
+- **Reflect queries** and **Chat replies** produce the content that lands in previews.
 - **Preview tabs** let you inspect and select content.
 - **Curated pages** let you compose the final document.
-- **Session items** record the query history and curated pages for later review.
+- **Session items** record the query, chat, and curated-page history for later review.
 
 ## Summary
 
-Preview tabs are read-only windows onto Reflect results and mental-model content. Curated pages are editable session-scoped documents made of sections that can be copied from previews, edited, reordered, and saved.
+Preview tabs are read-only windows onto Reflect results, Chat agent responses, and mental-model content. Curated pages are editable session-scoped documents made of sections that can be copied from previews or chat, edited, reordered, and saved.

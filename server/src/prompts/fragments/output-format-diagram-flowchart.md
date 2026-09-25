@@ -21,10 +21,23 @@ Arrows:
 - `id1 -.-> id2` — dotted arrow
 - `id1 ==> id2` — thick arrow
 - `id1 -- text --> id2` — labeled arrow
+- `id1 -->|text| id2` — arrow label in pipe syntax
 - `id1 --x id2` — arrow with cross
 - `id1 --o id2` — circle arrowhead
 - `id1 -> id2` — open arrowhead
 - `id1 -->|id2` — async (stroke)
+
+### Arrow-label quoting rule (MANDATORY)
+
+For any arrow label written as `id1 -->|label| id2`, the label MUST be wrapped in double quotes if it contains any character other than letters, digits, single spaces, or hyphens. This includes parentheses `()`, brackets `[]`, braces `{}`, slashes `/`, backslashes `\`, commas, periods, ampersands, or pipe characters.
+
+- Correct: `A -->|"IDoc payload (HTTPS/TLS)"| B`
+- Correct: `A -->|"POST /convert (raw file bytes, target format)"| B`
+- Correct: `A -->|simple payload| B`
+- Wrong: `A -->|POST /convert (raw file bytes, target format)| B` — the unquoted `)` terminates the label and breaks the parser.
+- Wrong: `A -->|IDoc payload (HTTPS/TLS)| B` — the unquoted `/` and `()` cause a parse error.
+
+If the label itself contains a double-quote character, use single quotes to wrap it instead, or remove/replace the double quote. Never leave a label that needs quoting unquoted.
 
 Subgraphs:
 

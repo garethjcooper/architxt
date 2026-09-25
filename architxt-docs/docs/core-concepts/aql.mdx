@@ -16,6 +16,8 @@ An AQL query is a plain text string. The parser recognizes three things:
 2. **Block directives** — `#graph`, `#table`, `#diagram`, or `#narrative` ... `#end`.
 3. **References** — `[[Label (type:id)]]` for entities and `[[source — label → target]]` for edges.
 
+Only one `#graph` block is allowed per query.
+
 If you write only plain text, AQL treats it as an implicit narrative request:
 
 ```aql

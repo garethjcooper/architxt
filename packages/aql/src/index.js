@@ -83,11 +83,11 @@ export const ALLOWED_KEYS_BY_BLOCK = Object.freeze({
  */
 
 /**
- * Convert parsed AQL blocks into the legacy section-focus shape used by the server
- * prompt templates and the UI API callers.
+ * Convert parsed AQL blocks into the section-focus shape used by server
+ * prompt templates and UI API callers.
  *
- *   graph     -> { name?, content }
- *   narrative -> { name?, content }
+ *   graph     -> Array<{name?, content}>
+ *   narrative -> Array<{name?, content}>
  *   table     -> Array<{name?, content}>
  *   diagram   -> Array<{name?, type, content}>
  *
@@ -109,13 +109,8 @@ export function toSectionFocus(aqlQuery) {
   for (const block of blocks) {
     const { kind, name, type, body } = block;
     if (kind === 'graph' || kind === 'narrative') {
-      const entry = { name: name || undefined, content: body };
-      if (sectionFocus[kind]) {
-        sectionFocus[kind].content = sectionFocus[kind].content + (body ? '\n' + body : '');
-        if (name && !sectionFocus[kind].name) sectionFocus[kind].name = name;
-      } else {
-        sectionFocus[kind] = entry;
-      }
+      if (!sectionFocus[kind]) sectionFocus[kind] = [];
+      sectionFocus[kind].push({ name: name || undefined, content: body });
       if (body) topicCandidates.push(body);
       continue;
     }
@@ -381,6 +376,14 @@ export function parseAql(rawQuery) {
       bodyReferences: refs,
     };
   });
+
+  const graphBlocks = builtBlocks.filter((b) => b.kind === 'graph');
+  if (graphBlocks.length > 1) {
+    errors.push({
+      message: `Only one #graph block is allowed; found ${graphBlocks.length}`,
+      line: graphBlocks[1].startLine,
+    });
+  }
 
   const remainingText = strippedLines
     .map((l) => l.trim())

@@ -56,7 +56,7 @@ export const UNIFIED_RESPONSE_SCHEMA = {
           },
         },
       },
-      required: ['nodes', 'edges'],
+      required: ['name', 'nodes', 'edges'],
     },
     tables: {
       type: 'array',

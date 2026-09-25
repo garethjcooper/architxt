@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { NarrativeViewer } from './narrative-viewer';
-import { buildEnvelopeMarkdown, formatPropertiesCompact, normalizeEnvelopeFromNullable, parseMarkdownTable } from '@/lib/envelope-markdown';
+import { buildEnvelopeMarkdown, formatPropertiesCompact, normalizeEnvelopeFromNullable, ensureEnvelopeIds } from '@/lib/envelope-markdown';
 import { EnvelopeControls } from './envelope-controls';
 import { toast } from 'sonner';
 import { downloadMarkdown } from '@/lib/utils';
@@ -18,8 +18,8 @@ import type { NarrativeBlock } from './narrative-blocks';
 export type { EnvelopeCopyEvent };
 
 export interface EnvelopeViewerProps {
-  /** Envelope to render. */
-  envelope: ResearchStepSummary | DiscoverStepResponse | null;
+  /** Envelope to render. May be a research step (with .envelope), a raw UnifiedEnvelope, or null. */
+  envelope: ResearchStepSummary | DiscoverStepResponse | UnifiedEnvelope | null;
   /** Human-readable title used for the section index and downloads. */
   title?: string;
   /** Optional override for the header bar title. Defaults to title. */
@@ -83,8 +83,12 @@ export function EnvelopeViewer({
   headerTitle,
 }: EnvelopeViewerProps) {
   const markdown = useMemo(() => {
-    const normalized = normalizeEnvelopeFromNullable(envelope);
-    return buildEnvelopeMarkdown(normalized);
+    const normalizedForMarkdown = !envelope
+      ? normalizeEnvelopeFromNullable(null)
+      : 'envelope' in (envelope as any)
+        ? normalizeEnvelopeFromNullable(envelope as ResearchStepSummary | DiscoverStepResponse)
+        : ensureEnvelopeIds(envelope as UnifiedEnvelope);
+    return buildEnvelopeMarkdown(normalizedForMarkdown);
   }, [envelope]);
   const [internalShowIndex, setInternalShowIndex] = useState(showIndex);
   const [internalPlain, setInternalPlain] = useState(plainProp ?? false);
@@ -113,11 +117,15 @@ export function EnvelopeViewer({
 
   const titleLabel = useMemo(() => {
     if (!envelope) return title;
-    if ('intent_text' in envelope && typeof (envelope as any).intent_text === 'string') return (envelope as any).intent_text;
+    if ('intent_text' in (envelope as any) && typeof (envelope as any).intent_text === 'string') return (envelope as any).intent_text;
     return title;
   }, [envelope, title]);
 
-  const normalized = useMemo(() => normalizeEnvelopeFromNullable(envelope), [envelope]);
+  const normalized = useMemo(() => {
+    if (!envelope) return normalizeEnvelopeFromNullable(null);
+    if ('envelope' in (envelope as any)) return normalizeEnvelopeFromNullable(envelope as ResearchStepSummary | DiscoverStepResponse);
+    return ensureEnvelopeIds(envelope as UnifiedEnvelope);
+  }, [envelope]);
 
   const [focus, setFocus] = useState<
     | { kind: 'narrative'; name: string; content: string }
@@ -177,37 +185,6 @@ export function EnvelopeViewer({
     }
     setFocus({ kind: 'narrative', name: parsed?.name || block.title || 'Narrative', content: resolvedEvent?.payload || _markdown });
   }, [normalized, parseSyntheticHeading, titleLabel]);
-
-  const structuredItems = useMemo(() => {
-    if (!normalized) return undefined;
-    const items: NonNullable<React.ComponentPropsWithoutRef<typeof EnvelopeControls>['structuredItems']> = {};
-    const graph = normalized.graph;
-    if (graph && ((graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0)) {
-      items.graph = {
-        payload: JSON.stringify(graph, null, 2),
-        label: titleLabel,
-      };
-    }
-    const tables = normalized.tables;
-    if (tables && tables.length > 0) {
-      // For top-level structured controls we use the first table's id; multi-table
-      // copies preserve all ids in the JSON payload, and add paths filter by id/name.
-      items.tables = {
-        payload: JSON.stringify(tables, null, 2),
-        label: titleLabel,
-        id: tables[0]?.id,
-      };
-    }
-    const diagrams = normalized.diagrams;
-    if (diagrams && diagrams.length > 0) {
-      items.diagrams = {
-        payload: JSON.stringify(diagrams, null, 2),
-        label: titleLabel,
-        id: diagrams[0]?.id,
-      };
-    }
-    return Object.keys(items).length > 0 ? items : undefined;
-  }, [normalized, titleLabel]);
 
   const handleCopy = () => {
     if (!markdown) return;
@@ -298,18 +275,6 @@ export function EnvelopeViewer({
         if (table) {
           return { type: 'tables', payload: JSON.stringify([table], null, 2), label: table.name, evidence, id: table.id };
         }
-      }
-
-      // Markdown tables inside narrative that do not correspond to an envelope
-      // table are promoted to JSON table data when copied.
-      const parsed = parseMarkdownTable(contentMarkdown);
-      if (parsed) {
-        return {
-          type: 'tables',
-          payload: JSON.stringify([{ name: trimmed || 'Table', columns: parsed.columns, rows: parsed.rows }], null, 2),
-          label: trimmed || 'Table',
-          evidence,
-        };
       }
 
       // Diagrams are rendered as "Diagram: <name>" headings; map back to envelope.diagrams by id then name.

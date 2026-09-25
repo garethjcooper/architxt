@@ -12,12 +12,16 @@ The **Scope / Reflect query** panel sits at the top of the left column. It is a 
 
 ### Writing a query
 
-Queries are plain text. The editor gives you two autocomplete helpers:
+Queries are plain text. The editor gives you autocomplete helpers:
 
 - Type `#` to see base document section types.
 - Type `[[` to see the list of grounded entities and edges from the contextual graph.
 
 You can double-click an entity or edge in the autocomplete to insert it into the query. This is useful when you want the model to reason about a specific known entity rather than relying on the query text alone.
+
+:::tip[AQL syntax errors]
+Reflect now surfaces AQL syntax errors directly in the Run Query flow. If the query cannot be parsed, the Preview tab shows the error message and the query is not submitted.
+:::
 
 ### Query options
 
@@ -26,7 +30,7 @@ Click the **Options** switch to show the Reflect-specific options. The defaults 
 | Option | Default | What it does |
 |---|---|---|
 | **Fact types** | `world`, `observation` | Restricts the kinds of facts Reflect can draw on. |
-| **Budget** | `low` | How much retrieval and generation effort to spend. Options are `low`, `mid`, `high`. |
+| **Budget** | `high` | How much retrieval and generation effort to spend. Options are `low`, `mid`, `high`. |
 | **Max tokens** | `4096` | Maximum length of the generated response. |
 | **Include source facts** | Off | When on, the response includes the source facts used to generate it. |
 | **Exclude mental models** | Off | When on, Reflect ignores plain and derived mental models attached to entities. |
@@ -39,6 +43,14 @@ Press the **Run Query** button or hit Enter to submit. While the query is runnin
 
 The **Session items** panel sits below the query panel in the left column. It lists every step in the current session, in chronological order. Each item represents one query or one curated page created in the session.
 
+### Origin filter chips
+
+The panel header contains filter chips that limit the visible session items by where they came from. Click a chip to toggle it. This makes it easier to find, for example, only Reflect results or only curated pages in a busy session.
+
+### Searching session items
+
+A freetext search filter in the panel header lets you narrow the list by title or query text. Multi-word searches use AND matching, so `charging singleview` shows only items that contain both words.
+
 ### What each item shows
 
 | Element | Meaning |
@@ -47,6 +59,10 @@ The **Session items** panel sits below the query panel in the left column. It li
 | **Status dot** | `running`, `failed`, or completed. |
 | **Title or query preview** | If the item has a title, the title is shown; otherwise the first line of the query is shown. |
 | **Expand chevron** | Multi-line queries can be expanded to show the full text. |
+
+### Panel counters
+
+The session items header shows the total number of items in scope and how many match the active filters, for example `5 (2)`. This mirrors the counter style used elsewhere in the Workspace.
 
 ### Actions on an item
 

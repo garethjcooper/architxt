@@ -33,6 +33,10 @@ import {
   buildEntityInfoMap,
   validateEntityInfoPayload,
 } from '../services/entity-info.js';
+import {
+  resolveEntitiesFromText,
+  groupResolvedEntities,
+} from '../services/agent/entity-resolver.js';
 
 const logger = createLogger('entities-route');
 const router = Router();
@@ -768,6 +772,77 @@ router.post('/documents', async (req, res) => {
   }));
   sendResponse({
     res, status: 200, data: docs,
+    logger, method: 'POST', path, duration: Date.now() - start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/resolve-from-text:
+ *   post:
+ *     summary: Resolve catalog entities mentioned in plain text
+ *     description: |
+ *       Deterministic, catalog-only entity resolution. Parses explicit
+ *       [[Name (type:entity_id)]] references, scans clean text against entity
+ *       names and aliases, and returns canonical references. No entities are
+ *       created or modified.
+ *     tags: [Entities]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 description: Text to scan for entity references
+ *     responses:
+ *       200:
+ *         description: Resolved entities
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 entities:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       db_id: { type: integer }
+ *                       entity_id: { type: string }
+ *                       name: { type: string }
+ *                       type_name: { type: string }
+ *                       canonical_reference: { type: string }
+ *                       matched_text: { type: string }
+ *                       from_tag: { type: boolean }
+ *       400:
+ *         description: Validation error
+ */
+router.post('/resolve-from-text', async (req, res) => {
+  const start = Date.now();
+  const path = '/entities/resolve-from-text';
+
+  const textCheck = validateRequiredString({ req, res, field: 'text', logger, path, start });
+  if (!textCheck.valid) return;
+
+  const result = await resolveEntitiesFromText(req.app.locals.db || db, textCheck.value);
+
+  if (!result.success) {
+    const status = result.code === 'VALIDATION_ERROR' ? 400 : 500;
+    sendResponse({
+      res, status, error: result.error, code: result.code,
+      logger, method: 'POST', path, duration: Date.now() - start,
+    });
+    return;
+  }
+
+  const entities = groupResolvedEntities(result.data);
+
+  sendResponse({
+    res, status: 200, data: { entities },
     logger, method: 'POST', path, duration: Date.now() - start,
   });
 });
