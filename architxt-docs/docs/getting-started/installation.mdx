@@ -80,6 +80,8 @@ Other common Docling images:
 | `quay.io/docling-project/docling-serve` | GPU-accelerated parsing. |
 | `quay.io/docling-project/docling-serve-cpu:arm-cpu` | Apple Silicon Macs (replace `cpu` with `arm-cpu`). |
 
+The compose file builds Docling from `docling.Dockerfile`, which installs `docling` and `docling-serve` with the CPU-only PyTorch wheel (`--extra-index-url https://download.pytorch.org/whl/cpu`) for correct image extraction.
+
 Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
 
 ```bash
