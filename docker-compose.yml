@@ -60,6 +60,7 @@ services:
     environment:
       # The UI is not needed for the architxt pipeline.
       DOCLING_SERVE_ENABLE_UI: "false"
+      DOCLING_SERVE_MAX_SYNC_WAIT: "${DOCLING_SERVE_MAX_SYNC_WAIT:-120}"
     expose:
       - "5001"
     restart: unless-stopped
