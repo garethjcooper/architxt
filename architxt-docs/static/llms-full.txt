@@ -70,13 +70,11 @@ This is optional if you only plan to upload plain text or images handled directl
 
 ```bash
 # Requires Python 3.10–3.12
-pip install docling docling-serve --extra-index-url https://download.pytorch.org/whl/cpu
+pip install docling
 
 # Default port is 5001
 docling serve
 ```
-
-The `--extra-index-url` installs the CPU-only PyTorch wheel, which is required for correct image extraction. Without it, embedded images may not be extracted properly.
 
 ### Point architxt at the Docling server
 
