@@ -80,6 +80,13 @@ Other common Docling images:
 | `quay.io/docling-project/docling-serve` | GPU-accelerated parsing. |
 | `quay.io/docling-project/docling-serve-cpu:arm-cpu` | Apple Silicon Macs (replace `cpu` with `arm-cpu`). |
 
+Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
+
+```bash
+DOCLING_SERVE_MAX_SYNC_WAIT=2400 \
+  docker compose --profile hindsight up --build -d
+```
+
 ### 4. Open the UI
 
 Once the logs look healthy, open:

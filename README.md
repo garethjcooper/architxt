@@ -108,7 +108,7 @@ Other profiles:
 | + Docling | `docker compose --profile docling up --build -d` | architxt + SQLite + Docling |
 | + Hindsight | `docker compose --profile hindsight up --build -d` | Full stack |
 
-For GPU Docling or Apple Silicon image variants, see [Docker / Podman](#docker--podman-optional).
+**Overriding Docling settings:** `DOCLING_SERVE_MAX_SYNC_WAIT` defaults to 1200 seconds (20 minutes) inside compose. To change it, export the variable before running compose or create a `.env` file in the project root; `server/.env` is not used for compose variable interpolation.
 
 ### Option 2: Local development
 
