@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir uv
 RUN uv pip install --system --no-cache-dir \
     docling==2.96.0 \
     docling-serve==1.20.0 \
-    rapidocr_onnxruntime
+    rapidocr==3.8.1
 
 EXPOSE 5001
 
