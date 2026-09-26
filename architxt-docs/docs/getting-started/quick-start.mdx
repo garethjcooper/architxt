@@ -94,6 +94,10 @@ For each extracted document:
 
 ## 3. Connect Hindsight
 
+If you started architxt with the `hindsight` Docker Compose profile, this step is already done: the profile registers a default Hindsight server at `http://hindsight:8888` and creates a memory bank named `architxt`. You can skip straight to [4. Sync architxt data into Hindsight](#4-sync-architxt-data-into-hindsight) and pick the pre-configured server and bank from the dropdowns.
+
+For local development or a manually started Hindsight server, follow the steps below.
+
 ### Add a Hindsight server
 
 1. Open **Servers** from the left nav.
@@ -121,7 +125,7 @@ For local Hindsight servers this is often not required.
 
 Banks live in Hindsight, not in architxt. Create the bank using either the [Hindsight Control Plane UI](https://hindsight.vectorize.io/developer/installation#control-plane) or the Hindsight CLI. You will select that bank inside architxt in the next section.
 
-## 5. Sync architxt data into Hindsight
+## 4. Sync architxt data into Hindsight
 
 Open **Hindsight Sync** from the left nav.
 
@@ -150,7 +154,7 @@ Open **Hindsight Sync** from the left nav.
 Click the **daemon status monitor** in the header bar to open the operations polling dialog and watch Hindsight retain/push progress, similar to the document extraction monitor.
 :::
 
-## 6. Enable automatic graph sync
+## 5. Enable automatic graph sync
 
 1. Return to **Servers** and click **Banks** on the Hindsight server row.
 2. Select the checkbox for the bank you are using.
@@ -158,7 +162,7 @@ Click the **daemon status monitor** in the header bar to open the operations pol
 4. Uncheck **Discovery**. Discovery is experimental and its output is not directly consumable yet.
 5. Click **Save**.
 
-## 7. Run the contextual-graph sync job
+## 6. Run the contextual-graph sync job
 
 1. Open **Context Patches** → **Sync Jobs** from the left nav.
 2. Click the **Run sync job** button and confirm.
@@ -228,7 +232,7 @@ Each grounded edge can have zero or more contextual edges attached.
 
 This keeps mental models up to date on subsequent sync runs.
 
-## 8. Compose a curated page
+## 7. Compose a curated page
 
 1. Open **Workspace** from the left nav.
 2. If no workspace session exists, a default session called **Workspace session** is created automatically.

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { createLogger } from './utils/logger.js';
 import { db, closeDatabase } from './db/connection.js';
+import { ensureDefaultHindsightServer } from './services/hindsight/seed.js';
 import documentsRoute from './routes/documents.js';
 import contextsRoute from './routes/contexts.js';
 import tagsRoute from './routes/tags.js';
@@ -272,7 +273,7 @@ app.get('*', (req, res) => {
 });
 
 // Start server
-const server = app.listen(config.server.port, config.server.host, () => {
+const server = app.listen(config.server.port, config.server.host, async () => {
   const baseUrl = `http://${config.server.host}:${config.server.port}`;
   const uiAvailable = fs.existsSync(uiDistPath);
   logger.info(`architxt server running at ${baseUrl}`);
@@ -283,6 +284,27 @@ const server = app.listen(config.server.port, config.server.host, () => {
   } else {
     logger.warn(`UI not found: ui/dist/ missing`);
   }
+
+  // Optionally auto-register a default Hindsight server + bank on startup.
+  // This is fire-and-forget: the API is up even if Hindsight isn't reachable yet.
+  try {
+    const seedResult = await ensureDefaultHindsightServer(db);
+    if (seedResult.seeded && seedResult.bank) {
+      logger.info('Default Hindsight bank ready', {
+        bank: seedResult.bank,
+        serverId: seedResult.id,
+      });
+    } else if (seedResult.seeded) {
+      logger.info('Default Hindsight server ready', { serverId: seedResult.id });
+    }
+  } catch (err) {
+    logger.error('Failed to seed default Hindsight server', { error: err.message });
+  }
+
+  // Spawn daemons after server starts and optional Hindsight seed completes
+  daemon = spawnDaemon();
+  hindsightPollDaemon = spawnHindsightPollDaemon();
+  contextualGraphSyncDaemon = spawnContextualGraphSyncDaemon();
 });
 
 // Allow long-running Hindsight research calls (e.g. reflect, dry-run extract) to
@@ -290,11 +312,6 @@ const server = app.listen(config.server.port, config.server.host, () => {
 // Bump both to match the 15-minute UI proxy and Hindsight client timeout.
 server.requestTimeout = 900000;
 server.headersTimeout = 120000;
-
-// Spawn daemons after server starts
-daemon = spawnDaemon();
-hindsightPollDaemon = spawnHindsightPollDaemon();
-contextualGraphSyncDaemon = spawnContextualGraphSyncDaemon();
 
 // Graceful shutdown
 let isShuttingDown = false;

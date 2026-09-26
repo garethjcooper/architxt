@@ -20,19 +20,76 @@ services:
       ARCHITXT_LOG_DIR: /app/server/logs
       ARCHITXT_TEMP_DIR: /app/server/tmp
       ARCHITXT_HOST: 0.0.0.0
+      # When the docling profile is active, architxt talks to the docling service
+      # by its compose network name instead of localhost.
+      DOCLING_SERVICE_URL: http://docling:5001
+      # NOTE: Set ARCHITXT_HINDSIGHT_DEFAULT_URL and ARCHITXT_HINDSIGHT_DEFAULT_BANK
+      # in server/.env so they are picked up by the env_file above. Defining them
+      # here with empty defaults would override the env_file values.
     volumes:
       - architxt-database:/app/server/database
       - architxt-documents:/app/server/documents
       - architxt-logs:/app/server/logs
       - architxt-tmp:/app/server/tmp
     restart: unless-stopped
+    depends_on:
+      docling:
+        condition: service_started
+        required: false
+      hindsight:
+        condition: service_healthy
+        required: false
     # Give the server + daemons time to shut down cleanly (default is 10s)
     stop_grace_period: 30s
-    healthcheck:  # Existing content continues...
+    healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => { if (!r.ok) throw new Error('not ok'); process.exit(0) }).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
+
+  # Docling document-conversion service.
+  # Active with: docker compose --profile docling up --build
+  # Also activated automatically by the hindsight profile.
+  docling:
+    profiles:
+      - docling
+      - hindsight
+    container_name: architxt-docling
+    image: ${DOCLING_IMAGE:-quay.io/docling-project/docling-serve-cpu}
+    environment:
+      # The UI is not needed for the architxt pipeline.
+      DOCLING_SERVE_ENABLE_UI: "false"
+    expose:
+      - "5001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Hindsight agent-memory service with the embedded pg0 database.
+  # Active with: docker compose --profile hindsight up --build
+  hindsight:
+    profiles:
+      - hindsight
+    container_name: architxt-hindsight
+    image: ghcr.io/vectorize-io/hindsight:latest
+    env_file:
+      - server/.env
+    ports:
+      - "8888:8888"
+      - "9999:9999"
+    volumes:
+      - hindsight-data:/home/hindsight/.pg0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
       start_period: 60s
 
 volumes:
@@ -40,3 +97,4 @@ volumes:
   architxt-documents:
   architxt-logs:
   architxt-tmp:
+  hindsight-data:

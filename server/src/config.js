@@ -42,7 +42,7 @@ export const providers = {
   ollama_cloud: {
     base_url: getEnv('ARCHITXT_OLLAMA_CLOUD_URL', 'https://ollama.com/v1'),
     api_key: getEnv('ARCHITXT_OLLAMA_CLOUD_API_KEY', ''),
-    default_model: getEnv('ARCHITXT_OLLAMA_CLOUD_DEFAULT_MODEL', 'glm-5.3-flash:cloud'),
+    default_model: getEnv('ARCHITXT_OLLAMA_CLOUD_DEFAULT_MODEL', 'gpt-oss:120b-cloud'),
     timeout_ms: getInt('ARCHITXT_OLLAMA_CLOUD_TIMEOUT_MS', 300000),
     chat_style: getEnv('ARCHITXT_OLLAMA_CLOUD_CHAT_STYLE', 'openai')
   },
@@ -193,7 +193,7 @@ export const config = {
     api_key: getEnv('ARCHITXT_AGENT_API_KEY', ''),
     base_url: getEnv('ARCHITXT_AGENT_BASE_URL', ''),
     model: getEnv('ARCHITXT_AGENT_MODEL', providers.ollama_cloud.default_model),
-    temperature: parseFloat(getEnv('ARCHITXT_AGENT_TEMPERATURE', '0.7')),
+    temperature: parseFloat(getEnv('ARCHITXT_AGENT_TEMPERATURE', '0.2')),
     timeout_ms: getInt('ARCHITXT_AGENT_TIMEOUT_MS', 300000),
     classify_intent_max_tokens: getEnv('ARCHITXT_AGENT_CLASSIFY_INTENT_MAX_TOKENS', '') !== ''
       ? getInt('ARCHITXT_AGENT_CLASSIFY_INTENT_MAX_TOKENS', 0)

@@ -14,6 +14,7 @@ WORKDIR /app
 
 # Copy workspace manifests first for better layer caching
 COPY package.json ./
+COPY packages/aql/package.json ./packages/aql/
 COPY packages/entity-matcher/package.json ./packages/entity-matcher/
 COPY server/package.json ./server/
 COPY ui/package.json ./ui/
@@ -24,6 +25,7 @@ RUN npm install
 COPY .git ./.git
 
 # Copy source code
+COPY packages/aql ./packages/aql
 COPY packages/entity-matcher ./packages/entity-matcher
 COPY server ./server
 COPY ui ./ui
