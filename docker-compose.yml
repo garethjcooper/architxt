@@ -57,6 +57,8 @@ services:
       - hindsight
     container_name: architxt-docling
     image: ${DOCLING_IMAGE:-quay.io/docling-project/docling-serve-cpu}
+    env_file:
+      - server/.env
     environment:
       # The UI is not needed for the architxt pipeline.
       DOCLING_SERVE_ENABLE_UI: "false"
