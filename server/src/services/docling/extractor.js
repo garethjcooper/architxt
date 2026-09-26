@@ -76,6 +76,7 @@ export async function extract(fileBuffer, filename, options = {}) {
     const result = await convertDocument(fileBuffer, filename, {
       to_format: 'md',
       image_export_mode: 'embedded',
+      generate_picture_images: true,
       do_ocr: true,
       table_mode: 'accurate',
       ...options
