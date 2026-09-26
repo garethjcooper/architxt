@@ -64,21 +64,13 @@ Start a profile with:
 docker compose up --build -d
 
 # Core + document parsing
-DOCLING_IMAGE=quay.io/docling-project/docling-serve-cpu \
-  docker compose --profile docling up --build -d
+docker compose --profile docling up --build -d
 
 # Full stack
-DOCLING_IMAGE=quay.io/docling-project/docling-serve-cpu \
-  docker compose --profile hindsight up --build -d
+docker compose --profile hindsight up --build -d
 ```
 
-Other common Docling images:
-
-| Tag | Use when |
-|---|---|
-| `quay.io/docling-project/docling-serve-cpu` | CPU-only machines (default). |
-| `quay.io/docling-project/docling-serve` | GPU-accelerated parsing. |
-| `quay.io/docling-project/docling-serve-cpu:arm-cpu` | Apple Silicon Macs (replace `cpu` with `arm-cpu`). |
+The `docling` service is built from the included `docling.Dockerfile`, which pins the Docling versions that work well with architxt. On first start the container downloads OCR/table models and warms up the pipeline; this can take **1–2 minutes** before the service reports healthy. Wait for `Application startup complete` in the Docling logs before uploading documents.
 
 Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
 
@@ -89,7 +81,7 @@ DOCLING_SERVE_MAX_SYNC_WAIT=2400 \
 
 ### 4. Open the UI
 
-Once the logs look healthy, open:
+Once all services report healthy — especially Docling, which can take 1–2 minutes on first start — open:
 
 ```text
 http://localhost:3000

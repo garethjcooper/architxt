@@ -108,6 +108,8 @@ Other profiles:
 | + Docling | `docker compose --profile docling up --build -d` | architxt + SQLite + Docling |
 | + Hindsight | `docker compose --profile hindsight up --build -d` | Full stack |
 
+**Docling startup:** The `docling` service is built from the included `docling.Dockerfile`. On first start it downloads OCR/table models and warms up the pipeline, which can take **1–2 minutes** before the health check passes. Check the Docling logs with `docker compose --profile hindsight logs -f docling` and wait for `Application startup complete` before uploading documents.
+
 **Overriding Docling settings:** `DOCLING_SERVE_MAX_SYNC_WAIT` defaults to 1200 seconds (20 minutes) inside compose. To change it, export the variable before running compose or create a `.env` file in the project root; `server/.env` is not used for compose variable interpolation.
 
 ### Option 2: Local development
@@ -217,13 +219,16 @@ docker compose --profile docling up --build
 This also starts a Docling conversion container. architxt connects to it
 automatically at `http://docling:5001`. No local `pip install docling` needed.
 
-The default image is the CPU-only variant. For a GPU variant, set `DOCLING_IMAGE`
-in your shell or `.env`:
+The Docling service is built from the included `docling.Dockerfile`, which pins
+known-working versions of Docling and its dependencies. On first start it
+downloads OCR/table models and warms up the pipeline; this can take **1–2 minutes**
+before the health check passes. Check the logs with:
 
 ```bash
-DOCLING_IMAGE=quay.io/docling-project/docling-serve-cu128 \
-  docker compose --profile docling up --build
+docker compose --profile docling logs -f docling
 ```
+
+and wait for `Application startup complete` before uploading documents.
 
 #### 3. architxt + Docling + Hindsight (full stack)
 
