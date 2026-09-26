@@ -22,7 +22,7 @@ services:
       ARCHITXT_HOST: 0.0.0.0
       # When the docling profile is active, architxt talks to the docling service
       # by its compose network name instead of localhost.
-      DOCLING_SERVICE_URL: http://docling:5001
+      DOCLING_SERVICE_URL: "${DOCLING_SERVICE_URL:-http://docling:5001}"
       # NOTE: Set ARCHITXT_HINDSIGHT_DEFAULT_URL and ARCHITXT_HINDSIGHT_DEFAULT_BANK
       # in server/.env so they are picked up by the env_file above. Defining them
       # here with empty defaults would override the env_file values.
