@@ -19,5 +19,6 @@
     "clean": "node scripts/clean.js",
     "purge": "node scripts/purge.js",
     "lint": "cd server && npm run lint && cd ../ui && npm run lint"
-  }
+  },
+  "license": "MIT"
 }
