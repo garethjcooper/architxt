@@ -70,7 +70,16 @@ docker compose --profile docling up --build -d
 docker compose --profile hindsight up --build -d
 ```
 
-The `docling` service is built from the included `docling.Dockerfile`, which pins the Docling versions that work well with architxt. On first start the container downloads OCR/table models and warms up the pipeline; this can take **1–2 minutes** before the service reports healthy. Wait for `Application startup complete` in the Docling logs before uploading documents.
+The `docling` service is built from the included `docling.Dockerfile`, which pins the Docling versions that work well with architxt. The image is CPU-only by default. On first start the container downloads OCR/table models and warms up the pipeline; this can take **1–2 minutes** before the service reports healthy. Wait for `Application startup complete` in the Docling logs before uploading documents.
+
+If you have another machine with a more powerful CPU or a GPU, you can run Docling there instead and point architxt at it. Set `DOCLING_SERVICE_URL` at Docker Compose interpolation time:
+
+```bash
+DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
+  docker compose --profile hindsight up --build -d
+```
+
+See [Configuration: external Docling host](./configuration#using-an-external-docling-host-for-example-a-gpu-machine) for details.
 
 Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
 
