@@ -68,7 +68,6 @@ services:
       #   export DOCLING_SERVE_MAX_SYNC_WAIT=2400
       # Docker Compose does not read server/.env for variable interpolation.
       DOCLING_SERVE_MAX_SYNC_WAIT: "${DOCLING_SERVE_MAX_SYNC_WAIT:-1200}"
-    command: ["docling-serve", "run", "--host", "0.0.0.0", "--port", "5001"]
     expose:
       - "5001"
     restart: unless-stopped
