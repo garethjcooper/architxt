@@ -196,13 +196,30 @@ These settings control the LLM used by the Workspace **Chat** panel when it clas
 
 ## Hindsight servers
 
-Hindsight connections are not configured through environment variables. After starting architxt, add a server record via **Settings → Servers** or the `/api/v1/servers` API with:
+In production or local development, Hindsight connections are added after starting architxt via **Settings → Servers** or the `/api/v1/servers` API:
 
 - `base_url` — the Hindsight server URL.
 - `api_key` — your API token.
 - `name` — a readable label.
 
 See [Prerequisites](./prerequisites) for Hindsight setup and recommended bank models.
+
+### Docker Compose auto-seeding
+
+When using the `hindsight` profile, architxt can automatically register a Hindsight server and create a memory bank on first boot. Set these variables in `server/.env`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_HINDSIGHT_DEFAULT_URL` | *(empty)* | URL of the default Hindsight server to register. In the `hindsight` profile this is typically `http://hindsight:8888`. |
+| `ARCHITXT_HINDSIGHT_DEFAULT_BANK` | *(empty)* | Name of the memory bank to create in the default Hindsight server, e.g. `architxt`. |
+
+When both are set:
+
+1. architxt inserts a server record for `ARCHITXT_HINDSIGHT_DEFAULT_URL` if one does not already exist.
+2. architxt calls `PUT /v1/default/banks/{ARCHITXT_HINDSIGHT_DEFAULT_BANK}` to create the bank.
+3. The server and bank appear in the **Hindsight** page selectors.
+
+This removes the manual server/bank setup step in Docker Compose. You still need to add Hindsight credentials in `server/.env` (see the Hindsight section in `.env.example`).
 
 ## Next steps
 

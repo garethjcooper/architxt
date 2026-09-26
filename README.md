@@ -79,6 +79,41 @@ nvm use 22
 
 ## Installation
 
+### Option 1: Docker Compose (recommended)
+
+The fastest way to get a working architxt stack is Docker Compose. It can start architxt together with Docling (document parsing) and Hindsight (long-term memory) in a single command.
+
+**Requirements:** Docker Engine ≥ 24 and Docker Compose ≥ 2.
+
+```bash
+git clone <repo-url> && cd architxt
+cp server/.env.example server/.env
+# Edit server/.env and add your LLM API keys
+
+# Full stack: architxt + Docling + Hindsight
+docker compose --profile hindsight up --build -d
+```
+
+After startup:
+
+- architxt UI: http://localhost:3000
+- Hindsight API: http://localhost:8888
+- Hindsight Control Plane: http://localhost:9999
+
+Other profiles:
+
+| Profile | Command | What it starts |
+|---|---|---|
+| Core only | `docker compose up --build -d` | architxt + SQLite |
+| + Docling | `docker compose --profile docling up --build -d` | architxt + SQLite + Docling |
+| + Hindsight | `docker compose --profile hindsight up --build -d` | Full stack |
+
+For GPU Docling or Apple Silicon image variants, see [Docker / Podman](#docker--podman-optional).
+
+### Option 2: Local development
+
+Use this if you are changing architxt's code.
+
 ### 1. Clone the repository
 
 ```bash
@@ -94,7 +129,7 @@ npm run setup
 This one command handles everything:
 
 | Step | What happens |
-|---|---|
+|---|---|---|
 | Node version check | Exits with clear error if < 22 |
 | `npm install` in `server/` | Backend dependencies (Express, SQLite, etc.) |
 | `npm install` in `ui/` | Frontend dependencies (Next.js, React, Tailwind, etc.) |
@@ -134,6 +169,18 @@ Open your browser to `http://localhost:3000`.
 
 If prerequisites are already met and you don't need the explanations:
 
+### Docker Compose (recommended)
+
+```bash
+git clone <repo-url> && cd architxt
+cp server/.env.example server/.env
+# Edit server/.env — add your API keys
+docker compose --profile hindsight up --build -d
+# Open http://localhost:3000
+```
+
+### Local development
+
 ```bash
 git clone <repo-url> && cd architxt
 npm run setup       # installs deps, creates dirs, builds UI
@@ -149,39 +196,97 @@ If you prefer a containerized deployment, a `Dockerfile` and `docker-compose.yml
 
 ### Quick Start with Docker
 
+Three stack tiers are supported. Pick the one that matches what you want to run.
+
+#### 1. architxt only (same as before)
+
 ```bash
-git clone <repo-url> && cd architxt
-
-# 1. Create your environment file
-cp server/.env.example server/.env
-# Edit server/.env — add your API keys and configure providers
-
-# 2. Build and run
 docker compose up --build
 ```
 
-Open your browser to `http://localhost:3000`.
+This builds and starts just the architxt container. You must provide your own
+Docling (`docling serve`) and Hindsight servers, or work without them.
+
+#### 2. architxt + Docling
+
+```bash
+# Edit server/.env if needed, then:
+docker compose --profile docling up --build
+```
+
+This also starts a Docling conversion container. architxt connects to it
+automatically at `http://docling:5001`. No local `pip install docling` needed.
+
+The default image is the CPU-only variant. For a GPU variant, set `DOCLING_IMAGE`
+in your shell or `.env`:
+
+```bash
+DOCLING_IMAGE=quay.io/docling-project/docling-serve-cu128 \
+  docker compose --profile docling up --build
+```
+
+#### 3. architxt + Docling + Hindsight (full stack)
+
+Set Hindsight credentials and the auto-registration URL in `server/.env`:
+
+```bash
+cp server/.env.example server/.env
+# Edit server/.env and set:
+#   HINDSIGHT_API_LLM_API_KEY=***
+#   ARCHITXT_HINDSIGHT_DEFAULT_URL=http://hindsight:8888
+#   ARCHITXT_HINDSIGHT_DEFAULT_BANK=architxt
+```
+
+`ARCHITXT_HINDSIGHT_DEFAULT_URL` tells architxt to create a default Hindsight
+server entry automatically on first boot, so you don't have to add one manually
+in the UI. `ARCHITXT_HINDSIGHT_DEFAULT_BANK` also creates a bank with that ID in
+Hindsight on startup.
+
+Then start the full stack:
+
+```bash
+docker compose --profile hindsight up --build
+```
+
+This uses Hindsight's **embedded pg0 database** inside the container, with a
+named Docker volume for persistence.
+
+After startup:
+
+- architxt UI: http://localhost:3000
+- Hindsight API: http://localhost:8888
+- Hindsight Control Plane: http://localhost:9999
+
+If you prefer to add the Hindsight server manually, leave
+`ARCHITXT_HINDSIGHT_DEFAULT_URL` unset and use `http://hindsight:8888` in
+Settings → Hindsight Servers.
 
 ### With Podman
 
 ```bash
-podman compose up --build
+podman compose --profile hindsight up --build
 
 # If your Podman installation does not include compose:
-podman-compose up --build
+podman-compose --profile hindsight up --build
 ```
 
 ### What the compose file does
 
-- Builds the architxt image from the `Dockerfile`
-- Exposes the app on port `3000`
+- Builds the architxt image from the `Dockerfile`.
+- Optionally adds a Docling service (`--profile docling`) using the official
+  `docling-serve` container image.
+- Optionally adds a Hindsight service (`--profile hindsight`) using the official
+  `ghcr.io/vectorize-io/hindsight` image with the embedded `pg0` database.
+- Exposes architxt on port `3000`, and Hindsight (when enabled) on ports
+  `8888` (API) and `9999` (Control Plane UI).
 - Creates named volumes for persistent data:
   - `architxt-database`
   - `architxt-documents`
   - `architxt-logs`
   - `architxt-tmp`
-- Runs database, documents, logs, and temp dirs inside `/app/server/...`
-- Sets a 30-second graceful shutdown window so background daemons stop cleanly
+  - `hindsight-data`
+- Runs database, documents, logs, and temp dirs inside `/app/server/...`.
+- Sets a 30-second graceful shutdown window so background daemons stop cleanly.
 
 ### Updating the Docker deployment
 
@@ -189,7 +294,9 @@ Pull the latest code, then rebuild:
 
 ```bash
 git pull origin main
-docker compose up --build -d
+
+# Rebuild the stack you are using, e.g.:
+docker compose --profile hindsight up --build -d
 ```
 
 Your data in the named volumes is preserved across rebuilds.
@@ -198,19 +305,19 @@ Your data in the named volumes is preserved across rebuilds.
 
 ```bash
 # Build
-docker build -t architxt:latest .
+docker build -t architxt .
 
-# Run with a named volume for persistence
-docker run -d -p 3000:3000 \
-  -v architxt-data:/app/server \
-  -e ARCHITXT_HOST=0.0.0.0 \
-  --name architxt architxt:latest
+# Run (example with host paths)
+docker run -d \
+  --name architxt \
+  -p 3000:3000 \
+  --env-file server/.env \
+  -v architxt-database:/app/server/database \
+  -v architxt-documents:/app/server/documents \
+  -v architxt-logs:/app/server/logs \
+  -v architxt-tmp:/app/server/tmp \
+  architxt
 ```
-
-### Notes
-
-- At least one LLM provider must be configured in `server/.env` or via environment variables, or the container will fail to start.
-- The container is built for a single-replica deployment. SQLite is used for storage, so do not scale horizontally without switching to a shared database.
 - `podman compose` and `docker compose` are supported. `podman-compose` is a separate Python package if your distribution does not bundle the Docker-compatible plugin.
 
 ### Plain Podman fallback (no compose)

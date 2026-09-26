@@ -40,10 +40,10 @@ const initializeDatabase = () => {
     
     // Auto-create schema on first run
     ensureSchema(db);
-    
+
     // Auto-populate seed data after schema is guaranteed present
     ensureSeedData(db);
-    
+
     logger.info(`Database initialized at ${dbPath}`);
     
     return db;

@@ -208,16 +208,120 @@ For detailed setup instructions, including how to install Hindsight and configur
 URL: https://architxtlabs.com/getting-started/installation
 # Installation
 
-architxt is a Node.js application with an Express backend and a Next.js frontend. It uses SQLite for local state and can connect to a Hindsight vector-memory server.
+You can run architxt in two ways:
+
+- **Docker Compose (recommended)** — one command, includes optional Docling and Hindsight services.
+- **Local development** — run the backend and UI directly from source.
+
+Choose Docker Compose if you just want to use architxt. Choose local development if you are modifying the code.
 
 ## Requirements
 
+- Docker Engine ≥ 24 and Docker Compose ≥ 2
+- OR Node.js ≥ 22 and npm 10+ for local development
+- Git
+
+## Option 1: Docker Compose (recommended)
+
+Docker Compose lets you start architxt together with everything it can use: a PDF/document parser (Docling) and a memory server (Hindsight).
+
+### 1. Clone the repo
+
+```bash
+git clone <your-architxt-repo>
+cd architxt
+```
+
+### 2. Create your environment file
+
+Copy the example file:
+
+```bash
+cp server/.env.example server/.env
+```
+
+Edit `server/.env` with your LLM credentials. architxt supports multiple LLM providers; see [Configuration](./configuration) for the full list and how to switch between them.
+
+The quickest way to get started is with Ollama Cloud:
+
+```bash
+ARCHITXT_OLLAMA_CLOUD_API_KEY=your-ollama-cloud-key
+```
+
+### 3. Pick a profile
+
+architxt ships with three Docker Compose profiles. Pick the one that matches what you need.
+
+| Profile | What it starts | Use this when... |
+|---|---|---|
+| *(none)* | architxt + SQLite | You only want the core app, no document parsing or memory. |
+| `docling` | architxt + SQLite + Docling | You want to upload and parse PDFs, Word docs, etc. |
+| `hindsight` | architxt + SQLite + Docling + Hindsight | You want the full stack: documents + long-term memory. |
+
+Start a profile with:
+
+```bash
+# Core only
+docker compose up --build -d
+
+# Core + document parsing
+DOCLING_IMAGE=quay.io/docling-project/docling-serve-cpu \
+  docker compose --profile docling up --build -d
+
+# Full stack
+DOCLING_IMAGE=quay.io/docling-project/docling-serve-cpu \
+  docker compose --profile hindsight up --build -d
+```
+
+Other common Docling images:
+
+| Tag | Use when |
+|---|---|
+| `quay.io/docling-project/docling-serve-cpu` | CPU-only machines (default). |
+| `quay.io/docling-project/docling-serve` | GPU-accelerated parsing. |
+| `quay.io/docling-project/docling-serve-cpu:arm-cpu` | Apple Silicon Macs (replace `cpu` with `arm-cpu`). |
+
+### 4. Open the UI
+
+Once the logs look healthy, open:
+
+```text
+http://localhost:3000
+```
+
+### What gets created automatically
+
+When the containers start for the first time:
+
+- The SQLite database file at the path set by `ARCHITXT_DB_PATH` (default `./database/architxt.db`).
+- All required tables and seed data.
+
+If you use the `hindsight` profile and set these variables in `server/.env`:
+
+```bash
+ARCHITXT_HINDSIGHT_DEFAULT_URL=http://hindsight:8888
+ARCHITXT_HINDSIGHT_DEFAULT_BANK=architxt
+```
+
+architxt also creates:
+
+1. A Hindsight server entry pointing to `http://hindsight:8888`.
+2. A Hindsight memory bank named `architxt`.
+
+This means the full stack works after a single `docker compose` command. You only need to add your LLM credentials.
+
+## Option 2: Local development
+
+Use this if you are changing architxt's code.
+
+### Requirements
+
 - Node.js ≥ 22
 - npm 10+
-- A Docling server if you want to parse PDFs or Office documents (see [Prerequisites](./prerequisites))
-- A Hindsight server URL and API token
+- A Docling server if you want PDF parsing (see [Prerequisites](./prerequisites))
+- A Hindsight server URL and API token if you want memory
 
-## Clone and install
+### Clone and install
 
 ```bash
 git clone <your-architxt-repo>
@@ -227,7 +331,7 @@ npm run setup
 
 `npm run setup` checks the Node version, installs dependencies in `server/` and `ui/`, creates the required directories, copies `server/.env.example` to `server/.env` if it does not exist, and builds the UI.
 
-## Start the application
+### Start the application
 
 ```bash
 npm run dev
@@ -235,13 +339,132 @@ npm run dev
 
 This starts both the backend API and the frontend UI. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Verify the backend
+### Verify the backend
 
 The API is available at [http://localhost:3001](http://localhost:3001) by default. Visit `/api-docs` to see the OpenAPI/Swagger UI.
+
+## Useful Docker Compose commands
+
+These commands work from the `architxt` project root.
+
+### View logs
+
+```bash
+# All services
+docker compose --profile hindsight logs -f
+
+# Just architxt
+docker compose --profile hindsight logs -f architxt
+
+# Just Hindsight
+docker compose --profile hindsight logs -f hindsight
+
+# Just Docling
+docker compose --profile hindsight logs -f docling
+
+# With timestamps
+docker compose --profile hindsight logs -f --timestamps architxt
+```
+
+### Check service health
+
+```bash
+docker compose --profile hindsight ps
+```
+
+### Rebuild after code changes
+
+```bash
+docker compose --profile hindsight up --build -d
+```
+
+### Stop everything
+
+```bash
+docker compose --profile hindsight down
+```
+
+To also remove the database and uploaded documents, add:
+
+```bash
+docker compose --profile hindsight down -v
+```
+
+> ⚠️ `-v` removes named volumes. This deletes Hindsight's embedded database and any data inside Docker volumes.
+
+### Reset only the architxt database
+
+To wipe just the SQLite database volume while keeping documents, logs, and optional Hindsight data:
+
+```bash
+docker compose --profile hindsight rm -s -f architxt
+docker volume rm architxt-database
+docker compose --profile hindsight up -d
+```
+
+This recreates `architxt.db` and re-runs seeding on the next start.
+
+## Common issues
+
+### "optional dependency failed to start"
+
+If you see a warning like:
+
+```text
+optional dependency "hindsight" failed to start: container architxt-hindsight is unhealthy
+```
+
+it means Docker Compose thinks Hindsight is not healthy. First, check the Hindsight logs:
+
+```bash
+docker compose --profile hindsight logs -f hindsight
+```
+
+If Hindsight is actually running and printing `✅ Hindsight is running!`, the healthcheck command may not be working in your image. Make sure you are using an image that includes the healthcheck endpoint on port `8888`.
+
+### First start takes a long time
+
+Docling downloads machine-learning models on first boot. This can take 2–5 minutes depending on your internet connection. architxt now starts before Docling is fully ready, so the UI is available sooner; document parsing will work once Docling finishes.
+
+### Hindsight bank is not created
+
+Check that these variables are set **in `server/.env`**, not just in your shell:
+
+```bash
+cat server/.env | grep ARCHITXT_HINDSIGHT
+```
+
+Expected output:
+
+```bash
+ARCHITXT_HINDSIGHT_DEFAULT_URL=http://hindsight:8888
+ARCHITXT_HINDSIGHT_DEFAULT_BANK=architxt
+```
+
+Then check the architxt seed logs:
+
+```bash
+docker compose --profile hindsight logs architxt | grep -i "hindsight-seed\|default Hindsight"
+```
+
+If the bank creation still fails, make sure Hindsight itself is healthy and that you have set `HINDSIGHT_API_LLM_API_KEY` in `server/.env`.
+
+### I changed server code and nothing happened
+
+Code changes inside `server/` or `ui/` are baked into the Docker image. You must rebuild:
+
+```bash
+docker compose --profile hindsight up --build -d
+```
+
+### `env_file` values are ignored
+
+If variables in `server/.env` seem to have no effect, make sure you did not set the same variable in a `docker-compose.yml` `environment:` block with an empty default. Empty values in `environment:` override `env_file` values. architxt does not set empty defaults for Hindsight seed variables.
 
 ## Next steps
 
 - [Configuration](./configuration)
+- [Quick Start](./quick-start)
 - [AQL language reference](../../core-concepts/aql)
 ---
 
@@ -441,13 +664,30 @@ These settings control the LLM used by the Workspace **Chat** panel when it clas
 
 ## Hindsight servers
 
-Hindsight connections are not configured through environment variables. After starting architxt, add a server record via **Settings → Servers** or the `/api/v1/servers` API with:
+In production or local development, Hindsight connections are added after starting architxt via **Settings → Servers** or the `/api/v1/servers` API:
 
 - `base_url` — the Hindsight server URL.
 - `api_key` — your API token.
 - `name` — a readable label.
 
 See [Prerequisites](./prerequisites) for Hindsight setup and recommended bank models.
+
+### Docker Compose auto-seeding
+
+When using the `hindsight` profile, architxt can automatically register a Hindsight server and create a memory bank on first boot. Set these variables in `server/.env`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_HINDSIGHT_DEFAULT_URL` | *(empty)* | URL of the default Hindsight server to register. In the `hindsight` profile this is typically `http://hindsight:8888`. |
+| `ARCHITXT_HINDSIGHT_DEFAULT_BANK` | *(empty)* | Name of the memory bank to create in the default Hindsight server, e.g. `architxt`. |
+
+When both are set:
+
+1. architxt inserts a server record for `ARCHITXT_HINDSIGHT_DEFAULT_URL` if one does not already exist.
+2. architxt calls `PUT /v1/default/banks/` to create the bank.
+3. The server and bank appear in the **Hindsight** page selectors.
+
+This removes the manual server/bank setup step in Docker Compose. You still need to add Hindsight credentials in `server/.env` (see the Hindsight section in `.env.example`).
 
 ## Next steps
 
@@ -549,6 +789,10 @@ For each extracted document:
 
 ## 3. Connect Hindsight
 
+If you started architxt with the `hindsight` Docker Compose profile, this step is already done: the profile registers a default Hindsight server at `http://hindsight:8888` and creates a memory bank named `architxt`. You can skip straight to [4. Sync architxt data into Hindsight](#4-sync-architxt-data-into-hindsight) and pick the pre-configured server and bank from the dropdowns.
+
+For local development or a manually started Hindsight server, follow the steps below.
+
 ### Add a Hindsight server
 
 1. Open **Servers** from the left nav.
@@ -576,7 +820,7 @@ For local Hindsight servers this is often not required.
 
 Banks live in Hindsight, not in architxt. Create the bank using either the [Hindsight Control Plane UI](https://hindsight.vectorize.io/developer/installation#control-plane) or the Hindsight CLI. You will select that bank inside architxt in the next section.
 
-## 5. Sync architxt data into Hindsight
+## 4. Sync architxt data into Hindsight
 
 Open **Hindsight Sync** from the left nav.
 
@@ -605,7 +849,7 @@ Open **Hindsight Sync** from the left nav.
 Click the **daemon status monitor** in the header bar to open the operations polling dialog and watch Hindsight retain/push progress, similar to the document extraction monitor.
 :::
 
-## 6. Enable automatic graph sync
+## 5. Enable automatic graph sync
 
 1. Return to **Servers** and click **Banks** on the Hindsight server row.
 2. Select the checkbox for the bank you are using.
@@ -613,7 +857,7 @@ Click the **daemon status monitor** in the header bar to open the operations pol
 4. Uncheck **Discovery**. Discovery is experimental and its output is not directly consumable yet.
 5. Click **Save**.
 
-## 7. Run the contextual-graph sync job
+## 6. Run the contextual-graph sync job
 
 1. Open **Context Patches** → **Sync Jobs** from the left nav.
 2. Click the **Run sync job** button and confirm.
@@ -662,7 +906,7 @@ Each grounded edge can have zero or more contextual edges attached.
 
 This keeps mental models up to date on subsequent sync runs.
 
-## 8. Compose a curated page
+## 7. Compose a curated page
 
 1. Open **Workspace** from the left nav.
 2. If no workspace session exists, a default session called **Workspace session** is created automatically.
