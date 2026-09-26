@@ -214,16 +214,10 @@ Docling (`docling serve`) and Hindsight servers, or work without them.
 docker compose --profile docling up --build
 ```
 
-This also starts a Docling conversion container. architxt connects to it
-automatically at `http://docling:5001`. No local `pip install docling` needed.
-
-The default image is the CPU-only variant. For a GPU variant, set `DOCLING_IMAGE`
-in your shell or `.env`:
-
-```bash
-DOCLING_IMAGE=quay.io/docling-project/docling-serve-cu128 \
-  docker compose --profile docling up --build
-```
+This also starts a Docling conversion container built from `docling.Dockerfile`.
+That image installs `docling` and `docling-serve` with the CPU-only PyTorch wheel
+(`--extra-index-url https://download.pytorch.org/whl/cpu`), which is required for
+proper image extraction.
 
 #### 3. architxt + Docling + Hindsight (full stack)
 
@@ -776,11 +770,13 @@ The extract pipeline's first stage uses [Docling](https://github.com/DS4SD/docli
 
 ```bash
 # 1. Install Docling (requires Python 3.10–3.12)
-pip install docling
+pip install docling docling-serve --extra-index-url https://download.pytorch.org/whl/cpu
 
 # 2. Start the server (default port 5001)
 docling serve
 ```
+
+The `--extra-index-url` installs the CPU-only PyTorch wheel, which is required for correct image extraction. Without it, embedded images may not be extracted properly.
 
 ### Configure architxt
 
