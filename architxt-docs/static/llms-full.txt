@@ -430,6 +430,24 @@ If Hindsight is actually running and printing `✅ Hindsight is running!`, the h
 
 Docling downloads machine-learning models on first boot. This can take 2–5 minutes depending on your internet connection. architxt now starts before Docling is fully ready, so the UI is available sooner; document parsing will work once Docling finishes.
 
+### `ImportError: libxcb.so.1` on Docling startup
+
+If Docling crashes during startup with:
+
+```text
+ImportError: libxcb.so.1: cannot open shared object file: No such file or directory
+```
+
+it is using a cached image built before the `opencv-python-headless` fix. Rebuild the Docling image with `--no-cache`:
+
+```bash
+docker compose --profile hindsight down docling
+docker compose --profile hindsight build --no-cache docling
+docker compose --profile hindsight up -d docling
+```
+
+Wait for `Application startup complete` before uploading documents.
+
 ### Hindsight bank is not created
 
 Check that these variables are set **in `server/.env`**, not just in your shell:
