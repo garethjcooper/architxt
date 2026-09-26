@@ -56,7 +56,9 @@ services:
       - docling
       - hindsight
     container_name: architxt-docling
-    image: ${DOCLING_IMAGE:-quay.io/docling-project/docling-serve}
+    build:
+      context: .
+      dockerfile: docling.Dockerfile
     env_file:
       - server/.env
     environment:
