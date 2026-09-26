@@ -276,7 +276,16 @@ docker compose --profile docling up --build -d
 docker compose --profile hindsight up --build -d
 ```
 
-The `docling` service is built from the included `docling.Dockerfile`, which pins the Docling versions that work well with architxt. On first start the container downloads OCR/table models and warms up the pipeline; this can take **1–2 minutes** before the service reports healthy. Wait for `Application startup complete` in the Docling logs before uploading documents.
+The `docling` service is built from the included `docling.Dockerfile`, which pins the Docling versions that work well with architxt. The image is CPU-only by default. On first start the container downloads OCR/table models and warms up the pipeline; this can take **1–2 minutes** before the service reports healthy. Wait for `Application startup complete` in the Docling logs before uploading documents.
+
+If you have another machine with a more powerful CPU or a GPU, you can run Docling there instead and point architxt at it. Set `DOCLING_SERVICE_URL` at Docker Compose interpolation time:
+
+```bash
+DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
+  docker compose --profile hindsight up --build -d
+```
+
+See [Configuration: external Docling host](./configuration#using-an-external-docling-host-for-example-a-gpu-machine) for details.
 
 Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
 
@@ -546,6 +555,43 @@ SQLite is used via `better-sqlite3`. The schema is created automatically on firs
 | `ARCHITXT_DOCLING_FORCE_OCR` | `false` | Force OCR on every page. Use this when PDFs contain subsetted fonts without ToUnicode CMaps, which produce `/g###/` glyph artifacts. |
 
 See [Prerequisites](./prerequisites) for Docling setup.
+
+### Using an external Docling host (for example a GPU machine)
+
+The default Docker Compose stack builds a local Docling image that runs on CPU. If you have another machine with a GPU and the Docling server running there, you can point architxt at it instead of the local `docling` container.
+
+1. Make sure the remote Docling server is reachable from the architxt host.
+2. Override `DOCLING_SERVICE_URL` at Docker Compose interpolation time when you start the stack:
+
+```bash
+DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
+  docker compose --profile hindsight up -d
+```
+
+When you use `sudo`, the exported variable is not forwarded by default. Either run without `sudo` (if your user is in the `docker` group) or preserve the environment:
+
+```bash
+DOCLING_SERVICE_URL=http://192.168.1.205:5001 sudo -E docker compose --profile hindsight up -d
+```
+
+> **Note:** The local `docling` container will still start because it is part of the `hindsight` profile, but architxt will send conversion requests to the external host instead. If you want to avoid the unused local container, start only the services you need:
+>
+> ```bash
+> DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
+>   docker compose --profile hindsight up -d architxt hindsight
+> ```
+
+Verify the override was applied:
+
+```bash
+docker compose exec architxt printenv DOCLING_SERVICE_URL
+```
+
+Expected output:
+
+```text
+http://192.168.1.205:5001
+```
 
 ## LLM providers
 

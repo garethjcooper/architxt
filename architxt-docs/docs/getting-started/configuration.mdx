@@ -57,6 +57,43 @@ SQLite is used via `better-sqlite3`. The schema is created automatically on firs
 
 See [Prerequisites](./prerequisites) for Docling setup.
 
+### Using an external Docling host (for example a GPU machine)
+
+The default Docker Compose stack builds a local Docling image that runs on CPU. If you have another machine with a GPU and the Docling server running there, you can point architxt at it instead of the local `docling` container.
+
+1. Make sure the remote Docling server is reachable from the architxt host.
+2. Override `DOCLING_SERVICE_URL` at Docker Compose interpolation time when you start the stack:
+
+```bash
+DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
+  docker compose --profile hindsight up -d
+```
+
+When you use `sudo`, the exported variable is not forwarded by default. Either run without `sudo` (if your user is in the `docker` group) or preserve the environment:
+
+```bash
+DOCLING_SERVICE_URL=http://192.168.1.205:5001 sudo -E docker compose --profile hindsight up -d
+```
+
+> **Note:** The local `docling` container will still start because it is part of the `hindsight` profile, but architxt will send conversion requests to the external host instead. If you want to avoid the unused local container, start only the services you need:
+>
+> ```bash
+> DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
+>   docker compose --profile hindsight up -d architxt hindsight
+> ```
+
+Verify the override was applied:
+
+```bash
+docker compose exec architxt printenv DOCLING_SERVICE_URL
+```
+
+Expected output:
+
+```text
+http://192.168.1.205:5001
+```
+
 ## LLM providers
 
 All provider settings are read from `server/.env`. The backend registers four named providers and each pipeline stage references one of them by name. At least one provider must be usable. There are no silent fallbacks: missing required values cause the server to exit with a clear error.
