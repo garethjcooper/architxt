@@ -226,23 +226,6 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Request logging for both API and UI routes
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    const route = req.originalUrl || req.url;
-    logger.info(`${req.method} ${route} ${res.statusCode}`, {
-      method: req.method,
-      path: route,
-      statusCode: res.statusCode,
-      durationMs: duration,
-      contentLength: res.get('Content-Length')
-    });
-  });
-  next();
-});
-
 // Routes
 app.use('/api/v1/documents', documentsRoute);
 app.use('/api/v1/contexts', contextsRoute);
