@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { DiscoverStepResponse, ResearchStepSummary, UnifiedNarrativeBlock } from '@/lib/api/client';
+import { uuidv4 } from '@/lib/envelope-markdown';
 import { buildEnvelopeMarkdown, normalizeEnvelope } from '@/lib/envelope-markdown';
 import { downloadMarkdown } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -665,9 +666,9 @@ export function CuratedPageEditor({
       : updatedDiagrams.findIndex((d) => d.name === oldName);
     if (diagramIndex >= 0) {
       const existingEvidence = updatedDiagrams[diagramIndex].evidence ?? [];
-      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], id: updatedDiagrams[diagramIndex].id || crypto.randomUUID(), name: newName, content: newContent, evidence: existingEvidence };
+      updatedDiagrams[diagramIndex] = { ...updatedDiagrams[diagramIndex], id: updatedDiagrams[diagramIndex].id || uuidv4(), name: newName, content: newContent, evidence: existingEvidence };
     } else {
-      updatedDiagrams.push({ id: crypto.randomUUID(), name: newName, type: 'flowchart', content: newContent, evidence: [] });
+      updatedDiagrams.push({ id: uuidv4(), name: newName, type: 'flowchart', content: newContent, evidence: [] });
     }
 
     // If the section was deleted under an old key, migrate the deletion to the canonical id key.
@@ -832,7 +833,7 @@ export function CuratedPageEditor({
           events.forEach((ev) => {
             if (ev.type === 'diagrams') {
               const parsed = JSON.parse(ev.payload);
-              const newDiagrams = parsed.map((d: any) => ({ ...d, id: crypto.randomUUID(), evidence: d.evidence ?? [] }));
+              const newDiagrams = parsed.map((d: any) => ({ ...d, id: uuidv4(), evidence: d.evidence ?? [] }));
               if (newDiagrams.length === 0) return;
               const nextEnvelope = { ...envelope, diagrams: [...envelope.diagrams, ...newDiagrams] };
               onChange?.({
@@ -844,7 +845,7 @@ export function CuratedPageEditor({
               });
             } else if (ev.type === 'tables') {
               const parsed = JSON.parse(ev.payload);
-              const newTables = parsed.map((t: any) => ({ ...t, id: crypto.randomUUID() }));
+              const newTables = parsed.map((t: any) => ({ ...t, id: uuidv4() }));
               if (newTables.length === 0) return;
               const nextEnvelope = { ...envelope, tables: [...envelope.tables, ...newTables] };
               onChange?.({
@@ -883,11 +884,11 @@ export function CuratedPageEditor({
             nextTables[tableIndex] = {
               ...existing,
               ...updated,
-              id: existing.id || crypto.randomUUID(),
+              id: existing.id || uuidv4(),
               evidence: existing.evidence ?? updated.evidence ?? [],
             };
           } else {
-            nextTables.push({ ...updated, id: crypto.randomUUID() });
+            nextTables.push({ ...updated, id: uuidv4() });
           }
           const nextDeletedKeys = new Set(deletedStructuredKeys);
           if (targetId) {

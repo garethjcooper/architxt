@@ -77,7 +77,7 @@ function toUnified(envelope: EnvelopeLike): Required<UnifiedEnvelope> {
   };
 }
 
-export { ensureEnvelopeIds };
+export { ensureEnvelopeIds, uuidv4 };
 
 export function escapeMarkdownCell(val: unknown): string {
   if (val === undefined || val === null) return '';
