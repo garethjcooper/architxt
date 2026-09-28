@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageShell } from '@/app/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
+import { uuidv4 } from '@/lib/envelope-markdown';
 import { type EntityLike as AqlEntityLike, type EdgeLike as AqlEdgeLike } from '@/components/aql-editor';
 import { serversApi, contextualGraphApi, entityInfoApi, entitiesApi, researchApi, mentalModelsApi, type Server, type Entity, type EntityInfo } from '@/lib/api/client';
 import { ServerBankSelectors, type SelectorBank } from '@/app/research-shared/server-bank-selectors';
@@ -713,7 +714,7 @@ export default function WorkspacePage() {
             }
             // Always generate a fresh id for each copied narrative so duplicates remain independent.
             const newBlock: UnifiedNarrativeBlock = {
-              id: crypto.randomUUID(),
+              id: uuidv4(),
               narrative_name: name,
               narrative: content,
               evidence: Array.isArray(ev.evidence) ? [...ev.evidence] : [],
@@ -734,7 +735,7 @@ export default function WorkspacePage() {
           }
           case 'tables': {
             const parsedTables = JSON.parse(ev.payload);
-            const newTables = (parsedTables ?? []).map((t: any) => ({ ...t, id: crypto.randomUUID() }));
+            const newTables = (parsedTables ?? []).map((t: any) => ({ ...t, id: uuidv4() }));
             nextEnvelope.tables = [...nextEnvelope.tables, ...newTables];
             toastMessage = `Added ${newTables.length} table(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
@@ -742,7 +743,7 @@ export default function WorkspacePage() {
           case 'diagrams': {
             const parsedDiagrams = JSON.parse(ev.payload);
             const newDiagrams = (parsedDiagrams ?? [])
-              .map((d: any) => ({ ...d, id: crypto.randomUUID(), evidence: d.evidence ?? [] }));
+              .map((d: any) => ({ ...d, id: uuidv4(), evidence: d.evidence ?? [] }));
             nextEnvelope.diagrams = [...nextEnvelope.diagrams, ...newDiagrams];
             toastMessage = `Added ${newDiagrams.length} diagram(s) to ${page.intent_text || `Page ${page.id}`}`;
             break;
