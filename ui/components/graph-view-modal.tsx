@@ -271,21 +271,24 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
   const edgeColumns = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
   const edgeRows = useMemo(
     () =>
-      graph.edges.map((e) => {
-        const src = graph.nodes.find((n) => n.id === e.from)!;
-        const tgt = graph.nodes.find((n) => n.id === e.to)!;
-        return {
-          from_name: src?.name || '',
-          to_name: tgt?.name || '',
-          from: e.from,
-          to: e.to,
-          type: e.type || '',
-          label: e.label || '',
-          detail: e.detail || '',
-          properties: e.properties ? JSON.stringify(e.properties) : '',
-          evidence: Array.isArray(e.evidence) ? e.evidence.join(', ') : '',
-        };
-      }),
+      graph.edges
+        .map((e) => {
+          const src = graph.nodes.find((n) => n.id === e.from);
+          const tgt = graph.nodes.find((n) => n.id === e.to);
+          if (!src || !tgt) return null;
+          return {
+            from_name: src.name || '',
+            to_name: tgt.name || '',
+            from: e.from,
+            to: e.to,
+            type: e.type || '',
+            label: e.label || '',
+            detail: e.detail || '',
+            properties: e.properties ? JSON.stringify(e.properties) : '',
+            evidence: Array.isArray(e.evidence) ? e.evidence.join(', ') : '',
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row !== null),
     [graph.edges, graph.nodes],
   );
 
@@ -302,14 +305,14 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
 
     const edgeHeader = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
     const edgeRows = graph.edges.map((e) => {
-      const src = graph.nodes.find((n) => n.id === e.from)!;
-      const tgt = graph.nodes.find((n) => n.id === e.to)!;
+      const src = graph.nodes.find((n) => n.id === e.from);
+      const tgt = graph.nodes.find((n) => n.id === e.to);
       return edgeHeader
         .map((key) => {
-          if (key === 'from_name') return escapeMarkdownCell(src.name);
-          if (key === 'to_name') return escapeMarkdownCell(tgt.name);
-          if (key === 'from') return escapeMarkdownCell(src.id);
-          if (key === 'to') return escapeMarkdownCell(tgt.id);
+          if (key === 'from_name') return escapeMarkdownCell(src?.name ?? '');
+          if (key === 'to_name') return escapeMarkdownCell(tgt?.name ?? '');
+          if (key === 'from') return escapeMarkdownCell(src?.id ?? e.from);
+          if (key === 'to') return escapeMarkdownCell(tgt?.id ?? e.to);
           if (key === 'properties') return escapeMarkdownCell(e.properties ? JSON.stringify(e.properties) : '');
           if (key === 'evidence') return escapeMarkdownCell(Array.isArray(e.evidence) ? e.evidence.join(', ') : '');
           return escapeMarkdownCell(e[key as keyof GraphEdge]);
@@ -477,21 +480,24 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
         label: n.label || '',
         name: n.name || '',
       }));
-      const edgeRows = graph.edges.map((e) => {
-        const src = graph.nodes.find((n) => n.id === e.from)!;
-        const tgt = graph.nodes.find((n) => n.id === e.to)!;
-        return {
-          from_name: src.name,
-          to_name: tgt.name,
-          from: src.id,
-          to: tgt.id,
-          type: e.type || '',
-          label: e.label || '',
-          detail: e.detail || '',
-          properties: e.properties || null,
-          evidence: e.evidence || [],
-        };
-      });
+      const edgeRows = graph.edges
+        .map((e) => {
+          const src = graph.nodes.find((n) => n.id === e.from);
+          const tgt = graph.nodes.find((n) => n.id === e.to);
+          if (!src || !tgt) return null;
+          return {
+            from_name: src.name,
+            to_name: tgt.name,
+            from: src.id,
+            to: tgt.id,
+            type: e.type || '',
+            label: e.label || '',
+            detail: e.detail || '',
+            properties: e.properties || null,
+            evidence: e.evidence || [],
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row !== null);
       const tables: Array<{ name: string; columns: string[]; rows: Record<string, any>[]; evidence: string[] }> = [];
       if (nodeRows.length > 0) {
         tables.push({ name: nodeTableName, columns: ['id', 'type', 'label', 'name'], rows: nodeRows, evidence: graphEvidence });
