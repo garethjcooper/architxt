@@ -1,8 +1,16 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, X, Trash2, Pencil, Save } from 'lucide-react';
+import { Plus, X, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { ResearchStepSummary } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -54,10 +62,6 @@ interface CuratedPageTabsProps {
   onDeleteCuratedPage: (stepId: number) => Promise<void>;
   onCloseTab: (tabId: string, kind: TabKind, isEmpty: boolean) => void;
   onCloseAllViews?: () => void;
-  /** Whether the active curated page has pending changes. */
-  activePageDirty?: boolean;
-  /** Called when the user clicks the Save button for the active curated page. */
-  onSaveActivePage?: () => void;
 }
 
 export function CuratedPageTabs({
@@ -71,8 +75,6 @@ export function CuratedPageTabs({
   onDeleteCuratedPage,
   onCloseTab,
   onCloseAllViews,
-  activePageDirty = false,
-  onSaveActivePage,
 }: CuratedPageTabsProps) {
   const [confirmDelete, setConfirmDelete] = useState<{ stepId: number; title: string } | null>(null);
   const [renamingPage, setRenamingPage] = useState<{ stepId: number; title: string } | null>(null);
@@ -195,15 +197,6 @@ export function CuratedPageTabs({
         </select>
         <button
           type="button"
-          onClick={() => onSaveActivePage?.()}
-          disabled={!activeCuratedTab || !activePageDirty}
-          className="h-6 w-6 inline-flex items-center justify-center rounded bg-surface-panel border border-border-default text-accent-primary-fg hover:bg-accent-primary-bg-hover hover:border-accent-primary-bd disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-border-default transition-colors"
-          title="Save active page"
-        >
-          <Save className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
           onClick={() => {
             if (!activeCuratedTab?.stepId) return;
             setRenamingPage({ stepId: activeCuratedTab.stepId, title: activeCuratedTab.label });
@@ -249,11 +242,12 @@ export function CuratedPageTabs({
       />
 
       {renamingPage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong">
-          <div className="rounded-lg border border-border-default bg-surface-overlay p-4 w-80 shadow-lg">
-            <div className="text-sm font-medium text-foreground-default mb-2">Rename curated page</div>
-            <input
-              type="text"
+        <Dialog open={!!renamingPage} onOpenChange={(open) => !open && setRenamingPage(null)}>
+          <DialogContent showCloseButton={false} className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Rename curated page</DialogTitle>
+            </DialogHeader>
+            <Input
               value={renamingPage.title}
               onChange={(e) => setRenamingPage({ ...renamingPage, title: e.target.value })}
               onKeyDown={(e) => {
@@ -264,19 +258,16 @@ export function CuratedPageTabs({
                   setRenamingPage(null);
                 }
               }}
-              className="w-full px-2 py-1.5 mb-4 rounded bg-surface-inset border border-border-default text-xs text-foreground-default placeholder:text-foreground-placeholder focus:outline-none focus:border-focus-ring/80"
               autoFocus
             />
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setRenamingPage(null)}>
+            <DialogFooter showCloseButton={false}>
+              <Button variant="outline" onClick={() => setRenamingPage(null)}>
                 Cancel
               </Button>
-              <Button variant="default" size="sm" onClick={() => void handleConfirmRename()}>
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
+              <Button onClick={() => void handleConfirmRename()}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

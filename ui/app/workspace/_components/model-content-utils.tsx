@@ -31,7 +31,7 @@ function isGroundedEdgeForWorkspace(edge: DisplayEdge): boolean {
   return isGroundedEdge(edge) && !isCandidateEdge(edge);
 }
 
-function parseMentalModelContent(raw: HindsightContentResult | ModelContentCacheEntry): MentalModelContent {
+export function parseMentalModelContent(raw: HindsightContentResult | ModelContentCacheEntry): MentalModelContent {
   // Prefer the server-normalized envelope when present.
   const serverEnvelope = raw.envelope ?? undefined;
 

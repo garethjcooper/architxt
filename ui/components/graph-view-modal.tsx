@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { ResizeHandle } from '@/app/workspace/_components/panel-layout';
 import { graphToMermaid } from '@/lib/graph/mermaid-flowchart';
-import { escapeMarkdownCell } from '@/lib/envelope-markdown';
+import { escapeMarkdownCell, graphToTableRows, graphToMarkdownTables } from '@/lib/envelope-markdown';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
@@ -257,76 +257,13 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
 
   const graphJson = useMemo(() => JSON.stringify(graph, null, 2), [graph]);
 
-  const nodeColumns = ['id', 'type', 'label', 'name'];
-  const nodeRows = useMemo(
-    () =>
-      graph.nodes.map((n) => ({
-        id: n.id,
-        type: n.type || '',
-        label: n.label || '',
-        name: n.name || '',
-      })),
-    [graph.nodes],
-  );
-  const edgeColumns = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
-  const edgeRows = useMemo(
-    () =>
-      graph.edges
-        .map((e) => {
-          const src = graph.nodes.find((n) => n.id === e.from);
-          const tgt = graph.nodes.find((n) => n.id === e.to);
-          if (!src || !tgt) return null;
-          return {
-            from_name: src.name || '',
-            to_name: tgt.name || '',
-            from: e.from,
-            to: e.to,
-            type: e.type || '',
-            label: e.label || '',
-            detail: e.detail || '',
-            properties: e.properties ? JSON.stringify(e.properties) : '',
-            evidence: Array.isArray(e.evidence) ? e.evidence.join(', ') : '',
-          };
-        })
-        .filter((row): row is NonNullable<typeof row> => row !== null),
-    [graph.edges, graph.nodes],
-  );
-
-  const markdownTables = useMemo(() => {
-    const nodeHeader = ['id', 'type', 'label', 'name'];
-    const nodeRows = graph.nodes.map((n) =>
-      nodeHeader.map((key) => escapeMarkdownCell(n[key as keyof GraphNode])).join(' | ')
-    );
-    const nodeTable = [
-      `| ${nodeHeader.join(' | ')} |`,
-      `| ${nodeHeader.map(() => '---').join(' | ')} |`,
-      ...nodeRows.map((row) => `| ${row} |`),
-    ].join('\n');
-
-    const edgeHeader = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
-    const edgeRows = graph.edges.map((e) => {
-      const src = graph.nodes.find((n) => n.id === e.from);
-      const tgt = graph.nodes.find((n) => n.id === e.to);
-      return edgeHeader
-        .map((key) => {
-          if (key === 'from_name') return escapeMarkdownCell(src?.name ?? '');
-          if (key === 'to_name') return escapeMarkdownCell(tgt?.name ?? '');
-          if (key === 'from') return escapeMarkdownCell(src?.id ?? e.from);
-          if (key === 'to') return escapeMarkdownCell(tgt?.id ?? e.to);
-          if (key === 'properties') return escapeMarkdownCell(e.properties ? JSON.stringify(e.properties) : '');
-          if (key === 'evidence') return escapeMarkdownCell(Array.isArray(e.evidence) ? e.evidence.join(', ') : '');
-          return escapeMarkdownCell(e[key as keyof GraphEdge]);
-        })
-        .join(' | ');
-    });
-    const edgeTable = [
-      `| ${edgeHeader.join(' | ')} |`,
-      `| ${edgeHeader.map(() => '---').join(' | ')} |`,
-      ...edgeRows.map((row) => `| ${row} |`),
-    ].join('\n');
-
-    return `### Nodes (${graph.nodes.length})\n\n${nodeTable}\n\n### Edges (${graph.edges.length})\n\n${edgeTable}`;
-  }, [graph]);
+  const {
+    nodeColumns,
+    edgeColumns,
+    nodeRows,
+    edgeRows,
+  } = useMemo(() => graphToTableRows(graph), [graph]);
+  const markdownTables = useMemo(() => graphToMarkdownTables(graph), [graph]);
 
   // Reset selections and default names whenever the graph changes so we don't drift.
   const graphKey = useMemo(() => JSON.stringify({ name: graph.name, nodeIds: graph.nodes.map((n) => n.id).sort(), edgeIds: graph.edges.map((e) => e.id).sort() }), [graph]);

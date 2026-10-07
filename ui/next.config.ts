@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: '100mb',
   },
+  transpilePackages: ['reactflow-edge-routing', 'obstacle-router'],
   async rewrites() {
     // Rewrites only used in dev mode (next dev).
     // In static export, rewrites are NOT applied.

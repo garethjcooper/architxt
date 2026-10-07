@@ -32,7 +32,7 @@ Click any job to open its detail view on the right. The detail panel contains:
 
 ### Stages
 
-Every contextual sync job runs the same six stages in order:
+Every contextual sync job runs seven stages in order:
 
 | Stage | What it does |
 |---|---|
@@ -42,6 +42,7 @@ Every contextual sync job runs the same six stages in order:
 | **Deploy contextual models** | Creates or updates role-based mental models for qualifying nodes, edges, and seeds. |
 | **Sync mental-model config** | Aligns per-entity overrides and refresh settings between architxt and Hindsight. |
 | **Refresh patches** | Re-runs mental models whose config changed so their content is current. |
+| **Update views from contextual graph** | Derives the current graph for each saved view, computes a diff, snapshots the new state, and appends a timeline slice when there are changes. This only updates existing views; it does not create default views. |
 
 Each stage shows a status dot and a label such as `completed`, `running`, `failed`, or `completed with issues`. A stage can finish with issues without failing the whole job.
 
@@ -90,6 +91,7 @@ Logs are useful for tracing the exact path a job took and for sharing with suppo
 - **Graph** — shows the entities and edges produced by the **Import Hindsight skeleton** stage.
 - **Candidates** — shows nodes discovered by seed-scoped models deployed in the **Deploy contextual models** and **Refresh patches** stages.
 - **Mental Models** — shows the models created, updated, and cleaned up across all model-related stages.
+- **Views** — shows saved views that are kept in sync by the **Update views from contextual graph** stage.
 
 ## Summary
 

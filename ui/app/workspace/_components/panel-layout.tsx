@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { forwardRef } from 'react';
 
 function PanelHeader({ title, count, actions }: { title: string; count?: number | string; actions?: React.ReactNode }) {
   return (
@@ -20,17 +21,11 @@ function PanelHeader({ title, count, actions }: { title: string; count?: number 
 }
 
 export type PanelHeaderCount = number | string;
-function Panel({
-  children,
-  className,
-  style,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
+
+const Panel = forwardRef<HTMLDivElement, { children: React.ReactNode; className?: string; style?: React.CSSProperties }>(function Panel({ children, className, style }, ref) {
   return (
     <Card
+      ref={ref}
       className={cn(
         'min-h-0 border-border-default bg-surface-card flex flex-col overflow-hidden gap-0 py-0',
         className
@@ -40,8 +35,8 @@ function Panel({
       {children}
     </Card>
   );
-}
-
+});
+Panel.displayName = 'Panel';
 
 function PanelContent({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
@@ -50,7 +45,6 @@ function PanelContent({ children, className }: { children: React.ReactNode; clas
     </CardContent>
   );
 }
-
 
 function ResizeHandle({
   direction,
@@ -81,13 +75,12 @@ function ResizeHandle({
     >
       <div
         className={cn(
-          'rounded-full bg-surface-strong group-hover:bg-accent-primary-bd-hover transition-colors',
-          isHorizontal ? 'w-16 h-1' : 'w-1 h-16'
+          'bg-border-default group-hover:bg-accent-primary transition-colors rounded-full',
+          isHorizontal ? 'w-8 h-1' : 'w-1 h-8'
         )}
       />
     </div>
   );
 }
-
 
 export { PanelHeader, Panel, PanelContent, ResizeHandle };

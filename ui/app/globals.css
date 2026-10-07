@@ -690,3 +690,20 @@
   scrollbar-color: var(--surface-scrollbar-thumb) transparent;
   scrollbar-width: thin;
 }
+
+/* Highlight animation for Find-in-panel */
+@keyframes find-flash {
+  0% { background-color: var(--accent-primary-solid); }
+  50% { background-color: var(--accent-primary-bg-hover); }
+  100% { background-color: transparent; }
+}
+
+.find-highlight {
+  animation: find-flash 1.5s ease-out 1;
+  outline: 2px solid var(--accent-primary-solid);
+  outline-offset: -2px;
+  box-shadow: 0 0 12px 2px var(--accent-primary-solid);
+  border-radius: 0.25rem;
+  position: relative;
+  z-index: 1;
+}

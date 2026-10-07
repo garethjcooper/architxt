@@ -390,8 +390,12 @@ router.get('/', async (req, res) => {
  *                 type: boolean
  *                 default: false
  *                 description: Fetch each mental model's content from Hindsight
- *     responses:
- *       200:
+  *              edge_ids:
+  *                type: array
+  *                items: { type: string }
+  *                description: Optional edge ids to restrict edge-context models to only those edges
+     responses:
+       200:
  *         description: Consolidated entity info map
  *         content:
  *           application/json:
@@ -430,7 +434,7 @@ router.post('/info', async (req, res) => {
     validation.serverId,
     validation.bankId,
     validation.entityIds,
-    { includeContent: validation.includeContent },
+    { includeContent: validation.includeContent, edgeIds: validation.edgeIds },
   );
 
   if (!result.success) {

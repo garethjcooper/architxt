@@ -518,3 +518,38 @@ CREATE TABLE research_artifact_outputs (
 
 CREATE INDEX idx_research_artifacts_session ON research_artifacts(rs_id);
 CREATE INDEX idx_research_artifact_outputs_artifact ON research_artifact_outputs(ra_id);
+
+-- ============================================================================
+-- VIEWS — persisted user-editable canvases over the contextual graph
+-- ============================================================================
+
+CREATE TABLE views (
+  view_id TEXT PRIMARY KEY,
+  view_server_id INTEGER NOT NULL,
+  view_bank_id TEXT NOT NULL,
+  view_name TEXT NOT NULL,
+  view_diagram_type TEXT NOT NULL DEFAULT 'flowchart',
+  view_graph JSON NOT NULL,
+  view_layout JSON NOT NULL,
+  view_style_defaults JSON,
+  view_timeline JSON NOT NULL DEFAULT '[]',
+  view_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  view_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (view_server_id) REFERENCES servers(svr_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_views_server_bank ON views(view_server_id, view_bank_id);
+
+CREATE TABLE view_snapshots (
+  vsnap_id TEXT PRIMARY KEY,
+  vsnap_view_id TEXT NOT NULL,
+  vsnap_name TEXT NOT NULL,
+  vsnap_graph JSON NOT NULL,
+  vsnap_layout JSON NOT NULL,
+  vsnap_mermaid TEXT,
+  vsnap_svg TEXT,
+  vsnap_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (vsnap_view_id) REFERENCES views(view_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_view_snapshots_view ON view_snapshots(vsnap_view_id);

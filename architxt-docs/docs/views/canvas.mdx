@@ -1,0 +1,91 @@
+---
+sidebar_position: 3
+---
+
+# Canvas
+
+The **Canvas** is the middle column of the Views page. It renders the entities and edges you selected in the Entities panel, and provides tools for arranging and styling the graph.
+
+## Interactions
+
+| Interaction | Behavior |
+|---|---|
+| **Click** | Select a node or edge. |
+| **Drag** | Move a node. |
+| **Shift-drag** | Draw a selection box around multiple items. |
+| **Delete / Backspace** | Remove selected items. |
+
+## Actions
+
+| Action | Result |
+|---|---|
+| **Undo** | Reverses the last change to the view. |
+| **Redo** | Re-applies the last undone change. |
+| **Delete / Backspace** | Removes the selected items from the view. |
+| **Find (F3)** | Opens a search box to find and reveal nodes and edges on the canvas and in the Entities panel. |
+
+## Edge merge modes
+
+The toolbar has a dropdown that controls how multiple edges between the same pair of nodes are drawn:
+
+| Mode | Behavior |
+|---|---|
+| **Merge: Full** | Combine every edge between the same two nodes into one bundled edge. |
+| **Merge: Type** | Bundle edges that share the same type. |
+| **Merge: None** | Draw every edge separately. |
+
+## Timeline
+
+The timeline panel lists change slices for the active view. Timeline snapshots are produced in two ways:
+
+- Manually, while you edit the view.
+- Automatically, by the contextual-graph sync job’s **Update views from contextual graph** stage, which diffs the current graph against each saved view and appends a slice when changes are detected.
+
+Each slice shows the time, action, summary, and counts of added, updated, or removed nodes and edges. Selecting a slice opens a read-only snapshot of the view at that point.
+
+## Controls
+
+The **Controls** switch in the panel header opens a floating panel with layout and display options.
+
+### Layout
+
+| Option | Description |
+|---|---|
+| **Algorithm** | ELK layout algorithm. |
+| **Direction** | Primary layout direction. |
+| **Edge routing** | How edges are drawn between nodes. |
+| **Crossing minimization** | Strategy for reducing edge crossings. |
+| **Greedy switch** | Additional crossing-reduction pass. |
+
+### Background and display
+
+| Option | Description |
+|---|---|
+| **Background** | Off, dots, lines, or cross. |
+| **Edge labels** | Show or hide edge labels. |
+| **Node IDs** | Show or hide node IDs. |
+| **Handles** | Show or hide connection handles. |
+| **Color bars** | Show or hide node color bars. |
+| **Top nodes** | Show only the N best-connected nodes. |
+
+### Spacing and routing
+
+| Option | Description |
+|---|---|
+| **Spacing** | Edge-to-edge, edge-to-node, handle, stub, layer, and node spacing. |
+| **Hate crossings** | Prefer shorter routes even if they cross. |
+| **Route only when blocked** | Keep edges straight unless blocked. |
+
+### Nodes
+
+| Option | Description |
+|---|---|
+| **Minimum width / height** | Smallest rendered node size. |
+| **Horizontal / vertical text alignment** | Text positioning inside nodes. |
+
+### Control actions
+
+| Action | Result |
+|---|---|
+| **Auto-layout** | Runs ELK on the current graph. |
+| **Reset** | Restores the default layout and display options. |

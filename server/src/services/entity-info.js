@@ -17,6 +17,7 @@ export function validateEntityInfoPayload(body) {
   const bankId = body?.bank_id;
   const entityIds = body?.entity_ids;
   const includeContent = body?.include_content === true;
+  const edgeIds = body?.edge_ids;
 
   if (!Number.isFinite(serverId) || serverId <= 0) {
     return { valid: false, error: 'server_id must be a positive integer', code: 'VALIDATION_ERROR' };
@@ -33,6 +34,12 @@ export function validateEntityInfoPayload(body) {
   if (entityIds.length > 100) {
     return { valid: false, error: 'entity_ids may not contain more than 100 ids', code: 'VALIDATION_ERROR' };
   }
+  if (edgeIds !== undefined && !Array.isArray(edgeIds)) {
+    return { valid: false, error: 'edge_ids must be an array when provided', code: 'VALIDATION_ERROR' };
+  }
+  const validEdgeIds = edgeIds
+    ? edgeIds.filter((id) => typeof id === 'string' && id.trim() !== '').map((id) => id.trim())
+    : [];
 
   return {
     valid: true,
@@ -40,6 +47,7 @@ export function validateEntityInfoPayload(body) {
     bankId: bankId.trim(),
     entityIds: entityIds.map((id) => id.trim()),
     includeContent,
+    edgeIds: validEdgeIds,
   };
 }
 
@@ -316,10 +324,12 @@ function deriveInstancesForEntity(template, entity, db, serverId, bankId) {
  * contextual ref for an edge-scoped role where the requested entity appears
  * as one of the physical edge's endpoints. The other endpoint in the scope need
  * not be part of the request.
- *
- * For very large graphs, switch the edge scan to an IN-clause query on endpoints.
+ * @param {string[]} requestedEntityIds
+ * @param {Map<string, string>} roleScopes
+ * @param {Set<string>} [allowedEdgeIds] - if provided, only return edge contexts for edges whose id is in this set
  */
-async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntityIds, roleScopes) {
+async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntityIds, roleScopes, allowedEdgeIds) {
+  const allowedEdgeIdSet = allowedEdgeIds && allowedEdgeIds.size > 0 ? allowedEdgeIds : null;
   const edgesResult = await listEdges(db, serverId, bankId, { limit: 10000 });
   if (!edgesResult.success) {
     logger.warn('Failed to load edges for entity info', { serverId, bankId, error: edgesResult.error });
@@ -336,7 +346,8 @@ async function loadEdgeContextsForEntities(db, serverId, bankId, requestedEntity
   for (const entityId of requestedEntityIds) byEntityId.set(entityId, []);
 
   for (const edge of edgesResult.data || []) {
-    const refs = extractContextualRefs(edge.properties, new Set(roleScopes.keys()))
+  if (allowedEdgeIdSet && !allowedEdgeIdSet.has(edge.cge_id)) continue;
+  const refs = extractContextualRefs(edge.properties, new Set(roleScopes.keys()))
       .filter((r) => edgeRoleIds.has(r.role));
     if (refs.length === 0) continue;
 
@@ -432,6 +443,7 @@ function buildEntityInfo({
 export async function buildEntityInfoMap(db, serverId, bankId, entityIds, options = {}) {
   try {
     const includeContent = options.includeContent === true;
+    const edgeIdSet = options.edgeIds?.length > 0 ? new Set(options.edgeIds) : null;
 
     const [graphNodesResult, catalogEntitiesResult] = await Promise.all([
       loadGraphNodes(db, serverId, bankId, entityIds),
@@ -563,7 +575,7 @@ export async function buildEntityInfoMap(db, serverId, bankId, entityIds, option
     const roleScopes = getRoleScopeMap(db);
     const knownRoleIds = new Set(roleScopes.keys());
 
-    const edgeContextsResult = await loadEdgeContextsForEntities(db, serverId, bankId, entityIds, roleScopes);
+    const edgeContextsResult = await loadEdgeContextsForEntities(db, serverId, bankId, entityIds, roleScopes, edgeIdSet);
     if (!edgeContextsResult.success) {
       return { success: false, error: edgeContextsResult.error, code: edgeContextsResult.code };
     }

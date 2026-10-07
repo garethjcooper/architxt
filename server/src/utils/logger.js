@@ -6,7 +6,7 @@ import { config } from '../config.js';
 const { combine, timestamp, printf, errors } = winston.format;
 
 const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
-  let msg = `${timestamp} [${level}]: ${message}`;
+  let msg = `${timestamp} [${level}]: ${typeof message === 'object' ? JSON.stringify(message) : message}`;
   if (Object.keys(metadata).length > 0) {
     msg += ` ${JSON.stringify(metadata)}`;
   }

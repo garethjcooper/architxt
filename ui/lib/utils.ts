@@ -16,6 +16,12 @@ export function downloadMarkdown(markdown: string, title: string) {
   const date = new Date().toISOString().split('T')[0];
   const filename = `${sanitizeFilenameBase(title)}-${date}.md`;
   const blob = new Blob([markdown], { type: 'text/markdown' });
+  downloadBlob(blob, filename);
+  toast.success(`Downloaded as ${filename}`);
+}
+
+/** Trigger a file download from a Blob and a sanitized filename. */
+export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -24,5 +30,4 @@ export function downloadMarkdown(markdown: string, title: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast.success(`Downloaded as ${filename}`);
 }

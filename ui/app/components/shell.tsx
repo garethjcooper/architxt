@@ -24,6 +24,7 @@ import {
   LayoutTemplate,
   Puzzle,
   Database,
+  Map,
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
@@ -35,19 +36,19 @@ import { useVersion } from '@/lib/use-version';
 import { useServerEnv } from '@/lib/use-server-env';
 
 const navItems = [
+  { href: '/views', label: 'Views', icon: Map },
   { href: '/workspace', label: 'Workspace', icon: LayoutTemplate },
-  { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/models', label: 'Mental Models', icon: Layers },
   { href: '/contextual-graph/manager', label: 'Context Patches', icon: Network },
+  { href: '/models', label: 'Mental Models', icon: Layers },
+  { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/hindsight', label: 'Hindsight Sync', icon: HindsightIcon },
-  { href: '/contexts', label: 'Contexts', icon: FolderOpen },
-  { href: '/tags', label: 'Tags', icon: Tags },
   { href: '/entities', label: 'Entities', icon: Users },
+  { href: '/tags', label: 'Tags', icon: Tags },
+  { href: '/contexts', label: 'Contexts', icon: FolderOpen },
   { href: '/metadata', label: 'Metadata', icon: MetadataIcon },
-  { href: '/directives', label: 'Directives', icon: DirectiveIcon },
-  { href: '/template-roles', label: 'Template Roles', icon: Puzzle },
-  { href: '/servers', label: 'Servers', icon: Server },
   { href: '/bank-settings', label: 'Bank Settings', icon: Database },
+  { href: '/servers', label: 'Servers', icon: Server },
+  { href: '/template-roles', label: 'Template Roles', icon: Puzzle },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

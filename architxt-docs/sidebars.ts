@@ -22,6 +22,12 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Views',
+      collapsed: false,
+      items: ['views/overview', 'views/entities-panel', 'views/canvas', 'views/detail-panel'],
+    },
+    {
+      type: 'category',
       label: 'Workspace',
       collapsed: false,
       items: [

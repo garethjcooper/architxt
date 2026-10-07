@@ -1,0 +1,70 @@
+---
+sidebar_position: 1
+---
+
+# Overview
+
+The **Views** page is where you explore and compose the contextual graph visually. It is scoped to the selected Hindsight server and bank, so every view, node, and edge belongs to a specific bank.
+
+## Layout
+
+The page is a three-column workspace.
+
+| Column | Purpose | Learn more |
+|---|---|---|
+| **Entities** | Browse grounded entities and their edges, then choose what appears on the canvas. | [Entities Panel](./entities-panel) |
+| **Canvas** | View, arrange, and select nodes and edges. | [Canvas](./canvas) |
+| **Detail** | Inspect the mental-model content behind selected nodes or edges. | [Detail Panel](./detail-panel) |
+
+You can resize the columns by dragging the handles between them, and toggle each column on or off from the top bar.
+
+## Top bar
+
+The top bar selects the Hindsight server and bank, and toggles the left and right columns. The rest of the page’s controls live in the green panel header below it.
+
+## View tabs
+
+Views are opened as tabs in the panel header.
+
+| Action | How it works |
+|---|---|
+| **New view** | Creates a blank view named automatically. |
+| **Rename** | Edits the active view name. |
+| **Delete** | Removes the active view permanently. |
+| **Undo / Redo** | Steps through changes to the active view. |
+| **Timeline** | Toggles the timeline panel for the active view. |
+
+## Export
+
+The export menu in the toolbar offers:
+
+- Copy or download the canvas as a PNG image.
+- Copy or download the canvas as an SVG image.
+- Copy or download the view as a Mermaid flowchart.
+
+## Send to Workspace
+
+The **Save to...** button sends the current view’s graph to a curated Workspace page. You can create a new page or add to an existing one. If the target page already contains a graph, architxt asks for confirmation before merging.
+
+## Persistence
+
+Open view tabs and active panel layout are restored per server and bank when you return to the page.
+
+## How it fits into architxt
+
+```text
+Context Patches ──► contextual graph ──► Views
+                                            │
+                                            ├── canvas editing
+                                            ├── mental-model detail
+                                            ├── timeline snapshots
+                                            └── export / send to Workspace
+```
+
+- **Context Patches** builds and maintains the graph.
+- **Views** lets you inspect, arrange, and compose that graph visually.
+- **Workspace** receives view content through curated pages.
+
+## Summary
+
+Views is the visual layer on top of the contextual graph. It gives you a bank-scoped canvas, an entity-driven selection panel, layout controls, mental-model detail, timeline snapshots, and export options, all tied back to the rest of the Workspace.

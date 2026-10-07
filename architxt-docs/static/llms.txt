@@ -25,6 +25,12 @@ Full plain-text dump: https://architxtlabs.com/llms-full.txt
 - Directives: https://architxtlabs.com/core-concepts/directives
 - AQL: architxt Query Language: https://architxtlabs.com/core-concepts/aql
 
+## Views
+- Overview: https://architxtlabs.com/views/overview
+- Entities Panel: https://architxtlabs.com/views/entities-panel
+- Canvas: https://architxtlabs.com/views/canvas
+- Detail Panel: https://architxtlabs.com/views/detail-panel
+
 ## Workspace
 - Overview: https://architxtlabs.com/workspace/overview
 - Chat: https://architxtlabs.com/workspace/chat
