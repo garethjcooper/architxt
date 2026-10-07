@@ -15,6 +15,7 @@ import { importHindsightSkeleton as defaultImportSkeleton } from './import-hinds
 import { addContext as defaultAddContext } from './add-context.js';
 import { refreshContextualGraphPatches as defaultRefreshPatches } from './refresh-patches.js';
 import { syncContextualMentalModelConfig as defaultSyncMentalModelConfig } from './sync-mental-model-config.js';
+import { syncViewsFromContextualGraph as defaultSyncViews } from '../../db/crud/views.js';
 import { cleanupDisallowedModels as defaultCleanupDisallowedModels } from './cleanup-disallowed-models.js';
 import { cleanupOrphanedModels as defaultCleanupOrphanedModels } from './cleanup-orphaned-models.js';
 import { getServer as defaultGetServer } from '../../db/crud/servers.js';
@@ -28,6 +29,7 @@ const STAGES = [
   { name: 'deploying_models', label: 'Deploy contextual models' },
   { name: 'syncing_config', label: 'Sync mental-model config' },
   { name: 'refreshing_patches', label: 'Refresh patches' },
+  { name: 'updating_views', label: 'Update views from contextual graph' },
 ];
 
 /**
@@ -117,6 +119,7 @@ function buildRunner(deps) {
   const cleanupOrphanedModels = deps.cleanupOrphanedModels || defaultCleanupOrphanedModels;
   const addContext = deps.addContext || defaultAddContext;
   const syncMentalModelConfig = deps.syncMentalModelConfig || defaultSyncMentalModelConfig;
+  const syncViews = deps.syncViews || defaultSyncViews;
   const refreshPatches = deps.refreshPatches || defaultRefreshPatches;
   const getServer = deps.getServer || defaultGetServer;
 
@@ -144,6 +147,7 @@ function buildRunner(deps) {
       deploy: {},
       sync: {},
       refresh: {},
+      views: {},
     };
 
     try {
@@ -222,6 +226,16 @@ function buildRunner(deps) {
           throw new StageError(result.error, result.code || 'REFRESH_FAILED');
         }
         stats.refresh = result;
+        return result;
+      });
+
+      await runStage(db, jobId, 'updating_views', async () => {
+        const rawResult = await syncViews(db, serverId, bankId);
+        if (!rawResult.success) {
+          throw new StageError(rawResult.error, rawResult.code || 'UPDATE_VIEWS_FAILED');
+        }
+        const result = rawResult.data || {};
+        stats.views = result;
         return result;
       });
 

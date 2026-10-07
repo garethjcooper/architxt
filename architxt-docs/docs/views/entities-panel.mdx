@@ -1,0 +1,40 @@
+---
+sidebar_position: 2
+---
+
+# Entities Panel
+
+The **Entities** panel is the left column of the Views page. It lists every grounded entity in the selected bank and lets you choose which entities and edges appear on the canvas.
+
+## What is listed
+
+- One row per grounded entity in the bank.
+- Expanding an entity reveals its edges.
+- The first level shows the grounded co-occurrence edges from Hindsight.
+- The next level shows contextualised edges that were found for each grounded edge.
+
+## Filters
+
+| Control | Purpose |
+|---|---|
+| **All** | Show every entity in the bank. |
+| **View** | Show only entities that are currently on the canvas. |
+| **Search** | Filter entities and edges by name, id, or edge type. |
+
+## Checkboxes
+
+| Checkbox | Effect on the canvas |
+|---|---|
+| **Entity** | Include or exclude the entity. |
+| **Grounded edge** | Toggle the whole grounded co-occurrence relationship at once. |
+| **Contextualised edge** | Toggle an individual contextual edge underneath a grounded edge. |
+
+When you select an edge, both of its endpoint entities are implied onto the canvas automatically.
+
+## Find in panel
+
+If you use the canvas find shortcut (`F3` / find) to locate an item on the graph, that item is also revealed in the Entities panel so you can inspect and toggle it from there.
+
+## Edge hierarchy
+
+Grounded co-occurrence edges appear first. The contextualised edges discovered for each grounded relationship appear underneath. This lets you turn on a whole relationship or inspect the individual edges that produced it.

@@ -22,6 +22,7 @@ import researchRoute from './routes/research.js';
 import contextualGraphRoute from './routes/contextual-graph.js';
 import templateRolesRoute from './routes/template-roles.js';
 import bankSettingsRoute from './routes/bank-settings.js';
+import viewsRoute from './routes/views.js';
 import swaggerSpecs, { swaggerUi } from './swagger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -241,6 +242,7 @@ app.use('/api/v1/template-roles', templateRolesRoute);
 app.use('/api/v1/research', researchRoute);
 app.use('/api/v1/contextual-graph', contextualGraphRoute);
 app.use('/api/v1/bank-settings', bankSettingsRoute);
+app.use('/api/v1/servers/:serverId/banks/:bankId/views', viewsRoute);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -167,6 +167,12 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
   const [threads, setThreads] = useState<AgentChatThread[]>([]);
   const [tabs, setTabs] = useState<ChatTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const tabsHydratedRef = useRef(false);
+
+  const chatTabsKey = useMemo(() => {
+    if (!sessionId) return null;
+    return `architxt:workspace-chat-tabs:${sessionId}`;
+  }, [sessionId]);
   const [messagesByThread, setMessagesByThread] = useState<Record<number, ChatMessage[]>>({});
   const [loadingByThread, setLoadingByThread] = useState<Record<number, boolean>>({});
   const [inputByThread, setInputByThread] = useState<Record<number, string>>({});
@@ -176,6 +182,56 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
   const [creatingThread, setCreatingThread] = useState(false);
   const [expandedAgentCards, setExpandedAgentCards] = useState<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Hydrate chat tabs from localStorage once thread list is loaded.
+  useEffect(() => {
+    if (tabsHydratedRef.current) return;
+    if (!chatTabsKey) return;
+    if (historyLoading) return;
+
+    try {
+      const raw = localStorage.getItem(chatTabsKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          tabs?: ChatTab[];
+          activeTabId?: string | null;
+        };
+        const restoredTabs = Array.isArray(saved.tabs) ? saved.tabs : [];
+        const validTabs: ChatTab[] = [];
+        for (const t of restoredTabs) {
+          if (!t || typeof t.id !== 'string' || typeof t.threadId !== 'number' || typeof t.label !== 'string') continue;
+          // Defer pruning against the loaded thread list: if threads are empty,
+          // keep the tab and let the sync effect below remove it later.
+          if (threads.length > 0 && !threads.some((th) => th.act_id === t.threadId)) continue;
+          validTabs.push({
+            id: t.id,
+            threadId: t.threadId,
+            label: t.label,
+          });
+        }
+        if (validTabs.length > 0) {
+          setTabs(validTabs);
+          if (saved.activeTabId && validTabs.some((t) => t.id === saved.activeTabId)) {
+            setActiveTabId(saved.activeTabId);
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to hydrate chat tabs', err);
+    }
+
+    tabsHydratedRef.current = true;
+  }, [chatTabsKey, historyLoading, threads]);
+
+  // Persist chat tabs whenever they change after hydration.
+  useEffect(() => {
+    if (!tabsHydratedRef.current || !chatTabsKey) return;
+    try {
+      localStorage.setItem(chatTabsKey, JSON.stringify({ tabs, activeTabId }));
+    } catch (err) {
+      logger.error('Failed to persist chat tabs', err);
+    }
+  }, [chatTabsKey, tabs, activeTabId]);
 
   const handleToggleExpand = useCallback((id: number) => {
     setExpandedAgentCards((prev) => {
@@ -211,10 +267,12 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
       setInputByThread({});
       setLoadingByThread({});
       setAgentConfig(null);
+      tabsHydratedRef.current = false;
       return;
     }
 
     let cancelled = false;
+    tabsHydratedRef.current = false;
     setHistoryLoading(true);
     researchApi
       .listChatThreads(sessionId)
@@ -222,18 +280,9 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
         if (cancelled) return;
         setThreads(res.threads);
         setAgentConfig({ provider: res.provider, model: res.model });
-        if (res.threads.length > 0) {
-          setTabs((prev) => {
-            if (prev.length > 0) return prev;
-            const first = res.threads[0];
-            const id = `chat-${first.act_id}`;
-            return [{ id, threadId: first.act_id, label: first.title }];
-          });
-          setActiveTabId((prev) => {
-            if (prev != null && tabs.some((t) => t.id === prev)) return prev;
-            return `chat-${res.threads[0].act_id}`;
-          });
-        }
+        // Do not auto-open a chat tab from the thread list. Tabs are restored from
+        // localStorage by the hydration effect, and if the user closed them all
+        // they should stay closed on reload.
       })
       .catch((err) => {
         if (cancelled) return;

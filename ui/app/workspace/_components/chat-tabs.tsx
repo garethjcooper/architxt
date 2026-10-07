@@ -3,6 +3,14 @@
 import { useState, useCallback } from 'react';
 import { Plus, X, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { AgentChatThread } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -220,11 +228,12 @@ export function ChatTabs({
       />
 
       {renamingChat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop-strong">
-          <div className="rounded-lg border border-border-default bg-surface-overlay p-4 w-80 shadow-lg">
-            <div className="text-sm font-medium text-foreground-default mb-2">Rename chat</div>
-            <input
-              type="text"
+        <Dialog open={!!renamingChat} onOpenChange={(open) => !open && setRenamingChat(null)}>
+          <DialogContent showCloseButton={false} className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Rename chat</DialogTitle>
+            </DialogHeader>
+            <Input
               value={renamingChat.title}
               onChange={(e) => setRenamingChat({ ...renamingChat, title: e.target.value })}
               onKeyDown={(e) => {
@@ -235,19 +244,16 @@ export function ChatTabs({
                   setRenamingChat(null);
                 }
               }}
-              className="w-full px-2 py-1.5 mb-4 rounded bg-surface-inset border border-border-default text-xs text-foreground-default placeholder:text-foreground-placeholder focus:outline-none focus:border-focus-ring/80"
               autoFocus
             />
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setRenamingChat(null)}>
+            <DialogFooter showCloseButton={false}>
+              <Button variant="outline" onClick={() => setRenamingChat(null)}>
                 Cancel
               </Button>
-              <Button variant="default" size="sm" onClick={() => void handleConfirmRename()}>
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
+              <Button onClick={() => void handleConfirmRename()}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

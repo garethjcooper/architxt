@@ -15,6 +15,7 @@ architxt is a knowledge-workbench for turning source documents into structured, 
 
 - **Upload documents** and extract entities, relationships, and mental models.
 - **Build contextual graphs** that connect people, systems, concepts, and evidence.
+- **Explore graphs visually** with the Views page: select entities, arrange the canvas, inspect mental-model detail, and export or send views to Workspace pages.
 - **Reflect** on the graph with free-text questions and get synthesized answers.
 - **Sync** selected documents and tags with a Hindsight memory bank.
 
@@ -24,6 +25,7 @@ architxt is a knowledge-workbench for turning source documents into structured, 
 - [Installation](./getting-started/installation) – get architxt running locally.
 - [Configuration](./getting-started/configuration) – env vars, database, and Hindsight servers.
 - [Quick Start](./getting-started/quick-start) – end-to-end tutorial from upload to curated page.
+- [Views](./views/overview) – explore and compose the contextual graph visually.
 - [Chat](./workspace/chat) – ask the architxt agent about your bank and move answers into curated pages.
 - [Quick start video](https://www.youtube.com/watch?v=9Nssbypo2xo) – watch the walkthrough on YouTube.
 - [Temporal Mosaic blog post](https://hindsight.vectorize.io/blog/2026/07/03/architxt-hindsight-temporal-mosaic) – read the original announcement of architxt and Hindsight's temporal mosaic architecture.
@@ -2244,6 +2246,236 @@ AQL is intentionally small: a few directives plus two reference shapes. That sma
 ---
 
 # Overview
+URL: https://architxtlabs.com/views/overview
+# Overview
+
+The **Views** page is where you explore and compose the contextual graph visually. It is scoped to the selected Hindsight server and bank, so every view, node, and edge belongs to a specific bank.
+
+## Layout
+
+The page is a three-column workspace.
+
+| Column | Purpose | Learn more |
+|---|---|---|
+| **Entities** | Browse grounded entities and their edges, then choose what appears on the canvas. | [Entities Panel](./entities-panel) |
+| **Canvas** | View, arrange, and select nodes and edges. | [Canvas](./canvas) |
+| **Detail** | Inspect the mental-model content behind selected nodes or edges. | [Detail Panel](./detail-panel) |
+
+You can resize the columns by dragging the handles between them, and toggle each column on or off from the top bar.
+
+## Top bar
+
+The top bar selects the Hindsight server and bank, and toggles the left and right columns. The rest of the page’s controls live in the green panel header below it.
+
+## View tabs
+
+Views are opened as tabs in the panel header.
+
+| Action | How it works |
+|---|---|
+| **New view** | Creates a blank view named automatically. |
+| **Rename** | Edits the active view name. |
+| **Delete** | Removes the active view permanently. |
+| **Undo / Redo** | Steps through changes to the active view. |
+| **Timeline** | Toggles the timeline panel for the active view. |
+
+## Export
+
+The export menu in the toolbar offers:
+
+- Copy or download the canvas as a PNG image.
+- Copy or download the canvas as an SVG image.
+- Copy or download the view as a Mermaid flowchart.
+
+## Send to Workspace
+
+The **Save to...** button sends the current view’s graph to a curated Workspace page. You can create a new page or add to an existing one. If the target page already contains a graph, architxt asks for confirmation before merging.
+
+## Persistence
+
+Open view tabs and active panel layout are restored per server and bank when you return to the page.
+
+## How it fits into architxt
+
+```text
+Context Patches ──► contextual graph ──► Views
+                                            │
+                                            ├── canvas editing
+                                            ├── mental-model detail
+                                            ├── timeline snapshots
+                                            └── export / send to Workspace
+```
+
+- **Context Patches** builds and maintains the graph.
+- **Views** lets you inspect, arrange, and compose that graph visually.
+- **Workspace** receives view content through curated pages.
+
+## Summary
+
+Views is the visual layer on top of the contextual graph. It gives you a bank-scoped canvas, an entity-driven selection panel, layout controls, mental-model detail, timeline snapshots, and export options, all tied back to the rest of the Workspace.
+---
+
+# Entities Panel
+URL: https://architxtlabs.com/views/entities-panel
+# Entities Panel
+
+The **Entities** panel is the left column of the Views page. It lists every grounded entity in the selected bank and lets you choose which entities and edges appear on the canvas.
+
+## What is listed
+
+- One row per grounded entity in the bank.
+- Expanding an entity reveals its edges.
+- The first level shows the grounded co-occurrence edges from Hindsight.
+- The next level shows contextualised edges that were found for each grounded edge.
+
+## Filters
+
+| Control | Purpose |
+|---|---|
+| **All** | Show every entity in the bank. |
+| **View** | Show only entities that are currently on the canvas. |
+| **Search** | Filter entities and edges by name, id, or edge type. |
+
+## Checkboxes
+
+| Checkbox | Effect on the canvas |
+|---|---|
+| **Entity** | Include or exclude the entity. |
+| **Grounded edge** | Toggle the whole grounded co-occurrence relationship at once. |
+| **Contextualised edge** | Toggle an individual contextual edge underneath a grounded edge. |
+
+When you select an edge, both of its endpoint entities are implied onto the canvas automatically.
+
+## Find in panel
+
+If you use the canvas find shortcut (`F3` / find) to locate an item on the graph, that item is also revealed in the Entities panel so you can inspect and toggle it from there.
+
+## Edge hierarchy
+
+Grounded co-occurrence edges appear first. The contextualised edges discovered for each grounded relationship appear underneath. This lets you turn on a whole relationship or inspect the individual edges that produced it.
+---
+
+# Canvas
+URL: https://architxtlabs.com/views/canvas
+# Canvas
+
+The **Canvas** is the middle column of the Views page. It renders the entities and edges you selected in the Entities panel, and provides tools for arranging and styling the graph.
+
+## Interactions
+
+| Interaction | Behavior |
+|---|---|
+| **Click** | Select a node or edge. |
+| **Drag** | Move a node. |
+| **Shift-drag** | Draw a selection box around multiple items. |
+| **Delete / Backspace** | Remove selected items. |
+
+## Actions
+
+| Action | Result |
+|---|---|
+| **Undo** | Reverses the last change to the view. |
+| **Redo** | Re-applies the last undone change. |
+| **Delete / Backspace** | Removes the selected items from the view. |
+| **Find (F3)** | Opens a search box to find and reveal nodes and edges on the canvas and in the Entities panel. |
+
+## Edge merge modes
+
+The toolbar has a dropdown that controls how multiple edges between the same pair of nodes are drawn:
+
+| Mode | Behavior |
+|---|---|
+| **Merge: Full** | Combine every edge between the same two nodes into one bundled edge. |
+| **Merge: Type** | Bundle edges that share the same type. |
+| **Merge: None** | Draw every edge separately. |
+
+## Timeline
+
+The timeline panel lists change slices for the active view. Timeline snapshots are produced in two ways:
+
+- Manually, while you edit the view.
+- Automatically, by the contextual-graph sync job’s **Update views from contextual graph** stage, which diffs the current graph against each saved view and appends a slice when changes are detected.
+
+Each slice shows the time, action, summary, and counts of added, updated, or removed nodes and edges. Selecting a slice opens a read-only snapshot of the view at that point.
+
+## Controls
+
+The **Controls** switch in the panel header opens a floating panel with layout and display options.
+
+### Layout
+
+| Option | Description |
+|---|---|
+| **Algorithm** | ELK layout algorithm. |
+| **Direction** | Primary layout direction. |
+| **Edge routing** | How edges are drawn between nodes. |
+| **Crossing minimization** | Strategy for reducing edge crossings. |
+| **Greedy switch** | Additional crossing-reduction pass. |
+
+### Background and display
+
+| Option | Description |
+|---|---|
+| **Background** | Off, dots, lines, or cross. |
+| **Edge labels** | Show or hide edge labels. |
+| **Node IDs** | Show or hide node IDs. |
+| **Handles** | Show or hide connection handles. |
+| **Color bars** | Show or hide node color bars. |
+| **Top nodes** | Show only the N best-connected nodes. |
+
+### Spacing and routing
+
+| Option | Description |
+|---|---|
+| **Spacing** | Edge-to-edge, edge-to-node, handle, stub, layer, and node spacing. |
+| **Hate crossings** | Prefer shorter routes even if they cross. |
+| **Route only when blocked** | Keep edges straight unless blocked. |
+
+### Nodes
+
+| Option | Description |
+|---|---|
+| **Minimum width / height** | Smallest rendered node size. |
+| **Horizontal / vertical text alignment** | Text positioning inside nodes. |
+
+### Control actions
+
+| Action | Result |
+|---|---|
+| **Auto-layout** | Runs ELK on the current graph. |
+| **Reset** | Restores the default layout and display options. |
+---
+
+# Detail Panel
+URL: https://architxtlabs.com/views/detail-panel
+# Detail Panel
+
+The **Detail** panel is the right column of the Views page. It loads the mental-model content behind whatever nodes or edges you have selected on the canvas.
+
+## What is shown
+
+| Selection | Content |
+|---|---|
+| **One or more nodes** | Attached plain, derived, node, and seed mental models for those entities. |
+| **One or more edges** | Edge-context mental models that explain the relationship. |
+
+## Envelope rendering
+
+The content renders as a standard architxt envelope with narratives, tables, diagrams, and graphs. Slide the section into view to reveal the hover actions: index/plain-text toggle, evidence, and add-to-page.
+
+## Actions
+
+| Action | Result |
+|---|---|
+| **Show evidence** | Opens the evidence modal for the section. |
+| **Add to page** | Adds the section to an open Workspace curated page. |
+
+## Toggling the panel
+
+Use the panel toggle in the top bar or the column handle to open and close the Detail panel.
+---
+
+# Overview
 URL: https://architxtlabs.com/workspace/overview
 # Overview
 
@@ -2360,7 +2592,7 @@ A thread is an independent conversation inside a research session. The thread ba
 | **Delete a thread** | Click the trash button. Deleting a thread removes all of its messages. |
 | **Close other tabs** | Click the **X** button to close every thread tab except the active one. The threads themselves remain available from the dropdown. |
 
-Threads are tied to the selected research session. Switching sessions switches to that session's set of threads.
+Threads are tied to the selected research session. Switching sessions switches to that session's set of threads. Open threads and the active thread are restored when you return, and the Workspace does not automatically open a thread when it first loads.
 
 ## Sending a message
 
@@ -2689,11 +2921,10 @@ When a preview or chat response contains multiple envelope sections, the rendere
 |---|---|
 | **New page** | Create a blank curated page from the tab bar. You can pick a title or let the UI assign one based on the first content. |
 | **Rename** | Double-click the tab title or use the tab menu. |
-| **Save** | Save the page explicitly. Until you save, changes are held in memory and the tab shows a dirty indicator. |
 | **Delete** | Remove the page from the session. This cannot be undone. |
 | **Reorder tabs** | Drag curated-page tabs to change their order. |
 
-### Curated-page sections
+Curated pages autosave. A transient dirty indicator appears while edits are being saved.
 
 Sections are the building blocks of a curated page. The editor shows each section with its own controls.
 
@@ -2710,7 +2941,7 @@ When you remove a section, it is not immediately discarded. The editor keeps a s
 
 ### Dirty state
 
-A curated-page tab shows a dirty indicator as soon as you add, edit, delete, or reorder a section. Saving clears the indicator. If you close the tab with unsaved changes, the editor prompts you to save or discard.
+A curated-page tab shows a dirty indicator while edits are being saved. Once autosave completes, the indicator clears.
 
 ## Evidence modal
 
@@ -3695,7 +3926,7 @@ Click any job to open its detail view on the right. The detail panel contains:
 
 ### Stages
 
-Every contextual sync job runs the same six stages in order:
+Every contextual sync job runs seven stages in order:
 
 | Stage | What it does |
 |---|---|
@@ -3705,6 +3936,7 @@ Every contextual sync job runs the same six stages in order:
 | **Deploy contextual models** | Creates or updates role-based mental models for qualifying nodes, edges, and seeds. |
 | **Sync mental-model config** | Aligns per-entity overrides and refresh settings between architxt and Hindsight. |
 | **Refresh patches** | Re-runs mental models whose config changed so their content is current. |
+| **Update views from contextual graph** | Derives the current graph for each saved view, computes a diff, snapshots the new state, and appends a timeline slice when there are changes. This only updates existing views; it does not create default views. |
 
 Each stage shows a status dot and a label such as `completed`, `running`, `failed`, or `completed with issues`. A stage can finish with issues without failing the whole job.
 
@@ -3753,6 +3985,7 @@ Logs are useful for tracing the exact path a job took and for sharing with suppo
 - **Graph** — shows the entities and edges produced by the **Import Hindsight skeleton** stage.
 - **Candidates** — shows nodes discovered by seed-scoped models deployed in the **Deploy contextual models** and **Refresh patches** stages.
 - **Mental Models** — shows the models created, updated, and cleaned up across all model-related stages.
+- **Views** — shows saved views that are kept in sync by the **Update views from contextual graph** stage.
 
 ## Summary
 

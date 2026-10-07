@@ -227,6 +227,123 @@ export interface MentalModelEntityOverrides {
   max_tokens?: number;
 }
 
+export interface ViewNode {
+  id: string;
+  type: 'entity' | 'edge' | 'note' | 'group' | 'shape';
+  label?: string;
+  name?: string;
+  text?: string;
+  entity_type?: string;
+  style?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface ViewEdge {
+  id: string;
+  type?: string;
+  source: string;
+  target: string;
+  label?: string;
+  edge_type?: string;
+  ref_id?: string;
+  source_ref_id?: string;
+  target_ref_id?: string;
+  properties?: Record<string, any>;
+  style?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface ViewGraph {
+  nodes: ViewNode[];
+  edges: ViewEdge[];
+}
+
+export interface ViewControlsState {
+  layoutOptions: {
+    algorithm: 'layered' | 'stress' | 'mrtree' | 'radial' | 'force';
+    direction: 'DOWN' | 'UP' | 'LEFT' | 'RIGHT';
+    edgeRouting: 'ORTHOGONAL' | 'POLYLINE' | 'SPLINES';
+    crossingMinimization: 'LAYER_SWEEP' | 'MEDIAN_LAYER_SWEEP' | 'INTERACTIVE' | 'NONE';
+    greedySwitch: 'TWO_SIDED' | 'ONE_SIDED' | 'OFF';
+    edgeMergeMode: 'full' | 'byType' | 'all';
+  };
+  routingTunables: {
+    edgeToEdgeSpacing: number;
+    edgeToNodeSpacing: number;
+    handleSpacing: number;
+    stubSize: number;
+    hateCrossings: boolean;
+    routeOnlyWhenBlocked: boolean;
+    elkNodeNodeSpacing: number;
+    elkNodeNodeBetweenLayers: number;
+    elkEdgeEdgeBetweenLayers: number;
+    elkEdgeNodeBetweenLayers: number;
+  };
+  nodeTunables: {
+    entityNodeMinWidth: number;
+    entityNodeMinHeight: number;
+    entityNodeTextAlignH: 'left' | 'center' | 'right';
+    entityNodeTextAlignV: 'top' | 'center' | 'bottom';
+  };
+  showEdgeLabels?: boolean;
+  showNodeIds?: boolean;
+  showHandles?: boolean;
+  showNodeColorBar?: boolean;
+  backgroundVariant?: 'off' | 'dots' | 'lines' | 'cross';
+  topK?: number;
+}
+
+export interface ViewLayout {
+  positions: Record<string, { x: number; y: number; parent?: string | null }>;
+  viewport: { x: number; y: number; zoom: number };
+  controls?: ViewControlsState;
+}
+
+export interface ViewTimelineSlice {
+  id: string;
+  at: string;
+  type: string;
+  summary: string;
+  details: {
+    added_nodes?: number;
+    updated_nodes?: number;
+    removed_nodes?: number;
+    added_edges?: number;
+    updated_edges?: number;
+    removed_edges?: number;
+    [key: string]: any;
+  };
+  snapshot_id?: string;
+}
+
+export interface View {
+  id: string;
+  server_id: number;
+  bank_id: string;
+  name: string;
+  diagram_type: 'flowchart' | 'sequenceDiagram' | 'erDiagram' | 'classDiagram' | 'stateDiagram' | 'timeline';
+  graph: ViewGraph;
+  layout: ViewLayout;
+  style_defaults: Record<string, any> | null;
+  timeline: ViewTimelineSlice[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateViewRequest {
+  name: string;
+  diagram_type?: View['diagram_type'];
+}
+
+export interface UpdateViewRequest {
+  name?: string;
+  diagram_type?: View['diagram_type'];
+  graph?: ViewGraph;
+  layout?: ViewLayout;
+  style_defaults?: Record<string, any> | null;
+  timeline?: ViewTimelineSlice[];
+}
+
 export interface ApiError {
   error: string;
   code: string;

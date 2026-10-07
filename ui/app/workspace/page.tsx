@@ -87,6 +87,8 @@ export default function WorkspacePage() {
   const [activeTabId, setActiveTabId] = useState<string | null>(ANCHOR_TAB_ID);
   // Remember the SelectedView associated with each view tab so switching tabs restores the right preview.
   const [tabViews, setTabViews] = useState<Record<string, SelectedView>>({});
+  const tabsHydratedRef = useRef(false);
+  const initialCuratedPageIdsRef = useRef<Set<number>>(new Set());
 
   const [pendingSection, setPendingSection] = useState<{ events: EnvelopeCopyEvent[]; title?: string } | null>(null);
 
@@ -113,13 +115,79 @@ export default function WorkspacePage() {
 
   const workspaceSession = useWorkspaceSession({ serverId, bankId, lastSessionId });
   const [activeSession, setActiveSession] = useState<ResearchSession | null>(workspaceSession.activeSession);
+
+  const workspaceTabsKey = useMemo(() => {
+    if (!serverId || !bankId || !activeSession?.id) return null;
+    return `architxt:workspace-tabs:${serverId}:${bankId}:${activeSession.id}`;
+  }, [serverId, bankId, activeSession?.id]);
+
+  // Hydrate tabs from localStorage once the session and its curated pages are known.
+  useEffect(() => {
+    if (tabsHydratedRef.current) return;
+    if (!workspaceTabsKey) return;
+    if (workspaceSession.loading) return;
+
+    try {
+      const raw = localStorage.getItem(workspaceTabsKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          tabs?: WorkspaceTab[];
+          activeTabId?: string | null;
+        };
+        const restoredTabs = Array.isArray(saved.tabs) ? saved.tabs : [];
+        const validTabs: WorkspaceTab[] = [makeAnchorTab()];
+        for (const t of restoredTabs) {
+          if (!t || typeof t.id !== 'string' || t.id === ANCHOR_TAB_ID) continue;
+          // Only filter curated tabs against loaded pages if we already have page
+          // data. Otherwise let the tab-sync effect prune deleted pages later.
+          if (
+            t.kind === 'curated' &&
+            t.stepId != null &&
+            workspaceSession.curatedPages.length > 0 &&
+            !workspaceSession.curatedPages.some((p) => p.id === t.stepId)
+          ) {
+            continue;
+          }
+          validTabs.push({
+            id: t.id,
+            kind: t.kind === 'curated' ? 'curated' : 'view',
+            label: typeof t.label === 'string' ? t.label : t.id,
+            stepId: t.stepId,
+            sourceId: t.sourceId,
+            pinned: t.pinned,
+            dirty: false,
+          });
+        }
+        setTabs(validTabs);
+        const savedActive = saved.activeTabId ?? null;
+        if (savedActive && validTabs.some((t) => t.id === savedActive)) {
+          setActiveTabId(savedActive);
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to hydrate workspace tabs', err);
+    }
+
+    tabsHydratedRef.current = true;
+    initialCuratedPageIdsRef.current = new Set(workspaceSession.curatedPages.map((p) => p.id));
+  }, [workspaceTabsKey, workspaceSession.loading, workspaceSession.curatedPages]);
+
+  // Persist tabs whenever they change after hydration.
+  useEffect(() => {
+    if (!tabsHydratedRef.current || !workspaceTabsKey) return;
+    try {
+      localStorage.setItem(workspaceTabsKey, JSON.stringify({ tabs, activeTabId }));
+    } catch (err) {
+      logger.error('Failed to persist workspace tabs', err);
+    }
+  }, [workspaceTabsKey, tabs, activeTabId]);
+
   const [sessionActionLoading, setSessionActionLoading] = useState(false);
   const [confirmSessionDelete, setConfirmSessionDelete] = useState(false);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState('');
   const [editingSession, setEditingSession] = useState(false);
-  const [activeCuratedPageDirty, setActiveCuratedPageDirty] = useState(false);
-  const [saveCuratedPageTrigger, setSaveCuratedPageTrigger] = useState(0);
+  const savingCuratedPageRef = useRef<number | null>(null);
 
   const handleCreateSession = useCallback(async () => {
     if (!serverId || !bankId) return;
@@ -656,7 +724,7 @@ export default function WorkspacePage() {
   }, [handleResizeMove, handleResizeEnd, handleHResizeMove, handleHResizeEnd, handleInnerResizeMove, handleInnerResizeEnd, handleNarrativeResizeMove, handleNarrativeResizeEnd]);
 
   const handleSaveCuratedPage = useCallback(
-    async (stepId: number, envelope: CuratedPageEnvelope) => {
+    async (stepId: number, envelope: CuratedPageEnvelope, { silent = false }: { silent?: boolean } = {}) => {
       try {
         await researchApi.updateCuratedPage(stepId, { envelope });
         // Clear local pending edits and deletions for this page once the server confirms the save.
@@ -671,7 +739,7 @@ export default function WorkspacePage() {
           return next;
         });
         await workspaceSession.refresh();
-        toast.success('Page saved');
+        if (!silent) toast.success('Page saved');
       } catch (err: unknown) {
         logger.error('Failed to save curated page', err);
         toast.error(`Failed to save page: ${String(err instanceof Error ? err.message : String(err))}`);
@@ -1155,14 +1223,29 @@ export default function WorkspacePage() {
   }, [serverId, bankId, groundedNodeIds]);
 
   // Keep curated tabs in sync with the session's curated pages. Preserve the anchor tab.
+  // Only auto-open pages that were created after the initial load (i.e. not in the
+  // initial curated page set); persisted closed tabs stay closed.
   useEffect(() => {
+    if (!tabsHydratedRef.current) return;
+    const initialIds = initialCuratedPageIdsRef.current;
     setTabs((prev) => {
       const curatedTabs = prev.filter((t) => t.kind === 'curated' && t.stepId != null);
       const existingCuratedIds = new Set(curatedTabs.map((t) => t.stepId!));
       const currentPageIds = new Set(workspaceSession.curatedPages.map((p) => p.id));
 
       const tabsToRemove = curatedTabs.filter((t) => !currentPageIds.has(t.stepId!));
-      const pagesToAdd = workspaceSession.curatedPages.filter((p) => !existingCuratedIds.has(p.id));
+
+      // The first time we see a non-empty page list, treat those pages as the
+      // baseline "already existed" set. This prevents auto-opening every
+      // existing page on the initial load while still opening pages created later.
+      if (initialIds.size === 0 && currentPageIds.size > 0) {
+        initialCuratedPageIdsRef.current = new Set(currentPageIds);
+        if (tabsToRemove.length === 0) return prev;
+      }
+
+      const pagesToAdd = workspaceSession.curatedPages.filter(
+        (p) => !existingCuratedIds.has(p.id) && !initialIds.has(p.id)
+      );
 
       if (tabsToRemove.length === 0 && pagesToAdd.length === 0) {
         return prev;
@@ -1221,6 +1304,9 @@ export default function WorkspacePage() {
               onSelect={async (id) => {
                 const session = workspaceSession.sessions.find((s) => s.id === id);
                 if (!session) return;
+                // Reset hydration so the new session restores its own persisted tabs.
+                tabsHydratedRef.current = false;
+                initialCuratedPageIdsRef.current = new Set();
                 // Reset the page panel for the new session, then load its latest item.
                 setTabs([makeAnchorTab()]);
                 setActiveTabId(ANCHOR_TAB_ID);
@@ -1399,8 +1485,6 @@ export default function WorkspacePage() {
               activeCuratedPageBaseline={activeCuratedPage ? normalizeEnvelope(activeCuratedPage) : undefined}
               curatedPages={workspaceSession.curatedPages}
               onSaveCuratedPage={handleSaveCuratedPage}
-              onCuratedPageDirtyChange={setActiveCuratedPageDirty}
-              saveCuratedPageTrigger={saveCuratedPageTrigger}
               onCuratedPageChange={({ envelope, deletedBlockIds, deletedStructuredKeys, deletedNarrativeIds, dirty }) => {
                 if (!activeCuratedPage) return;
                 setPendingCuratedDeletions((prev) => {
@@ -1419,6 +1503,16 @@ export default function WorkspacePage() {
                     ...prev,
                     [activeCuratedPage.id]: envelope,
                   }));
+                  // Auto-save curated-page edits so the user doesn't need to remember to click Save.
+                  // The manual Save button remains as a fallback if an auto-save fails.
+                  if (savingCuratedPageRef.current !== activeCuratedPage.id) {
+                    savingCuratedPageRef.current = activeCuratedPage.id;
+                    void handleSaveCuratedPage(activeCuratedPage.id, envelope, { silent: true }).finally(() => {
+                      if (savingCuratedPageRef.current === activeCuratedPage.id) {
+                        savingCuratedPageRef.current = null;
+                      }
+                    });
+                  }
                 } else {
                   setPendingCuratedEdits((prev) => {
                     if (!prev[activeCuratedPage.id]) return prev;
@@ -1498,8 +1592,6 @@ export default function WorkspacePage() {
                       return keepCurated ? current! : ANCHOR_TAB_ID;
                     });
                   }}
-                  activePageDirty={activeCuratedPageDirty}
-                  onSaveActivePage={() => setSaveCuratedPageTrigger((n) => n + 1)}
                 />
               }
             />

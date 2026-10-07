@@ -51,11 +51,10 @@ When a preview or chat response contains multiple envelope sections, the rendere
 |---|---|
 | **New page** | Create a blank curated page from the tab bar. You can pick a title or let the UI assign one based on the first content. |
 | **Rename** | Double-click the tab title or use the tab menu. |
-| **Save** | Save the page explicitly. Until you save, changes are held in memory and the tab shows a dirty indicator. |
 | **Delete** | Remove the page from the session. This cannot be undone. |
 | **Reorder tabs** | Drag curated-page tabs to change their order. |
 
-### Curated-page sections
+Curated pages autosave. A transient dirty indicator appears while edits are being saved.
 
 Sections are the building blocks of a curated page. The editor shows each section with its own controls.
 
@@ -72,7 +71,7 @@ When you remove a section, it is not immediately discarded. The editor keeps a s
 
 ### Dirty state
 
-A curated-page tab shows a dirty indicator as soon as you add, edit, delete, or reorder a section. Saving clears the indicator. If you close the tab with unsaved changes, the editor prompts you to save or discard.
+A curated-page tab shows a dirty indicator while edits are being saved. Once autosave completes, the indicator clears.
 
 ## Evidence modal
 

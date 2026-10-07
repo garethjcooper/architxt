@@ -1,4 +1,4 @@
-import type { DiscoverStepResponse, ResearchStepSummary, UnifiedEnvelope, UnifiedNarrativeBlock } from '@/lib/api/client';
+import type { DiscoverStepResponse, ResearchStepSummary, UnifiedEnvelope, UnifiedNarrativeBlock, GraphNode, GraphEdge } from '@/lib/api/client';
 
 export type EnvelopeLike = UnifiedEnvelope | null | undefined;
 
@@ -94,6 +94,50 @@ export function rowsToMarkdownTable(columns: string[], rows: Record<string, unkn
     return `| ${cells.join(' | ')} |`;
   }).join('\n');
   return `${header}\n${sep}\n${body}`;
+}
+
+export function graphToTableRows(
+  graph: { nodes: GraphNode[]; edges: GraphEdge[] },
+  edgeColumnFilter?: string[],
+) {
+  const nodeColumns = ['id', 'type', 'label', 'name'];
+  const allEdgeColumns = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
+  const edgeColumns = edgeColumnFilter?.length
+    ? allEdgeColumns.filter((c) => edgeColumnFilter.includes(c))
+    : allEdgeColumns;
+  const nodeRows = graph.nodes.map((n) => ({
+    id: n.id,
+    type: n.type || '',
+    label: n.label || '',
+    name: n.name || '',
+  }));
+  const edgeRows = graph.edges.map((e) => {
+    const src = graph.nodes.find((n) => n.id === e.from);
+    const tgt = graph.nodes.find((n) => n.id === e.to);
+    const row: Record<string, string> = {
+      from_name: src?.name || '',
+      to_name: tgt?.name || '',
+      from: e.from,
+      to: e.to,
+      type: e.type || '',
+      label: e.label || '',
+      detail: e.detail || '',
+      properties: e.properties ? JSON.stringify(e.properties) : '',
+      evidence: Array.isArray(e.evidence) ? e.evidence.join(', ') : '',
+    };
+    return edgeColumns.reduce((acc, col) => {
+      acc[col] = row[col];
+      return acc;
+    }, {} as Record<string, string>);
+  });
+  return { nodeColumns, edgeColumns, nodeRows, edgeRows };
+}
+
+export function graphToMarkdownTables(graph: { name?: string | null; nodes: GraphNode[]; edges: GraphEdge[] }): string {
+  const { nodeColumns, edgeColumns, nodeRows, edgeRows } = graphToTableRows(graph);
+  const nodeTable = rowsToMarkdownTable(nodeColumns, nodeRows);
+  const edgeTable = rowsToMarkdownTable(edgeColumns, edgeRows);
+  return `### Nodes (${graph.nodes.length})\n\n${nodeTable}\n\n### Edges (${graph.edges.length})\n\n${edgeTable}`;
 }
 
 export function parseMarkdownTable(markdown: string): { columns: string[]; rows: Record<string, unknown>[] } | null {

@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings } from '../types';
+import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -388,9 +388,10 @@ const entityInfoCache = new Map<string, EntityInfoCacheEntry>();
 const ENTITY_INFO_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ENTITY_INFO_CACHE_MAX_ENTRIES = 50;
 
-function makeEntityInfoCacheKey(serverId: number, bankId: string, entityIds: string[], includeContent: boolean): string {
+function makeEntityInfoCacheKey(serverId: number, bankId: string, entityIds: string[], includeContent: boolean, edgeIds?: string[]): string {
   const sortedIds = [...entityIds].sort().join(',');
-  return `${serverId}:${bankId}:${includeContent}:${sortedIds}`;
+  const sortedEdgeIds = edgeIds?.length ? [...edgeIds].sort().join(',') : '';
+  return `${serverId}:${bankId}:${includeContent}:${sortedIds}:${sortedEdgeIds}`;
 }
 
 function trimEntityInfoCache() {
@@ -403,11 +404,11 @@ function trimEntityInfoCache() {
 }
 
 export const entityInfoApi = {
-  info: (serverId: number, bankId: string, entityIds: string[], includeContent = true) => {
+  info: (serverId: number, bankId: string, entityIds: string[], includeContent = true, edgeIds?: string[]) => {
     // Deduplicate calls across re-renders, resizes, and repeated mounts. Entity
     // names rarely change, so cache completed results for 5 minutes with LRU
     // eviction so the same set of IDs does not keep hitting the server.
-    const key = makeEntityInfoCacheKey(serverId, bankId, entityIds, includeContent);
+    const key = makeEntityInfoCacheKey(serverId, bankId, entityIds, includeContent, edgeIds);
     const now = Date.now();
     const cached = entityInfoCache.get(key);
 
@@ -418,13 +419,23 @@ export const entityInfoApi = {
       return cached.promise;
     }
 
+    const body: Record<string, unknown> = {
+      server_id: serverId,
+      bank_id: bankId,
+      entity_ids: entityIds,
+      include_content: includeContent,
+    };
+    if (edgeIds?.length) {
+      body.edge_ids = edgeIds;
+    }
+
     const promise = fetchApi<{
       entities: Record<string, EntityInfo>;
       content?: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>;
       meta: { server_id: number; bank_id: string; requested_count: number; graph_nodes_found: number; catalog_entities_found: number };
     }>('/entities/info', {
       method: 'POST',
-      body: JSON.stringify({ server_id: serverId, bank_id: bankId, entity_ids: entityIds, include_content: includeContent }),
+      body: JSON.stringify(body),
     });
 
     const entry: EntityInfoCacheEntry = { promise, expiresAt: now + ENTITY_INFO_CACHE_TTL_MS };
@@ -2247,4 +2258,46 @@ export const contextualGraphApi = {
 
   cancelSyncJob: (id: string) =>
     fetchApi<{ success: boolean; error?: string; code?: string }>(`/contextual-graph/sync-jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+};
+
+// Views API
+export const viewsApi = {
+  list: (serverId: number, bankId: string) =>
+    fetchApi<View[]>(`/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views`),
+
+  get: (serverId: number, bankId: string, viewId: string) =>
+    fetchApi<View>(`/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views/${encodeURIComponent(viewId)}`),
+
+  create: (serverId: number, bankId: string, data: CreateViewRequest) =>
+    fetchApi<{ id: string }>(`/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (serverId: number, bankId: string, viewId: string, data: UpdateViewRequest) =>
+    fetchApi<View>(`/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views/${encodeURIComponent(viewId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (serverId: number, bankId: string, viewId: string) =>
+    fetchApi<void>(`/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views/${encodeURIComponent(viewId)}`, {
+      method: 'DELETE',
+    }),
+
+  getTimelineSnapshot: (
+    serverId: number,
+    bankId: string,
+    viewId: string,
+    snapshotId: string
+  ): Promise<{ graph: View['graph']; layout: View['layout']; slice: ViewTimelineSlice }> =>
+    fetchApi<{ graph: View['graph']; layout: View['layout']; slice: ViewTimelineSlice }>(
+      `/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views/${encodeURIComponent(viewId)}/timeline/${encodeURIComponent(snapshotId)}/snapshot`
+    ),
+
+  clearTimeline: (serverId: number, bankId: string, viewId: string): Promise<{ deleted: number }> =>
+    fetchApi<{ deleted: number }>(
+      `/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views/${encodeURIComponent(viewId)}/timeline`,
+      { method: 'DELETE' }
+    ),
 };
