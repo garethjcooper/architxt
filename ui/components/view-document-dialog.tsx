@@ -1025,6 +1025,7 @@ export function ViewDocumentDialog({
           initialContext={document?.context?.description ?? null}
           initialTimestamp={document?.timestamp ?? null}
           contexts={contexts}
+          documentId={document.id}
         />
       </DialogContent>
     </Dialog>

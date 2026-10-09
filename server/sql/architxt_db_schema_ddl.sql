@@ -94,6 +94,36 @@ CREATE TABLE document_metadata (
 );
 
 -- ============================================================================
+-- DOCUMENT RETAIN RUNS — persisted dry-run extraction outputs for A/B/C comparison
+-- ============================================================================
+
+CREATE TABLE document_retain_runs (
+  drr_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  drr_doc_id INTEGER NOT NULL,
+  drr_run_label TEXT,
+  drr_server_id INTEGER,
+  drr_bank_id TEXT,
+  drr_context TEXT,
+  drr_retain_mission TEXT,
+  drr_extraction_mode TEXT,
+  drr_timestamp TEXT,
+  drr_entity_label_source TEXT,
+  drr_entities_allow_free_form INTEGER DEFAULT 0,
+  drr_content_snapshot TEXT,
+  drr_content_hash TEXT,
+  drr_facts_json JSON NOT NULL,
+  drr_usage_json JSON,
+  drr_model TEXT,
+  drr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  drr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (drr_doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE,
+  FOREIGN KEY (drr_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_document_retain_runs_doc_id ON document_retain_runs(drr_doc_id);
+CREATE INDEX idx_document_retain_runs_created_at ON document_retain_runs(drr_doc_id, drr_created_at DESC);
+
+-- ============================================================================
 -- SERVER/MEMORYBANK TABLES
 -- ============================================================================
 

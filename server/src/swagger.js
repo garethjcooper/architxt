@@ -254,6 +254,48 @@ const options = {
             updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
           }
         },
+        RetainRun: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', description: 'Run identifier' },
+            doc_id: { type: 'integer', description: 'Document identifier' },
+            run_label: { type: 'string', nullable: true, description: 'Human-readable run label' },
+            server_id: { type: 'string', nullable: true, description: 'Server identifier' },
+            bank_id: { type: 'string', nullable: true, description: 'Bank identifier' },
+            context: { type: 'string', nullable: true, description: 'Document context used' },
+            retain_mission: { type: 'string', nullable: true, description: 'Retain mission used' },
+            extraction_mode: { type: 'string', nullable: true, description: 'Effective retain extraction mode' },
+            timestamp: { type: 'string', format: 'date-time', nullable: true, description: 'Run timestamp' },
+            entity_label_source: { type: 'string', nullable: true, description: 'Entity label source' },
+            free_form_entities: { type: 'boolean', description: 'Free-form entities enabled' },
+            content_snapshot: { type: 'string', nullable: true, description: 'Snapshot of document content' },
+            content_hash: { type: 'string', nullable: true, description: 'Hash of document content' },
+            facts: { type: 'array', items: { type: 'object' }, description: 'Extracted facts' },
+            usage: { type: 'object', nullable: true, description: 'Usage metadata' },
+            model: { type: 'string', nullable: true, description: 'Model used for extraction' },
+            created_at: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
+            updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
+          }
+        },
+        RetainRunInput: {
+          type: 'object',
+          properties: {
+            server_id: { type: 'string', nullable: true, description: 'Server identifier' },
+            bank_id: { type: 'string', nullable: true, description: 'Bank identifier' },
+            context: { type: 'string', nullable: true, description: 'Document context used' },
+            retain_mission: { type: 'string', nullable: true, description: 'Retain mission used' },
+            extraction_mode: { type: 'string', nullable: true, description: 'Effective retain extraction mode' },
+            timestamp: { type: 'string', format: 'date-time', nullable: true, description: 'Run timestamp' },
+            entity_label_source: { type: 'string', nullable: true, description: 'Entity label source' },
+            free_form_entities: { type: 'boolean', description: 'Free-form entities enabled' },
+            entities_allow_free_form: { type: 'boolean', description: 'Legacy alias for free_form_entities' },
+            content_snapshot: { type: 'string', nullable: true, description: 'Snapshot of document content' },
+            content_hash: { type: 'string', nullable: true, description: 'Hash of document content' },
+            facts: { type: 'array', items: { type: 'object' }, description: 'Extracted facts' },
+            usage: { type: 'object', nullable: true, description: 'Usage metadata' },
+            model: { type: 'string', nullable: true, description: 'Model used for extraction' }
+          }
+        },
         Error: {
           type: 'object',
           properties: {

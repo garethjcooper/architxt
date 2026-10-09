@@ -22,6 +22,7 @@ export interface ServerBankSelectorsProps {
   setSelectedBankId: (id: string) => void;
   loadingBanks?: boolean;
   disabled?: boolean;
+  children?: React.ReactNode;
 }
 
 export function ServerBankSelectors({
@@ -33,6 +34,7 @@ export function ServerBankSelectors({
   setSelectedBankId,
   loadingBanks,
   disabled,
+  children,
 }: ServerBankSelectorsProps) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 shrink-0">
@@ -71,6 +73,7 @@ export function ServerBankSelectors({
           ))}
         </select>
       </div>
+      {children}
     </div>
   );
 }
