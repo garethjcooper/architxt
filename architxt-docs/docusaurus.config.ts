@@ -93,6 +93,15 @@ const config: Config = {
           ],
         },
         {
+          title: 'Contact',
+          items: [
+            {
+              label: 'hello@architxtlabs.com',
+              href: 'mailto:hello@architxtlabs.com',
+            },
+          ],
+        },
+        {
           title: 'Community',
           items: [
             {
