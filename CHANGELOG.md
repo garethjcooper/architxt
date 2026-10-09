@@ -2,6 +2,34 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.4.4] - 2026-10-10
+
+### Added
+- Documentation site landing page refresh:
+  - New hero tagline **"architxt: unlock the doc"** with IT-architecture focused copy.
+  - Screenshot carousel on the intro page showing document import, workspace curation, and grounded views.
+- Retain dry-run runs can be saved, loaded, deleted, and exported as markdown with a run label.
+- UI: compact single-line dry-run toolbar with a running-man icon and persistent suffix input.
+- UI: reset button returns retain dry-run to bank defaults without clearing the panel.
+- Server: persisted retain dry-run runs with `retain-runs` CRUD routes and swagger docs.
+
+### Changed
+- Default environment values in `server/src/config.js` updated for the current Ollama Cloud model set:
+  - `ARCHITXT_DENOISE_LLM_MODEL`: `gpt-oss:120b-cloud`
+  - `ARCHITXT_DENOISE_LLM_TIMEOUT_MS`: `1200000`
+  - `ARCHITXT_DENOISE_LLM_TEMPERATURE`: `0.0`
+  - `ARCHITXT_DIAGRAM_BATCH_SIZE`: `1`
+  - `ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_ENABLED`: `true`
+- UI: saved-runs dropdown widened to 360px and switched to native select for stable form behaviour.
+- Retain run labels removed from saved-runs dropdown labels and API input for cleaner UX.
+- Extraction reset now re-derives bank defaults (mission, mode, labels) instead of clearing them.
+
+### Fixed
+- Retain runs route correctly mounted and returns a plain array.
+- Single retain run fetched correctly by unwrapping the `dbExec` wrapper.
+- Default extraction mode resets to Bank on Reset and after Delete.
+- Base UI select edge cases resolved by using `null` for unselected retain-run values.
+
 ## [0.4.0] - 2026-09-17
 
 ### Added

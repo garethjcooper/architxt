@@ -183,7 +183,7 @@ export const config = {
     task_prompt: getEnv('ARCHITXT_VISION_PROMPT', PROMPTS.diagram_description.task),
     system_prompt: getEnv('ARCHITXT_VISION_SYSTEM_PROMPT', PROMPTS.diagram_description.system),
     timeout_ms: getInt('ARCHITXT_VISION_TIMEOUT_MS', 300000),
-    batch_size: getInt('ARCHITXT_DIAGRAM_BATCH_SIZE', 2),
+    batch_size: getInt('ARCHITXT_DIAGRAM_BATCH_SIZE', 1),
     max_batches: getInt('ARCHITXT_DIAGRAM_MAX_BATCHES', -1),
     concurrency: getInt('ARCHITXT_DIAGRAM_CONCURRENCY', 3),
     temperature: parseFloat(getEnv('ARCHITXT_DIAGRAM_TEMPERATURE', '0.0'))
@@ -215,11 +215,11 @@ export const config = {
   document_denoise_llm: {
     enabled: getEnv('ARCHITXT_DENOISE_LLM_ENABLED', 'true') === 'true',
     provider: getEnv('ARCHITXT_DENOISE_LLM_PROVIDER', 'ollama_cloud'),
-    model: getEnv('ARCHITXT_DENOISE_LLM_MODEL', 'gpt-oss:20b-cloud'),
-    timeout_ms: getInt('ARCHITXT_DENOISE_LLM_TIMEOUT_MS', 600000),
+    model: getEnv('ARCHITXT_DENOISE_LLM_MODEL', 'gpt-oss:120b-cloud'),
+    timeout_ms: getInt('ARCHITXT_DENOISE_LLM_TIMEOUT_MS', 1200000),
     task_prompt: getEnv('ARCHITXT_DENOISE_LLM_PROMPT', PROMPTS.document_denoise_llm.task),
     system_prompt: getEnv('ARCHITXT_DENOISE_LLM_SYSTEM_PROMPT', PROMPTS.document_denoise_llm.system),
-    temperature: parseFloat(getEnv('ARCHITXT_DENOISE_LLM_TEMPERATURE', '0.1'))
+    temperature: parseFloat(getEnv('ARCHITXT_DENOISE_LLM_TEMPERATURE', '0.0'))
   },
   document_denoise: {
     enabled: getEnv('ARCHITXT_DENOISE_ENABLED', 'true') === 'true',
@@ -238,7 +238,7 @@ export const config = {
     // Sync daemon auto-starts contextual-graph sync jobs for managed banks.
     // Background refresh poll removed: the sync daemon is now the only scheduled contextual-graph refresh path.
     sync_daemon: {
-      enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_ENABLED', 'false') === 'true',
+      enabled: getEnv('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_ENABLED', 'true') === 'true',
       poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_POLL_INTERVAL_MS', 60000),
     },
   },

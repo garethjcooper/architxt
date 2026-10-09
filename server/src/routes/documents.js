@@ -8,6 +8,7 @@ import documentsWorkflow from './documents-workflow.js';
 import documentsExtract from './documents-extract.js';
 import documentTags from './document-tags.js';
 import documentMetadata from './document-metadata.js';
+import documentRetainRuns from './document-retain-runs.js';
 
 const logger = createLogger('documents-route');
 const router = Router();
@@ -38,9 +39,10 @@ router.use('/', documentsWorkflow);
 // Then extract routes (parameterized :id/source, :id/extracted)
 router.use('/', documentsExtract);
 
-// Document tags and metadata sub-routes (must be before documents-core's /:id)
+// Document tags, metadata, and retain-run sub-routes (must be before documents-core's /:id)
 router.use('/:id/tags', documentTags);
 router.use('/:id/metadata', documentMetadata);
+router.use('/:id/retain-runs', documentRetainRuns);
 
 // Finally core routes (catch-all :id is here, so must be last)
 // Note: documents-core uses upload middleware internally

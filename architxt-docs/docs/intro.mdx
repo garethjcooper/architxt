@@ -1,28 +1,123 @@
 ---
 sidebar_position: 1
 slug: /
+title: 'Introduction'
+description: 'Turn source documents into structured, explorable contextual graphs backed by a vector memory bank.'
 ---
 
-# Introduction
+import Link from '@docusaurus/Link';
+import Head from '@docusaurus/Head';
+import ScreenshotCarousel from '@site/src/components/ScreenshotCarousel';
 
-architxt is a knowledge-workbench for turning source documents into structured, explorable contextual graphs backed by a vector memory bank.
+export const screenshots = [
+  {
+    title: 'Import documents and consistently tag entities',
+    src: '/img/screenshots/docdata.png',
+    alt: 'Screenshot of document contextual data extraction',
+  },
+  {
+    title: 'Investigate and curate solution design artifacts',
+    src: '/img/screenshots/workspace.png',
+    alt: 'Screenshot of the workspace chat and curated pages',
+  },
+  {
+    title: 'Construct grounded views for use in your designs',
+    src: '/img/screenshots/views.png',
+    alt: 'Screenshot of the views graph exploration canvas',
+  },
+];
 
-## What you can do
+<Head>
+  <title>architxt: unlock the doc</title>
+  <meta name="description" content="Turn source documents into structured, explorable contextual graphs backed by a vector memory bank." />
+</Head>
 
-- **Upload documents** and extract entities, relationships, and mental models.
-- **Build contextual graphs** that connect people, systems, concepts, and evidence.
-- **Explore graphs visually** with the Views page: select entities, arrange the canvas, inspect mental-model detail, and export or send views to Workspace pages.
-- **Reflect** on the graph with free-text questions and get synthesized answers.
-- **Sync** selected documents and tags with a Hindsight memory bank.
+<div className="atx-landing">
+  <section className="atx-hero">
+    <span className="atx-hero-eyebrow">architxt documentation</span>
+    <h1 className="atx-hero-title">architxt: unlock the doc</h1>
+    <p className="atx-hero-tagline">Designs → Contextual Graph → Knowledge</p>
+    <div className="atx-hero-lead">
+      architxt is an IT architecture focused knowledge workbench that turns source documents into a structured, explorable contextual graph. Designs contain a wealth of information - unlock, query, use.
+    </div>
+    <div className="atx-hero-actions">
+      <Link className="atx-button atx-button--primary" to="/getting-started/quick-start">
+        <span>Quick start</span>
+      </Link>
+      <Link className="atx-button" to="/getting-started/installation">
+        <span>Installation</span>
+      </Link>
+    </div>
+  </section>
 
-## Where to start
+  <ScreenshotCarousel slides={screenshots} />
 
-- [Prerequisites](./getting-started/prerequisites) – runtime, Docling, LLM access, and optional Hindsight.
-- [Installation](./getting-started/installation) – get architxt running locally.
-- [Configuration](./getting-started/configuration) – env vars, database, and Hindsight servers.
-- [Quick Start](./getting-started/quick-start) – end-to-end tutorial from upload to curated page.
-- [Views](./views/overview) – explore and compose the contextual graph visually.
-- [Chat](./workspace/chat) – ask the architxt agent about your bank and move answers into curated pages.
-- [Quick start video](https://www.youtube.com/watch?v=9Nssbypo2xo) – watch the walkthrough on YouTube.
-- [Temporal Mosaic blog post](https://hindsight.vectorize.io/blog/2026/07/03/architxt-hindsight-temporal-mosaic) – read the original announcement of architxt and Hindsight's temporal mosaic architecture.
-- [For agents / LLMs](https://architxtlabs.com/llms.txt) – point an AI assistant at the architxt documentation.
+  <section className="atx-features">
+    <article className="atx-feature-card">
+      <h3>Extract structure</h3>
+      <p>Upload documents and automatically pull out entities, relationships, contexts, tags, and mental models.</p>
+      <span className="atx-feature-link"><Link to="/core-concepts/documents">How documents work →</Link></span>
+    </article>
+    <article className="atx-feature-card">
+      <h3>Explore visually</h3>
+      <p>Compose the contextual graph on the Views canvas, inspect detail panels, and export focused snapshots.</p>
+      <span className="atx-feature-link"><Link to="/views/overview">Explore Views →</Link></span>
+    </article>
+    <article className="atx-feature-card">
+      <h3>Reflect and curate</h3>
+      <p>Ask free-text questions against the graph and move answers into curated Workspace pages with focused sections.</p>
+      <span className="atx-feature-link"><Link to="/workspace/chat">Try Workspace chat →</Link></span>
+    </article>
+    <article className="atx-feature-card">
+      <h3>Sync to Hindsight</h3>
+      <p>Push documents, entities, and mental models into a Hindsight memory bank and keep them aligned over time.</p>
+      <span className="atx-feature-link"><Link to="/hindsight-sync/overview">Hindsight sync →</Link></span>
+    </article>
+  </section>
+
+  <section className="atx-getting-started">
+    <h2>Start building</h2>
+    <div className="atx-start-grid">
+      <Link className="atx-start-card" to="/getting-started/prerequisites">
+        <span className="atx-start-number">1</span>
+        <span className="atx-start-body">
+          <span className="atx-start-title">Prerequisites</span>
+          <span className="atx-start-desc">Runtime, Docling, LLM access, and optional Hindsight setup.</span>
+        </span>
+      </Link>
+      <Link className="atx-start-card" to="/getting-started/installation">
+        <span className="atx-start-number">2</span>
+        <span className="atx-start-body">
+          <span className="atx-start-title">Installation</span>
+          <span className="atx-start-desc">Get architxt running locally from the repository.</span>
+        </span>
+      </Link>
+      <Link className="atx-start-card" to="/getting-started/configuration">
+        <span className="atx-start-number">3</span>
+        <span className="atx-start-body">
+          <span className="atx-start-title">Configuration</span>
+          <span className="atx-start-desc">Env vars, database, and Hindsight server settings.</span>
+        </span>
+      </Link>
+      <Link className="atx-start-card" to="/getting-started/quick-start">
+        <span className="atx-start-number">4</span>
+        <span className="atx-start-body">
+          <span className="atx-start-title">Quick start tutorial</span>
+          <span className="atx-start-desc">End-to-end walkthrough from upload to curated page.</span>
+        </span>
+      </Link>
+    </div>
+  </section>
+
+  <section className="atx-links">
+    <h2>Other ways in</h2>
+    <ul>
+      <li><Link to="/views/overview">Views</Link> – explore and compose the contextual graph visually.</li>
+      <li><Link to="/workspace/chat">Chat</Link> – ask the architxt agent about your bank and move answers into curated pages.</li>
+      <li><Link to="/context-patches/overview">Context Patches</Link> – manage the living contextual graph layer on top of a Hindsight bank.</li>
+      <li><a href="https://www.youtube.com/watch?v=9Nssbypo2xo">Quick start video</a> – watch the walkthrough on YouTube.</li>
+      <li><a href="https://hindsight.vectorize.io/blog/2026/07/03/architxt-hindsight-temporal-mosaic">Temporal Mosaic blog post</a> – read the original announcement.</li>
+      <li><a href="https://architxtlabs.com/llms.txt">For agents / LLMs</a> – point an AI assistant at the architxt documentation.</li>
+    </ul>
+  </section>
+</div>

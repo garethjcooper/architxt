@@ -249,8 +249,92 @@ export const documentsApi = {
       {
         method: 'POST',
         body: JSON.stringify({ document_ids: docIds, ...config }),
-      }
+      },
     ),
+
+  // Retain runs — persisted dry-run extraction outputs
+  listRetainRuns: (id: number) =>
+    fetchApi<Array<{
+      id: number;
+      run_label: string | null;
+      server_id: number | null;
+      bank_id: string | null;
+      context: string | null;
+      retain_mission: string | null;
+      extraction_mode: string | null;
+      timestamp: string | null;
+      entity_label_source: string | null;
+      free_form_entities: boolean;
+      content_snapshot: string | null;
+      content_hash: string | null;
+      facts: any[];
+      usage: any;
+      model: string | null;
+      created_at: string;
+      updated_at: string;
+    }>>(`/documents/${id}/retain-runs`),
+
+  createRetainRun: (id: number, data: {
+    server_id?: number | null;
+    bank_id?: string | null;
+    context?: string | null;
+    retain_mission?: string | null;
+    extraction_mode?: string | null;
+    timestamp?: string | null;
+    entity_label_source?: string | null;
+    free_form_entities?: boolean;
+    content_snapshot?: string | null;
+    content_hash?: string | null;
+    facts?: any[];
+    usage?: any;
+    model?: string | null;
+  }) =>
+    fetchApi<{
+      id: number;
+      run_label: string | null;
+      server_id: number | null;
+      bank_id: string | null;
+      context: string | null;
+      retain_mission: string | null;
+      extraction_mode: string | null;
+      timestamp: string | null;
+      entity_label_source: string | null;
+      free_form_entities: boolean;
+      content_snapshot: string | null;
+      content_hash: string | null;
+      facts: any[];
+      usage: any;
+      model: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(`/documents/${id}/retain-runs`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getRetainRun: (docId: number, runId: number) =>
+    fetchApi<{
+      id: number;
+      run_label: string | null;
+      server_id: number | null;
+      bank_id: string | null;
+      context: string | null;
+      retain_mission: string | null;
+      extraction_mode: string | null;
+      timestamp: string | null;
+      entity_label_source: string | null;
+      free_form_entities: boolean;
+      content_snapshot: string | null;
+      content_hash: string | null;
+      facts: any[];
+      usage: any;
+      model: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(`/documents/${docId}/retain-runs/${runId}`),
+
+  deleteRetainRun: (docId: number, runId: number) =>
+    fetchApi<void>(`/documents/${docId}/retain-runs/${runId}`, { method: 'DELETE' }),
 };
 
 // Contexts API
@@ -1073,7 +1157,7 @@ export const hindsightApi = {
     }),
 
   getBankConfig: (serverId: number, bankId: string) =>
-    fetchApi<{ bank_id: string; config: { entity_labels?: any[]; retain_mission?: string | null } }>(
+    fetchApi<{ bank_id: string; config: { entity_labels?: any[]; retain_mission?: string | null; retain_extraction_mode?: string | null; model?: string; llm?: { default_model?: string } } }>(
       `/hindsight/bank-config?server_id=${encodeURIComponent(serverId)}&bank_id=${encodeURIComponent(bankId)}`
     ),
 

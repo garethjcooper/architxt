@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import {
   Loader2,
   Play,
@@ -18,6 +17,12 @@ import {
   FileText,
   ChevronDown,
   Calendar as CalendarIcon,
+  Copy,
+  Download,
+  Trash2,
+  Plus,
+  Footprints,
+  RotateCcw,
 } from "lucide-react";
 import { colorForType } from '@/lib/graph/render-utils';
 import {
@@ -32,14 +37,12 @@ import {
   hindsightApi,
   entitiesApi,
   entityTypesApi,
+  documentsApi,
 } from "@/lib/api/client";
 import { toast } from "sonner";
 import { formatErrorValue } from "@/lib/error-format";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { downloadMarkdown } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -58,6 +61,8 @@ interface DryRunExtractDialogProps {
   initialContext?: string | null;
   initialTimestamp?: string | null;
   contexts?: MinimalContext[];
+  /** Document ID so successful dry-runs can be persisted server-side. */
+  documentId?: number | null;
 }
 
 interface EntityLabel {
@@ -77,6 +82,42 @@ interface Fact {
   entities: string[];
 }
 
+interface StoredRun {
+  id: number;
+  run_label: string | null;
+  server_id: number | null;
+  bank_id: string | null;
+  context: string | null;
+  retain_mission: string | null;
+  extraction_mode: string | null;
+  timestamp: string | null;
+  entity_label_source: string | null;
+  free_form_entities: boolean;
+  facts: Fact[];
+  usage: any;
+  content_snapshot: string | null;
+  model: string | null;
+  created_at: string;
+}
+
+function simpleHash(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i += 1) {
+    h = (h * 33) ^ str.charCodeAt(i);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function hydrateFact(raw: any): Fact {
+  return {
+    text: String(raw?.text ?? ""),
+    fact_type: String(raw?.fact_type ?? raw?.type ?? "fact"),
+    occurred_start: raw?.occurred_start ?? null,
+    occurred_end: raw?.occurred_end ?? null,
+    entities: Array.isArray(raw?.entities) ? raw.entities.map(String) : [],
+  };
+}
+
 export function DryRunExtractDialog({
   open,
   onOpenChange,
@@ -84,6 +125,7 @@ export function DryRunExtractDialog({
   initialContext = "",
   initialTimestamp = "",
   contexts: propContexts = [],
+  documentId = null,
 }: DryRunExtractDialogProps) {
   const [servers, setServers] = useState<SelectorServer[]>([]);
   const [banks, setBanks] = useState<SelectorBank[]>([]);
@@ -130,6 +172,12 @@ export function DryRunExtractDialog({
     string | null
   >(null);
   const [retainMission, setRetainMission] = useState("");
+  const [bankModel, setBankModel] = useState<string | null>(null);
+  const [bankExtractionMode, setBankExtractionMode] = useState<string | null>(null);
+  const [previousRuns, setPreviousRuns] = useState<StoredRun[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(false);
+  const [savingRun, setSavingRun] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const freeFormSwitchId = useId();
 
   useEffect(() => {
@@ -143,6 +191,9 @@ export function DryRunExtractDialog({
       setEntitiesAllowFreeForm(false);
       setBankLabels([]);
       setRetainMission("");
+      setBankModel(null);
+      setPreviousRuns([]);
+      setSelectedRunId(null);
       setResults(null);
       setError(null);
       setEntityFilter("all");
@@ -246,9 +297,19 @@ export function DryRunExtractDialog({
         : [];
       setBankLabels(labels);
       setRetainMission(data?.config?.retain_mission || "");
+      const model =
+        data?.config?.model ?? data?.config?.llm?.default_model ?? null;
+      setBankModel(typeof model === "string" ? model : null);
+      const extractionMode =
+        data?.config?.retain_extraction_mode ?? null;
+      setBankExtractionMode(
+        typeof extractionMode === "string" ? extractionMode : null,
+      );
     } catch (err) {
       setBankLabels([]);
       setRetainMission("");
+      setBankModel(null);
+      setBankExtractionMode(null);
     } finally {
       setLoadingBankLabels(false);
     }
@@ -308,6 +369,29 @@ export function DryRunExtractDialog({
     }
     loadBankLabels(parseInt(selectedServerId, 10), selectedBankId);
   }, [open, selectedServerId, selectedBankId]);
+
+  useEffect(() => {
+    if (!open || !documentId || !selectedServerId || !selectedBankId) {
+      setPreviousRuns([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLoadingRuns(true);
+      try {
+        const runs = await documentsApi.listRetainRuns(documentId);
+        if (!cancelled) setPreviousRuns(Array.isArray(runs) ? runs : []);
+      } catch (err) {
+        if (!cancelled) setPreviousRuns([]);
+      } finally {
+        if (!cancelled) setLoadingRuns(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, documentId, selectedServerId, selectedBankId]);
 
   const handleRun = async () => {
     if (!selectedServerId || !selectedBankId) {
@@ -466,6 +550,118 @@ export function DryRunExtractDialog({
     );
   }, [results, activeEntityLabels]);
 
+  const exportPayload = useMemo(() => {
+    return {
+      exportedAt: new Date().toISOString(),
+      serverId: selectedServerId ?? undefined,
+      bankId: selectedBankId ?? undefined,
+      context: context.trim() || undefined,
+      retainMission: retainMission.trim() || undefined,
+      extractionMode:
+        (retainExtractionMode === "bank"
+          ? bankExtractionMode
+          : retainExtractionMode) ?? undefined,
+      timestamp: timestamp.trim() || undefined,
+      entityLabelSource,
+      entitiesAllowFreeForm,
+      usage: results?.usage ?? undefined,
+      model: bankModel ?? undefined,
+      facts: (results?.facts ?? []).map((fact, idx) => ({
+        index: idx + 1,
+        fact: fact.text,
+        factType: fact.fact_type || "fact",
+        occurredStart: fact.occurred_start ?? undefined,
+        occurredEnd: fact.occurred_end ?? undefined,
+        entities: fact.entities ?? [],
+      })),
+    };
+  }, [
+    selectedServerId,
+    selectedBankId,
+    context,
+    retainMission,
+    retainExtractionMode,
+    timestamp,
+    entityLabelSource,
+    entitiesAllowFreeForm,
+    results,
+    bankExtractionMode,
+    bankModel,
+  ]);
+
+  const exportMarkdown = useMemo(() => {
+    const p = exportPayload;
+    const headerTitle = "Dry-Run Result";
+    const lines: string[] = [];
+    lines.push(`# ${headerTitle}`);
+    lines.push("");
+    lines.push("## Run Metadata");
+    lines.push("");
+    lines.push(`- **Exported at**: ${p.exportedAt}`);
+    if (p.serverId && p.bankId) {
+      lines.push(`- **Server / Bank**: ${p.serverId} / ${p.bankId}`);
+    }
+    if (p.extractionMode) {
+      lines.push(`- **Extraction Mode**: ${p.extractionMode}`);
+    }
+    if (p.timestamp) {
+      lines.push(`- **Document Date**: ${p.timestamp}`);
+    }
+    lines.push(`- **Entity Label Source**: ${p.entityLabelSource}`);
+    lines.push(`- **Free-form Entities**: ${p.entitiesAllowFreeForm ? "Yes" : "No"}`);
+    if (p.usage) {
+      lines.push(`- **Tokens**: ${p.usage.total_tokens ?? "?"} total (${p.usage.input_tokens ?? "?"} in / ${p.usage.output_tokens ?? "?"} out)`);
+    }
+    if (p.model) {
+      lines.push(`- **Model**: ${p.model}`);
+    }
+    lines.push("");
+    lines.push("## Context");
+    lines.push("");
+    lines.push(p.context || "_No context provided._");
+    lines.push("");
+    lines.push("## Retain Mission");
+    lines.push("");
+    lines.push(p.retainMission || "_No retain mission set._");
+    lines.push("");
+    lines.push("## Extracted Facts");
+    lines.push("");
+    if (p.facts.length === 0) {
+      lines.push("_No facts extracted._");
+    } else {
+      lines.push("| # | Fact | Type | Entities | Date Range |");
+      lines.push("|---|------|------|----------|------------|");
+      for (const f of p.facts) {
+        const dateRange =
+          f.occurredStart || f.occurredEnd
+            ? `${f.occurredStart ?? ""}${f.occurredEnd && f.occurredEnd !== f.occurredStart ? ` → ${f.occurredEnd}` : ""}`
+            : "";
+        const escapedFact = String(f.fact || "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+        const entities = f.entities.length ? f.entities.join(", ") : "_none_";
+        lines.push(`| ${f.index} | ${escapedFact} | ${f.factType} | ${entities} | ${dateRange} |`);
+      }
+    }
+    lines.push("");
+    lines.push("## Raw Payload (for re-import / diff)");
+    lines.push("");
+    lines.push("```json");
+    lines.push(JSON.stringify(p, null, 2));
+    lines.push("```");
+    lines.push("");
+    return lines.join("\n");
+  }, [exportPayload]);
+
+  const handleCopyMarkdown = () => {
+    navigator.clipboard.writeText(exportMarkdown).then(() => {
+      toast.success("Dry-run result copied as Markdown");
+    });
+  };
+
+  const handleDownloadMarkdown = () => {
+    const title = `dry-run-${selectedBankId || "result"}`;
+    downloadMarkdown(exportMarkdown, title);
+  };
+
   const filteredResultEntities = useMemo(() => {
     if (entityFilter === "all") return resultEntities;
     if (entityFilter === "matched")
@@ -490,6 +686,131 @@ export function DryRunExtractDialog({
     );
   }, [results, selectedResultEntity]);
 
+  const loadRuns = async () => {
+    if (!documentId) return;
+    setLoadingRuns(true);
+    try {
+      const runs = await documentsApi.listRetainRuns(documentId);
+      setPreviousRuns(Array.isArray(runs) ? runs : []);
+    } catch (err) {
+      setPreviousRuns([]);
+    } finally {
+      setLoadingRuns(false);
+    }
+  };
+
+  const handleSaveRun = async () => {
+    if (!documentId || !results || !selectedServerId || !selectedBankId) {
+      toast.error("Run a dry-run with a document, server and bank selected before saving");
+      return;
+    }
+    setSavingRun(true);
+    try {
+      await documentsApi.createRetainRun(documentId, {
+        server_id: parseInt(selectedServerId, 10),
+        bank_id: selectedBankId,
+        context: context.trim() || null,
+        retain_mission: retainMission.trim() || null,
+        extraction_mode:
+          (retainExtractionMode === "bank"
+            ? bankExtractionMode
+            : retainExtractionMode) ?? null,
+        timestamp: timestamp.trim() || null,
+        entity_label_source: entityLabelSource,
+        free_form_entities: entitiesAllowFreeForm,
+        content_snapshot: content.trim() || null,
+        content_hash: content.trim() ? simpleHash(content.trim()) : null,
+        facts: results.facts,
+        usage: results.usage,
+        model: bankModel ?? null,
+      });
+      toast.success("Run saved");
+      await loadRuns();
+    } catch (err) {
+      toast.error(`Failed to save run: ${formatErrorValue(err)}`);
+    } finally {
+      setSavingRun(false);
+    }
+  };
+
+  const handleLoadRun = async (runId: number) => {
+    if (!documentId) return;
+    try {
+      const run = await documentsApi.getRetainRun(documentId, runId);
+      if (run.server_id) setSelectedServerId(String(run.server_id));
+      if (run.bank_id) setSelectedBankId(run.bank_id);
+      setContent(run.content_snapshot || "");
+      setContext(run.context || "");
+      setTimestamp(run.timestamp || "");
+      setRetainMission(run.retain_mission || "");
+      setRetainExtractionMode(
+        (run.extraction_mode as typeof retainExtractionMode) || "bank",
+      );
+      setEntityLabelSource(
+        (run.entity_label_source as typeof entityLabelSource) || "bank",
+      );
+      setEntitiesAllowFreeForm(run.free_form_entities ?? false);
+      setBankModel(run.model ?? null);
+      setSelectedRunId(run.id);
+      setResults({
+        facts: (run.facts ?? []).map(hydrateFact),
+        usage: run.usage ?? undefined,
+      });
+      toast.success(`Loaded run ${run.run_label || `#${run.id}`}`);
+    } catch (err) {
+      toast.error(`Failed to load run: ${formatErrorValue(err)}`);
+    }
+  };
+
+  const handleDeleteRun = async (runId: number) => {
+    if (!documentId) return;
+    try {
+      await documentsApi.deleteRetainRun(documentId, runId);
+      toast.success("Run deleted");
+      setPreviousRuns((prev) => prev.filter((r) => r.id !== runId));
+      if (selectedRunId === runId) {
+        setSelectedRunId(null);
+        resetRunState();
+      }
+    } catch (err) {
+      toast.error(`Failed to delete run: ${formatErrorValue(err)}`);
+    }
+  };
+
+  const resetRunState = () => {
+    setContent(initialContent || "");
+    setContext(initialContext || "");
+    setTimestamp(initialTimestamp || "");
+    setEntityLabelSource("bank");
+    setEntitiesAllowFreeForm(false);
+    setResults(null);
+    setError(null);
+    setEntityFilter("all");
+    setRetainExtractionMode("bank");
+    setSelectedRunId(null);
+    // Re-derive bank defaults so mission/mode/labels are not left empty.
+    if (selectedServerId && selectedBankId) {
+      loadBankLabels(parseInt(selectedServerId, 10), selectedBankId);
+    } else {
+      setBankLabels([]);
+      setRetainMission("");
+      setBankModel(null);
+      setBankExtractionMode(null);
+    }
+  };
+
+  const handleResetRun = () => {
+    resetRunState();
+    toast.info("Run reset to default state");
+  };
+
+  const runOptions = useMemo(() => {
+    return previousRuns.map((r) => ({
+      value: String(r.id),
+      label: `Run #${r.id} · ${new Date(r.created_at).toLocaleString()} · ${r.facts?.length ?? 0} facts`,
+    }));
+  }, [previousRuns]);
+
   return (
     <>
       <Dialog open={open} onOpenChange={requestClose}>
@@ -503,7 +824,7 @@ export function DryRunExtractDialog({
         <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
           {/* Controls */}
           <div className="flex flex-col gap-2 shrink-0">
-            {/* Hindsight server / bank selectors */}
+            {/* Hindsight server / bank selectors + saved runs + run label */}
             <div className="shrink-0">
               <ServerBankSelectors
                 servers={servers}
@@ -514,7 +835,66 @@ export function DryRunExtractDialog({
                 setSelectedBankId={setSelectedBankId}
                 loadingBanks={loadingBanks}
                 disabled={running}
-              />
+              >
+                {documentId != null && (
+                  <>
+                    <Footprints className="h-4 w-4 text-foreground-subtle shrink-0" />
+                    <select
+                      className="h-8 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50 shrink-0 w-[360px]"
+                      value={selectedRunId != null ? String(selectedRunId) : ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (!value) return;
+                        const id = parseInt(value, 10);
+                        if (!Number.isNaN(id)) handleLoadRun(id);
+                      }}
+                      disabled={loadingRuns || runOptions.length === 0}
+                    >
+                      <option value="">
+                        {loadingRuns
+                          ? "Loading..."
+                          : runOptions.length === 0
+                            ? "No saved runs"
+                            : "Load run..."}
+                      </option>
+                      {runOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!results || savingRun}
+                        onClick={handleSaveRun}
+                        className="h-8 px-2.5 flex items-center gap-1"
+                        title="Save current run"
+                      >
+                        {savingRun ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                        Save Run
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={selectedRunId == null}
+                        onClick={() =>
+                          selectedRunId != null && handleDeleteRun(selectedRunId)
+                        }
+                        className="h-8 px-2.5 flex items-center gap-1 text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
+                        title="Delete selected run"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete Run
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </ServerBankSelectors>
             </div>
 
             {/* Options area */}
@@ -816,6 +1196,7 @@ export function DryRunExtractDialog({
                     </PopoverContent>
                   </Popover>
                 </div>
+
               </div>
             </div>
           </div>
@@ -852,13 +1233,27 @@ export function DryRunExtractDialog({
 
               {results && (
                 <div className="flex-1 flex flex-col gap-3 overflow-hidden">
-                  <div className="flex items-center gap-3 text-xs text-foreground-subtle shrink-0">
+                  <div className="flex items-center gap-3 text-xs text-foreground-subtle shrink-0 flex-wrap">
                     <span className="bg-surface-card px-2 py-1 rounded">
                       {results.facts?.length ?? 0} facts
                     </span>
                     {results.usage && (
                       <span className="bg-surface-card px-2 py-1 rounded">
                         {results.usage.total_tokens ?? 0} tokens
+                      </span>
+                    )}
+                    {(retainExtractionMode === "bank"
+                      ? bankExtractionMode
+                      : retainExtractionMode) && (
+                      <span className="bg-surface-card px-2 py-1 rounded">
+                        mode: {retainExtractionMode === "bank"
+                          ? bankExtractionMode
+                          : retainExtractionMode}
+                      </span>
+                    )}
+                    {bankModel && (
+                      <span className="bg-surface-card px-2 py-1 rounded">
+                        model: {bankModel}
                       </span>
                     )}
                   </div>
@@ -1098,27 +1493,64 @@ export function DryRunExtractDialog({
           </div>
         </div>
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-border-default shrink-0">
-          <Button
-            variant="ghost"
-            onClick={requestClose}
-            className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card flex items-center gap-2"
-          >
-            <X className="h-4 w-4" />
-            Close
-          </Button>
-          <Button
-            onClick={handleRun}
-            disabled={running || !canRun}
-            className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 flex items-center gap-2"
-          >
-            {running ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
+        <div className="flex justify-between items-center gap-3 pt-4 border-t border-border-default shrink-0">
+          <div className="flex items-center gap-2">
+            {results && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyMarkdown}
+                  className="flex items-center gap-2"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy as Markdown
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadMarkdown}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Save as Markdown
+                </Button>
+              </>
             )}
-            {running ? "Running..." : "Run Dry-Run"}
-          </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={selectedRunId == null}
+              onClick={handleResetRun}
+              className="flex items-center gap-2"
+              title="Unload the selected run and reset to defaults"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={requestClose}
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              Close
+            </Button>
+            <Button
+              onClick={handleRun}
+              disabled={running || !canRun}
+              className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default disabled:opacity-50 flex items-center gap-2"
+            >
+              {running ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {running ? "Running..." : "Run Dry-Run"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
