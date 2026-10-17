@@ -30,9 +30,14 @@ function cleanMdx(text) {
 }
 
 function extractTitle(text) {
+  const fmMatch = text.match(/^---\s*\n([\s\S]*?)\n---/);
+  const fmTitle = fmMatch ? fmMatch[1].match(/^title:\s*(.+)$/m) : null;
+  const fmValue = fmTitle
+    ? fmTitle[1].trim().replace(/^['"]|['"]$/g, '')
+    : '';
   const body = stripFrontmatter(text);
   const match = body.match(/^#\s+(.+)$/m);
-  return match ? match[1].trim() : '';
+  return (match ? match[1].trim() : '') || fmValue;
 }
 
 function extractSlug(text) {
@@ -82,7 +87,15 @@ function findDocFiles() {
   return files.sort();
 }
 
-function buildLlmsIndex(sidebarPages) {
+function extractTopLevelDocIds(sidebarsText) {
+  const segment = sidebarsText.split(/type:\s*'category'/)[0];
+  return [...segment.matchAll(/'([\w/-]+)'/g)]
+    .map((m) => m[1])
+    .filter((id) => id !== 'intro');
+}
+
+function buildLlmsIndex(sidebarPages, sidebarsText) {
+  const topLevelIds = extractTopLevelDocIds(sidebarsText);
   const lines = [
     '# architxt documentation',
     '',
@@ -93,11 +106,25 @@ function buildLlmsIndex(sidebarPages) {
     '',
   ];
 
-  // Add intro link if not already present in sidebars
   const introFile = path.join(DOCS_DIR, 'intro.mdx');
   if (fs.existsSync(introFile)) {
     lines.push('## Getting started');
     lines.push(`- Introduction: ${SITE_URL}/`);
+    if (topLevelIds.length) {
+      lines.push('');
+      lines.push('## Overview');
+      for (const item of topLevelIds) {
+        const candidates = [
+          path.join(DOCS_DIR, `${item}.mdx`),
+          path.join(DOCS_DIR, `${item}.md`),
+        ];
+        const file = candidates.find((f) => fs.existsSync(f));
+        if (!file) continue;
+        const title = extractTitle(readText(file));
+        const urlPath = urlPathFromFile(file);
+        lines.push(`- ${title}: ${SITE_URL}${urlPath}`);
+      }
+    }
     lines.push('');
   }
 
@@ -184,7 +211,7 @@ function main() {
   const sidebarPages = parseSidebars(sidebarsText);
   const allFiles = findDocFiles();
 
-  const index = buildLlmsIndex(sidebarPages);
+  const index = buildLlmsIndex(sidebarPages, sidebarsText);
   const full = buildLlmsFull(sidebarPages, allFiles);
 
   if (!fs.existsSync(STATIC_DIR)) fs.mkdirSync(STATIC_DIR, { recursive: true });

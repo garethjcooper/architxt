@@ -8,6 +8,9 @@ Full plain-text dump: https://architxtlabs.com/llms-full.txt
 ## Getting started
 - Introduction: https://architxtlabs.com/
 
+## Overview
+- Query your architecture, don’t hunt for it.: https://architxtlabs.com/benefits
+
 ## Getting Started
 - Prerequisites: https://architxtlabs.com/getting-started/prerequisites
 - Installation: https://architxtlabs.com/getting-started/installation
