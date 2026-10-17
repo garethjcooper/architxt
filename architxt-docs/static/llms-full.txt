@@ -5,7 +5,7 @@ Individual pages and index: https://architxtlabs.com/llms.txt
 
 ---
 
-# 
+# Introduction
 URL: https://architxtlabs.com/
 
   ,
@@ -19,11 +19,12 @@ URL: https://architxtlabs.com/
   <section className="atx-hero">
     <span className="atx-hero-eyebrow">architxt documentation</span>
     <h1 className="atx-hero-title">architxt: unlock the doc</h1>
-    <p className="atx-hero-tagline">Designs → Contextual Graph → Knowledge</p>
+    <p className="atx-hero-tagline">Query your architecture, don’t hunt for it.</p>
     <div className="atx-hero-lead">
-      architxt is an IT architecture focused knowledge workbench that turns source documents into a structured, explorable contextual graph. Designs contain a wealth of information - unlock, query, use.
+      architxt is an IT architecture focused knowledge workbench that turns source documents into a structured, explorable contextual graph. Research suggests software practitioners spend ~32% of their day seeking and using information — for architects that time is split across documents, diagrams, wikis, tickets and ADRs. architxt collapses the hunt into one queryable architecture layer.
     </div>
     <div className="atx-hero-actions">
+      
       
       
     </div>
@@ -4573,4 +4574,301 @@ Bank settings map to the Hindsight bank config fields described in the [memory b
 ## Summary
 
 Bank Settings sync is a single-object comparison between architxt's master configuration and a Hindsight bank's config. It checks missions, extraction mode, chunk size, free-form entities, and disposition. Push sends the master settings to the bank; pull copies the bank's settings back into the architxt master.
+---
+
+# Query your architecture, don’t hunt for it.
+URL: https://architxtlabs.com/benefits
+
+
+
+
+
+<span className="atx-hero-eyebrow">architxt benefits</span>
+
+# Query your architecture, don’t hunt for it.
+
+Architecture knowledge lives in documents, diagrams, wikis, tickets, architecture decision records (ADRs), and the heads of experienced people. That scattering has a real cost. architxt turns those scattered, decaying design artifacts into a structured, queryable architecture layer — without replacing your enterprise-architecture (EA) framework or sending proprietary information outside your infrastructure.
+
+---
+
+## Bridge existing information and new knowledge stores
+
+The direction of the field is convergent: unstructured documents, existing repositories, and new AI-powered knowledge stores will increasingly be treated as parts of one architecture-knowledge ecosystem rather than separate silos. Large language models (LLMs) and knowledge graphs are seen as complementary, not competing. However, convergence does not eliminate the need for a **bridge** — a layer that maps existing, often informal information onto stable, queryable entities that newer knowledge stores can consume, cross-reference, and reason over. architxt aims to be that bridge.
+
+See the [full paper index](#full-paper-index) for the research sources behind this section.
+
+---
+
+## Complement, not replace
+
+architxt is an IT-architecture knowledge workbench that works with the design information you already have, in the formats you already use. It extracts entities, relationships, and decisions from documents, diagrams, wikis, tickets, and ADRs, links them to stable IDs, and makes the result queryable. It does not require you to abandon TOGAF, ArchiMate, ITIL, ITAM, Ardoq, LeanIX, or any other EA framework or modelling tool; it sits beside them and fills the gap between formal governance models and the informal, scattered detail that actually drives day-to-day decisions.
+
+In practice, that means:
+
+- **No rip-and-replace.** Keep your existing taxonomy, repository, and service-management tooling.
+- **No clean-up front.** Ingest heterogeneous, imperfect sources as they are; quality gaps are surfaced and can be addressed before ingestion, not hidden.
+- **No ontology project.** The model is anchored to real-world architecture items rather than to a heavyweight schema. It uses the lightest possible ontology to retain its connection to the enterprise's other systems.
+- **No external LLM required.** Can run fully on-premise with open-source models when data sovereignty matters.
+
+---
+
+## Benefit Areas
+
+| # | Benefit area | What the research says | Why it matters for architxt |
+|---|---|---|---|
+| 1 | Save time finding information | **32%** of a software practitioner’s day is spent seeking and using information ([Al Haque et al. et al., 2024](https://arxiv.org/abs/2408.04032)). | Architects split that time across heterogeneous artifacts. architxt collapses the hunt into one queryable architecture layer. |
+| 2 | Query for specifics | **86% F1** for automatic architecture entity recognition from documents (Fuchß et al., 2025). Knowledge-graph and retrieval-augmented generation (KG/RAG) approaches improve factual accuracy for enterprise question answering (QA). | Architecture concepts can be extracted accurately without hand-built models, and answers can be grounded in the source graph. |
+| 3 | Detect gaps, seams and erosion | Architecture erosion harms development and evolution ([Li et al. et al., 2021](https://arxiv.org/abs/2201.01184)); manual consistency checking is **laborious and error-prone** ([Greifenberg et al. et al., 2015](https://arxiv.org/abs/1510.08510)). | A queryable architecture model lets violations, duplicates, and cyclic dependencies surface before they harden. |
+| 4 | Discover current-state architecture | Architecture knowledge is **scattered across heterogeneous artifacts** and hard to access ([Keim & Kaplan et al., 2026](https://arxiv.org/abs/2601.19548)); enterprise-architecture management (EAM) success crucially depends on **information availability** ([Ehrensperger et al. et al., 2020](https://arxiv.org/abs/2004.05087)). | architxt assembles a queryable as-is model from existing documents instead of leaving teams to reverse-engineer from code. |
+| 5 | Stop design-doc shelfware | **50%** of software development cost is maintenance ([Vallecillos Ruiz et al., 2024](https://arxiv.org/abs/2406.16739)); the biggest documentation defects are **missing docs (35), erroneous examples (23), and outdated content (19)** in 101 cases ([Silva et al. et al., 2024](https://arxiv.org/abs/2404.10793)). | Solution designs and ADRs decay. architxt keeps them alive as queryable design rationale. |
+| 6 | Faster architect onboarding | Guided onboarding tours raised comprehension scores from **57% to 83%** ([Kara et al. et al., 2026](https://arxiv.org/abs/2603.25391)); a modelling-focused intervention accelerated comprehension by **15 percentage points** ([Kumar & Choppella et al., 2025](https://arxiv.org/abs/2510.07010)). | A queryable architecture model is the same kind of structured ramp-up surface for new architects. |
+| 7 | Data sovereignty | Cloud LLM use is **constrained by privacy and security legislation** ([Paloniemi et al. et al., 2025](https://arxiv.org/abs/2504.07907)); organisations are moving to on-premise and edge deployments to safeguard data sovereignty (Huang et al., 2024; Yew et al., 2026). | Architecture documents describe boundaries, vendors, data flows, and regulated information. architxt can be self-hosted on open-source models. |
+
+The sections below explain what each benefit means for architxt and list the supporting research sources.
+
+---
+
+## 1. Save time finding architecture information
+
+Software practitioners spend a large fraction of their day searching for and using information. For architects, that information is scattered across many sources — docs, diagrams, wikis, tickets, ADRs — so the overhead is multiplied.
+
+### How architxt addresses this
+
+This is the foundational “time saved” benefit. We use the academic 32% figure in place of the commonly quoted but unverifiable McKinsey / IDC / Gartner “19–30% searching” statistic. It is not architecture-specific, but it grounds the time-loss claim in a citable source. architxt reduces that overhead by making the architecture layer queryable from one place.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Al Haque et al. — [A Survey on Software Engineering Data](https://arxiv.org/abs/2408.04032) (arXiv:2408.04032, 2024) | ~**32%** of a software practitioner’s day is spent seeking and using information. |
+| Jean de Dieu et al. — [Leveraging Machine Learning for Software Architecture Recovery](https://arxiv.org/abs/2112.10920) (arXiv:2112.10920, 2021) | Architects spend too much time going through many dispersed sources to recover architecture knowledge. |
+
+---
+
+## 2. Query for specifics with accuracy and quality
+
+Stakeholders need precise answers from architecture documents — “which services depend on X?”, “what was the rationale for this decision?”, “where is this quality attribute handled?”. Large language model (LLM) + retrieval-augmented generation (RAG) + knowledge-graph approaches are shown to improve enterprise question-answering (QA) accuracy and traceability compared with plain document search.
+
+### How architxt addresses this
+
+This bridges the “time saved” benefit to “quality of answers.” It positions architxt as a query tool, not a static wiki. The 0.86 F1 figure is useful because it shows architecture concepts can be automatically extracted from documents at useful accuracy, and then queried with grounding.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Sequeda — [The AI RDF Knowledge Graph Connection](https://arxiv.org/abs/2311.07509) (arXiv:2311.07509, 2023) | KG-based grounding improves factual accuracy of LLM answers over enterprise data. |
+| Chakraborty — [Knowledge Graph RAG: Agentic Crawling and Graph Construction in Enterprise Documents](https://arxiv.org/abs/2604.14220) (arXiv:2604.14220, 2026) | KG/RAG shows precision gains for enterprise question answering. |
+| Chen — [VDGR-RAG: Vectors, Directories, Graphs, and Reflection Are All You Need for Unified Reasoning over Hierarchical Enterprise Knowledge](https://arxiv.org/abs/2608.07994) (arXiv:2608.07994, 2026) | KG/RAG shows precision gains for enterprise question answering. |
+| Fuchß et al. — [Who’s Who? LLM-assisted Software Traceability with Architecture Entity Recognition](https://arxiv.org/abs/2511.02434) (arXiv:2511.02434, 2025) | Architecture entity recognition achieves F1 ~**0.86** without hand-built models. |
+
+---
+
+## 3. Detect gaps, seams, and architecture erosion
+
+Architecture drift and erosion happen silently and harm quality and evolution. Manual consistency checking is laborious and error-prone. A queryable architecture model makes it easier to spot violations, duplicates, cyclic dependencies, and missing coverage.
+
+### How architxt addresses this
+
+This is the “health check” benefit. architxt is not a code analyzer competing with SonarQube, ArchUnit, or CodeScene. The gap detection is at the design/model layer — missing entities, inconsistent relationships, undocumented decisions — and a queryable model makes those problems visible earlier.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Li et al. — [Understanding Software Architecture Erosion: A Systematic Mapping Study](https://arxiv.org/abs/2112.10934) (arXiv:2112.10934, 2021) | Architecture erosion adversely affects software development and evolution. |
+| Li et al. — [Architecture Erosion: Symptoms, Causes, and Detection](https://arxiv.org/abs/2201.01184) (arXiv:2201.01184, 2022) | Erosion symptoms include violations, duplicate functionality, and cyclic dependencies. |
+| Greifenberg et al. — [Consistency Checking of Models and Code](https://arxiv.org/abs/1510.08510) (arXiv:1510.08510, 2015) | Manual consistency checking is **laborious and error-prone**. |
+| Di Pompeo & Tucci — [Many-Objective Optimization of Non-Functional Attributes based on Refactoring of Software Models](https://arxiv.org/abs/2301.07516) (arXiv:2301.07516, 2023) | Quality-attribute estimation is challenging and time-consuming. |
+
+---
+
+## 4. Discover current-state architecture
+
+Enterprise architecture knowledge is scattered across requirements documents, design diagrams, code comments, wikis, and other artifacts. EAM success depends on information availability. architxt builds a queryable as-is model from existing documents.
+
+### How architxt addresses this
+
+“Discover current state” is distinct from “find information faster.” Finding information is about point queries; discovering current state is about assembling a coherent, queryable model of the as-is architecture. This is a larger, more strategic benefit area.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Keim & Kaplan — [A Systematic Mapping Study on Architecture Knowledge Management in Software Engineering](https://arxiv.org/abs/2601.19548) (arXiv:2601.19548, 2026) | Architectural knowledge is **scattered across heterogeneous artifacts** and is hard to access and utilize. |
+| Ehrensperger et al. — [Current Practices in the Information Collection for Enterprise Architecture Management](https://arxiv.org/abs/2004.05087) (arXiv:2004.05087, 2020) | The success of Enterprise Architecture Management crucially depends on **information availability**. |
+| Ponsard — [Enterprise Architecture Model Enrichment](https://arxiv.org/abs/2204.06226) (arXiv:2204.06226, 2022) | EA models help keep IT evolution aligned with business evolution. |
+| Constantinou — [Effort to comprehend source code and discover architecture](https://arxiv.org/abs/1110.1992) (arXiv:1110.1992, 2011) | Without architecture documentation, teams must reverse-engineer from code, which is costly. |
+
+---
+
+## 5. Stop design-document shelfware / preserve design value
+
+Solution-design documents, ADRs, and architecture rationale are often created once, used for an immediate decision, and then left to rot. Outdated docs, incomplete ADRs, and loss of expert knowledge waste prior design effort. architxt keeps these artifacts alive as a reusable, queryable knowledge base.
+
+### How architxt addresses this
+
+“Shelfware” is not a direct academic term, so we map it to adjacent concepts: documentation debt, stale docs, incomplete ADRs, and tacit expert knowledge loss. The evidence does not provide a clean “X% of design documents are never reused” figure, but the surrounding evidence is strong. architxt keeps design rationale alive by attaching it to stable entities and making it queryable long after the original decision was made.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Tan et al. — [Outdated Code-Element References in GitHub Projects](https://arxiv.org/abs/2212.01479) (arXiv:2212.01479, 2022) | Outdated code-element references are **pervasive across 3,000+ GitHub projects**. |
+| Silva et al. — [Documentation Defects in Open-Source Software](https://arxiv.org/abs/2402.11048) (arXiv:2402.11048, 2024) | In 101 documentation defects, the biggest contributors are missing docs (35), erroneous examples (23), and outdated content (19). |
+| Miccio Palermo et al. — [What Do Architecture Decision Records Really Capture?](https://arxiv.org/abs/2609.07375) (arXiv:2609.07375, 2026) | ADRs often **under-document alternatives, drivers, and quality concerns**. |
+| Cervera — [Expert Mind: A Retrieval-Augmented Architecture for Expert Knowledge Preservation](https://arxiv.org/abs/2603.14541) (arXiv:2603.14541, 2026) | The departure of subject-matter experts causes **irreversible loss of tacit knowledge** rarely captured by conventional documentation. |
+| Mills et al. — [Automatic Traceability Maintenance](https://arxiv.org/abs/1807.06684) (arXiv:1807.06684, 2018) | Traceability links are important, costly, and become outdated as projects evolve. |
+| Vallecillos Ruiz — [Software Maintenance Cost](https://arxiv.org/abs/2406.16739) (arXiv:2406.16739, 2024) | Software maintenance accounts for ~**50%** of software development cost. |
+
+---
+
+## 6. Faster architect onboarding / time to first useful output
+
+New architects face a long ramp before they understand the existing architecture well enough to contribute. Effective onboarding is correlated with productivity and job satisfaction, yet it is often lengthy, costly, and error-prone. A structured, queryable architecture map accelerates that ramp.
+
+### How architxt addresses this
+
+This area is framed around documents, models, and visualisation rather than code analysis. The evidence consistently describes onboarding as lengthy and costly, and shows that structured comprehension aids improve it. A queryable architecture model is the same kind of structured ramp-up surface for new architects.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Santos et al. — [Software Solutions for Newcomers’ Onboarding in Software Projects](https://arxiv.org/abs/2408.15989) (arXiv:2408.15989, 2024) | Systematic literature review (SLR) of 32 studies. Onboarding is **“lengthy, costly, and error-prone”**; many newcomer barriers remain unaddressed. |
+| Ju et al. — [A Case Study of Onboarding in Software Teams](https://arxiv.org/abs/2103.05055) (arXiv:2103.05055, 2021) | Microsoft study (32 devs, 15 managers, surveys N=189/37). Onboarding experience is **correlated with productivity and job satisfaction**. |
+| Azanza et al. — [Onboarding in Software Product Lines: ConceptMaps as Welcome Guides](https://arxiv.org/abs/2103.03829) (arXiv:2103.03829, 2021) | Incorporating a new developer is **“lengthy, frustrating and expensive”**; newcomers face personal, interpersonal, process, and technical barriers. |
+| Padoan et al. — [Charting a Path to Efficient Onboarding](https://arxiv.org/abs/2401.09605) (arXiv:2401.09605, 2024) | Professionals spend a **substantial portion of work hours understanding existing systems**. Ineffective onboarding **prolongs the period before newcomers become productive**. |
+| Ionescu et al. — [A Multi-agent Onboarding Assistant based on LLM, RAG, and Chain-of-Thought](https://arxiv.org/abs/2503.23421) (arXiv:2503.23421, 2025) | Traditional onboarding methods are costly, time-consuming, and quickly outdated in large projects. |
+| Bajraktari & Vogelsang — [Enhancing Understandability and Transparency of Research Software](https://arxiv.org/abs/2604.10793) (arXiv:2604.10793, 2026) | Targets **long onboarding times for newcomers**; clear links between ideas and implementation improve understanding. |
+| Kumar & Choppella — [Teaching Modelling for Software Comprehension in New-Hire Onboarding](https://arxiv.org/abs/2510.07010) (arXiv:2510.07010, 2025) | A modelling-focused onboarding intervention accelerated comprehension for less-prepared new hires by **15 percentage points**. |
+| Kara et al. — [LACY: Simulating Expert Mentoring for Software Onboarding with Code Tours](https://arxiv.org/abs/2603.25391) (arXiv:2603.25391, 2026) | Expert walkthroughs are effective but **expensive, repetitive, and don’t scale**. Guided tours improved quiz scores from **57% to 83%**. |
+| Shokri & Mirakhorli — [ArCode: A Tool for Supporting Comprehension and Implementation of Architectural Concerns](https://arxiv.org/abs/2103.06735) (arXiv:2103.06735, 2021) | Integrated development environments (IDEs) focus on low-level programming; there is less support for understanding and implementing **architectural concerns**. |
+| Gao et al. — [Understanding Codebase like a Professional! Human-AI Collaboration for Code Comprehension](https://arxiv.org/abs/2504.04553) (arXiv:2504.04553, 2025) | A structured map-based tool reduced reliance on reading raw LLM responses by **79%** and increased map usage by **90%**. |
+| Dhar et al. — [AgenticAKM: Enroute to Agentic Architecture Knowledge Management](https://arxiv.org/abs/2602.04445) (arXiv:2602.04445, 2026) | Architecture Knowledge Management is often laborious and not adopted; architectural knowledge is distributed and needs agentic, multi-step workflows. |
+| Tian et al. — [The Impact of Traceability on Software Maintenance and Evolution](https://arxiv.org/abs/2108.02133) (arXiv:2108.02133, 2021) | 63 studies show traceability is critical for maintenance/evolution, but **establishing and maintaining traceability links is the main cost**. |
+
+---
+
+## 7. Data sovereignty, on-premise, and open-source
+
+Architecture documents describe systems, boundaries, vendors, data flows, and sometimes regulated information. Many organisations cannot or will not send that content to a remote, proprietary LLM. architxt can be fully self-hosted on open-source models, keeping proprietary architecture knowledge under the organisation’s control.
+
+### How architxt addresses this
+
+This is a procurement and governance differentiator rather than a productivity benefit. It matters most for regulated industries, government, and large enterprises with strict data-residency policies. architxt is open-source and can run on local open-source models, so organisations can keep proprietary architecture knowledge inside their own infrastructure.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Paloniemi et al. — [Porting an LLM based Application from ChatGPT to an On-Premise Environment](https://arxiv.org/abs/2504.07907) (arXiv:2504.07907, 2025) | Cloud LLMs conflict with **legislation related to privacy and security of data**; organisations port to on-premise environments where privacy and security can be controlled. |
+| Huang et al. — [A Middle Path for On-Premises LLM Deployment](https://arxiv.org/abs/2410.11182) (arXiv:2410.11182, 2024) | **“Privacy-sensitive users require deploying large language models within their own infrastructure (on-premises) to safeguard private data and enable customization.”** |
+| Huang et al. — [Securing LLMs in the Wild](https://arxiv.org/abs/2607.13088) (arXiv:2607.13088, 2026) | Cloud deployments raise concerns over **data sovereignty, compliance, latency, and third-party dependence**, driving organisations toward edge and on-premise LLMs. |
+| Gupta & Shrivastava — [Zero Data Retention in LLM-based Enterprise AI Assistants](https://arxiv.org/abs/2510.11558) (arXiv:2510.11558, 2025) | For healthcare and finance, **governance of data, compliance, and business privacy** is a priority; zero data retention is an active architectural concern. |
+| Yew et al. — [The Commodification of AI Sovereignty](https://arxiv.org/abs/2601.11763) (arXiv:2601.11763, 2026) | “Sovereignty” is now part of national AI policies and enterprise procurement. |
+| Pan et al. — [A Cost-Benefit Analysis of On-Premise Large Language Model Deployment](https://arxiv.org/abs/2509.18101) (arXiv:2509.18101, 2025) | Organisations weigh commercial cloud services against local open-source models due to **data privacy, vendor lock-in, and long-term operating costs**. |
+| Zeng et al. — [Mitigating the Privacy Issues in Retrieval-Augmented Generation (RAG)](https://arxiv.org/abs/2406.14773) (arXiv:2406.14773, 2024) | RAG over private data creates **severe privacy risks** and potential leakage of sensitive information. |
+| Kooy et al. — [Impact and Implications of Generative AI for Enterprise Architects](https://arxiv.org/abs/2510.22003) (arXiv:2510.22003, 2025) | GenAI supports design ideation, artifact creation, and architectural decision support, but reported risks include **privacy and compliance concerns**. |
+
+---
+
+## Barriers to success
+
+The benefits above are only possible if a tool can handle the messy reality of architecture knowledge. Two barrier areas keep organisations from getting good answers today.
+
+### Barrier 1: Existing data location, format, and quality
+
+Before a tool like architxt can query an architecture, the existing knowledge must be accessible, interpretable, and sufficiently complete. In practice it is not. Architecture knowledge is scattered across many artifact types and storage locations, captured in inconsistent formats, and kept current only sporadically. These barriers directly limit the quality of any downstream query, retrieval, or analysis.
+
+### How architxt addresses this
+
+architxt reduces this barrier by ingesting documents, diagrams, wikis, tickets, and ADRs in the formats they already exist in, then normalising and linking their content to stable entities. It does not require a clean-up front: extraction, entity disambiguation, and relationship inference are part of the pipeline. Gaps in the source material are surfaced in the queryable model, so teams can see where their architecture knowledge is thin rather than assuming the tool is broken. The result is a working as-is model built from the degraded but real information the organisation actually has.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| Zhang, Wan, Xia, Jiang & Lo — [Software Architecture in Practice: Challenges and Opportunities](https://arxiv.org/abs/2308.09978) (arXiv:2308.09978, 2023) | Qualitative study of **32 practitioners from 21 organisations across three continents**. Documentation-specific barriers include inadequate models/tools for completeness, docs becoming obsolete as software evolves, and inadequate tool support for sharing, version control, and tracing scattered design docs. |
+| Keim & Kaplan — [Architecture Knowledge Management SLR](https://arxiv.org/abs/2601.19548) (arXiv:2601.19548, 2026) | Architectural knowledge is **scattered across heterogeneous software artifacts**, making it hard to access and utilise. |
+| Enterprise Architecture Model Transformation Engine — [arXiv:2108.13169](https://arxiv.org/abs/2108.13169) (2021) | The **heterogeneity of modelling frameworks and description languages** makes concatenation and integration of enterprise architecture models considerably difficult. |
+| Polystore Architecture Using Knowledge Graphs — [arXiv:2308.03584](https://arxiv.org/abs/2308.03584) (2023) | Modern applications manage datasets with **heterogeneous data and schemas**, making integrated access difficult. |
+| Cervera — [Expert Mind](https://arxiv.org/abs/2603.14541) (arXiv:2603.14541, 2026) | The departure of subject-matter experts causes **irreversible loss of tacit knowledge** rarely captured by conventional documentation practices. |
+| Greifenberg et al. — [Consistency Checking](https://arxiv.org/abs/1510.08510) (arXiv:1510.08510, 2015) | Manual consistency checking is **laborious and error-prone**. |
+
+### Barrier 2: Domain expertise and pipeline-design effort
+
+Even when source documents exist, building a useful queryable architecture model from them is not automatic. It requires understanding the problem domain, choosing what entities and relationships matter, designing extraction and normalisation pipelines, validating quality, and maintaining the model as sources change.
+
+### How architxt addresses this
+
+architxt lowers this barrier by shipping a domain-aware architecture pipeline rather than a blank knowledge-graph canvas. It extracts entities and relationships from architecture documents without hand-built models, aligns them to stable IDs, and lets the user tune the model through the UI rather than by writing ontology definitions. T-RAG confirms that robust enterprise RAG demands deep domain work; architxt does that work out of the box for IT architecture artifacts, so the team can start querying before they have designed schemas or extraction rules.
+
+### Supporting evidence
+
+| Paper | Key finding |
+|---|---|
+| T-RAG — [T-RAG: Lessons from the LLM Trenches](https://arxiv.org/abs/2402.07483) (arXiv:2402.07483, 2024) | “While building a RAG is relatively straightforward, **making it robust and a reliable application requires extensive customization and relatively deep knowledge of the application domain**.” |
+| Fuchß et al. — [Who’s Who? LLM-assisted Software Traceability with Architecture Entity Recognition](https://arxiv.org/abs/2511.02434) (arXiv:2511.02434, 2025) | Extraction achieves F1 ~**0.86**, but that is only one step. Schema design, relationship inference, and quality validation remain. |
+| OntoEKG — [LLM-Driven Ontology Construction for Enterprise Knowledge Graphs](https://arxiv.org/abs/2602.01276) (arXiv:2602.01276, 2026) | Construction of enterprise-knowledge-graph ontologies remains a **resource-intensive, manual process that relies heavily on domain expertise**. Fuzzy-match F1 only **0.724** in the Data domain. |
+| Knowledge Graph Curation — [A Practical Framework](https://arxiv.org/abs/2208.08130) (arXiv:2208.08130, 2022) | Knowledge graphs inevitably contain errors, duplicates, and missing values. **Low-quality KGs produce low-quality applications** built on top of them, so curation is essential. |
+| LLMATCH — [A Unified Schema Matching Framework with Large Language Models](https://arxiv.org/abs/2507.10897) (arXiv:2507.10897, 2025) | Schema matching is foundational for enterprise data integration, but aligning disparate data sources remains hard. |
+
+---
+
+## Full paper index
+
+| First author | Title | arXiv ID | Year | Used in area |
+|---|---|---|---|---|
+| Al Haque | A Survey on Software Engineering Data: Sources, Opportunities, and Challenges | [2408.04032](https://arxiv.org/abs/2408.04032) | 2024 | 1 |
+| Azanza | Onboarding in Software Product Lines: ConceptMaps as Welcome Guides | [2103.03829](https://arxiv.org/abs/2103.03829) | 2021 | 6 |
+| Bajraktari | Enhancing Understandability and Transparency of Research Software | [2604.10793](https://arxiv.org/abs/2604.10793) | 2026 | 6 |
+| Cervera | Expert Mind: Retrieval-Augmented Architecture for Expert Knowledge Preservation | [2603.14541](https://arxiv.org/abs/2603.14541) | 2026 | 5 / Barrier |
+| Chen | VDGR-RAG: Vectors, Directories, Graphs, and Reflection Are All You Need for Unified Reasoning over Hierarchical Enterprise Knowledge | [2608.07994](https://arxiv.org/abs/2608.07994) | 2026 | 2 |
+| Chakraborty | KG/RAG for enterprise question answering (QA) | [2604.14220](https://arxiv.org/abs/2604.14220) | 2026 | 2 |
+| Constantinou | Effort to comprehend source code and discover architecture | [1110.1992](https://arxiv.org/abs/1110.1992) | 2011 | 4 |
+| Di Pompeo | Many-Objective Optimization of Non-Functional Attributes | [2301.07516](https://arxiv.org/abs/2301.07516) | 2023 | 3 |
+| Dhar | AgenticAKM: Enroute to Agentic Architecture Knowledge Management | [2602.04445](https://arxiv.org/abs/2602.04445) | 2026 | 6 |
+| Ehrensperger | Current Practices in the Information Collection for Enterprise Architecture Management (EAM) | [2004.05087](https://arxiv.org/abs/2004.05087) | 2020 | 4 |
+| Fuchß | Automatic Extraction and Classification of Architecture Information | [2511.02434](https://arxiv.org/abs/2511.02434) | 2025 | 2 / Barrier |
+| Gao | Understanding Codebase like a Professional! | [2504.04553](https://arxiv.org/abs/2504.04553) | 2025 | 6 |
+| Greifenberg | Consistency Checking of Models and Code | [1510.08510](https://arxiv.org/abs/1510.08510) | 2015 | 3 / Barrier |
+| Gupta | Zero Data Retention in LLM-based Enterprise AI Assistants | [2510.11558](https://arxiv.org/abs/2510.11558) | 2025 | 7 |
+| Huang | A Middle Path for On-Premises LLM Deployment | [2410.11182](https://arxiv.org/abs/2410.11182) | 2024 | 7 |
+| Huang | Securing LLMs in the Wild | [2607.13088](https://arxiv.org/abs/2607.13088) | 2026 | 7 |
+| Ionescu | A Multi-agent Onboarding Assistant | [2503.23421](https://arxiv.org/abs/2503.23421) | 2025 | 6 |
+| Jean de Dieu | Leveraging Machine Learning for Software Architecture Recovery | [2112.10920](https://arxiv.org/abs/2112.10920) | 2021 | 1 |
+| Ju | A Case Study of Onboarding in Software Teams | [2103.05055](https://arxiv.org/abs/2103.05055) | 2021 | 6 |
+| Kara | LACY: Simulating Expert Mentoring for Software Onboarding | [2603.25391](https://arxiv.org/abs/2603.25391) | 2026 | 6 |
+| Keim | Architecture Knowledge Management SLR | [2601.19548](https://arxiv.org/abs/2601.19548) | 2026 | 4 / Barrier |
+| Kooy | Impact and Implications of Generative AI for Enterprise Architects | [2510.22003](https://arxiv.org/abs/2510.22003) | 2025 | 7 |
+| Kumar | Teaching Modelling for Software Comprehension in New-Hire Onboarding | [2510.07010](https://arxiv.org/abs/2510.07010) | 2025 | 6 |
+| Li | Understanding Software Architecture Erosion | [2112.10934](https://arxiv.org/abs/2112.10934) | 2021 | 3 |
+| Li | Architecture Erosion: Symptoms, Causes, and Detection | [2201.01184](https://arxiv.org/abs/2201.01184) | 2022 | 3 |
+| Miccio Palermo | What Do Architecture Decision Records Really Capture? | [2609.07375](https://arxiv.org/abs/2609.07375) | 2026 | 5 |
+| Mills | Automatic Traceability Maintenance | [1807.06684](https://arxiv.org/abs/1807.06684) | 2018 | 5 |
+| Padoan | Charting a Path to Efficient Onboarding | [2401.09605](https://arxiv.org/abs/2401.09605) | 2024 | 6 |
+| Paloniemi | Porting an LLM based Application from ChatGPT to On-Premise | [2504.07907](https://arxiv.org/abs/2504.07907) | 2025 | 7 |
+| Pan | Cost-Benefit Analysis of On-Premise Large Language Model Deployment | [2509.18101](https://arxiv.org/abs/2509.18101) | 2025 | 7 |
+| Pan | Unifying Large Language Models and Knowledge Graphs: A Roadmap | [2306.08302](https://arxiv.org/abs/2306.08302) | 2023 | Forward-looking |
+| Ponsard | Enterprise Architecture Model Enrichment | [2204.06226](https://arxiv.org/abs/2204.06226) | 2022 | 4 |
+| Santos | Software Solutions for Newcomers’ Onboarding | [2408.15989](https://arxiv.org/abs/2408.15989) | 2024 | 6 |
+| Sequeda | The AI RDF Knowledge Graph Connection | [2311.07509](https://arxiv.org/abs/2311.07509) | 2023 | 2 |
+| Shokri | ArCode: Supporting Comprehension of Architectural Concerns | [2103.06735](https://arxiv.org/abs/2103.06735) | 2021 | 6 |
+| Shen | Orchestrating Agents and Data for Enterprise | [2504.08148](https://arxiv.org/abs/2504.08148) | 2025 | Forward-looking |
+| Silva | Documentation Defects in Open-Source Software | [2402.11048](https://arxiv.org/abs/2404.10793) | 2024 | 5 |
+| Tan | Outdated Code-Element References in GitHub Projects | [2212.01479](https://arxiv.org/abs/2212.01479) | 2022 | 5 |
+| Tian | The Impact of Traceability on Software Maintenance and Evolution | [2103.05055](https://arxiv.org/abs/2108.02133) | 2021 | 6 |
+| T-RAG | T-RAG: Lessons from the LLM Trenches | [2402.07483](https://arxiv.org/abs/2402.07483) | 2024 | Barrier |
+| Vallecillos Ruiz | Software Maintenance Cost | [2406.16739](https://arxiv.org/abs/2406.16739) | 2024 | 5 |
+| Yew | The Commodification of AI Sovereignty | [2601.11763](https://arxiv.org/abs/2601.11763) | 2026 | 7 |
+| Zhang, Wan, Xia, Jiang & Lo | Software Architecture in Practice: Challenges and Opportunities | [2308.09978](https://arxiv.org/abs/2308.09978) | 2023 | Barrier |
+| OntoEKG | LLM-Driven Ontology Construction for Enterprise Knowledge Graphs | [2602.01276](https://arxiv.org/abs/2602.01276) | 2026 | Barrier |
+| LLMATCH | A Unified Schema Matching Framework with Large Language Models | [2507.10897](https://arxiv.org/abs/2507.10897) | 2025 | Barrier |
+| KG Curation | Knowledge Graph Curation: A Practical Framework | [2208.08130](https://arxiv.org/abs/2208.08130) | 2022 | Barrier |
+| Zeng | Mitigating Privacy Issues in RAG | [2406.14773](https://arxiv.org/abs/2406.14773) | 2024 | 7 |
+| Compound AI Blueprint | A Blueprint Architecture of Compound AI Systems for Enterprise | [2406.00584](https://arxiv.org/abs/2406.00584) | 2024 | Forward-looking |
+| Multi-Agent Relational KG | A Multi-Agent System for Semantic Mapping of Relational Data to Knowledge Graphs | [2511.06455](https://arxiv.org/abs/2511.06455) | 2025 | Forward-looking |
+| FabKG | A Knowledge graph of Manufacturing Science domain | [2206.10318](https://arxiv.org/abs/2206.10318) | 2022 | Forward-looking |
+| Legacy Modernization | Model-Driven Legacy System Modernization at Scale | [2602.04341](https://arxiv.org/abs/2602.04341) | 2026 | Forward-looking |
 ---
