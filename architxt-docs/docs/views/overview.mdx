@@ -44,7 +44,17 @@ The export menu in the toolbar offers:
 
 ## Send to Workspace
 
-The **Save to...** button sends the current view’s graph to a curated Workspace page. You can create a new page or add to an existing one. If the target page already contains a graph, architxt asks for confirmation before merging.
+The **Save to...** button sends the current view to a curated Workspace page. You can create a new page or add to an existing one. Before sending, a modal lets you choose which formats to include:
+
+| Format | Output |
+|---|---|
+| **Flowchart** | A Mermaid flowchart diagram of the current view. |
+| **Graph** | A canonical graph section with the view's nodes and edges. |
+| **Table** | Node and edge tables derived from the canonical graph, using the same table structure as the Graph focus modal's **Add table to page** action. |
+
+Flowchart is selected by default. At least one format must be selected. When multiple formats are selected, they are all included in the same standard envelope on the target page.
+
+If the target page already contains a graph, architxt asks for confirmation before merging.
 
 ## Persistence
 

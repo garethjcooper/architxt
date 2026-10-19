@@ -2,6 +2,26 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.4.6] - 2026-10-20
+
+> ⚠️ **Important:** After upgrading, open **Settings → Server → Banks** and click **Clean local graph** for each bank, then run **Sync local graph** again. This ensures your local context graph is rebuilt cleanly with the corrected edge-detail hashing and entity ID canonicalisation introduced in this release.
+
+### Added
+- Views page **Save to workspace** now supports three export formats: **Flowchart**, **Graph**, and **Table**.
+  - All formats share the same **Send to** modal and target page.
+  - **Flowchart** remains selected by default; at least one format must be chosen.
+  - When multiple formats are selected they are merged into the same target page envelope.
+- **Graph** export produces a canonical `type: 'graph'` envelope from the current view.
+- **Table** export produces node and edge tables using the same row/column layout as the Graph focus modal's **Add table to page** action.
+- Server banks dialog now includes a **Clean local graph** button to remove stale contextual graph data.
+
+### Changed
+- Views export events are regenerated from the current picker format selection at apply time, so toggling formats inside the modal always matches the saved output.
+- The canonical directed edge ID hash now includes edge `detail`, making graph identity stable when edge detail changes.
+
+### Fixed
+- Views graph export to workspace and Mermaid export now use canonical entity IDs consistently.
+
 ## [0.4.5] - 2026-10-19
 
 ### Added

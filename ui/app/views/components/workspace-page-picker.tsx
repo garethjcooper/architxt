@@ -1,16 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import type { ResearchStepSummary } from '@/lib/api/client';
+
+export type SaveToFormat = 'flowchart' | 'graph' | 'table';
 
 interface WorkspacePagePickerProps {
   open: boolean;
   title: string;
   hasSession: boolean;
   curatedPages: ResearchStepSummary[];
+  /** Initially selected export formats. Defaults to ['flowchart']. */
+  initialFormats?: SaveToFormat[];
   onClose: () => void;
-  onCreatePage: () => void;
-  onApplyToPage: (page: ResearchStepSummary) => void;
+  onCreatePage: (formats: SaveToFormat[]) => void;
+  onApplyToPage: (page: ResearchStepSummary, formats: SaveToFormat[]) => void;
 }
 
 export function WorkspacePagePicker({
@@ -18,11 +24,28 @@ export function WorkspacePagePicker({
   title,
   hasSession,
   curatedPages,
+  initialFormats = ['flowchart'],
   onClose,
   onCreatePage,
   onApplyToPage,
 }: WorkspacePagePickerProps) {
+  const [selectedFormats, setSelectedFormats] = useState<Set<SaveToFormat>>(new Set(initialFormats));
+
   if (!open) return null;
+
+  const toggleFormat = (format: SaveToFormat) => {
+    setSelectedFormats((prev) => {
+      const next = new Set(prev);
+      if (next.has(format)) {
+        next.delete(format);
+      } else {
+        next.add(format);
+      }
+      return next;
+    });
+  };
+
+  const hasFormat = selectedFormats.size > 0;
 
   return (
     <div
@@ -39,12 +62,48 @@ export function WorkspacePagePicker({
       <div className="rounded-lg border border-border-default bg-surface-raised p-4 w-80 shadow-lg">
         <div className="text-sm font-medium text-foreground-default mb-2">Send to workspace page</div>
         <p className="text-xs text-foreground-faint mb-4">“{title || 'Untitled'}”</p>
+
+        <div className="rounded border border-border-default bg-surface-inset p-2 mb-4">
+          <div className="text-[11px] font-medium text-foreground-muted mb-2 uppercase tracking-wide">Include</div>
+          <label className="flex items-center justify-between gap-2 mb-2 text-xs text-foreground-faint cursor-pointer select-none">
+            <span>Flowchart</span>
+            <Switch
+              checked={selectedFormats.has('flowchart')}
+              onCheckedChange={() => toggleFormat('flowchart')}
+              size="sm"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2 mb-2 text-xs text-foreground-faint cursor-pointer select-none">
+            <span>Graph</span>
+            <Switch
+              checked={selectedFormats.has('graph')}
+              onCheckedChange={() => toggleFormat('graph')}
+              size="sm"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2 text-xs text-foreground-faint cursor-pointer select-none">
+            <span>Table</span>
+            <Switch
+              checked={selectedFormats.has('table')}
+              onCheckedChange={() => toggleFormat('table')}
+              size="sm"
+            />
+          </label>
+          {!hasFormat && (
+            <p className="text-[11px] text-destructive-fg mt-2">Select at least one format.</p>
+          )}
+        </div>
+
         <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto mb-4">
           {hasSession && (
             <button
               type="button"
-              onClick={onCreatePage}
-              className="text-left text-xs px-2 py-1.5 rounded border border-dashed border-accent-primary-bd bg-accent-primary-bg/30 text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+              onClick={() => {
+                if (!hasFormat) return;
+                onCreatePage(Array.from(selectedFormats));
+              }}
+              disabled={!hasFormat}
+              className="text-left text-xs px-2 py-1.5 rounded border border-dashed border-accent-primary-bd bg-accent-primary-bg/30 text-accent-primary-fg hover:bg-accent-primary-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               + New page
             </button>
@@ -56,8 +115,12 @@ export function WorkspacePagePicker({
             <button
               key={page.id}
               type="button"
-              onClick={() => onApplyToPage(page)}
-              className="text-left text-xs px-2 py-1.5 rounded border border-border-default bg-surface-inset text-foreground-faint hover:bg-surface-card hover:text-foreground-default transition-colors"
+              onClick={() => {
+                if (!hasFormat) return;
+                onApplyToPage(page, Array.from(selectedFormats));
+              }}
+              disabled={!hasFormat}
+              className="text-left text-xs px-2 py-1.5 rounded border border-border-default bg-surface-inset text-foreground-faint hover:bg-surface-card hover:text-foreground-default disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {page.intent_text || `Page ${page.id}`}
             </button>

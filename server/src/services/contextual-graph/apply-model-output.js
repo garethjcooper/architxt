@@ -296,7 +296,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
         updated_at: timestamp,
       };
     } else {
-      edgeId = buildDirectedEdgeId(fromId, toId, modelEdge.type, modelEdge.label, 'edge-ctx');
+      edgeId = buildDirectedEdgeId(fromId, toId, modelEdge.type, modelEdge.label, 'edge-ctx', modelEdge.detail);
       source = fromId;
       target = toId;
       properties = {

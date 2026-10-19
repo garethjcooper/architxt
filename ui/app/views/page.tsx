@@ -36,7 +36,7 @@ import {
 import type { ViewControlsState } from '@/lib/types';
 import { EntitiesPanel } from './components/entities-panel';
 import { DetailPanel } from './components/detail-panel';
-import { WorkspacePagePicker } from './components/workspace-page-picker';
+import { WorkspacePagePicker, type SaveToFormat } from './components/workspace-page-picker';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { backendEdgeToDisplayEdge, type DisplayEdge } from '@/lib/contextual-graph/display';
 import { ensureEnvelopeIds } from '@/lib/envelope-markdown';
@@ -338,6 +338,7 @@ export default function ViewsPage() {
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const [workspacePickerTitle, setWorkspacePickerTitle] = useState<string>('');
   const [workspacePickerEvents, setWorkspacePickerEvents] = useState<EnvelopeCopyEvent[] | null>(null);
+  const [workspacePickerFormats, setWorkspacePickerFormats] = useState<SaveToFormat[]>(['flowchart']);
 
   useEffect(() => {
     if (!serverId || !bankId) {
@@ -460,25 +461,15 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
     }
   }, [confirmMergePage, handleApplyEventsToWorkspacePage]);
 
-  const handleCreateWorkspacePageAndApply = useCallback(
-    async () => {
-      if (!activeSession || !workspacePickerEvents?.length) return;
-      const title = workspacePickerTitle || 'Section';
-      try {
-        const newPage = await researchApi.createSessionPage(activeSession.id, title);
-        await workspaceSession.fetchTrail(activeSession.id);
-        await handleApplyEventsToWorkspacePage(newPage, workspacePickerEvents);
-        setWorkspacePickerOpen(false);
-      } catch (err: unknown) {
-        logger.error('Failed to create workspace page from view', err);
-        toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
-      }
-    },
-    [activeSession, workspacePickerEvents, workspacePickerTitle, workspaceSession, handleApplyEventsToWorkspacePage]
-  );
+  const buildEventsForFormats = useCallback((formats: SaveToFormat[]): EnvelopeCopyEvent[] => {
+    if (!activeView) return [];
+    const includeGraph = formats.includes('graph');
+    const includeTable = formats.includes('table');
+    const includeFlowchart = formats.includes('flowchart');
+    if (!includeGraph && !includeTable && !includeFlowchart) return [];
 
-  const handleSendViewToWorkspace = useCallback(() => {
-    if (!activeView) return;
+    // Build a single envelope with all requested parts so the canonical graph
+    // is generated once and reused for graph and table outputs.
     const envelope = viewToEnvelope(activeView, {
       direction: layoutOptions.direction,
       title: activeView.name,
@@ -486,18 +477,65 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
       edgeMergeMode: layoutOptions.edgeMergeMode,
       diagramName: activeView.name || 'View diagram',
       graphName: activeView.name || 'View graph',
+      formats: [
+        ...(includeFlowchart ? ['flowchart' as const] : []),
+        ...(includeGraph || includeTable ? ['graph' as const, 'table' as const] : []),
+      ],
     });
+
     const events: EnvelopeCopyEvent[] = [];
-    if (envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0) {
+    if ((envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0) && includeGraph) {
       events.push({ type: 'graph', payload: JSON.stringify(envelope.graph), label: envelope.graph.name ?? undefined });
     }
-    for (const d of envelope.diagrams) {
-      events.push({ type: 'diagrams', payload: JSON.stringify([d]), label: d.name ?? undefined, evidence: d.evidence ?? undefined, id: d.id });
+    if (includeTable && envelope.tables.length > 0) {
+      events.push({
+        type: 'tables',
+        payload: JSON.stringify(envelope.tables),
+        label: `${envelope.graph.name || 'View'} tables`,
+        evidence: Array.from(new Set(envelope.graph.edges.flatMap((e) => e.evidence ?? []))),
+      });
     }
-    setWorkspacePickerTitle(activeView.name || 'Untitled view');
-    setWorkspacePickerEvents(events.length ? events : null);
-    setWorkspacePickerOpen(true);
+    if (includeFlowchart) {
+      for (const d of envelope.diagrams) {
+        events.push({ type: 'diagrams', payload: JSON.stringify([d]), label: d.name ?? undefined, evidence: d.evidence ?? undefined, id: d.id });
+      }
+    }
+    return events;
   }, [activeView, layoutOptions.direction, showEdgeLabels, layoutOptions.edgeMergeMode]);
+
+  const handleCreateWorkspacePageAndApply = useCallback(
+    async (formats: SaveToFormat[]) => {
+      if (!activeSession) return;
+      const events = buildEventsForFormats(formats);
+      if (!events.length) return;
+      const title = workspacePickerTitle || 'Section';
+      try {
+        const newPage = await researchApi.createSessionPage(activeSession.id, title);
+        await workspaceSession.fetchTrail(activeSession.id);
+        await handleApplyEventsToWorkspacePage(newPage, events);
+        setWorkspacePickerOpen(false);
+      } catch (err: unknown) {
+        logger.error('Failed to create workspace page from view', err);
+        toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
+      }
+    },
+    [activeSession, buildEventsForFormats, workspacePickerTitle, workspaceSession, handleApplyEventsToWorkspacePage]
+  );
+
+  const handleApplyToPageWithFormats = useCallback((page: ResearchStepSummary, formats: SaveToFormat[]) => {
+    setWorkspacePickerFormats(formats);
+    const events = buildEventsForFormats(formats);
+    if (events.length) {
+      handleApplyEventsToWorkspacePage(page, events);
+    }
+    setWorkspacePickerOpen(false);
+  }, [buildEventsForFormats, handleApplyEventsToWorkspacePage]);
+
+  const handleSendViewToWorkspace = useCallback(() => {
+    if (!activeView) return;
+    setWorkspacePickerTitle(activeView.name || 'Untitled view');
+    setWorkspacePickerOpen(true);
+  }, [activeView]);
 
   const handleDetailAddToPage = useCallback((event: EnvelopeCopyEvent) => {
     setWorkspacePickerTitle(event.label ?? 'Section');
@@ -1001,14 +1039,10 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
         title={workspacePickerTitle}
         hasSession={!!activeSession}
         curatedPages={workspaceSession.curatedPages}
+        initialFormats={workspacePickerFormats}
         onClose={() => setWorkspacePickerOpen(false)}
         onCreatePage={handleCreateWorkspacePageAndApply}
-        onApplyToPage={(page) => {
-          if (workspacePickerEvents) {
-            handleApplyEventsToWorkspacePage(page, workspacePickerEvents);
-          }
-          setWorkspacePickerOpen(false);
-        }}
+        onApplyToPage={handleApplyToPageWithFormats}
       />
     </PageShell>
   );
