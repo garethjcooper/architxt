@@ -288,4 +288,43 @@ describe('agent chat service', () => {
     assert.ok(secondResult.query_state.created_at, 'expected query_state created_at on second turn');
     assert.equal(secondResult.query_state.resolved_entities.length, 1, 'expected one resolved entity');
   });
+
+  it('skips entity resolution and contextual list when flags are off', async () => {
+    const nodeId = buildNodeId({ canonicalId: 'SVC-TEST-001', typeLabel: 'svc' });
+    const stepResult = createStep(db, {
+      rs_id: sessionId,
+      rstep_intent_text: 'Explore Test Service',
+      rstep_raw_query: 'Explore Test Service',
+      rstep_action_type: 'discover',
+      rstep_status: 'completed',
+    });
+    assert.equal(stepResult.success, true);
+
+    await updateStep(db, stepResult.data, {
+      rstep_envelope: {
+        narratives: [{ id: 'n-1', narrative_name: 'Overview', narrative: `The Test Service (${nodeId}) provides core functionality.`, evidence: [] }],
+        graph: {
+          name: 'Test Service Graph',
+          nodes: [{ id: nodeId, name: 'Test Service', type: 'service' }],
+          edges: [],
+        },
+        tables: [],
+        diagrams: [],
+      },
+    });
+
+    const result = await sendChatMessage(db, sessionId, threadId, 'Tell me about Test Service', {
+      parse_entities: false,
+      contextual_list: false,
+    });
+
+    assert.equal(result.reply.model, 'chat');
+    assert.equal(result.reply.content, 'Entity parsing disabled.');
+    assert.equal(result.reply.contextual_items, undefined);
+    assert.ok(
+      !result.tool_log.tools.some((t) => t.tool === 'buildContextualItems'),
+      'expected no buildContextualItems call when contextual_list is false',
+    );
+    assert.equal(result.query_state.resolved_entities.length, 0, 'expected no resolved entities');
+  });
 });

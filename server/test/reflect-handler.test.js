@@ -93,7 +93,7 @@ describe('reflect handler', () => {
       return { success: true, data: { text: 'ok', structured_output: { narratives: [{ narrative_name: '', narrative: 'ok' }], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
-    await handleReflect(1, 'bank', 'test query', { reflectFn }, db);
+    await handleReflect(1, 'bank', 'test query', { reflectFn }, db, 'test query');
 
     assert.ok(capturedBody);
     assert.ok(capturedBody.query.includes('test query'));
@@ -104,20 +104,21 @@ describe('reflect handler', () => {
     assert.ok(edgeSchema.required.includes('evidence'), 'edge schema should require evidence');
   });
 
-  it('injects section focus variables when provided', async () => {
+  it('parses #graph directive from raw query for composition', async () => {
     let capturedQuery = null;
     const reflectFn = async (body) => {
       capturedQuery = body.query;
       return { success: true, data: { structured_output: { narratives: [], graph: { nodes: [], edges: [] }, tables: [], diagrams: [] } } };
     };
 
-    await handleReflect(1, 'bank', 'test query', {
+    await handleReflect(1, 'bank', 'CRM, ERP', {
       reflectFn,
       section_focus: { graph: 'CRM, ERP' },
-    }, db);
+    }, db, '#graph\nCRM, ERP\n#end');
 
     assert.ok(capturedQuery);
-    assert.ok(capturedQuery.includes('- CRM, ERP'));
+    assert.ok(capturedQuery.includes('Active output sections: `graph`'));
+    assert.ok(capturedQuery.includes('## Topic\n\nCRM, ERP'));
   });
 
   it('returns narrative and graph for generic template', async () => {

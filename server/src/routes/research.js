@@ -36,6 +36,8 @@ import {
 import { toEnvelope } from '../services/contextual-graph/to-envelope.js';
 import { normalizeEnvelopeForApi } from '../services/contextual-graph/normalize-model-output.js';
 import { parseJsonString } from '../prompts/graph-parser.js';
+import { composeMentalModelPrompt, formatFocusVariable } from '../prompts/template-service.js';
+
 
 /**
  * Extract the first balanced JSON object/array from a string that may contain
@@ -679,6 +681,7 @@ router.post('/discover', async (req, res) => {
         bankId: bank_id,
         queryDepth: effectiveDepth,
         intentText: intent_text,
+        rawQuery: req.body.raw_query || intent_text,
         selections: selections || [],
         options: handlerOptions,
         rsId,
@@ -1468,7 +1471,10 @@ router.post('/sessions/:id/chats', async (req, res) => {
   if (!idCheck.valid) return;
 
   try {
-    const result = await agentChatService.createChatThread(db, idCheck.id, req.body?.title);
+    const result = await agentChatService.createChatThread(db, idCheck.id, {
+      title: req.body?.title,
+      is_aql: req.body?.is_aql === true,
+    });
     sendResponse({ res, status: 201, data: result, logger, method: 'POST', path: '/research/sessions/:id/chats', duration: Date.now() - start });
   } catch (err) {
     logger.error('Create agent chat thread error', { sessionId: idCheck.id, error: err.message, code: err.code });
@@ -1648,8 +1654,14 @@ router.post('/sessions/:id/chats/:chatId/messages', async (req, res) => {
     return;
   }
 
+  const parseEntities = req.body.parse_entities !== false;
+  const contextualList = req.body.contextual_list !== false;
+
   try {
-    const result = await agentChatService.sendChatMessage(db, idCheck.id, chatIdCheck.id, message.trim());
+    const result = await agentChatService.sendChatMessage(db, idCheck.id, chatIdCheck.id, message.trim(), {
+      parse_entities: parseEntities,
+      contextual_list: contextualList,
+    });
     sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/sessions/:id/chats/:chatId/messages', duration: Date.now() - start });
   } catch (err) {
     logger.error('Send agent chat message error', { sessionId: idCheck.id, chatId: chatIdCheck.id, error: err.message, code: err.code });
@@ -2002,6 +2014,7 @@ router.post('/synthesize', async (req, res) => {
         bankId: bank_id,
         queryDepth: 'synthesize',
         intentText: parsed.intentText,
+        rawQuery: req.body.raw_query || intent_text,
         selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
         options: handlerOptions,
         rsId: session_id,
@@ -2544,6 +2557,7 @@ router.post('/steps/:id/rerun', async (req, res) => {
       bankId,
       queryDepth: step.rstep_action_type,
       intentText: step.rstep_intent_text,
+      rawQuery: step.rstep_raw_query || step.rstep_intent_text,
       selections: step.rstep_selections || [],
       options: step.rstep_parameters || {},
       rsId: step.rs_id,
@@ -2695,6 +2709,99 @@ router.get('/entities', async (req, res) => {
   } catch (err) {
     logger.error('Research entities route error', { serverId, bankId, error: err.message });
     sendResponse({ res, status: 500, error: err.message, code: 'INTERNAL_ERROR', logger, method: 'GET', path: '/research/entities', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/preview-prompt:
+ *   post:
+ *     summary: Compose and preview the mental-model prompt for a Reflect query
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [raw_query]
+ *             properties:
+ *               raw_query:
+ *                 type: string
+ *               section_focus:
+ *                 type: object
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Composed prompt text
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 prompt:
+ *                   type: string
+ *                 topic:
+ *                   type: string
+ *                 section_focus:
+ *                   type: object
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Compose error
+ */
+router.post('/preview-prompt', async (req, res) => {
+  const start = Date.now();
+  const { raw_query, section_focus } = req.body;
+
+  if (!raw_query || typeof raw_query !== 'string') {
+    sendResponse({
+      res,
+      status: 400,
+      error: 'raw_query is required',
+      code: 'VALIDATION_ERROR',
+      logger,
+      method: 'POST',
+      path: '/research/preview-prompt',
+      duration: Date.now() - start,
+    });
+    return;
+  }
+
+  try {
+    const focus = section_focus || {};
+    const prompt = await composeMentalModelPrompt(db, 'generic', raw_query, {
+      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
+      ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
+      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(focus.diagram),
+      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
+    });
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        prompt,
+        topic: raw_query,
+        section_focus: focus,
+      },
+      logger,
+      method: 'POST',
+      path: '/research/preview-prompt',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research preview-prompt route error', { error: err.message, stack: err.stack });
+    sendResponse({
+      res,
+      status: 500,
+      error: err.message,
+      code: 'COMPOSE_PROMPT_FAILED',
+      logger,
+      method: 'POST',
+      path: '/research/preview-prompt',
+      duration: Date.now() - start,
+    });
   }
 });
 

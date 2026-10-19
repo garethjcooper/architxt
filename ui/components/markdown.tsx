@@ -81,7 +81,7 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
       h5: headingWithId,
       h6: headingWithId,
       code: renderCode,
-      pre: ({ ...props }: any) => <pre className="bg-markdown-pre-bg rounded p-2 overflow-x-auto text-xs mb-3" {...props} />,
+      pre: ({ ...props }: any) => <pre className="bg-markdown-pre-bg rounded p-2 overflow-x-auto text-xs mb-3 whitespace-pre-wrap" {...props} />,
       a: ({ ...props }: any) => <a className="text-markdown-link hover:underline" {...props} />,
       strong: ({ ...props }: any) => <strong className="font-semibold text-markdown-strong" {...props} />,
       em: ({ ...props }: any) => <em className="italic text-foreground-default" {...props} />,

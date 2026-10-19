@@ -51,6 +51,17 @@ function safeNodeId(id: string): string {
   return sanitized;
 }
 
+/** Pick the stable public identifier for a node before Mermaid-safe escaping.
+ *
+ *  View entity nodes use a synthetic `entity-<cgn_id>` id for internal
+ *  React Flow tracking, but their real identifier is stored in `ref_id`.
+ *  Using the real id keeps the exported Mermaid compatible with workspace
+ *  flowcharts that reference the same entities by their canonical ids.
+ */
+function mermaidNodeId(node: ViewNode): string {
+  return safeNodeId(node.ref_id || node.entity_id || node.id);
+}
+
 function quotedLabel(label: string): string {
   return `"${label.replace(/"/g, '\\"')}"`;
 }
@@ -114,16 +125,18 @@ export function viewToMermaid(
 
   lines.push(`flowchart ${flowchartDirection}`);
 
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const mermaidIdByNodeId = new Map(nodes.map((n) => [n.id, mermaidNodeId(n)]));
+
   for (const node of nodes) {
-    const id = safeNodeId(node.id);
+    const id = mermaidNodeId(node);
     const label = nodeLabel(node);
     lines.push(`    ${id}[${quotedLabel(label)}]`);
   }
 
-  const nodeById = new Map(nodes.map((n) => [n.id, n]));
   for (const edge of visibleEdges) {
-    const fromId = safeNodeId(edge.source);
-    const toId = safeNodeId(edge.target);
+    const fromId = mermaidIdByNodeId.get(edge.source) ?? safeNodeId(edge.source);
+    const toId = mermaidIdByNodeId.get(edge.target) ?? safeNodeId(edge.target);
     const label = showEdgeLabels ? edgeTypeLabel(edge, nodeById) : undefined;
     const arrow = label ? `-.${quotedLabel(label)}.->` : '-->';
     lines.push(`    ${fromId} ${arrow} ${toId}`);

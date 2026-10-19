@@ -8,7 +8,7 @@
 import { reflect } from '../../hindsight/index.js';
 import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';
-import { composeMentalModelPrompt, formatFocusVariable } from '../../../prompts/template-service.js';
+import { composeMentalModelPrompt } from '../../../prompts/template-service.js';
 import { UNIFIED_RESPONSE_SCHEMA } from '../../contextual-graph/unified-response-schema.js';
 import { toEnvelope } from '../../contextual-graph/to-envelope.js';
 
@@ -45,7 +45,7 @@ function escapeTableCell(value) {
   return String(value).replace(/\|/g, '\\|');
 }
 
-export async function handleReflect(serverId, bankId, query, options = {}, db) {
+export async function handleReflect(serverId, bankId, query, options = {}, db, rawQuery) {
   if (!serverId || !bankId || !query) {
     return { success: false, error: 'server_id, bank_id, and query are required', code: 'MISSING_PARAMS' };
   }
@@ -54,7 +54,17 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
     return { success: false, error: 'db is required to compose Reflect prompt', code: 'MISSING_DB' };
   }
 
-  logger.info('Reflect research query', { serverId, bankId, queryLength: query.length });
+  logger.info('Reflect research query', { serverId, bankId, queryLength: query.length, rawQueryLength: rawQuery?.length });
+
+  // Compose the prompt from the raw query so that #table / #graph directives
+  // are parsed exactly once, by the same composer used by the preview endpoint.
+  let composedQuery;
+  try {
+    composedQuery = await composeMentalModelPrompt(db, 'generic', rawQuery || query);
+  } catch (err) {
+    logger.error('Failed to compose Reflect prompt', { error: err.message });
+    return { success: false, error: err.message, code: 'COMPOSE_PROMPT_FAILED' };
+  }
 
   const focus = options.section_focus || {};
   const requestedGraph = Array.isArray(focus.graph) && focus.graph.some((g) => (typeof g === 'string' ? g.trim() : g.content?.trim()));
@@ -62,19 +72,16 @@ export async function handleReflect(serverId, bankId, query, options = {}, db) {
   const requestedDiagrams = Array.isArray(focus.diagram) && focus.diagram.length > 0;
   const requestedNarrative = Array.isArray(focus.narrative) && focus.narrative.some((n) => (typeof n === 'string' ? n.trim().length > 0 : n.content?.trim().length > 0));
   const requestedStructured = requestedGraph || requestedTables || requestedDiagrams;
-  const hasAnyDirective = requestedNarrative || requestedStructured;
-  let composedQuery;
-  try {
-    composedQuery = await composeMentalModelPrompt(db, 'generic', query, {
-      ARCHITXT_GRAPH_FOCUS: formatFocusVariable(focus.graph),
-      ARCHITXT_TABLE_FOCUS: formatFocusVariable(focus.table),
-      ARCHITXT_DIAGRAM_FOCUS: formatFocusVariable(focus.diagram),
-      ARCHITXT_NARRATIVE_FOCUS: formatFocusVariable(focus.narrative),
-    });
-  } catch (err) {
-    logger.error('Failed to compose Reflect prompt', { error: err.message });
-    return { success: false, error: err.message, code: 'COMPOSE_PROMPT_FAILED' };
-  }
+
+  logger.info('Composed Reflect prompt', {
+    serverId,
+    bankId,
+    requestedGraph,
+    requestedTables,
+    requestedDiagrams,
+    requestedNarrative,
+    prompt: composedQuery,
+  });
 
   const knownCatalogPromise = loadEntityCatalog(db).then((entities) => new Map(entities.map((e) => [e.id, e])));
 

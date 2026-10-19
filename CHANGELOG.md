@@ -2,6 +2,28 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.4.5] - 2026-10-19
+
+### Added
+- Workspace chat AQL threads: dedicated `aql1`, `aql2`, … threads that generate structured AQL queries from plain intent.
+- Server-side AQL builder in Workspace chat returns a wrapped, readable **Generated AQL** block with every response.
+- **Copy AQL to Reflect input** action on generated AQL output, with a standard confirmation dialog when Reflect input is not empty.
+- **Preview prompt** button on Reflect, Recall, and Synthesize query forms showing the fully composed prompt before it is sent.
+- Chat option switches: **Parse Entities** and **Contextual List** for normal chat threads.
+
+### Changed
+- AQL mode is now a thread type rather than a per-message toggle.
+- Generated AQL output is wrapped for readability and the explanation moved into the chat input placeholder.
+- Default Reflect mission wording expanded to cover components, data flows, risks & constraints, sizing, and system purpose & capabilities; existing banks are migrated on startup.
+- Reflect handler composes the prompt from the raw query, matching the preview behaviour.
+- Output directives are generated dynamically from active section-focus directives instead of static placeholders.
+
+### Fixed
+- Prompt composition only loads narrative-generation rules when no section directives are present or narrative is explicitly active.
+- Views graph export to workspace and Mermaid export now use canonical entity IDs consistently.
+- Narrative sections hide the evidence icon when no evidence exists.
+- Removed accidentally committed SQLite database and added `.gitignore` protection.
+
 ## [0.4.4] - 2026-10-10
 
 ### Added

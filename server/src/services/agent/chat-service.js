@@ -7,7 +7,9 @@ import { runRecallTool } from './research-tools.js';
 import { buildMergedGraphForEntityRefs } from './graph-merge-tool.js';
 import { buildEntityInfoMap } from '../entity-info.js';
 import { generateCompletion } from '../llm/client.js';
+import * as provider from './provider.js';
 import { randomUUID } from 'crypto';
+import { parseAql, BLOCK_DIRECTIVES } from '@architxt/aql';
 
 const logger = createLogger('agent-chat-service');
 
@@ -186,16 +188,76 @@ function stripSourcesSection(text) {
   return text.replace(/\n?##\s*Sources\s*\n[\s\S]*?(?=\n##|\n\n\n|$)/i, '').trim();
 }
 
-function buildChatEnvelope({ synthesisText, evidence, mergedGraph }) {
+
+function extractAqlCodeBlock(text) {
+  if (!text) return '';
+  const fenceRe = /\`\`\`(?:aql)?\s*\n([\s\S]*?)\n\`\`\`/;
+  const m = text.match(fenceRe);
+  if (m) return m[1].trim();
+  // If no fence, trim leading prose lines and treat first block-looking text as AQL.
+  const lines = text.split('\n');
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('#') && BLOCK_DIRECTIVES.some((d) => trimmed.toLowerCase().startsWith(`#${d}`))) {
+      start = i;
+      break;
+    }
+  }
+  if (start >= 0) return lines.slice(start).join('\n').trim();
+  return '';
+}
+
+async function validateAndRepairAql(rawAql, { messages, request, rawContent, attempt = 1, maxAttempts = 2 } = {}) {
+  let aql = extractAqlCodeBlock(rawAql);
+  if (!aql) aql = rawAql.trim();
+  const parsed = parseAql(aql);
+  if (!parsed.errors || parsed.errors.length === 0) {
+    return { aql, parsed, valid: true };
+  }
+  if (attempt >= maxAttempts || !messages || !request) {
+    return { aql, parsed, valid: false };
+  }
+  const errorLines = parsed.errors.map((e) => `line ${e.line}: ${e.message}`).join('\n');
+  const assistantContent = rawContent || aql;
+  const repairMessages = [
+    ...messages,
+    { role: 'assistant', content: assistantContent },
+    {
+      role: 'user',
+      content: `That AQL query has syntax errors. Return only the corrected AQL in a markdown code block labelled \`\`\`aql. Keep the same intent and structure.\n\nErrors:\n${errorLines}\n\nCorrected AQL:`,
+    },
+  ];
+  const repairResult = await generateCompletion(repairMessages, request);
+  if (!repairResult.success) {
+    return { aql, parsed, valid: false, repairError: repairResult.error };
+  }
+  const next = repairResult.data.content || '';
+  return validateAndRepairAql(next, { messages, request, rawContent: next, attempt: attempt + 1, maxAttempts });
+}
+
+
+
+function buildChatEnvelope({ synthesisText, evidence, mergedGraph, aql }) {
   const narrative = stripSourcesSection(synthesisText);
   const narrativeName = narrative ? 'Agent response' : 'No response';
-  return {
-    narratives: [{
+  const narratives = [{
+    id: randomUUID(),
+    narrative_name: narrativeName,
+    narrative,
+    evidence: Array.isArray(evidence) ? evidence : [],
+  }];
+  if (aql) {
+    narratives.push({
       id: randomUUID(),
-      narrative_name: narrativeName,
-      narrative,
+      narrative_name: 'Generated AQL',
+      narrative: `\`\`\`aql\n${aql}\n\`\`\``,
+      aql,
       evidence: Array.isArray(evidence) ? evidence : [],
-    }],
+    });
+  }
+  return {
+    narratives,
     graph: mergedGraph || { name: '', nodes: [], edges: [] },
     tables: [],
     diagrams: [],
@@ -215,6 +277,7 @@ function toApiChatMessage(row) {
     evidence: Array.isArray(toolLog.synthesis_evidence) ? toolLog.synthesis_evidence : undefined,
     envelope: row.acm_envelope || undefined,
     contextual_items: row.acm_contextual_items || undefined,
+    build_aql: row.acm_build_aql || undefined,
     acm_created_at: row.acm_created_at,
     acm_updated_at: row.acm_updated_at,
   };
@@ -225,6 +288,7 @@ function toApiThread(row, messageCount = 0) {
     act_id: row.act_id,
     rs_id: row.rs_id,
     title: row.act_title,
+    is_aql: row.act_is_aql === 1 || row.act_is_aql === true,
     message_count: messageCount,
     act_created_at: row.act_created_at,
     act_updated_at: row.acm_updated_at,
@@ -239,6 +303,16 @@ function generateNewChatName(threads) {
     index++;
   }
   return `${base} ${index}`;
+}
+
+function generateNewAqlName(threads) {
+  const base = 'aql';
+  let index = 1;
+  const existing = new Set(threads.map((t) => t.act_title));
+  while (existing.has(`${base}${index}`)) {
+    index++;
+  }
+  return `${base}${index}`;
 }
 
 async function resolvePromptEntities(db, text) {
@@ -388,7 +462,7 @@ export async function listChatThreads(db, sessionId) {
  * @param {number} sessionId
  * @param {string} [title]
  */
-export async function createChatThread(db, sessionId, title) {
+export async function createChatThread(db, sessionId, { title, is_aql } = {}) {
   const sessionResult = await researchCrud.getSession(db, sessionId);
   if (!sessionResult.success || !sessionResult.data) {
     throw Object.assign(new Error('Research session not found'), { code: 'SESSION_NOT_FOUND' });
@@ -396,11 +470,13 @@ export async function createChatThread(db, sessionId, title) {
 
   const threadsResult = await agentChatCrud.listThreadsForSession(db, sessionId);
   const threads = threadsResult.success ? threadsResult.data : [];
-  const nextTitle = title?.trim() || generateNewChatName(threads);
+  const isAql = is_aql === true || is_aql === 1;
+  const nextTitle = title?.trim() || (isAql ? generateNewAqlName(threads) : generateNewChatName(threads));
 
   const threadResult = await agentChatCrud.createThread(db, {
     rs_id: sessionId,
     act_title: nextTitle,
+    act_is_aql: isAql,
   });
   if (!threadResult.success) {
     throw new Error(threadResult.error || 'Failed to create chat thread');
@@ -497,12 +573,19 @@ export async function getChatHistory(db, sessionId, threadId) {
  * @param {number} threadId
  * @param {string} userMessage
  */
-export async function sendChatMessage(db, sessionId, threadId, userMessage) {
+export async function sendChatMessage(db, sessionId, threadId, userMessage, options = {}) {
   if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
     throw Object.assign(new Error('message is required and must be a non-empty string'), { code: 'MISSING_MESSAGE' });
   }
 
   const threadResult = await agentChatCrud.getThread(db, threadId);
+
+  const thread = threadResult.data;
+  const isAqlThread = thread.act_is_aql === 1 || thread.act_is_aql === true;
+  const parseEntities = options.parse_entities !== false;
+  const contextualList = !isAqlThread && options.contextual_list !== false;
+  const buildAql = isAqlThread;
+
   if (!threadResult.success || !threadResult.data) {
     throw Object.assign(new Error('Chat thread not found'), { code: 'NOT_FOUND' });
   }
@@ -528,6 +611,21 @@ export async function sendChatMessage(db, sessionId, threadId, userMessage) {
   }
   const userMessageId = userMessageResult.data;
 
+  const effectiveText = userMessage.trim();
+  const toolLog = { tools: [] };
+
+  if (buildAql) {
+    return runAqlBuilder(db, {
+      sessionId,
+      threadId,
+      userMessageId,
+      effectiveText,
+      session,
+      parseEntities,
+      toolLog,
+    });
+  }
+
   let agentReply = null;
   let resolvedEntities = null;
   let outputIntent = null;
@@ -536,22 +634,23 @@ export async function sendChatMessage(db, sessionId, threadId, userMessage) {
   let recallResult = null;
   let mergedGraph = null;
   let agentEnvelope = null;
-  const effectiveText = userMessage.trim();
-  const toolLog = { tools: [] };
-
   let synthesisEntities = null;
   let synthesisEntityRefs = [];
   let contextualItems = null;
 
   try {
-    resolvedEntities = await resolvePromptEntities(db, effectiveText);
+    if (parseEntities) {
+      resolvedEntities = await resolvePromptEntities(db, effectiveText);
+    }
     const resolvedEntityRefs = toCanonicalEntityRefs(resolvedEntities?.data);
     const resolvedEntityBracketedRefs = resolvedEntityRefs.map((ref) => `[[${ref}]]`);
 
-    const entityScanText = formatDeterministicResponse(resolvedEntities?.data || []);
+    const entityScanText = parseEntities
+      ? formatDeterministicResponse(resolvedEntities?.data || [])
+      : 'Entity parsing disabled.';
     agentReply = {
       content: entityScanText,
-      model: 'deterministic-entity-scan',
+      model: parseEntities ? 'deterministic-entity-scan' : 'chat',
       usage: null,
     };
 
@@ -607,27 +706,36 @@ export async function sendChatMessage(db, sessionId, threadId, userMessage) {
         const combinedEntityRefs = [...new Set([...resolvedEntityRefs, ...synthesisEntityRefs])];
 
         if (combinedEntityRefs.length > 0) {
-          const [graphResult, contextualResult] = await Promise.all([
-            buildMergedGraphForEntityRefs(
-              db,
-              session.rs_server_id,
-              session.rs_bank_id,
-              combinedEntityRefs,
-            ),
-            buildContextualItemsForEntities(
-              db,
-              session.rs_server_id,
-              session.rs_bank_id,
-              combinedEntityRefs,
-            ),
-          ]);
+          const graphResult = await buildMergedGraphForEntityRefs(
+            db,
+            session.rs_server_id,
+            session.rs_bank_id,
+            combinedEntityRefs,
+          );
 
           if (graphResult.success && graphResult.data?.graph) {
             mergedGraph = graphResult.data.graph;
           }
 
-          if (contextualResult.success && contextualResult.items?.length > 0) {
-            contextualItems = contextualResult.items;
+          if (contextualList) {
+            const contextualResult = await buildContextualItemsForEntities(
+              db,
+              session.rs_server_id,
+              session.rs_bank_id,
+              combinedEntityRefs,
+            );
+
+            if (contextualResult.success && contextualResult.items?.length > 0) {
+              contextualItems = contextualResult.items;
+            }
+
+            toolLog.tools.push({
+              tool: 'buildContextualItems',
+              status: contextualResult.success ? 'success' : 'failure',
+              summary: contextualResult.success
+                ? { item_count: contextualResult.items?.length ?? 0 }
+                : { error: contextualResult.error },
+            });
           }
 
           agentEnvelope = buildChatEnvelope({
@@ -653,14 +761,6 @@ export async function sendChatMessage(db, sessionId, threadId, userMessage) {
                 }
               : { error: graphResult.error },
           });
-
-          toolLog.tools.push({
-            tool: 'buildContextualItems',
-            status: contextualResult.success ? 'success' : 'failure',
-            summary: contextualResult.success
-              ? { item_count: contextualResult.items?.length ?? 0 }
-              : { error: contextualResult.error },
-          });
         }
       }
     }
@@ -674,10 +774,7 @@ export async function sendChatMessage(db, sessionId, threadId, userMessage) {
       ...toCanonicalEntityRefs(synthesisEntities?.data),
     ])];
 
-    // Build contextual items from the local graph for every resolved entity.
-    // This does not depend on recall/synthesis success, so the chat panel still
-    // shows grounded context when Hindsight is temporarily unreachable.
-    if (session.rs_server_id && session.rs_bank_id && combinedEntityRefs.length > 0) {
+    if (contextualList && session.rs_server_id && session.rs_bank_id && combinedEntityRefs.length > 0) {
       const contextualResult = await buildContextualItemsForEntities(
         db,
         session.rs_server_id,
@@ -752,13 +849,146 @@ export async function sendChatMessage(db, sessionId, threadId, userMessage) {
   };
 }
 
-/**
- * Delete a single chat message by id.
- * @param {Object} db
- * @param {number} sessionId
- * @param {number} threadId
- * @param {number} messageId
- */
+
+async function classifyChatOutputIntent(userMessage) {
+  const { intent } = await provider.classifyOutputIntent(userMessage);
+  return intent;
+}
+
+async function runAqlBuilder(db, { sessionId, threadId, userMessageId, effectiveText, session, parseEntities, toolLog }) {
+  let resolvedEntities = null;
+  let outputIntent = null;
+  let recallResult = null;
+  let agentEnvelope = null;
+  let aql = '';
+  let agentReply = { content: '', model: 'aql-builder', usage: null };
+
+  try {
+    if (parseEntities) {
+      resolvedEntities = await resolvePromptEntities(db, effectiveText);
+    }
+    const resolvedEntityRefs = toCanonicalEntityRefs(resolvedEntities?.data);
+    const resolvedEntityBracketedRefs = resolvedEntityRefs.map((ref) => `[[${ref}]]`);
+
+    if (session.rs_server_id && session.rs_bank_id) {
+      const recallQuery = resolvedEntityBracketedRefs.length
+        ? `${effectiveText}\n\nEntities: ${resolvedEntityBracketedRefs.join(', ')}`
+        : effectiveText;
+      recallResult = await runRecallTool(db, session.rs_server_id, session.rs_bank_id, recallQuery, {
+        budget: 'high',
+        max_tokens: 4096,
+        prefer_observations: true,
+        types: ['world', 'observation'],
+        include: { entities: { max_tokens: 500 } },
+      });
+
+      toolLog.tools.push({
+        tool: 'recall',
+        status: recallResult.success ? 'success' : 'failure',
+        request: { query: recallQuery, types: ['world', 'observation'], budget: 'high' },
+        summary: recallResult.success
+          ? { memory_count: recallResult.data?.count ?? 0, query: recallResult.data?.query }
+          : { error: recallResult.error },
+      });
+    }
+
+    const priorAqlContext = [];
+
+    outputIntent = await classifyChatOutputIntent(effectiveText);
+    if (outputIntent) {
+      toolLog.tools.push({
+        tool: 'classifyIntent',
+        status: 'success',
+        summary: { focus: outputIntent.focus, sections: outputIntent.sections?.length },
+      });
+    }
+
+    const generated = await provider.generateAqlFromIntent({
+      userMessage: effectiveText,
+      outputIntent,
+      recallResult,
+      resolvedEntityRefs: resolvedEntityBracketedRefs,
+      priorAqlContext,
+    });
+
+    aql = generated.aql || '';
+    agentReply.content = generated.explanation || '';
+    if (!agentReply.content && aql) {
+      agentReply.content = 'Generated an AQL query for the request.';
+    }
+    agentReply.model = generated.model || config.agent.model || 'aql-builder';
+    agentReply.usage = generated.usage || null;
+
+    toolLog.tools.push({
+      tool: 'generateAqlFromIntent',
+      status: 'success',
+      summary: { aql_length: aql?.length, explanation_length: agentReply.content?.length },
+      usage: generated.usage,
+    });
+
+    const validation = await validateAndRepairAql(aql, {
+      messages: generated.messages,
+      request: generated.request,
+      rawContent: generated.rawContent,
+    });
+
+    if (!validation.valid) {
+      toolLog.tools.push({
+        tool: 'validateAql',
+        status: 'failure',
+        summary: { errors: validation.parsed?.errors?.map((e) => e.message) },
+      });
+    } else {
+      aql = validation.aql;
+      toolLog.tools.push({
+        tool: 'validateAql',
+        status: 'success',
+        summary: { blocks: validation.parsed?.blocks?.length, references: validation.parsed?.references?.length },
+      });
+    }
+
+    agentEnvelope = buildChatEnvelope({
+      synthesisText: agentReply.content,
+      evidence: generated.evidence,
+      aql,
+    });
+  } catch (err) {
+    logger.error('AQL builder failed', { sessionId, threadId, error: err.message, code: err.code });
+    agentReply.content = `Sorry, I couldn't build an AQL query: ${err.message}`;
+  }
+
+  const agentMessageResult = await agentChatCrud.createMessage(db, {
+    act_id: threadId,
+    rs_id: sessionId,
+    acm_role: 'agent',
+    acm_content: agentReply.content,
+    acm_model: agentReply.model,
+    acm_usage: agentReply.usage,
+    acm_tool_log: toolLog,
+    acm_envelope: agentEnvelope,
+  });
+  if (!agentMessageResult.success) {
+    throw new Error(agentMessageResult.error || 'Failed to persist agent message');
+  }
+  const agentMessageId = agentMessageResult.data;
+
+  const agentRowResult = await agentChatCrud.getMessage(db, agentMessageId);
+  const agentRow = agentRowResult.success ? agentRowResult.data : null;
+
+  return {
+    session_id: sessionId,
+    thread_id: threadId,
+    user_message_id: userMessageId,
+    agent_message_id: agentMessageId,
+    reply: toApiChatMessage(agentRow),
+    tool_log: toolLog,
+    query_state: buildQueryState({ outputIntent, resolvedEntities: resolvedEntities?.data || [] }),
+    envelope: agentEnvelope,
+    server_id: session.rs_server_id ?? null,
+    bank_id: session.rs_bank_id ?? null,
+  };
+}
+
 export async function deleteChatMessage(db, sessionId, threadId, messageId) {
   const threadResult = await agentChatCrud.getThread(db, threadId);
   if (!threadResult.success || !threadResult.data) {

@@ -201,21 +201,26 @@ const DIAGRAM_TYPE_TO_FRAGMENT = {
  */
 export function buildConditionalFragments(sectionFocus) {
   const extra = [];
-  const hasAnyDirective =
-    (Array.isArray(sectionFocus?.graph) && sectionFocus.graph.length > 0) ||
-    (Array.isArray(sectionFocus?.table) && sectionFocus.table.length > 0) ||
-    (Array.isArray(sectionFocus?.diagram) && sectionFocus.diagram.length > 0) ||
-    (Array.isArray(sectionFocus?.narrative) && sectionFocus.narrative.length > 0);
-  if (!hasAnyDirective || (Array.isArray(sectionFocus?.narrative) && sectionFocus.narrative.length > 0)) {
+  const hasGraph = Array.isArray(sectionFocus?.graph) && sectionFocus.graph.length > 0;
+  const hasTables = Array.isArray(sectionFocus?.table) && sectionFocus.table.length > 0;
+  const hasDiagrams = Array.isArray(sectionFocus?.diagram) && sectionFocus.diagram.length > 0;
+  const hasNarrative = Array.isArray(sectionFocus?.narrative) && sectionFocus.narrative.length > 0;
+  const hasAnyDirective = hasGraph || hasTables || hasDiagrams || hasNarrative;
+
+  // Only include the narrative rules fragment when narrative is explicitly
+  // requested or when no directives are present at all (legacy bare-topic
+  // fallback). If only structured sections are requested, leave narrative out
+  // so the model is not tempted to emit prose in an inactive envelope bucket.
+  if (!hasAnyDirective || hasNarrative) {
     extra.push('output-format-narrative-contextual.md');
   }
-  if (Array.isArray(sectionFocus?.graph) && sectionFocus.graph.length > 0) {
+  if (hasGraph) {
     extra.push('output-format-graph-contextual.md');
   }
-  if (Array.isArray(sectionFocus?.table) && sectionFocus.table.length > 0) {
+  if (hasTables) {
     extra.push('output-format-table-contextual.md');
   }
-  if (Array.isArray(sectionFocus?.diagram) && sectionFocus.diagram.length > 0) {
+  if (hasDiagrams) {
     extra.push('output-format-diagram-contextual.md');
     const requestedTypes = new Set(
       sectionFocus.diagram
@@ -353,11 +358,9 @@ function mergeFragments(template, extraFragments) {
     const newPatchIndex = base.indexOf('contextual-patch.md');
     const insertAt = newPatchIndex !== -1 ? newPatchIndex + 1 : 0;
     base.splice(insertAt, 0, 'section-focus.md');
-    // Insert mapping rules immediately after section-focus.md so the model
-    // knows exactly which envelope array each requested section belongs to.
-    if (!base.includes('section-mapping.md')) {
-      base.splice(insertAt + 1, 0, 'section-mapping.md');
-    }
+    // Mapping rules are now generated dynamically inside section-focus.md via
+    // the ARCHITXT_OUTPUT_DIRECTIVES variable, so the static mapping fragment
+    // is no longer needed.
   }
 
   return {
@@ -385,7 +388,7 @@ function formatSectionInstructions({ active, empty, sectionFocus }) {
     lines.push('Do not answer the topic in narrative prose. Set `narrative` to an empty string and express all findings through the structured output sections above.');
     lines.push('');
   } else {
-    lines.push('Narrative is active: you may use it for concise human-readable prose, but only for bullets listed under ARCHITXT_NARRATIVE_FOCUS. Graph, table, and diagram bullets produce their own structured sections; do not create extra narrative entries summarising them.');
+    lines.push('Narrative is active: you may use it for concise human-readable prose, but only for bullets listed under `ARCHITXT_NARRATIVE_FOCUS`. Graph, table, and diagram bullets produce their own structured sections; do not create extra narrative entries summarising them.');
     lines.push('');
   }
   return lines.join('\n');
@@ -407,6 +410,75 @@ function injectBeforeOutputDirectives(prompt, instructions) {
   }
   return prompt + '\n' + instructions;
 }
+
+/**
+ * Build the unified output directives block.
+ *
+ * Lists every section (narrative, graph, tables, diagrams) with its mapping rule
+ * inline. Active sections show their focus bullets; inactive sections explicitly
+ * tell the model to return the empty envelope structure.
+ *
+ * @param {{graph?:Array,table?:Array,diagram?:Array,narrative?:Array}} effectiveFocus
+ * @returns {string}
+ */
+function formatOutputDirectives(effectiveFocus) {
+  const sectionOrder = ['narrative', 'graph', 'table', 'diagram'];
+  const sectionTitles = {
+    narrative: 'Narrative',
+    graph: 'Graph',
+    table: 'Tables',
+    diagram: 'Diagrams',
+  };
+  const sectionRules = {
+    narrative: 'emit one item in `narratives[]` per bullet.',
+    graph: 'emit one `graph` object for the first graph bullet. Additional graph bullets are intentionally ignored; do not write prose about them.',
+    table: 'emit one item in `tables[]` per bullet.',
+    diagram: 'emit one item in `diagrams[]` per bullet.',
+  };
+  const emptyStructure = {
+    narrative: 'Return an empty narrative structure.',
+    graph: 'Return an empty graph structure.',
+    table: 'Return an empty tables structure.',
+    diagram: 'Return an empty diagrams structure.',
+  };
+
+  const lines = [
+    'The following named output sections were requested. Use the provided titles exactly as given.',
+    '',
+  ];
+
+  for (const key of sectionOrder) {
+    const bullets = effectiveFocus?.[key];
+    const isActive = Array.isArray(bullets) && bullets.length > 0;
+    lines.push(`### ${sectionTitles[key]} → ${sectionRules[key]}`);
+    if (isActive) {
+      const rendered = formatFocusVariable(bullets);
+      if (rendered) {
+        lines.push(rendered);
+      } else {
+        lines.push(emptyStructure[key]);
+      }
+    } else {
+      lines.push(emptyStructure[key]);
+    }
+    lines.push('');
+  }
+
+  lines.push('A section requested as one type must not appear as any other type (narrative, graph, table, diagram) unless it was explicitly requested as multiple types.');
+  lines.push('');
+  lines.push('A table, graph, or diagram section is already expressed in its own structured form. You must NOT create extra `narratives[]` entries that merely describe or summarise table, graph, or diagram sections.');
+  lines.push('');
+  lines.push('Before returning, verify:');
+  lines.push('1. `narratives[]` contains only sections requested as narratives.');
+  lines.push('2. `graph` contains only the single requested graph title, if any.');
+  lines.push('3. `tables[]` contains only sections requested as tables.');
+  lines.push('4. `diagrams[]` contains only sections requested as diagrams.');
+  lines.push('5. No requested section appears in more than one envelope bucket.');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 function buildFocusFromDirectives(topic) {
   const { intentText, sectionFocus } = parseSectionDirectives(topic || '');
   // AQL's fallback for a bare topic returns a string in sectionFocus.narrative.
@@ -619,7 +691,16 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
   // callers who supply section_focus as variables still get the right fragments.
   const effectiveFocus = computeEffectiveFocus(parsedSectionFocus, merged);
   const nameVariables = buildNameVariables(effectiveFocus, merged);
-  const variablesWithNames = { ...merged, ...nameVariables };
+
+  // Generate the unified output directives block directly from the effective
+  // focus so inactive sections are shown as empty and active sections show
+  // their actual bullets, with no references to already-substituted constants.
+  const outputDirectives = formatOutputDirectives(effectiveFocus);
+  const variablesWithNames = {
+    ...merged,
+    ...nameVariables,
+    ARCHITXT_OUTPUT_DIRECTIVES: outputDirectives,
+  };
 
   const extra = buildConditionalFragments(effectiveFocus);
   const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
@@ -682,7 +763,8 @@ export async function composeMentalModelPromptBatch(db, items) {
 
       const effectiveFocus = computeEffectiveFocus(sectionFocus, variables);
       const nameVariables = buildNameVariables(effectiveFocus, variables);
-      const variablesWithNames = { ...variables, ...nameVariables };
+      const outputDirectives = formatOutputDirectives(effectiveFocus);
+      const variablesWithNames = { ...variables, ...nameVariables, ARCHITXT_OUTPUT_DIRECTIVES: outputDirectives };
       const extra = buildConditionalFragments(effectiveFocus);
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
       const { prompt } = composePrompt(effectiveTemplate, variablesWithNames);

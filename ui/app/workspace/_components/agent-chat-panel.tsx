@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Loader2, User, Trash2 } from 'lucide-react';
+import { Send, Loader2, User, Trash2, ClipboardPaste } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { ArchitxtIcon } from '@/components/icons/architxt-icon';
 import { toast } from 'sonner';
 import { researchApi, type AgentChatMessage, type AgentChatThread, type UnifiedEnvelope, type AgentChatQueryState } from '@/lib/api/client';
@@ -27,6 +28,10 @@ export interface AgentChatPanelProps {
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Callback when the user selects a contextual model item from the chat response. */
   onSelectModel?: (entityId: string, item: ModelItem, openInNewTab?: boolean) => void;
+  /** Current Reflect input value; used to warn before overwriting generated AQL. */
+  reflectQuery?: string;
+  /** Copy generated AQL into the Reflect input. */
+  onCopyAqlToReflect?: (aql: string) => void;
 }
 
 interface ChatMessage {
@@ -48,6 +53,11 @@ interface PendingDelete {
   messageId?: number;
 }
 
+interface PendingAqlCopy {
+  aql: string;
+  onConfirm: () => void;
+}
+
 const MemoizedChatMessage = React.memo(function ChatMessageRow({
   m,
   isExpanded,
@@ -55,6 +65,7 @@ const MemoizedChatMessage = React.memo(function ChatMessageRow({
   onDelete,
   onCopyToPage,
   onSelectModel,
+  onCopyAqlToReflect,
 }: {
   m: ChatMessage;
   isExpanded: boolean;
@@ -62,7 +73,13 @@ const MemoizedChatMessage = React.memo(function ChatMessageRow({
   onDelete: (id: number) => void;
   onCopyToPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   onSelectModel?: (entityId: string, item: ModelItem, openInNewTab?: boolean) => void;
+  onCopyAqlToReflect?: (aql: string) => void;
 }) {
+  const aqlText = m.envelope?.narratives?.find((n) => n.narrative_name === 'Generated AQL')?.narrative
+    ?.replace(/^```aql\n?/, '')
+    ?.replace(/\n?```\s*$/, '')
+    ?.trim() || m.queryState?.aql || null;
+
   return (
     <div
       className={cn(
@@ -111,13 +128,15 @@ const MemoizedChatMessage = React.memo(function ChatMessageRow({
                 addToPageLabel="Add to page"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => onToggleExpand(m.id)}
-              className="self-start text-[11px] text-accent-primary-fg hover:underline"
-            >
-              {isExpanded ? 'Show less' : 'Show more'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onToggleExpand(m.id)}
+                className="self-start text-[11px] text-accent-primary-fg hover:underline"
+              >
+                {isExpanded ? 'Show less' : 'Show more'}
+              </button>
+            </div>
             {m.serverId && m.bankId && (((m.queryState?.contextual_items?.length ?? 0) > 0) || ((m.contextualItems?.length ?? 0) > 0)) && onSelectModel && (
               <ChatContextualItemsCard
                 contextualItems={m.queryState?.contextual_items ?? m.contextualItems ?? null}
@@ -146,6 +165,18 @@ const MemoizedChatMessage = React.memo(function ChatMessageRow({
             'group-hover:opacity-100'
           )}
         >
+          {aqlText && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Copy AQL to Reflect input"
+              title="Copy AQL to Reflect input"
+              onClick={() => onCopyAqlToReflect?.(aqlText)}
+              className="h-5 w-5 text-purple-600 hover:text-purple-700 dark:text-purple-300 dark:hover:text-purple-200"
+            >
+              <ClipboardPaste className="h-3 w-3" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-xs"
@@ -163,7 +194,7 @@ const MemoizedChatMessage = React.memo(function ChatMessageRow({
   );
 });
 
-export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId, availableEntities = [], availableEdges = [], onCopyToCuratedPage, onSelectModel }: AgentChatPanelProps) {
+export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId, availableEntities = [], availableEdges = [], onCopyToCuratedPage, onSelectModel, reflectQuery, onCopyAqlToReflect }: AgentChatPanelProps) {
   const [threads, setThreads] = useState<AgentChatThread[]>([]);
   const [tabs, setTabs] = useState<ChatTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -176,9 +207,12 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
   const [messagesByThread, setMessagesByThread] = useState<Record<number, ChatMessage[]>>({});
   const [loadingByThread, setLoadingByThread] = useState<Record<number, boolean>>({});
   const [inputByThread, setInputByThread] = useState<Record<number, string>>({});
+  const [parseEntitiesByThread, setParseEntitiesByThread] = useState<Record<number, boolean>>({});
+  const [contextualListByThread, setContextualListByThread] = useState<Record<number, boolean>>({});
   const [historyLoading, setHistoryLoading] = useState(false);
   const [agentConfig, setAgentConfig] = useState<{ provider: string; model: string } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingAqlCopy, setPendingAqlCopy] = useState<PendingAqlCopy | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
   const [expandedAgentCards, setExpandedAgentCards] = useState<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -255,6 +289,9 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
 
   const messages = activeThreadId != null ? messagesByThread[activeThreadId] ?? [] : [];
   const input = activeThreadId != null ? inputByThread[activeThreadId] ?? '' : '';
+  const parseEntities = activeThreadId != null ? parseEntitiesByThread[activeThreadId] ?? true : true;
+  const isAqlThread = activeThread?.is_aql ?? false;
+  const contextualList = activeThreadId != null && !isAqlThread ? contextualListByThread[activeThreadId] ?? false : false;
   const loading = activeThreadId != null ? loadingByThread[activeThreadId] ?? false : false;
 
   // Load the thread list for the session.
@@ -266,6 +303,8 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
       setMessagesByThread({});
       setInputByThread({});
       setLoadingByThread({});
+      setParseEntitiesByThread({});
+      setContextualListByThread({});
       setAgentConfig(null);
       tabsHydratedRef.current = false;
       return;
@@ -360,11 +399,11 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
   }, []);
 
   const handleCreateChat = useCallback(
-    async (title: string) => {
+    async (title: string, isAql?: boolean) => {
       if (sessionId == null) return;
       setCreatingThread(true);
       try {
-        const thread = await researchApi.createChatThread(sessionId, title);
+        const thread = await researchApi.createChatThread(sessionId, title, isAql);
         setThreads((prev) => [thread, ...prev]);
         openThread(thread);
         toast.success(`Created ${thread.title}`);
@@ -482,7 +521,10 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
     setLoadingByThread((prev) => ({ ...prev, [activeThreadId]: true }));
 
     try {
-      const res = await researchApi.sendChatMessage(sessionId, activeThreadId, text);
+      const res = await researchApi.sendChatMessage(sessionId, activeThreadId, text, {
+        parse_entities: parseEntities,
+        contextual_list: contextualList,
+      });
       const reply = res.reply;
       setAgentConfig((agentCfg) => {
         return agentCfg
@@ -530,7 +572,7 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
     } finally {
       setLoadingByThread((prev) => ({ ...prev, [activeThreadId]: false }));
     }
-  }, [input, sessionId, activeThreadId, loading, agentConfig]);
+  }, [input, sessionId, activeThreadId, loading, agentConfig, parseEntities, contextualList]);
 
   const handleDeleteMessage = useCallback(
     async (messageId: number) => {
@@ -555,6 +597,25 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
       setInputByThread((prev) => ({ ...prev, [activeThreadId]: value }));
     },
     [activeThreadId]
+  );
+
+  const handleCopyAqlToReflect = useCallback(
+    (aql: string) => {
+      if (!onCopyAqlToReflect) return;
+      if (reflectQuery?.trim()) {
+        setPendingAqlCopy({
+          aql,
+          onConfirm: () => {
+            onCopyAqlToReflect(aql);
+            toast.success('Copied to Reflect input');
+          },
+        });
+        return;
+      }
+      onCopyAqlToReflect(aql);
+      toast.success('Copied to Reflect input');
+    },
+    [onCopyAqlToReflect, reflectQuery]
   );
 
   const disabled = sessionId == null || activeThreadId == null || loading || creatingThread;
@@ -601,6 +662,7 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
                 onDelete={handleRequestDelete}
                 onCopyToPage={onCopyToCuratedPage}
                 onSelectModel={onSelectModel}
+                onCopyAqlToReflect={handleCopyAqlToReflect}
               />
             ))}
             {loading && (
@@ -616,17 +678,58 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
             )}
           </div>
         </div>
-        <div className="border-t border-border-default p-2 flex gap-2 shrink-0">
-          <ChatInput
-            value={input}
-            onChange={handleInputChange}
-            onSubmit={handleSend}
-            placeholder={sessionId == null ? 'Select a session…' : activeThreadId == null ? 'Select or create a chat…' : 'Ask questions to retrieve summary, graph and contextual data. Type [[ to show entities and edge list.'}
-            disabled={disabled}
-            availableEntities={availableEntities}
-            availableEdges={availableEdges}
-            className="min-h-[104px] bg-surface-inset text-sm rounded-md border border-input"
-          />
+        <div className="border-t border-border-default p-2 flex gap-2 items-end shrink-0">
+          <div className="flex-1 flex flex-col gap-2 min-w-0">
+            <div className="flex items-center gap-4 px-1">
+              <label className="flex items-center gap-2 text-xs text-muted-fg cursor-pointer select-none">
+                <Switch
+                  size="sm"
+                  checked={parseEntities}
+                  onCheckedChange={(checked) =>
+                    setParseEntitiesByThread((prev) => ({ ...prev, [activeThreadId!]: checked }))
+                  }
+                  disabled={disabled}
+                />
+                Parse Entities
+              </label>
+              <label
+                className={cn(
+                  "flex items-center gap-2 text-xs cursor-pointer select-none",
+                  isAqlThread ? "text-muted-fg/50 cursor-not-allowed" : "text-muted-fg"
+                )}
+                title={isAqlThread ? "Contextual list is disabled in AQL chats" : undefined}
+              >
+                <Switch
+                  size="sm"
+                  checked={contextualList}
+                  onCheckedChange={(checked) => {
+                    if (isAqlThread) return;
+                    setContextualListByThread((prev) => ({ ...prev, [activeThreadId!]: checked }));
+                  }}
+                  disabled={disabled || isAqlThread}
+                />
+                Contextual List
+              </label>
+            </div>
+            <ChatInput
+              value={input}
+              onChange={handleInputChange}
+              onSubmit={handleSend}
+              placeholder={
+                sessionId == null
+                  ? 'Select a session…'
+                  : activeThreadId == null
+                    ? 'Select or create a chat…'
+                    : activeThread?.is_aql
+                      ? 'Describe the AQL query you want to build. Type [[ to reference entities and edges. Every response generates a structured AQL query.'
+                      : 'Ask questions to retrieve summary, graph and contextual data. Type [[ to show entities and edge list.'
+              }
+              disabled={disabled}
+              availableEntities={availableEntities}
+              availableEdges={availableEdges}
+              className="min-h-[104px] bg-surface-inset text-sm rounded-md border border-input"
+            />
+          </div>
           <Button
             size="icon"
             onClick={() => void handleSend()}
@@ -656,6 +759,20 @@ export const AgentChatPanel = React.memo(function AgentChatPanelMemo({ sessionId
           if (pendingDelete?.type === 'message' && pendingDelete.messageId != null) {
             void handleDeleteMessage(pendingDelete.messageId);
           }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!pendingAqlCopy}
+        onOpenChange={(open) => {
+          if (!open) setPendingAqlCopy(null);
+        }}
+        title="Overwrite Reflect input?"
+        description="The Reflect input already contains text. Replacing it will discard the existing query."
+        confirmLabel="Replace"
+        onConfirm={() => {
+          pendingAqlCopy?.onConfirm();
+          setPendingAqlCopy(null);
         }}
       />
 

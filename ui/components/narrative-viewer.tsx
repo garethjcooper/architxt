@@ -388,22 +388,23 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
           </span>
         </button>
         <div className="flex items-center gap-0.5 flex-shrink-0 max-w-0 overflow-hidden group-hover/copy:max-w-fit focus-within:max-w-fit transition-[max-width]">
-          {onShowEvidence && b.type === 'heading' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const evidenceIds = resolveSectionEvidence?.(b.title ?? '', undefined, b.__tableId, b.__diagramId) ?? [];
-                if (evidenceIds.length === 0) return;
-                onShowEvidence(evidenceIds, b.title || evidenceLabel);
-              }}
-              className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
-              title={evidenceLabel}
-              aria-label={evidenceLabel}
-            >
-              <FileSearch className="h-3 w-3" />
-            </button>
-          )}
+          {onShowEvidence && b.type === 'heading' && (() => {
+            const evidenceIds = resolveSectionEvidence?.(b.title ?? '', undefined, b.__tableId, b.__diagramId) ?? [];
+            return evidenceIds.length > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowEvidence(evidenceIds, b.title || evidenceLabel);
+                }}
+                className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+                title={evidenceLabel}
+                aria-label={evidenceLabel}
+              >
+                <FileSearch className="h-3 w-3" />
+              </button>
+            ) : null;
+          })()}
           {onFocusSection && b.type === 'heading' && (
             <button
               type="button"

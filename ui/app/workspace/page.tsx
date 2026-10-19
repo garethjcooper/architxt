@@ -1611,6 +1611,8 @@ export default function WorkspacePage() {
                 availableEdges={aqlEdges}
                 onCopyToCuratedPage={handleCopyToCuratedPage}
                 onSelectModel={selectEntityModel}
+                reflectQuery={reflectQuery}
+                onCopyAqlToReflect={setReflectQuery}
               />
             </div>
           )}

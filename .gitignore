@@ -12,6 +12,8 @@ documents/
 logs/
 tmp/
 server/test-tmp/
+server/*.db
+*.db
 
 # Environment
 .env
