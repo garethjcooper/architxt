@@ -53,6 +53,8 @@ export function ServerGraphBanksDialog({
   const [cleaning, setCleaning] = useState<Record<string, boolean>>({});
   const [clearingAll, setClearingAll] = useState<Record<string, boolean>>({});
   const [confirmClearBankId, setConfirmClearBankId] = useState<string | null>(null);
+  const [confirmCleanLocalGraphBankId, setConfirmCleanLocalGraphBankId] = useState<string | null>(null);
+  const [cleaningLocalGraph, setCleaningLocalGraph] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!server || !open) return;
@@ -286,6 +288,25 @@ export function ServerGraphBanksDialog({
       toast.error(err instanceof Error ? err.message : 'Clean failed');
     } finally {
       setCleaning((prev) => ({ ...prev, [bankId]: false }));
+    }
+  };
+
+  const handleCleanLocalGraph = async (bankId: string) => {
+    setCleaningLocalGraph((prev) => ({ ...prev, [bankId]: true }));
+    try {
+      const result = await contextualGraphApi.clear(server.id, bankId);
+      if (!result.success) {
+        toast.error(result.error || 'Failed to clean local graph');
+        return;
+      }
+      toast.success(
+        `Cleaned local graph for ${bankId}: removed ${result.cleared?.nodes ?? 0} nodes / ${result.cleared?.edges ?? 0} edges.`,
+      );
+      onServerUpdated?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to clean local graph');
+    } finally {
+      setCleaningLocalGraph((prev) => ({ ...prev, [bankId]: false }));
     }
   };
 
@@ -565,6 +586,16 @@ export function ServerGraphBanksDialog({
                             <Button
                               variant="ghost"
                               size="sm"
+                              disabled={cleaningLocalGraph[bank.bank_id]}
+                              onClick={() => setConfirmCleanLocalGraphBankId(bank.bank_id)}
+                              className="h-7 text-[11px] text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
+                            >
+                              {cleaningLocalGraph[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                              Clean local graph
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               disabled={cleaning[bank.bank_id]}
                               onClick={() => {
                                 if (confirm(`Delete all contextual-graph mental models AND remove the entire local context graph from ${bank.bank_id}? Auto-sync will be disabled for this bank.`)) {
@@ -630,6 +661,22 @@ export function ServerGraphBanksDialog({
       onConfirm={() => {
         if (confirmClearBankId) {
           handleClearAllMentalModels(confirmClearBankId);
+        }
+      }}
+    />
+    <ConfirmDialog
+      open={!!confirmCleanLocalGraphBankId}
+      onOpenChange={(open) => {
+        if (!open) setConfirmCleanLocalGraphBankId(null);
+      }}
+      title="Clean local context graph?"
+      description={`This will remove every node and edge in the local contextual graph for bank "${confirmCleanLocalGraphBankId}". Hindsight mental models will not be affected. Auto-sync settings are unchanged.`}
+      confirmLabel="Clean local graph"
+      cancelLabel="Cancel"
+      variant="destructive"
+      onConfirm={() => {
+        if (confirmCleanLocalGraphBankId) {
+          handleCleanLocalGraph(confirmCleanLocalGraphBankId);
         }
       }}
     />

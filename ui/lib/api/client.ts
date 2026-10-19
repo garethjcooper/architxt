@@ -2303,6 +2303,8 @@ export const contextualGraphApi = {
   },
 
   startSyncJob: (serverId: number, bankId: string, options?: {
+    dry_run?: boolean;
+    rerun?: boolean;
     node_ids?: string[];
     seed_node_ids?: string[];
     min_count?: number;
@@ -2325,6 +2327,11 @@ export const contextualGraphApi = {
     }>('/contextual-graph/sync-jobs', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
+    }).catch((err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        return { success: false, job: undefined, error: err.message, code: err.code };
+      }
+      throw err;
     }),
 
   getSyncJob: (id: string, options?: { limit?: number; offset?: number }) => {

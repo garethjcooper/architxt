@@ -137,5 +137,10 @@ describe('contextual graph identity', () => {
     const sameTypeSameLabel = buildDirectedEdgeId('a', 'b', 'sends', 'events', 'edge-ctx');
     assert.notEqual(directed, sameTypeDifferentLabel);
     assert.equal(sameTypeDifferentLabel, sameTypeSameLabel);
+
+    const sameLabelDifferentDetail = buildDirectedEdgeId('a', 'b', 'sends', 'events', 'edge-ctx', 'detail one');
+    const sameLabelAnotherDetail = buildDirectedEdgeId('a', 'b', 'sends', 'events', 'edge-ctx', 'detail two');
+    assert.notEqual(sameTypeSameLabel, sameLabelDifferentDetail);
+    assert.notEqual(sameLabelDifferentDetail, sameLabelAnotherDetail);
   });
 });

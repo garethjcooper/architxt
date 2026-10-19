@@ -3,7 +3,7 @@ import type { UnifiedEnvelope, GraphNode, GraphEdge } from '@/lib/api/client';
 import { viewToMermaid, type ViewToMermaidOptions } from './view-to-mermaid';
 import { bundleViewEdges, type BundledViewEdge } from './view-edges';
 import type { EdgeMergeMode } from '@/app/views/components/view-editor-options';
-import { ensureEnvelopeIds, uuidv4 } from '@/lib/envelope-markdown';
+import { ensureEnvelopeIds, uuidv4, graphToTableRows } from '@/lib/envelope-markdown';
 
 export interface ViewToEnvelopeOptions {
   /** Flowchart direction passed through to the Mermaid export. */
@@ -18,6 +18,12 @@ export interface ViewToEnvelopeOptions {
   diagramName?: string;
   /** Name used for the generated graph. Defaults to the view name. */
   graphName?: string;
+  /**
+   * Which parts of the envelope to produce. Any combination of 'flowchart',
+   * 'graph', and 'table' is supported. When multiple formats are included they
+   * are delivered as a single standard envelope.
+   */
+  formats?: Array<'flowchart' | 'graph' | 'table'>;
 }
 
 function viewNodeToGraphNode(node: ViewNode): GraphNode {
@@ -63,10 +69,12 @@ function viewEdgeToGraphEdge(edge: ViewEdge, nodeById: Map<string, ViewNode>): G
 /**
  * Build a standard envelope from a view.
  *
- * The returned envelope contains:
+ * The returned envelope can contain:
  * - A `flowchart` diagram whose `content` is the Mermaid source for the view.
  * - A merged graph with the view's nodes and edges converted to the canonical
  *   `GraphNode` / `GraphEdge` shape used by the workspace viewer.
+ *
+ * Both parts are produced in the same standard envelope when requested.
  */
 export function viewToEnvelope(
   view: View,
@@ -79,20 +87,15 @@ export function viewToEnvelope(
     edgeMergeMode = 'full',
     diagramName = view.name || 'View diagram',
     graphName = view.name || 'View graph',
+    formats = ['flowchart'],
   } = options;
 
   const nodes = view.graph?.nodes || [];
   const edges = view.graph?.edges || [];
 
-  // The workspace graph always stores the raw, unmerged edges so the data
-  // remains complete. The Mermaid diagram, however, should match what the
-  // user currently sees on the canvas, so we apply the same bundling mode.
-  const bundledEdges: BundledViewEdge[] = bundleViewEdges(edges, edgeMergeMode);
-  const mermaidSource = viewToMermaid(nodes, bundledEdges, {
-    direction,
-    title,
-    showEdgeLabels,
-  });
+  const includeFlowchart = formats.includes('flowchart');
+  const includeGraph = formats.includes('graph');
+  const includeTable = formats.includes('table');
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
 
@@ -103,21 +106,62 @@ export function viewToEnvelope(
     ...collectEvidence(edges),
   ];
 
+  const diagrams: UnifiedEnvelope['diagrams'] = [];
+  if (includeFlowchart) {
+    // The workspace graph always stores the raw, unmerged edges so the data
+    // remains complete. The Mermaid diagram, however, should match what the
+    // user currently sees on the canvas, so we apply the same bundling mode.
+    const bundledEdges: BundledViewEdge[] = bundleViewEdges(edges, edgeMergeMode);
+    const mermaidSource = viewToMermaid(nodes, bundledEdges, {
+      direction,
+      title,
+      showEdgeLabels,
+    });
+
+    diagrams.push({
+      name: diagramName,
+      type: 'flowchart',
+      content: mermaidSource,
+      evidence: diagramEvidence,
+    });
+  }
+
+  const graph = includeGraph || includeTable
+    ? {
+        name: graphName,
+        nodes: nodes.map(viewNodeToGraphNode),
+        edges: edges.map((e) => viewEdgeToGraphEdge(e, nodeById)),
+      }
+    : { name: '', nodes: [], edges: [] };
+
+  const tables: UnifiedEnvelope['tables'] = [];
+  if (includeTable && (graph.nodes.length > 0 || graph.edges.length > 0)) {
+    const { nodeRows, edgeRows } = graphToTableRows(graph);
+    const graphEvidence = Array.from(
+      new Set(graph.edges.flatMap((e) => e.evidence ?? []))
+    );
+    if (nodeRows.length > 0) {
+      tables.push({
+        name: `${graphName} nodes`,
+        columns: ['id', 'type', 'label', 'name'],
+        rows: nodeRows,
+        evidence: graphEvidence,
+      });
+    }
+    if (edgeRows.length > 0) {
+      tables.push({
+        name: `${graphName} edges`,
+        columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'],
+        rows: edgeRows,
+        evidence: graphEvidence,
+      });
+    }
+  }
+
   return ensureEnvelopeIds({
     narratives: [],
-    graph: {
-      name: graphName,
-      nodes: nodes.map(viewNodeToGraphNode),
-      edges: edges.map((e) => viewEdgeToGraphEdge(e, nodeById)),
-    },
-    tables: [],
-    diagrams: [
-      {
-        name: diagramName,
-        type: 'flowchart',
-        content: mermaidSource,
-        evidence: diagramEvidence,
-      },
-    ],
+    graph,
+    tables,
+    diagrams,
   });
 }

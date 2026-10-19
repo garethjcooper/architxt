@@ -500,6 +500,34 @@ describe('applyModelOutput', () => {
     assert.ok(byLabel['usage data'].startsWith('edge-ctx-a-com:COM-001-a-com:COM-002-sends-'));
   });
 
+  it('keeps parallel edges with the same type and label but different details distinct', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+
+    const output = normalizeModelOutput(JSON.stringify({
+      narratives: [],
+      graph: {
+        nodes: [],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'data', detail: 'BOSS provides data for billing.', evidence: ['m1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'data', detail: 'BOSS provides data for reconciliation.', evidence: ['m2'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    }));
+
+    const result = await applyModelOutput(db, serverId, bankId, model('edge-ctx-a-com:COM-001|a-com:COM-002', 'sys_edge_context'), output);
+    assert.equal(result.success, true);
+    assert.equal(result.applied.edgeIds.length, 2);
+
+    const allEdges = listEdges(db, serverId, bankId, { limit: 100 }).data;
+    assert.equal(allEdges.length, 2);
+    const ids = allEdges.map((e) => e.cge_id);
+    assert.notEqual(ids[0], ids[1]);
+    ids.forEach((id) => assert.ok(id.startsWith('edge-ctx-a-com:COM-001-a-com:COM-002-sends-')));
+  });
+
   it('synthesizes envelope from Markdown capability table', () => {
     const content = '## Overview\n\nSingleview is the billing hub.\n\n```markdown\n| Capability | Responsibility | Purpose | Business Capability Mapping |\n|---|---|---|---|\n| Adjustments | Corrects charges. | Enables corrections. | Billing Adjustments |\n```';
     const output = normalizeModelOutput(content);

@@ -328,24 +328,30 @@ export async function dedupeCandidates(db, serverId, bankId, lookups, candidates
  * @param {string} [detail]
  * @returns {string}
  */
-function buildEdgeContentHash(label) {
-  return createHash('sha256').update(String(label || '')).digest('hex').slice(0, 8);
+function buildEdgeContentHash(label, detail = '') {
+  return createHash('sha256')
+    .update(String(label || ''))
+    .update('\0')
+    .update(String(detail || ''))
+    .digest('hex')
+    .slice(0, 8);
 }
 
 /**
  * Build a deterministic edge id for a directed edge.
  * Direction is preserved: source -> target is different from target -> source.
- * Parallel edges of the same type are separated by a hash of their label.
+ * Parallel edges of the same type are separated by a hash of their label and detail.
  *
  * @param {string} sourceId
  * @param {string} targetId
  * @param {string|null} type
  * @param {string} [label] - used to differentiate parallel edges
  * @param {string} [provenance] - e.g. 'edge-ctx', 'manual'
+ * @param {string} [detail] - used to differentiate parallel edges with the same label
  */
-export function buildDirectedEdgeId(sourceId, targetId, type = null, label = '', provenance = 'edge-ctx') {
+export function buildDirectedEdgeId(sourceId, targetId, type = null, label = '', provenance = 'edge-ctx', detail = '') {
   const typePart = type ? `-${type}` : '';
-  const hash = type ? `-${buildEdgeContentHash(label)}` : '';
+  const hash = type ? `-${buildEdgeContentHash(label, detail)}` : '';
   return `${provenance}-${sourceId}-${targetId}${typePart}${hash}`;
 }
 
