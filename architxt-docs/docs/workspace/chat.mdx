@@ -16,7 +16,8 @@ A thread is an independent conversation inside a research session. The thread ba
 
 | Action | How to use it |
 |---|---|
-| **Create a thread** | Click the **+** button. New threads are named `Chat 1`, `Chat 2`, and so on. |
+| **Create a normal thread** | Click the **+** button. New threads are named `Chat 1`, `Chat 2`, and so on. |
+| **Create an AQL thread** | Click the **AQL** button (architxt icon) next to the **+** button. New AQL threads are named `aql1`, `aql2`, and so on. |
 | **Switch threads** | Click a tab, or choose a thread from the dropdown. The dropdown also lists threads that have been closed but still exist. |
 | **Rename a thread** | Click the pencil button and type a new name. |
 | **Delete a thread** | Click the trash button. Deleting a thread removes all of its messages. |
@@ -34,11 +35,47 @@ Type a plain-language question about the bank, for example "What depends on the 
 - Press **Enter** to send.
 - Press **Alt+Enter** or **Shift+Enter** to insert a new line without sending.
 
+The placeholder text changes depending on the thread type:
+
+| Thread type | Placeholder guidance |
+|---|---|
+| Normal chat | Ask questions to retrieve summary, graph and contextual data. Type `[[` to show entities and edge list. |
+| AQL thread | Describe the AQL query you want to build. Type `[[` to reference entities and edges. Every response generates a structured AQL query. |
+
 Messages are saved as you send them, so reloading the page or returning later restores the thread history.
 
-## How the agent responds
+## AQL threads
 
-When you send a message, the agent follows a deterministic pipeline:
+An AQL thread is a dedicated conversation that builds structured AQL queries. Use it when you want the agent to help you compose an AQL query for a Reflect request, a mental model, or a curated-page section rather than just answering a free-form question.
+
+What makes AQL threads different:
+
+- Every agent response renders a generated AQL query in addition to any explanation.
+- The query appears in a readable, wrapped block under **Generated AQL** in the response envelope.
+- The chat input placeholder reminds you that every response produces a structured AQL query.
+- AQL threads are badged with the architxt icon and a purple accent on the tab.
+
+You can use the generated AQL in two ways:
+
+- **Copy AQL to Reflect input** — hover the generated AQL output and click the **Copy AQL** button in the top-right hover group. This copies the raw AQL into the Reflect query input so you can run it as a Reflect query. If the Reflect input already contains text, a standard confirmation dialog warns you before overwriting it.
+- **Add to page** — like any other envelope section, you can copy the AQL or its explanation into a curated page.
+
+:::tip[Start with intent, not syntax]
+You do not need to write perfect AQL in an AQL thread. Describe what you want, for example "Show me a graph of everything that calls the Payment Gateway", and let the agent generate the block directives and references for you.
+:::
+
+## Chat options
+
+The chat panel has two switches above the input that control how the agent handles normal chat messages. They do not change how the input looks; they change what the agent does after you send a message.
+
+| Option | Default | What it does |
+|---|---|---|
+| **Parse Entities** | On | Scans your message for entity names, `[[...]]` references, and edge mentions. Any matches are resolved to canonical `type:entity_id` form and passed to recall, so the agent can retrieve facts about those specific entities. When off, the agent treats your message as plain text and does not resolve entity references. |
+| **Contextual List** | Off | After the agent produces an answer, looks up the mental models attached to the entities in the answer (node summaries, plain models, derived models, and edge-context models) and shows them in a card below the reply. This gives quick links to related contextual data without leaving the chat. When off, the response shows only the synthesized answer and any graph. |
+
+In an AQL thread the **Contextual List** switch is disabled, because AQL threads focus on producing a query rather than collecting contextual models.
+
+## How the agent responds
 
 1. **Entity resolution** — extracts any entity or edge references from your message and resolves them to canonical `type:entity_id` form.
 2. **Recall from Hindsight** — when the session is backed by a Hindsight bank, the agent runs a recall query against world facts and observations, weighted toward the resolved entities.
@@ -55,7 +92,8 @@ The final reply is rendered as a unified envelope: narrative, graph, and context
 | **Agent response card** | The synthesized answer, collapsed to a fixed height by default. Click **Show more** to expand it, or **Show less** to collapse it. |
 | **Envelope viewer** | If the response has structured sections, the card renders the full `EnvelopeViewer` with the usual controls. Use **Add to page** to copy a section into the active curated page. |
 | **Graph button / evidence icon** | Opens the merged edge-context graph. Evidence collected from the graph edges is available in the evidence modal. |
-| **Contextual data card** | Lists mental models attached to the entities in the response: node summaries, capability models, discovery models, and edge-context models. Each item shows the entity name, model role, and title. |
+| **Contextual data card** | Lists mental models attached to the entities in the response: node summaries, capability models, discovery models, and edge-context models. Each item shows the entity name, model role, and title. Empty unless **Contextual List** is enabled. |
+| **Generated AQL block** | Appears only in AQL threads. Shows the structured AQL query the agent built for your request, ready to be copied into Reflect. |
 
 The agent response card shows the model name and token count at the bottom when the reply came from the LLM synthesizer.
 

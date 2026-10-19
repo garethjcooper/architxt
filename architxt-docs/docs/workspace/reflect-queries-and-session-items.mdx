@@ -39,6 +39,10 @@ Click the **Options** switch to show the Reflect-specific options. The defaults 
 
 Press the **Run Query** button or hit Enter to submit. While the query is running, the Preview tab shows a loading state and the session item row displays a running indicator. If the query fails, the error appears in the Preview tab and the session item shows a failed status.
 
+### Previewing the composed prompt
+
+Before you run a Reflect, Recall, or Synthesize query, you can inspect the composed prompt that will be sent to the model. Click the **Preview prompt** button to open a read-only dialog showing the fully composed prompt. This is useful when you want to check how the query, block directives, and references are translated into the final request before spending tokens on a real call.
+
 ## Session items panel
 
 The **Session items** panel sits below the query panel in the left column. It lists every step in the current session, in chronological order. Each item represents one query or one curated page created in the session.

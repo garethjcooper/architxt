@@ -5,7 +5,7 @@ const THREAD_TABLE = 'agent_chat_threads';
 const THREAD_PK = 'act_id';
 const MESSAGE_TABLE = 'agent_chat_messages';
 const MESSAGE_PK = 'acm_id';
-const MESSAGE_JSON_FIELDS = ['acm_context_snapshot', 'acm_tool_log', 'acm_envelope', 'acm_contextual_items'];
+const MESSAGE_JSON_FIELDS = ['acm_context_snapshot', 'acm_tool_log', 'acm_envelope', 'acm_contextual_items', 'acm_build_aql'];
 
 export const getMessage = (db, messageId) => dbExec(() => {
   const id = requireInt('messageId', messageId);
@@ -45,8 +45,9 @@ export const getThread = (db, threadId) => dbExec(() => {
 export const createThread = (db, data) => dbExec(() => {
   const rsId = requireInt('rs_id', data.rs_id);
   requireString('act_title', data.act_title);
-  const sql = `INSERT INTO ${THREAD_TABLE} (rs_id, act_title) VALUES (?, ?)`;
-  const result = stmt(db, sql).run(rsId, data.act_title);
+  const isAql = data.act_is_aql === true || data.act_is_aql === 1 ? 1 : 0;
+  const sql = `INSERT INTO ${THREAD_TABLE} (rs_id, act_title, act_is_aql) VALUES (?, ?, ?)`;
+  const result = stmt(db, sql).run(rsId, data.act_title, isAql);
   return result.lastInsertRowid;
 }, 'agentChat.createThread');
 
@@ -58,7 +59,7 @@ export const createThread = (db, data) => dbExec(() => {
  */
 export const updateThread = (db, threadId, data) => dbExec(() => {
   const id = requireInt('threadId', threadId);
-  const allowedFields = new Set(['act_title']);
+  const allowedFields = new Set(['act_title', 'act_is_aql']);
   const entries = Object.entries(data).filter(([key]) => allowedFields.has(key));
   if (entries.length === 0) {
     throw new Error('No allowed fields to update');
@@ -97,7 +98,6 @@ export const listMessagesForThread = (db, threadId) => dbExec(() => {
 }, 'agentChat.listMessagesForThread');
 
 /**
-/**
  * Create a chat message.
  * @param {Object} db
  * @param {Object} data - { act_id, rs_id, acm_role, acm_content, acm_context_snapshot?, acm_tool_log?, acm_envelope?, acm_contextual_items? }
@@ -115,18 +115,19 @@ export const createMessage = (db, data) => dbExec(() => {
 
   const prepared = toJson(data, MESSAGE_JSON_FIELDS);
   const sql = `INSERT INTO ${MESSAGE_TABLE} (
-    act_id, rs_id, acm_role, acm_content, acm_context_snapshot, acm_tool_log, acm_envelope, acm_contextual_items
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-
+    act_id, rs_id, acm_role, acm_content, acm_model, acm_context_snapshot, acm_tool_log, acm_envelope, acm_contextual_items, acm_build_aql
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const result = stmt(db, sql).run(
     prepared.act_id,
     prepared.rs_id,
     prepared.acm_role,
     prepared.acm_content,
+    prepared.acm_model ?? null,
     prepared.acm_context_snapshot ?? null,
     prepared.acm_tool_log ?? null,
     prepared.acm_envelope ?? null,
-    prepared.acm_contextual_items ?? null
+    prepared.acm_contextual_items ?? null,
+    prepared.acm_build_aql ?? null
   );
   return result.lastInsertRowid;
 }, 'agentChat.createMessage');

@@ -47,6 +47,7 @@ export async function runDiscoverStep(params) {
     bankId,
     queryDepth = 'prebuilt',
     intentText,
+    rawQuery,
     options = {},
     rsId,
     rstepId,
@@ -82,7 +83,7 @@ export async function runDiscoverStep(params) {
   try {
     const start = performance.now();
     const handlerOptions = queryDepth === 'prebuilt' ? { ...options, dimension: options.dimension || 'interface' } : options;
-    const handlerResult = await dispatchHandler(queryDepth, serverId, bankId, intentText, handlerOptions, db);
+    const handlerResult = await dispatchHandler(queryDepth, serverId, bankId, intentText, handlerOptions, db, rawQuery);
     const duration_ms = Math.round(performance.now() - start);
 
     calls.push(...buildCallLog(handlerResult, options, duration_ms));

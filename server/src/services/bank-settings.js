@@ -44,7 +44,14 @@ Only extract purpose and capability statements that are stated explicitly in the
 3. Exclude temporal and procedural noise. Strip migration timelines, phase references ("before/after"), "intent", "recommendation", "should", and "may" language. Observations must state what is, not what is planned or advised.
 
 4. Prefer architectural relationships over restatements. Prioritize observations that describe cross-system data flows, dependency chains, or architectural trade-offs. Avoid observations that only restate identity, sizing, or deployment counts already captured in world facts.`),
-  reflect_mission: normalizeText(`You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.`),
+  reflect_mission: normalizeText(`You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.
+
+Always consider the following when formulating your response:
+1. COMPONENTS: A single system, service, database, or external integration. Use entity labels [[Name (ID)]] when present. Components by themselves (i.e. just being present) is NOT a fact.
+2. DATA FLOWS:  which specific component produces data and which specific component consumes it. Use explicit language: sends to, receives from, exchanges with.
+3. RISKS & CONSTRAINTS: performance limits, size limits, vendor gaps, or regulatory requirements.
+5. SIZING: data volumes, collection sizes, or throughput figures.
+6. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse). If the source text states what would break or degrade if this system were unavailable, capture that as a separate purpose fact.`),
   entities_allow_free_form: false,
   disposition: { empathy: 1, literalism: 4, skepticism: 1 },
   retain_extraction_mode: 'verbose',

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Plus, X, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { ArchitxtIcon } from '@/components/icons/architxt-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,11 +18,8 @@ import { cn } from '@/lib/utils';
 import { PanelHeader } from './panel-layout';
 
 export interface ChatTab {
-  /** Unique local id for React keys. */
   id: string;
-  /** Chat thread id from the backend. */
   threadId: number;
-  /** Display label. */
   label: string;
 }
 
@@ -35,6 +33,16 @@ export function generateNewChatName(tabs: ChatTab[]): string {
   return `${base} ${index}`;
 }
 
+export function generateNewAqlName(tabs: ChatTab[]): string {
+  const base = 'aql';
+  let index = 1;
+  const existing = new Set(tabs.map((t) => t.label));
+  while (existing.has(`${base}${index}`)) {
+    index++;
+  }
+  return `${base}${index}`;
+}
+
 interface ChatTabsProps {
   tabs: ChatTab[];
   activeTabId: string | null;
@@ -43,7 +51,7 @@ interface ChatTabsProps {
   historyLoading?: boolean;
   onSelect: (tabId: string) => void;
   onSelectThread: (threadId: number) => void | Promise<void>;
-  onCreateChat: (title: string) => Promise<void>;
+  onCreateChat: (title: string, isAql?: boolean) => Promise<void>;
   onRenameChat: (threadId: number, title: string) => Promise<void>;
   onDeleteChat: (threadId: number) => Promise<void>;
   onCloseTab: (tabId: string, hasMessages: boolean) => void;
@@ -73,6 +81,10 @@ export function ChatTabs({
     await onCreateChat(generateNewChatName(tabs));
   }, [tabs, onCreateChat]);
 
+  const handleCreateAql = useCallback(async () => {
+    await onCreateChat(generateNewAqlName(tabs), true);
+  }, [tabs, onCreateChat]);
+
   const handleConfirmRename = useCallback(async () => {
     if (!renamingChat) return;
     const next = renamingChat.title.trim();
@@ -91,6 +103,7 @@ export function ChatTabs({
   }, [confirmDelete, onDeleteChat]);
 
   const threadTabIds = new Set(tabs.map((t) => t.threadId));
+  const threadById = new Map(threads.map((t) => [t.act_id, t]));
 
   return (
     <div className="flex flex-col shrink-0 border-b border-border-default bg-surface-overlay">
@@ -104,6 +117,8 @@ export function ChatTabs({
         <div className="flex-1 min-w-0 flex items-start gap-1 overflow-x-auto custom-scrollbar pt-2 pb-2">
           {tabs.map((tab) => {
             const isActive = activeTabId === tab.id;
+            const thread = threadById.get(tab.threadId);
+            const isAql = thread?.is_aql ?? false;
             return (
               <div
                 key={tab.id}
@@ -115,7 +130,17 @@ export function ChatTabs({
                     : 'bg-surface-inset border-border-subtle text-foreground-faint hover:bg-surface-card hover:text-foreground-muted'
                 )}
               >
-                <span className={cn('absolute left-0 top-0 bottom-0 w-[3px] rounded-l shrink-0 bg-accent-primary-fg')} />
+                <span
+                  className={cn(
+                    'absolute left-0 top-0 bottom-0 w-[3px] rounded-l shrink-0',
+                    isAql ? 'bg-purple-500' : 'bg-accent-primary-fg'
+                  )}
+                />
+                {isAql && (
+                  <span className="inline-flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-300" title="AQL chat">
+                    <ArchitxtIcon className="h-3.5 w-3.5" />
+                  </span>
+                )}
                 <span className="truncate min-w-0" title={tab.label}>
                   {tab.label}
                 </span>
@@ -123,8 +148,8 @@ export function ChatTabs({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const thread = threads.find((th) => th.act_id === tab.threadId);
-                    onCloseTab(tab.id, (thread?.message_count ?? 0) > 0);
+                    const th = threadById.get(tab.threadId);
+                    onCloseTab(tab.id, (th?.message_count ?? 0) > 0);
                   }}
                   className={cn(
                     'absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-foreground-subtle hover:text-foreground-default hover:bg-surface-panel transition-opacity opacity-0 group-hover/tab:opacity-100'
@@ -167,18 +192,11 @@ export function ChatTabs({
             className="h-6 rounded-md border border-border-default bg-surface-panel px-1.5 text-[11px] text-foreground-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none min-w-[6rem] max-w-[10rem]"
           >
             <option value="">Chats...</option>
-            {tabs.map((tab) => (
-              <option key={tab.id} value={tab.id}>
-                {tab.label}
+            {threads.map((th) => (
+              <option key={`thread-${th.act_id}`} value={`thread-${th.act_id}`}>
+                {th.is_aql ? 'AQL: ' : ''}{th.title || `Chat ${th.act_id}`}
               </option>
             ))}
-            {threads
-              .filter((th) => !threadTabIds.has(th.act_id))
-              .map((th) => (
-                <option key={`thread-${th.act_id}`} value={`thread-${th.act_id}`}>
-                  {th.title || `Chat ${th.act_id}`}
-                </option>
-              ))}
           </select>
           <button
             type="button"
@@ -203,6 +221,15 @@ export function ChatTabs({
             title="Delete active chat"
           >
             <Trash2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCreateAql()}
+            className="h-6 inline-flex items-center gap-1 px-1.5 rounded bg-purple-100 border border-purple-300 text-purple-700 hover:bg-purple-200 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-200 transition-colors"
+            title="Add AQL chat"
+          >
+            <ArchitxtIcon className="h-3.5 w-3.5" />
+            <span className="text-[10px] font-medium">AQL</span>
           </button>
           <button
             type="button"

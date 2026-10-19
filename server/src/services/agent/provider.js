@@ -374,6 +374,90 @@ function normalizeQueries(parsedQueries, focusList, userMessage) {
  * @param {string} userMessage
  * @returns {Promise<{intent: object, provenance: array}>}
  */
+
+const AQL_BLOCK_DIRECTIVE_DOCS = `Allowed AQL block directives (each on its own line):
+- #narrative
+- #diagram
+- #table
+- #graph
+- #end (must be on its own line to close the current block)
+
+Allowed sub-directives (must also be on their own lines inside the matching block):
+- #narrative-name "Name" (only inside #narrative)
+- #diagram-name "Name" (only inside #diagram)
+- #diagram-type <type> (only inside #diagram)
+- #table-name "Name" (only inside #table)
+- #graph-name "Name" (only inside #graph)
+
+Allowed diagram types exactly as the parser expects them: flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, pie, timeline, journey, mindmap, radar-beta, architecture-beta, venn-beta.
+
+Entity references: [[Label (type:id)]]  e.g. [[Message Router (A-C:MSG-RTR-001)]].
+Edge references: [[Source — label → Target]]  e.g. [[CRM — sends → Billing]].
+
+General formatting rules:
+1. Each directive (#narrative, #diagram, #table, #graph, sub-directives, #end) must be on a separate line. Never put a directive and body text on the same line.
+2. Block body content goes on the lines immediately following the opening directive (and any sub-directives), before the #end line.
+3. A block name must be provided with a sub-directive on its own line, for example:
+   #narrative
+   #narrative-name "Prompt phrasing"
+   Provide a clear, concise description of the expected outcome when a document is processed through the architxt ingestion pipeline, covering extraction, transformation, and routing steps, and indicating the final state of the message.
+   #end
+4. For a diagram, the type must be on its own line too. The body is an outcome prompt, not a pre-filled list of nodes:
+   #diagram
+   #diagram-name "System Overview"
+   #diagram-type flowchart
+   Show the overall system architecture as a flowchart including the main runtime components and external integrations, with edges derived from the recalled context.
+   #end
+5. Put each entity or edge reference on its own line inside #diagram/#graph blocks only when the user explicitly asks for specific fixed items. Otherwise describe the outcome and let the synthesizer populate the items.
+6. Unknown directives cause parse errors. Do not invent directives such as #narrative Prompt phrasing on a single line.
+7. Do not wrap the body in a markdown code fence; emit plain AQL lines only inside the fenced output.`;
+
+const AQL_BUILDER_SYSTEM_PROMPT = `You are an AQL query builder for the architxt Workspace. Convert the user's request into one valid AQL query inside a markdown code block labelled \`\`\`aql. Put a brief explanation (one or two sentences) outside the code block, before or after it. Do not put explanatory prose inside the AQL code block.
+
+${AQL_BLOCK_DIRECTIVE_DOCS}
+
+Rules:
+1. Understand the user's intent, then choose the right blocks. Use the recall digest and resolved entities to ground the query.
+2. In Build AQL mode, every block body should describe the desired *outcome*, not the final content. The AQL will be handed to a downstream synthesizer that can query the recalled context and fill in entities, edges, rows, and diagram nodes. Do not enumerate every entity or edge in the body unless the user explicitly asks for a fixed, specific list. Instead, write a concise prompt that tells the synthesizer what to produce (e.g. "Show the overall system architecture as a flowchart including main runtime components and external integrations, with edges derived from the recalled context").
+3. The #narrative block is required. Its body should be a concise, standalone prompt describing the expected outcome. Give it a name with #narrative-name.
+4. Emit a #diagram block when the user asks for a visual. Default #diagram-type is flowchart unless the user clearly asks for another allowed type. The #diagram body should describe the desired diagram in outcome terms, not list every node/edge explicitly.
+5. Emit a #table block only when the user explicitly asks for structured rows/columns. Its body should describe what columns to produce and what rows to list, without filling in every row unless the user asks for a fixed list.
+6. Emit a #graph block only when the user explicitly asks for nodes and edges. Its body should describe the desired nodes and edges, not enumerate them unless the user asks for a fixed list.
+7. Use [[Label (type:id)]] only when the user explicitly names specific entities that must appear. Prefer referring to them by role or name in the outcome prompt and letting the synthesizer resolve the exact canonical ids.
+8. Use [[Source — label → Target]] only when the user explicitly names a specific relationship that must appear.
+9. Self-check before returning:
+   - Every #narrative/#diagram/#table/#graph has a matching #end on its own line.
+   - Sub-directives (#*-name, #diagram-type) are each on their own line, inside the correct block.
+   - No body text appears on the same line as a directive.
+   - Every #diagram has a valid #diagram-type from the allowed list.
+   - No unknown #directives appear.
+   - Every emitted block has a non-empty body that encodes the ask as an outcome, not a pre-filled answer.
+10. If the user is revising a prior query, preserve the existing structure and only change what was asked.`;
+
+function formatAqlBuilderUserMessage({ userMessage, outputIntent, recallDigest, resolvedEntityRefs, priorAqlContext }) {
+  const sectionsSummary = (outputIntent?.sections || [])
+    .map((s) => `- ${s.focus}: ${s.name}${s.diagram_type ? ` (${s.diagram_type})` : ''}`)
+    .join('\n');
+
+  const priorContext = (priorAqlContext || []).length
+    ? `\n\nPrior AQL versions in this session (oldest first):\n${priorAqlContext.map((c, i) => `\nVersion ${i + 1}:\n${c.aql || c.content}`).join('\n')}`
+    : '';
+
+  return `User request: ${userMessage}
+
+Planned outputs:
+${sectionsSummary || '- narrative: summary'}
+
+Resolved entities: ${resolvedEntityRefs.join(', ') || 'none'}
+
+Recall digest:
+${recallDigest || 'No recall results.'}
+${priorContext}
+
+Generate the AQL query now. For every block you emit, make sure its body contains the actual prompt text a downstream model would need to produce the requested outcome, not just a title or description of the output type. Follow the line-based syntax rules exactly.`;
+}
+
+
 export async function classifyOutputIntent(userMessage) {
   const provenance = [];
   const entry = getProviderEntry();
@@ -491,6 +575,114 @@ export async function classifyOutputIntent(userMessage) {
   return { intent, provenance };
 }
 
+export async function generateAqlFromIntent({ userMessage, outputIntent, recallResult, resolvedEntityRefs, priorAqlContext }) {
+  const provenance = [];
+  const entry = getProviderEntry();
+  if (entry.error) {
+    return {
+      aql: '',
+      explanation: `AQL generation unavailable: ${entry.error}`,
+      model: null,
+      usage: null,
+      messages: [],
+      request: null,
+      evidence: [],
+    };
+  }
+
+  const { model } = entry;
+  const recallDigest = recallResult?.success ? recallResult.data?.llm_digest || 'No recall results.' : `Recall unavailable: ${recallResult?.error || 'unknown'}`;
+  const validMemoryIds = new Set(
+    (recallResult?.success ? recallResult.data?.memories || [] : [])
+      .map((m) => m.id)
+      .filter(Boolean)
+  );
+
+  const messages = [
+    { role: 'system', content: AQL_BUILDER_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: formatAqlBuilderUserMessage({ userMessage, outputIntent, recallDigest, resolvedEntityRefs, priorAqlContext }),
+    },
+  ];
+
+  const request = {
+    provider: config.agent.provider,
+    model,
+    temperature: config.agent.temperature ?? 0.2,
+    max_tokens: 4096,
+  };
+
+  logger.info('AQL builder request', { provider: config.agent.provider, model });
+
+  const result = await generateCompletion(messages, request);
+  provenance.push(buildLlmProvenance('generateAqlFromIntent', messages, request, result));
+
+  if (!result.success) {
+    logger.warn('AQL builder failed', { error: result.error, code: result.code });
+    return {
+      aql: '',
+      explanation: `AQL generation failed: ${result.error}`,
+      model: result.data?.model || null,
+      usage: result.data?.usage || null,
+      messages,
+      request,
+      evidence: [],
+      provenance,
+    };
+  }
+
+  const contentText = result.data.content || '';
+  const extracted = extractAqlFromCompletion(contentText);
+
+  return {
+    aql: extracted.aql,
+    explanation: deriveAqlExplanation(extracted.aql, extracted.explanation, userMessage),
+    model: result.data.model,
+    usage: result.data.usage || null,
+    messages,
+    request,
+    rawContent: contentText,
+    evidence: extractAqlEvidence(extracted.aql, validMemoryIds),
+    provenance,
+  };
+}
+
+function extractAqlFromCompletion(contentText) {
+  // Prefer a fenced ```aql block. Allow opening and closing fences with optional language tag.
+  const fenceMatch = contentText.match(/```(?:aql)?\s*\n?([\s\S]*?)\n?```/);
+  if (fenceMatch) {
+    const aql = fenceMatch[1].trim();
+    const explanation = contentText.replace(/```(?:aql)?\s*\n?[\s\S]*?\n?```/, '').trim();
+    return { aql, explanation };
+  }
+  // Fallback: look for the first block starting with a directive and ending with the first #end.
+  const blockMatch = contentText.match(/(#(?:narrative|diagram|table|graph)\b[\s\S]*?#end\b)/);
+  if (blockMatch) {
+    const aql = blockMatch[1].trim();
+    const explanation = contentText.replace(blockMatch[0], '').trim();
+    return { aql, explanation };
+  }
+  return { aql: '', explanation: contentText.trim() };
+}
+
+function deriveAqlExplanation(aql, explicitExplanation, userMessage) {
+  if (explicitExplanation && explicitExplanation.trim().length > 0) {
+    return explicitExplanation.trim();
+  }
+  if (aql && aql.trim().length > 0) {
+    return 'Generated an AQL query for the request.';
+  }
+  return userMessage ? 'No AQL query could be generated.' : '';
+}
+
+function extractAqlEvidence(aqlText, validIds = new Set()) {
+  if (!aqlText || validIds.size === 0) return [];
+  const candidates = [...new Set((aqlText.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi) || []))];
+  return candidates.filter((id) => validIds.has(id));
+}
+
 export default {
   classifyOutputIntent,
+  generateAqlFromIntent,
 };

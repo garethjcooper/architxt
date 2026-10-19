@@ -448,6 +448,7 @@ CREATE TABLE agent_chat_threads (
   act_id INTEGER PRIMARY KEY AUTOINCREMENT,
   rs_id INTEGER NOT NULL,
   act_title TEXT NOT NULL,
+  act_is_aql INTEGER NOT NULL DEFAULT 0 CHECK (act_is_aql IN (0, 1)),
   act_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   act_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
@@ -461,10 +462,12 @@ CREATE TABLE agent_chat_messages (
   rs_id INTEGER NOT NULL,
   acm_role TEXT NOT NULL CHECK (acm_role IN ('user', 'agent', 'system')),
   acm_content TEXT NOT NULL,
+  acm_model TEXT,
   acm_context_snapshot JSON,
   acm_tool_log JSON,
   acm_envelope JSON,
   acm_contextual_items JSON,
+  acm_build_aql JSON,
   acm_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (act_id) REFERENCES agent_chat_threads(act_id) ON DELETE CASCADE,
   FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE

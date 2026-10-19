@@ -160,6 +160,7 @@ function ensureMissingTables(db) {
         rs_id INTEGER NOT NULL,
         acm_role TEXT NOT NULL CHECK (acm_role IN ('user', 'agent', 'system')),
         acm_content TEXT NOT NULL,
+        acm_model TEXT,
         acm_context_snapshot JSON,
         acm_tool_log JSON,
         acm_envelope JSON,
@@ -647,7 +648,16 @@ Only extract purpose and capability statements that are stated explicitly in the
 
 4. Prefer architectural relationships over restatements. Prioritize observations that describe cross-system data flows, dependency chains, or architectural trade-offs. Avoid observations that only restate identity, sizing, or deployment counts already captured in world facts.`;
 
-  const DEFAULT_REFLECT_MISSION = 'You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.';
+  const DEFAULT_REFLECT_MISSION = `You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.
+
+Always consider the following when formulating your response:
+1. COMPONENTS: A single system, service, database, or external integration. Use entity labels [[Name (ID)]] when present. Components by themselves (i.e. just being present) is NOT a fact.
+2. DATA FLOWS:  which specific component produces data and which specific component consumes it. Use explicit language: sends to, receives from, exchanges with.
+3. RISKS & CONSTRAINTS: performance limits, size limits, vendor gaps, or regulatory requirements.
+5. SIZING: data volumes, collection sizes, or throughput figures.
+6. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse). If the source text states what would break or degrade if this system were unavailable, capture that as a separate purpose fact.`;
+
+  const OLD_REFLECT_MISSION = 'You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.';
 
   const row = db.prepare('SELECT bs_id FROM bank_settings WHERE bs_id = 1').get();
   if (!row) {
@@ -672,23 +682,47 @@ Only extract purpose and capability statements that are stated explicitly in the
       AND IFNULL(observations_mission, '') = ''
       AND IFNULL(reflect_mission, '') = ''
   `).get();
-  if (!empty) return 0;
-
-  try {
-    db.prepare(`
-      UPDATE bank_settings
-      SET retain_mission = ?,
-          observations_mission = ?,
-          reflect_mission = ?,
-          bs_updated_at = CURRENT_TIMESTAMP
-      WHERE bs_id = 1
-    `).run(DEFAULT_RETAIN_MISSION, DEFAULT_OBSERVATIONS_MISSION, DEFAULT_REFLECT_MISSION);
-    logger.info('Backfilled default bank_settings missions');
-    return 1;
-  } catch (err) {
-    logger.error('Failed to backfill bank_settings defaults', { error: err.message });
-    return 0;
+  if (empty) {
+    try {
+      db.prepare(`
+        UPDATE bank_settings
+        SET retain_mission = ?,
+            observations_mission = ?,
+            reflect_mission = ?,
+            bs_updated_at = CURRENT_TIMESTAMP
+        WHERE bs_id = 1
+      `).run(DEFAULT_RETAIN_MISSION, DEFAULT_OBSERVATIONS_MISSION, DEFAULT_REFLECT_MISSION);
+      logger.info('Backfilled default bank_settings missions');
+      return 1;
+    } catch (err) {
+      logger.error('Failed to backfill bank_settings defaults', { error: err.message });
+      return 0;
+    }
   }
+
+  // Migrate rows that still carry the previous reflect_mission default.
+  const needsReflectMigration = db.prepare(`
+    SELECT bs_id FROM bank_settings
+    WHERE bs_id = 1
+      AND reflect_mission = ?
+  `).get(OLD_REFLECT_MISSION);
+  if (needsReflectMigration) {
+    try {
+      db.prepare(`
+        UPDATE bank_settings
+        SET reflect_mission = ?,
+            bs_updated_at = CURRENT_TIMESTAMP
+        WHERE bs_id = 1
+      `).run(DEFAULT_REFLECT_MISSION);
+      logger.info('Migrated default reflect_mission to updated wording');
+      return 1;
+    } catch (err) {
+      logger.error('Failed to migrate reflect_mission default', { error: err.message });
+      return 0;
+    }
+  }
+
+  return 0;
 }
 
 /**
@@ -1397,11 +1431,24 @@ function ensureMissingColumns(db) {
       ]
     },
     {
+      table: 'agent_chat_threads',
+      columns: [
+        {
+          name: 'act_is_aql',
+          ddl: 'ALTER TABLE agent_chat_threads ADD COLUMN act_is_aql INTEGER NOT NULL DEFAULT 0 CHECK (act_is_aql IN (0, 1))'
+        }
+      ]
+    },
+    {
       table: 'agent_chat_messages',
       columns: [
         {
           name: 'act_id',
           ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN act_id INTEGER REFERENCES agent_chat_threads(act_id) ON DELETE CASCADE'
+        },
+        {
+          name: 'acm_model',
+          ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN acm_model TEXT'
         },
         {
           name: 'acm_tool_log',
@@ -1414,6 +1461,10 @@ function ensureMissingColumns(db) {
         {
           name: 'acm_contextual_items',
           ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN acm_contextual_items JSON'
+        },
+        {
+          name: 'acm_build_aql',
+          ddl: 'ALTER TABLE agent_chat_messages ADD COLUMN acm_build_aql JSON'
         }
       ]
     },

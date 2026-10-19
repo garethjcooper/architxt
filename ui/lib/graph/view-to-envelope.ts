@@ -22,12 +22,16 @@ export interface ViewToEnvelopeOptions {
 
 function viewNodeToGraphNode(node: ViewNode): GraphNode {
   return {
-    id: node.id,
+    id: node.ref_id || node.id,
     name: node.name || node.label || node.text || node.id,
     label: node.label || node.name || node.text || '',
     type: node.entity_type || node.type || 'entity',
     properties: node.properties,
   };
+}
+
+function resolveGraphNodeId(nodeById: Map<string, ViewNode>, viewId: string): string {
+  return nodeById.get(viewId)?.ref_id || viewId;
 }
 
 function collectEvidence(items: Record<string, any>[]): string[] {
@@ -43,11 +47,11 @@ function collectEvidence(items: Record<string, any>[]): string[] {
   return Array.from(ids);
 }
 
-function viewEdgeToGraphEdge(edge: ViewEdge): GraphEdge {
+function viewEdgeToGraphEdge(edge: ViewEdge, nodeById: Map<string, ViewNode>): GraphEdge {
   return {
     id: edge.id,
-    from: edge.source,
-    to: edge.target,
+    from: resolveGraphNodeId(nodeById, edge.source),
+    to: resolveGraphNodeId(nodeById, edge.target),
     type: edge.edge_type || edge.type || '',
     label: edge.label || '',
     detail: edge.properties?.detail || '',
@@ -90,6 +94,8 @@ export function viewToEnvelope(
     showEdgeLabels,
   });
 
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
   // Compile all evidence referenced by the graph's nodes and edges so the
   // generated diagram can cite the same sources as the underlying data.
   const diagramEvidence = [
@@ -102,7 +108,7 @@ export function viewToEnvelope(
     graph: {
       name: graphName,
       nodes: nodes.map(viewNodeToGraphNode),
-      edges: edges.map(viewEdgeToGraphEdge),
+      edges: edges.map((e) => viewEdgeToGraphEdge(e, nodeById)),
     },
     tables: [],
     diagrams: [

@@ -1539,6 +1539,7 @@ export interface AgentChatThread {
   act_id: number;
   rs_id: number;
   title: string;
+  is_aql: boolean;
   message_count: number;
   act_created_at: string;
   act_updated_at: string;
@@ -1809,6 +1810,15 @@ export interface ResearchStepSummary {
 }
 
 export const researchApi = {
+  previewPrompt: (payload: {
+    raw_query: string;
+    section_focus?: Record<string, string | { name?: string; content: string } | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
+  }) =>
+    fetchApi<{ prompt: string; topic: string; section_focus: Record<string, unknown> }>('/research/preview-prompt', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }),
+
   discover: (payload: {
     server_id: number;
     session_id?: number;
@@ -1961,10 +1971,10 @@ export const researchApi = {
   listChatThreads: (sessionId: number) =>
     fetchApi<AgentChatList>(`/research/sessions/${sessionId}/chats`),
 
-  createChatThread: (sessionId: number, title?: string) =>
+  createChatThread: (sessionId: number, title?: string, is_aql?: boolean) =>
     fetchApi<AgentChatThread>(`/research/sessions/${sessionId}/chats`, {
       method: 'POST',
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, is_aql }),
     }),
 
   renameChatThread: (sessionId: number, threadId: number, title: string) =>
@@ -1981,10 +1991,10 @@ export const researchApi = {
   getChatHistory: (sessionId: number, threadId: number) =>
     fetchApi<AgentChatHistory>(`/research/sessions/${sessionId}/chats/${threadId}/messages`),
 
-  sendChatMessage: (sessionId: number, threadId: number, message: string) =>
+  sendChatMessage: (sessionId: number, threadId: number, message: string, options?: { parse_entities?: boolean; contextual_list?: boolean }) =>
     fetchApi<AgentChatSendResponse>(`/research/sessions/${sessionId}/chats/${threadId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, parse_entities: options?.parse_entities, contextual_list: options?.contextual_list }),
     }, { timeoutMs: 300000 }),
 
   deleteChatMessage: (sessionId: number, threadId: number, messageId: number) =>

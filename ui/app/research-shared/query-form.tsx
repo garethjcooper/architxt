@@ -3,12 +3,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Send } from 'lucide-react';
+import { Send, Eye } from 'lucide-react';
 import { colorForType } from '@/lib/graph/render-utils';
 import { type ResearchQueryOptions } from './use-research-session';
 import { type ResearchStepSummary } from '@/lib/api/client';
 import { researchApi } from '@/lib/api/client';
 import { AqlEditor } from '@/components/aql-editor';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { parseAql, toSectionFocus } from '@architxt/aql';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('QueryForm');
+
 
 export type Server = {
   id: number;
@@ -99,6 +110,10 @@ export function QueryForm(props: QueryFormProps) {
     viewMode = 'step',
   } = props;
 
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewPrompt, setPreviewPrompt] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [eligibleTemplates, setEligibleTemplates] = useState<Array<{
     id: number;
     ext_id: string;
@@ -112,6 +127,29 @@ export function QueryForm(props: QueryFormProps) {
   }>>([]);
   const [eligibleLoading, setEligibleLoading] = useState(false);
   const [eligibleError, setEligibleError] = useState<string | null>(null);
+
+  const handlePreviewPrompt = useCallback(async () => {
+    if (!query.trim()) return;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewPrompt(null);
+    setPreviewOpen(true);
+    try {
+      const aqlQuery = parseAql(query.trim());
+      const parsed = toSectionFocus(aqlQuery);
+      const res = await researchApi.previewPrompt({
+        raw_query: query.trim(),
+        section_focus: parsed.sectionFocus,
+      });
+      setPreviewPrompt(res.prompt || '');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPreviewError(message);
+      logger.error('Failed to preview prompt', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [query]);
 
   const sourceSteps = useMemo(() => {
     if (queryMode !== 'synthesize') return [];
@@ -531,7 +569,41 @@ export function QueryForm(props: QueryFormProps) {
             </>
           )}
         </Button>
+        {(queryMode === 'recall' || queryMode === 'reflect' || queryMode === 'synthesize') && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isRunning || loading || !query.trim()}
+            onClick={handlePreviewPrompt}
+            title="Preview the composed prompt"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            Preview prompt
+          </Button>
+        )}
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-base font-semibold text-foreground-default">
+              Composed prompt preview
+            </DialogTitle>
+          </DialogHeader>
+          {previewLoading ? (
+            <div className="text-sm text-foreground-subtle py-4">Loading preview…</div>
+          ) : previewError ? (
+            <div className="text-sm text-destructive-fg py-4">{previewError}</div>
+          ) : previewPrompt == null ? (
+            <div className="text-sm text-foreground-subtle py-4">No preview available.</div>
+          ) : (
+            <pre className="flex-1 min-h-0 overflow-auto text-[11px] text-foreground-faint font-mono bg-surface-inset border border-border-default rounded p-3 whitespace-pre-wrap">
+              {previewPrompt}
+            </pre>
+          )}
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
