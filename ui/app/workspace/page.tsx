@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, Pencil, LayoutPanelLeft, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, Loader2, Pencil, LayoutPanelLeft, MessageSquare, GitBranch } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,7 @@ import { CuratedPageEnvelope } from './_components/curated-page-editor';
 import { normalizeEnvelope } from '@/lib/envelope-markdown';
 import { type EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
 import { mergeGraphs } from '@/lib/envelope-merge';
+import { AddToViewModal } from '@/components/add-to-view-modal';
 
 const logger = createLogger('WorkspacePage');
 
@@ -91,6 +92,7 @@ export default function WorkspacePage() {
   const initialCuratedPageIdsRef = useRef<Set<number>>(new Set());
 
   const [pendingSection, setPendingSection] = useState<{ events: EnvelopeCopyEvent[]; title?: string } | null>(null);
+  const [addToViewEvent, setAddToViewEvent] = useState<EnvelopeCopyEvent | null>(null);
 
   // Local envelope overrides per curated-page id. These represent edits that
   // have been applied in the UI (copy/add from a view) but not yet persisted.
@@ -889,6 +891,10 @@ export default function WorkspacePage() {
     []
   );
 
+  const handleAddToView = useCallback((event: EnvelopeCopyEvent) => {
+    setAddToViewEvent(event);
+  }, []);
+
   const handleSelectStep = useCallback((step: ResearchStepSummary, openInNewTab = false) => {
     const view: SelectedView = { kind: 'step', step };
     setSelectedView(view);
@@ -1525,6 +1531,7 @@ export default function WorkspacePage() {
               activeCuratedPageDeletions={activeCuratedPage ? pendingCuratedDeletions[activeCuratedPage.id] : undefined}
               onCopyToCuratedPage={handleCopyToCuratedPage}
               onRequestCopySection={handleRequestCopySection}
+              onAddToView={handleAddToView}
               tabs={
                 <CuratedPageTabs
                   tabs={tabs}
@@ -1748,6 +1755,14 @@ export default function WorkspacePage() {
             </div>
           </div>
         )}
+
+        <AddToViewModal
+          open={addToViewEvent != null}
+          onOpenChange={(open) => { if (!open) setAddToViewEvent(null); }}
+          event={addToViewEvent}
+          serverId={serverId}
+          bankId={bankId}
+        />
 
       </div>
     </PageShell>

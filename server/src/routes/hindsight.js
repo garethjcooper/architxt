@@ -28,6 +28,7 @@ import { pushMentalModel, createMentalModel } from '../services/hindsight/push-m
 import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import {
   getBankConfig,
+  getBankProfile,
   patchBankConfig,
   normalizeText,
   extractHindsightDisposition,
@@ -1967,6 +1968,7 @@ router.post('/bank-settings/pull', async (req, res) => {
 
   try {
     const configResult = await getBankConfig(serverId, bankId);
+    const profileResult = await getBankProfile(serverId, bankId);
 
     if (!configResult.success) {
       sendResponse({ res, status: 502, error: configResult.error, code: 'PULL_FAILED', logger, method: 'POST', path: '/hindsight/bank-settings/pull', duration: Date.now() - start });
@@ -1978,8 +1980,11 @@ router.post('/bank-settings/pull', async (req, res) => {
     const defaults = defaultsResult.success ? defaultsResult.settings : { ...DEFAULT_BANK_SETTINGS };
 
     const hindDisposition = extractHindsightDisposition(hindConfig);
+    const profileDisposition = profileResult.success && profileResult.profile?.traits
+      ? extractHindsightDisposition(profileResult.profile)
+      : null;
 
-    const disposition = hindDisposition ?? defaults.disposition;
+    const disposition = profileDisposition ?? hindDisposition ?? defaults.disposition;
 
     const payload = {
       retain_mission: normalizeText(typeof hindConfig.retain_mission === 'string' ? hindConfig.retain_mission : defaults.retain_mission),

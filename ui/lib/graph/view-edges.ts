@@ -19,23 +19,23 @@ function isCanonicalEdge(e: ViewEdge): boolean {
 /** Group parallel view edges for visual bundling.
  *
  *  - 'all':   no bundling; each edge is rendered individually.
- *  - 'byType': bundle edges that share the same endpoint pair AND edge_type.
- *  - 'full':   bundle all edges that share the same endpoint pair.
+ *  - 'byType': bundle edges that share the same directed endpoint pair AND edge_type.
+ *  - 'full':   bundle all edges that share the same directed endpoint pair.
  *
  *  Canonical/hindsight edges are suppressed when contextual edges already exist
- *  for the same endpoint pair, matching the canvas rendering behaviour.
+ *  for the same directed endpoint pair, matching the canvas rendering behaviour.
  */
 export function bundleViewEdges(edges: ViewEdge[], mode: EdgeMergeMode): BundledViewEdge[] {
   // Pairs that have at least one contextual (non-canonical) edge.
   const contextualPairs = new Set(
     edges
       .filter((e) => !isCanonicalEdge(e))
-      .map((e) => [e.source, e.target].sort().join('|'))
+      .map((e) => `${e.source}|${e.target}`)
   );
 
   function keepCanonical(e: ViewEdge): boolean {
     if (!isCanonicalEdge(e)) return true;
-    const pair = [e.source, e.target].sort().join('|');
+    const pair = `${e.source}|${e.target}`;
     return !contextualPairs.has(pair);
   }
 
@@ -55,7 +55,7 @@ export function bundleViewEdges(edges: ViewEdge[], mode: EdgeMergeMode): Bundled
     const filtered = edges.filter(keepCanonical);
     const groups = new Map<string, ViewEdge[]>();
     for (const e of filtered) {
-      const pair = [e.source, e.target].sort().join('|');
+      const pair = `${e.source}|${e.target}`;
       const list = groups.get(pair) || [];
       list.push(e);
       groups.set(pair, list);
@@ -69,8 +69,6 @@ export function bundleViewEdges(edges: ViewEdge[], mode: EdgeMergeMode): Bundled
       const bidirectional = directions.size > 1;
       result.push({
         ...representative,
-        source: bidirectional ? sortedSource(group[0]) : representative.source,
-        target: bidirectional ? sortedTarget(group[0]) : representative.target,
         bundledEdges: bundled,
         bundledCount: group.length,
         bidirectional,
@@ -82,7 +80,7 @@ export function bundleViewEdges(edges: ViewEdge[], mode: EdgeMergeMode): Bundled
 
   const groups = new Map<string, ViewEdge[]>();
   for (const e of edges) {
-    const pair = [e.source, e.target].sort().join('|');
+    const pair = `${e.source}|${e.target}`;
     const key = `${pair}|${e.edge_type || ''}`;
     const list = groups.get(key) || [];
     list.push(e);
@@ -101,8 +99,6 @@ export function bundleViewEdges(edges: ViewEdge[], mode: EdgeMergeMode): Bundled
     const bidirectional = directions.size > 1;
     result.push({
       ...representative,
-      source: bidirectional ? sortedSource(group[0]) : representative.source,
-      target: bidirectional ? sortedTarget(group[0]) : representative.target,
       bundledEdges: bundled,
       bundledCount: group.length,
       bidirectional,
@@ -114,14 +110,6 @@ export function bundleViewEdges(edges: ViewEdge[], mode: EdgeMergeMode): Bundled
 
 function pickRepresentative(group: ViewEdge[]): ViewEdge {
   return group.find((e) => e.edge_type) || group[0];
-}
-
-function sortedSource(edge: ViewEdge): string {
-  return [edge.source, edge.target].sort()[0];
-}
-
-function sortedTarget(edge: ViewEdge): string {
-  return [edge.source, edge.target].sort()[1];
 }
 
 /** Given a set of selected visible edge ids and the current merge mode, return

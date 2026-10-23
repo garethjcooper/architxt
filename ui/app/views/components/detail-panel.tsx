@@ -249,51 +249,6 @@ function collectNodeEnvelopes(
   return result;
 }
 
-function collectEdgeContextEnvelopes(
-  sourceId: string,
-  targetId: string,
-  edgeType: string | null | undefined,
-  edgeId: string | undefined,
-  infoMap: Record<string, EntityInfo>,
-  contentMap: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>,
-): UnifiedEnvelope[] {
-  const result: UnifiedEnvelope[] = [];
-  const handledExtIds = new Set<string>();
-
-  for (const info of Object.values(infoMap)) {
-    // First pass: collect all contexts that match endpoints + type.
-    const endpointTypeMatches = (info.edge_contexts || []).filter((ctx) => {
-      const matchesEndpoints =
-        (ctx.source_id === sourceId && ctx.target_id === targetId) ||
-        (ctx.source_id === targetId && ctx.target_id === sourceId);
-      if (!matchesEndpoints) return false;
-      if (edgeType != null && ctx.edge_type !== edgeType) return false;
-      return true;
-    });
-
-    // When a specific edge is selected (merge:none), narrow to contexts for that
-    // exact contextual edge id. Fall back to the broad match if no such context
-    // exists so bundle modes still behave sensibly.
-    const hasExactMatch = edgeId && endpointTypeMatches.some((ctx) => ctx.edge_id === edgeId);
-    const contexts = hasExactMatch
-      ? endpointTypeMatches.filter((ctx) => ctx.edge_id === edgeId)
-      : endpointTypeMatches;
-
-    for (const ctx of contexts) {
-      for (const ref of ctx.refs || []) {
-        if (!ref.ext_id || handledExtIds.has(ref.ext_id)) continue;
-        const entry = contentMap[ref.ext_id];
-        if (entry?.found && entry.mental_model) {
-          handledExtIds.add(ref.ext_id);
-          result.push(contentToEnvelope(entry.mental_model));
-        }
-      }
-    }
-  }
-
-  return result;
-}
-
 function buildNodeDetailEnvelope(
   infoMap: Record<string, EntityInfo>,
   selectedNodeIds: string[],
@@ -307,24 +262,54 @@ function buildNodeDetailEnvelope(
   return mergeEnvelopes(envelopes);
 }
 
-function buildEdgeDetailEnvelope(
+function buildEdgePropertiesEnvelope(
   selectedEdges: ViewEdge[],
-  infoMap: Record<string, EntityInfo>,
-  contentMap: Record<string, { found: boolean; error?: string; mental_model?: MentalModelContent }>,
   nodeByViewId: Map<string, ViewNode>,
 ): UnifiedEnvelope {
-  const edgeEnvelopes: UnifiedEnvelope[] = [];
-  for (const edge of selectedEdges) {
-    const sourceId = edge.source_ref_id || nodeByViewId.get(edge.source)?.ref_id;
-    const targetId = edge.target_ref_id || nodeByViewId.get(edge.target)?.ref_id;
-    if (!sourceId || !targetId) continue;
+  if (!selectedEdges.length) return emptyEnvelope();
 
-    edgeEnvelopes.push(
-      ...collectEdgeContextEnvelopes(sourceId, targetId, edge.edge_type || null, edge.id, infoMap, contentMap),
-    );
+  const rows: Record<string, unknown>[] = [];
+  const evidence = new Set<string>();
+
+  for (const edge of selectedEdges) {
+    const sourceNode = nodeByViewId.get(edge.source);
+    const targetNode = nodeByViewId.get(edge.target);
+    const from = edge.source_ref_id || sourceNode?.ref_id || edge.source;
+    const to = edge.target_ref_id || targetNode?.ref_id || edge.target;
+    const props = edge.properties || {};
+    const label = String(props.label || edge.label || '');
+    const detail = String(props.detail || '');
+    const frequency = String(props.frequency || '');
+    const edgeEvidence = Array.isArray(props.evidence) ? props.evidence : [];
+    for (const id of edgeEvidence) evidence.add(String(id));
+
+    rows.push({
+      from,
+      from_name: sourceNode?.name || sourceNode?.label || from,
+      to,
+      to_name: targetNode?.name || targetNode?.label || to,
+      type: edge.edge_type || edge.type || '',
+      label,
+      detail,
+      frequency,
+      evidence: edgeEvidence,
+      properties: props,
+    });
   }
 
-  return mergeEnvelopes(edgeEnvelopes);
+  return {
+    narratives: [],
+    tables: rows.length
+      ? [{
+          name: `Edges (${rows.length})`,
+          columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'properties'],
+          rows,
+          evidence: Array.from(evidence),
+        }]
+      : [],
+    diagrams: [],
+    graph: { name: '', nodes: [], edges: [] },
+  };
 }
 
 function buildGraphTableEnvelope(graph: UnifiedEnvelope['graph'], edgeColumnFilter?: string[]): UnifiedEnvelope {
@@ -335,106 +320,6 @@ function buildGraphTableEnvelope(graph: UnifiedEnvelope['graph'], edgeColumnFilt
     tables: [{ name: `Graph edges (${edgeRows.length})`, columns: edgeColumns, rows: edgeRows, evidence: [] }],
     diagrams: [],
     graph: { name: '', nodes: [], edges: [] },
-  };
-}
-
-function normalizeEdgeSignature(a: string, b: string, type: string): string {
-  const pair = [a, b].sort().join('|');
-  return `${pair}|${type || ''}`;
-}
-
-function filterEnvelopeBySelectedEdges(
-  envelope: UnifiedEnvelope,
-  selectedEdges: ViewEdge[],
-  nodeByViewId: Map<string, ViewNode>,
-  edgeMergeMode: EdgeMergeMode,
-): UnifiedEnvelope {
-  if (!selectedEdges.length || !envelope.graph?.edges?.length) return envelope;
-
-  const selectedEdgeIds = new Set<string>(
-    selectedEdges.map((e) => e.id).filter(Boolean),
-  );
-  const selectedEdgeLabels = new Set<string>();
-  const selectedEdgeDetails = new Set<string>();
-  const signatures = new Set<string>();
-  for (const edge of selectedEdges) {
-    const sourceRef = edge.source_ref_id || nodeByViewId.get(edge.source)?.ref_id;
-    const targetRef = edge.target_ref_id || nodeByViewId.get(edge.target)?.ref_id;
-    if (sourceRef && targetRef) {
-      signatures.add(normalizeEdgeSignature(sourceRef, targetRef, edge.edge_type || edge.type || ''));
-    }
-    if (edge.label) selectedEdgeLabels.add(edge.label);
-    if (edge.properties?.detail) selectedEdgeDetails.add(edge.properties.detail);
-  }
-
-  // The mental-model envelope graph may contain every parallel edge between the
-  // selected endpoints (the edge-context model is keyed by endpoint pair). To
-  // show exactly the edges that are part of the current selection, rebuild the
-  // graph from the selected ViewEdges and enrich it with any matching
-  // mental-model edge properties when available.
-  const selectedGraphEdges: GraphEdge[] = [];
-  const selectedGraphNodes: GraphNode[] = [];
-  const seenNodeIds = new Set<string>();
-  for (const edge of selectedEdges) {
-    const converted = viewEdgeToGraphEdge(edge, nodeByViewId);
-    if (!converted) continue;
-    selectedGraphEdges.push(converted.edge);
-    for (const refNode of [converted.sourceNode, converted.targetNode]) {
-      if (!refNode || seenNodeIds.has(refNode.ref_id || refNode.id)) continue;
-      seenNodeIds.add(refNode.ref_id || refNode.id);
-      selectedGraphNodes.push({
-        id: refNode.ref_id || refNode.id,
-        name: refNode.properties?.display_name || refNode.properties?.name || refNode.id,
-        label: refNode.properties?.display_name || refNode.properties?.name || refNode.id,
-        type: Array.isArray(refNode.labels) ? refNode.labels[0] : refNode.properties?.entity_type,
-        properties: refNode.properties || {},
-      });
-    }
-  }
-
-  // Try to enrich selected edges with properties from matching mental-model edges.
-  const enrichedEdges = selectedGraphEdges.map((selectedEdge) => {
-    const candidates = envelope.graph.edges.filter((e) => {
-      const sig = normalizeEdgeSignature(e.from, e.to, e.type || '');
-      const selectedSig = normalizeEdgeSignature(selectedEdge.from, selectedEdge.to, selectedEdge.type || '');
-      return sig === selectedSig;
-    });
-    const exact = candidates.find(
-      (e) => e.id && selectedEdgeIds.has(e.id),
-    ) || candidates.find(
-      (e) => (e.label && selectedEdgeLabels.has(e.label)) || (e.detail && selectedEdgeDetails.has(e.detail)),
-    ) || candidates[0];
-    if (!exact) return selectedEdge;
-    return {
-      ...selectedEdge,
-      properties: { ...selectedEdge.properties, ...(exact.properties || {}) },
-      evidence: exact.evidence?.length ? exact.evidence : selectedEdge.evidence,
-      detail: selectedEdge.detail || exact.detail || '',
-    };
-  });
-
-  const finalEdges = enrichedEdges;
-
-  if (finalEdges.length === envelope.graph.edges.length && finalEdges.every((e) =>
-    envelope.graph.edges.some((orig) => orig.id === e.id && orig.from === e.from && orig.to === e.to && orig.type === e.type),
-  )) return envelope;
-
-  const keptNodeIds = new Set<string>();
-  for (const e of finalEdges) {
-    keptNodeIds.add(e.from);
-    keptNodeIds.add(e.to);
-  }
-  const keptNodes = selectedGraphNodes.length > 0
-    ? selectedGraphNodes.filter((n) => keptNodeIds.has(n.id))
-    : envelope.graph.nodes.filter((n) => keptNodeIds.has(n.id));
-
-  return {
-    ...envelope,
-    graph: {
-      name: envelope.graph.name || '',
-      nodes: keptNodes,
-      edges: finalEdges,
-    },
   };
 }
 
@@ -662,8 +547,11 @@ export function DetailPanel({
       const nodeIds = selectedNodes.map((n) => n.ref_id).filter(Boolean) as string[];
       result = buildNodeDetailEnvelope(infoMap, nodeIds, contentMap);
     } else {
-      result = buildEdgeDetailEnvelope(selectedEdges, infoMap, contentMap, nodeByViewId);
-      result = filterEnvelopeBySelectedEdges(result, selectedEdges, nodeByViewId, edgeMergeMode);
+      // For edge selections, render the stored contextual-graph edge properties
+      // directly. Each ViewEdge carries the full cge_properties of the underlying
+      // contextual-graph edge, so there is no need to reverse-match mental-model
+      // table rows by endpoint/label signatures.
+      result = buildEdgePropertiesEnvelope(selectedEdges, nodeByViewId);
     }
 
     // If no mental-model content came back for a selection, fall back to a

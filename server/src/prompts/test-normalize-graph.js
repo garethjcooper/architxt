@@ -29,7 +29,7 @@ describe('normalizeGraph', () => {
     assert.strictEqual(result.edges[0].provenance, 'inferred');
   });
 
-  it('collapses duplicate edges by (from, to, type)', () => {
+  it('preserves parallel edges by default', () => {
     const result = normalizeGraph({
       nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'a-svc:SVC-005', name: 'Rating' }],
       edges: [
@@ -37,6 +37,21 @@ describe('normalizeGraph', () => {
         { from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'events', detail: 'B' },
       ],
     });
+    assert.strictEqual(result.edges.length, 2);
+    assert.strictEqual(result.edges[0].label, 'usage data');
+    assert.strictEqual(result.edges[0].detail, 'A');
+    assert.strictEqual(result.edges[1].label, 'events');
+    assert.strictEqual(result.edges[1].detail, 'B');
+  });
+
+  it('can still collapse duplicate edges when preserveParallelEdges is false', () => {
+    const result = normalizeGraph({
+      nodes: [{ id: 'a-com:COM-001', name: 'Singleview' }, { id: 'a-svc:SVC-005', name: 'Rating' }],
+      edges: [
+        { from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'usage data', detail: 'A' },
+        { from: 'a-com:COM-001', to: 'a-svc:SVC-005', type: 'sends', label: 'events', detail: 'B' },
+      ],
+    }, { preserveParallelEdges: false });
     assert.strictEqual(result.edges.length, 1);
     assert.strictEqual(result.edges[0].label, 'usage data; events');
     assert.strictEqual(result.edges[0].detail, 'A; B');

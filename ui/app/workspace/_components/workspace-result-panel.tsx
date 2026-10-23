@@ -44,6 +44,8 @@ export interface WorkspaceResultPanelProps {
   onCopyToCuratedPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Called from inside a curated page editor to copy a section via the target picker. */
   onRequestCopySection?: (event: EnvelopeCopyEvent) => void;
+  /** Called when the user requests to send a section to a view (diagram/graph). */
+  onAddToView?: (event: EnvelopeCopyEvent) => void;
   /** Optional tabs or navigation rendered between the header and the content. */
   tabs?: React.ReactNode;
   /** Optional override for the header bar title. Defaults to title. */
@@ -70,6 +72,7 @@ export function WorkspaceResultPanel({
   activeCuratedPageDeletions,
   onCopyToCuratedPage,
   onRequestCopySection,
+  onAddToView,
   tabs,
   headerTitle,
 }: WorkspaceResultPanelProps) {
@@ -203,6 +206,7 @@ export function WorkspaceResultPanel({
         bankId={bankId}
         sessionName={sessionName}
         onAddToPage={onCopyToCuratedPage}
+        onAddToView={onAddToView}
         tabs={tabs}
       />
     </div>

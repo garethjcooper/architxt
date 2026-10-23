@@ -28,10 +28,14 @@ export interface EnvelopeViewerProps {
   count?: number;
   /** Called when a copy action is requested. When omitted, the viewer copies/downloads directly. */
   onCopy?: (event: EnvelopeCopyEvent) => void;
-  /** Optional callback to add structured or narrative content to a curated page. May receive a single event or an array of events for whole-document decomposition. */
+  /** Optional callback to add a section/block to a curated page. May receive a single event or an array of events for whole-document decomposition. */
   onAddToPage?: (event: EnvelopeCopyEvent | EnvelopeCopyEvent[]) => void;
   /** Optional label for the add-to-page action. */
   addToPageLabel?: string;
+  /** Optional callback to send a section to a view (diagram/graph). */
+  onAddToView?: (event: EnvelopeCopyEvent) => void;
+  /** Optional label for the add-to-view action. */
+  addToViewLabel?: string;
   /** Optional key namespace passed through to NarrativeViewer. */
   keyPrefix?: string;
   /** Optional extra className for the outer container. */
@@ -79,6 +83,8 @@ export function EnvelopeViewer({
   sessionName,
   onAddToPage,
   addToPageLabel,
+  onAddToView,
+  addToViewLabel,
   tabs,
   headerTitle,
 }: EnvelopeViewerProps) {
@@ -358,9 +364,11 @@ export function EnvelopeViewer({
           showIndex={effectiveShowIndex}
           onCopySection={handleCopySection}
           onAddToPage={handleAddSection}
+          addToPageLabel={addToPageLabel}
+          onAddToView={onAddToView}
+          addToViewLabel={addToViewLabel}
           resolveSectionCopy={resolveSectionCopy}
           onCopyWholeDocument={handleCopyWholeDocument}
-          addToPageLabel={addToPageLabel}
           keyPrefix={keyPrefix}
           className="h-full"
           sidebarWidth={sidebarWidth}

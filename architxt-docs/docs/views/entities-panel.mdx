@@ -9,9 +9,9 @@ The **Entities** panel is the left column of the Views page. It lists every grou
 ## What is listed
 
 - One row per grounded entity in the bank.
-- Expanding an entity reveals its edges.
-- The first level shows the grounded co-occurrence edges from Hindsight.
-- The next level shows contextualised edges that were found for each grounded edge.
+- Expanding an entity reveals its edges grouped by directed endpoint pair (`source → target`).
+- The group header represents all edges between the same two entities, regardless of edge type or label.
+- Expanding a group shows the individual edges underneath, including the underlying grounded edge and any contextualised variants.
 
 ## Filters
 
@@ -26,10 +26,16 @@ The **Entities** panel is the left column of the Views page. It lists every grou
 | Checkbox | Effect on the canvas |
 |---|---|
 | **Entity** | Include or exclude the entity. |
-| **Grounded edge** | Toggle the whole grounded co-occurrence relationship at once. |
-| **Contextualised edge** | Toggle an individual contextual edge underneath a grounded edge. |
+| **Edge group header** | Toggle every edge in the group on or off at once. |
+| **Individual edge** | Toggle a single edge beneath a group. |
 
-When you select an edge, both of its endpoint entities are implied onto the canvas automatically.
+When only some edges in a group are selected, the group checkbox shows an indeterminate state.
+
+When you select any edge, both of its endpoint entities are implied onto the canvas automatically.
+
+## Edge direction
+
+Edges are grouped and rendered using their real mental-model direction (`source → target`). The canvas arrow points from source to target. When an edge is detected as bidirectional, markers are drawn on both ends.
 
 ## Find in panel
 
@@ -37,4 +43,4 @@ If you use the canvas find shortcut (`F3` / find) to locate an item on the graph
 
 ## Edge hierarchy
 
-Grounded co-occurrence edges appear first. The contextualised edges discovered for each grounded relationship appear underneath. This lets you turn on a whole relationship or inspect the individual edges that produced it.
+The top level lists entities. Under each entity, edges are grouped by their directed endpoint pair. The group row shows the endpoint pair and a count of edges in the group. Expanding the group reveals the individual edges, letting you turn on a whole relationship or select specific contextual variants.

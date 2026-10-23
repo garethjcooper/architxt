@@ -42,29 +42,29 @@ Graph previews share the common envelope controls and add graph-specific explora
 
 ## The Focus modal
 
-The **Focus** modal is the main action surface for a graph. It opens the graph in a larger view and exposes controls for turning the graph into other section types.
+The **Focus** modal is the main action surface for a graph. It opens the graph in a larger view and exposes controls for turning the graph into other section types or into a View.
 
 | Action | Result |
 |---|---|
 | **Add diagram to page** | Converts the graph into a Mermaid diagram section on the active curated page. Evidence attached to nodes and edges is carried over to the diagram. |
 | **Add table to page** | Converts the graph into a table section on the active curated page, giving you a structured view of nodes, edges, or both. |
+| **Create view** | Creates a new View from the selected nodes and edges in the modal. Enter a name and click **Create view**; a toast confirms the result. |
 | **Copy** | Copies the graph source or image, depending on the control you use. |
 | **Fit to page** | The modal opens with fit-to-page enabled so the whole graph is visible at a glance. |
 
-:::tip[Graphs become diagrams or tables, not editable graph sections]
-A curated page cannot hold a live graph section. Instead, the Focus modal lets you add a **diagram** (static Mermaid flowchart) or a **table** derived from the graph. The graph itself stays read-only in the Preview tab.
+:::tip[Graphs become diagrams, tables, or Views]
+A curated page cannot hold a live graph section. Instead, the Focus modal lets you add a **diagram** or **table** to the active curated page, or create a **View** that you can open and edit on the Views page.
 :::
 
-## From graph to curated page
+## From graph to curated page or View
 
-The typical flow is:
+Open the **Focus** modal from a graph preview and choose:
 
-1. Ask a Reflect question that requests a graph, or open a mental model whose output is a graph.
-2. Inspect the interactive canvas in the Preview tab.
-3. Pan, zoom, and filter until the important relationships are visible.
-4. Select nodes to read their details and evidence.
-5. Open the **Focus** modal and choose **Add diagram to page** or **Add table to page**.
-6. In the curated page, edit the generated diagram source or table cells, then save the page.
+- **Add diagram to page** — convert the graph into a Mermaid diagram section on the active curated page.
+- **Add table to page** — convert the graph into a table section on the active curated page.
+- **Create view** — create a new View from the selected nodes and edges in the modal. Enter a name and click **Create view**; a toast confirms the result. The new View is saved to the active server and bank and can be opened from the Views page.
+
+Curated-page sections can be edited and saved with the page. Views created this way are full Views canvas objects, not sections.
 
 ## Relationship to other focus pages
 
@@ -77,4 +77,4 @@ Graphs and diagrams are closely related but serve different purposes. A graph is
 
 ## Summary
 
-The graph focus turns Reflect output into an interactive network canvas. Previews give you zoom, filter, search, and details controls; the Focus modal converts the graph into a diagram or table section on a curated page.
+The graph focus turns Reflect output into an interactive network canvas. Previews give you zoom, filter, search, and details controls; the Focus modal converts the graph into a diagram or table section on a curated page, or into a new View.

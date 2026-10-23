@@ -63,7 +63,9 @@ Example:
 ```
 
 Rules:
+- Arrow labels: if the provided context includes an existing contextual-graph or mental-model edge between the same two blocks, reuse its exact `label` and `type` for the arrow label. Only generate a new label when no such edge exists. Direction does not matter for this lookup.
 - Use `block-beta`, not `block`.
 - Define `columns` early so the layout is predictable.
+- Node labels should be plain display names followed by the canonical entity id in the form `Display Name example-type:EXAMPLE-001`. Do NOT use parentheses `()`, square brackets `[]`, or the narrative entity-reference format `[[Name (type:id)]]` inside Mermaid labels. The id must be a plain space-separated `type:id` suffix. Wrong: `Example System (EXAMPLE-001)` or `[[Example System (example-type:EXAMPLE-001)]]`. Right: `Example System example-type:EXAMPLE-001`. Do not put raw catalog references such as `EXT:EXT-ERP-001` or `A-C:XFR-ENG-001` inside node labels as plain text.
 - One block, group, arrow, or style per line.
 - No blank lines inside the Mermaid source.

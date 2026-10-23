@@ -110,6 +110,7 @@ export function groupResolvedEntities(matches) {
         id: entityId,
         db_id: entityId,
         entity_id: m.entity_id,
+        canonical_id: m.type_name ? `${m.type_name}:${m.entity_id}` : m.entity_id,
         name: m.name,
         type_name: m.type_name,
         canonical_reference: buildTag(m.name, m.name, m.entity_id, m.type_name, formatKey),

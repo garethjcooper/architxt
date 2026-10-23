@@ -7,12 +7,12 @@ import {
   getEdge,
   deleteEdge,
   deleteNode,
-  findEdgeByEndpoints,
 } from '../../db/crud/contextual-graph.js';
 import { buildDirectedEdgeId, normalizeModelNodeId, modelNodeLookupKeys, stripDiscoveryPrefix } from './identity.js';
 import { createLogger } from '../../utils/logger.js';
 import { contentHash } from './normalize-model-output.js';
 import { getRoleScopeMap } from '../../db/crud/template-roles.js';
+import { deriveEdgeContextEdges } from './table-to-edges.js';
 
 const logger = createLogger('contextual-graph-apply-model-output');
 
@@ -128,10 +128,21 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     return { success: false, error: 'Cannot resolve pair from edge-ctx model scope', code: 'BAD_SCOPE' };
   }
 
+  // Edge-context models may return either a table (preferred) or the legacy
+  // graph envelope. Normalize both into the same edge list.
+  const effective = deriveEdgeContextEdges(output);
+
   const warnings = [];
-  if (output.graph.edges.length === 0) {
+  if (effective.edges.length === 0) {
     return { success: false, error: 'edge-ctx model returned no edges', code: 'NO_EDGES' };
   }
+
+  logger.debug('applyEdgeContext input source', {
+    extId: model.mm_ext_id,
+    source: effective.source,
+    nodeCount: effective.nodes.length,
+    edgeCount: effective.edges.length,
+  });
 
   const allEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
   const allEdges = allEdgesResult?.success ? allEdgesResult.data : [];
@@ -143,12 +154,9 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   const modelRef = buildModelRef(model, output.raw, timestamp);
 
   // Compute the set of node ids that are actually used as edge endpoints in the
-  // model output. The graph-format contract requires every emitted node to be an
-  // endpoint; enforcing this in code prevents models from accidentally creating
-  // working-graph nodes for intermediaries that should only live inside edge
-  // properties.
+  // model output. The contract requires every emitted node to be an endpoint.
   const endpointModelIds = new Set();
-  for (const modelEdge of output.graph.edges) {
+  for (const modelEdge of effective.edges) {
     if (modelEdge.from) endpointModelIds.add(modelEdge.from);
     if (modelEdge.to) endpointModelIds.add(modelEdge.to);
   }
@@ -167,6 +175,12 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     deleteEdge(db, serverId, bankId, edge.cge_id);
   }
 
+  logger.debug('applyEdgeContext removed existing edges', {
+    extId: model.mm_ext_id,
+    removedCount: edgesToRemove.length,
+    removedIds: edgesToRemove.map((e) => e.cge_id),
+  });
+
   // Remove orphan nodes that were created by this edge-context model and are
   // no longer endpoints of any emitted edge. This prevents models from leaving
   // behind stale intermediaries when a refreshed output no longer references
@@ -174,7 +188,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   const remainingEdgesResult = listEdges(db, serverId, bankId, { limit: 10000 });
   const remainingEdges = remainingEdgesResult?.success ? remainingEdgesResult.data : [];
   const endpointIds = new Set();
-  for (const edge of output.graph.edges) {
+  for (const edge of effective.edges) {
     if (edge.from) endpointIds.add(edge.from);
     if (edge.to) endpointIds.add(edge.to);
   }
@@ -208,7 +222,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   // node instead of creating a new duplicate.
   let createdNodes = 0;
   const idRemap = new Map();
-  for (const node of output.graph.nodes) {
+  for (const node of effective.nodes) {
     if (!endpointModelIds.has(node.id)) {
       warnings.push(`Ignoring non-endpoint node emitted by edge-ctx model: ${node.id}`);
       continue;
@@ -256,7 +270,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
   const appliedEdges = [];
   const touchedEdgeIds = new Set();
 
-  for (const modelEdge of output.graph.edges) {
+  for (const modelEdge of effective.edges) {
     if (!modelEdge.from || !modelEdge.to || !modelEdge.type) {
       warnings.push('Skipping malformed model edge missing from/to/type');
       continue;
@@ -265,25 +279,34 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     const fromId = idRemap.get(modelEdge.from) || resolveModelNodeId(modelEdge.from, existingNodeIds, nodeIdByModelId);
     const toId = idRemap.get(modelEdge.to) || resolveModelNodeId(modelEdge.to, existingNodeIds, nodeIdByModelId);
 
-    // Look for an existing edge between the same endpoints and type. We query
-    // the DB directly so large banks don't miss edges due to an in-memory page
-    // limit. Edges touched earlier in this same call are ignored so parallel
-    // edges of the same type but different labels remain distinct.
-    const findResult = findEdgeByEndpoints(db, serverId, bankId, fromId, toId, modelEdge.type);
-    let existing = findResult?.success ? findResult.data : null;
+    // Compute the deterministic edge id first. Different labels/details produce
+    // different ids, so parallel edges (e.g. "rated Jasper records" and
+    // "rated charging" between the same endpoints) stay separate rows.
+    let edgeId = buildDirectedEdgeId(fromId, toId, modelEdge.type, modelEdge.label, 'edge-ctx', modelEdge.detail);
+    const getResult = getEdge(db, serverId, bankId, edgeId);
+    const existing = getResult?.success ? getResult.data : null;
+
     if (existing && touchedEdgeIds.has(existing.cge_id)) {
-      existing = null;
+      // Already handled another model edge with the same deterministic id in
+      // this pass (should not happen with deterministic ids, but guard anyway).
+      continue;
     }
 
-    let edgeId;
+    logger.debug('applyEdgeContext edge decision', {
+      extId: model.mm_ext_id,
+      modelEdge: { from: modelEdge.from, to: modelEdge.to, type: modelEdge.type, label: modelEdge.label, detail: modelEdge.detail?.slice(0, 60) },
+      resolved: { fromId, toId },
+      edgeId,
+      existingId: existing?.cge_id || null,
+    });
+
     let source;
     let target;
     let properties;
 
     if (existing) {
-      edgeId = existing.cge_id;
-      source = existing.cge_source_id;
-      target = existing.cge_target_id;
+      source = fromId;
+      target = toId;
       properties = {
         ...existing.cge_properties,
         ...(modelEdge.properties || {}),
@@ -296,7 +319,6 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
         updated_at: timestamp,
       };
     } else {
-      edgeId = buildDirectedEdgeId(fromId, toId, modelEdge.type, modelEdge.label, 'edge-ctx', modelEdge.detail);
       source = fromId;
       target = toId;
       properties = {
@@ -323,6 +345,14 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     touchedEdgeIds.add(edgeId);
     appliedEdges.push(edgeId);
   }
+
+  logger.debug('applyEdgeContext result', {
+    extId: model.mm_ext_id,
+    appliedEdges: appliedEdges.length,
+    createdNodes,
+    deletedNodes,
+    warnings,
+  });
 
   return { success: true, applied: { edgeIds: appliedEdges, createdNodes, deletedNodes }, warnings };
 }

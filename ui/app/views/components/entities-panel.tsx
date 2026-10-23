@@ -20,7 +20,6 @@ import {
   isCandidateNode,
   isGroundedEdge,
   isCandidateEdge,
-  getEdgeSortGroup,
 } from '@/lib/contextual-graph/display';
 import { contextualGraphApi } from '@/lib/api/client';
 import type { View, ViewGraph, ViewLayout, ViewNode, ViewEdge } from '@/lib/types';
@@ -62,23 +61,6 @@ function isEntityId(id: string): boolean {
   return id.startsWith('entity-');
 }
 
-function canonicalViewEdge(edge: ViewEdge): ViewEdge {
-  const source = edge.source ?? '';
-  const target = edge.target ?? '';
-  const sourceRef = edge.source_ref_id ?? '';
-  const targetRef = edge.target_ref_id ?? '';
-  const a = [source, sourceRef].join('\0');
-  const b = [target, targetRef].join('\0');
-  if (a <= b) return edge;
-  return {
-    ...edge,
-    source: target,
-    target: source,
-    source_ref_id: targetRef,
-    target_ref_id: sourceRef,
-  };
-}
-
 function stripEntityPrefix(id: string): string {
   return id.startsWith('entity-') ? id.slice('entity-'.length) : id;
 }
@@ -86,7 +68,10 @@ function stripEntityPrefix(id: string): string {
 function groupEdges(edges: DisplayEdge[], nodeById: Map<string, DisplayNode>): EdgeGroup[] {
   const rawGroups = new Map<string, DisplayEdge[]>();
   for (const edge of edges) {
-    const key = getEdgeSortGroup(edge);
+    // Group by the directed endpoint pair only, so all related edges
+    // (hindsight skeleton + contextual edges from every mental model) share
+    // one expandable row and stop duplicating source/target labels.
+    const key = `${edge.source_id}|${edge.target_id}`;
     let list = rawGroups.get(key);
     if (!list) {
       list = [];
@@ -98,22 +83,12 @@ function groupEdges(edges: DisplayEdge[], nodeById: Map<string, DisplayNode>): E
   const groups: EdgeGroup[] = [];
   for (const [key, members] of rawGroups) {
     const rep = members[0];
-    const rawSourceId = toEntityViewId(rep.source_id);
-    const rawTargetId = toEntityViewId(rep.target_id);
-    const rawSourceRef = rep.source_id;
-    const rawTargetRef = rep.target_id;
-    const a = [rawSourceId, rawSourceRef].join('\0');
-    const b = [rawTargetId, rawTargetRef].join('\0');
-    const flipped = a > b;
-    const [sourceViewId, targetViewId] = flipped
-      ? [rawTargetId, rawSourceId]
-      : [rawSourceId, rawTargetId];
-    const [sourceRefId, targetRefId] = flipped
-      ? [rawTargetRef, rawSourceRef]
-      : [rawSourceRef, rawTargetRef];
-    const [sourceLabel, targetLabel] = flipped
-      ? [nodeById.get(rep.target_id)?.label || rep.target_id, nodeById.get(rep.source_id)?.label || rep.source_id]
-      : [nodeById.get(rep.source_id)?.label || rep.source_id, nodeById.get(rep.target_id)?.label || rep.target_id];
+    const sourceViewId = toEntityViewId(rep.source_id);
+    const targetViewId = toEntityViewId(rep.target_id);
+    const sourceRefId = rep.source_id;
+    const targetRefId = rep.target_id;
+    const sourceLabel = nodeById.get(rep.source_id)?.label || rep.source_id;
+    const targetLabel = nodeById.get(rep.target_id)?.label || rep.target_id;
     const typeName = rep.type;
     const hindsightEdge = members.find(
       (e) => e.id.startsWith('hindsight-') || e.properties?.provenance?.source === 'hindsight'
@@ -197,8 +172,14 @@ function deriveGroupState(
   const selected = allIds.filter((id) => checkedIds.has(id)).length;
   return {
     checked: selected > 0,
-    indeterminate: false,
+    indeterminate: selected > 0 && selected < total,
   };
+}
+
+function collectGroupToggleIds(group: EdgeGroup): string[] {
+  // The group header now represents the endpoint pair, so toggling it
+  // selects/deselects every related edge (hindsight + all contextual).
+  return collectGroupAllEdgeIds(group);
 }
 
 function collectContextualEdgeIds(group: EdgeGroup): string[] {
@@ -240,13 +221,6 @@ function PanelCheckbox({
       {!checked && indeterminate && <Minus className="h-3.5 w-3.5 text-foreground-default" />}
     </button>
   );
-}
-
-function collectGroupToggleIds(group: EdgeGroup): string[] {
-  // For hindsight-backed groups, the group header toggles only the hindsight
-  // edge. Contextual child edges are added individually via their own checkboxes.
-  if (group.hindsightEdge) return [group.hindsightEdge.id];
-  return collectContextualEdgeIds(group);
 }
 
 function collectGroupAllEdgeIds(group: EdgeGroup): string[] {
@@ -370,9 +344,9 @@ function buildViewGraph(
           properties: edge.properties,
         };
         if (existing) {
-          nextEdges.push(canonicalViewEdge({ ...existing, ...base }));
+          nextEdges.push({ ...existing, ...base });
         } else {
-          nextEdges.push(canonicalViewEdge(base));
+          nextEdges.push(base);
         }
       }
       for (const edge of group.edges) {
@@ -393,9 +367,9 @@ function buildViewGraph(
           properties: edge.properties,
         };
         if (existing) {
-          nextEdges.push(canonicalViewEdge({ ...existing, ...base }));
+          nextEdges.push({ ...existing, ...base });
         } else {
-          nextEdges.push(canonicalViewEdge(base));
+          nextEdges.push(base);
         }
       }
     }
@@ -837,22 +811,18 @@ export function EntitiesPanel({ serverId, bankId, activeView, onChange, findTarg
                       <div className="border-t border-border-default px-1 py-1 space-y-0.5">
                         {row.groups.map((group) => {
                           const groupExpanded = expandedGroupKeys.has(group.key);
-                          const { checked: groupChecked } = deriveGroupState(group, checkedIds);
+                          const { checked: groupChecked, indeterminate: groupIndeterminate } = deriveGroupState(group, checkedIds);
                           const groupColor = colorForType(
                             group.hindsightEdge?.type || group.typeName || 'edge'
                           );
-                          const groupSecondary = group.hindsightEdge
-                            ? group.hindsightEdge.label || group.hindsightEdge.detail || group.hindsightEdge.type || group.hindsightEdge.id
-                            : null;
+                          const groupEdgesAll: DisplayEdge[] = group.hindsightEdge
+                            ? [group.hindsightEdge, ...group.edges]
+                            : group.edges;
 
                           return (
                             <div
                               key={group.key}
-                              data-find-id={group.hindsightEdge ? `edge-row-${group.hindsightEdge.id}` : undefined}
-                              className={cn(
-                                'rounded overflow-hidden',
-                                group.hindsightEdge && highlightId === `edge-row-${group.hindsightEdge.id}` && 'find-highlight'
-                              )}
+                              className="rounded overflow-hidden"
                             >
                               <div
                                 className="flex items-center gap-2 px-2 py-1 text-left hover:bg-surface-card transition-colors"
@@ -860,6 +830,7 @@ export function EntitiesPanel({ serverId, bankId, activeView, onChange, findTarg
                               >
                                 <PanelCheckbox
                                   checked={groupChecked}
+                                  indeterminate={groupIndeterminate}
                                   onChange={() => toggleGroup(row, group)}
                                   disabled={disabled}
                                   title={groupChecked ? 'Remove group from canvas' : 'Add group to canvas'}
@@ -874,32 +845,21 @@ export function EntitiesPanel({ serverId, bankId, activeView, onChange, findTarg
                                 </button>
                                 <div className="min-w-0 flex-1 flex flex-col justify-center">
                                   <div className="text-[11px] text-foreground-default truncate">
-                                    {group.hindsightEdge?.label || (
-                                      <>
-                                        {group.sourceLabel} <span className="text-foreground-faint">→</span> {group.targetLabel}
-                                      </>
-                                    )}
-                                    {group.edges.length === 0 && group.hindsightEdge && (
-                                      <span className="ml-1 text-[9px] text-foreground-subtle">(hindsight)</span>
-                                    )}
+                                    {group.sourceLabel} <span className="text-foreground-faint">→</span> {group.targetLabel}
                                   </div>
-                                  {groupSecondary && (
-                                    <div className="text-[10px] text-foreground-subtle font-mono truncate" title={groupSecondary}>
-                                      {groupSecondary}
-                                    </div>
-                                  )}
                                 </div>
                                 <span className="text-[9px] text-foreground-subtle px-1 py-0.5 rounded border border-border-default bg-surface-card shrink-0">
-                                  {group.edges.length}
+                                  {groupEdgesAll.length}
                                 </span>
                               </div>
 
                               {groupExpanded && (
                                 <div className="pl-5 pr-1 py-0.5 space-y-0.5">
-                                  {group.edges.map((edge) => {
+                                  {groupEdgesAll.map((edge) => {
                                     const edgeChecked = edgeIsChecked(edge, checkedIds);
                                     const edgeColor = colorForType(edge.type || 'edge');
-                                    const secondary = edge.label || edge.type || edge.id;
+                                    const primary = edge.label || edge.type || edge.id;
+                                    const isHindsight = edge === group.hindsightEdge;
 
                                     return (
                                       <div
@@ -919,9 +879,12 @@ export function EntitiesPanel({ serverId, bankId, activeView, onChange, findTarg
                                         />
                                         <div className="min-w-0 flex-1">
                                           <div className="text-[11px] text-foreground-default truncate">
-                                            {group.sourceLabel} <span className="text-foreground-faint">→</span> {group.targetLabel}
+                                            {primary}
+                                            {isHindsight && (
+                                              <span className="ml-1 text-[9px] text-foreground-subtle">(hindsight)</span>
+                                            )}
                                           </div>
-                                          <div className="text-[10px] text-foreground-subtle font-mono truncate">{secondary}</div>
+                                          <div className="text-[10px] text-foreground-subtle font-mono truncate">{edge.type || edge.id}</div>
                                         </div>
                                       </div>
                                     );

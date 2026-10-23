@@ -236,6 +236,99 @@ describe('refreshContextualGraphPatches', () => {
     assert.equal(node.properties.provenance.model_refs[0].last_refresh_status, 'ok');
   });
 
+  it('re-applies edge-ctx models when the generated edge set changes', async () => {
+    // Attach the edge-ctx model ref to an endpoint node (the same way the UI
+    // attaches edge-context models to the source node of the selected edge).
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['active'], { display_name: 'ICMS' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['active'], {
+      display_name: 'Singleview',
+      provenance: {
+        source: 'contextual-graph',
+        model_refs: [{
+          ext_id: 'edge-ctx-icms-singleview',
+          role: 'sys_edge_context',
+          scope: { source_id: 'a-com:COM-001', target_id: 'a-com:COM-002' },
+          content_hash: 'oldhash',
+          fetched_at: '2026-01-01T00:00:00Z',
+          attached_at: '2026-01-01T00:00:00Z',
+        }],
+      },
+    });
+
+    const firstContent = JSON.stringify({
+      narratives: [],
+      graph: {
+        name: 'Edge Context ICMS - Singleview',
+        nodes: [
+          { id: 'a-com:COM-001', name: 'Singleview' },
+          { id: 'a-com:COM-002', name: 'ICMS' },
+          { id: 'a-com:COM-049', name: 'Fuse' },
+        ],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'rental feed', detail: 'rental feed detail', evidence: ['e1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'usage data detail', evidence: ['e2'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'calls', label: 'account merge', detail: 'account merge detail', evidence: ['e3'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    });
+
+    const secondContent = JSON.stringify({
+      narratives: [],
+      graph: {
+        name: 'Edge Context ICMS - Singleview',
+        nodes: [
+          { id: 'a-com:COM-001', name: 'Singleview' },
+          { id: 'a-com:COM-002', name: 'ICMS' },
+          { id: 'a-com:COM-019', name: 'IME' },
+        ],
+        edges: [
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'usage data', detail: 'usage data detail v2', evidence: ['e2'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'rental feed', detail: 'rental feed detail', evidence: ['e1'] },
+          { from: 'a-com:COM-001', to: 'a-com:COM-019', type: 'sends', label: 'rated charging', detail: 'Singleview sends rated charging to IME', evidence: ['e4'] },
+          { from: 'a-com:COM-019', to: 'a-com:COM-002', type: 'sends', label: 'rated charging', detail: 'IME forwards rated charging to ICMS', evidence: ['e4'] },
+        ],
+      },
+      tables: [],
+      diagrams: [],
+    });
+
+    let currentContent = firstContent;
+    const injectedList = async () => ({
+      success: true,
+      mentalModels: [mentalModelWithContent('edge-ctx-icms-singleview', currentContent)],
+    });
+
+    // First refresh: apply the initial edge set.
+    let result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.applied, 1);
+
+    const listEdges = (await import('../src/db/crud/contextual-graph.js')).listEdges;
+    const firstEdges = listEdges(db, serverId, bankId, { limit: 1000 }).data;
+    assert.ok(firstEdges.some((e) => e.cge_source_id === 'a-com:COM-001' && e.cge_target_id === 'a-com:COM-002' && e.cge_type === 'calls'));
+    assert.equal(firstEdges.length, 3);
+
+    // Second refresh: the model output has changed (new IME edges, dropped calls
+    // edge). The old code could miss this when an existing parallel edge matched
+    // one of the new edges.
+    currentContent = secondContent;
+    result = await refreshContextualGraphPatches(db, serverId, bankId, { listAllMentalModels: injectedList });
+    assert.equal(result.success, true);
+    assert.equal(result.stats.applied, 1);
+
+    const secondEdges = listEdges(db, serverId, bankId, { limit: 1000 }).data;
+    assert.equal(secondEdges.length, 4);
+    assert.ok(secondEdges.some((e) => e.cge_source_id === 'a-com:COM-001' && e.cge_target_id === 'a-com:COM-019' && e.cge_properties.label === 'rated charging'));
+    assert.ok(secondEdges.some((e) => e.cge_source_id === 'a-com:COM-019' && e.cge_target_id === 'a-com:COM-002' && e.cge_properties.label === 'rated charging'));
+    assert.ok(!secondEdges.some((e) => e.cge_type === 'calls'));
+
+    const imeNode = (await import('../src/db/crud/contextual-graph.js')).getNode(db, serverId, bankId, 'a-com:COM-019').data;
+    assert.equal(imeNode.properties.display_name, 'IME');
+  });
+
   it('skips newly deployed models and marks them pending_build', async () => {
     upsertNode(db, serverId, bankId, 'svc-001', ['active'], {
       display_name: 'Billing Service',

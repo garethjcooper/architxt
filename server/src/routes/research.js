@@ -23,6 +23,8 @@ import {
   updateCuratedPage,
 } from '../db/crud/research.js';
 import * as agentChatService from '../services/agent/chat-service.js';
+import * as edgeResolver from '../services/edge-resolver.js';
+import * as graphEntityResolver from '../services/graph-entity-resolver.js';
 
 import { discoverMentalModelsByRoles } from '../services/research/mental-model-discovery.js';
 import { runPrebuiltResearch } from '../services/research/prebuilt-research.js';
@@ -1078,6 +1080,167 @@ router.post('/mental-models', async (req, res) => {
   } catch (err) {
     logger.error('Research mental-models route error', { error: err.message, stack: err.stack });
     sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/mental-models', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/resolve-edges:
+ *   post:
+ *     summary: Resolve graph edges against the contextual-graph edge table
+ *     description: |
+ *       Takes a graph (nodes + edges) and attempts to match each edge to a
+ *       physical edge in the contextual graph. Matches are deterministic and
+ *       100% confident; ambiguous edges are returned unresolved.
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, graph]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               graph:
+ *                 type: object
+ *                 properties:
+ *                   nodes: { type: array }
+ *                   edges: { type: array }
+ *     responses:
+ *       200:
+ *         description: Resolved edges with match_class metadata
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Edge resolution error
+ */
+router.post('/resolve-edges', async (req, res) => {
+  const start = Date.now();
+  try {
+    const { server_id, bank_id, graph } = req.body;
+
+    if (!server_id || typeof server_id !== 'number') {
+      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/resolve-edges', duration: Date.now() - start });
+      return;
+    }
+    if (!bank_id || typeof bank_id !== 'string') {
+      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/resolve-edges', duration: Date.now() - start });
+      return;
+    }
+
+    const result = await edgeResolver.resolveGraphEdges(db, server_id, bank_id, graph);
+    if (!result.success) {
+      sendResponse({ res, status: mapErrorToStatus(result.code) || 500, error: result.error, code: result.code, logger, method: 'POST', path: '/research/resolve-edges', duration: Date.now() - start });
+      return;
+    }
+
+    sendResponse({ res, status: 200, data: result, logger, method: 'POST', path: '/research/resolve-edges', duration: Date.now() - start });
+  } catch (err) {
+    logger.error('Research resolve-edges route error', { error: err.message, stack: err.stack });
+    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/resolve-edges', duration: Date.now() - start });
+  }
+});
+
+/**
+ * @openapi
+ * /research/resolve-graph:
+ *   post:
+ *     summary: Resolve graph nodes to canonical entities and match edges
+ *     description: |
+ *       Takes a graph (nodes + edges), resolves every node to its canonical
+ *       catalog entity_id, deduplicates by canonical id, rewrites edge
+ *       endpoints with those canonical ids, then resolves edges against the
+ *       contextual graph.
+ *     tags: [Research]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [server_id, bank_id, graph]
+ *             properties:
+ *               server_id: { type: integer }
+ *               bank_id: { type: string }
+ *               graph:
+ *                 type: object
+ *                 properties:
+ *                   nodes: { type: array }
+ *                   edges: { type: array }
+ *     responses:
+ *       200:
+ *         description: Resolved canonical nodes and edges
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Resolver error
+ */
+router.post('/resolve-graph', async (req, res) => {
+  const start = Date.now();
+  try {
+    const { server_id, bank_id, graph, text, section_type } = req.body;
+
+    const isGraphSection = section_type === 'graph';
+
+    if (!server_id || typeof server_id !== 'number') {
+      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
+      return;
+    }
+    if (!bank_id || typeof bank_id !== 'string') {
+      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
+      return;
+    }
+    if (isGraphSection && (!graph || typeof graph !== 'object' || !Array.isArray(graph.edges))) {
+      sendResponse({ res, status: 400, error: 'graph.edges must be an array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
+      return;
+    }
+    if (!isGraphSection && (typeof text !== 'string' || text.trim().length === 0)) {
+      sendResponse({ res, status: 400, error: 'text must be a non-empty string', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
+      return;
+    }
+
+    let entityResult;
+    if (isGraphSection) {
+      entityResult = await graphEntityResolver.resolveGraphEntities(db, graph.nodes || []);
+    } else {
+      entityResult = await graphEntityResolver.resolveTextEntitiesToGraphNodes(db, text);
+    }
+    if (!entityResult.success) {
+      sendResponse({ res, status: mapErrorToStatus(entityResult.code) || 500, error: entityResult.error, code: entityResult.code, logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
+      return;
+    }
+
+    let edgeResult;
+    if (isGraphSection) {
+      const rewrittenEdges = graphEntityResolver.rewriteEdgeEndpoints(graph.edges, entityResult.aliases || {});
+      edgeResult = await edgeResolver.resolveGraphEdges(db, server_id, bank_id, { nodes: graph.nodes, edges: rewrittenEdges });
+    } else {
+      edgeResult = { success: true, edges: [] };
+    }
+    if (!edgeResult.success) {
+      sendResponse({ res, status: mapErrorToStatus(edgeResult.code) || 500, error: edgeResult.error, code: edgeResult.code, logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
+      return;
+    }
+
+    sendResponse({
+      res,
+      status: 200,
+      data: {
+        success: true,
+        nodes: entityResult.nodes,
+        edges: edgeResult.edges,
+        aliases: entityResult.aliases,
+      },
+      logger,
+      method: 'POST',
+      path: '/research/resolve-graph',
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    logger.error('Research resolve-graph route error', { error: err.message, stack: err.stack });
+    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/resolve-graph', duration: Date.now() - start });
   }
 });
 
