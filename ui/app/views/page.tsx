@@ -15,7 +15,7 @@ import { mergeGraphs } from '@/lib/envelope-merge';
 import { CuratedPageEnvelope } from '@/app/workspace/_components/curated-page-editor';
 import { usePersistentServerBank } from '@/lib/use-persistent-server-bank';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { serversApi, viewsApi, contextualGraphApi } from '@/lib/api/client';
+import { serversApi, viewsApi } from '@/lib/api/client';
 import { createLogger } from '@/lib/logger';
 import type { View } from '@/lib/types';
 import type { SelectorBank } from '@/app/research-shared/server-bank-selectors';
@@ -38,7 +38,6 @@ import { EntitiesPanel } from './components/entities-panel';
 import { DetailPanel } from './components/detail-panel';
 import { WorkspacePagePicker, type SaveToFormat } from './components/workspace-page-picker';
 import type { EnvelopeCopyEvent } from '@/lib/envelope-copy-event';
-import { backendEdgeToDisplayEdge, type DisplayEdge } from '@/lib/contextual-graph/display';
 import { ensureEnvelopeIds } from '@/lib/envelope-markdown';
 import type { UnifiedEnvelope } from '@/lib/api/client';
 
@@ -51,9 +50,9 @@ export default function ViewsPage() {
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [views, setViews] = useState<View[]>([]);
   const [tabs, setTabs] = useState<ViewTab[]>([]);
-  const [contextualEdges, setContextualEdges] = useState<DisplayEdge[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
   const tabsHydratedRef = useRef(false);
+  const pendingViewIdFromUrl = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingViews, setLoadingViews] = useState(true);
   const [layoutOptions, setLayoutOptions] = useState<LayoutOptions>(DEFAULT_LAYOUT_OPTIONS);
@@ -339,6 +338,35 @@ export default function ViewsPage() {
   const [workspacePickerTitle, setWorkspacePickerTitle] = useState<string>('');
   const [workspacePickerEvents, setWorkspacePickerEvents] = useState<EnvelopeCopyEvent[] | null>(null);
   const [workspacePickerFormats, setWorkspacePickerFormats] = useState<SaveToFormat[]>(['flowchart']);
+  const [workspacePickerSessionId, setWorkspacePickerSessionId] = useState<number | null>(
+    workspaceSession.activeSessionId,
+  );
+
+  useEffect(() => {
+    setWorkspacePickerSessionId(workspaceSession.activeSessionId);
+  }, [workspaceSession.activeSessionId]);
+
+  const pickerSession = useMemo(
+    () => workspaceSession.sessions.find((s) => s.id === workspacePickerSessionId) ?? workspaceSession.activeSession,
+    [workspaceSession.sessions, workspacePickerSessionId, workspaceSession.activeSession],
+  );
+
+  // Fetch curated pages for the session currently chosen in the picker so the
+  // "apply to existing page" list belongs to that workspace, not the globally
+  // active one.
+  const [pickerTrail, setPickerTrail] = useState<ResearchStepSummary[]>(workspaceSession.curatedPages);
+  useEffect(() => {
+    setPickerTrail(workspaceSession.curatedPages);
+  }, [workspaceSession.curatedPages]);
+
+  const handlePickerSessionChange = useCallback(
+    async (sessionId: number) => {
+      setWorkspacePickerSessionId(sessionId);
+      const trail = await workspaceSession.fetchTrail(sessionId, { silent: true });
+      setPickerTrail(trail.filter((step) => step.action_type === 'curated_page'));
+    },
+    [workspaceSession],
+  );
 
   useEffect(() => {
     if (!serverId || !bankId) {
@@ -505,13 +533,13 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
 
   const handleCreateWorkspacePageAndApply = useCallback(
     async (formats: SaveToFormat[]) => {
-      if (!activeSession) return;
+      if (!pickerSession) return;
       const events = buildEventsForFormats(formats);
       if (!events.length) return;
       const title = workspacePickerTitle || 'Section';
       try {
-        const newPage = await researchApi.createSessionPage(activeSession.id, title);
-        await workspaceSession.fetchTrail(activeSession.id);
+        const newPage = await researchApi.createSessionPage(pickerSession.id, title);
+        await workspaceSession.fetchTrail(pickerSession.id);
         await handleApplyEventsToWorkspacePage(newPage, events);
         setWorkspacePickerOpen(false);
       } catch (err: unknown) {
@@ -519,7 +547,7 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
         toast.error(`Failed to create page: ${String(err instanceof Error ? err.message : String(err))}`);
       }
     },
-    [activeSession, buildEventsForFormats, workspacePickerTitle, workspaceSession, handleApplyEventsToWorkspacePage]
+    [pickerSession, buildEventsForFormats, workspacePickerTitle, workspaceSession, handleApplyEventsToWorkspacePage]
   );
 
   const handleApplyToPageWithFormats = useCallback((page: ResearchStepSummary, formats: SaveToFormat[]) => {
@@ -721,6 +749,17 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
 
       // If a persisted tab was open but the view no longer exists, close it.
       setTabs((prev) => prev.filter((t) => list.some((v) => v.id === t.viewId)));
+
+      const viewNameById = new Map(list.map((v) => [v.id, v.name]));
+
+      // Open a view requested via URL query param, if it exists in the loaded list.
+      const requestedViewId = pendingViewIdFromUrl.current;
+      if (requestedViewId && list.some((v) => v.id === requestedViewId)) {
+        const tabId = `view-${requestedViewId}`;
+        setTabs((prev) => (prev.some((t) => t.id === tabId) ? prev : [...prev, { id: tabId, viewId: requestedViewId, label: viewNameById.get(requestedViewId) ?? 'View' }]));
+        setActiveTabId(tabId);
+        pendingViewIdFromUrl.current = null;
+      }
     } catch (err) {
       logger.error('Failed to load views', err);
       toast.error('Failed to load views');
@@ -733,13 +772,13 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
     tabsHydratedRef.current = false;
     setViews([]);
     setTabs([]);
-    setContextualEdges([]);
     setActiveTabId('');
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      pendingViewIdFromUrl.current = params.get('view');
+    }
     if (serverId && bankId) {
       loadViews();
-      contextualGraphApi.listEdges(serverId, bankId, { limit: 2000 })
-        .then((edges) => setContextualEdges(edges.map(backendEdgeToDisplayEdge)))
-        .catch((err) => logger.error('Failed to load contextual edges', err));
     }
   }, [serverId, bankId]);
 
@@ -977,7 +1016,6 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
                   topK={topK}
                   onHistoryChange={setHistoryState}
                   onSelectionChange={setSelectedItems}
-                  contextualEdges={contextualEdges}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-foreground-faint text-sm px-6 text-center gap-2">
@@ -1038,7 +1076,11 @@ function envelopeFromEvents(events: EnvelopeCopyEvent[]): UnifiedEnvelope {
         open={workspacePickerOpen}
         title={workspacePickerTitle}
         hasSession={!!activeSession}
-        curatedPages={workspaceSession.curatedPages}
+        sessions={workspaceSession.sessions}
+        activeSessionId={workspacePickerSessionId}
+        sessionsLoading={workspaceSession.sessionsLoading}
+        onSessionChange={handlePickerSessionChange}
+        curatedPages={pickerTrail}
         initialFormats={workspacePickerFormats}
         onClose={() => setWorkspacePickerOpen(false)}
         onCreatePage={handleCreateWorkspacePageAndApply}

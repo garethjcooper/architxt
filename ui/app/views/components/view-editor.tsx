@@ -38,7 +38,6 @@ import { DEFAULT_LAYOUT_OPTIONS, DEFAULT_ROUTING_TUNABLES, DEFAULT_NODE_TUNABLES
 import type { LayoutOptions, RoutingTunables, NodeTunables, ElkAlgorithm, ElkDirection, ElkEdgeRouting, ElkCrossingMinimization, ElkGreedySwitch, BackgroundVariantOption, EntityNodeTextAlignH, EntityNodeTextAlignV } from './view-editor-options';
 import { bundleViewEdges } from '@/lib/graph/view-edges';
 import { cn } from '@/lib/utils';
-import type { DisplayEdge } from '@/lib/contextual-graph/display';
 
 const logger = createLogger('ViewEditor');
 const elk = new ELK();
@@ -314,7 +313,6 @@ interface ViewEditorProps {
   saving?: boolean;
   onHistoryChange?: (state: { canUndo: boolean; canRedo: boolean }) => void;
   onSelectionChange?: (state: { nodeIds: string[]; edgeIds: string[] }) => void;
-  contextualEdges?: DisplayEdge[];
 }
 
 
@@ -398,7 +396,6 @@ function toReactFlow(
   showHandles: boolean,
   showNodeColorBar: boolean,
   topK: number | undefined,
-  contextualEdgesById: Map<string, DisplayEdge>
 ): { nodes: Node[]; edges: Edge[] } {
   const positions = view.layout?.positions || {};
 
@@ -498,27 +495,20 @@ function toReactFlow(
       maxBundledCount > 1
         ? Math.max(1.5, 1 + Math.sqrt((count - 1) / (maxBundledCount - 1)) * 7)
         : 1.5;
-    const group = layoutOptions.edgeMergeMode === 'all' ? parallelGroups.get([e.source, e.target].sort().join('|')) : undefined;
+    const group = layoutOptions.edgeMergeMode === 'all' ? parallelGroups.get(`${e.source}|${e.target}`) : undefined;
     const parallelIndex = group ? group.indexOf(e) : 0;
     const parallelTotal = group ? group.length : 1;
     const baseColor = edgeColorForType(layoutOptions.edgeMergeMode === 'full' ? 'grounded' : e.edge_type);
 
-    // Some canonical/hindsight edges have source/target flipped relative to the
-    // original contextual-graph direction. Detect that and put the arrowhead on
-    // the correct end without changing the rendered line geometry.
-    const contextualEdge = contextualEdgesById.get(e.id);
-    const originalSource = contextualEdge?.source_id;
-    const originalTarget = contextualEdge?.target_id;
-    const needsFlippedArrow =
-      layoutOptions.edgeMergeMode === 'all' &&
-      contextualEdge != null &&
-      (originalSource !== stripEntityPrefix(e.source) || originalTarget !== stripEntityPrefix(e.target));
-    const arrowMarker = {
-      type: MarkerType.ArrowClosed,
-      width: 10,
-      height: 10,
-      color: baseColor,
-    };
+    const undirected = e.properties?.directed === false;
+    const arrowMarker = undirected
+      ? undefined
+      : {
+          type: MarkerType.ArrowClosed,
+          width: 10,
+          height: 10,
+          color: baseColor,
+        };
 
     let edgeLabel: string | undefined;
     if (showEdgeLabels) {
@@ -530,11 +520,8 @@ function toReactFlow(
         edgeLabel = e.label || e.edge_type || undefined;
       } else {
         // Fallback to resolved node names for canonical-only / hindsight edges.
-        // Use original direction when the visual endpoints were flipped.
-        const visualSource = needsFlippedArrow && originalSource ? originalSource : e.source;
-        const visualTarget = needsFlippedArrow && originalTarget ? originalTarget : e.target;
-        const sourceLabel = nodeById.get(visualSource)?.label || nodeById.get(visualSource)?.name || visualSource;
-        const targetLabel = nodeById.get(visualTarget)?.label || nodeById.get(visualTarget)?.name || visualTarget;
+        const sourceLabel = nodeById.get(e.source)?.label || nodeById.get(e.source)?.name || e.source;
+        const targetLabel = nodeById.get(e.target)?.label || nodeById.get(e.target)?.name || e.target;
         edgeLabel = `${sourceLabel} → ${targetLabel}`;
       }
     }
@@ -550,8 +537,8 @@ function toReactFlow(
         opacity: 0.85,
         strokeDasharray: e.canonicalOnly ? '5,5' : undefined,
       },
-      markerEnd: !needsFlippedArrow && (e.bidirectional || count === 1) ? arrowMarker : undefined,
-      markerStart: needsFlippedArrow || e.bidirectional ? arrowMarker : undefined,
+      markerEnd: arrowMarker,
+      markerStart: e.bidirectional && !undirected ? arrowMarker : undefined,
       label: edgeLabel,
       labelStyle: { fill: 'var(--foreground-subtle)', fontSize: 10 },
       data: {
@@ -673,15 +660,7 @@ const ViewEditorInner = forwardRef<ViewEditorHandle, ViewEditorProps>(function V
 
   const isHistoryMode = showTimeline && historyIndex >= 0;
 
-  const contextualEdgesById = useMemo(() => {
-    const map = new Map<string, DisplayEdge>();
-    for (const edge of props.contextualEdges || []) {
-      map.set(edge.id, edge);
-    }
-    return map;
-  }, [props.contextualEdges]);
-
-  const initial = useMemo(() => toReactFlow(effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK, contextualEdgesById), [effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK, contextualEdgesById]);
+  const initial = useMemo(() => toReactFlow(effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK), [effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
 
@@ -736,10 +715,10 @@ const ViewEditorInner = forwardRef<ViewEditorHandle, ViewEditorProps>(function V
   }, [positionsHash]);
 
   useEffect(() => {
-    const { nodes: nextNodes, edges: nextEdges } = toReactFlow(effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK, contextualEdgesById);
+    const { nodes: nextNodes, edges: nextEdges } = toReactFlow(effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK);
     setNodes(nextNodes);
     setEdges(nextEdges);
-  }, [effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK, contextualEdgesById, setNodes, setEdges]);
+  }, [effectiveView, layoutOptions, nodeTunables, showEdgeLabels, showNodeIds, showHandles, showNodeColorBar, topK, setNodes, setEdges]);
 
   // Edge merge mode / edge routing style changes should be reflected immediately
   // without resetting node positions. Rebuild edges from the current nodes so
@@ -767,7 +746,6 @@ const ViewEditorInner = forwardRef<ViewEditorHandle, ViewEditorProps>(function V
       showHandles,
       showNodeColorBar,
       topK,
-      contextualEdgesById
     );
     setEdges(nextEdges);
     edgeRoutingRef.current?.resetRouting();

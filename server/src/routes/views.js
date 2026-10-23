@@ -176,6 +176,14 @@ router.get('/', async (req, res) => {
  *               diagram_type:
  *                 type: string
  *                 default: flowchart
+ *               graph:
+ *                 type: object
+ *               layout:
+ *                 type: object
+ *               style_defaults:
+ *                 type: object
+ *               timeline:
+ *                 type: array
  *     responses:
  *       201:
  *         description: View created
@@ -225,6 +233,10 @@ router.post('/', async (req, res) => {
       bank_id: bankId,
       name: req.body.name,
       diagram_type: diagramType,
+      graph: req.body.graph,
+      layout: req.body.layout,
+      style_defaults: req.body.style_defaults,
+      timeline: req.body.timeline,
     });
     if (!result.success) {
       const duration = Date.now() - start;

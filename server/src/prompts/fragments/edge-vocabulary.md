@@ -1,14 +1,13 @@
-### Edge vocabulary
+### Edge/Relationship vocabulary
 
 Use only these edge types. Direction is implicit: each type is expressed from the `from` node toward the `to` node.
 
 | Edge type | Direction | Meaning |
 |---|---|---|
-| `calls` | `from` → `to` | `from` invokes or calls `to`. |
-| `sends` | `from` → `to` | `from` sends data or an event to `to`. |
-| `reads` | `from` → `to` | `from` reads data from `to`. |
-| `writes` | `from` → `to` | `from` persists or writes data to `to`. |
-| `depends-on` | `from` → `to` | `from` depends on `to`. Use only when no more specific type applies. |
+| `calls` | `from` → `to` | `from` invokes a service or other exposed utility or interface on `to`. |
+| `sends` | `from` → `to` | `from` delivers an object such as data, file, atomic packet to `to`. |
+| `event` | `from` → `to` | `from` sends an event to `to`. |
+| `flow` | `from` → `to` | `from` flows, interacts or is related `to`. A generalised interaction between `from` and `to`. Use only when no more specific type applies. |
 
 Rules:
 - Do not prefix edge types with any node-state marker.

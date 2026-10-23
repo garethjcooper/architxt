@@ -1,8 +1,8 @@
 ### Diagram generation rules
 
-The `diagrams` envelope section holds Mermaid diagrams. Populate it only when the diagrams section is active; otherwise leave it as an empty array `[]`.
+The `diagrams` envelope section holds Mermaid diagrams.
 
-Each bullet in `ARCHITXT_DIAGRAM_FOCUS` is a separate requested diagram. Emit exactly as many `diagrams` array items as there are non-empty bullets in `ARCHITXT_DIAGRAM_FOCUS`. Do not merge multiple diagram bullets into one array item, and do **not** create narrative entries for diagram sections. Diagrams belong only in `diagrams[]`.
+Each bullet under `### Diagrams` in the output directives is a separate requested diagram. Emit exactly as many `diagrams` array items as there are non-empty bullets. Do not merge multiple diagram bullets into one array item, and do **not** create narrative entries for diagram sections. Diagrams belong only in `diagrams[]`.
 
 For each `diagrams[]` item:
 - `name`: the exact title shown in the focus bullet. If the bullet has a bold name (e.g. `- **Example Diagram** (flowchart) — ...`), use that exact bold text. **This MUST be the exact title provided via `#diagram-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If the bullet has no name, generate a short descriptive name (4–6 words) based on the diagram's content.
@@ -11,18 +11,16 @@ For each `diagrams[]` item:
 - `evidence`: an array of Hindsight memory IDs that justify the diagram. **Every emitted diagram must include this field;** use an empty array only when the diagram has no source evidence. Evidence IDs must be the **full, exact** Hindsight memory IDs as they appear in the source material. Do not truncate, shorten, hash, abbreviate, or invent IDs. For example, if the source material lists a memory as `mem-abc123def4567890abcdef12`, emit that exact string; do not reduce it to `abc123de` or any other partial form.
 
 Rules:
-- Only emit a diagram when it is justified by the source material and requested by the active section directives.
-- The `type` must match exactly one of the allowed keywords.
+- Each emitted diagram must be justified by the source material; record the supporting Hindsight memory IDs in the `evidence` array.
+- The `type` value must be one of the valid types listed above.
 - Do not wrap the `content` in Markdown fences or triple backticks; it must be the raw Mermaid source.
-- When the active sections do not include diagrams, return an empty `diagrams` array.
-- Do not include entity catalog IDs or type prefixes such as `(Company:COM-001)` in visible labels.
-- **No literal parentheses `( )` may appear inside any quoted or unquoted label, node text, message text, or relationship label.** Parentheses are reserved for Mermaid structural syntax only. If a concept naturally reads with a parenthetical, omit the parenthetical entirely or rephrase it without parentheses. For example, write `sends IDoc payloads`, not `sends IDoc payloads (IDoc)`; write `connects via HTTPS`, not `connects via HTTPS (client ID auth)`.
-- Node labels must be plain display names only. Do not put catalog references such as `EXT:EXT-ERP-001` or `A-C:XFR-ENG-001` inside node labels.
+- Node labels should be plain display names followed by the canonical entity id in the form `Display Name example-type:EXAMPLE-001`. Do NOT use parentheses `()`, square brackets `[]`, or the narrative entity-reference format `[[Name (type:id)]]` inside Mermaid labels. The id must be a plain space-separated `type:id` suffix. Wrong: `Example System (EXAMPLE-001)` or `[[Example System (example-type:EXAMPLE-001)]]`. Right: `Example System example-type:EXAMPLE-001`. Do not put raw catalog references such as `EXT:EXT-ERP-001` or `A-C:XFR-ENG-001` inside node labels as plain text.
+- Edge labels: if the provided context includes an existing contextual-graph or mental-model edge between the same two nodes, reuse its exact `label` and `type` for the diagram edge. Only generate a new label when no such edge exists. Direction does not matter for this lookup; if an edge connects the two nodes in either direction, reuse its label.
 - One node or edge per line. No blank lines inside the Mermaid source.
 - Do not emit the literal two-character sequence `\\n` inside the content; always use an actual newline.
 - Do not summarise a diagram's content in the `narratives[]` section. A diagram section is fully expressed by its own `diagrams[]` entry.
 
-Example — when `ARCHITXT_DIAGRAM_FOCUS` is:
+Example — when the `### Diagrams` focus bullets are:
 ```
 - **Example Diagram A** (flowchart) — Show a flowchart of the interactions between Example A and Example B.
 - **Example Diagram B** (sequenceDiagram) — Show the payment sequence.

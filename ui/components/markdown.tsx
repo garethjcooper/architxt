@@ -9,9 +9,11 @@ interface MarkdownProps {
   className?: string;
   /** Optional resolver that returns an icon element for a heading text. When returned, the icon is prepended to the heading and the matched prefix is removed. */
   headingIconResolver?: (text: string) => { icon: React.ReactNode; text: string } | null;
+  /** Optional renderer that returns action buttons for a heading text. When returned, the actions are placed on the right side of the heading row and shown on hover. */
+  headingActionRenderer?: (text: string, level: number) => React.ReactNode;
 }
 
-export function Markdown({ children, className = '', headingIconResolver }: MarkdownProps) {
+export function Markdown({ children, className = '', headingIconResolver, headingActionRenderer }: MarkdownProps) {
   const components = useMemo(() => {
     const headingWithId = ({ node, children, level, ...props }: any) => {
       const text = node?.children
@@ -36,21 +38,33 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
         children
       );
 
+      const actions = headingActionRenderer?.(text, level);
+      const headingContent = actions ? (
+        <span className="group/heading flex items-center justify-between gap-2">
+          <span className="flex-1 min-w-0">{childrenWithIcon}</span>
+          <span className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/heading:opacity-100 focus-within:opacity-100 transition-opacity">
+            {actions}
+          </span>
+        </span>
+      ) : (
+        childrenWithIcon
+      );
+
       switch (level) {
         case 1:
-          return <h1 id={id} className={baseClass} {...props}>{childrenWithIcon}</h1>;
+          return <h1 id={id} className={baseClass} {...props}>{headingContent}</h1>;
         case 2:
-          return <h2 id={id} className={baseClass} {...props}>{childrenWithIcon}</h2>;
+          return <h2 id={id} className={baseClass} {...props}>{headingContent}</h2>;
         case 3:
-          return <h3 id={id} className={baseClass} {...props}>{childrenWithIcon}</h3>;
+          return <h3 id={id} className={baseClass} {...props}>{headingContent}</h3>;
         case 4:
-          return <h4 id={id} className={baseClass} {...props}>{childrenWithIcon}</h4>;
+          return <h4 id={id} className={baseClass} {...props}>{headingContent}</h4>;
         case 5:
-          return <h5 id={id} className={baseClass} {...props}>{childrenWithIcon}</h5>;
+          return <h5 id={id} className={baseClass} {...props}>{headingContent}</h5>;
         case 6:
-          return <h6 id={id} className={baseClass} {...props}>{childrenWithIcon}</h6>;
+          return <h6 id={id} className={baseClass} {...props}>{headingContent}</h6>;
         default:
-          return <h3 id={id} className={baseClass} {...props}>{childrenWithIcon}</h3>;
+          return <h3 id={id} className={baseClass} {...props}>{headingContent}</h3>;
       }
     };
 
@@ -92,7 +106,7 @@ export function Markdown({ children, className = '', headingIconResolver }: Mark
       th: ({ ...props }: any) => <th className="text-left py-1.5 px-2 font-medium text-markdown-table-head" {...props} />,
       td: ({ ...props }: any) => <td className="py-1.5 px-2 border-b border-markdown-table-border text-foreground-muted" {...props} />,
     };
-  }, [headingIconResolver]);
+  }, [headingIconResolver, headingActionRenderer]);
 
   return (
     <div className={`markdown-body ${className}`}>

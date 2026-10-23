@@ -654,10 +654,29 @@ Always consider the following when formulating your response:
 1. COMPONENTS: A single system, service, database, or external integration. Use entity labels [[Name (ID)]] when present. Components by themselves (i.e. just being present) is NOT a fact.
 2. DATA FLOWS:  which specific component produces data and which specific component consumes it. Use explicit language: sends to, receives from, exchanges with.
 3. RISKS & CONSTRAINTS: performance limits, size limits, vendor gaps, or regulatory requirements.
+4. SIZING: data volumes, collection sizes, or throughput figures.
+5. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse). If the source text states what would break or degrade if this system were unavailable, capture that as a separate purpose fact.
+
+## Mental Model Data
+Many mental models use a standard data envelope schema in json. The shape is shown below - use it to understand the data structure when you encounter it.
+
+### Data Shape
+
+{
+  narratives: Array<{ id?, narrative_name, narrative, evidence: string[] }>;
+  graph: { name?, nodes: GraphNode[], edges: GraphEdge[] };
+  tables: Array<{ id?, name, columns: string[], rows: Record<string, any>[], evidence: string[] }>;
+  diagrams: Array<{ id?, name, type, content, evidence: string[] }>;
+}`;
+
+  const OLD_REFLECT_MISSION = `You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.
+
+Always consider the following when formulating your response:
+1. COMPONENTS: A single system, service, database, or external integration. Use entity labels [[Name (ID)]] when present. Components by themselves (i.e. just being present) is NOT a fact.
+2. DATA FLOWS:  which specific component produces data and which specific component consumes it. Use explicit language: sends to, receives from, exchanges with.
+3. RISKS & CONSTRAINTS: performance limits, size limits, vendor gaps, or regulatory requirements.
 5. SIZING: data volumes, collection sizes, or throughput figures.
 6. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse). If the source text states what would break or degrade if this system were unavailable, capture that as a separate purpose fact.`;
-
-  const OLD_REFLECT_MISSION = 'You are a senior IT Architect. Your purpose is to surface architectural components, interfaces and interactions in a concise, accurate and consistent way.';
 
   const row = db.prepare('SELECT bs_id FROM bank_settings WHERE bs_id = 1').get();
   if (!row) {
@@ -835,10 +854,38 @@ List its major capabilities, each with its purpose, responsibility, business cap
     extId: 'edge-ctx-{source-id}|{target-id}',
     name: 'Edge context: {source-name} ↔ {target-name}',
     role: 'sys_edge_context',
-    sourceQuery: `What are the flows (APIs, data, files, interface calls, events, or dependencies) between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]]?
-#graph
-#graph-name Edge Context {source-name} - {target-name}
-For each flow, describe what is transferred, how it is transferred, how often, any known intermediaries, and any known reliability behavior. The endpoints are supplied above with their exact node ids; reuse those exact ids for from/to. Only use a bare lowercase slug for endpoints that are genuinely new and not listed above.
+    sourceQuery: `#table
+#table-name Edge Context [[{source-name} ({source-id})]] - [[{target-name} ({target-id})]]
+
+List every distinct relationship and interaction between [[{source-name} ({source-id})]] and [[{target-name} ({target-id})]].
+
+## Definitions
+- Compositions
+    - shared: this means that both systems in scope both interact or are related to the same 'to' or 'from'.
+    - indirect: this means that both systems in scope both interact or are related by way of an intermediary entity.
+    - direct: this means that both systems interact or are related directly
+- Relationship Types
+     - sends: 'from' delivers an object such as data, file, atomic packet to 'to'
+     - calls: 'from' invokes a service or other exposed utility or interface on 'to'
+     - event: 'from' sends an event to 'to'
+     - flow: generalised interaction between 'from' and 'to
+
+## Rules
+- from/to values must be the full known canonical id.
+- Direction is implicit: each type is expressed from the from id toward the to id.
+- Where there are multiple objects, types or calls are made along the same route, list individually. This could be multiple separate files or processes using the same relationship or interaction route.
+- Constraints, risks, requirements, comments or shared context should be appended to the detail field - these do NOT result in an individual row.
+- For relationships or interactions which follow the shared composition definition, individual rows must be generated which uses one of the target systems ([[{source-name} ({source-id})]] or [[{target-name} ({target-id})]]) in the 'to'/'from' and the shared system in either the 'to' or 'from'.
+- For relationships or interactions which follow the indirect composition definition, split into its atomic flows so each leg or step of the indirect relationship is captured as an individual row. e.g. sys-a (indirect via sys-x) sys-b would be two rows, sys-a -> sys-x and sys-x -> sys-b.
+- For unknown, unspecified or empty data use "-".
+
+## Column Definition
+- from / to: source and target ids. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied. Do not invent or use non-entity ids such as inferred or derived names - only existing, known ids should be present. Either 'from' or 'to' MUST be either [[{source-name} ({source-id})]] or [[{target-name} ({target-id})]]. If either 'from' or 'to' are not known then omit that row.
+- type: picked from the valid Relationship Types.
+- label: short phrase, max 5 words. Do not include or use entity names or ids - this should be a short concise description of the flow. Do NOT use entity names, interfaces or other known names in this field.
+- detail: readable description of the flow, 2-4 complete sentences when the source material supports it.
+- frequency: optional cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, per bill cycle, on startup).
+- evidence ids
 #end`,
     maxTokens: 8192,
     refreshMode: 'full',

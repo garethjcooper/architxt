@@ -94,8 +94,20 @@ Always consider the following when formulating your response - but only return i
 1. COMPONENTS: A single system, service, database, or external integration. Use full entity labels [[entity name (entity canonical id)]] when present. Components by themselves (i.e. just being present) is NOT a fact.
 2. DATA FLOWS:  which specific component produces data and which specific component consumes it. Use explicit language: sends to, receives from, exchanges with.
 3. RISKS & CONSTRAINTS: performance limits, size limits, vendor gaps, or regulatory requirements.
-5. SIZING: data volumes, collection sizes, or throughput figures.
-6. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse).
+4. SIZING: data volumes, collection sizes, or throughput figures.
+5. SYSTEM PURPOSE & CAPABILITIES: What business or technical capability the system provides, what problem it solves in the architecture, and what role it plays (e.g., canonical source, integration hub, customer-facing portal, reporting layer, data warehouse).
+
+## Mental Model Data
+Many mental models use a standard data envelope schema in json. The shape is shown below - use it to understand the data structure when you encounter it.
+
+### Data Shape
+
+{
+  narratives: Array<{ id?, narrative_name, narrative, evidence: string[] }>;
+  graph: { name?, nodes: GraphNode[], edges: GraphEdge[] };
+  tables: Array<{ id?, name, columns: string[], rows: Record<string, any>[], evidence: string[] }>;
+  diagrams: Array<{ id?, name, type, content, evidence: string[] }>;
+}
 
 OUTPUT RULES — obey these strictly:
 - Write plain text only. Do not use markdown tables, lists, code blocks, or headings in the body of the summary.

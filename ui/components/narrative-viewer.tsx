@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle, Fragment, useId } from 'react';
-import { Plus, Eye, FileText, FileSearch, Table2, GitGraph, Workflow } from 'lucide-react';
+import { Plus, Eye, FileText, FileSearch, Table2, GitGraph, Workflow, GitBranch } from 'lucide-react';
 import { parseNarrativeBlocks, getSectionBlockIds, getSidebarIndent, type NarrativeBlock } from './narrative-blocks';
+import { slugifyHeading } from './smart-document-editor';
 
 import { Markdown } from './markdown';
 import { MermaidDiagram } from './mermaid-diagram';
@@ -42,12 +43,6 @@ function formatSectionLabel(title?: string) {
   const parsed = parseSyntheticHeadingTitle(title);
   if (!parsed) return { icon: null, label: title || '' };
   return { icon: sectionIcon(parsed.kind), label: parsed.name };
-}
-
-function resolveMarkdownHeadingIcon(text: string): { icon: React.ReactNode; text: string } | null {
-  const parsed = parseSyntheticHeadingTitle(text);
-  if (!parsed) return null;
-  return { icon: sectionIcon(parsed.kind), text: parsed.name };
 }
 
 export interface NarrativeViewerProps {
@@ -93,10 +88,16 @@ export interface NarrativeViewerProps {
   renderSidebarRowActions?: (block: NarrativeBlock, ctx: { isActive: boolean; index: number; indent: number }) => React.ReactNode;
   /** Optional render prop for extra content-block actions, appended inside the default block row. */
   renderBlockActions?: (block: NarrativeBlock, ctx: { isActive: boolean }) => React.ReactNode;
+  /** Optional callback to send a section to a view (diagram/graph). When provided, a branch icon appears on structural blocks. */
+  onAddToView?: (event: EnvelopeCopyEvent) => void;
+  /** Optional label for the add-to-view action. */
+  addToViewLabel?: string;
   /** Optional callback to add a section/block to a curated page. When provided, a + icon appears on each structural block. */
   onAddToPage?: (event: EnvelopeCopyEvent) => void;
   /** Optional label for the add-to-page action. */
   addToPageLabel?: string;
+  /** Optional render prop that produces action buttons rendered on each top-level section heading in the rendered output. When provided, default heading actions are not rendered. */
+  renderSectionHeadingActions?: (block: NarrativeBlock) => React.ReactNode;
   /** When true, show copy/add actions in the section index header. Defaults to true when onCopySection/onAddToPage are provided. */
   showHeaderActions?: boolean;
   /**
@@ -137,6 +138,9 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
   renderBlockActions,
   onAddToPage,
   addToPageLabel = 'Add to page',
+  onAddToView,
+  addToViewLabel = 'Add to view',
+  renderSectionHeadingActions,
   showHeaderActions,
   resolveSectionCopy,
   onCopyWholeDocument,
@@ -289,6 +293,136 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
     onFocusSection(b, markdown, resolved);
   }, [blocks, resolveSectionCopy, onFocusSection]);
 
+  const renderDefaultHeadingActions = useCallback((b: NarrativeBlock) => {
+    const parsed = parseSyntheticHeadingTitle(b.title);
+    const isGraphOrDiagram = parsed?.kind === 'graph' || parsed?.kind === 'diagram';
+    const isTable = parsed?.kind === 'table';
+    const isNarrative = parsed?.kind === 'narrative' || (b.type === 'heading' && !b.synthetic);
+    const isText = b.type === 'text';
+    const canFocus = isNarrative || isTable || isGraphOrDiagram || isText;
+    const evidenceIds = resolveSectionEvidence?.(b.title ?? '', b.__narrativeId, b.__tableId, b.__diagramId) ?? [];
+    if (b.deleted) return null;
+    return (
+      <>
+        {evidenceIds.length > 0 && onShowEvidence && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowEvidence(evidenceIds, b.title || evidenceLabel);
+            }}
+            className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+            title={evidenceLabel}
+            aria-label={evidenceLabel}
+          >
+            <FileSearch className="h-3 w-3" />
+          </button>
+        )}
+        {canFocus && onFocusSection && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleFocusSection(b);
+            }}
+            className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+            title={focusLabel}
+            aria-label={focusLabel}
+          >
+            <Eye className="h-3 w-3" />
+          </button>
+        )}
+        {onAddToView && isGraphOrDiagram && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const event = makeSectionEvent(b);
+              onAddToView(event);
+            }}
+            className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+            title={addToViewLabel}
+            aria-label={addToViewLabel}
+          >
+            <GitBranch className="h-3 w-3" />
+          </button>
+        )}
+        {onAddToPage && !isText && !b.synthetic && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const event = makeSectionEvent(b);
+              onAddToPage(event);
+            }}
+            className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+            title={addToPageLabel}
+            aria-label={addToPageLabel}
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        )}
+      </>
+    );
+  }, [
+    resolveSectionEvidence,
+    onShowEvidence,
+    evidenceLabel,
+    onFocusSection,
+    focusLabel,
+    handleFocusSection,
+    onAddToView,
+    addToViewLabel,
+    onAddToPage,
+    addToPageLabel,
+    makeSectionEvent,
+  ]);
+
+  const renderSectionHeading = useCallback((section: NarrativeBlock) => {
+    if (section.type !== 'heading') return null;
+    const actions = renderSectionHeadingActions
+      ? renderSectionHeadingActions(section)
+      : renderDefaultHeadingActions(section);
+    const level = section.level ?? 2;
+    const baseClass =
+      level === 1
+        ? 'text-lg font-semibold mb-2 mt-4 first:mt-0'
+        : level === 2
+          ? 'text-base font-semibold mb-2 mt-3 first:mt-0'
+          : 'text-sm font-semibold mb-1 mt-2 first:mt-0';
+    const id = slugifyHeading(section.title ?? '');
+    const { icon, label } = formatSectionLabel(section.title);
+    const headingContent = (
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 flex-1 min-w-0">
+          {icon}
+          <span>{label}</span>
+        </span>
+        {actions && (
+          <span className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/heading:opacity-100 focus-within:opacity-100 transition-opacity">
+            {actions}
+          </span>
+        )}
+      </span>
+    );
+    switch (level) {
+      case 1:
+        return <h1 id={id} className={baseClass}>{headingContent}</h1>;
+      case 2:
+        return <h2 id={id} className={baseClass}>{headingContent}</h2>;
+      case 3:
+        return <h3 id={id} className={baseClass}>{headingContent}</h3>;
+      case 4:
+        return <h4 id={id} className={baseClass}>{headingContent}</h4>;
+      case 5:
+        return <h5 id={id} className={baseClass}>{headingContent}</h5>;
+      case 6:
+        return <h6 id={id} className={baseClass}>{headingContent}</h6>;
+      default:
+        return <h3 id={id} className={baseClass}>{headingContent}</h3>;
+    }
+  }, [renderSectionHeadingActions, renderDefaultHeadingActions]);
+
   const copyWholeDocument = useCallback(() => {
     if (!onCopyWholeDocument) return;
     const events: EnvelopeCopyEvent[] = [];
@@ -387,54 +521,11 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
             {label}
           </span>
         </button>
-        <div className="flex items-center gap-0.5 flex-shrink-0 max-w-0 overflow-hidden group-hover/copy:max-w-fit focus-within:max-w-fit transition-[max-width]">
-          {onShowEvidence && b.type === 'heading' && (() => {
-            const evidenceIds = resolveSectionEvidence?.(b.title ?? '', undefined, b.__tableId, b.__diagramId) ?? [];
-            return evidenceIds.length > 0 ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShowEvidence(evidenceIds, b.title || evidenceLabel);
-                }}
-                className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
-                title={evidenceLabel}
-                aria-label={evidenceLabel}
-              >
-                <FileSearch className="h-3 w-3" />
-              </button>
-            ) : null;
-          })()}
-          {onFocusSection && b.type === 'heading' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleFocusSection(b);
-              }}
-              className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
-              title={focusLabel}
-              aria-label={focusLabel}
-            >
-              <Eye className="h-3 w-3" />
-            </button>
-          )}
-          {onAddToPage && b.type === 'heading' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToPage(makeSectionEvent(b));
-              }}
-              className="p-1 rounded text-foreground-placeholder hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
-              title={addToPageLabel}
-              aria-label={addToPageLabel}
-            >
-              <Plus className="h-3 w-3" />
-            </button>
-          )}
-          {renderSidebarRowActions && renderSidebarRowActions(b, { isActive, index: idx, indent })}
-        </div>
+        {renderSidebarRowActions && (
+          <div className="flex items-center gap-0.5 flex-shrink-0 max-w-0 overflow-hidden group-hover/copy:max-w-fit focus-within:max-w-fit transition-[max-width]">
+            {renderSidebarRowActions(b, { isActive, index: idx, indent })}
+          </div>
+        )}
       </div>
     );
   };
@@ -713,6 +804,7 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                   .filter((bb) => sectionIds.includes(bb.id) && !bb.deleted)
                   .map((bb) => bb.edited ?? bb.raw)
                   .join('');
+                const sectionBodyMarkdown = sectionMarkdown.slice(section.raw.length);
                 const isLast = sectionIdx === structuralBlocks.filter((bb) => !bb.deleted).length - 1;
                 return (
                   <div
@@ -726,10 +818,11 @@ export const NarrativeViewer = forwardRef(function NarrativeViewer({
                         blockRefs.current.set(id, el);
                       });
                     }}
-                    className={`${isLast ? '' : 'border-b border-border-subtle pb-3 mb-3'}`}
+                    className={`group/heading ${isLast ? '' : 'border-b border-border-subtle pb-3 mb-3'}`}
                   >
-                    <Markdown className="text-[12px] leading-relaxed" headingIconResolver={resolveMarkdownHeadingIcon}>
-                      {sectionMarkdown}
+                    {renderSectionHeading(section)}
+                    <Markdown className="text-[12px] leading-relaxed">
+                      {sectionBodyMarkdown}
                     </Markdown>
                   </div>
                 );

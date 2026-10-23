@@ -333,6 +333,10 @@ export interface View {
 export interface CreateViewRequest {
   name: string;
   diagram_type?: View['diagram_type'];
+  graph?: ViewGraph;
+  layout?: ViewLayout;
+  style_defaults?: Record<string, any> | null;
+  timeline?: ViewTimelineSlice[];
 }
 
 export interface UpdateViewRequest {

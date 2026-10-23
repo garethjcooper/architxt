@@ -18,8 +18,8 @@ Node field rules:
 
 Edge field rules:
 - `from` / `to`: source and target node ids. Every endpoint id must also appear in `nodes`. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied.
-- `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`.
-- `label`: short phrase, max 4 words.
+- `type`: one of `calls`, `sends`, `reads`, `writes`, `depends-on`. If an existing contextual-graph or mental-model edge already connects the same two nodes, reuse its exact `type` for this edge. Only generate a new type when no such edge exists.
+- `label`: short phrase, max 4 words. If an existing contextual-graph or mental-model edge already connects the same two nodes, reuse its exact `label`. Only generate a new label when no such edge exists. Direction does not matter for this lookup.
 - `detail`: readable description of the flow, 2–4 complete sentences when the source material supports it. Write the `detail` so a reader can understand the flow without looking at `properties`:
   1. Sentence 1: what moves between the endpoints (data object, event, file, API call).
   2. Sentence 2: direction and mechanism (e.g., calls over HTTPS REST, writes to a shared database, drops files on SFTP).

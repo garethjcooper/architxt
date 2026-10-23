@@ -2,6 +2,37 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.4.7] - 2026-10-24
+
+> ⚠️ **Important:** After upgrading, open **Settings → Server → Banks** and click **Clean local graph** for each bank, then run **Sync local graph** again. This ensures your local context graph is rebuilt cleanly with the deterministic edge identity, directed-edge handling, and canonical entity/edge resolution introduced in this release.
+
+### Added
+
+- **Add to view** flow is now fully server-side: parsed entities, deterministic edge resolution, and candidate selection for unresolved edges.
+- Create view directly from the **Add to View** modal with a canonical view graph.
+- Multi-select checkboxes for nodes and edges in `AddToViewModal`; related edges enable/disable automatically.
+- Resolves typed and typeless edges by endpoint pair and label, with reversed-orientation fallback.
+- Shows closest candidate edges for unresolved matches, sorted by Jaro-Winkler similarity.
+- Edge-context mental model uses a structured table-based output, replacing the previous free-text prompt.
+- Diagram and graph prompt fragments use canonical entity references and plain `type:id` labels.
+- Views entity panel groups edges by directed endpoint pair and preserves real source/target direction.
+
+### Changed
+
+- Edge resolution is deterministic and server-side; endpoint-only fallbacks removed.
+- `AddToViewModal` uses standard project Table components and a resizable two-pane layout.
+- Workspace section action icons moved from sidebar into rendered heading rows; send-to-view scoped to graph/diagram sections.
+- Default Reflect mission wording expanded; existing banks migrated on startup.
+- Hindsight image pinned to `1.1.0` in `docker-compose.yml`.
+
+### Fixed
+
+- Edge identity honors model-asserted direction and distinguishes parallel edges by label/detail.
+- Skeleton edges replaced cleanly on edge-context apply instead of being mutated.
+- Edge-context edges no longer overwrite each other on fresh skeleton imports.
+- Profile disposition preserved in bank-settings pull route.
+- Views edge detail read from stored contextual-graph properties.
+
 ## [0.4.6] - 2026-10-20
 
 > ⚠️ **Important:** After upgrading, open **Settings → Server → Banks** and click **Clean local graph** for each bank, then run **Sync local graph** again. This ensures your local context graph is rebuilt cleanly with the corrected edge-detail hashing and entity ID canonicalisation introduced in this release.

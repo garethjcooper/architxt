@@ -10,8 +10,8 @@
  */
 
 import { getMentalModel as getHindsightMentalModel } from '../../hindsight/mental-models.js';
-import { normalizeGraph } from '../../../prompts/normalize-graph.js';
 import { createLogger } from '../../../utils/logger.js';
+import { toEnvelopeWithFallback } from '../../contextual-graph/to-envelope.js';
 
 const logger = createLogger('research-handler-templates');
 
@@ -90,44 +90,39 @@ export async function handleTemplates(serverId, bankId, intentText, options = {}
         };
       }
 
-      const structuredOutput = result.mentalModel.reflect_response?.structured_output ?? null;
-      if (!structuredOutput || typeof structuredOutput !== 'object') {
+      const reflectResponse = result.mentalModel.reflect_response ?? null;
+      const { envelope, usedFallback } = toEnvelopeWithFallback(reflectResponse, {
+        preserveParallelEdges: true,
+      });
+
+      if (usedFallback) {
+        logger.debug('Using content fallback for templates handler', { extId, name });
+      }
+
+      const hasValidStructuredOutput = reflectResponse?.structured_output
+        && typeof reflectResponse.structured_output === 'object'
+        && !Array.isArray(reflectResponse.structured_output);
+
+      if (!hasValidStructuredOutput && !usedFallback) {
         return {
           ext_id: extId,
           name,
           found: true,
           content: null,
           graph: { nodes: [], edges: [] },
-          graph_error: 'Mental-model reflect_response.structured_output is empty or missing.',
+          graph_error: 'Mental-model reflect_response has no usable structured output or envelope content.',
         };
       }
-
-      const content = structuredOutput;
-      const rawNarratives = Array.isArray(content.narratives)
-        ? content.narratives.filter((n) => n && typeof n === 'object' && !Array.isArray(n) && typeof n.narrative === 'string')
-        : [];
-      const legacyNarrative = typeof content.narrative === 'string' ? content.narrative : '';
-      const narratives = rawNarratives.length > 0
-        ? rawNarratives.map((n) => ({
-          narrative_name: typeof n.narrative_name === 'string' ? n.narrative_name : '',
-          narrative: n.narrative,
-          evidence: Array.isArray(n.evidence) ? n.evidence.filter((id) => typeof id === 'string') : [],
-        }))
-        : legacyNarrative ? [{ narrative_name: '', narrative: legacyNarrative, evidence: [] }] : [];
-      const graph = content.graph && typeof content.graph === 'object' ? content.graph : { nodes: [], edges: [] };
-      const tables = Array.isArray(content.tables) ? content.tables : [];
-      const diagrams = Array.isArray(content.diagrams) ? content.diagrams : [];
-      const graphNormalized = normalizeGraph(graph, { source: 'template_model', preserveParallelEdges: true });
 
       return {
         ext_id: extId,
         name,
         found: true,
-        content,
-        narratives,
-        graph: graphNormalized,
-        tables,
-        diagrams,
+        content: envelope,
+        narratives: envelope.narratives,
+        graph: envelope.graph,
+        tables: envelope.tables,
+        diagrams: envelope.diagrams,
         graph_error: undefined,
       };
     }),

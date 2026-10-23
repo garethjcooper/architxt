@@ -1,6 +1,6 @@
 {
   "name": "architxt-backend",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "architxt: Document processing backend",
   "engines": {
     "node": ">=22.0.0"
@@ -16,8 +16,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@architxt/aql": "^0.4.5",
-    "@architxt/entity-matcher": "^0.4.5",
+    "@architxt/aql": "^0.4.7",
+    "@architxt/entity-matcher": "^0.4.7",
     "better-sqlite3": "^12.10.0",
     "cors": "^2.8.6",
     "dotenv": "^16.3.1",

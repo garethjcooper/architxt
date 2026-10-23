@@ -2381,9 +2381,9 @@ The **Entities** panel is the left column of the Views page. It lists every grou
 ## What is listed
 
 - One row per grounded entity in the bank.
-- Expanding an entity reveals its edges.
-- The first level shows the grounded co-occurrence edges from Hindsight.
-- The next level shows contextualised edges that were found for each grounded edge.
+- Expanding an entity reveals its edges grouped by directed endpoint pair (`source → target`).
+- The group header represents all edges between the same two entities, regardless of edge type or label.
+- Expanding a group shows the individual edges underneath, including the underlying grounded edge and any contextualised variants.
 
 ## Filters
 
@@ -2398,10 +2398,16 @@ The **Entities** panel is the left column of the Views page. It lists every grou
 | Checkbox | Effect on the canvas |
 |---|---|
 | **Entity** | Include or exclude the entity. |
-| **Grounded edge** | Toggle the whole grounded co-occurrence relationship at once. |
-| **Contextualised edge** | Toggle an individual contextual edge underneath a grounded edge. |
+| **Edge group header** | Toggle every edge in the group on or off at once. |
+| **Individual edge** | Toggle a single edge beneath a group. |
 
-When you select an edge, both of its endpoint entities are implied onto the canvas automatically.
+When only some edges in a group are selected, the group checkbox shows an indeterminate state.
+
+When you select any edge, both of its endpoint entities are implied onto the canvas automatically.
+
+## Edge direction
+
+Edges are grouped and rendered using their real mental-model direction (`source → target`). The canvas arrow points from source to target. When an edge is detected as bidirectional, markers are drawn on both ends.
 
 ## Find in panel
 
@@ -2409,7 +2415,7 @@ If you use the canvas find shortcut (`F3` / find) to locate an item on the graph
 
 ## Edge hierarchy
 
-Grounded co-occurrence edges appear first. The contextualised edges discovered for each grounded relationship appear underneath. This lets you turn on a whole relationship or inspect the individual edges that produced it.
+The top level lists entities. Under each entity, edges are grouped by their directed endpoint pair. The group row shows the endpoint pair and a count of edges in the group. Expanding the group reveals the individual edges, letting you turn on a whole relationship or select specific contextual variants.
 ---
 
 # Canvas
@@ -2435,6 +2441,10 @@ The **Canvas** is the middle column of the Views page. It renders the entities a
 | **Redo** | Re-applies the last undone change. |
 | **Delete / Backspace** | Removes the selected items from the view. |
 | **Find (F3)** | Opens a search box to find and reveal nodes and edges on the canvas and in the Entities panel. |
+
+## Edge direction and bidirectional markers
+
+Edges are rendered with their real mental-model direction: the arrowhead points at the `target` node. If the same pair of nodes has edges in both directions, or if an edge is otherwise detected as bidirectional, a marker is drawn on both ends of that edge.
 
 ## Edge merge modes
 
@@ -3393,29 +3403,29 @@ Graph previews share the common envelope controls and add graph-specific explora
 
 ## The Focus modal
 
-The **Focus** modal is the main action surface for a graph. It opens the graph in a larger view and exposes controls for turning the graph into other section types.
+The **Focus** modal is the main action surface for a graph. It opens the graph in a larger view and exposes controls for turning the graph into other section types or into a View.
 
 | Action | Result |
 |---|---|
 | **Add diagram to page** | Converts the graph into a Mermaid diagram section on the active curated page. Evidence attached to nodes and edges is carried over to the diagram. |
 | **Add table to page** | Converts the graph into a table section on the active curated page, giving you a structured view of nodes, edges, or both. |
+| **Create view** | Creates a new View from the selected nodes and edges in the modal. Enter a name and click **Create view**; a toast confirms the result. |
 | **Copy** | Copies the graph source or image, depending on the control you use. |
 | **Fit to page** | The modal opens with fit-to-page enabled so the whole graph is visible at a glance. |
 
-:::tip[Graphs become diagrams or tables, not editable graph sections]
-A curated page cannot hold a live graph section. Instead, the Focus modal lets you add a **diagram** (static Mermaid flowchart) or a **table** derived from the graph. The graph itself stays read-only in the Preview tab.
+:::tip[Graphs become diagrams, tables, or Views]
+A curated page cannot hold a live graph section. Instead, the Focus modal lets you add a **diagram** or **table** to the active curated page, or create a **View** that you can open and edit on the Views page.
 :::
 
-## From graph to curated page
+## From graph to curated page or View
 
-The typical flow is:
+Open the **Focus** modal from a graph preview and choose:
 
-1. Ask a Reflect question that requests a graph, or open a mental model whose output is a graph.
-2. Inspect the interactive canvas in the Preview tab.
-3. Pan, zoom, and filter until the important relationships are visible.
-4. Select nodes to read their details and evidence.
-5. Open the **Focus** modal and choose **Add diagram to page** or **Add table to page**.
-6. In the curated page, edit the generated diagram source or table cells, then save the page.
+- **Add diagram to page** — convert the graph into a Mermaid diagram section on the active curated page.
+- **Add table to page** — convert the graph into a table section on the active curated page.
+- **Create view** — create a new View from the selected nodes and edges in the modal. Enter a name and click **Create view**; a toast confirms the result. The new View is saved to the active server and bank and can be opened from the Views page.
+
+Curated-page sections can be edited and saved with the page. Views created this way are full Views canvas objects, not sections.
 
 ## Relationship to other focus pages
 
@@ -3428,7 +3438,7 @@ Graphs and diagrams are closely related but serve different purposes. A graph is
 
 ## Summary
 
-The graph focus turns Reflect output into an interactive network canvas. Previews give you zoom, filter, search, and details controls; the Focus modal converts the graph into a diagram or table section on a curated page.
+The graph focus turns Reflect output into an interactive network canvas. Previews give you zoom, filter, search, and details controls; the Focus modal converts the graph into a diagram or table section on a curated page, or into a new View.
 ---
 
 # Focus: evidence

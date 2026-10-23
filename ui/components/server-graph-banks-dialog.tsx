@@ -558,7 +558,7 @@ export function ServerGraphBanksDialog({
                           <div className="text-xs text-foreground-subtle">
                             Auto defaults: top 100 nodes, no model types deployed.
                           </div>
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-start flex-wrap justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="sm"

@@ -1,42 +1,66 @@
 import { listAllMentalModels } from '../../services/hindsight/mental-models.js';
 import { refreshMentalModel } from '../../services/hindsight/mental-models.js';
-import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge, findEdgeByEndpoints } from '../../db/crud/contextual-graph.js';
+import { listNodes, getNode, listEdges, getEdge, upsertNode, upsertEdge } from '../../db/crud/contextual-graph.js';
+import { buildDirectedEdgeId } from './identity.js';
 import { contentHash } from './normalize-model-output.js';
 import { applyModelOutput } from './apply-model-output.js';
 import { createLogger } from '../../utils/logger.js';
 import { stripModelRefsFromProperties } from './graph-model-refs.js';
-import { isContextualGraphRole } from '../../db/crud/template-roles.js';
+import { isContextualGraphRole, getRoleScopeMap } from '../../db/crud/template-roles.js';
+import { toEnvelopeWithFallback, isEnvelopeEmpty } from './to-envelope.js';
+import { deriveEdgeContextEdges } from './table-to-edges.js';
+
+const ROLES = {
+  edgeContext: 'sys_edge_context',
+  discoveryContext: 'sys_discovery_context',
+};
 
 const logger = createLogger('contextual-graph-refresh-patches');
 
-function isEnvelopeEmpty(output) {
-  const hasNarrative = Array.isArray(output.narratives) && output.narratives.some(
-    (n) => n && typeof n === 'object' && typeof n.narrative === 'string' && n.narrative.trim().length > 0,
-  );
-  const hasNodes = Array.isArray(output.graph?.nodes) && output.graph.nodes.length > 0;
-  const hasEdges = Array.isArray(output.graph?.edges) && output.graph.edges.length > 0;
-  const hasTables = Array.isArray(output.tables) && output.tables.length > 0;
-  const hasDiagrams = Array.isArray(output.diagrams) && output.diagrams.length > 0;
-  return !hasNarrative && !hasNodes && !hasEdges && !hasTables && !hasDiagrams;
+function buildKnownCatalog(db, serverId, bankId) {
+  const nodesResult = listNodes(db, serverId, bankId, { limit: 100000 });
+  const nodes = nodesResult?.success ? nodesResult.data : [];
+  const catalog = new Map();
+  for (const node of nodes) {
+    catalog.set(node.cgn_id, {
+      id: node.cgn_id,
+      name: node.properties?.display_name || node.cgn_id,
+      type: node.properties?.type,
+    });
+  }
+  return catalog;
 }
 
-function getModelContent(model) {
+function getModelContent(model, knownCatalog) {
   const reflectResponse = model?.reflect_response;
   if (!reflectResponse) {
     // No reflect response at all means the model is still building or has never
     // been run. Treat as pending, not as an error.
-    return null;
+    return { envelope: null, usedFallback: false };
   }
+
+  const { envelope, usedFallback } = toEnvelopeWithFallback(reflectResponse, {
+    knownCatalog,
+    preserveParallelEdges: true,
+  });
+
+  if (usedFallback) {
+    logger.debug('Using content fallback for contextual mental model', {
+      extId: model?.id,
+    });
+  }
+
+  if (!isEnvelopeEmpty(envelope)) {
+    return { envelope, usedFallback };
+  }
+
   if (!('structured_output' in reflectResponse)) {
     // A reflect_response without structured_output means the model was run under an
     // older config (e.g. before response_schema was added). It needs a re-run under
     // the current schema, not a hard failure.
-    return null;
+    return { envelope: null, usedFallback };
   }
-  const structuredOutput = reflectResponse.structured_output;
-  if (structuredOutput && typeof structuredOutput === 'object') {
-    return structuredOutput;
-  }
+
   throw new Error(`Mental model ${model?.id} has malformed reflect_response.structured_output`);
 }
 
@@ -83,9 +107,10 @@ function edgeContentEqual(props, modelEdge) {
  * @returns {boolean}
  */
 function hasDivergence(db, serverId, bankId, scope, output) {
+  const effective = deriveEdgeContextEdges(output);
   const firstNarrative = output.narratives?.[0]?.narrative ?? '';
   // Empty output = nothing to apply
-  if (!firstNarrative && output.graph.edges.length === 0 && output.tables.length === 0) {
+  if (!firstNarrative && effective.edges.length === 0 && output.tables.length === 0) {
     return false;
   }
 
@@ -93,13 +118,14 @@ function hasDivergence(db, serverId, bankId, scope, output) {
     // Node-scoped models no longer persist summary/capabilities, so we only
     // need to check graph-edge divergence (e.g. edge-ctx models whose ref is
     // attached to an endpoint node).
-    if (output.graph.edges.length > 0) {
-      for (const modelEdge of output.graph.edges) {
+    if (effective.edges.length > 0) {
+      for (const modelEdge of effective.edges) {
         if (!modelEdge.from || !modelEdge.to || !modelEdge.type) continue;
-        const findResult = findEdgeByEndpoints(db, serverId, bankId, modelEdge.from, modelEdge.to, modelEdge.type);
-        const existing = findResult?.success ? findResult.data : null;
-        if (!existing) return true;
-        if (!edgeContentEqual(existing.cge_properties || {}, modelEdge)) return true;
+        const edgeId = buildDirectedEdgeId(modelEdge.from, modelEdge.to, modelEdge.type, modelEdge.label, 'edge-ctx', modelEdge.detail);
+        const existing = getEdge(db, serverId, bankId, edgeId);
+        if (!existing?.success || !existing.data) return true;
+        const props = existing.data.cge_properties || {};
+        if (!edgeContentEqual(props, modelEdge)) return true;
       }
     }
 
@@ -107,14 +133,15 @@ function hasDivergence(db, serverId, bankId, scope, output) {
   }
 
   if (scope.type === 'edge') {
-    if (output.graph.edges.length === 0) return true;
+    if (effective.edges.length === 0) return true;
 
-    for (const modelEdge of output.graph.edges) {
+    for (const modelEdge of effective.edges) {
       if (!modelEdge.from || !modelEdge.to || !modelEdge.type) continue;
-      const findResult = findEdgeByEndpoints(db, serverId, bankId, modelEdge.from, modelEdge.to, modelEdge.type);
-      const existing = findResult?.success ? findResult.data : null;
-      if (!existing) return true;
-      if (!edgeContentEqual(existing.cge_properties || {}, modelEdge)) return true;
+      const edgeId = buildDirectedEdgeId(modelEdge.from, modelEdge.to, modelEdge.type, modelEdge.label, 'edge-ctx', modelEdge.detail);
+      const existing = getEdge(db, serverId, bankId, edgeId);
+      if (!existing?.success || !existing.data) return true;
+      const props = existing.data.cge_properties || {};
+      if (!edgeContentEqual(props, modelEdge)) return true;
     }
     return false;
   }
@@ -367,6 +394,8 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
     stats.fetched = models.length;
     const remoteExtIds = new Set(models.map((m) => m.id).filter(Boolean));
 
+    const knownCatalog = buildKnownCatalog(db, serverId, bankId);
+
     // Detect local refs whose remote model no longer exists in Hindsight.
     // Exclude newly deployed / pending-rerun models because those are expected
     // to be missing from the list until Hindsight finishes building them.
@@ -399,9 +428,9 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      let content;
+      let modelContent;
       try {
-        content = getModelContent(model);
+        modelContent = getModelContent(model, knownCatalog);
       } catch (err) {
         stats.failed += 1;
         const error = `Missing structured output: ${err.message}`;
@@ -410,6 +439,9 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         logger.warn('Mental model has no structured output; treating as failed', { extId: model.id, error: err.message });
         continue;
       }
+
+      const content = modelContent.envelope;
+      const usedFallback = modelContent.usedFallback;
 
       if (content === null) {
         if (!model?.reflect_response) {
@@ -454,7 +486,10 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
-      const newHash = contentHash(getModelContentHashSource(model));
+      // Hash the canonical structured output when available; when falling back to
+      // content, hash the effective envelope so content changes are detected.
+      const hashSource = usedFallback ? JSON.stringify(content) : getModelContentHashSource(model);
+      const newHash = contentHash(hashSource);
 
       // Pass a consistent envelope to applyModelOutput so the content_hash it
       // stores matches the hash we compute above from reflect_response.structured_output.
@@ -475,21 +510,69 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
         continue;
       }
 
+      const role = scope.ref?.role;
+      const scopeMap = getRoleScopeMap(db);
+      const roleScope = scopeMap.get(role);
+      const graphRole = role === ROLES.edgeContext || role === ROLES.discoveryContext || roleScope === 'edge' || roleScope === 'seed';
+
       const oldHash = scope.ref.content_hash;
       const hashChanged = !oldHash || oldHash !== newHash;
       const diverged = hasDivergence(db, serverId, bankId, scope, output);
 
-      if (!diverged) {
-        // No structural divergence. Refresh the ref metadata (hash, fetched_at,
-        // status) without re-running applyModelOutput. This keeps the stats honest
-        // so "applied" only counts actual graph mutations.
+      logger.debug('Evaluating contextual mental model', {
+        extId: model.id,
+        role,
+        roleScope,
+        graphRole,
+        scopeType: scope.type,
+        scopeId: scope.type === 'edge' ? `${scope.ref.scope?.source_id}|${scope.ref.scope?.target_id}` : scope.ref.scope?.node_id,
+        oldHash,
+        newHash,
+        hashChanged,
+        diverged,
+        modelEdges: output.graph?.edges?.length ?? 0,
+        modelNodes: output.graph?.nodes?.length ?? 0,
+      });
+
+      if (!hashChanged && !diverged) {
+        logger.debug('Skipping unchanged contextual mental model', {
+          extId: model.id,
+          reason: 'hash_unchanged_and_no_divergence',
+        });
         stats.skippedUnchanged += 1;
         updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash, fetched_at: timestamp }, timestamp, { status: 'ok', emptyEnvelope: isEnvelopeEmpty(output) });
         continue;
       }
 
+      // A changed hash on a graph-role model means the generated graph content
+      // itself changed, even if the structural divergence check failed to notice
+      // (e.g. parallel-edge rewording, property changes). Node-only roles with no
+      // graph impact just need their metadata refreshed.
+      if (hashChanged && !diverged && !graphRole) {
+        logger.debug('Skipping narrative-only contextual mental model', {
+          extId: model.id,
+          reason: 'hash_changed_but_not_graph_role',
+        });
+        stats.skippedUnchanged += 1;
+        updateRefOnScope(db, serverId, bankId, scope, { ...scope.ref, content_hash: newHash, fetched_at: timestamp }, timestamp, { status: 'ok', emptyEnvelope: isEnvelopeEmpty(output) });
+        continue;
+      }
+
+      logger.debug('Applying contextual mental model', {
+        extId: model.id,
+        reason: hashChanged ? (diverged ? 'hash_changed_and_diverged' : 'hash_changed_graph_role') : 'diverged',
+        graphRole,
+      });
+
       const localModel = buildLocalModel(model, scope);
       const applyResult = await applyModelOutput(db, serverId, bankId, localModel, output, { now: timestamp });
+      logger.debug('Contextual mental model apply result', {
+        extId: model.id,
+        success: applyResult.success,
+        code: applyResult.code,
+        edgeResult: applyResult.edgeResult,
+        nodeResult: applyResult.nodeResult,
+      });
       if (!applyResult.success) {
         // If the model's backing node/edge is gone, treat it as a stale ref rather
         // than a hard failure. The sync-config stage still patches trigger config,
@@ -521,6 +604,11 @@ export async function refreshContextualGraphPatches(db, serverId, bankId, option
       const updatedRef = { ...scope.ref, content_hash: newHash, fetched_at: timestamp, attached_at: scope.ref.attached_at || timestamp };
       updateRefOnScope(db, serverId, bankId, scope, updatedRef, timestamp, { status: 'ok', emptyEnvelope: isEnvelopeEmpty(output) });
       stats.applied += 1;
+      logger.debug('Applied contextual mental model', {
+        extId: model.id,
+        edgeResult: applyResult.edgeResult,
+        nodeResult: applyResult.nodeResult,
+      });
     }
 
     return { success: true, stats };

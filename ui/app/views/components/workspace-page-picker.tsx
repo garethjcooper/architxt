@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import type { ResearchStepSummary } from '@/lib/api/client';
+import { SessionSelector } from '@/app/workspace/_components/session-selector';
+import type { ResearchSession, ResearchStepSummary } from '@/lib/api/client';
 
 export type SaveToFormat = 'flowchart' | 'graph' | 'table';
 
@@ -11,6 +12,10 @@ interface WorkspacePagePickerProps {
   open: boolean;
   title: string;
   hasSession: boolean;
+  sessions: ResearchSession[];
+  activeSessionId?: number | null;
+  sessionsLoading?: boolean;
+  onSessionChange?: (sessionId: number) => void;
   curatedPages: ResearchStepSummary[];
   /** Initially selected export formats. Defaults to ['flowchart']. */
   initialFormats?: SaveToFormat[];
@@ -23,6 +28,10 @@ export function WorkspacePagePicker({
   open,
   title,
   hasSession,
+  sessions,
+  activeSessionId,
+  sessionsLoading = false,
+  onSessionChange,
   curatedPages,
   initialFormats = ['flowchart'],
   onClose,
@@ -62,6 +71,17 @@ export function WorkspacePagePicker({
       <div className="rounded-lg border border-border-default bg-surface-raised p-4 w-80 shadow-lg">
         <div className="text-sm font-medium text-foreground-default mb-2">Send to workspace page</div>
         <p className="text-xs text-foreground-faint mb-4">“{title || 'Untitled'}”</p>
+
+        <div className="mb-4">
+          <div className="text-[11px] font-medium text-foreground-muted mb-1.5 uppercase tracking-wide">Workspace session</div>
+          <SessionSelector
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            loading={sessionsLoading}
+            disabled={!hasSession || sessionsLoading}
+            onSelect={(id) => onSessionChange?.(id)}
+          />
+        </div>
 
         <div className="rounded border border-border-default bg-surface-inset p-2 mb-4">
           <div className="text-[11px] font-medium text-foreground-muted mb-2 uppercase tracking-wide">Include</div>

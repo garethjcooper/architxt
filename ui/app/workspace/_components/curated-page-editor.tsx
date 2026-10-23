@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Eye, Trash2, Undo2, Loader2, FileSearch, FileText, Plus } from 'lucide-react';
+import { Eye, Trash2, Undo2, Loader2, FileSearch, FileText, Plus, GitBranch } from 'lucide-react';
 import { NarrativeViewer } from '@/components/narrative-viewer';
 import { EnvelopeControls } from '@/components/envelope-controls';
 import { parseNarrativeBlocks, getSectionBlockIds, buildNarrativeBlocks, type NarrativeBlock } from '@/components/narrative-blocks';
@@ -10,6 +10,7 @@ import { TableFocusModal } from '@/components/table-focus-modal';
 import { NarrativeFocusModal } from '@/components/narrative-focus-modal';
 import { EvidenceModal } from '@/components/evidence-modal';
 import { DiagramFocusModal } from '@/components/diagram-focus-modal';
+import { AddToViewModal } from '@/components/add-to-view-modal';
 import {
   Dialog,
   DialogContent,
@@ -217,6 +218,7 @@ export function CuratedPageEditor({
   const [focusedTable, setFocusedTable] = useState<{ block: NarrativeBlock; name: string } | null>(null);
   const [focusedNarrativeIndex, setFocusedNarrativeIndex] = useState<number | null>(null);
   const [evidenceModal, setEvidenceModal] = useState<{ memoryIds: string[]; label: string } | null>(null);
+  const [addToViewEvent, setAddToViewEvent] = useState<EnvelopeCopyEvent | null>(null);
 
   // Reset transient edit state only when the page identity changes, not on every envelope update.
   const pageIdRef = useRef('id' in page && typeof page.id === 'number' ? String(page.id) : JSON.stringify(page));
@@ -730,19 +732,20 @@ export function CuratedPageEditor({
           onSidebarWidthChange={onSidebarWidthChange}
           keyPrefix="curated"
           className="h-full"
-          renderSidebarRowActions={(b) => {
+          renderSectionHeadingActions={(b) => {
             if (readOnly) return null;
-            const isDeleted = b.deleted;
-            const isText = b.type === 'text';
             const parsed = parseSyntheticHeading(b.title);
             const isDiagram = parsed?.kind === 'diagram';
             const isGraph = parsed?.kind === 'graph';
             const isTable = parsed?.kind === 'table';
             const isNarrative = b.type === 'heading' && (!b.synthetic || parsed?.kind === 'narrative');
+            const isText = b.type === 'text';
             const canFocus = isText || isNarrative || isDiagram || isGraph || isTable;
+            const canSendToView = isGraph || isDiagram;
             const evidenceIds = resolveSectionEvidence(b.title ?? '', b.__narrativeId, b.__tableId, b.__diagramId);
+            if (b.deleted) return null;
             return (
-              <div className="flex items-center gap-0.5 max-w-0 overflow-hidden group-hover/copy:max-w-fit focus-within:max-w-fit transition-[max-width]">
+              <>
                 {evidenceIds.length > 0 && (
                   <button
                     type="button"
@@ -757,7 +760,7 @@ export function CuratedPageEditor({
                     <FileSearch className="h-3 w-3" />
                   </button>
                 )}
-                {canFocus && !isDeleted && (
+                {canFocus && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -778,7 +781,22 @@ export function CuratedPageEditor({
                     <Eye className="h-3 w-3" />
                   </button>
                 )}
-                {onRequestCopySection && !isDeleted && canFocus && (
+                {canSendToView && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const event = makeSectionCopyEvent(b);
+                      if (event) setAddToViewEvent(event);
+                    }}
+                    className="p-1 rounded text-foreground-subtle hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+                    title="Add to view"
+                    aria-label="Add to view"
+                  >
+                    <GitBranch className="h-3 w-3" />
+                  </button>
+                )}
+                {onRequestCopySection && canFocus && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -797,22 +815,31 @@ export function CuratedPageEditor({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isDeleted) {
-                      restoreSectionOrBlock(b);
-                    } else {
-                      removeSectionOrBlock(b);
-                    }
+                    removeSectionOrBlock(b);
                   }}
-                  className={`p-1 rounded transition-colors ${
-                    isDeleted
-                      ? 'text-accent-primary-fg hover:text-accent-primary-fg hover:bg-accent-primary-bg'
-                      : 'text-foreground-subtle hover:text-destructive-fg hover:bg-destructive-bg'
-                  }`}
-                  title={isDeleted ? 'Restore' : 'Remove'}
+                  className="p-1 rounded text-foreground-subtle hover:text-destructive-fg hover:bg-destructive-bg transition-colors"
+                  title="Remove"
                 >
-                  {isDeleted ? <Undo2 className="h-3 w-3" /> : <Trash2 className="h-3 w-3" />}
+                  <Trash2 className="h-3 w-3" />
                 </button>
-              </div>
+              </>
+            );
+          }}
+          renderSidebarRowActions={(b) => {
+            if (readOnly || !b.deleted) return null;
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  restoreSectionOrBlock(b);
+                }}
+                className="p-1 rounded text-accent-primary-fg hover:text-accent-primary-fg hover:bg-accent-primary-bg transition-colors"
+                title="Restore"
+                aria-label="Restore"
+              >
+                <Undo2 className="h-3 w-3" />
+              </button>
             );
           }}
         />
@@ -947,6 +974,13 @@ export function CuratedPageEditor({
         serverId={serverId}
         bankId={bankId}
         memoryIds={evidenceModal?.memoryIds ?? []}
+      />
+      <AddToViewModal
+        open={addToViewEvent != null}
+        onOpenChange={(open) => { if (!open) setAddToViewEvent(null); }}
+        event={addToViewEvent}
+        serverId={serverId}
+        bankId={bankId}
       />
     </div>
   );

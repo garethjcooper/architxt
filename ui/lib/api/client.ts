@@ -588,11 +588,13 @@ export const entitiesApi = {
     fetchApi<{
       entities: Array<{
         id: number;
+        db_id: number;
         entity_id: string;
+        canonical_id: string;
         name: string;
-        type_id: number;
         type_name: string;
         canonical_reference: string;
+        matched_text: string;
         from_tag: boolean;
         ranges: Array<{ start: number; end: number }>;
       }>;
@@ -1857,6 +1859,17 @@ export const researchApi = {
       body: JSON.stringify(payload),
     }, { timeoutMs: 60000 }),
 
+  discoverMentalModels: (payload: {
+    server_id: number;
+    bank_id: string;
+    entities: string[];
+    roles: string[];
+  }) =>
+    fetchApi<{ success: boolean; data?: unknown; error?: string; code?: string }>('/research/mental-models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 60000 }),
+
   prebuiltOneshot: (payload: {
     server_id: number;
     bank_id: string;
@@ -1867,6 +1880,92 @@ export const researchApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { timeoutMs: 60000 }),
+
+  resolveEdges: (payload: {
+    server_id: number;
+    bank_id: string;
+    graph: { nodes?: any[]; edges: any[] };
+  }) =>
+    fetchApi<{
+      success: boolean;
+      edges: Array<{
+        input_index: number;
+        id: string | null;
+        from: string;
+        to: string;
+        type: string | null;
+        label: string | null;
+        detail: string | null;
+        match_class: 'id' | 'full' | 'label' | 'partial' | 'evidence' | null;
+        stage: 'id' | 'full' | 'label' | 'partial' | 'evidence' | 'no_endpoints' | 'no_type' | 'ambiguous_type' | 'no_label_match' | 'ambiguous_label' | 'ambiguous_evidence';
+        reversed?: boolean;
+        candidates: Array<{
+          id: string;
+          from: string;
+          to: string;
+          type: string | null;
+          label: string | null;
+          detail: string | null;
+        }>;
+      }>;
+      error?: string;
+      code?: string;
+    }>('/research/resolve-edges', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }),
+
+  resolveGraph: (payload: {
+    server_id: number;
+    bank_id: string;
+    section_type: 'graph' | 'tables' | 'diagrams' | 'narrative';
+    graph?: { nodes?: any[]; edges: any[] };
+    text?: string;
+  }) =>
+    fetchApi<{
+      success: boolean;
+      nodes: Array<{
+        id: number;
+        db_id: number;
+        entity_id: string;
+        canonical_id?: string;
+        name: string;
+        type_name: string;
+        canonical_reference?: string;
+        matched_text: string;
+        from_tag: boolean;
+      }>;
+      edges: Array<{
+        input_index: number;
+        id: string | null;
+        from: string;
+        to: string;
+        type: string | null;
+        label: string | null;
+        detail: string | null;
+        match_class: 'id' | 'full' | 'label' | 'partial' | 'evidence' | null;
+        stage: 'id' | 'full' | 'label' | 'partial' | 'evidence' | 'no_endpoints' | 'no_type' | 'ambiguous_type' | 'no_label_match' | 'ambiguous_label' | 'ambiguous_evidence';
+        reversed?: boolean;
+        candidates: Array<{
+          id: string;
+          from: string;
+          to: string;
+          type: string | null;
+          label: string | null;
+          detail: string | null;
+        }>;
+      }>;
+      aliases: Record<string, string>;
+      error?: string;
+      code?: string;
+    }>('/research/resolve-graph', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { timeoutMs: 30000 }),
+
+  // Agent chat within a research session
+  listChatThreads: (sessionId: number) =>
+    fetchApi<AgentChatList>(`/research/sessions/${sessionId}/chats`),
 
   eligibleTemplateModels: (payload: {
     server_id: number;
@@ -1968,9 +2067,6 @@ export const researchApi = {
     }),
 
   // Agent chat within a research session
-  listChatThreads: (sessionId: number) =>
-    fetchApi<AgentChatList>(`/research/sessions/${sessionId}/chats`),
-
   createChatThread: (sessionId: number, title?: string, is_aql?: boolean) =>
     fetchApi<AgentChatThread>(`/research/sessions/${sessionId}/chats`, {
       method: 'POST',

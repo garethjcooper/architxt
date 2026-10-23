@@ -242,5 +242,10 @@ export const config = {
       poll_interval_ms: getInt('ARCHITXT_CONTEXTUAL_GRAPH_SYNC_DAEMON_POLL_INTERVAL_MS', 60000),
     },
   },
-
+  mentalModel: {
+    // When true, a missing/invalid structured_output from a mental model's reflect_response
+    // will fall back to parsing reflect_response.content/text as the standard envelope.
+    // Only valid standard envelopes are accepted; anything else fails as before.
+    noStructuredOutputFallbackContent: getEnv('ARCHITXT_NO_STRUCTURED_OUTPUT_FALLBACK_CONTENT', 'false') === 'true',
+  },
 };

@@ -10,7 +10,7 @@ import { loadEntityCatalog } from '../../../prompts/entity-catalog.js';
 import { createLogger } from '../../../utils/logger.js';
 import { composeMentalModelPrompt } from '../../../prompts/template-service.js';
 import { UNIFIED_RESPONSE_SCHEMA } from '../../contextual-graph/unified-response-schema.js';
-import { toEnvelope } from '../../contextual-graph/to-envelope.js';
+import { toEnvelopeWithFallback, isEnvelopeEmpty } from '../../contextual-graph/to-envelope.js';
 
 const logger = createLogger('research-handler-reflect');
 
@@ -125,10 +125,21 @@ export async function handleReflect(serverId, bankId, query, options = {}, db, r
     };
   }
 
-  const structuredOutput = result.data?.structured_output;
-  if (!structuredOutput || typeof structuredOutput !== 'object') {
+  const knownCatalog = await knownCatalogPromise;
+  const { envelope, usedFallback } = toEnvelopeWithFallback(result.data || {}, {
+    knownCatalog,
+    mode: 'generic',
+    activity: 'reflect',
+    preserveParallelEdges: true,
+  });
+
+  if (usedFallback) {
+    logger.debug('Using content fallback for Reflect handler', { serverId, bankId });
+  }
+
+  if (isEnvelopeEmpty(envelope)) {
     const keys = Object.keys(result.data || {});
-    logger.warn('Reflect response missing structured_output', { keys });
+    logger.warn('Reflect response has no usable structured output or envelope content', { keys });
     return {
       success: false,
       error: 'Reflect response missing structured_output',
@@ -141,14 +152,6 @@ export async function handleReflect(serverId, bankId, query, options = {}, db, r
       }],
     };
   }
-  const extracted = structuredOutput;
-  const knownCatalog = await knownCatalogPromise;
-  const envelope = toEnvelope(extracted, {
-    knownCatalog,
-    mode: 'generic',
-    activity: 'reflect',
-    preserveParallelEdges: true,
-  });
 
   const hasGraph = envelope.graph.nodes.length > 0 || envelope.graph.edges.length > 0;
   const hasTables = Array.isArray(envelope.tables) && envelope.tables.length > 0;

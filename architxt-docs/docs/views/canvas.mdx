@@ -24,6 +24,10 @@ The **Canvas** is the middle column of the Views page. It renders the entities a
 | **Delete / Backspace** | Removes the selected items from the view. |
 | **Find (F3)** | Opens a search box to find and reveal nodes and edges on the canvas and in the Entities panel. |
 
+## Edge direction and bidirectional markers
+
+Edges are rendered with their real mental-model direction: the arrowhead points at the `target` node. If the same pair of nodes has edges in both directions, or if an edge is otherwise detected as bidirectional, a marker is drawn on both ends of that edge.
+
 ## Edge merge modes
 
 The toolbar has a dropdown that controls how multiple edges between the same pair of nodes are drawn:
