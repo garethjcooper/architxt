@@ -14,7 +14,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Loader2, Network, AlertTriangle, ChevronDown, ChevronUp, Trash2, Bomb } from 'lucide-react';
-import { serversApi, contextualGraphApi, hindsightApi, mentalModelsApi } from '@/lib/api/client';
+import { serversApi, contextualGraphApi, hindsightApi, mentalModelsApi, viewsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { ConfirmDialog } from './confirm-dialog';
 import type { Server, ContextualGraphBankConfig } from '@/lib/types';
@@ -55,6 +55,8 @@ export function ServerGraphBanksDialog({
   const [confirmClearBankId, setConfirmClearBankId] = useState<string | null>(null);
   const [confirmCleanLocalGraphBankId, setConfirmCleanLocalGraphBankId] = useState<string | null>(null);
   const [cleaningLocalGraph, setCleaningLocalGraph] = useState<Record<string, boolean>>({});
+  const [confirmClearContextGraphAndViewsBankId, setConfirmClearContextGraphAndViewsBankId] = useState<string | null>(null);
+  const [clearingContextGraphAndViews, setClearingContextGraphAndViews] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!server || !open) return;
@@ -307,6 +309,26 @@ export function ServerGraphBanksDialog({
       toast.error(err instanceof Error ? err.message : 'Failed to clean local graph');
     } finally {
       setCleaningLocalGraph((prev) => ({ ...prev, [bankId]: false }));
+    }
+  };
+
+  const handleClearContextGraphAndViews = async (bankId: string) => {
+    setClearingContextGraphAndViews((prev) => ({ ...prev, [bankId]: true }));
+    try {
+      const graphResult = await contextualGraphApi.clear(server.id, bankId);
+      if (!graphResult.success) {
+        toast.error(graphResult.error || 'Failed to clear context graph');
+        return;
+      }
+      const viewsResult = await viewsApi.clearAll(server.id, bankId);
+      toast.success(
+        `Cleared ${bankId}: removed ${graphResult.cleared?.nodes ?? 0} nodes / ${graphResult.cleared?.edges ?? 0} edges and ${viewsResult.deleted ?? 0} view(s).`,
+      );
+      onServerUpdated?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to clear context graph and views');
+    } finally {
+      setClearingContextGraphAndViews((prev) => ({ ...prev, [bankId]: false }));
     }
   };
 
@@ -610,6 +632,16 @@ export function ServerGraphBanksDialog({
                             <Button
                               variant="ghost"
                               size="sm"
+                              disabled={clearingContextGraphAndViews[bank.bank_id]}
+                              onClick={() => setConfirmClearContextGraphAndViewsBankId(bank.bank_id)}
+                              className="h-7 text-[11px] text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
+                            >
+                              {clearingContextGraphAndViews[bank.bank_id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bomb className="h-3 w-3 mr-1" />}
+                              Clear graph & views
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               disabled={clearingAll[bank.bank_id]}
                               onClick={() => setConfirmClearBankId(bank.bank_id)}
                               className="h-7 text-[11px] text-destructive-fg hover:text-destructive-fg hover:bg-destructive-bg"
@@ -677,6 +709,22 @@ export function ServerGraphBanksDialog({
       onConfirm={() => {
         if (confirmCleanLocalGraphBankId) {
           handleCleanLocalGraph(confirmCleanLocalGraphBankId);
+        }
+      }}
+    />
+    <ConfirmDialog
+      open={!!confirmClearContextGraphAndViewsBankId}
+      onOpenChange={(open) => {
+        if (!open) setConfirmClearContextGraphAndViewsBankId(null);
+      }}
+      title="Clear context graph and views?"
+      description={`This will remove every node and edge in the local contextual graph for bank "${confirmClearContextGraphAndViewsBankId}" AND delete all views. Hindsight mental models will not be affected. Auto-sync settings are unchanged.`}
+      confirmLabel="Clear graph & views"
+      cancelLabel="Cancel"
+      variant="destructive"
+      onConfirm={() => {
+        if (confirmClearContextGraphAndViewsBankId) {
+          handleClearContextGraphAndViews(confirmClearContextGraphAndViewsBankId);
         }
       }}
     />

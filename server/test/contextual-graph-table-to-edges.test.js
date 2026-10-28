@@ -2,6 +2,14 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { edgeContextTableToGraph, deriveEdgeContextEdges } from '../src/services/contextual-graph/table-to-edges.js';
 
+const EMPTY_PROPERTIES = {
+  protocol: '',
+  format: '',
+  frequency: '',
+  auth: '',
+  encryption: '',
+};
+
 describe('edgeContextTableToGraph', () => {
   it('converts table rows to graph edges', () => {
     const table = {
@@ -26,7 +34,7 @@ describe('edgeContextTableToGraph', () => {
       label: 'Usage rating feed',
       detail: 'Detail one.',
       evidence: ['e1'],
-      properties: { frequency: '-' },
+      properties: { ...EMPTY_PROPERTIES, frequency: '' },
     });
 
     assert.deepEqual(edges[1], {
@@ -36,7 +44,71 @@ describe('edgeContextTableToGraph', () => {
       label: 'Postal address data',
       detail: 'Detail two.',
       evidence: ['e2', 'e3'],
-      properties: { frequency: 'nightly' },
+      properties: { ...EMPTY_PROPERTIES, frequency: 'nightly' },
+    });
+  });
+
+  it('converts "-" placeholders to empty strings in edge properties', () => {
+    const table = {
+      name: 'edge-context',
+      columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'protocol', 'auth', 'encryption', 'format'],
+      rows: [
+        ['a-com:COM-001', 'a-com:COM-002', 'sends', 'Usage rating feed', 'Detail one.', '-', ['e1'], '-', '-', '-', 'BLINCL feed'],
+      ],
+      evidence: [],
+    };
+
+    const { edges } = edgeContextTableToGraph(table);
+    assert.equal(edges.length, 1);
+    assert.deepEqual(edges[0].properties, {
+      ...EMPTY_PROPERTIES,
+      format: 'BLINCL feed',
+    });
+  });
+
+  it('carries protocol, auth and encryption columns through to edge properties', () => {
+    const table = {
+      name: 'edge-context',
+      columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'protocol', 'auth', 'encryption'],
+      rows: [
+        ['a-com:COM-001', 'a-com:COM-002', 'sends', 'Usage rating feed', 'Detail one.', '-', ['e1'], 'HTTPS', 'OAuth2', 'TLS1.3'],
+      ],
+      evidence: [],
+    };
+
+    const { edges } = edgeContextTableToGraph(table);
+    assert.equal(edges.length, 1);
+    assert.deepEqual(edges[0].properties, {
+      ...EMPTY_PROPERTIES,
+      protocol: 'HTTPS',
+      auth: 'OAuth2',
+      encryption: 'TLS1.3',
+    });
+  });
+
+  it('carries protocol, auth and encryption from object rows', () => {
+    const table = {
+      name: 'edge-context',
+      columns: ['from', 'to', 'type', 'label', 'protocol', 'auth', 'encryption'],
+      rows: [{
+        from: 'a-com:COM-001',
+        to: 'a-com:COM-002',
+        type: 'sends',
+        label: 'Usage rating feed',
+        protocol: 'gRPC',
+        auth: 'mTLS',
+        encryption: 'TLS1.3',
+      }],
+      evidence: [],
+    };
+
+    const { edges } = edgeContextTableToGraph(table);
+    assert.equal(edges.length, 1);
+    assert.deepEqual(edges[0].properties, {
+      ...EMPTY_PROPERTIES,
+      protocol: 'gRPC',
+      auth: 'mTLS',
+      encryption: 'TLS1.3',
     });
   });
 
@@ -55,8 +127,8 @@ describe('edgeContextTableToGraph', () => {
     assert.equal(edges[0].type, 'sends');
     assert.equal(edges[0].label, 'Label');
     assert.equal(edges[0].detail, 'Detail.');
+    assert.deepEqual(edges[0].properties, { ...EMPTY_PROPERTIES, frequency: '' });
     assert.deepEqual(edges[0].evidence, ['e1']);
-    assert.equal(edges[0].properties.frequency, '-');
   });
 
   it('returns empty graph when required columns are missing', () => {
@@ -88,13 +160,14 @@ describe('edgeContextTableToGraph', () => {
     const { edges } = edgeContextTableToGraph(table);
     assert.equal(edges.length, 1);
     assert.equal(edges[0].label, 'OK');
+    assert.deepEqual(edges[0].properties, { ...EMPTY_PROPERTIES, frequency: '' });
   });
 
   it('treats string evidence as a single-item array', () => {
     const table = {
       name: 'edge-context',
-      columns: ['from', 'to', 'type', 'evidence'],
-      rows: [['a-com:COM-001', 'a-com:COM-002', 'sends', 'e1']],
+      columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence'],
+      rows: [['a-com:COM-001', 'a-com:COM-002', 'sends', 'L', 'D', '-', 'e1']],
       evidence: [],
     };
 
@@ -110,24 +183,40 @@ describe('edgeContextTableToGraph', () => {
         from: 'a-com:COM-001',
         to: 'a-com:COM-002',
         type: 'sends',
-        label: 'Usage rating feed',
-        detail: 'Singleview sends usage to ICMS.',
-        frequency: 'nightly',
+        label: 'L',
+        detail: 'D',
+        frequency: 'hourly',
         evidence: ['e1'],
       }],
       evidence: [],
     };
 
-    const { nodes, edges } = edgeContextTableToGraph(table);
-    assert.equal(nodes.length, 2);
+    const { edges } = edgeContextTableToGraph(table);
     assert.equal(edges.length, 1);
-    assert.equal(edges[0].from, 'a-com:COM-001');
-    assert.equal(edges[0].to, 'a-com:COM-002');
-    assert.equal(edges[0].type, 'sends');
-    assert.equal(edges[0].label, 'Usage rating feed');
-    assert.equal(edges[0].detail, 'Singleview sends usage to ICMS.');
-    assert.equal(edges[0].properties.frequency, 'nightly');
+    assert.equal(edges[0].label, 'L');
+    assert.equal(edges[0].detail, 'D');
     assert.deepEqual(edges[0].evidence, ['e1']);
+    assert.deepEqual(edges[0].properties, { ...EMPTY_PROPERTIES, frequency: 'hourly' });
+  });
+
+  it('carries arbitrary extra columns through to edge properties', () => {
+    const table = {
+      name: 'edge-context',
+      columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'reliability', 'intermediaries'],
+      rows: [[
+        'a-com:COM-001', 'a-com:COM-002', 'sends', 'L', 'D', '-', ['e1'],
+        'at-least-once', ['mq-bridge'],
+      ]],
+      evidence: [],
+    };
+
+    const { edges } = edgeContextTableToGraph(table);
+    assert.deepEqual(edges[0].properties, {
+      ...EMPTY_PROPERTIES,
+      frequency: '',
+      reliability: 'at-least-once',
+      intermediaries: ['mq-bridge'],
+    });
   });
 });
 
@@ -137,45 +226,41 @@ describe('deriveEdgeContextEdges', () => {
       tables: [{
         name: 'edge-context',
         columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence'],
-        rows: [['a-com:COM-001', 'a-com:COM-002', 'sends', 'Table edge', 'detail', '-', ['e1']]],
+        rows: [['a-com:COM-001', 'a-com:COM-002', 'sends', 'L', 'D', '-', ['e1']]],
         evidence: [],
       }],
-      graph: {
-        edges: [{ from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'Graph edge', detail: 'detail', evidence: ['e2'] }],
-      },
+      graph: { nodes: [], edges: [{ from: 'x', to: 'y', type: 'calls', label: 'ignored' }] },
     };
 
     const result = deriveEdgeContextEdges(output);
     assert.equal(result.source, 'table');
     assert.equal(result.edges.length, 1);
-    assert.equal(result.edges[0].label, 'Table edge');
+    assert.equal(result.edges[0].from, 'a-com:COM-001');
   });
 
   it('falls back to graph edges when no tables exist', () => {
     const output = {
       tables: [],
       graph: {
-        edges: [{ from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'Graph edge', detail: 'detail', evidence: ['e2'] }],
+        nodes: [],
+        edges: [{ from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'calls', label: 'L', detail: 'D', evidence: ['e1'], properties: {} }],
       },
     };
 
     const result = deriveEdgeContextEdges(output);
     assert.equal(result.source, 'graph');
     assert.equal(result.edges.length, 1);
-    assert.equal(result.edges[0].label, 'Graph edge');
   });
 
   it('does not fall back to graph when a table is present but has no rows', () => {
     const output = {
       tables: [{
         name: 'edge-context',
-        columns: ['from', 'to', 'type'],
+        columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence'],
         rows: [],
         evidence: [],
       }],
-      graph: {
-        edges: [{ from: 'a-com:COM-001', to: 'a-com:COM-002', type: 'sends', label: 'Graph edge', detail: 'detail', evidence: ['e2'] }],
-      },
+      graph: { nodes: [], edges: [{ from: 'x', to: 'y', type: 'calls', label: 'ignored' }] },
     };
 
     const result = deriveEdgeContextEdges(output);

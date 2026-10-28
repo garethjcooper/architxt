@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db/connection.js';
+import { db as singletonDb } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
 import {
   handleDeleteById,
@@ -17,7 +17,20 @@ import {
   deleteEntityType,
   getEntityType,
   listEntityTypes,
+  entityTypeArchitecture,
 } from '../db/crud/entity-types.js';
+import {
+  createEdgeType,
+  updateEdgeType,
+  deleteEdgeType,
+  getEdgeType,
+  listEdgeTypes,
+  normalizeEdgeTypeName,
+  normalizeDescription,
+  normalizeArchimateRelationship,
+  ARCHIMATE_RELATIONSHIPS,
+} from '../db/crud/edge-types.js';
+import { buildEdgeVocabularyFragment } from '../prompts/edge-vocabulary.js';
 import {
   createEntity,
   updateEntity,
@@ -41,6 +54,8 @@ import {
 const logger = createLogger('entities-route');
 const router = Router();
 
+const getDb = (req) => req.app.locals.db || singletonDb;
+
 /* ─────────── DB → API transforms ─────────── */
 
 const toApiEntityType = (dbRow) => ({
@@ -55,8 +70,20 @@ const toApiEntityType = (dbRow) => ({
   id_format_prefix: dbRow.et_id_format_prefix,
   min_id_digits: dbRow.et_min_id_digits,
   id_separator: dbRow.et_id_separator ?? 'none',
+  c4_element: dbRow.et_c4_element,
+  archimate_element: dbRow.et_archimate_element,
   created_at: dbRow.et_created_at,
   updated_at: dbRow.et_updated_at,
+});
+
+const toApiEdgeType = (dbRow) => ({
+  id: dbRow.edt_id,
+  type_name: dbRow.edt_type_name,
+  description: dbRow.edt_description,
+  c4_description: dbRow.edt_c4_description,
+  archimate_relationship: dbRow.edt_archimate_relationship,
+  created_at: dbRow.edt_created_at,
+  updated_at: dbRow.edt_updated_at,
 });
 
 const toApiEntity = (dbRow) => ({
@@ -103,7 +130,7 @@ const toApiEntity = (dbRow) => ({
  */
 router.get('/types', async (req, res) => {
   const start = Date.now();
-  const result = await listEntityTypes(db, { orderBy: 'et_type_name' });
+  const result = await listEntityTypes(getDb(req), { orderBy: 'et_type_name' });
   handleCrudResult({
     res,
     result,
@@ -141,6 +168,8 @@ router.get('/types', async (req, res) => {
  *               id_format_prefix: { type: string, description: 'Alphanumeric prefix for formatted entity ids (e.g. APP)' }
  *               min_id_digits: { type: integer, default: 3, minimum: 1, maximum: 10, description: 'Minimum zero-padded digits in formatted entity ids' }
  *               id_separator: { type: string, enum: ['none', '-'], default: 'none', description: 'Separator between prefix and zero-padded entity id' }
+ *               c4_element: { type: string, enum: [Person, SoftwareSystem, Container, Component], nullable: true, description: 'Optional C4 element type for entities of this type' }
+ *               archimate_element: { type: string, enum: [BusinessActor, ApplicationComponent, ApplicationService, ApplicationInterface, DataObject], nullable: true, description: 'Optional ArchiMate element type for entities of this type' }
  *     responses:
  *       201:
  *         description: Entity type created
@@ -160,7 +189,7 @@ router.post('/types', async (req, res) => {
   const nameCheck = validateRequiredString({ req, res, field: 'type_name', logger, path, start });
   if (!nameCheck.valid) return;
 
-  const result = await createEntityType(db, {
+  const result = await createEntityType(getDb(req), {
     type_name: nameCheck.value,
     description: req.body.description || null,
     id_label: req.body.id_label || null,
@@ -171,6 +200,8 @@ router.post('/types', async (req, res) => {
     id_format_prefix: req.body.id_format_prefix,
     min_id_digits: req.body.min_id_digits,
     id_separator: req.body.id_separator,
+    c4_element: req.body.c4_element,
+    archimate_element: req.body.archimate_element,
   });
 
   handleCrudResult({
@@ -208,6 +239,8 @@ router.post('/types', async (req, res) => {
  *               id_format_prefix: { type: string, description: 'Alphanumeric prefix for formatted entity ids (e.g. APP)' }
  *               min_id_digits: { type: integer, minimum: 1, maximum: 10, description: 'Minimum zero-padded digits in formatted entity ids' }
  *               id_separator: { type: string, enum: ['none', '-'], description: 'Separator between prefix and zero-padded entity id' }
+ *               c4_element: { type: string, enum: [Person, SoftwareSystem, Container, Component], nullable: true, description: 'Optional C4 element type for entities of this type' }
+ *               archimate_element: { type: string, enum: [BusinessActor, ApplicationComponent, ApplicationService, ApplicationInterface, DataObject], nullable: true, description: 'Optional ArchiMate element type for entities of this type' }
  *     responses:
  *       200:
  *         description: Entity type updated
@@ -227,7 +260,7 @@ router.put('/types/:id', async (req, res) => {
     return sendResponse({ res, status: 400, error: 'At least one field is required', code: 'VALIDATION_ERROR', logger, method: 'PUT', path, duration: Date.now() - start });
   }
 
-  const result = await updateEntityType(db, idCheck.id, {
+  const result = await updateEntityType(getDb(req), idCheck.id, {
     type_name: req.body.type_name,
     description: req.body.description,
     id_label: req.body.id_label,
@@ -238,6 +271,8 @@ router.put('/types/:id', async (req, res) => {
     id_format_prefix: req.body.id_format_prefix,
     min_id_digits: req.body.min_id_digits,
     id_separator: req.body.id_separator,
+    c4_element: req.body.c4_element,
+    archimate_element: req.body.archimate_element,
   });
 
   handleCrudResult({
@@ -264,7 +299,293 @@ router.put('/types/:id', async (req, res) => {
  *         description: Entity type not found
  */
 router.delete('/types/:id', handleDeleteById({
-  db, crudFn: deleteEntityType, resourceName: 'entity type', logger, basePath: '/entity-types',
+  db: getDb, crudFn: deleteEntityType, resourceName: 'entity type', logger, basePath: '/entity-types',
+}));
+
+/**
+ * @openapi
+ * /entities/edge-types:
+ *   get:
+ *     summary: List all edge types
+ *     tags: [Entities]
+ *     responses:
+ *       200:
+ *         description: Array of edge types
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: integer }
+ *                   type_name: { type: string }
+ *                   description: { type: string, nullable: true }
+ *                   c4_description: { type: string, nullable: true }
+ *                   archimate_relationship: { type: string, nullable: true }
+ */
+router.get('/edge-types', async (req, res) => {
+  const start = Date.now();
+  const result = await listEdgeTypes(getDb(req), { orderBy: 'edt_type_name' });
+  handleCrudResult({
+    res,
+    result,
+    notFoundError: null,
+    successStatus: 200,
+    successData: result.success ? result.data.map(toApiEdgeType) : null,
+    logger,
+    method: 'GET',
+    path: '/entity-edge-types',
+    start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/edge-types/prompt-preview:
+ *   get:
+ *     summary: Preview the generated edge vocabulary prompt fragment
+ *     tags: [Entities]
+ *     responses:
+ *       200:
+ *         description: Markdown edge vocabulary fragment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 prompt: { type: string }
+ */
+router.get('/edge-types/prompt-preview', async (req, res) => {
+  const start = Date.now();
+  const prompt = buildEdgeVocabularyFragment(getDb(req));
+  sendResponse({
+    res,
+    status: 200,
+    data: { prompt },
+    logger,
+    method: 'GET',
+    path: '/entity-edge-types/prompt-preview',
+    duration: Date.now() - start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/edge-types:
+ *   post:
+ *     summary: Create a new edge type
+ *     tags: [Entities]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [type_name, description]
+ *             properties:
+ *               type_name: { type: string, description: 'Lowercase slug (letters, digits, hyphens)' }
+ *               description: { type: string, description: 'Required human-readable description of the relationship' }
+ *               c4_description: { type: string, description: 'Optional C4 relationship phrase' }
+ *               archimate_relationship: { type: string, enum: [association, serving, used-by, composition, aggregation, assignment, realization, specialization, influence, triggering, flow, access], description: 'Optional ArchiMate relationship type' }
+ *     responses:
+ *       201:
+ *         description: Edge type created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: integer }
+ *       400:
+ *         description: Validation error
+ *       409:
+ *         description: Edge type name already exists
+ */
+router.post('/edge-types', async (req, res) => {
+  const start = Date.now();
+  const path = '/entity-edge-types';
+
+  const nameCheck = validateRequiredString({ req, res, field: 'type_name', logger, path, start });
+  if (!nameCheck.valid) return;
+
+  const descCheck = validateRequiredString({ req, res, field: 'description', logger, path, start });
+  if (!descCheck.valid) return;
+
+  let normalizedName;
+  try {
+    normalizedName = normalizeEdgeTypeName(nameCheck.value);
+  } catch (err) {
+    return sendResponse({
+      res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+      logger, method: 'POST', path, duration: Date.now() - start,
+    });
+  }
+
+  let normalizedArchimate = null;
+  if (req.body.archimate_relationship !== undefined && req.body.archimate_relationship !== null && String(req.body.archimate_relationship).trim() !== '') {
+    try {
+      normalizedArchimate = normalizeArchimateRelationship(req.body.archimate_relationship);
+    } catch (err) {
+      return sendResponse({
+        res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+        logger, method: 'POST', path, duration: Date.now() - start,
+      });
+    }
+  }
+
+  const result = await createEdgeType(getDb(req), {
+    type_name: normalizedName,
+    description: descCheck.value,
+    c4_description: req.body.c4_description || null,
+    archimate_relationship: normalizedArchimate,
+  });
+
+  handleCrudResult({
+    res, result, notFoundError: null, successStatus: 201,
+    successData: result.success ? { id: result.data } : null,
+    logger, method: 'POST', path, start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/edge-types/{id}:
+ *   get:
+ *     summary: Get an edge type by id
+ *     tags: [Entities]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Edge type
+ *       404:
+ *         description: Edge type not found
+ */
+router.get('/edge-types/:id', async (req, res) => {
+  const start = Date.now();
+  const path = `/entity-edge-types/${req.params.id}`;
+
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/entity-edge-types', start });
+  if (!idCheck.valid) return;
+
+  const result = await getEdgeType(getDb(req), idCheck.id);
+  handleCrudResult({
+    res, result, notFoundError: 'Edge type not found', successStatus: 200,
+    successData: result.success && result.data ? toApiEdgeType(result.data) : null,
+    logger, method: 'GET', path, start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/edge-types/{id}:
+ *   put:
+ *     summary: Update an edge type
+ *     tags: [Entities]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               type_name: { type: string }
+ *               description: { type: string }
+ *               c4_description: { type: string }
+ *               archimate_relationship: { type: string, enum: [association, serving, used-by, composition, aggregation, assignment, realization, specialization, influence, triggering, flow, access] }
+ *     responses:
+ *       200:
+ *         description: Edge type updated
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Edge type not found
+ */
+router.put('/edge-types/:id', async (req, res) => {
+  const start = Date.now();
+  const path = `/entity-edge-types/${req.params.id}`;
+
+  const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/entity-edge-types', start });
+  if (!idCheck.valid) return;
+
+  if (Object.keys(req.body).length === 0) {
+    return sendResponse({ res, status: 400, error: 'At least one field is required', code: 'VALIDATION_ERROR', logger, method: 'PUT', path, duration: Date.now() - start });
+  }
+
+  let updateData = {
+    description: req.body.description,
+    c4_description: req.body.c4_description,
+  };
+
+  if (req.body.type_name !== undefined) {
+    try {
+      updateData.type_name = normalizeEdgeTypeName(req.body.type_name);
+    } catch (err) {
+      return sendResponse({
+        res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+        logger, method: 'PUT', path, duration: Date.now() - start,
+      });
+    }
+  }
+
+  if (req.body.description !== undefined) {
+    try {
+      updateData.description = normalizeDescription(req.body.description);
+    } catch (err) {
+      return sendResponse({
+        res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+        logger, method: 'PUT', path, duration: Date.now() - start,
+      });
+    }
+  }
+
+  if (req.body.archimate_relationship !== undefined) {
+    try {
+      updateData.archimate_relationship = normalizeArchimateRelationship(req.body.archimate_relationship);
+    } catch (err) {
+      return sendResponse({
+        res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+        logger, method: 'PUT', path, duration: Date.now() - start,
+      });
+    }
+  }
+
+  const result = await updateEdgeType(getDb(req), idCheck.id, updateData);
+
+  handleCrudResult({
+    res, result, notFoundError: 'Edge type not found', successStatus: 200,
+    successData: { success: true }, logger, method: 'PUT', path, start,
+  });
+});
+
+/**
+ * @openapi
+ * /entities/edge-types/{id}:
+ *   delete:
+ *     summary: Delete an edge type
+ *     tags: [Entities]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       204:
+ *         description: Edge type deleted
+ *       404:
+ *         description: Edge type not found
+ */
+router.delete('/edge-types/:id', handleDeleteById({
+  db: getDb, crudFn: deleteEdgeType, resourceName: 'edge type', logger, basePath: '/entity-edge-types',
 }));
 
 /**
@@ -297,13 +618,13 @@ router.get('/types/:id/next-id', async (req, res) => {
   const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/entity-types', start });
   if (!idCheck.valid) return;
 
-  const typeResult = await getEntityType(db, idCheck.id);
+  const typeResult = await getEntityType(getDb(req), idCheck.id);
   if (!typeResult.success || !typeResult.data) {
     sendResponse({ res, status: 404, error: 'Entity type not found', code: 'NOT_FOUND', logger, method: 'GET', path, duration: Date.now() - start });
     return;
   }
 
-  const nextIdResult = await getNextEntityIdForType(db, typeResult.data, { excludeEntityId: req.query.exclude_entity_id });
+  const nextIdResult = await getNextEntityIdForType(getDb(req), typeResult.data, { excludeEntityId: req.query.exclude_entity_id });
   const nextId = nextIdResult.success ? nextIdResult.data : null;
   sendResponse({ res, status: 200, data: { next_entity_id: nextId }, logger, method: 'GET', path, duration: Date.now() - start });
 });
@@ -333,13 +654,13 @@ router.get('/', async (req, res) => {
   // Uses the configured full-text document index to avoid full LIKE scans of doc_content.
   const start = Date.now();
   const listStart = Date.now();
-  const result = await listEntitiesWithType(db);
+  const result = await listEntitiesWithType(getDb(req));
   logger.info(`GET /entities listEntitiesWithType took ${Date.now() - listStart}ms`);
 
   if (result.success && result.data.length > 0) {
     const entIds = result.data.map((e) => e.ent_entity_id);
     const countStart = Date.now();
-    const countResult = await getEntityUsageCounts(db, entIds);
+    const countResult = await getEntityUsageCounts(getDb(req), entIds);
     logger.info(`GET /entities getEntityUsageCounts took ${Date.now() - countStart}ms`);
     if (countResult.success) {
       result.data = result.data.map((ent) => ({
@@ -430,7 +751,7 @@ router.post('/info', async (req, res) => {
   }
 
   const result = await buildEntityInfoMap(
-    req.app.locals.db || db,
+    getDb(req),
     validation.serverId,
     validation.bankId,
     validation.entityIds,
@@ -480,7 +801,7 @@ router.get('/:id', async (req, res) => {
   const idCheck = validateId({ req, res, paramName: 'id', logger, path: '/entities', start });
   if (!idCheck.valid) return;
 
-  const result = await getEntityWithType(db, idCheck.id);
+  const result = await getEntityWithType(getDb(req), idCheck.id);
 
   if (!result || !result.success || !result.data) {
     const duration = Date.now() - start;
@@ -538,7 +859,7 @@ router.post('/', async (req, res) => {
   const typeIdCheck = validateBodyId({ req, res, field: 'type_id', logger, path, start });
   if (!typeIdCheck.valid) return;
 
-  const result = await createEntity(db, {
+  const result = await createEntity(getDb(req), {
     type_id: typeIdCheck.id,
     entity_id: entityIdCheck.value,
     name: nameCheck.value,
@@ -601,7 +922,7 @@ router.put('/:id', async (req, res) => {
     return sendResponse({ res, status: 400, error: 'At least one field is required', code: 'VALIDATION_ERROR', logger, method: 'PUT', path, duration: Date.now() - start });
   }
 
-  const result = await updateEntity(db, idCheck.id, {
+  const result = await updateEntity(getDb(req), idCheck.id, {
     type_id: req.body.type_id,
     entity_id: req.body.entity_id,
     name: req.body.name,
@@ -636,7 +957,7 @@ router.put('/:id', async (req, res) => {
  *         description: Entity not found
  */
 router.delete('/:id', handleDeleteById({
-  db, crudFn: deleteEntity, resourceName: 'entity', logger, basePath: '/entities',
+  db: getDb, crudFn: deleteEntity, resourceName: 'entity', logger, basePath: '/entities',
 }));
 
 /**
@@ -705,7 +1026,7 @@ router.post('/batch/updateconfig', async (req, res) => {
     return;
   }
 
-  const result = await batchUpdateEntityConfig(db, entityIds, config);
+  const result = await batchUpdateEntityConfig(getDb(req), entityIds, config);
 
   if (!result.success) {
     handleCrudResult({ res, result, notFoundError: null, successStatus: 200, logger, method: 'POST', path, start });
@@ -762,7 +1083,7 @@ router.post('/documents', async (req, res) => {
   if (!idsCheck.valid) return;
 
   const limit = parseInt(req.body.limit, 10) || undefined;
-  const result = await findDocumentsForEntities(db, idsCheck.ids, { limit });
+  const result = await findDocumentsForEntities(getDb(req), idsCheck.ids, { limit });
 
   if (!result.success) {
     handleCrudResult({ res, result, notFoundError: null, successStatus: 200, logger, method: 'POST', path, start });
@@ -832,7 +1153,7 @@ router.post('/resolve-from-text', async (req, res) => {
   const textCheck = validateRequiredString({ req, res, field: 'text', logger, path, start });
   if (!textCheck.valid) return;
 
-  const result = await resolveEntitiesFromText(req.app.locals.db || db, textCheck.value);
+  const result = await resolveEntitiesFromText(getDb(req), textCheck.value);
 
   if (!result.success) {
     const status = result.code === 'VALIDATION_ERROR' ? 400 : 500;

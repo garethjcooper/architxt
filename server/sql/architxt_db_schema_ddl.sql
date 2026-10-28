@@ -258,6 +258,8 @@ CREATE TABLE entity_types (
   et_id_format_prefix TEXT,
   et_min_id_digits INTEGER DEFAULT 3 CHECK(et_min_id_digits BETWEEN 1 AND 10),
   et_id_separator TEXT,
+  et_c4_element TEXT,
+  et_archimate_element TEXT,
   et_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   et_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -278,6 +280,20 @@ CREATE TABLE entities (
   ent_generated_by TEXT CHECK(ent_generated_by IN ('user', 'import')),
   ent_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   ent_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- ============================================================================
+-- EDGE TYPES — first-class relationship types for the contextual graph
+-- ============================================================================
+
+CREATE TABLE edge_types (
+  edt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  edt_type_name TEXT NOT NULL UNIQUE,
+  edt_description TEXT NOT NULL,
+  edt_c4_description TEXT,
+  edt_archimate_relationship TEXT,
+  edt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  edt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- ============================================================================

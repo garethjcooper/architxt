@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice } from '../types';
+import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -618,6 +618,8 @@ export const entityTypesApi = {
     id_format_prefix?: string;
     min_id_digits?: number;
     id_separator?: 'none' | '-';
+    c4_element?: C4Element | null;
+    archimate_element?: ArchiMateElement | null;
   }) => fetchApi<{ id: number }>('/entities/types', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -635,6 +637,8 @@ export const entityTypesApi = {
       id_format_prefix?: string;
       min_id_digits?: number;
       id_separator?: 'none' | '-';
+      c4_element?: C4Element | null;
+      archimate_element?: ArchiMateElement | null;
     }
   ) => fetchApi<unknown>(`/entities/types/${id}`, {
     method: 'PUT',
@@ -645,6 +649,34 @@ export const entityTypesApi = {
     const query = excludeEntityId ? `?exclude_entity_id=${encodeURIComponent(excludeEntityId)}` : '';
     return fetchApi<{ next_entity_id: string | null }>(`/entities/types/${id}/next-id${query}`);
   },
+};
+
+export const edgeTypesApi = {
+  list: () => fetchApi<EdgeType[]>('/entities/edge-types'),
+  previewPrompt: () => fetchApi<{ prompt: string }>('/entities/edge-types/prompt-preview'),
+  get: (id: number) => fetchApi<EdgeType>(`/entities/edge-types/${id}`),
+  create: (data: {
+    type_name: string;
+    description?: string;
+    c4_description?: string;
+    archimate_relationship?: string;
+  }) => fetchApi<{ id: number }>('/entities/edge-types', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (
+    id: number,
+    data: {
+      type_name?: string;
+      description?: string | null;
+      c4_description?: string | null;
+      archimate_relationship?: string | null;
+    }
+  ) => fetchApi<unknown>(`/entities/edge-types/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: number) => fetchApi<void>(`/entities/edge-types/${id}`, { method: 'DELETE' }),
 };
 
 // Mental Models API
@@ -1336,6 +1368,37 @@ export interface GraphEdge {
   properties?: Record<string, any>;
   /** Patch health status (green = all roles present, orange = some, red = none). */
   health?: 'green' | 'orange' | 'red';
+}
+
+export interface CsvExportEnvelope {
+  nodes: string;
+  edges: string;
+  meta: {
+    server_id: number;
+    bank_id: string;
+    format: string;
+    version: string;
+    generated_at: string;
+    node_count: number;
+    edge_count: number;
+  };
+}
+
+/**
+ * Raw contextual-graph export envelope returned for `format=json`.
+ */
+export interface GraphExportEnvelope {
+  nodes: Array<{ id: string; labels: string[]; properties: Record<string, any> }>;
+  edges: Array<{ id: string; source_id: string; target_id: string; type: string | null; properties: Record<string, any> }>;
+  meta: {
+    server_id: number;
+    bank_id: string;
+    format: string;
+    version: string;
+    generated_at: string;
+    node_count: number;
+    edge_count: number;
+  };
 }
 
 export interface GraphCanvas {
@@ -2107,7 +2170,7 @@ export const researchApi = {
 export { ApiError };
 
 // Re-export types for convenient importing
-export type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, MentalModel };
+export type { Document, Context, Directive, Tag, Server, Metadata, Entity, EntityType, EdgeType, MentalModel };
 
 // Config API — entity tag format discovery
 export const configApi = {
@@ -2198,12 +2261,104 @@ export interface ContextualGraphConfig {
 }
 
 // Contextual Graph API
+function buildExportParams(
+  serverId: number,
+  bankId: string,
+  options?: {
+    format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+    filename?: string;
+    labels?: string[];
+    ids?: string[];
+    sourceId?: string;
+    targetId?: string;
+    type?: string | null;
+    undirected?: boolean;
+    limit?: number;
+    offset?: number;
+  }
+): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set('server_id', String(serverId));
+  params.set('bank_id', bankId);
+  params.set('format', options?.format ?? 'json');
+  if (options?.filename) params.set('filename', options.filename);
+  if (options?.labels?.length) params.set('labels', options.labels.join(','));
+  if (options?.ids?.length) params.set('ids', options.ids.join(','));
+  if (options?.sourceId) params.set('source_id', options.sourceId);
+  if (options?.targetId) params.set('target_id', options.targetId);
+  if (options?.type !== undefined) params.set('type', options.type ?? '');
+  if (options?.undirected) params.set('undirected', 'true');
+  return params;
+}
+
 export const contextualGraphApi = {
   import: (serverId: number, bankId: string, options?: { min_count?: number; min_weight?: number }) =>
     fetchApi<{ success: boolean; imported?: { nodes: number; edges: number }; raw?: { nodes: number; edges: number }; error?: string; code?: string }>('/contextual-graph/import', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId, bank_id: bankId, ...options }),
     }),
+
+  export: (
+    serverId: number,
+    bankId: string,
+    options?: {
+      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+      filename?: string;
+      labels?: string[];
+      ids?: string[];
+      sourceId?: string;
+      targetId?: string;
+      type?: string | null;
+      undirected?: boolean;
+    }
+  ) => {
+    const params = buildExportParams(serverId, bankId, options);
+    if (options?.format === 'graphml' || options?.format === 'gexf' || options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'archimate') {
+      const accept = options.format === 'graphml'
+        ? 'application/graphml+xml'
+        : options.format === 'gexf'
+          ? 'application/gexf+xml'
+          : options.format === 'cypher'
+            ? 'text/plain'
+            : options.format === 'c4' || options.format === 'c4-mermaid'
+              ? 'text/plain'
+              : 'application/xml';
+      return fetch(`${API_URL}/contextual-graph/export?${params.toString()}`, {
+        method: 'GET',
+        headers: { Accept: accept },
+      }).then((res) => res.text());
+    }
+    if (options?.format === 'csv') {
+      return fetchApi<CsvExportEnvelope>(`/contextual-graph/export?${params.toString()}`);
+    }
+    return fetchApi<GraphExportEnvelope>(`/contextual-graph/export?${params.toString()}`);
+  },
+
+  /**
+   * Export the contextual graph and return the raw fetch Response.
+   * Useful for non-browser consumers that want to stream the download,
+   * inspect headers, or handle the body themselves.
+   */
+  exportStream: (
+    serverId: number,
+    bankId: string,
+    options?: {
+      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+      filename?: string;
+      labels?: string[];
+      ids?: string[];
+      sourceId?: string;
+      targetId?: string;
+      type?: string | null;
+      undirected?: boolean;
+    }
+  ): Promise<Response> => {
+    const params = buildExportParams(serverId, bankId, options);
+    return fetch(`${API_URL}/contextual-graph/export?${params.toString()}`, {
+      method: 'GET',
+      headers: { Accept: options?.format === 'graphml' ? 'application/graphml+xml' : options?.format === 'gexf' ? 'application/gexf+xml' : options?.format === 'cypher' ? 'text/plain' : options?.format === 'c4' || options?.format === 'c4-mermaid' ? 'text/plain' : options?.format === 'archimate' ? 'application/xml' : 'application/json' },
+    });
+  },
 
   addContext: (serverId: number, bankId: string, options?: {
     min_count?: number;
@@ -2495,6 +2650,12 @@ export const viewsApi = {
   clearTimeline: (serverId: number, bankId: string, viewId: string): Promise<{ deleted: number }> =>
     fetchApi<{ deleted: number }>(
       `/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views/${encodeURIComponent(viewId)}/timeline`,
+      { method: 'DELETE' }
+    ),
+
+  clearAll: (serverId: number, bankId: string) =>
+    fetchApi<{ deleted: number }>(
+      `/servers/${encodeURIComponent(serverId)}/banks/${encodeURIComponent(bankId)}/views`,
       { method: 'DELETE' }
     ),
 };

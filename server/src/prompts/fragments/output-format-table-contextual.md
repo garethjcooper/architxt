@@ -2,7 +2,7 @@
 
 The `tables` envelope section holds structured tables. Populate it only when the tables section is active; otherwise leave it as an empty array `[]`.
 
-Each bullet in `ARCHITXT_TABLE_FOCUS` is a separate requested table. Emit exactly as many `tables` array items as there are non-empty bullets in `ARCHITXT_TABLE_FOCUS`. Do not merge multiple table bullets into one array item, and do **not** create narrative entries for table sections. Tables belong only in `tables[]`.
+Each bullet under `### Tables` in the output directives is a separate requested table. Emit exactly as many `tables` array items as there are non-empty bullets. Do not merge multiple table bullets into one array item, and do **not** create narrative entries for table sections. Tables belong only in `tables[]`.
 
 For each `tables[]` item:
 - `name`: the exact title shown in the focus bullet. If the bullet has a bold name (e.g. `- **Example Table Name** — ...`), use that exact bold text. **This MUST be the exact name provided via `#table-name` when one is present. Do not rename, paraphrase, or invent an alternative title.** If the bullet has no name, generate a short descriptive name (4–6 words) based on the table's content.
@@ -18,7 +18,7 @@ Row rules:
 - Do not include rows that are not backed by evidence.
 - Do not summarise a table's content in the `narratives[]` section. A table section is fully expressed by its own `tables[]` entry.
 
-Example — when `ARCHITXT_TABLE_FOCUS` is:
+Example — when the `### Tables` focus bullets are:
 ```
 - **Example Table A** — List each connection to Example A with Source, Target, Protocol, and Content.
 - **Example Table B** — List each connection to Example B with Source, Target, Protocol, and Content.

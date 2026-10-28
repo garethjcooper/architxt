@@ -13,6 +13,8 @@ import type { EntityType } from '@/lib/types';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
 import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
+import { C4ElementSelect, ArchiMateElementSelect } from './architecture-element-select';
+import type { C4Element, ArchiMateElement } from '@/lib/types';
 
 interface ViewEntityTypeDialogProps {
   entityType: EntityType | null;
@@ -41,6 +43,8 @@ export function ViewEntityTypeDialog({
   const [idFormatPrefix, setIdFormatPrefix] = useState('');
   const [minIdDigits, setMinIdDigits] = useState(String(DEFAULT_DIGITS));
   const [idSeparator, setIdSeparator] = useState<'none' | '-'>('none');
+  const [c4Element, setC4Element] = useState<C4Element | null>(null);
+  const [archimateElement, setArchimateElement] = useState<ArchiMateElement | null>(null);
 
   useEffect(() => {
     if (entityType) {
@@ -52,6 +56,8 @@ export function ViewEntityTypeDialog({
       setIdFormatPrefix(entityType.id_format_prefix || '');
       setMinIdDigits(String(entityType.min_id_digits ?? DEFAULT_DIGITS));
       setIdSeparator(entityType.id_separator ?? 'none');
+      setC4Element((entityType.c4_element as C4Element | null) || null);
+      setArchimateElement((entityType.archimate_element as ArchiMateElement | null) || null);
     }
   }, [entityType, open]);
 
@@ -65,7 +71,9 @@ export function ViewEntityTypeDialog({
     usesPattern !== (entityType.uses_entity_id_pattern ?? false) ||
     idFormatPrefix.trim() !== (entityType.id_format_prefix || '') ||
     Number(minIdDigits || DEFAULT_DIGITS) !== (entityType.min_id_digits ?? DEFAULT_DIGITS) ||
-    idSeparator !== (entityType.id_separator ?? 'none');
+    idSeparator !== (entityType.id_separator ?? 'none') ||
+    c4Element !== (entityType.c4_element ?? null) ||
+    archimateElement !== (entityType.archimate_element ?? null);
 
   const handlePrefixChange = (value: string) => {
     setIdFormatPrefix(value.replace(/[^a-zA-Z0-9]/g, ''));
@@ -126,6 +134,12 @@ export function ViewEntityTypeDialog({
       }
       if (usesPattern && idSeparator !== (entityType.id_separator ?? 'none')) {
         updates.id_separator = idSeparator;
+      }
+      if (c4Element !== (entityType.c4_element ?? null)) {
+        updates.c4_element = c4Element;
+      }
+      if (archimateElement !== (entityType.archimate_element ?? null)) {
+        updates.archimate_element = archimateElement;
       }
 
       if (Object.keys(updates).length > 0) {
@@ -264,6 +278,26 @@ export function ViewEntityTypeDialog({
                 checked={wordBoundaries}
                 onChange={setWordBoundaries}
               />
+            </div>
+
+            {/* Architecture mapping */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">C4 Element (optional)</Label>
+                <C4ElementSelect
+                  value={c4Element}
+                  onChange={setC4Element}
+                  placeholder="None"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">ArchiMate Element (optional)</Label>
+                <ArchiMateElementSelect
+                  value={archimateElement}
+                  onChange={setArchimateElement}
+                  placeholder="None"
+                />
+              </div>
             </div>
           </div>
 

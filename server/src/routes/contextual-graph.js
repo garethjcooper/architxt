@@ -2,6 +2,14 @@ import { Router } from 'express';
 import { db as defaultDb } from '../db/connection.js';
 import { createLogger } from '../utils/logger.js';
 import { sendResponse } from '../utils/route-helpers.js';
+import { toGraphML } from '../utils/graphml.js';
+import { toGEXF } from '../utils/gexf.js';
+import { toCypher } from '../utils/cypher.js';
+import { toCsv } from '../utils/csv.js';
+import { toC4StructurizrDsl } from '../utils/c4-structurizr-dsl.js';
+import { toC4Mermaid } from '../utils/c4-mermaid.js';
+import { toArchimateXml } from '../utils/archimate-xml.js';
+import { resolveArchitectureMetadata } from '../utils/architecture-metadata.js';
 import {
   listNodes,
   getNode,
@@ -78,6 +86,22 @@ export function createContextualGraphRouter({
     if (!value || typeof value !== 'string') return undefined;
     const labels = value.split(',').map((s) => s.trim()).filter(Boolean);
     return labels.length > 0 ? labels : undefined;
+  }
+
+  /**
+   * Parse a list of string ids from a comma-separated or repeated query value.
+   */
+  function parseIds(value) {
+    if (!value) return undefined;
+    if (Array.isArray(value)) {
+      const ids = value.flatMap((v) => (typeof v === 'string' ? v.split(',') : [])).map((s) => s.trim()).filter(Boolean);
+      return ids.length > 0 ? ids : undefined;
+    }
+    if (typeof value === 'string') {
+      const ids = value.split(',').map((s) => s.trim()).filter(Boolean);
+      return ids.length > 0 ? ids : undefined;
+    }
+    return undefined;
   }
 
   /**
@@ -185,10 +209,8 @@ export function createContextualGraphRouter({
     const labels = parseLabels(req.query.labels);
     if (labels) options.labels = labels;
     if (req.query.id_prefix) options.idPrefix = req.query.id_prefix;
-    const limit = parseIntParam(req.query.limit);
-    if (limit !== undefined) options.limit = limit;
-    const offset = parseIntParam(req.query.offset);
-    if (offset !== undefined) options.offset = offset;
+    const ids = parseIds(req.query.ids);
+    if (ids) options.ids = ids;
     return options;
   }
 
@@ -204,12 +226,205 @@ export function createContextualGraphRouter({
     }
     const undirected = parseBoolParam(req.query.undirected);
     if (undirected !== undefined) options.undirected = undirected;
-    const limit = parseIntParam(req.query.limit);
-    if (limit !== undefined) options.limit = limit;
-    const offset = parseIntParam(req.query.offset);
-    if (offset !== undefined) options.offset = offset;
     return options;
   }
+
+  /**
+   * @openapi
+   * /contextual-graph/export:
+   *   get:
+   *     summary: Export the contextual graph for a server/bank
+   *     description: |
+   *       Returns the working graph as a single JSON document containing nodes and edges.
+   *       CSV export remains on the roadmap once the JSON shape is fully validated.
+   *     tags: [Contextual Graph]
+   *     parameters:
+   *       - in: query
+   *         name: server_id
+   *         required: true
+   *         schema: { type: integer }
+   *       - in: query
+   *         name: bank_id
+   *         required: true
+   *         schema: { type: string }
+   *       - in: query
+   *         name: format
+   *         schema: { type: string, enum: [json, graphml, gexf, cypher, csv, c4, c4-mermaid, archimate], default: json }
+   *       - in: query
+   *         name: filename
+   *         description: |-
+   *           If provided, the response includes `Content-Disposition: attachment` with this filename,
+   *           causing browsers and HTTP clients to treat the response as a downloadable file.
+   *           CSV export returns a JSON envelope containing separate `nodes` and `edges` CSV strings,
+   *           so the recommended filename extension is `.json`. If omitted, the response is returned as a
+   *           normal 200 JSON payload with no disposition header.
+   *           C4 export returns a Structurizr DSL (.dsl) file.
+   *           C4 Mermaid export returns a Mermaid (.mmd) file.
+   *           ArchiMate export returns an ArchiMate Open Exchange XML (.xml) file.
+   *         schema: { type: string }
+   *       - in: query
+   *         name: id_prefix
+   *         schema: { type: string }
+   *       - in: query
+   *         name: ids
+   *         description: Comma-separated list of exact node ids to include in the export
+   *         schema: { type: string }
+   *       - in: query
+   *         name: source_id
+   *         schema: { type: string }
+   *       - in: query
+   *         name: target_id
+   *         schema: { type: string }
+   *       - in: query
+   *         name: type
+   *         schema: { type: string }
+   *       - in: query
+   *         name: undirected
+   *         schema: { type: boolean }
+   *     responses:
+   *       200:
+   *         description: |
+   *           Graph export (JSON or GraphML). When called with `filename`, the response includes
+   *           `Content-Disposition: attachment` so browsers/clients can save it as a
+   *           file/stream. If omitted, the response is returned as a normal 200 payload.
+   *           The export always returns the complete matching graph for the requested bank;
+   *           pagination (limit/offset) is not supported on this endpoint.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 nodes: { type: array }
+   *                 edges: { type: array }
+   *                 meta: { type: object }
+   *       400: { description: Missing or invalid scope/format }
+   */
+  router.get('/export', async (req, res) => {
+    const start = Date.now();
+    const scope = validateScope(req, res, start, 'query');
+    if (!scope.valid) return;
+
+    const format = typeof req.query.format === 'string' && req.query.format.trim()
+      ? req.query.format.trim().toLowerCase()
+      : 'json';
+
+    if (format !== 'json' && format !== 'graphml' && format !== 'gexf' && format !== 'cypher' && format !== 'csv' && format !== 'c4' && format !== 'c4-mermaid' && format !== 'archimate') {
+      const duration = Date.now() - start;
+      sendResponse({
+        res,
+        status: 400,
+        error: `Unsupported export format: ${format}. Supported formats: json, graphml, gexf, cypher, csv, c4, c4-mermaid, archimate.`,
+        code: 'UNSUPPORTED_FORMAT',
+        logger,
+        method: req.method,
+        path: req.path,
+        duration,
+      });
+      return;
+    }
+
+    const { serverId, bankId } = scope;
+    const nodeOptions = buildNodeListOptions(req);
+    const nodeResult = listNodes(db, serverId, bankId, nodeOptions);
+    const edgeResult = listEdges(db, serverId, bankId, buildEdgeListOptions(req));
+
+    const nodes = nodeResult.success ? nodeResult.data.map(normalizeNode).filter(Boolean) : [];
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    let edges = edgeResult.success ? edgeResult.data.map(normalizeEdge).filter(Boolean) : [];
+
+    // When node selectors are applied, keep only edges whose endpoints are both
+    // in the returned node set so the export is a coherent subgraph.
+    const nodeFiltersApplied = nodeOptions.labels !== undefined
+      || nodeOptions.idPrefix !== undefined
+      || nodeOptions.ids !== undefined;
+    if (nodeFiltersApplied) {
+      edges = edges.filter((e) => nodeIds.has(e.source_id) && nodeIds.has(e.target_id));
+    }
+
+    const meta = {
+      server_id: serverId,
+      bank_id: bankId,
+      format,
+      version: '1.0',
+      generated_at: new Date().toISOString(),
+      node_count: nodes.length,
+      edge_count: edges.length,
+    };
+
+    const undirected = parseBoolParam(req.query.undirected, false);
+
+    const requestedFilename = typeof req.query.filename === 'string' && req.query.filename.trim()
+      ? req.query.filename.trim().replace(/[^\w\-_.]/g, '_')
+      : undefined;
+
+    const defaultExtension = format === 'graphml' ? '.graphml' : format === 'gexf' ? '.gexf' : format === 'cypher' ? '.cypher' : format === 'c4' ? '.dsl' : format === 'c4-mermaid' ? '.mmd' : format === 'archimate' ? '.xml' : '.json';
+    const filename = requestedFilename
+      ? (requestedFilename.endsWith(defaultExtension) ? requestedFilename : `${requestedFilename}${defaultExtension}`)
+      : undefined;
+
+    const duration = Date.now() - start;
+    logger.info('Exported contextual graph', {
+      serverId,
+      bankId,
+      format,
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+      hasFilename: !!filename,
+      durationMs: duration,
+    });
+
+    if (filename) {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    }
+
+    if (format === 'graphml') {
+      const xml = toGraphML(nodes, edges, meta, undirected);
+      res.setHeader('Content-Type', 'application/graphml+xml; charset=utf-8');
+      return res.status(200).send(xml);
+    }
+
+    if (format === 'gexf') {
+      const xml = toGEXF(nodes, edges, meta, undirected);
+      res.setHeader('Content-Type', 'application/gexf+xml; charset=utf-8');
+      return res.status(200).send(xml);
+    }
+
+    if (format === 'cypher') {
+      const cypher = toCypher(nodes, edges, meta, undirected);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(200).send(cypher);
+    }
+
+    if (format === 'csv') {
+      const csv = toCsv(nodes, edges, meta, undirected);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(200).json({ nodes: csv.nodes, edges: csv.edges, meta: csv.meta });
+    }
+
+    if (format === 'c4') {
+      const { nodeMap, edgeMap } = await resolveArchitectureMetadata(db, nodes, edges);
+      const dsl = toC4StructurizrDsl(nodes, edges, meta, undirected, nodeMap, edgeMap);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(200).send(dsl);
+    }
+
+    if (format === 'c4-mermaid') {
+      const { nodeMap, edgeMap } = await resolveArchitectureMetadata(db, nodes, edges);
+      const mermaid = toC4Mermaid(nodes, edges, meta, undirected, nodeMap, edgeMap);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(200).send(mermaid);
+    }
+
+    if (format === 'archimate') {
+      const { nodeMap, edgeMap } = await resolveArchitectureMetadata(db, nodes, edges);
+      const xml = toArchimateXml(nodes, edges, meta, undirected, nodeMap, edgeMap);
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      return res.status(200).send(xml);
+    }
+
+    const payload = { nodes, edges, meta };
+    return res.status(200).json(payload);
+  });
 
   /**
    * @openapi

@@ -281,9 +281,24 @@ function diffGraphs(prev, next) {
   };
 }
 
+export const deleteView = base.del;
+
+/**
+ * Delete every view for a server/bank scope.
+ * @param {Object} db
+ * @param {{ server_id: number, bank_id: string }} params
+ */
+export const deleteAllViewsByBank = (db, { server_id, bank_id }) => dbExec(() => {
+  const sid = requireInt('server_id', server_id);
+  const bid = requireString('bank_id', bank_id);
+  const sql = `DELETE FROM ${TABLE}
+    WHERE view_server_id = ? AND view_bank_id = ?`;
+  const result = stmt(db, sql).run(sid, bid);
+  return { deleted: result.changes };
+}, `${TABLE}.deleteAllViewsByBank`);
+
 // Generic operations
 export const getView = base.get;
-export const deleteView = base.del;
 
 /**
  * List all views for a server/bank, ordered by most recently updated.

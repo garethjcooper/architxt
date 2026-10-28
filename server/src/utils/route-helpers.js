@@ -367,6 +367,7 @@ export const handleGetById = ({ db, crudFn, resourceName, logger, basePath, tran
  * @param {string} options.basePath - Base path for logging
  */
 export const handleDeleteById = ({ db, crudFn, resourceName, logger, basePath }) => {
+  const resolveDb = typeof db === 'function' ? db : () => db;
   return async (req, res) => {
     const start = Date.now();
     const path = `${basePath}/${req.params.id}`;
@@ -374,7 +375,7 @@ export const handleDeleteById = ({ db, crudFn, resourceName, logger, basePath })
     const idCheck = validateId({ req, res, paramName: 'id', logger, path: basePath, start });
     if (!idCheck.valid) return;
     
-    const result = await crudFn(db, idCheck.id);
+    const result = await crudFn(resolveDb(req), idCheck.id);
     
     handleCrudResult({
       res,

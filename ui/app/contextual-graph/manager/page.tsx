@@ -14,12 +14,13 @@ import { createLogger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, RefreshCw, Loader2 } from "lucide-react";
+import { Search, RefreshCw, Loader2, Download } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SyncJobsTab } from './sync-jobs-tab';
 import { MentalModelsTab } from './mental-models-tab';
 import { CandidatesTab } from './candidates-tab';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { GraphExportDialog } from './graph-export-dialog';
 
 import {
   BackendNode,
@@ -62,6 +63,7 @@ export default function ContextManagerPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmRunSyncOpen, setConfirmRunSyncOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Graph tab search/filter state.
   const [graphSearch, setGraphSearch] = useState('');
@@ -648,6 +650,17 @@ export default function ContextManagerPage() {
                 className="h-8 pl-8 text-xs bg-surface-card border-border-default text-foreground-default placeholder:text-foreground-subtle"
               />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportDialogOpen(true)}
+              disabled={!serverId || !bankId}
+              title="Export graph"
+              className="h-8 px-2.5 border-border-default bg-surface-card hover:bg-surface-panel hover:text-foreground-default"
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              Export
+            </Button>
             <span className="text-xs font-mono text-accent-primary-fg bg-surface-inset border border-accent-primary-bd px-2 py-0.5 rounded ml-auto">
               {filteredSortedNodes.length} node{filteredSortedNodes.length !== 1 ? 's' : ''} / {filteredSortedEdges.length} edge
               {filteredSortedEdges.length !== 1 ? 's' : ''}
@@ -807,7 +820,15 @@ export default function ContextManagerPage() {
         description={bankId ? `Run a full contextual sync job for ${bankId}? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.` : 'Run a full contextual sync job? This imports the Hindsight skeleton, deploys configured contextual models, syncs mental-model config, and refreshes patches.'}
         confirmLabel="Run sync job"
         cancelLabel="Cancel"
+        variant="default"
         onConfirm={handleRunSyncJob}
+      />
+
+      <GraphExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        serverId={serverId}
+        bankId={bankId || ''}
       />
     </PageShell>
   );

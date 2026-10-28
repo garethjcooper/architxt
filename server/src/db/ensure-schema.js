@@ -7,6 +7,8 @@ import { createLogger } from '../utils/logger.js';
 import { createFtsIndex } from '../services/search/full-text.js';
 import { resetSeedData } from './ensure-seed.js';
 import { getTagByName, createTag } from './crud/tags.js';
+import { ensureStandardEdgeTypes } from './crud/edge-types.js';
+import { ensureStandardEntityTypes } from './crud/entity-types.js';
 
 const logger = createLogger('schema');
 
@@ -357,28 +359,15 @@ function ensureMissingTables(db) {
       )`
     },
     {
-      name: 'document_retain_runs',
-      ddl: `CREATE TABLE IF NOT EXISTS document_retain_runs (
-        drr_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        drr_doc_id INTEGER NOT NULL,
-        drr_run_label TEXT,
-        drr_server_id INTEGER,
-        drr_bank_id TEXT,
-        drr_context TEXT,
-        drr_retain_mission TEXT,
-        drr_extraction_mode TEXT,
-        drr_timestamp TEXT,
-        drr_entity_label_source TEXT,
-        drr_entities_allow_free_form INTEGER DEFAULT 0,
-        drr_content_snapshot TEXT,
-        drr_content_hash TEXT,
-        drr_facts_json JSON NOT NULL,
-        drr_usage_json JSON,
-        drr_model TEXT,
-        drr_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        drr_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (drr_doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE,
-        FOREIGN KEY (drr_server_id) REFERENCES servers(svr_id) ON DELETE SET NULL
+      name: 'edge_types',
+      ddl: `CREATE TABLE IF NOT EXISTS edge_types (
+        edt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        edt_type_name TEXT NOT NULL UNIQUE,
+        edt_description TEXT NOT NULL,
+        edt_c4_description TEXT,
+        edt_archimate_relationship TEXT,
+        edt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        edt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
     }
   ];
@@ -447,34 +436,18 @@ const BUILTIN_TEMPLATES = [
     name: 'sys_edge_context',
     mode: 'sys_edge_context',
     description: 'System template: directed interactions between two specific contextual-graph nodes.',
-    body: `Answer the topic below.
-
-## Topic
-
-{{ARCHITXT_TOPIC}}
-
-## Source material
-
-{{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    body: `Answer the topic below.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n{{ARCHITXT_EDGE_VOCABULARY}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS","ARCHITXT_EDGE_VOCABULARY"]',
     examplesHeuristic: null,
   },
   {
     name: 'sys_discovery_context',
     mode: 'sys_discovery_context',
     description: 'System template: suggest new contextual-graph nodes and edges around a seed node.',
-    body: `Answer the topic below.
-
-## Topic
-
-{{ARCHITXT_TOPIC}}
-
-## Source material
-
-{{ARCHITXT_CORPUS}}`,
-    fragments: '["contextual-patch.md","section-focus.md","edge-vocabulary.md","node-discovery-policy-known.md","entity-id-format.md","provenance-rules.md"]',
-    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS"]',
+    body: `Answer the topic below.\n\n## Topic\n\n{{ARCHITXT_TOPIC}}\n\n{{ARCHITXT_EDGE_VOCABULARY}}\n\n## Source material\n\n{{ARCHITXT_CORPUS}}`,
+    fragments: '["contextual-patch.md","section-focus.md","node-discovery-policy-known.md","entity-id-format.md","provenance-rules.md"]',
+    variables: '["ARCHITXT_TOPIC","ARCHITXT_NARRATIVE_FOCUS","ARCHITXT_GRAPH_FOCUS","ARCHITXT_TABLE_FOCUS","ARCHITXT_EDGE_VOCABULARY"]',
     examplesHeuristic: null,
   },
 ];
@@ -864,11 +837,6 @@ List every distinct relationship and interaction between [[{source-name} ({sourc
     - shared: this means that both systems in scope both interact or are related to the same 'to' or 'from'.
     - indirect: this means that both systems in scope both interact or are related by way of an intermediary entity.
     - direct: this means that both systems interact or are related directly
-- Relationship Types
-     - sends: 'from' delivers an object such as data, file, atomic packet to 'to'
-     - calls: 'from' invokes a service or other exposed utility or interface on 'to'
-     - event: 'from' sends an event to 'to'
-     - flow: generalised interaction between 'from' and 'to
 
 ## Rules
 - from/to values must be the full known canonical id.
@@ -881,10 +849,14 @@ List every distinct relationship and interaction between [[{source-name} ({sourc
 
 ## Column Definition
 - from / to: source and target ids. Use the exact ids provided in the topic; do not invent new ids for endpoints that were already supplied. Do not invent or use non-entity ids such as inferred or derived names - only existing, known ids should be present. Either 'from' or 'to' MUST be either [[{source-name} ({source-id})]] or [[{target-name} ({target-id})]]. If either 'from' or 'to' are not known then omit that row.
-- type: picked from the valid Relationship Types.
+- type: picked from the valid Edge Type list.
 - label: short phrase, max 5 words. Do not include or use entity names or ids - this should be a short concise description of the flow. Do NOT use entity names, interfaces or other known names in this field.
-- detail: readable description of the flow, 2-4 complete sentences when the source material supports it.
+- detail: readable description of the flow, 2-6 complete sentences when the source material supports it.
+- protocol: transfer mechanism if supported by the source material (e.g., HTTPS, gRPC, SFTP, Kafka, file drop, shared database, in-process call). Use "-" if unknown or unsupported.
+- format: data format / API style if supported by the source material (e.g., JSON, XML, CSV, Avro, protobuf, REST, SOAP). Use "-" if unknown or unsupported.
 - frequency: optional cadence (e.g., real-time, on-demand, hourly, nightly, weekly, ad-hoc, per bill cycle, on startup).
+- auth: authentication / authorization mechanism if supported by the source material (e.g., OAuth 2.0, mTLS, API key, JWT, IP allowlist). Use "-" if unknown or unsupported.
+- encryption: encryption in transit/rest, signing, or hashing if supported by the source material (e.g., TLS 1.3, AES-256-GCM at rest, GPG signed). Use "-" if unknown or unsupported.
 - evidence ids
 #end`,
     maxTokens: 8192,
@@ -994,11 +966,50 @@ function ensureContextualGraphTemplates(db) {
     }
   }
 
-  if (seeded > 0 || deleted > 0) {
-    logger.info('Ensured contextual-graph system templates', { seeded, deleted, roles: CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role) });
+  // Patch existing system templates so the canonical source query stays current
+  // even when the row already exists.
+  let patched = 0;
+  const updateCanonical = db.prepare(`
+    UPDATE mental_models
+    SET mm_source_query = ?,
+        mm_name = ?,
+        mm_max_tokens = ?,
+        mm_refresh_mode = ?,
+        mm_refresh_after_consolidation = ?,
+        mm_exclude_all_mental_models = ?,
+        mm_tags_match_mode = ?
+    WHERE mm_is_template = ?
+      AND mm_template_role = ?
+      AND mm_ext_id = ?
+      AND mm_source_query != ?
+  `);
+
+  for (const t of CONTEXTUAL_GRAPH_TEMPLATES) {
+    try {
+      const result = updateCanonical.run(
+        t.sourceQuery,
+        t.name,
+        t.maxTokens,
+        t.refreshMode,
+        t.refreshAfterConsolidation,
+        t.excludeAllMentalModels,
+        t.tagsMatchMode,
+        'true',
+        t.role,
+        t.extId,
+        t.sourceQuery,
+      );
+      patched += result.changes;
+    } catch (err) {
+      logger.error('Failed to patch contextual-graph template', { extId: t.extId, role: t.role, error: err.message });
+    }
   }
 
-  return seeded;
+  if (seeded > 0 || deleted > 0 || patched > 0) {
+    logger.info('Ensured contextual-graph system templates', { seeded, deleted, patched, roles: CONTEXTUAL_GRAPH_TEMPLATES.map((t) => t.role) });
+  }
+
+  return seeded + patched;
 }
 
 function relaxResearchStepsParentCascade(db) {
@@ -1620,6 +1631,14 @@ function ensureMissingColumns(db) {
         {
           name: 'et_id_separator',
           ddl: "ALTER TABLE entity_types ADD COLUMN et_id_separator TEXT"
+        },
+        {
+          name: 'et_c4_element',
+          ddl: 'ALTER TABLE entity_types ADD COLUMN et_c4_element TEXT'
+        },
+        {
+          name: 'et_archimate_element',
+          ddl: 'ALTER TABLE entity_types ADD COLUMN et_archimate_element TEXT'
         }
       ]
     },
@@ -1655,6 +1674,39 @@ function ensureMissingColumns(db) {
         {
           name: 'tr_updated_at',
           ddl: "ALTER TABLE template_roles ADD COLUMN tr_updated_at DATETIME NOT NULL DEFAULT '1970-01-01T00:00:00Z'"
+        }
+      ]
+    },
+    {
+      table: 'edge_types',
+      columns: [
+        {
+          name: 'edt_id',
+          ddl: 'ALTER TABLE edge_types ADD COLUMN edt_id INTEGER PRIMARY KEY AUTOINCREMENT'
+        },
+        {
+          name: 'edt_type_name',
+          ddl: 'ALTER TABLE edge_types ADD COLUMN edt_type_name TEXT NOT NULL UNIQUE'
+        },
+        {
+          name: 'edt_description',
+          ddl: 'ALTER TABLE edge_types ADD COLUMN edt_description TEXT'
+        },
+        {
+          name: 'edt_c4_description',
+          ddl: 'ALTER TABLE edge_types ADD COLUMN edt_c4_description TEXT'
+        },
+        {
+          name: 'edt_archimate_relationship',
+          ddl: 'ALTER TABLE edge_types ADD COLUMN edt_archimate_relationship TEXT'
+        },
+        {
+          name: 'edt_created_at',
+          ddl: "ALTER TABLE edge_types ADD COLUMN edt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"
+        },
+        {
+          name: 'edt_updated_at',
+          ddl: "ALTER TABLE edge_types ADD COLUMN edt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"
         }
       ]
     }
@@ -2125,15 +2177,17 @@ export function ensureSchema(db) {
     const templateRolesSeeded = ensureTemplateRoles(db);
     const templateRoleUniqueIndex = ensureTemplateRoleUniqueIndex(db);
     const bankSettingsSeeded = ensureBankSettingsDefaults(db);
+    const standardEdgeTypesSeeded = ensureStandardEdgeTypes(db);
+    const standardEntityTypesSeeded = ensureStandardEntityTypes(db);
     const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
     const agentChatIndexes = ensureAgentChatIndexes(db);
     migrateAgentChatThreads(db);
-    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}`);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, standard edge types seeded: ${standardEdgeTypesSeeded}, standard entity types seeded: ${standardEntityTypesSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || idPlaceholderMigrated > 0 || agentChatIndexes > 0;
+    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {
@@ -2155,6 +2209,8 @@ export function ensureSchema(db) {
   logger.info('Schema applied successfully');
   const templatesSeeded = ensureBuiltinPromptTemplates(db);
   const cgTemplates = ensureContextualGraphTemplates(db);
+  ensureStandardEdgeTypes(db);
+  ensureStandardEntityTypes(db);
   return true;
 }
 

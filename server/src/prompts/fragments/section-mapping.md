@@ -2,10 +2,10 @@
 
 Each requested section in the directives above maps to exactly one output array or object. A section requested as one type must not appear as any other type (narrative, graph, table, diagram) unless it was explicitly requested as multiple types.
 
-- `ARCHITXT_NARRATIVE_FOCUS` bullets → emit one item in `narratives[]` per bullet.
-- `ARCHITXT_GRAPH_FOCUS` bullets → emit **one** `graph` object for the **first** graph bullet. Additional graph bullets are intentionally ignored; do not write prose about them.
-- `ARCHITXT_TABLE_FOCUS` bullets → emit one item in `tables[]` per bullet.
-- `ARCHITXT_DIAGRAM_FOCUS` bullets → emit one item in `diagrams[]` per bullet.
+- Bullets under `### Narratives` in the output directives → emit one item in `narratives[]` per bullet.
+- Bullets under `### Graph` in the output directives → emit **one** `graph` object for the **first** graph bullet. Additional graph bullets are intentionally ignored; do not write prose about them.
+- Bullets under `### Tables` in the output directives → emit one item in `tables[]` per bullet.
+- Bullets under `### Diagrams` in the output directives → emit one item in `diagrams[]` per bullet.
 
 A table, graph, or diagram section is already expressed in its own structured form. You must NOT create extra `narratives[]` entries that merely describe or summarise table, graph, or diagram sections.
 

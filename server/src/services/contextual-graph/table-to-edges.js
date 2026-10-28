@@ -2,13 +2,21 @@
  * Convert an edge-context table into the same `{ nodes, edges }` shape that
  * `applyEdgeContext` already consumes.
  *
- * The edge-context table contract:
- *   columns: [from, to, type, label, detail, frequency, evidence]
- * Each row becomes one directed edge. Nodes are derived deterministically from
- * the unique set of endpoint ids used by valid rows.
+ * Recognised columns: from, to, type, label, detail, frequency, evidence,
+ * protocol, auth, encryption, format. Any additional columns are also carried
+ * through into edge properties so the table contract stays open to future fields.
  */
 
-const EDGE_CONTEXT_TABLE_COLUMNS = ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence'];
+const EDGE_CONTEXT_TABLE_COLUMNS = ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'protocol', 'auth', 'encryption', 'format'];
+
+/** @returns {boolean} */
+function isTopLevelField(key) {
+  return key === 'from' || key === 'to' || key === 'type' || key === 'label' || key === 'detail' || key === 'evidence';
+}
+
+const EMPTY_PROPERTY_VALUES = Object.fromEntries(
+  EDGE_CONTEXT_TABLE_COLUMNS.filter((c) => !isTopLevelField(c)).map((c) => [c, ''])
+);
 
 function normalizeEvidence(value) {
   if (Array.isArray(value)) return value.filter((v) => typeof v === 'string' && v.length > 0);
@@ -17,6 +25,17 @@ function normalizeEvidence(value) {
     return trimmed ? [trimmed] : [];
   }
   return [];
+}
+
+/**
+ * The model prompt uses '-' to mean "unknown or unsupported". Convert those
+ * sentinels to empty strings so the edge property bag always has a stable set
+ * of keys.
+ */
+function normalizeValue(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'string' && value.trim() === '-') return '';
+  return value;
 }
 
 /**
@@ -50,7 +69,6 @@ export function edgeContextTableToGraph(table) {
     let label;
     let detail;
     let evidence;
-    let frequency;
 
     if (Array.isArray(row)) {
       from = row[colIdx.from];
@@ -59,7 +77,6 @@ export function edgeContextTableToGraph(table) {
       label = row[colIdx.label];
       detail = row[colIdx.detail];
       evidence = row[colIdx.evidence];
-      frequency = row[colIdx.frequency];
     } else if (row && typeof row === 'object') {
       from = row.from;
       to = row.to;
@@ -67,7 +84,6 @@ export function edgeContextTableToGraph(table) {
       label = row.label;
       detail = row.detail;
       evidence = row.evidence;
-      frequency = row.frequency;
     } else {
       continue;
     }
@@ -78,10 +94,22 @@ export function edgeContextTableToGraph(table) {
     const cleanLabel = typeof label === 'string' ? label.trim() : '';
     const cleanDetail = typeof detail === 'string' ? detail.trim() : '';
     const cleanEvidence = normalizeEvidence(evidence);
-    const cleanFrequency = typeof frequency === 'string' ? frequency.trim() : '';
 
-    const properties = {};
-    if (cleanFrequency) properties.frequency = cleanFrequency;
+    // Pull out all non-top-level columns as edge properties. Unknown values
+    // ('-'/empty) are stored as null so the property bag has a stable shape.
+    const properties = { ...EMPTY_PROPERTY_VALUES };
+    if (Array.isArray(row)) {
+      for (let i = 0; i < columns.length; i += 1) {
+        const key = columns[i];
+        if (isTopLevelField(key)) continue;
+        properties[key] = normalizeValue(row[i]);
+      }
+    } else {
+      for (const key of columns) {
+        if (isTopLevelField(key)) continue;
+        properties[key] = normalizeValue(row[key]);
+      }
+    }
 
     nodeIds.add(from.trim());
     nodeIds.add(to.trim());
@@ -93,7 +121,7 @@ export function edgeContextTableToGraph(table) {
       label: cleanLabel,
       detail: cleanDetail,
       evidence: cleanEvidence,
-      properties: Object.keys(properties).length > 0 ? properties : undefined,
+      properties,
     });
   }
 

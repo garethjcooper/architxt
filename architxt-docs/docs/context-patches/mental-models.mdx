@@ -82,6 +82,24 @@ Contextual models are derived automatically from the graph by the sync pipeline:
 
 The deploy stage of a sync job creates specs for each qualifying node, edge, and seed, pushes them to Hindsight, and stores the resulting `ext_id` back on the graph item. The Mental Models tab simply collects all of those model refs and lets you browse them.
 
+### `sys_edge_context` output shape
+
+Edge-context models return a table. The first valid table in the envelope is converted into graph edges, one row per edge. Required columns are `from`, `to`, and `type`; optional columns are recognised and stored as edge properties:
+
+| Column | Property | Example values |
+|---|---|---|
+| `label` | `label` | Short relationship phrase, e.g. `usage data`. |
+| `detail` | `detail` | Longer explanation, up to four sentences. |
+| `protocol` | `protocol` | HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop. |
+| `format` | `format` | JSON, XML, CSV, Avro, protobuf, REST, SOAP. |
+| `frequency` | `frequency` | real-time, on-demand, hourly, nightly, ad-hoc. |
+| `auth` | `auth` | OAuth 2.0, mTLS, API key, JWT, IP allowlist. |
+| `encryption` | `encryption` | TLS 1.3, AES-256-GCM at rest, GPG signed. |
+
+The `type` column must be a registered [edge type](../core-concepts/edge-types). If it is not, the edge is still created but exporters fall back to a default relationship. Values of `-` or blank cells are normalised to empty strings so the stored edge always has a stable property bag.
+
+These properties appear in the Graph tab details panel and are included in JSON and CSV exports.
+
 ## Refresh lifecycle
 
 1. A model is deployed during the sync job.
