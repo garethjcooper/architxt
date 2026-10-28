@@ -2,6 +2,7 @@ import { stmt } from '../cache.js';
 import { createLogger } from '../utils/logger.js';
 import { composeFragments } from './fragment-loader.js';
 import { parseSectionDirectives } from './section-directives.js';
+import { buildEdgeVocabularyFragment } from './edge-vocabulary.js';
 
 const logger = createLogger('prompt-templates');
 
@@ -114,7 +115,11 @@ export function loadAndCompose(db, name, variables) {
   if (!template) {
     throw new Error(`Prompt template not found: ${name}`);
   }
-  return composePrompt(template, variables);
+  const variablesWithEdgeVocab = {
+    ARCHITXT_EDGE_VOCABULARY: buildEdgeVocabularyFragment(db),
+    ...variables,
+  };
+  return composePrompt(template, variablesWithEdgeVocab);
 }
 
 /**
@@ -700,6 +705,7 @@ export async function composeMentalModelPrompt(db, templateName, topic, focusVar
     ...merged,
     ...nameVariables,
     ARCHITXT_OUTPUT_DIRECTIVES: outputDirectives,
+    ARCHITXT_EDGE_VOCABULARY: buildEdgeVocabularyFragment(db),
   };
 
   const extra = buildConditionalFragments(effectiveFocus);
@@ -764,7 +770,7 @@ export async function composeMentalModelPromptBatch(db, items) {
       const effectiveFocus = computeEffectiveFocus(sectionFocus, variables);
       const nameVariables = buildNameVariables(effectiveFocus, variables);
       const outputDirectives = formatOutputDirectives(effectiveFocus);
-      const variablesWithNames = { ...variables, ...nameVariables, ARCHITXT_OUTPUT_DIRECTIVES: outputDirectives };
+      const variablesWithNames = { ...variables, ...nameVariables, ARCHITXT_OUTPUT_DIRECTIVES: outputDirectives, ARCHITXT_EDGE_VOCABULARY: buildEdgeVocabularyFragment(db) };
       const extra = buildConditionalFragments(effectiveFocus);
       const effectiveTemplate = extra.length > 0 ? mergeFragments(template, extra) : template;
       const { prompt } = composePrompt(effectiveTemplate, variablesWithNames);

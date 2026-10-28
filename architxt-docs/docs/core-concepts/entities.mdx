@@ -27,6 +27,19 @@ The following fields are shown when you create or edit an entity type:
 | **Minimum Number Of Id Digits** | `min_id_digits` | Zero-padded width for the numeric suffix. Allowed range: 1–10. |
 | **Id Separator** | `id_separator` | `none` or `-` between prefix and number. |
 
+### C4 and ArchiMate mappings
+
+Entity types can carry optional mappings that tell the contextual-graph exporters which C4 and ArchiMate shapes a type represents. The exporters use these values directly; they do not guess from the type name or label.
+
+| UI column | API field | Exported as |
+|---|---|---|
+| **C4 Element** | `c4_element` | C4 shape in Structurizr DSL and Mermaid exports. Allowed values: `Person`, `SoftwareSystem`, `Container`, `Component`. |
+| **C4 Description** | `c4_description` | Relationship description in C4 exports. Stored on the edge type. |
+| **ArchiMate Element** | `archimate_element` | ArchiMate element type in ArchiMate XML exports. |
+| **ArchiMate Relationship** | `archimate_relationship` | ArchiMate relationship type in ArchiMate XML exports. Stored on the edge type. |
+
+If a mapping is empty, the exporter falls back to a sensible default (`SoftwareSystem` for unmapped nodes, `Association` for unmapped edges). For a fully deterministic export, set the mappings on the entity and [edge types](./edge-types) your bank uses.
+
 ### Matching defaults
 
 | Field | Option | Meaning |
@@ -95,11 +108,13 @@ The tab shows every entity in a table with columns for **Entity ID**, **Pattern*
 
 ### Entity Types tab
 
-The tab lists all types with columns for **Type Name**, **Description**, **Pattern**, **Case**, **Boundary**, and **Created**. You can:
+The tab lists all types with columns for **Type Name**, **Description**, **Pattern**, **Case**, **Boundary**, **C4 Element**, **ArchiMate Element**, and **Created**. You can:
 
 - Add a new type.
 - Delete selected types. Deleting a type is blocked by the database if entities of that type still exist because `entity_types` has an `ON DELETE RESTRICT` foreign key from `entities`.
-- Click a type row to edit its fields in the **Entity Type Details** dialog.
+- Click a type row to edit its fields in the **Entity Type Details** dialog, including the C4 and ArchiMate mappings.
+
+See [Edge Types](./edge-types) for the equivalent registry that controls relationship semantics and exports.
 
 ## How entities fit into architxt
 

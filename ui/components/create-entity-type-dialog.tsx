@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { entityTypesApi } from '@/lib/api/client';
+import type { C4Element, ArchiMateElement } from '@/lib/types';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
 import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
+import { C4ElementSelect, ArchiMateElementSelect } from './architecture-element-select';
 
 interface Props {
   open: boolean;
@@ -32,6 +34,8 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
   const [idFormatPrefix, setIdFormatPrefix] = useState('');
   const [minIdDigits, setMinIdDigits] = useState(String(DEFAULT_DIGITS));
   const [idSeparator, setIdSeparator] = useState<'none' | '-'>('none');
+  const [c4Element, setC4Element] = useState<C4Element | null>(null);
+  const [archimateElement, setArchimateElement] = useState<ArchiMateElement | null>(null);
 
   const reset = () => {
     setTypeName('');
@@ -42,6 +46,8 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
     setIdFormatPrefix('');
     setMinIdDigits(String(DEFAULT_DIGITS));
     setIdSeparator('none');
+    setC4Element(null);
+    setArchimateElement(null);
   };
 
   const handlePrefixChange = (value: string) => {
@@ -90,6 +96,8 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
         id_format_prefix: usesPattern ? idFormatPrefix.trim() || undefined : undefined,
         min_id_digits: usesPattern ? Number(minIdDigits) : undefined,
         id_separator: usesPattern ? idSeparator : undefined,
+        c4_element: c4Element || undefined,
+        archimate_element: archimateElement || undefined,
       });
       toast.success('Entity type created');
       reset();
@@ -220,6 +228,26 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
               checked={wordBoundaries}
               onChange={setWordBoundaries}
             />
+          </div>
+
+          {/* Architecture mapping */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">C4 Element (optional)</Label>
+              <C4ElementSelect
+                value={c4Element}
+                onChange={setC4Element}
+                placeholder="None"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">ArchiMate Element (optional)</Label>
+              <ArchiMateElementSelect
+                value={archimateElement}
+                onChange={setArchimateElement}
+                placeholder="None"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border-default">

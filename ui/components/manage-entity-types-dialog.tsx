@@ -8,11 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Trash2, Pencil, X, Layers } from 'lucide-react';
 import { entityTypesApi, entitiesApi } from '@/lib/api/client';
-import type { EntityType } from '@/lib/types';
+import type { EntityType, C4Element, ArchiMateElement } from '@/lib/types';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import { CaseMatchToggle } from './case-match-toggle';
 import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
+import { C4ElementSelect, ArchiMateElementSelect, ArchitectureElementSelect } from './architecture-element-select';
 
 const logger = createLogger('ManageEntityTypesDialog');
 
@@ -46,6 +47,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   const [addIdFormatPrefix, setAddIdFormatPrefix] = useState('');
   const [addMinIdDigits, setAddMinIdDigits] = useState(String(DEFAULT_DIGITS));
   const [addIdSeparator, setAddIdSeparator] = useState<'none' | '-'>('none');
+  const [addC4Element, setAddC4Element] = useState<C4Element | null>(null);
+  const [addArchimateElement, setAddArchimateElement] = useState<ArchiMateElement | null>(null);
   const [adding, setAdding] = useState(false);
 
   // Edit state: id -> field values
@@ -58,6 +61,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   const [editIdFormatPrefix, setEditIdFormatPrefix] = useState('');
   const [editMinIdDigits, setEditMinIdDigits] = useState(String(DEFAULT_DIGITS));
   const [editIdSeparator, setEditIdSeparator] = useState<'none' | '-'>('none');
+  const [editC4Element, setEditC4Element] = useState<C4Element | null>(null);
+  const [editArchimateElement, setEditArchimateElement] = useState<ArchiMateElement | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Delete state
@@ -100,6 +105,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     setAddIdFormatPrefix('');
     setAddMinIdDigits(String(DEFAULT_DIGITS));
     setAddIdSeparator('none');
+    setAddC4Element(null);
+    setAddArchimateElement(null);
     setShowAddForm(false);
   };
 
@@ -149,6 +156,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
         id_format_prefix: addUsesPattern ? addIdFormatPrefix.trim() || undefined : undefined,
         min_id_digits: addUsesPattern ? Number(addMinIdDigits || DEFAULT_DIGITS) : undefined,
         id_separator: addUsesPattern ? addIdSeparator : undefined,
+        c4_element: addC4Element || undefined,
+        archimate_element: addArchimateElement || undefined,
       });
       toast.success('Entity type created');
       resetAddForm();
@@ -171,6 +180,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     setEditIdFormatPrefix(t.id_format_prefix || '');
     setEditMinIdDigits(String(t.min_id_digits ?? DEFAULT_DIGITS));
     setEditIdSeparator(t.id_separator ?? 'none');
+    setEditC4Element(t.c4_element);
+    setEditArchimateElement(t.archimate_element);
   };
 
   const cancelEdit = () => {
@@ -183,6 +194,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     setEditIdFormatPrefix('');
     setEditMinIdDigits(String(DEFAULT_DIGITS));
     setEditIdSeparator('none');
+    setEditC4Element(null);
+    setEditArchimateElement(null);
   };
 
   const handleSaveEdit = async (id: number) => {
@@ -216,6 +229,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
         id_format_prefix: editUsesPattern ? editIdFormatPrefix.trim() || undefined : undefined,
         min_id_digits: editUsesPattern ? Number(editMinIdDigits || DEFAULT_DIGITS) : undefined,
         id_separator: editUsesPattern ? editIdSeparator : undefined,
+        c4_element: editC4Element ?? null,
+        archimate_element: editArchimateElement ?? null,
       });
       toast.success('Entity type updated');
       setEditingId(null);
@@ -370,6 +385,25 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-foreground-faint">C4 Element</Label>
+                  <C4ElementSelect
+                    value={addC4Element}
+                    onChange={setAddC4Element}
+                    placeholder="None"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-foreground-faint">ArchiMate Element</Label>
+                  <ArchiMateElementSelect
+                    value={addArchimateElement}
+                    onChange={setAddArchimateElement}
+                    placeholder="None"
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="ghost" size="sm" onClick={resetAddForm}>Close</Button>
                 <Button type="submit" size="sm" disabled={adding} className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default">
@@ -391,13 +425,15 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                   <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Case</th>
                   <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Boundary</th>
                   <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Entities</th>
+                  <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">C4</th>
+                  <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">ArchiMate</th>
                   <th className="text-right py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {types.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-foreground-subtle">
+                    <td colSpan={9} className="text-center py-8 text-foreground-subtle">
                       <div className="flex flex-col items-center gap-2">
                         <Layers className="h-6 w-6 opacity-40" />
                         <p>No entity types found.</p>
@@ -473,6 +509,22 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                             </div>
                           </td>
                           <td className="py-2 px-3 text-center text-xs text-foreground-subtle">{entityCounts[t.id] || 0}</td>
+                          <td className="py-2 px-3">
+                            <C4ElementSelect
+                              value={editC4Element}
+                              onChange={setEditC4Element}
+                              placeholder="None"
+                              compact
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <ArchiMateElementSelect
+                              value={editArchimateElement}
+                              onChange={setEditArchimateElement}
+                              placeholder="None"
+                              compact
+                            />
+                          </td>
                           <td className="py-2 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
@@ -533,6 +585,8 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               {entityCounts[t.id] || 0}
                             </span>
                           </td>
+                          <td className="py-2 px-3 text-foreground-subtle text-xs">{t.c4_element || <span className="text-foreground-placeholder">-</span>}</td>
+                          <td className="py-2 px-3 text-foreground-subtle text-xs">{t.archimate_element || <span className="text-foreground-placeholder">-</span>}</td>
                           <td className="py-2 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button

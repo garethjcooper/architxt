@@ -304,12 +304,24 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
     let target;
     let properties;
 
+    const edgeProperties = modelEdge.properties || {};
+    const baseProperties = {
+      protocol: edgeProperties.protocol ?? '',
+      format: edgeProperties.format ?? '',
+      frequency: edgeProperties.frequency ?? '',
+      auth: edgeProperties.auth ?? '',
+      encryption: edgeProperties.encryption ?? '',
+      directed: true,
+      label: modelEdge.label ?? '',
+      detail: modelEdge.detail ?? '',
+      evidence: modelEdge.evidence ?? [],
+    };
+
     if (existing) {
       source = fromId;
       target = toId;
       properties = {
-        ...existing.cge_properties,
-        ...(modelEdge.properties || {}),
+        ...baseProperties,
         provenance: {
           ...(existing.cge_properties?.provenance || {}),
           source: 'contextual-graph',
@@ -322,11 +334,7 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
       source = fromId;
       target = toId;
       properties = {
-        ...(modelEdge.properties || {}),
-        directed: true,
-        label: modelEdge.label,
-        detail: modelEdge.detail,
-        evidence: modelEdge.evidence,
+        ...baseProperties,
         provenance: {
           source: 'contextual-graph',
           model_refs: [modelRef],
@@ -335,11 +343,6 @@ function applyEdgeContext(db, serverId, bankId, model, output, timestamp) {
         updated_at: timestamp,
       };
     }
-
-    // Always overwrite label/detail/evidence with the model's values when present.
-    if (modelEdge.label !== undefined) properties.label = modelEdge.label;
-    if (modelEdge.detail !== undefined) properties.detail = modelEdge.detail;
-    if (modelEdge.evidence !== undefined) properties.evidence = modelEdge.evidence;
 
     upsertEdge(db, serverId, bankId, edgeId, source, target, modelEdge.type, properties);
     touchedEdgeIds.add(edgeId);

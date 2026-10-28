@@ -1,0 +1,72 @@
+---
+sidebar_position: 6
+---
+
+# C4 and ArchiMate mapping reference
+
+architxt maps your internal entity and edge types to standard architecture notation so exports produce diagrams that other tools can read without re-typing. This page lists the C4 and ArchiMate values that the UI accepts, with short definitions.
+
+The mappings are stored per type. See [Entity types](./entities) and [Edge types](./edge-types) for how to set them.
+
+## C4 elements
+
+C4 values come from the C4 model by Simon Brown.
+
+| Value | What it means |
+|---|---|
+| `Person` | A human user, role, or external actor who interacts with the system. |
+| `SoftwareSystem` | A software system owned or operated by your organisation; the highest-level C4 abstraction. |
+| `Container` | A separately deployable application or data store inside a software system, such as a web app, mobile app, database, or file system. |
+| `Component` | A grouping of related functionality encapsulated behind an interface. |
+
+Official reference: [c4model.com](https://c4model.com/).
+
+## ArchiMate elements
+
+ArchiMate values come from The Open Group ArchiMate 3 Specification. architxt currently supports the most common application-layer elements, plus `BusinessActor` for people and users.
+
+| Value | What it means |
+|---|---|
+| `BusinessActor` | A person, organisation, or unit that performs business behaviour. |
+| `ApplicationComponent` | A modular, deployable, and replaceable part of a software system that encapsulates its behaviour and data. |
+| `ApplicationService` | An externally visible unit of functionality exposed by an application component. |
+| `ApplicationInterface` | The point through which an application service is made available. |
+| `DataObject` | A data element that represents data structured and managed by the business. |
+
+Official reference: [The Open Group ArchiMate 3 Specification](https://pubs.opengroup.org/architecture/archimate3-doc/).
+
+## ArchiMate relationships
+
+Edge types map to standard ArchiMate relationship types.
+
+| Value | What it means |
+|---|---|
+| `association` | A generic relationship between any two elements. |
+| `serving` | The source element provides functionality to the target element. |
+| `used-by` | The target element uses functionality provided by the source element (inverse reading of serving). |
+| `composition` | The source is composed of the target; the target cannot exist independently of the source. |
+| `aggregation` | The source aggregates the target; the target can exist independently. |
+| `assignment` | Responsibility for behaviour is assigned to an active structure element. |
+| `realization` | A logical element is realised by a more concrete element. |
+| `specialization` | The source element is a specialised version of the target element. |
+| `influence` | The source element affects the target element. |
+| `triggering` | The source element causes the target element to start or change state. |
+| `flow` | Information, data, or value transfers from the source to the target. |
+| `access` | Behaviour at the source reads or writes the data object at the target. |
+
+Official reference: [The Open Group ArchiMate 3 Specification — Relationships](https://pubs.opengroup.org/architecture/archimate3-doc/chap05.html).
+
+## What happens if a mapping is missing
+
+If you leave a mapping blank, the exporter falls back to a default:
+
+- Nodes default to `SoftwareSystem` for C4 and `ApplicationComponent` for ArchiMate.
+- Edges default to `Association`.
+
+Set the mapping explicitly if you want deterministic exports.
+
+## Where to go next
+
+- [Entity types](./entities) — set C4/ArchiMate element mappings for nodes.
+- [Edge types](./edge-types) — set C4 description and ArchiMate relationship mappings.
+- [Contextual Graph export](../context-patches/graph) — see how these mappings are used in exported files.

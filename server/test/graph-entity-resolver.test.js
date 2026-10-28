@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { clearCache } from '../src/cache.js';
 import { ensureSchema } from '../src/db/ensure-schema.js';
-import { createEntityType } from '../src/db/crud/entity-types.js';
+import { createEntityType, listEntityTypes } from '../src/db/crud/entity-types.js';
 import { createEntity } from '../src/db/crud/entities.js';
 import {
   resolveGraphEntities,
@@ -39,12 +39,13 @@ describe('graph-entity-resolver', () => {
 
   describe('resolveGraphEntities', () => {
     it('resolves raw ids, names, and aliases to canonical ids', async () => {
-      const typeResult = createEntityType(db, {
-        type_name: 'a-com',
-        description: 'component',
-      });
-      assert.equal(typeResult.success, true, typeResult.error);
-      const typeId = typeResult.data;
+      // a-com is now a seeded standard entity type, so look it up rather
+      // than trying to create it again.
+      const listResult = listEntityTypes(db);
+      assert.equal(listResult.success, true, listResult.error);
+      const type = listResult.data.find((t) => t.et_type_name === 'a-com');
+      assert.ok(type, 'seeded a-com entity type should exist');
+      const typeId = type.et_id;
 
       createEntity(db, {
         type_id: typeId,
@@ -119,12 +120,12 @@ describe('graph-entity-resolver', () => {
 
   describe('resolveTextEntitiesToGraphNodes', () => {
     it('returns canonical graph-node shape for entities mentioned in text', async () => {
-      const typeResult = createEntityType(db, {
-        type_name: 'a-com',
-        description: 'component',
-      });
-      assert.equal(typeResult.success, true, typeResult.error);
-      const typeId = typeResult.data;
+      // a-com is seeded by ensureSchema; reuse it instead of recreating.
+      const listResult = listEntityTypes(db);
+      assert.equal(listResult.success, true, listResult.error);
+      const type = listResult.data.find((t) => t.et_type_name === 'a-com');
+      assert.ok(type, 'seeded a-com entity type should exist');
+      const typeId = type.et_id;
 
       createEntity(db, {
         type_id: typeId,

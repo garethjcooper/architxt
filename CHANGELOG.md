@@ -2,6 +2,34 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.4.8] - 2026-10-29
+
+> ⚠️ **Important:** After upgrading, open **Settings → Server → Banks** and click **Clean local graph** for each bank, then run **Sync local graph** again. This ensures your local context graph is rebuilt cleanly with the new edge types and export metadata introduced in this release.
+
+### Added
+
+- Contextual graph exports in eight formats: JSON, GraphML, GEXF, Cypher, CSV, C4 Structurizr DSL, C4 Mermaid, and ArchiMate Open Exchange Format.
+- Export modal on the contextual graph with API filtering and coherent-subgraph trimming.
+- Persistent edge types with CRUD UI and seeded standard edge types.
+- C4 and ArchiMate mappings stored in the database and consumed by exporters.
+- Container view drill-down for synthetic C4 systems.
+- Bank graph cleanup, mental-model actions, and per-bank sync/import/deployment controls.
+- New documentation: Use cases page with positioning diagram, Servers getting-started guide, bank graph settings, Edge Types core-concept page, and C4/ArchiMate mapping reference.
+- Introduction page now links to **Use cases** alongside **Why architxt?**.
+
+### Changed
+
+- Replaced C4 PlantUML export with C4 Structurizr DSL.
+- Enriched `sys_edge_context` export metadata for downstream consumers.
+- Replaced CPU-heavy ID hashing with fast counter-based IDs in ArchiMate XML export.
+- Collapsed parallel C4 relationships for valid Structurizr DSL.
+- C4 Mermaid output now emits paired `->` arrows for undirected edges instead of `<->`.
+
+### Fixed
+
+- Structurizr DSL emits valid braced nesting.
+- ArchiMate XML export uses stable, fast IDs.
+
 ## [0.4.7] - 2026-10-24
 
 > ⚠️ **Important:** After upgrading, open **Settings → Server → Banks** and click **Clean local graph** for each bank, then run **Sync local graph** again. This ensures your local context graph is rebuilt cleanly with the deterministic edge identity, directed-edge handling, and canonical entity/edge resolution introduced in this release.

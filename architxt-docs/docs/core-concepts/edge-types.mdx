@@ -1,0 +1,91 @@
+---
+sidebar_position: 5
+---
+
+# Edge Types
+
+**Edge types** classify the relationships in the contextual graph. They are the relationship equivalent of entity types: every grounded or inferred edge has a `type` value that maps to one row in the `edge_types` registry, and that row defines how the relationship is described, exported, and used by prompts.
+
+## What edge types control
+
+Each edge type carries four values:
+
+| UI label | API field | Purpose |
+|---|---|---|
+| **Type Name** | `type_name` | Machine name used in `cge_type` and in model output. Lowercase letters, digits, and hyphens only. |
+| **Description** | `description` | Human-readable meaning shown in the UI and in the edge-vocabulary prompt. |
+| **C4 Description** | `c4_description` | Relationship label used in C4 (Structurizr DSL and Mermaid) exports. |
+| **ArchiMate Relationship** | `archimate_relationship` | Standard ArchiMate relationship type used in ArchiMate XML exports. |
+
+The C4 and ArchiMate mappings behave the same way as the mappings on [entity types](./entities#c4-and-archimate-mappings): the exporters read the stored value directly and only fall back to a default when the mapping is empty. The default for an unmapped edge relationship is `Association`.
+
+## Where you manage edge types
+
+Edge types are managed on the **Entities** page, in the **Edge Types** tab. The tab lists every type with columns for **Type Name**, **Description**, **C4 Description**, **ArchiMate Relationship**, and **Created**.
+
+### Creating a type
+
+1. Click **Create edge type**.
+2. Enter a **Type Name** (slug-style, e.g. `consumes-from`).
+3. Enter a **Description** (required).
+4. Optionally enter a **C4 Description** (e.g. `consumes events from`).
+5. Optionally choose an **ArchiMate Relationship** from the standard list.
+
+### Editing a type
+
+Click any edge-type row to open **Edge Type Details**. You can change the description, C4 description, and ArchiMate relationship. The type name can also be edited, but it must stay globally unique and slug-formatted.
+
+### Deleting types
+
+Select one or more rows and click **Delete**. Deletion is blocked if any contextual-graph edge still references the type.
+
+## Standard seeded edge types
+
+architxt ships with five standard edge types that cover the most common system interactions. They are created automatically when the schema is initialized:
+
+| Type name | Description | C4 description | ArchiMate relationship |
+|---|---|---|---|
+| `calls` | A calls or invokes a service or interface on B. | invokes or calls to | `serving` |
+| `sends` | A sends data or an event to B. | sends data or an event to | `flow` |
+| `reads` | A reads data from B. | reads data from | `access` |
+| `writes` | A persists or writes data to B. | persists or writes data to | `access` |
+| `depends-on` | A depends on B. Use only when no more specific type applies. | depends on | `association` |
+
+You can add custom types for domain-specific relationships (for example `notifies`, `owns`, `hosts`). Custom types appear in the edge-vocabulary prompt and can be emitted by edge-context models just like the standard ones.
+
+## Edge types in the contextual graph
+
+- Grounded edges imported from Hindsight keep their original relationship type if it matches an `edge_types` row.
+- Edge-context mental models emit edges with a `type` field. The type must be one of the registered edge types.
+- If a model emits a type that does not exist in the registry, the edge is still created, but exporters treat it as unmapped and fall back to the default relationship.
+
+## Edge vocabulary prompt
+
+The **Preview edge vocabulary prompt** button on the Edge Types tab shows the exact markdown fragment that is injected into contextual-graph prompts as the `{{ARCHITXT_EDGE_VOCABULARY}}` variable. This fragment lists every registered edge type with its description and direction rule, so you can verify what models are being told to use.
+
+## Edge-context properties
+
+When an edge-context model returns a table, the following columns are recognised and carried through into the edge's `properties` bag:
+
+| Column | Stored as | Example values |
+|---|---|---|
+| `protocol` | `protocol` | HTTPS, gRPC, SFTP, Kafka, RabbitMQ, file drop |
+| `format` | `format` | JSON, XML, CSV, Avro, protobuf, REST, SOAP |
+| `frequency` | `frequency` | real-time, on-demand, hourly, nightly, ad-hoc |
+| `auth` | `auth` | OAuth 2.0, mTLS, API key, JWT, IP allowlist |
+| `encryption` | `encryption` | TLS 1.3, AES-256-GCM at rest, GPG signed |
+
+Any additional columns in the table are also carried through into `properties`, so the contract stays open to future fields. Unknown or unsupported values should be emitted as `-` or left blank; architxt normalises them to empty strings before storage.
+
+These properties appear on the edge in the **Graph** tab and are included in JSON and CSV exports.
+
+## How edge types relate to other concepts
+
+- **[Entity types](./entities)** define the nodes at each end of an edge.
+- **[Contextual Graph](../context-patches/graph)** shows the edges that use these types.
+- **[Contextual Mental Models](../context-patches/mental-models)** — especially the `sys_edge_context` role — produce the edges and properties described here.
+- **[Graph exports](../context-patches/graph#export)** use the C4 and ArchiMate mappings on edge types.
+
+## Summary
+
+Edge types are the central registry for relationship semantics in architxt. They give every contextual-graph edge a consistent type name, a human description, a C4 relationship label, and an ArchiMate relationship type, and they feed the edge vocabulary that guides model output.

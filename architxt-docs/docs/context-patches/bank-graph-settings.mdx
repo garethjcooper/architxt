@@ -1,0 +1,120 @@
+---
+sidebar_position: 6
+---
+
+# Bank graph settings
+
+Bank graph settings control which Hindsight banks architxt manages as contextual graphs, how often they sync, and what limits apply when importing and deploying models. You open them from the **Servers** page by clicking the **Banks** button on a server row.
+
+This page explains each setting and destructive action in the **Graph Banks** dialog so you can configure a bank safely and recover from a stale or over-generated graph.
+
+## Opening the Graph Banks dialog
+
+1. Go to **Servers**.
+2. Find the Hindsight server that owns the bank.
+3. Click **Banks** in the rightmost column.
+
+The dialog lists every bank on that server. Each bank can be enabled or disabled for contextual-graph management. Only enabled banks appear in the **Context Patches** page selectors.
+
+## Enabling a bank
+
+Use the checkbox on each bank row to include it in contextual-graph management. Disabling a bank removes it from the Context Patches selectors but does **not** delete any data.
+
+## Mode
+
+Each enabled bank runs in one of two modes.
+
+| Mode | What it does |
+|---|---|
+| **Manual** | The bank appears in Context Patches, but nothing happens automatically. You run sync jobs by clicking **Run sync job** in the Context Manager. |
+| **Auto** | A background sync job runs repeatedly on the configured refresh interval. Requires the sync daemon to be running. |
+
+Switching to **Auto** also reveals the **Interval** field.
+
+## Refresh interval
+
+When a bank is in **Auto** mode, set how often the sync daemon should rerun the full contextual sync. Use a duration with a single unit:
+
+- `5m` — 5 minutes
+- `2h` — 2 hours
+- `1d` — 1 day
+- `1w` — 1 week
+
+The dialog validates the format before saving.
+
+## Import limits
+
+Import limits cap what the sync job brings **from Hindsight into the local contextual graph**.
+
+| Setting | What it controls |
+|---|---|
+| **Top K nodes** | The maximum number of Hindsight skeleton nodes to import per sync. Lower values keep the graph small; higher values capture more of the bank. |
+| **Min edge weight** | The minimum weight an edge must have to be imported. Edges below this threshold are ignored. |
+| **Include patterns** | Comma-separated regex patterns. Only nodes whose labels match at least one pattern are imported. Leave empty to allow everything. |
+| **Exclude patterns** | Comma-separated regex patterns. Nodes whose labels match any pattern are skipped, even if they also match an include pattern. |
+
+Typical starting values are **Top K nodes: 100** and **Min edge weight: 0**. Add exclude patterns such as `temp-, noise, draft` to filter out low-value nodes.
+
+## Deploy limits
+
+Deploy limits cap what the sync job creates **on top of the local graph**.
+
+| Setting | What it controls |
+|---|---|
+| **Max models per run** | The maximum number of contextual mental models the sync job can deploy in one pass. This protects the bank from being flooded with generated models. |
+| **Model types** | Which contextual template roles the sync job is allowed to deploy. Checked roles run; unchecked roles are skipped. |
+
+The available roles correspond to the seeded and custom contextual template roles. The four system roles are:
+
+- **Entity summary** (`sys_entity_summary`)
+- **Entity capabilities** (`sys_entity_capabilities`)
+- **Edge context** (`sys_edge_context`)
+- **Discovery / Seed** (`sys_discovery_context`)
+
+Custom roles you create on **Template Roles** also appear here.
+
+:::warning Auto with no restrictions
+If you enable **Auto** mode but leave both import and deploy limits empty, the dialog shows a caution warning. Auto-sync with no limits can create a large number of mental models quickly. Set at least **Top K nodes** and **Max models per run** before saving.
+:::
+
+## Clean and clear actions
+
+The expanded bank row exposes several destructive operations. All of them ask for confirmation and show a toast with the result count. They do **not** affect source documents, entity types, or Hindsight bank settings unless explicitly stated.
+
+| Action | What it does |
+|---|---|
+| **Dry-run clean** | Simulates the **Clean models** action and reports how many generated mental models would be deleted. No data is changed. |
+| **Clean models** | Deletes all contextual-graph mental models for this bank. Local graph nodes are marked stale but kept. Auto-sync is disabled for the bank. |
+| **Clean local graph** | Removes every node and edge in the local contextual graph for this bank. Hindsight mental models are not affected. Auto-sync settings are unchanged. |
+| **Clean everything** | Deletes all contextual-graph mental models **and** removes the entire local context graph. Auto-sync is disabled for the bank. |
+| **Clear graph & views** | Removes every node and edge in the local context graph **and** deletes all Views for this bank. Hindsight mental models are not affected. Auto-sync settings are unchanged. |
+| **Clear all mental models** | Permanently deletes **all** mental models from the Hindsight bank itself, including non-contextual models. This can break contextual graph or research features that rely on them. |
+
+Use the clean/clear actions when:
+
+- A sync produced too many or the wrong models (**Clean models**).
+- The local graph is stale and you want to rebuild it from scratch (**Clean local graph** or **Clean everything**).
+- Views are stale after a major graph change (**Clear graph & views**).
+- You need a completely blank bank state (**Clear all mental models**).
+
+After cleaning or clearing, run a fresh manual or auto sync job to regenerate the parts you want.
+
+## Saving changes
+
+Click **Save Changes** to write the configuration back to the server record. The save button is disabled until you actually change something. Validation runs first: any **Auto** bank with a malformed refresh interval blocks the save.
+
+## How bank graph settings fit into architxt
+
+```text
+   Servers  ──►  Graph Banks dialog
+                    │
+                    ├── enable / disable banks
+                    ├── manual or auto sync mode
+                    ├── import and deploy limits
+                    └── clean / clear actions
+                          │
+                          ▼
+                   Context Patches  ◄──►  Hindsight bank
+```
+
+Bank graph settings are the control plane for contextual graphs. They decide which banks are managed, how aggressively they sync, and give you the tools to reset a bank's graph, views, or mental models when needed.

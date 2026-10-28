@@ -146,9 +146,50 @@ export interface EntityType {
   id_format_prefix: string | null;
   min_id_digits: number;
   id_separator: 'none' | '-';
+  c4_element: C4Element | null;
+  archimate_element: ArchiMateElement | null;
   created_at: string;
   updated_at: string;
 }
+
+export const C4_ELEMENTS = ['Person', 'SoftwareSystem', 'Container', 'Component'] as const;
+export type C4Element = typeof C4_ELEMENTS[number];
+
+export const ARCHIMATE_ELEMENTS = [
+  'BusinessActor',
+  'ApplicationComponent',
+  'ApplicationService',
+  'ApplicationInterface',
+  'DataObject',
+] as const;
+export type ArchiMateElement = typeof ARCHIMATE_ELEMENTS[number];
+
+export interface EdgeType {
+  id: number;
+  type_name: string;
+  description: string;
+  c4_description: string | null;
+  archimate_relationship: ArchiMateRelationship | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const ARCHIMATE_RELATIONSHIPS = [
+  'association',
+  'serving',
+  'used-by',
+  'composition',
+  'aggregation',
+  'assignment',
+  'realization',
+  'specialization',
+  'influence',
+  'triggering',
+  'flow',
+  'access',
+] as const;
+
+export type ArchiMateRelationship = typeof ARCHIMATE_RELATIONSHIPS[number];
 
 export interface Entity {
   id: number;

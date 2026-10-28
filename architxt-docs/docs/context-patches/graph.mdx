@@ -90,6 +90,49 @@ The raw properties stored for this entity or edge, excluding provenance and lega
 | **Search** | Filters both entities and edges by label, ID, type, source, or target. |
 | **Drag resize handles** | Resizes the panels. |
 | **Double-click a resize handle** | Resets that split to its default size. |
+| **Export** | Opens the export dialog for the current bank's graph. |
+
+## Export
+
+The **Export** button sits on the same row as the graph search bar and the node/edge count. Clicking it opens a dialog where you choose how to download the current bank's contextual graph.
+
+| Option | What it controls |
+|---|---|
+| **Format** | The export file format. |
+| **Filename base** | An optional prefix for the downloaded files. If you leave this blank, architxt uses the bank name and today's date. |
+| **Undirected edges only** | When checked, the export contains only edges explicitly marked as undirected. |
+
+### Supported formats
+
+| Format | Download |
+|---|---|
+| **JSON** | A single `.json` file containing the nodes, edges, and export metadata. |
+| **GraphML** | A single `.graphml` file for tools that support the GraphML format. |
+| **GEXF** | A single `.gexf` file for Gephi and other GEXF-compatible tools. |
+| **Cypher** | A single `.cypher` file containing Neo4j-flavoured Cypher statements. |
+| **CSV** | Two files: `nodes.csv` and `edges.csv`. The node file has an `id` and `labels` column plus any stored properties; the edge file has `id`, `source_id`, `target_id`, `type`, and `directed` columns plus any stored properties. |
+| **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
+| **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
+| **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
+
+### API filtering
+
+The export dialog calls the `/contextual-graph/export` endpoint. The same endpoint can be used directly with the following query parameters:
+
+| Parameter | Effect |
+|---|---|
+| `server_id` *(required)* | The Hindsight server to export from. |
+| `bank_id` *(required)* | The bank to export from. |
+| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
+| `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
+| `id_prefix` | Include only nodes whose ID starts with this prefix. |
+| `ids` | Comma-separated list of exact node IDs to include. |
+| `source_id` | Include only edges that originate from this node ID. |
+| `target_id` | Include only edges that point to this node ID. |
+| `type` | Include only edges of this relationship type. Pass an empty value to match untyped edges. |
+| `undirected` | `true` to include only edges explicitly marked as undirected. |
+
+When any node selector is used (`labels`, `id_prefix`, or `ids`), the export trims the edge list to edges whose source and target are both in the returned node set, so the download stays a coherent subgraph.
 
 ## How the Graph tab relates to the others
 

@@ -13,6 +13,7 @@ import {
   createView,
   updateView,
   deleteView,
+  deleteAllViewsByBank,
   getTimelineSnapshot,
   clearViewTimeline,
 } from '../db/crud/views.js';
@@ -774,6 +775,67 @@ router.delete('/:viewId', async (req, res) => {
       logger,
       method: 'DELETE',
       path: `/banks/${bankId}/views/${viewId}`,
+      duration: Date.now() - start,
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /servers/{serverId}/banks/{bankId}/views:
+ *   delete:
+ *     summary: Delete all views for a bank
+ *     description: Delete every view in the specified server/bank scope. Frozen views are not special-cased.
+ *     tags: [Views]
+ *     parameters:
+ *       - in: path
+ *         name: serverId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Server ID
+ *       - in: path
+ *         name: bankId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Bank ID
+ *     responses:
+ *       200:
+ *         description: Views deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 deleted: { type: integer }
+ */
+router.delete('/', async (req, res) => {
+  const start = Date.now();
+  const params = requireBankParams(req, res, start, `/banks/${req.params.bankId}/views`);
+  if (!params) return;
+  const { serverId, bankId } = params;
+
+  try {
+    const result = await deleteAllViewsByBank(db, { server_id: serverId, bank_id: bankId });
+    sendResponse({
+      res,
+      status: 200,
+      data: result,
+      logger,
+      method: 'DELETE',
+      path: `/banks/${bankId}/views`,
+      duration: Date.now() - start,
+    });
+  } catch (err) {
+    sendResponse({
+      res,
+      status: 500,
+      error: err.message,
+      code: 'DATABASE_ERROR',
+      logger,
+      method: 'DELETE',
+      path: `/banks/${bankId}/views`,
       duration: Date.now() - start,
     });
   }

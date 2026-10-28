@@ -28,15 +28,20 @@ import {
   Table as TableIcon,
   Settings2,
   FileText,
+  MessageSquareText,
+  Loader2,
 } from 'lucide-react';
-import { entitiesApi, entityTypesApi, type Entity, type EntityType } from '@/lib/api/client';
+import { entitiesApi, entityTypesApi, edgeTypesApi, type Entity, type EntityType, type EdgeType } from '@/lib/api/client';
 import { useMultiSelect } from '@/hooks/useMultiSelect';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { BatchProgressDialog, type BatchItem, type BatchResult } from '@/components/batch-progress-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CreateEntityDialog } from '@/components/create-entity-dialog';
 import { CreateEntityTypeDialog } from '@/components/create-entity-type-dialog';
+import { CreateEdgeTypeDialog } from '@/components/create-edge-type-dialog';
 import { ViewEntityDialog } from '@/components/view-entity-dialog';
 import { ViewEntityTypeDialog } from '@/components/view-entity-type-dialog';
+import { ViewEdgeTypeDialog } from '@/components/view-edge-type-dialog';
 import { ImportDialog, parseEntityImport } from '@/components/import-dialog';
 import { ManageEntityConfigDialog } from '@/components/manage-entity-config-dialog';
 import { EntityDocumentsDialog } from '@/components/entity-documents-dialog';
@@ -50,6 +55,7 @@ const logger = createLogger('EntitiesPage');
 export default function EntitiesPage() {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [entityTypes, setEntityTypes] = useState<EntityType[]>([]);
+  const [edgeTypes, setEdgeTypes] = useState<EdgeType[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* ── Shared modals ── */
@@ -85,6 +91,13 @@ export default function EntitiesPage() {
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType | null>(null);
   const [viewTypeOpen, setViewTypeOpen] = useState(false);
   const [entityDocumentsOpen, setEntityDocumentsOpen] = useState(false);
+   /* ── Edge Types tab state ── */
+   const [createEdgeTypeOpen, setCreateEdgeTypeOpen] = useState(false);
+   const [selectedEdgeType, setSelectedEdgeType] = useState<EdgeType | null>(null);
+   const [viewEdgeTypeOpen, setViewEdgeTypeOpen] = useState(false);
+   const [edgeTypePromptPreview, setEdgeTypePromptPreview] = useState<string | null>(null);
+   const [edgeTypePreviewLoading, setEdgeTypePreviewLoading] = useState(false);
+   const edgeTypeMulti = useMultiSelect(edgeTypes);
 
   /* ── Derived: filtered entities ── */
   const filteredEntities = useMemo(() => {
@@ -134,12 +147,14 @@ export default function EntitiesPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [entData, typeData] = await Promise.all([
+      const [entData, typeData, edgeData] = await Promise.all([
         entitiesApi.list(),
         entityTypesApi.list(),
+        edgeTypesApi.list(),
       ]);
       setEntities(entData);
       setEntityTypes(typeData);
+      setEdgeTypes(edgeData);
     } catch (err: any) {
       logger.error('Failed to fetch', { error: err });
       toast.error(err.message || 'Failed to load data');
@@ -218,6 +233,7 @@ export default function EntitiesPage() {
     }
     entityMulti.clearSelection();
     typeMulti.clearSelection();
+     edgeTypeMulti.clearSelection();
     fetchAll();
   };
 
@@ -233,9 +249,48 @@ export default function EntitiesPage() {
     setSelectedEntityType(type);
     setViewTypeOpen(true);
   };
+  const handleEdgeTypeClick = (type: EdgeType, e: React.MouseEvent) => {
+    e.preventDefault();
+    if ((e.target as HTMLElement).closest('[role="checkbox"]')) return;
+    setSelectedEdgeType(type);
+    setViewEdgeTypeOpen(true);
+  };
 
   const entityTypeName = (typeId: number) =>
     entityTypes.find((t) => t.id === typeId)?.type_name || 'Unknown';
+
+  const openDeleteEdgeTypes = () => {
+    setConfirmTitle('Delete Selected Edge Types');
+    setConfirmDesc(`Are you sure you want to delete ${edgeTypeMulti.selected.size} edge type(s)? This action cannot be undone.`);
+    setConfirmVariant('destructive');
+    setConfirmAction(() => () => {
+      const ids = Array.from(edgeTypeMulti.selected) as number[];
+      setBatchTitle('Deleting Edge Types');
+      setBatchDescription(`${ids.length} edge type${ids.length !== 1 ? 's' : ''}`);
+      setBatchItems(ids.map((id) => {
+        const t = edgeTypes.find((x) => x.id === id);
+        return { id, label: t?.type_name || `Edge Type #${id}` };
+      }));
+      setBatchOperation(() => async (item: BatchItem) => {
+        await edgeTypesApi.delete(item.id as number);
+      });
+      setBatchProgressOpen(true);
+    });
+    setConfirmOpen(true);
+  };
+
+  const handleEdgeTypePromptPreview = async () => {
+    setEdgeTypePreviewLoading(true);
+    try {
+      const { prompt } = await edgeTypesApi.previewPrompt();
+      setEdgeTypePromptPreview(prompt);
+    } catch (err: any) {
+      logger.error('Failed to load edge type prompt preview', { error: err });
+      toast.error(err.message || 'Failed to load prompt preview');
+    } finally {
+      setEdgeTypePreviewLoading(false);
+    }
+  };
 
   return (
     <PageShell title="Entities" loading={loading}>
@@ -249,6 +304,10 @@ export default function EntitiesPage() {
             <Layers className="h-3.5 w-3.5 mr-1.5" />
             Entity Types
           </TabsTrigger>
+           <TabsTrigger value="edge-types" className="text-xs">
+             <Box className="h-3.5 w-3.5 mr-1.5" />
+             Edge Types
+           </TabsTrigger>
         </TabsList>
 
         {/* ═══════════════════════════════════════════════════════════
@@ -553,6 +612,8 @@ export default function EntitiesPage() {
                       <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-20">Pattern</TableHead>
                       <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-16">Case</TableHead>
                       <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-16">Boundary</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-28">C4</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-32">ArchiMate</TableHead>
                       <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Created</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -630,6 +691,119 @@ export default function EntitiesPage() {
                             );
                           })()}
                         </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {type.c4_element || <span className="text-foreground-placeholder">-</span>}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {type.archimate_element || <span className="text-foreground-placeholder">-</span>}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-subtle">
+                          {formatDistanceToNow(new Date(type.created_at), { addSuffix: true })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: Edge Types
+           ═══════════════════════════════════════════════════════════ */}
+        <TabsContent value="edge-types" className="flex flex-col flex-1 min-h-0 mt-0">
+          {/* Action bar */}
+          <div className="flex items-center gap-2 mb-2 shrink-0">
+            <div className="flex-1" />
+            <div className="w-px h-5 bg-surface-panel mx-1" />
+            <Button
+              onClick={handleEdgeTypePromptPreview}
+              disabled={edgeTypePreviewLoading}
+              title="Preview generated prompt vocabulary"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {edgeTypePreviewLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageSquareText className="h-3.5 w-3.5" />}
+            </Button>
+            <Button onClick={fetchAll} title="Refresh" className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"><RefreshCw className="h-3.5 w-3.5" /></Button>
+            <Button
+              onClick={openDeleteEdgeTypes}
+              disabled={edgeTypeMulti.selected.size === 0}
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-destructive-bd text-destructive-fg hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => setCreateEdgeTypeOpen(true)}
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-sm font-medium bg-surface-card border border-border-default text-foreground-default hover:bg-surface-hover transition-colors"
+              title="Add"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Table card */}
+          <div className="rounded-md overflow-hidden bg-surface-card border border-on-dark/[0.08] flex flex-col flex-1 min-h-0">
+            {/* Header bar */}
+            <div className="flex items-center justify-between px-4 py-2 bg-accent-primary-bg border-b border-accent-primary-bd shrink-0">
+              <div className="flex-1" />
+              <span className="text-xs font-mono text-accent-secondary-fg bg-surface-inset border border-accent-secondary-bd px-2 py-0.5 rounded">
+                {edgeTypes.length} ({edgeTypeMulti.selected.size})
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {edgeTypes.length === 0 && !loading ? (
+                <div className="text-center py-12">
+                  <Box className="h-8 w-8 opacity-30 mx-auto mb-3" />
+                  <p className="text-foreground-subtle text-sm">No edge types found.</p>
+                  <p className="text-foreground-placeholder text-xs mt-1">Create edge types that contextual graph edges can reference.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-border-default">
+                      <TableHead className="w-12 py-2 px-4">
+                        <Checkbox
+                          checked={edgeTypeMulti.isAllSelected}
+                          onCheckedChange={edgeTypeMulti.toggleAll}
+                        />
+                      </TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Type Name</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Description</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-32">C4</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left w-32">ArchiMate</TableHead>
+                      <TableHead className="text-xs uppercase text-foreground-faint font-medium py-2 px-4 text-left">Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {edgeTypes.map((type) => (
+                      <TableRow
+                        key={type.id}
+                        className={`border-b border-border-subtle transition-colors cursor-pointer ${
+                          edgeTypeMulti.selected.has(type.id) ? 'bg-accent-primary-bg' : 'hover:bg-surface-card'
+                        }`}
+                        onClick={(e) => handleEdgeTypeClick(type, e)}
+                      >
+                        <TableCell className="py-1.5 px-4" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={edgeTypeMulti.selected.has(type.id)}
+                            onCheckedChange={() => edgeTypeMulti.toggleSelection(type.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs font-medium text-foreground-muted">
+                          {type.type_name}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {type.description || <span className="text-foreground-placeholder">-</span>}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {type.c4_description || <span className="text-foreground-placeholder">-</span>}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-4 text-xs text-foreground-faint">
+                          {type.archimate_relationship || <span className="text-foreground-placeholder">-</span>}
+                        </TableCell>
                         <TableCell className="py-1.5 px-4 text-xs text-foreground-subtle">
                           {formatDistanceToNow(new Date(type.created_at), { addSuffix: true })}
                         </TableCell>
@@ -697,6 +871,44 @@ export default function EntitiesPage() {
         onOpenChange={setViewTypeOpen}
         onEntityTypeUpdated={fetchAll}
       />
+
+      <CreateEdgeTypeDialog
+        open={createEdgeTypeOpen}
+        onOpenChange={setCreateEdgeTypeOpen}
+        onEdgeTypeCreated={fetchAll}
+      />
+
+      <ViewEdgeTypeDialog
+        edgeType={selectedEdgeType}
+        open={viewEdgeTypeOpen}
+        onOpenChange={setViewEdgeTypeOpen}
+        onEdgeTypeUpdated={fetchAll}
+      />
+
+      <Dialog open={edgeTypePromptPreview !== null} onOpenChange={(open) => { if (!open) setEdgeTypePromptPreview(null); }}>
+        <DialogContent className="!w-[85vw] !max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-lg font-semibold text-foreground-default flex items-center gap-2">
+              <MessageSquareText className="h-5 w-5 text-badge-entity-fg" />
+              Edge Vocabulary Prompt Preview
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-3 border border-border-default rounded-md bg-surface-inset my-4">
+            <pre className="text-xs font-mono text-foreground-muted whitespace-pre-wrap break-all">
+              {edgeTypePromptPreview}
+            </pre>
+          </div>
+          <div className="shrink-0 flex justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => setEdgeTypePromptPreview(null)}
+              className="text-foreground-faint hover:text-foreground-default hover:bg-surface-card"
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ManageEntityConfigDialog
         isOpen={manageConfigDialogOpen}

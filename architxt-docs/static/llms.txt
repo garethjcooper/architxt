@@ -10,15 +10,19 @@ Full plain-text dump: https://architxtlabs.com/llms-full.txt
 
 ## Overview
 - Query your architecture, don’t hunt for it.: https://architxtlabs.com/benefits
+- Where architxt fits: https://architxtlabs.com/use-cases
 
 ## Getting Started
 - Prerequisites: https://architxtlabs.com/getting-started/prerequisites
 - Installation: https://architxtlabs.com/getting-started/installation
 - Configuration: https://architxtlabs.com/getting-started/configuration
+- Servers: https://architxtlabs.com/getting-started/servers
 - Quick Start: https://architxtlabs.com/getting-started/quick-start
 
 ## Core Concepts
 - Entities: https://architxtlabs.com/core-concepts/entities
+- Edge Types: https://architxtlabs.com/core-concepts/edge-types
+- C4 and ArchiMate mapping reference: https://architxtlabs.com/core-concepts/mapping-reference
 - Documents: https://architxtlabs.com/core-concepts/documents
 - Mental Models: https://architxtlabs.com/core-concepts/mental-models
 - Contexts: https://architxtlabs.com/core-concepts/contexts
@@ -52,6 +56,7 @@ Full plain-text dump: https://architxtlabs.com/llms-full.txt
 - Candidates: https://architxtlabs.com/context-patches/candidates
 - Mental Models: https://architxtlabs.com/context-patches/mental-models
 - Sync Jobs: https://architxtlabs.com/context-patches/sync-jobs
+- Bank graph settings: https://architxtlabs.com/context-patches/bank-graph-settings
 
 ## Hindsight Sync
 - Overview: https://architxtlabs.com/hindsight-sync/overview

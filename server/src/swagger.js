@@ -213,6 +213,8 @@ const options = {
             name_label: { type: 'string', nullable: true, description: 'Label for the entity name field' },
             case_match: { type: 'string', enum: ['insensitive', 'sensitive'], default: 'insensitive', description: 'Default case matching rule for scan' },
             word_boundary_match: { type: 'string', enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Default word-boundary matching rule for scan' },
+            c4_element: { type: 'string', enum: ['Person', 'SoftwareSystem', 'Container', 'Component'], nullable: true, description: 'Optional C4 element type for entities of this type' },
+            archimate_element: { type: 'string', enum: ['BusinessActor', 'ApplicationComponent', 'ApplicationService', 'ApplicationInterface', 'DataObject'], nullable: true, description: 'Optional ArchiMate element type for entities of this type' },
             created_at: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
             updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
           }

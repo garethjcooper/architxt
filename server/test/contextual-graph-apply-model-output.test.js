@@ -33,13 +33,15 @@ function makeEdgeContextModel(sourceId, targetId) {
   };
 }
 
-function makeTableEnvelope(rows) {
+const BASE_KEYS = ['protocol', 'format', 'frequency', 'auth', 'encryption', 'directed', 'label', 'detail', 'evidence', 'updated_at', 'provenance'];
+
+function makeTableEnvelope(rows, columns) {
   const envelope = {
     narratives: [],
     graph: { name: '', nodes: [], edges: [] },
     tables: [{
       name: 'edge-context',
-      columns: ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence'],
+      columns: columns || ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence'],
       rows,
       evidence: [],
     }],
@@ -86,9 +88,14 @@ describe('applyModelOutput edge-context table input', () => {
     assert.equal(usageEdge.cge_source_id, 'a-com:COM-001');
     assert.equal(usageEdge.cge_target_id, 'a-com:COM-002');
     assert.equal(usageEdge.cge_type, 'sends');
+    assert.deepEqual(Object.keys(usageEdge.cge_properties).sort(), BASE_KEYS.sort());
     assert.equal(usageEdge.cge_properties.detail, 'Singleview sends postpaid usage to ICMS.');
     assert.deepEqual(usageEdge.cge_properties.evidence, ['e1']);
-    assert.equal(usageEdge.cge_properties.frequency, '-');
+    assert.equal(usageEdge.cge_properties.frequency, '');
+    assert.equal(usageEdge.cge_properties.protocol, '');
+    assert.equal(usageEdge.cge_properties.format, '');
+    assert.equal(usageEdge.cge_properties.auth, '');
+    assert.equal(usageEdge.cge_properties.encryption, '');
   });
 
   it('re-applies deterministically: same table content replaces edges rather than duplicating', async () => {
@@ -127,6 +134,36 @@ describe('applyModelOutput edge-context table input', () => {
     assert.equal(edgesResult.data.length, 1);
     assert.equal(edgesResult.data[0].cge_properties.detail, 'Updated detail.');
     assert.deepEqual(edgesResult.data[0].cge_properties.evidence, ['e1', 'e2']);
+  });
+
+  it('re-applies with the same property shape as a fresh edge', async () => {
+    upsertNode(db, serverId, bankId, 'a-com:COM-001', ['canonical', 'active'], { display_name: 'Singleview' });
+    upsertNode(db, serverId, bankId, 'a-com:COM-002', ['canonical', 'active'], { display_name: 'ICMS' });
+
+    const model = makeEdgeContextModel('a-com:COM-001', 'a-com:COM-002');
+
+    // First apply: model emits protocol/auth/encryption.
+    await applyModelOutput(db, serverId, bankId, model, makeTableEnvelope([
+      ['a-com:COM-001', 'a-com:COM-002', 'sends', 'Usage rating feed', 'Singleview sends postpaid usage to ICMS.', '-', ['e1'], 'HTTPS', 'OAuth2', 'TLS1.3'],
+    ], ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'protocol', 'auth', 'encryption']));
+
+    const firstEdge = listEdges(db, serverId, bankId, { limit: 100 }).data[0];
+    assert.deepEqual(Object.keys(firstEdge.cge_properties).sort(), BASE_KEYS.sort());
+    assert.deepEqual(firstEdge.cge_properties.protocol, 'HTTPS');
+    assert.deepEqual(firstEdge.cge_properties.auth, 'OAuth2');
+    assert.deepEqual(firstEdge.cge_properties.encryption, 'TLS1.3');
+
+    // Re-apply: same edge, but protocol/auth/encryption are now unknown ('-').
+    await applyModelOutput(db, serverId, bankId, model, makeTableEnvelope([
+      ['a-com:COM-001', 'a-com:COM-002', 'sends', 'Usage rating feed', 'Singleview sends postpaid usage to ICMS.', '-', ['e1'], '-', '-', '-'],
+    ], ['from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'protocol', 'auth', 'encryption']));
+
+    const secondEdge = listEdges(db, serverId, bankId, { limit: 100 }).data[0];
+    assert.equal(secondEdge.cge_id, firstEdge.cge_id);
+    assert.deepEqual(Object.keys(secondEdge.cge_properties).sort(), BASE_KEYS.sort());
+    assert.equal(secondEdge.cge_properties.protocol, '');
+    assert.equal(secondEdge.cge_properties.auth, '');
+    assert.equal(secondEdge.cge_properties.encryption, '');
   });
 
   it('ignores rows missing required columns', async () => {

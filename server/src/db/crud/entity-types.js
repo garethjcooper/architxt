@@ -1,6 +1,9 @@
 import { createBaseCrud } from '../base.js';
 import { stmt } from '../../cache.js';
 import { dbExec } from '../../utils/db-helpers.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('entity-types-crud');
 
 const TABLE = 'entity_types';
 const PK = 'et_id';
@@ -74,12 +77,77 @@ function normalizeIdSeparator(value) {
 }
 
 /**
+ * Valid C4 element types that can be assigned to an entity type.
+ * Kept as an application-level enum; the database column remains TEXT so
+ * the list can evolve without schema migrations.
+ */
+export const C4_ELEMENTS = Object.freeze([
+  'Person',
+  'SoftwareSystem',
+  'Container',
+  'Component',
+]);
+
+const C4_ELEMENT_SET = new Set(C4_ELEMENTS);
+
+/**
+ * Valid ArchiMate element types that can be assigned to an entity type.
+ * Initial scope: Application layer plus BusinessActor for people/users.
+ */
+export const ARCHIMATE_ELEMENTS = Object.freeze([
+  'BusinessActor',
+  'ApplicationComponent',
+  'ApplicationService',
+  'ApplicationInterface',
+  'DataObject',
+]);
+
+const ARCHIMATE_ELEMENT_SET = new Set(ARCHIMATE_ELEMENTS);
+
+/**
+ * Validate a C4 element value, if provided.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeC4Element(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (!C4_ELEMENT_SET.has(trimmed)) {
+    throw new Error(`c4_element must be one of: ${C4_ELEMENTS.join(', ')}`);
+  }
+  return trimmed;
+}
+
+/**
+ * Validate an ArchiMate element value, if provided.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeArchiMateElement(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (!ARCHIMATE_ELEMENT_SET.has(trimmed)) {
+    throw new Error(`archimate_element must be one of: ${ARCHIMATE_ELEMENTS.join(', ')}`);
+  }
+  return trimmed;
+}
+
+export const entityTypeArchitecture = {
+  C4_ELEMENTS,
+  ARCHIMATE_ELEMENTS,
+  normalizeC4Element,
+  normalizeArchiMateElement,
+};
+
+/**
  * Create entity type
  * @param {Object} db
- * @param {Object} data — { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator }
+ * @param {Object} data — { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator, c4_element, archimate_element }
  */
 export const createEntityType = (db, data) => dbExec(() => {
-  const { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator } = data;
+  const { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator, c4_element, archimate_element } = data;
   if (!type_name) throw new Error('Internal: type_name is required');
 
   const usesPattern = normalizeUsesPattern(uses_entity_id_pattern ?? false);
@@ -94,8 +162,9 @@ export const createEntityType = (db, data) => dbExec(() => {
   const sql = `INSERT INTO ${TABLE} (
     et_type_name, et_description, et_id_label, et_name_label,
     et_case_match, et_word_boundary_match,
-    et_uses_entity_id_pattern, et_id_format_prefix, et_min_id_digits, et_id_separator
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    et_uses_entity_id_pattern, et_id_format_prefix, et_min_id_digits, et_id_separator,
+    et_c4_element, et_archimate_element
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     type_name,
@@ -107,7 +176,9 @@ export const createEntityType = (db, data) => dbExec(() => {
     usesPattern,
     prefix,
     digits,
-    separator
+    separator,
+    normalizeC4Element(c4_element),
+    normalizeArchiMateElement(archimate_element)
   );
   return result.lastInsertRowid;
 }, 'entity_types.create');
@@ -122,7 +193,8 @@ export const updateEntityType = (db, id, data) => dbExec(() => {
   const {
     type_name, description, id_label, name_label,
     case_match, word_boundary_match,
-    uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator
+    uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator,
+    c4_element, archimate_element
   } = data;
 
   const updates = ['et_updated_at = CURRENT_TIMESTAMP'];
@@ -173,6 +245,16 @@ export const updateEntityType = (db, id, data) => dbExec(() => {
     params.push(separator);
   }
 
+  if (c4_element !== undefined) {
+    updates.push('et_c4_element = ?');
+    params.push(normalizeC4Element(c4_element));
+  }
+
+  if (archimate_element !== undefined) {
+    updates.push('et_archimate_element = ?');
+    params.push(normalizeArchiMateElement(archimate_element));
+  }
+
   if (updates.length > 1) {
     params.push(id);
     stmt(db, `UPDATE ${TABLE} SET ${updates.join(', ')} WHERE ${PK} = ?`).run(...params);
@@ -194,3 +276,105 @@ export const entityTypePattern = {
   MAX_ID_DIGITS_LIMIT,
   VALID_ID_SEPARATORS,
 };
+
+/**
+ * Standard entity types shipped with the system. Seeded idempotently by
+ * ensureSchema. Existing rows are left untouched (INSERT OR IGNORE).
+ */
+export const STANDARD_ENTITY_TYPES = Object.freeze([
+  {
+    type_name: 'b-act',
+    description: 'Business role or organisational actor that participates in processes or services.',
+    uses_entity_id_pattern: 1,
+    id_format_prefix: 'ACT',
+    min_id_digits: 3,
+    id_separator: '-',
+    case_match: 'insensitive',
+    word_boundary_match: 'boundaries',
+    c4_element: 'Person',
+    archimate_element: 'BusinessActor',
+  },
+  {
+    type_name: 'a-com',
+    description: 'Deployable application component, module or bounded context in the architecture.',
+    uses_entity_id_pattern: 1,
+    id_format_prefix: 'COM',
+    min_id_digits: 3,
+    id_separator: '-',
+    case_match: 'insensitive',
+    word_boundary_match: 'boundaries',
+    c4_element: 'Container',
+    archimate_element: 'ApplicationComponent',
+  },
+  {
+    type_name: 'a-svc',
+    description: 'Exposed application service or API that other components consume.',
+    uses_entity_id_pattern: 1,
+    id_format_prefix: 'SVC',
+    min_id_digits: 3,
+    id_separator: '-',
+    case_match: 'insensitive',
+    word_boundary_match: 'boundaries',
+    c4_element: 'Container',
+    archimate_element: 'ApplicationService',
+  },
+  {
+    type_name: 'a-int',
+    description: 'Interface, contract or integration point exposed by an application service or component.',
+    uses_entity_id_pattern: 1,
+    id_format_prefix: 'INT',
+    min_id_digits: 3,
+    id_separator: '-',
+    case_match: 'insensitive',
+    word_boundary_match: 'boundaries',
+    c4_element: 'Component',
+    archimate_element: 'ApplicationInterface',
+  },
+]);
+
+/**
+ * Upsert the standard entity types. Used during schema ensure so new databases
+ * (and upgraded ones that lack the baseline set) always have the default types.
+ * Idempotent via INSERT OR IGNORE on type_name; existing rows are not updated.
+ * @param {Object} db
+ * @returns {number} count of newly inserted rows
+ */
+export function ensureStandardEntityTypes(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'entity_types'").get();
+  if (!tableExists) return 0;
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO ${TABLE} (
+      et_type_name, et_description,
+      et_uses_entity_id_pattern, et_id_format_prefix, et_min_id_digits, et_id_separator,
+      et_case_match, et_word_boundary_match,
+      et_c4_element, et_archimate_element
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  let seeded = 0;
+  for (const t of STANDARD_ENTITY_TYPES) {
+    try {
+      const result = insert.run(
+        t.type_name,
+        t.description,
+        t.uses_entity_id_pattern,
+        t.id_format_prefix,
+        t.min_id_digits,
+        t.id_separator,
+        t.case_match,
+        t.word_boundary_match,
+        t.c4_element || null,
+        t.archimate_element || null
+      );
+      if (result.changes > 0) seeded++;
+    } catch (err) {
+      logger.warn({ err, type_name: t.type_name }, 'Failed to seed standard entity type');
+    }
+  }
+
+  if (seeded > 0) {
+    logger.info(`Seeded ${seeded} standard entity type(s)`);
+  }
+  return seeded;
+}

@@ -1,0 +1,83 @@
+---
+sidebar_position: 3
+title: 'Use cases'
+description: 'Where architxt fits and what it is for.'
+---
+
+import Head from '@docusaurus/Head';
+import Link from '@docusaurus/Link';
+
+<Head>
+  <title>Use cases — Where architxt fits</title>
+  <meta name="description" content="Where architxt fits in your architecture knowledge workflow and four first-class use cases." />
+</Head>
+
+<span className="atx-hero-eyebrow">architxt use cases</span>
+
+# Where architxt fits
+
+architxt is a self-hosted, open-source application layer that turns solid architecture documentation, wikis, diagrams, and existing EA exports into a queryable, evidence-linked model. It then bridges that model into EA tools, knowledge stores, RAG systems, and human decision workflows — without replacing them.
+
+It is not an enterprise-architecture repository, a code-analysis tool, or a blank knowledge-graph canvas. It sits between the messy human-readable artifacts your organisation already produces and the systems that need a cleaner, queryable architecture layer.
+
+![architxt position in the architecture knowledge workflow](/img/SystemPosition.jpg)
+
+## What feeds architxt
+
+- Documents — Word, PDF, Markdown solution designs, tech specs, runbooks
+- Document images and diagrams — extracted and converted to systems inventory and relationships
+- Wikis — Confluence, Notion, SharePoint, GitHub wikis
+- Diagrams-as-text — Mermaid, PlantUML, draw.io source files
+- Existing EA exports — Archi/ArchiMate, LeanIX, Ardoq CSV/GraphML
+- Human-readable repo artifacts — READMEs, service descriptions, API specs
+
+## Where the model goes
+
+| Consumer | Value from architxt |
+|---|---|
+| EA and modelling tools (LeanIX, Ardoq, Archi/ArchiMate, TOGAF repos) | Evidence-linked current-state model to enrich formal repositories |
+| Knowledge stores and RAG layers | Structured, grounded architecture facts instead of raw document chunks |
+| Internal AI agents | Queryable graph and AQL as a reasoning surface |
+| Visualisation and reporting tools | Graph exports: JSON, GraphML, GEXF, Cypher, CSV |
+| Governance and review processes | Queryable as-is model plus impact and dependency answers |
+| CMDB, ITAM, ITSM | Entity mappings and dependency data |
+| Onboarding and training systems | Structured architecture map that survives expert turnover |
+| Compliance and audit tooling | Traceable links between documents, decisions, and entities |
+
+---
+
+# Use cases
+
+Fundamental applications for architxt are captured in these use cases.
+
+## 1. Discover current-state architecture and recurring patterns
+
+The organisation already has architecture documentation but lacks a coherent, queryable view of the as-is structure and repeated design patterns.
+
+architxt takes existing documentation sources and builds a contextual graph which contains carefully curated facts and relationships which can be queried at multiple levels — rather than just searching for named items.
+
+**Linked benefits:** [Discover current-state architecture](/benefits#4-discover-current-state-architecture), [Detect gaps, seams, and architecture erosion](/benefits#3-detect-gaps-seams-and-architecture-erosion), [Query for specifics with accuracy and quality](/benefits#2-query-for-specifics-with-accuracy-and-quality), and [Stop design-document shelfware](/benefits#5-stop-design-document-shelfware--preserve-design-value).
+
+## 2. Architecture recovery after M&A or team turnover
+
+A merger, acquisition, or departure of key architects leaves the organisation holding unfamiliar systems with scattered documentation.
+
+architxt ingests docs, diagrams, wikis, and existing EA exports as they are — with a pipeline for advanced clean up and entity embedding — and reconstructs a queryable as-is architecture from degraded, real-world artifacts.
+
+**Linked benefits:** [Discover current-state architecture](/benefits#4-discover-current-state-architecture), [Save time finding architecture information](/benefits#1-save-time-finding-architecture-information), [Faster architect onboarding](/benefits#6-faster-architect-onboarding--time-to-first-useful-output), and [Barrier 1: existing data location, format, and quality](/benefits#barrier-1-existing-data-location-format-and-quality).
+
+## 3. Pre-change impact and dependency analysis
+
+A team is planning a migration, deprecation, re-platforming, or large-scale change and needs to understand blast radius before committing.
+
+architxt uses the extracted contextual graph and AQL/Reflect queries to answer precise, grounded questions — "what depends on X?", "what was the rationale for this decision?" — and surfaces seams, gaps, and undocumented dependencies before work begins.
+
+**Linked benefits:** [Query for specifics with accuracy and quality](/benefits#2-query-for-specifics-with-accuracy-and-quality), [Detect gaps, seams, and architecture erosion](/benefits#3-detect-gaps-seams-and-architecture-erosion), [Stop design-document shelfware](/benefits#5-stop-design-document-shelfware--preserve-design-value), and [Barrier 2: domain expertise and pipeline-design effort](/benefits#barrier-2-domain-expertise-and-pipeline-design-effort).
+
+## 4. Sovereign architecture knowledge base for regulated environments
+
+A regulated, government, or data-residency-sensitive organisation cannot send proprietary architecture content to external, cloud-hosted LLMs.
+
+architxt provides a fully self-hosted, open-source ingestion and querying layer over architecture documents, keeping proprietary knowledge inside the organisation’s own infrastructure.
+
+**Linked benefits:** [Data sovereignty, on-premise, and open-source](/benefits#7-data-sovereignty-on-premise-and-open-source), [Stop design-document shelfware](/benefits#5-stop-design-document-shelfware--preserve-design-value), and [Barrier 1: existing data location, format, and quality](/benefits#barrier-1-existing-data-location-format-and-quality).

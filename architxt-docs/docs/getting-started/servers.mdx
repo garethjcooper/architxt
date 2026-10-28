@@ -1,0 +1,63 @@
+---
+sidebar_position: 3
+---
+
+# Servers
+
+The **Servers** page is where you register and manage the Hindsight servers that architxt connects to. Before you can sync documents, build contextual graphs, or run Reflect queries, you need at least one healthy Hindsight server configured in architxt.
+
+This page describes how to add a server, check its health, and open the bank-level contextual-graph settings.
+
+## What the Servers page shows
+
+The page lists every Hindsight server you have registered. Each row shows:
+
+| Column | What it means |
+|---|---|
+| **Server ID** | The internal architxt id for this server record. |
+| **Name** | A friendly label you assign when registering the server. |
+| **Base URL** | The Hindsight API endpoint, e.g. `http://localhost:8888`. |
+| **Graph Banks** | Which banks on this server are enabled for contextual-graph management, and whether each is in **Manual** (`M`) or **Auto** (`A`) mode. |
+| **Health** | The result of the last health check, either **OK** or **Error**. |
+
+## Registering a server
+
+You can register a server in two ways:
+
+1. **Environment variables.** If you start architxt with the `hindsight` Docker Compose profile, a default server at `http://hindsight:8888` is registered automatically. See [Configuration](./configuration) for the `HINDSIGHT_*` variables.
+2. **Servers page UI.** Click the **Add Server** button, enter the base URL, name, and credentials, and save.
+
+Once saved, the server appears in the list and its banks become selectable throughout architxt.
+
+## Checking server health
+
+Click **Health** on a single row to check just that server, or select several servers and click the **Health** toolbar button to check them in bulk. The health column updates with the result. A failing health check usually means the base URL is unreachable or the credentials are invalid.
+
+## Configuring graph banks
+
+Each server row has a **Banks** button. Clicking it opens the **Graph Banks** dialog, where you decide:
+
+- Which banks on this server are managed by architxt.
+- Whether each bank syncs manually or on a schedule.
+- Import and deploy limits that cap how much graph data and how many mental models are created.
+- Destructive clean/clear actions for resetting a bank's graph, views, or mental models.
+
+See [Bank graph settings](../context-patches/bank-graph-settings) for the full reference.
+
+## Deleting a server
+
+Select one or more servers and click the **Delete** toolbar button. Deleting a server record in architxt does **not** delete the Hindsight server or its banks; it only removes the connection from architxt's local settings.
+
+## Where servers fit into architxt
+
+```text
+   Servers  ──►  Graph Banks dialog  ──►  Context Patches / Workspace
+      │                                          │
+      └──────────►  Hindsight Sync  ─────────────┘
+```
+
+Servers are the top-level data source. Everything that touches a Hindsight bank — sync, contextual graphs, mental models, Reflect queries, and Views — starts from a server registered on this page.
+
+## Summary
+
+Register Hindsight servers on the **Servers** page, check their health, and use the **Banks** button to configure which banks architxt should manage as contextual graphs. With a healthy server and at least one enabled bank, you can move on to Hindsight Sync, Context Patches, or the Workspace.

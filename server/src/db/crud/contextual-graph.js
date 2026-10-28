@@ -88,6 +88,7 @@ export const getNode = (db, serverId, bankId, id) => dbExec(() => {
  * @param {Object} [options]
  * @param {string[]} [options.labels] - nodes must contain all of these labels
  * @param {string} [options.idPrefix] - id prefix match (case-sensitive)
+ * @param {string[]} [options.ids] - exact node ids to include
  * @param {number} [options.limit]
  * @param {number} [options.offset]
  */
@@ -105,6 +106,11 @@ export const listNodes = (db, serverId, bankId, options = {}) => dbExec(() => {
   if (options.idPrefix) {
     conditions.push('cgn_id LIKE ?');
     values.push(`${options.idPrefix}%`);
+  }
+
+  if (options.ids && options.ids.length > 0) {
+    conditions.push(`cgn_id IN (${options.ids.map(() => '?').join(', ')})`);
+    values.push(...options.ids);
   }
 
   const limit = Number.isInteger(options.limit) ? options.limit : 1000;

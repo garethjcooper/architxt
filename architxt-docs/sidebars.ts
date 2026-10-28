@@ -4,6 +4,7 @@ const sidebars: SidebarsConfig = {
   docs: [
     'intro',
     'benefits',
+    'use-cases',
     {
       type: 'category',
       label: 'Getting Started',
@@ -12,6 +13,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/prerequisites',
         'getting-started/installation',
         'getting-started/configuration',
+        'getting-started/servers',
         'getting-started/quick-start',
       ],
     },
@@ -19,7 +21,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Core Concepts',
       collapsed: false,
-      items: ['core-concepts/entities', 'core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/contexts', 'core-concepts/metadata', 'core-concepts/tags', 'core-concepts/bank-settings', 'core-concepts/directives', 'core-concepts/aql'],
+      items: ['core-concepts/entities', 'core-concepts/edge-types', 'core-concepts/mapping-reference', 'core-concepts/documents', 'core-concepts/mental-models', 'core-concepts/contexts', 'core-concepts/metadata', 'core-concepts/tags', 'core-concepts/bank-settings', 'core-concepts/directives', 'core-concepts/aql'],
     },
     {
       type: 'category',
@@ -49,7 +51,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Context Patches',
       collapsed: false,
-      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates', 'context-patches/mental-models', 'context-patches/sync-jobs'],
+      items: ['context-patches/overview', 'context-patches/graph', 'context-patches/candidates', 'context-patches/mental-models', 'context-patches/sync-jobs', 'context-patches/bank-graph-settings'],
     },
     {
       type: 'category',
