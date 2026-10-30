@@ -12,11 +12,12 @@ CREATE TABLE bank_settings (
   disposition TEXT NOT NULL DEFAULT '{"empathy":1,"literalism":4,"skepticism":1}',
   retain_extraction_mode TEXT NOT NULL DEFAULT 'verbose',
   retain_chunk_size INTEGER NOT NULL DEFAULT 2000 CHECK (retain_chunk_size > 0),
+  entities_allow_free_form INTEGER NOT NULL DEFAULT 0 CHECK (entities_allow_free_form IN (0, 1)),
   bs_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   bs_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-INSERT INTO bank_settings (bs_id, retain_mission, observations_mission, reflect_mission, disposition, retain_extraction_mode, retain_chunk_size) VALUES (1, '', '', '', '{"empathy":1,"literalism":4,"skepticism":1}', 'verbose', 2000);
+INSERT INTO bank_settings (bs_id, retain_mission, observations_mission, reflect_mission, disposition, retain_extraction_mode, retain_chunk_size, entities_allow_free_form) VALUES (1, '', '', '', '{"empathy":1,"literalism":4,"skepticism":1}', 'verbose', 2000, 0);
 
 -- ============================================================================
 -- CORE TABLES

@@ -42,7 +42,6 @@ const darkMarkdownTheme = EditorView.theme({
   },
   '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit' },
   '.cm-content': { width: '100%', minWidth: '0', padding: '6px 8px', caretColor: 'var(--focus-ring)' },
-  '.cm-line': { whiteSpace: 'pre-wrap' },
   '.cm-cursor': { borderLeftColor: 'var(--focus-ring)' },
   '.cm-selectionBackground': { backgroundColor: 'var(--accent-primary-bg)' },
   '.cm-activeLine': { backgroundColor: 'var(--surface-subtle)' },
@@ -60,7 +59,7 @@ export function NarrativeFocusModal({ open, onOpenChange, name, content, onApply
     setDraftContent(content);
   }, [name, content]);
 
-  const extensions = useMemo(() => [oneDark, darkMarkdownTheme], []);
+  const extensions = useMemo(() => [oneDark, EditorView.lineWrapping, darkMarkdownTheme], []);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     const container = (e.currentTarget as HTMLElement).parentElement;

@@ -42,15 +42,10 @@ const DEFAULT_OPTIONS = {
  * @param {Buffer|ReadableStream} fileBuffer - File content
  * @param {string} filename - Original filename for type detection
  * @param {Object} options - Override default conversion options
- * @returns {Promise<{
- *   markdown: string|null,
- *   document: Object|null,  // DoclingDocument JSON if requested
- *   status: string,
- *   errors: Array,
- *   processingTime: number
- * }>}
+ * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
+ * @returns {Promise<{...}>}
  */
-export async function convertDocument(fileBuffer, filename, options = {}) {
+export async function convertDocument(fileBuffer, filename, options = {}, signal = null) {
   if (!SERVICE_URL) {
     throw new Error('DOCLING_SERVICE_URL not configured');
   }
@@ -81,6 +76,7 @@ export async function convertDocument(fileBuffer, filename, options = {}) {
         // Don't set Content-Type - fetch/boundary handles it for FormData
       },
       body: formData,
+      signal: signal || null,
     });
 
     if (!response.ok) {

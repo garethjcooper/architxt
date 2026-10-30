@@ -2,6 +2,30 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.4.9] - TBD
+
+### Added
+
+- PowerPoint / Gotenberg preprocessing: `.ppt` and `.pptx` files can be converted to PDF before Docling via `ARCHITXT_CONVERT_PPT_PPTX_TO_PDF` (default `true`).
+- Page Up / Page Down keyboard scrolling in document content panes and smart-edit document editor.
+- Configurable denoise-LLM chunk size via `ARCHITXT_DENOISE_LLM_CHUNK_SIZE` (default `4000`).
+- Mental-model envelope content embedded in JSON graph exports.
+
+### Changed
+
+- Views detail panel extracts protocol, format, authentication, and encryption into dedicated columns and hides the raw properties JSON.
+- New views no longer receive an automatic default note node.
+- CodeMirror editor uses `EditorView.lineWrapping` for correct selection rendering on wrapped lines.
+- Docker Compose Docling timeout reverted to CPU-only default (`1200s`); container default remains `240s`.
+
+### Fixed
+
+- Runtime TDZ error: `denoiseLlmConfig.chunk_size` referenced before declaration.
+- Conditional hook call in `ViewDocumentDialog` page scrolling.
+- Catastrophic whitespace regexes in denoise replaced with linear line scans.
+- Extract daemon keeps `request_release` recovery while reverting the work-polling contract.
+- Documents stuck in `request_release` recovered by reconcile path.
+
 ## [0.4.8] - 2026-10-29
 
 > ⚠️ **Important:** After upgrading, open **Settings → Server → Banks** and click **Clean local graph** for each bank, then run **Sync local graph** again. This ensures your local context graph is rebuilt cleanly with the new edge types and export metadata introduced in this release.

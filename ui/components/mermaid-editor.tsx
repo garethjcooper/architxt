@@ -102,9 +102,6 @@ const mermaidTheme = EditorView.theme({
     padding: '6px 8px',
     caretColor: 'var(--focus-ring)',
   },
-  '.cm-line': {
-    whiteSpace: 'pre-wrap',
-  },
   '.cm-cursor': {
     borderLeftColor: 'var(--focus-ring)',
   },
@@ -249,7 +246,7 @@ export function MermaidEditor({ content, onChange, onErrorChange, className, nam
   );
 
   const extensions = useMemo(
-    () => [mermaidLanguage, mermaidTheme, syntaxHighlighting(mermaidHighlightStyle)],
+    () => [EditorView.lineWrapping, mermaidLanguage, mermaidTheme, syntaxHighlighting(mermaidHighlightStyle)],
     [],
   );
 

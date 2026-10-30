@@ -77,6 +77,8 @@ export function GraphExportDialog({
   const [format, setFormat] = useState<ExportFormat>('json');
   const [filename, setFilename] = useState('');
   const [undirected, setUndirected] = useState(false);
+  const [includeEntityContent, setIncludeEntityContent] = useState(false);
+  const [includeEdgeContent, setIncludeEdgeContent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -84,6 +86,8 @@ export function GraphExportDialog({
       setFormat('json');
       setFilename('');
       setUndirected(false);
+      setIncludeEntityContent(false);
+      setIncludeEdgeContent(false);
     }
   }, [open]);
 
@@ -115,6 +119,8 @@ export function GraphExportDialog({
         const result = (await contextualGraphApi.export(serverId, bankId, {
           format,
           undirected,
+          includeEntityContent,
+          includeEdgeContent,
         })) as GraphExportEnvelope;
         const blob = new Blob([JSON.stringify(result, null, 2)], { type: MIME_TYPES.json });
         downloadBlob(blob, `${baseName}${EXTENSIONS.json}`);
@@ -184,6 +190,28 @@ export function GraphExportDialog({
             />
             <span>Undirected edges only</span>
           </label>
+
+          {format === 'json' && (
+            <div className="space-y-2 pt-1">
+              <p className="text-sm font-medium text-foreground-default">Include mental model content</p>
+              <label className="flex items-center gap-2 text-sm text-foreground-muted cursor-pointer">
+                <Checkbox
+                  checked={includeEntityContent}
+                  onCheckedChange={(checked) => setIncludeEntityContent(!!checked)}
+                  disabled={loading}
+                />
+                <span>Entity Content</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-foreground-muted cursor-pointer">
+                <Checkbox
+                  checked={includeEdgeContent}
+                  onCheckedChange={(checked) => setIncludeEdgeContent(!!checked)}
+                  disabled={loading}
+                />
+                <span>Edge Content</span>
+              </label>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

@@ -23,6 +23,7 @@ import {
 } from './entity-tagged-content';
 import { loadFormatRegistry } from '@/lib/entity-tag-format';
 import { colorForType } from '@/lib/graph/render-utils';
+import { usePagedScroll } from '@/hooks/usePagedScroll';
 
 interface EntityDetectionDialogProps {
   documentId: number;
@@ -392,6 +393,7 @@ export function EntityDetectionDialog({
   }, [matchGroups, searchQuery]);
 
   const [activeSidebarTab, setActiveSidebarTab] = useState<'existing' | 'found'>('existing');
+  const contentScroll = usePagedScroll([isOpen, workingContent, showPlainText, activeSidebarTab]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -696,7 +698,10 @@ export function EntityDetectionDialog({
                 </button>
               </div>
             </div>
-            <div className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
+            <div
+              {...contentScroll}
+              className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-focus-ring"
+            >
               {showPlainText ? (
                 <pre className="whitespace-pre-wrap text-foreground-muted">{workingContent}</pre>
               ) : (

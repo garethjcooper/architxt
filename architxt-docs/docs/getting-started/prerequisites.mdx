@@ -36,6 +36,47 @@ The extract pipeline uses [Docling](https://github.com/DS4SD/docling) to parse P
 
 This is optional if you only plan to upload plain text or images handled directly by the vision pipeline, but for most document workflows it is required. A GPU is recommended for Docling processing — CPU-only conversion is much slower and can become a bottleneck when batching large PDFs or slide decks.
 
+## Gotenberg
+
+[Gotenberg](https://gotenberg.dev/) is an optional document-conversion service. When enabled, it converts `.doc`, `.docx`, `.html`, and `.htm` files to PDF before they are sent to Docling. This is useful when:
+
+- Word documents contain embedded WMF/EMF vector diagrams that Docling does not render correctly.
+- HTML files include inline or remote images that Docling reports as `Image not available` placeholders.
+
+Gotenberg is **not required**. If it is unreachable, disabled, or returns an error, architxt falls back to sending the original Word or HTML file directly to Docling.
+
+### Install and start Gotenberg
+
+The simplest way to run Gotenberg is with Docker:
+
+```bash
+docker run --rm -p 3031:3000 gotenberg/gotenberg:8
+```
+
+Gotenberg listens on port `3031` by default in architxt configurations to avoid colliding with the architxt UI dev server on port `3001` and other common local services.
+
+### Point architxt at the Gotenberg server
+
+In `server/.env`:
+
+```bash
+ARCHITXT_GOTENBERG_URL=http://localhost:3031
+```
+
+### Enable preprocessing
+
+Two toggles control which formats are routed through Gotenberg:
+
+```bash
+# Convert Word documents to PDF before Docling (default: true)
+ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=true
+
+# Convert HTML pages to PDF before Docling (default: true)
+ARCHITXT_CONVERT_HTML_TO_PDF=true
+```
+
+Both default to `true`, so Gotenberg preprocessing is active as soon as `ARCHITXT_GOTENBERG_URL` points at a healthy server. Set either toggle to `false` to send that format directly to Docling instead.
+
 ### Install and start Docling
 
 ```bash
@@ -47,6 +88,18 @@ docling serve
 ```
 
 The `--extra-index-url` installs the CPU-only PyTorch wheel, which is required for correct image extraction. Without it, embedded images may not be extracted properly.
+
+### Increase the Docling conversion timeout
+
+`docling serve` has a default synchronous conversion timeout that may be too short for large PDFs or slide decks. Set `DOCLING_SERVE_MAX_SYNC_WAIT` when starting the server to extend it:
+
+```bash
+DOCLING_SERVE_MAX_SYNC_WAIT=240 docling serve
+```
+
+The value is in seconds. Use `240` (4 minutes) as a practical default for mixed document sizes, or increase it further for very large files.
+
+When running under Docker Compose, this variable is set on the `docling` container automatically. See [Installation](./installation) for how to override it.
 
 ### Point architxt at the Docling server
 
@@ -166,6 +219,7 @@ For detailed setup instructions, including how to install Hindsight and configur
 
 - [ ] Node.js 22+ and npm 10+ installed.
 - [ ] Python 3.10–3.12 available if you plan to run Docling.
+- [ ] Gotenberg installed and running on port `3031` if you want `.doc`/`.docx`/`.html` preprocessing.
 - [ ] Docling installed and `docling serve` reachable on the URL you will set in `server/.env`.
 - [ ] At least one LLM provider configured with a working endpoint or API key.
 - [ ] Hindsight server running and ability to create your first bank.

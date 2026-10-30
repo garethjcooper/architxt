@@ -60,8 +60,8 @@ async function execute(artifacts, config, data, services, context) {
 
     logger.info('File loaded', { docId: data.doc_id, fileSize });
 
-    // Call docling extractor
-    const result = await extract(fileBuffer, data.filename);
+    // Call docling extractor with abort signal so cancellation interrupts the HTTP request
+    const result = await extract(fileBuffer, data.filename, {}, context?.abortSignal);
 
     // Check for cancellation before returning
     if (context?.abortSignal?.aborted) {

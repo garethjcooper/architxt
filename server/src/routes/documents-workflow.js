@@ -17,6 +17,7 @@ import {
   listDocuments,
   updateDocument,
   getNextReadyToExtractDocument,
+  getNextStalledReleaseDocument,
   claimDocument,
   markDocumentReadyToExtract
 } from '../db/crud/documents.js';
@@ -119,10 +120,20 @@ router.get('/reconcile', async (req, res) => {
     return;
   }
 
+  const releaseResult = await listDocuments(db, { status: 'request_release', limit: 1000 });
+  if (!releaseResult.success) {
+    sendResponse({ res, status: 500, error: releaseResult.error, code: releaseResult.code, logger, method: 'GET', path: routePath, duration: Date.now() - start });
+    return;
+  }
+
   const cutoffTime = new Date(Date.now() - ORPHAN_THRESHOLD_MINUTES * 60 * 1000);
-  const orphans = result.data
+  const processingOrphans = result.data
     ?.filter(doc => new Date(doc.doc_updated_at) < cutoffTime)
     ?.map(doc => doc.doc_id) || [];
+
+  // request_release documents are explicit user cancellation orphans; release them immediately
+  const releaseOrphans = releaseResult.data?.map(doc => doc.doc_id) || [];
+  const orphans = [...new Set([...processingOrphans, ...releaseOrphans])];
 
   sendResponse({ res, status: 200, data: { orphans, threshold_minutes: ORPHAN_THRESHOLD_MINUTES }, logger, method: 'GET', path: routePath, duration: Date.now() - start });
 });
@@ -462,8 +473,8 @@ router.post('/:id/release', async (req, res) => {
 
   const currentStatus = docResult.data.doc_status;
 
-  if (currentStatus !== 'processing_extract' && currentStatus !== 'request_release') {
-    sendResponse({ res, status: 409, error: `Document in state '${currentStatus}', expected 'processing_extract' or 'request_release'`, code: 'STATE_CONFLICT', logger, method: 'POST', path: routePath, duration: Date.now() - start });
+  if (currentStatus !== 'processing_extract' && currentStatus !== 'request_release' && currentStatus !== 'releasing') {
+    sendResponse({ res, status: 409, error: `Document in state '${currentStatus}', expected 'processing_extract', 'request_release' or 'releasing'`, code: 'STATE_CONFLICT', logger, method: 'POST', path: routePath, duration: Date.now() - start });
     return;
   }
 

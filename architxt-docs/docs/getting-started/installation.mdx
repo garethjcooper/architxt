@@ -19,7 +19,7 @@ Choose Docker Compose if you just want to use architxt. Choose local development
 
 ## Option 1: Docker Compose (recommended)
 
-Docker Compose lets you start architxt together with everything it can use: a PDF/document parser (Docling) and a memory server (Hindsight).
+Docker Compose lets you start architxt together with everything it can use: a PDF/document parser (Docling), a document converter (Gotenberg), and a memory server (Hindsight).
 
 ### 1. Clone the repo
 
@@ -51,11 +51,11 @@ Add the Hindsight key only if you are starting architxt with the `hindsight` Doc
 
 architxt ships with three Docker Compose profiles. Pick the one that matches what you need.
 
-| Profile | What it starts | Use this when... |
-|---|---|---|
-| *(none)* | architxt + SQLite | You only want the core app, no document parsing or memory. |
-| `docling` | architxt + SQLite + Docling | You want to upload and parse PDFs, Word docs, etc. |
-| `hindsight` | architxt + SQLite + Docling + Hindsight | You want the full stack: documents + long-term memory. |
+|| Profile | What it starts | Use this when... |
+|---|---|---|---|
+|| *(none)* | architxt + SQLite | You only want the core app, no document parsing or memory. |
+|| `docling` | architxt + SQLite + Docling + Gotenberg | You want to upload and parse PDFs, Word docs, HTML pages, etc. |
+|| `hindsight` | architxt + SQLite + Docling + Gotenberg + Hindsight | You want the full stack: documents + long-term memory. |
 
 Start a profile with:
 
@@ -81,12 +81,32 @@ DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
 
 See [Configuration: external Docling host](./configuration#using-an-external-docling-host-for-example-a-gpu-machine) for details.
 
-Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
+Docling sync operations time out after 1200 seconds (20 minutes) by default inside Docker Compose. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
 
 ```bash
 DOCLING_SERVE_MAX_SYNC_WAIT=2400 \
   docker compose --profile hindsight up --build -d
 ```
+
+### Gotenberg in Docker Compose
+
+The `docling` and `hindsight` profiles start a Gotenberg container on port `3031`. architxt connects to it automatically at `http://gotenberg:3031` and you do not need to set `ARCHITXT_GOTENBERG_URL` in `server/.env` unless you want to override it.
+
+To disable Gotenberg preprocessing for a specific format, set the matching variable in `server/.env`:
+
+```bash
+ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=false
+ARCHITXT_CONVERT_HTML_TO_PDF=false
+```
+
+If you prefer to run Gotenberg outside Docker Compose, override the URL at compose interpolation time:
+
+```bash
+ARCHITXT_GOTENBERG_URL=http://192.168.1.205:3031 \
+  docker compose --profile hindsight up --build -d
+```
+
+See [Configuration: external Gotenberg host](./configuration#external-gotenberg-host) for details.
 
 ### 4. Open the UI
 
@@ -126,6 +146,7 @@ Use this if you are changing architxt's code.
 - Node.js ≥ 22
 - npm 10+
 - A Docling server if you want PDF parsing (see [Prerequisites](./prerequisites))
+- A Gotenberg server on port `3031` if you want `.doc`/`.docx`/`.html` preprocessing
 - A Hindsight server URL and API token if you want memory
 
 ### Clone and install

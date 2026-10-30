@@ -10,28 +10,36 @@ import { denoiseText } from '../../services/llm/stage-service.js';
 
 const logger = createLogger('stage-denoise-llm');
 
+/**
+ * Chunk markdown by line, trying to keep headings with their following content.
+ * Splitting respects heading boundaries where possible.
+ *
+ * @param {string} text - Markdown text
+ * @param {number} maxSize - Maximum target chunk size in characters
+ * @returns {string[]} Array of markdown chunks
+ */
 function chunkMarkdown(text, maxSize = 4000) {
   const chunks = [];
-  
+
   let content = text.replace(/^---[\s\S]*?---\n*/, '');
   const lines = content.split('\n');
   let startIdx = 0;
-  
+
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].match(/^#{1,6}\s+/) || (lines[i].trim() && !lines[i].match(/^[a-z_]+:/))) {
       startIdx = i;
       break;
     }
   }
-  
+
   const validLines = lines.slice(startIdx);
   let currentChunk = [];
   let currentSize = 0;
-  
+
   for (let i = 0; i < validLines.length; i++) {
     const line = validLines[i];
     const lineSize = line.length + 1;
-    
+
     if (currentSize + lineSize > maxSize) {
       let splitIdx = currentChunk.length;
       for (let j = currentChunk.length - 1; j >= 0; j--) {
@@ -40,10 +48,10 @@ function chunkMarkdown(text, maxSize = 4000) {
           break;
         }
       }
-      
+
       const chunk = currentChunk.slice(0, splitIdx).join('\n');
       if (chunk.trim()) chunks.push(chunk);
-      
+
       currentChunk = currentChunk.slice(splitIdx);
       currentChunk.push(line);
       currentSize = currentChunk.reduce((sum, l) => sum + l.length + 1, 0);
@@ -52,11 +60,11 @@ function chunkMarkdown(text, maxSize = 4000) {
       currentSize += lineSize;
     }
   }
-  
+
   if (currentChunk.length > 0) {
     chunks.push(currentChunk.join('\n'));
   }
-  
+
   return chunks;
 }
 
@@ -76,19 +84,20 @@ async function execute(artifacts, config, data, services, context) {
   const docId = data.doc_id;
   
   try {
-    const chunks = chunkMarkdown(markdown);
+    const denoiseLlmConfig = config.document_denoise_llm;
+    const chunkSize = denoiseLlmConfig?.chunk_size ?? 4000;
+    const chunks = chunkMarkdown(markdown, chunkSize);
 
     logger.info('Denoise LLM:', { 
       docId, 
       contentLengthOriginal: markdown.length,
-      chunkCount: chunks.length
+      chunkCount: chunks.length,
+      chunkSize
     });
 
     // Process each chunk through LLM
     const cleanChunks = [];
     let totalTokens = 0;
-    
-    const denoiseLlmConfig = config.document_denoise_llm;
     
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -158,7 +167,7 @@ async function execute(artifacts, config, data, services, context) {
       }
     }
     
-    const cleanMarkdown = cleanChunks.join('\n\n');
+    const cleanMarkdown = cleanChunks.join('\n');
 
     const stats = {
       inputLength: markdown.length,

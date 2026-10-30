@@ -33,11 +33,20 @@ function execute(artifacts, config, data, services) {
   }
 
   const original = markdown;
+  const timeoutMs = denoiseConfig?.timeout_ms ?? 60000;
 
   logger.debug('Denoise input check', {
     inputLength: markdown.length,
     hasImageTags: markdown.includes('{{IMAGE:')
   });
+
+  // Safety guard: prevent any future regex or split operation from hanging forever
+  const deadline = Date.now() + timeoutMs;
+  const checkTimeout = (label) => {
+    if (Date.now() > deadline) {
+      throw new Error(`Denoise timeout (${timeoutMs}ms) at step: ${label}`);
+    }
+  };
 
   let cleaned = markdown;
   const stats = {
@@ -48,23 +57,29 @@ function execute(artifacts, config, data, services) {
     // Step 1: Remove page number patterns
     if (denoiseConfig?.remove_page_numbers) {
       const before = cleaned.length;
-      cleaned = removePageNumbers(cleaned);
+      cleaned = removePageNumbers(cleaned, checkTimeout);
       stats.pageNumbersRemoved = before - cleaned.length;
     }
+
+    checkTimeout('after-remove-page-numbers');
 
     // Step 2: Remove confidential headers
     if (denoiseConfig?.remove_confidential_headers) {
       const before = cleaned.length;
-      cleaned = removeConfidentialHeaders(cleaned);
+      cleaned = removeConfidentialHeaders(cleaned, checkTimeout);
       stats.confidentialHeadersRemoved = before - cleaned.length;
     }
+
+    checkTimeout('after-remove-confidential');
 
     // Step 3: Remove document IDs
     if (denoiseConfig?.remove_document_ids) {
       const before = cleaned.length;
-      cleaned = removeDocumentIds(cleaned);
+      cleaned = removeDocumentIds(cleaned, checkTimeout);
       stats.documentIdsRemoved = before - cleaned.length;
     }
+
+    checkTimeout('after-remove-document-ids');
 
     // Step 4: Unescape HTML entities
     if (denoiseConfig?.unescape_html_entities) {
@@ -87,12 +102,16 @@ function execute(artifacts, config, data, services) {
       stats.whitespaceNormalizations = before - cleaned.length;
     }
 
+    checkTimeout('after-normalize-whitespace');
+
     // Step 6: Remove non-ASCII
     if (denoiseConfig?.remove_non_ascii) {
       const before = cleaned.length;
       cleaned = stripNonAscii(cleaned);
       stats.removeNonAscii = before - cleaned.length;
     }
+
+    checkTimeout('after-strip-non-ascii');
 
     const durationMs = Date.now() - startTime;
     const reductionPercent = original.length > 0 
@@ -132,47 +151,51 @@ function execute(artifacts, config, data, services) {
   }
 }
 
-function removePageNumbers(text) {
-  const patterns = [
-    /\n?\s*Page\s+\d+\s+of\s+\d+\s*\n?/gi,
-    /\n?\s*-?\s*\d+\s*-?\s*\n(?=\n|$)/g,
-    /\n?\s*\d+\s*\/\s*\d+\s*\n/g,
-    /^\s*\d+\s*$/gm
-  ];
-  
-  let result = text;
-  for (const pattern of patterns) {
-    result = result.replace(pattern, '\n');
+function removePageNumbers(text, checkTimeout) {
+  const lines = text.split('\n');
+  const result = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (i % 1000 === 0) checkTimeout('removePageNumbers');
+    const line = lines[i];
+    const stripped = line.trim();
+    if (stripped.length === 0) {
+      result.push(line);
+      continue;
+    }
+    if (/^Page\s+\d+\s+of\s+\d+$/i.test(stripped)) continue;
+    if (/^\d+\s*\/\s*\d+$/.test(stripped)) continue;
+    if (/^\d{1,6}$/.test(stripped)) continue;
+    result.push(line);
   }
-  return result;
+  return result.join('\n');
 }
 
-function removeConfidentialHeaders(text) {
-  const patterns = [
-    /\n?\s*CONFIDENTIAL\s*\n?/gi,
-    /\n?\s*\[CONFIDENTIAL\]\s*\n?/gi,
-    /\n?\s*\*\*\s*Confidential\s*\*\*\s*\n?/gi
-  ];
-  
-  let result = text;
-  for (const pattern of patterns) {
-    result = result.replace(pattern, '\n');
+function removeConfidentialHeaders(text, checkTimeout) {
+  const lines = text.split('\n');
+  const result = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (i % 1000 === 0) checkTimeout('removeConfidentialHeaders');
+    const stripped = lines[i].trim();
+    if (/^CONFIDENTIAL$/i.test(stripped)) continue;
+    if (/^\[CONFIDENTIAL\]$/i.test(stripped)) continue;
+    if (/^\*\*\s*Confidential\s*\*\*$/i.test(stripped)) continue;
+    result.push(lines[i]);
   }
-  return result;
+  return result.join('\n');
 }
 
-function removeDocumentIds(text) {
-  const patterns = [
-    /\n?\s*Document\s*(ID|#)?\s*[:\-]?\s*[A-Z0-9-]+\s*\n?/gi,
-    /\n?\s*Ref\s*[:\-]?\s*[A-Z0-9-]+\s*\n?/gi,
-    /\n?\s*ID\s*[:\-]\s*[A-Z0-9-]+\s*\n?/gi
-  ];
-  
-  let result = text;
-  for (const pattern of patterns) {
-    result = result.replace(pattern, '\n');
+function removeDocumentIds(text, checkTimeout) {
+  const lines = text.split('\n');
+  const result = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (i % 1000 === 0) checkTimeout('removeDocumentIds');
+    const stripped = lines[i].trim();
+    if (/^Document\s*(ID|#)?\s*[:\-]?\s*[A-Z0-9-]+$/i.test(stripped)) continue;
+    if (/^Ref\s*[:\-]?\s*[A-Z0-9-]+$/i.test(stripped)) continue;
+    if (/^ID\s*[:\-]\s*[A-Z0-9-]+$/i.test(stripped)) continue;
+    result.push(lines[i]);
   }
-  return result;
+  return result.join('\n');
 }
 
 function unescapeHtmlEntities(text) {
@@ -217,14 +240,42 @@ function unescapeMarkdownPunctuation(text) {
 }
 
 function normalizeWhitespace(text, maxConsecutiveNewlines = 3) {
-  const pattern = new RegExp(`\n{${maxConsecutiveNewlines + 1},}`, 'g');
-  const replacement = '\n'.repeat(maxConsecutiveNewlines);
-  
-  return text
-    .replace(pattern, replacement)
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .trim();
+  const lines = text.split('\n');
+  const out = [];
+  let emptyStreak = 0;
+
+  for (const rawLine of lines) {
+    // Strip leading/trailing spaces/tabs with simple linear scans.
+    // Avoid global regexes across the whole document: long Docling table
+    // lines with huge runs of padding spaces can make /[ \\t]+\\n/g
+    // backtrack catastrophically.
+    let start = 0;
+    while (start < rawLine.length && (rawLine[start] === ' ' || rawLine[start] === '\t')) {
+      start++;
+    }
+    let end = rawLine.length;
+    while (end > start && (rawLine[end - 1] === ' ' || rawLine[end - 1] === '\t')) {
+      end--;
+    }
+    const line = rawLine.slice(start, end);
+
+    if (line.length === 0) {
+      emptyStreak++;
+      if (emptyStreak <= maxConsecutiveNewlines) {
+        out.push('');
+      }
+    } else {
+      emptyStreak = 0;
+      out.push(line);
+    }
+  }
+
+  // Trim trailing empty lines (equivalent to final .trim())
+  while (out.length > 0 && out[out.length - 1] === '') {
+    out.pop();
+  }
+
+  return out.join('\n');
 }
 
 function stripNonAscii(text, replacement = '') {

@@ -100,6 +100,7 @@ function startCancelPoll(docId, abortController) {
  */
 async function processNext() {
   let cancelPoll = null;
+  let processResult = null;
   try {
     // Step 1: Poll for work (get candidate docId, no state change)
     const docId = await pollForWork();
@@ -131,7 +132,7 @@ async function processNext() {
     const abortController = new AbortController();
     currentAbortController = abortController;
     cancelPoll = startCancelPoll(docId, abortController);
-    const processResult = await processDocument(doc, abortController.signal);
+    processResult = await processDocument(doc, abortController.signal);
     cancelPoll.stop();
     cancelPoll = null;
     currentAbortController = null;
@@ -192,8 +193,11 @@ async function processNext() {
       try {
         const latestDoc = await getDocument(currentDocId);
         if (latestDoc?.status === 'request_release') {
-          await releaseDocument(currentDocId, 'user cancelled during processing', {});
-          logger.info('Released document from catch block after user cancellation', { docId: currentDocId });
+          logger.info('Releasing document from catch block after user cancellation', { docId: currentDocId });
+          const released = await releaseDocument(currentDocId, 'user cancelled during processing', {});
+          if (!released) {
+            logger.error('Failed to release cancelled document from catch block', { docId: currentDocId });
+          }
         } else if (latestDoc?.status === 'processing_extract') {
           // Preserve any structured stage errors we already collected before the exception
           await reportExtracted(currentDocId, false, {

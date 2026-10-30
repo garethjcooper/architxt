@@ -26,12 +26,12 @@ function seedServer(db) {
   return Number(db.prepare('SELECT svr_id FROM servers').get().svr_id);
 }
 
-function makeApp({ db, importHindsightSkeleton, addContext, refreshPatches }) {
+function makeApp({ db, importHindsightSkeleton, addContext, refreshPatches, getMentalModel }) {
   const app = express();
   app.use(express.json());
   app.use(
     '/api/v1/contextual-graph',
-    createContextualGraphRouter({ db, importHindsightSkeleton, addContext, refreshPatches }),
+    createContextualGraphRouter({ db, importHindsightSkeleton, addContext, refreshPatches, getMentalModel }),
   );
   return app;
 }
@@ -116,6 +116,202 @@ describe('contextual-graph route', () => {
 
       assert.equal(res.status, 400);
       assert.equal(res.body.code, 'UNSUPPORTED_FORMAT');
+    });
+
+    it('ignores include_entity_content for non-JSON formats', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['canonical'], { display_name: 'Service A' });
+      upsertNode(db, serverId, bankId, 'B', ['canonical'], { display_name: 'Service B' });
+      upsertEdge(db, serverId, bankId, 'e1', 'A', 'B', 'depends-on', {});
+
+      const app = makeApp({ db });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'graphml', include_entity_content: 'true', include_edge_content: 'true' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.headers['content-type'], 'application/graphml+xml; charset=utf-8');
+    });
+
+    it('attaches normalized envelope content to node model_refs when include_entity_content=true', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['canonical'], {
+        display_name: 'Service A',
+        provenance: {
+          source: 'contextual-graph',
+          model_refs: [
+            {
+              role: 'sys_entity_summary',
+              ext_id: 'entity-summary-A',
+              scope: { node_id: 'A' },
+              attached_at: '2026-10-27T23:31:28.068Z',
+              content_hash: 'abc',
+            },
+          ],
+        },
+      });
+
+      const mockEnvelope = {
+        narratives: [{ narrative_name: 'Summary', narrative: 'A is a service', evidence: [] }],
+        graph: { name: 'A', nodes: [], edges: [] },
+        tables: [],
+        diagrams: [],
+      };
+
+      const fakeGetMentalModel = async (sid, bid, extId, options) => {
+        assert.equal(sid, serverId);
+        assert.equal(bid, bankId);
+        assert.equal(extId, 'entity-summary-A');
+        assert.equal(options.detail, 'full');
+        return {
+          success: true,
+          mentalModel: {
+            id: extId,
+            name: 'Summary',
+            reflect_response: { structured_output: mockEnvelope },
+          },
+        };
+      };
+
+      const app = makeApp({ db, getMentalModel: fakeGetMentalModel });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'json', include_entity_content: 'true' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.nodes.length, 1);
+      assert.equal(res.body.meta.include_entity_content, true);
+      assert.equal(res.body.meta.include_edge_content, undefined);
+      const ref = res.body.nodes[0].properties.provenance.model_refs[0];
+      assert.equal(ref.ext_id, 'entity-summary-A');
+      assert.deepEqual(ref.content, mockEnvelope);
+    });
+
+    it('attaches normalized envelope content to grounded co-occurrence edge model_refs when include_edge_content=true', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['canonical'], {});
+      upsertNode(db, serverId, bankId, 'B', ['canonical'], {});
+      upsertEdge(db, serverId, bankId, 'e1', 'A', 'B', null, {
+        directed: false,
+        weight: 9,
+        labels: ['grounded', 'active'],
+        provenance: {
+          source: 'contextual-graph',
+          model_refs: [
+            {
+              role: 'sys_edge_context',
+              ext_id: 'edge-context-e1',
+              scope: { source_id: 'A', target_id: 'B' },
+              attached_at: '2026-10-27T23:31:28.068Z',
+            },
+          ],
+        },
+      });
+
+      const mockEnvelope = {
+        narratives: [{ narrative_name: 'Context', narrative: 'A co-occurs with B', evidence: [] }],
+        graph: { name: 'A↔B', nodes: [], edges: [] },
+        tables: [],
+        diagrams: [],
+      };
+
+      const fakeGetMentalModel = async (sid, bid, extId, options) => {
+        assert.equal(extId, 'edge-context-e1');
+        assert.equal(options.detail, 'full');
+        return {
+          success: true,
+          mentalModel: {
+            id: extId,
+            reflect_response: { structured_output: mockEnvelope },
+          },
+        };
+      };
+
+      const app = makeApp({ db, getMentalModel: fakeGetMentalModel });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'json', include_edge_content: 'true' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.edges.length, 1);
+      assert.equal(res.body.meta.include_edge_content, true);
+      const ref = res.body.edges[0].properties.provenance.model_refs[0];
+      assert.equal(ref.ext_id, 'edge-context-e1');
+      assert.deepEqual(ref.content, mockEnvelope);
+    });
+
+    it('does not attach content to non-grounded edge model_refs when include_edge_content=true', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['canonical'], {});
+      upsertNode(db, serverId, bankId, 'B', ['canonical'], {});
+      upsertEdge(db, serverId, bankId, 'e2', 'A', 'B', 'depends-on', {
+        directed: true,
+        labels: ['active'],
+        provenance: {
+          source: 'contextual-graph',
+          model_refs: [
+            {
+              role: 'sys_edge_context',
+              ext_id: 'edge-context-e2',
+              scope: { source_id: 'A', target_id: 'B' },
+              attached_at: '2026-10-27T23:31:28.068Z',
+            },
+          ],
+        },
+      });
+
+      const fakeGetMentalModel = async () => {
+        throw new Error('should not fetch mental models for non-grounded edges');
+      };
+
+      const app = makeApp({ db, getMentalModel: fakeGetMentalModel });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'json', include_edge_content: 'true' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.edges.length, 1);
+      const ref = res.body.edges[0].properties.provenance.model_refs[0];
+      assert.equal(ref.ext_id, 'edge-context-e2');
+      assert.equal(ref.content, undefined);
+    });
+
+    it('sets content to null when the referenced mental model is unreachable', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['canonical'], {
+        provenance: {
+          source: 'contextual-graph',
+          model_refs: [{ role: 'sys_entity_summary', ext_id: 'missing-model', scope: { node_id: 'A' } }],
+        },
+      });
+
+      const fakeGetMentalModel = async () => ({ success: false, error: 'not found' });
+
+      const app = makeApp({ db, getMentalModel: fakeGetMentalModel });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'json', include_entity_content: 'true' });
+
+      assert.equal(res.status, 200);
+      const ref = res.body.nodes[0].properties.provenance.model_refs[0];
+      assert.equal(ref.content, null);
+    });
+
+    it('does not attach content when flags are false or absent', async () => {
+      upsertNode(db, serverId, bankId, 'A', ['canonical'], {
+        provenance: {
+          source: 'contextual-graph',
+          model_refs: [{ role: 'sys_entity_summary', ext_id: 'entity-summary-A', scope: { node_id: 'A' } }],
+        },
+      });
+
+      const fakeGetMentalModel = async () => {
+        throw new Error('should not be called');
+      };
+
+      const app = makeApp({ db, getMentalModel: fakeGetMentalModel });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'json' });
+
+      assert.equal(res.status, 200);
+      const ref = res.body.nodes[0].properties.provenance.model_refs[0];
+      assert.equal(ref.content, undefined);
     });
 
     it('exports GraphML with directed default', async () => {

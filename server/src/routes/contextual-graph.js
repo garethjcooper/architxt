@@ -10,6 +10,8 @@ import { toC4StructurizrDsl } from '../utils/c4-structurizr-dsl.js';
 import { toC4Mermaid } from '../utils/c4-mermaid.js';
 import { toArchimateXml } from '../utils/archimate-xml.js';
 import { resolveArchitectureMetadata } from '../utils/architecture-metadata.js';
+import { getMentalModel } from '../services/hindsight/mental-models.js';
+import { toEnvelopeWithFallback } from '../services/contextual-graph/to-envelope.js';
 import {
   listNodes,
   getNode,
@@ -59,6 +61,7 @@ const BASE_PATH = '/contextual-graph';
  * @param {Function} [deps.fetchCandidates]
  * @param {Function} [deps.ingestCandidates]
  * @param {Function} [deps.refreshPatches]
+ * @param {Function} [deps.getMentalModel]
  * @returns {import('express').Router}
  */
 export function createContextualGraphRouter({
@@ -76,6 +79,7 @@ export function createContextualGraphRouter({
   cancelSyncJob = defaultCancelSyncJob,
   undeployBank = defaultUndeployBank,
   getServer = defaultGetServer,
+  getMentalModel: getMentalModelDep = getMentalModel,
 } = {}) {
   const router = Router();
 
@@ -230,6 +234,89 @@ export function createContextualGraphRouter({
   }
 
   /**
+   * Fetch the normalized envelope for a single Hindsight mental model.
+   * Returns null when the model is unreachable or has no usable content.
+   */
+  async function fetchModelContentEnvelope(serverId, bankId, extId) {
+    const result = await getMentalModelDep(serverId, bankId, extId, { detail: 'full' });
+    if (!result.success || !result.mentalModel) {
+      logger.warn('Could not fetch mental-model content for export', { serverId, bankId, extId, error: result.error });
+      return null;
+    }
+    const { envelope } = toEnvelopeWithFallback(result.mentalModel.reflect_response ?? {}, {
+      preserveParallelEdges: true,
+    });
+    return envelope ?? null;
+  }
+
+  /**
+   * Attach mental-model envelope content to model_refs on nodes and edges.
+   * Mutates the provided arrays in place. Missing/unreachable models get
+   * `content: null` so the ref shape stays consistent.
+   *
+   * Edge content is only attached to Hindsight co-occurrence edges. In the
+   * contextual graph those edges are marked with `labels: ['grounded', ...]`
+   * (see entity-info.js and the Hindsight skeleton import). Other edges keep
+   * their model_refs but receive no `content` field, and their referenced mental
+   * models are not fetched.
+   */
+  async function attachModelContent(db, serverId, bankId, nodes, edges) {
+    const nodeExtIds = [];
+    for (const node of nodes) {
+      const refs = node.properties?.provenance?.model_refs;
+      if (!Array.isArray(refs)) continue;
+      for (const ref of refs) {
+        if (ref?.ext_id) nodeExtIds.push(ref.ext_id);
+      }
+    }
+
+    const groundedEdgeExtIds = [];
+    for (const edge of edges) {
+      if (!edge.properties?.labels?.includes('grounded')) continue;
+      const refs = edge.properties?.provenance?.model_refs;
+      if (!Array.isArray(refs)) continue;
+      for (const ref of refs) {
+        if (ref?.ext_id) groundedEdgeExtIds.push(ref.ext_id);
+      }
+    }
+
+    const uniqueExtIds = [...new Set([...nodeExtIds, ...groundedEdgeExtIds])];
+    if (uniqueExtIds.length === 0) return;
+
+    const contentByExtId = new Map();
+    await Promise.all(
+      uniqueExtIds.map(async (extId) => {
+        const envelope = await fetchModelContentEnvelope(serverId, bankId, extId);
+        contentByExtId.set(extId, envelope ?? null);
+      }),
+    );
+
+    function attachToRefs(properties, isEdge) {
+      if (!properties || typeof properties !== 'object') return properties;
+      const provenance = properties.provenance;
+      if (!provenance || typeof provenance !== 'object' || !Array.isArray(provenance.model_refs)) {
+        return properties;
+      }
+      // Edge content is only for grounded Hindsight co-occurrence edges.
+      if (isEdge && !properties.labels?.includes('grounded')) {
+        return properties;
+      }
+      const nextRefs = provenance.model_refs.map((ref) => {
+        if (!ref || typeof ref !== 'object' || typeof ref.ext_id !== 'string') return ref;
+        return { ...ref, content: contentByExtId.get(ref.ext_id) ?? null };
+      });
+      return { ...properties, provenance: { ...provenance, model_refs: nextRefs } };
+    }
+
+    for (let i = 0; i < nodes.length; i += 1) {
+      nodes[i] = { ...nodes[i], properties: attachToRefs(nodes[i].properties, false) };
+    }
+    for (let i = 0; i < edges.length; i += 1) {
+      edges[i] = { ...edges[i], properties: attachToRefs(edges[i].properties, true) };
+    }
+  }
+
+  /**
    * @openapi
    * /contextual-graph/export:
    *   get:
@@ -262,6 +349,25 @@ export function createContextualGraphRouter({
    *           C4 Mermaid export returns a Mermaid (.mmd) file.
    *           ArchiMate export returns an ArchiMate Open Exchange XML (.xml) file.
    *         schema: { type: string }
+   *       - in: query
+   *         name: include_entity_content
+   *         description: |
+   *           When `true` and `format=json`, every node `properties.provenance.model_refs[]` entry
+   *           is augmented with a `content` field containing the normalized envelope of the
+   *           referenced Hindsight mental model. Entity nodes may reference multiple models
+   *           (e.g. summaries, capabilities, or custom entity-derived models). Requires one fetch
+   *           per referenced model.
+   *         schema: { type: boolean, default: false }
+   *       - in: query
+   *         name: include_edge_content
+   *         description: |
+   *           When `true` and `format=json`, every Hindsight co-occurrence edge
+   *           (identified by `properties.labels` containing `'grounded'`) `properties.provenance.model_refs[]`
+   *           entry is augmented with a `content` field containing the normalized envelope of the
+   *           referenced Hindsight mental model. Co-occurrence edges may reference multiple models.
+   *           Other edges are left unchanged and their models are not fetched. Requires one fetch per
+   *           referenced co-occurrence model.
+   *         schema: { type: boolean, default: false }
    *       - in: query
    *         name: id_prefix
    *         schema: { type: string }
@@ -352,10 +458,47 @@ export function createContextualGraphRouter({
     };
 
     const undirected = parseBoolParam(req.query.undirected, false);
+    const includeEntityContent = format === 'json' ? parseBoolParam(req.query.include_entity_content, false) : false;
+    const includeEdgeContent = format === 'json' ? parseBoolParam(req.query.include_edge_content, false) : false;
 
     const requestedFilename = typeof req.query.filename === 'string' && req.query.filename.trim()
       ? req.query.filename.trim().replace(/[^\w\-_.]/g, '_')
       : undefined;
+
+    // Fetch and attach mental-model envelopes before we potentially send the response.
+    if (includeEntityContent || includeEdgeContent) {
+      try {
+        const targetNodes = includeEntityContent ? nodes : [];
+        const targetEdges = includeEdgeContent ? edges : [];
+        await attachModelContent(db, serverId, bankId, targetNodes, targetEdges);
+        if (includeEntityContent) {
+          meta.include_entity_content = true;
+        }
+        if (includeEdgeContent) {
+          meta.include_edge_content = true;
+        }
+      } catch (err) {
+        const duration = Date.now() - start;
+        logger.error('Failed to attach mental-model content to export', {
+          serverId,
+          bankId,
+          includeEntityContent,
+          includeEdgeContent,
+          error: err.message,
+        });
+        sendResponse({
+          res,
+          status: 502,
+          error: `Failed to fetch mental-model content: ${err.message}`,
+          code: 'MODEL_CONTENT_FETCH_FAILED',
+          logger,
+          method: req.method,
+          path: req.path,
+          duration,
+        });
+        return;
+      }
+    }
 
     const defaultExtension = format === 'graphml' ? '.graphml' : format === 'gexf' ? '.gexf' : format === 'cypher' ? '.cypher' : format === 'c4' ? '.dsl' : format === 'c4-mermaid' ? '.mmd' : format === 'archimate' ? '.xml' : '.json';
     const filename = requestedFilename

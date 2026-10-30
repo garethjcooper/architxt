@@ -117,9 +117,6 @@ const mermaidTheme = EditorView.theme({
     padding: '6px 8px',
     caretColor: 'var(--focus-ring)',
   },
-  '.cm-line': {
-    whiteSpace: 'pre-wrap',
-  },
   '.cm-cursor': {
     borderLeftColor: 'var(--focus-ring)',
   },
@@ -298,7 +295,7 @@ export function GraphViewModal({ open, onOpenChange, graph, title, onApply, read
   }, [graph.edges]);
 
   const extensions = useMemo(
-    () => [mermaidLanguage, mermaidTheme, syntaxHighlighting(mermaidHighlightStyle)],
+    () => [EditorView.lineWrapping, mermaidLanguage, mermaidTheme, syntaxHighlighting(mermaidHighlightStyle)],
     [],
   );
 

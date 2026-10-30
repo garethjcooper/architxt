@@ -337,13 +337,9 @@ export const createView = (db, data) => dbExec(() => {
   const diagramType = data.diagram_type ?? 'flowchart';
   const nowIso = new Date().toISOString();
 
-  const defaultNoteId = `note-${randomUUID()}`;
-  const graph = data.graph ?? {
-    nodes: [{ id: defaultNoteId, type: 'note', text: 'Double-click to edit this note' }],
-    edges: [],
-  };
+  const graph = data.graph ?? { nodes: [], edges: [] };
   const layout = data.layout ?? {
-    positions: { [defaultNoteId]: { x: 100, y: 100 } },
+    positions: {},
     viewport: { x: 0, y: 0, zoom: 1 },
   };
 

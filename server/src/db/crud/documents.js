@@ -97,7 +97,7 @@ export const listDocuments = (db, options = {}) => dbExec(() => {
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const sql = `
     SELECT d.doc_id, d.doc_ext_id, d.doc_status, d.doc_content_hash,
-      d.doc_source_path, d.doc_filename, d.doc_full_path, d.doc_authors, d.doc_generated_by, d.ctxt_id,
+      d.doc_source_path, d.doc_filename, d.doc_authors, d.doc_generated_by, d.ctxt_id,
       d.doc_processing_progress, d.doc_processing_history,
       d.doc_timestamp, d.doc_created_at, d.doc_updated_at,
       ROUND(LENGTH(d.doc_content) / 1000.0, 1) AS doc_content_length_k,
@@ -160,6 +160,13 @@ export const getNextReadyToExtractDocument = (db) => dbExec(() => {
   return row ? row.doc_id : null;
 }, 'documents.getNextReady');
 
+// Custom - find oldest document stuck in request_release (no state change)
+export const getNextStalledReleaseDocument = (db) => dbExec(() => {
+  const sql = `SELECT ${PK} FROM ${TABLE} WHERE doc_status = 'request_release' ORDER BY doc_created_at ASC LIMIT 1`;
+  const row = stmt(db, sql).get();
+  return row ? row.doc_id : null;
+}, 'documents.getNextStalledRelease');
+
 // Custom - atomic claim: update status only if currently ready_to_extract
 export const claimDocument = (db, id) => dbExec(() => {
   const sql = `UPDATE ${TABLE} SET doc_status = 'processing_extract', doc_updated_at = CURRENT_TIMESTAMP WHERE ${PK} = ? AND doc_status = 'ready_to_extract'`;
@@ -167,7 +174,12 @@ export const claimDocument = (db, id) => dbExec(() => {
   return result.changes > 0;
 }, 'documents.claim');
 
-// Custom - atomic transition to ready_to_extract (only from allowed states)
+// Custom - atomic claim for release: update status only if currently request_release
+export const claimReleaseDocument = (db, id) => dbExec(() => {
+  const sql = `UPDATE ${TABLE} SET doc_status = 'releasing', doc_updated_at = CURRENT_TIMESTAMP WHERE ${PK} = ? AND doc_status = 'request_release'`;
+  const result = stmt(db, sql).run(requireInt('doc_id', id));
+  return result.changes > 0;
+}, 'documents.claimRelease');
 export const markDocumentReadyToExtract = (db, id) => dbExec(() => {
   // Allowed source states for manual process trigger
   const allowedStatuses = ['uploaded', 'processed_extract_failed', 'processed_extract_success'];
