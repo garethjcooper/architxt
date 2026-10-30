@@ -96,43 +96,125 @@ The raw properties stored for this entity or edge, excluding provenance and lega
 
 The **Export** button sits on the same row as the graph search bar and the node/edge count. Clicking it opens a dialog where you choose how to download the current bank's contextual graph.
 
-| Option | What it controls |
-|---|---|
-| **Format** | The export file format. |
-| **Filename base** | An optional prefix for the downloaded files. If you leave this blank, architxt uses the bank name and today's date. |
-| **Undirected edges only** | When checked, the export contains only edges explicitly marked as undirected. |
+|| Option | What it controls |
+|---|---|---|
+|| **Format** | The export file format. |
+|| **Filename base** | An optional prefix for the downloaded files. If you leave this blank, architxt uses the bank name and today's date. |
+|| **Undirected edges only** | When checked, the export contains only edges explicitly marked as undirected. |
+|| **Entity Content** *(JSON only)* | When checked, every mental-model ref attached to a node is expanded with its normalized envelope content. |
+|| **Edge Content** *(JSON only)* | When checked, every mental-model ref attached to a grounded co-occurrence edge is expanded with its normalized envelope content. Other edges are left unchanged. |
+
+:::tip[Entity Content and Edge Content are JSON-only]
+The two content checkboxes are only available when **Format** is set to **JSON**. They are disabled for all other export formats because those formats do not carry mental-model `model_refs` in a way that can meaningfully include full envelope content.
+:::
+
+### Embedded mental-model content
+
+When **Entity Content** is enabled, each node `properties.provenance.model_refs[]` entry gains a `content` field containing the normalized envelope of the referenced Hindsight mental model. The envelope follows the standard architxt shape — `narratives`, `graph`, `tables`, and `diagrams` — and is produced by `toEnvelopeWithFallback` from the model's `reflect_response`.
+
+When **Edge Content** is enabled, the same `content` field is added to `model_refs` on grounded co-occurrence edges (edges whose `properties.labels` contains `'grounded'`). Non-grounded edges keep their `model_refs` but receive no `content` field, so their mental models are not fetched.
+
+If a referenced model cannot be fetched, the `content` field is set to `null` and the export continues. Each referenced model is fetched individually, so large graphs with many attached models may take longer to export when these options are enabled.
 
 ### Supported formats
 
-| Format | Download |
-|---|---|
-| **JSON** | A single `.json` file containing the nodes, edges, and export metadata. |
-| **GraphML** | A single `.graphml` file for tools that support the GraphML format. |
-| **GEXF** | A single `.gexf` file for Gephi and other GEXF-compatible tools. |
-| **Cypher** | A single `.cypher` file containing Neo4j-flavoured Cypher statements. |
-| **CSV** | Two files: `nodes.csv` and `edges.csv`. The node file has an `id` and `labels` column plus any stored properties; the edge file has `id`, `source_id`, `target_id`, `type`, and `directed` columns plus any stored properties. |
-| **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
-| **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
-| **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
+|| Format | Download |
+|---|---|---|
+|| **JSON** | A single `.json` file containing the nodes, edges, export metadata, and (optionally) embedded mental-model envelope content. |
+|| **GraphML** | A single `.graphml` file for tools that support the GraphML format. |
+|| **GEXF** | A single `.gexf` file for Gephi and other GEXF-compatible tools. |
+|| **Cypher** | A single `.cypher` file containing Neo4j-flavoured Cypher statements. |
+|| **CSV** | Two files: `nodes.csv` and `edges.csv`. The node file has an `id` and `labels` column plus any stored properties; the edge file has `id`, `source_id`, `target_id`, `type`, and `directed` columns plus any stored properties. |
+|| **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
+|| **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
+|| **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
 
 ### API filtering
 
 The export dialog calls the `/contextual-graph/export` endpoint. The same endpoint can be used directly with the following query parameters:
 
-| Parameter | Effect |
-|---|---|
-| `server_id` *(required)* | The Hindsight server to export from. |
-| `bank_id` *(required)* | The bank to export from. |
-| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
-| `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
-| `id_prefix` | Include only nodes whose ID starts with this prefix. |
-| `ids` | Comma-separated list of exact node IDs to include. |
-| `source_id` | Include only edges that originate from this node ID. |
-| `target_id` | Include only edges that point to this node ID. |
-| `type` | Include only edges of this relationship type. Pass an empty value to match untyped edges. |
-| `undirected` | `true` to include only edges explicitly marked as undirected. |
+|| Parameter | Effect |
+|---|---|---|
+|| `server_id` *(required)* | The Hindsight server to export from. |
+|| `bank_id` *(required)* | The bank to export from. |
+|| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
+|| `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
+|| `id_prefix` | Include only nodes whose ID starts with this prefix. |
+|| `ids` | Comma-separated list of exact node IDs to include. |
+|| `source_id` | Include only edges that originate from this node ID. |
+|| `target_id` | Include only edges that point to this node ID. |
+|| `type` | Include only edges of this relationship type. Pass an empty value to match untyped edges. |
+|| `undirected` | `true` to include only edges explicitly marked as undirected. |
+|| `include_entity_content` | `true` to embed normalized mental-model envelope content in every node `model_refs` entry. JSON format only. |
+|| `include_edge_content` | `true` to embed normalized mental-model envelope content in grounded co-occurrence edge `model_refs` entries. JSON format only. |
 
 When any node selector is used (`labels`, `id_prefix`, or `ids`), the export trims the edge list to edges whose source and target are both in the returned node set, so the download stays a coherent subgraph.
+
+### Example JSON output with content enabled
+
+```json
+{
+  "meta": {
+    "server_id": 1,
+    "bank_id": "Mozart-API",
+    "format": "json",
+    "include_entity_content": true,
+    "include_edge_content": true,
+    "node_count": 2,
+    "edge_count": 1
+  },
+  "nodes": [
+    {
+      "id": "svc:SVC-005",
+      "labels": ["service"],
+      "properties": {
+        "provenance": {
+          "source": "hindsight",
+          "model_refs": [
+            {
+              "role": "sys_entity_summary",
+              "ext_id": "summary-svc-005",
+              "content": {
+                "narratives": [{ "narrative_name": "Summary", "narrative": "..." }],
+                "graph": { "name": "...", "nodes": [], "edges": [] },
+                "tables": [],
+                "diagrams": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source_id": "svc:SVC-005",
+      "target_id": "com:COM-001",
+      "type": null,
+      "properties": {
+        "directed": false,
+        "labels": ["grounded", "active"],
+        "provenance": {
+          "source": "contextual-graph",
+          "model_refs": [
+            {
+              "role": "sys_edge_context",
+              "ext_id": "edge-context-e1",
+              "content": {
+                "narratives": [{ "narrative_name": "Context", "narrative": "..." }],
+                "graph": { "name": "...", "nodes": [], "edges": [] },
+                "tables": [],
+                "diagrams": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
 
 ## How the Graph tab relates to the others
 

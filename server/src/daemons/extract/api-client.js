@@ -101,6 +101,28 @@ export async function claimDocument(docId) {
 }
 
 /**
+ * Atomically claim a document stuck in request_release for release
+ */
+export async function claimReleaseDocument(docId) {
+  logger.info('Attempting to claim release document', { docId });
+
+  const result = await apiCall('POST', `/documents/${docId}/claimrelease`);
+
+  if (result.status === 409) {
+    logger.warn('Document already claimed by another daemon', { docId });
+    return false;
+  }
+
+  if (!result.ok) {
+    logger.error('Failed to claim release document', { docId, status: result.status, error: result.data?.error });
+    return false;
+  }
+
+  logger.info('Release document claimed successfully', { docId });
+  return true;
+}
+
+/**
  * Report extraction result
  */
 export async function reportExtracted(docId, success, details = {}) {

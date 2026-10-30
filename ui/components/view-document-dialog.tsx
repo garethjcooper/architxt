@@ -22,6 +22,7 @@ import { EntityTaggedContent } from './entity-tagged-content';
 import { loadFormatRegistry } from '@/lib/entity-tag-format';
 import { formatErrorValue } from '@/lib/error-format';
 import { HindsightIcon } from './icons/hindsight-icon';
+import { usePagedScroll } from '@/hooks/usePagedScroll';
 
 interface Context {
   id: number;
@@ -118,6 +119,8 @@ export function ViewDocumentDialog({
   const [contentBlocks, setContentBlocks] = useState<any[] | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
   const [showPlainText, setShowPlainText] = useState(false);
+
+  const contentScroll = usePagedScroll([activeTab === 'content', contentLoading, content]);
 
   // Processing history state
   const [history, setHistory] = useState<ProcessingHistoryEntry[] | null>(null);
@@ -622,7 +625,10 @@ export function ViewDocumentDialog({
                         {showPlainText ? 'Show Tags' : 'Show Plain'}
                       </button>
                     </div>
-                    <div className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed">
+                    <div
+                      {...contentScroll}
+                      className="flex-1 p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-focus-ring"
+                    >
                       {showPlainText ? (
                         <pre className="whitespace-pre-wrap text-foreground-muted">{content}</pre>
                       ) : (

@@ -138,9 +138,6 @@ const chatInputTheme = EditorView.theme({
     padding: '6px 8px',
     caretColor: 'var(--focus-ring)',
   },
-  '.cm-line': {
-    whiteSpace: 'pre-wrap',
-  },
   '.cm-cursor': {
     borderLeftColor: 'var(--focus-ring)',
   },
@@ -258,6 +255,7 @@ function ChatInputComponent(props: ChatInputProps) {
 
   const extensions = useMemo(
     () => [
+      EditorView.lineWrapping,
       chatInputTheme,
       autocompletion({ override: [chatCompletions(propsRef)] }),
       completionInputHandler({ directive: true, entity: true }),

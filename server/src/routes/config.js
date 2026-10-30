@@ -163,6 +163,7 @@ router.get('/contextual-graph', (req, res) => {
  *                         task_prompt:{ type: string }
  *                         system_prompt:{ type: string }
  *                         timeout_ms: { type: number }
+ *                         chunk_size: { type: number }
  *                     document_denoise:
  *                       type: object
  *                       additionalProperties:
@@ -274,6 +275,7 @@ router.get('/settings', (req, res) => {
           task_prompt: { value: denoise.task_prompt || '', envVar: 'ARCHITXT_DENOISE_LLM_PROMPT' },
           system_prompt:{value: denoise.system_prompt|| '', envVar: 'ARCHITXT_DENOISE_LLM_SYSTEM_PROMPT' },
           timeout_ms:  { value: denoise.timeout_ms  || '—', envVar: 'ARCHITXT_DENOISE_LLM_TIMEOUT_MS' },
+          chunk_size:  { value: denoise.chunk_size  || '—', envVar: 'ARCHITXT_DENOISE_LLM_CHUNK_SIZE' },
         },
         document_denoise: {
           enabled:                     { value: denoiseBasic.enabled                     ?? '—', envVar: 'ARCHITXT_DENOISE_ENABLED' },

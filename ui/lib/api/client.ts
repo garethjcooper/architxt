@@ -2273,8 +2273,8 @@ function buildExportParams(
     targetId?: string;
     type?: string | null;
     undirected?: boolean;
-    limit?: number;
-    offset?: number;
+    includeEntityContent?: boolean;
+    includeEdgeContent?: boolean;
   }
 ): URLSearchParams {
   const params = new URLSearchParams();
@@ -2288,6 +2288,8 @@ function buildExportParams(
   if (options?.targetId) params.set('target_id', options.targetId);
   if (options?.type !== undefined) params.set('type', options.type ?? '');
   if (options?.undirected) params.set('undirected', 'true');
+  if (options?.includeEntityContent) params.set('include_entity_content', 'true');
+  if (options?.includeEdgeContent) params.set('include_edge_content', 'true');
   return params;
 }
 
@@ -2310,6 +2312,8 @@ export const contextualGraphApi = {
       targetId?: string;
       type?: string | null;
       undirected?: boolean;
+      includeEntityContent?: boolean;
+      includeEdgeContent?: boolean;
     }
   ) => {
     const params = buildExportParams(serverId, bankId, options);

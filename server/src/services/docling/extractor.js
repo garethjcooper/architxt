@@ -9,9 +9,59 @@
  */
 
 import { convertDocument } from './client.js';
+import { convertDocumentToPdf } from '../gotenberg/client.js';
+import { config } from '../../config.js';
 import { createLogger } from '../../utils/logger.js';
+import path from 'path';
 
 const logger = createLogger('docling-extractor');
+
+const WORD_EXTENSIONS = new Set(['.doc', '.docx']);
+const HTML_EXTENSIONS = new Set(['.html', '.htm']);
+const POWERPOINT_EXTENSIONS = new Set(['.ppt', '.pptx']);
+
+/**
+ * Decide whether a file should be preprocessed by Gotenberg.
+ * @param {string} filename
+ * @returns {boolean}
+ */
+function shouldPreprocessToPdf(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  if (WORD_EXTENSIONS.has(ext)) return config.gotenberg?.convertDocDocxToPdf ?? false;
+  if (HTML_EXTENSIONS.has(ext)) return config.gotenberg?.convertHtmlToPdf ?? false;
+  if (POWERPOINT_EXTENSIONS.has(ext)) return config.gotenberg?.convertPptPptxToPdf ?? false;
+  return false;
+}
+
+/**
+ * Convert Word/HTML file to PDF via Gotenberg, with fallback to the original file.
+ * @param {Buffer} fileBuffer
+ * @param {string} filename
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<{buffer: Buffer, filename: string, preprocessed: boolean}>}
+ */
+async function maybeConvertToPdf(fileBuffer, filename, signal) {
+  if (!shouldPreprocessToPdf(filename)) {
+    return { buffer: fileBuffer, filename, preprocessed: false };
+  }
+
+  const pdfResult = await convertDocumentToPdf(fileBuffer, filename, signal);
+
+  if (pdfResult.success && pdfResult.buffer?.length > 0) {
+    logger.info('Gotenberg PDF preprocessing succeeded', {
+      originalFilename: filename,
+      pdfSize: pdfResult.buffer.length,
+    });
+    const pdfFilename = `${filename.replace(/\.[^.]+$/, '')}.pdf`;
+    return { buffer: pdfResult.buffer, filename: pdfFilename, preprocessed: true };
+  }
+
+  logger.warn('Gotenberg PDF preprocessing failed, falling back to direct Docling', {
+    originalFilename: filename,
+    error: pdfResult.error,
+  });
+  return { buffer: fileBuffer, filename, preprocessed: false };
+}
 
 /**
  * Extract images from markdown content
@@ -60,28 +110,39 @@ function extractImagesFromMarkdown(markdown) {
  * @param {Buffer} fileBuffer - File content buffer
  * @param {string} filename - Original filename (for type detection)
  * @param {Object} options - Optional overrides for docling conversion
- * @returns {Promise<{
- *   markdown: string,
- *   images: Array,
- *   metadata: Object
- * }>}
+ * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
+ * @returns {Promise<...>}
  */
-export async function extract(fileBuffer, filename, options = {}) {
+export async function extract(fileBuffer, filename, options = {}, signal = null) {
   const startTime = Date.now();
 
   logger.info('Starting extraction', { filename, size: fileBuffer.length });
 
   try {
-    // Step 1: Call docling-serve
-    const result = await convertDocument(fileBuffer, filename, {
+    // Step 0: Optionally preprocess Word/HTML files to PDF via Gotenberg
+    const { buffer: convertedBuffer, filename: convertedFilename, preprocessed } =
+      await maybeConvertToPdf(fileBuffer, filename, signal);
+
+    // Step 1: Call docling extractor (pass abort signal so cancellation interrupts the HTTP request)
+    const result = await convertDocument(convertedBuffer, convertedFilename, {
       to_format: 'md',
       image_export_mode: 'embedded',
       do_ocr: true,
       table_mode: 'accurate',
       ...options
-    });
+    }, signal);
 
     if (result.status !== 'success') {
+      // If Gotenberg preprocessed the file and Docling still failed, fall back
+      // to sending the original Word file directly. This preserves current behaviour
+      // if the PDF happens to be worse for a specific document.
+      if (preprocessed) {
+        logger.warn('Docling failed on Gotenberg PDF, falling back to original Word file', {
+          originalFilename: filename,
+          error: result.errors?.join('; ') || result.status,
+        });
+        return extract(fileBuffer, filename, options, signal);
+      }
       const doclingErrors = result.errors?.join('; ') || 'unknown error';
       const err = new Error(`Docling conversion failed (${result.status}): ${doclingErrors}`);
       err.doclingStatus = result.status;
@@ -121,6 +182,7 @@ export async function extract(fileBuffer, filename, options = {}) {
         image_count: images.length,
         processing_time: result.processingTime,
         extraction_duration_ms: duration,
+        preprocessed_to_pdf: preprocessed,
         // Include docling doc if available for downstream use
         docling_doc: result.document || null
       }

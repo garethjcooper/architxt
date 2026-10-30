@@ -280,6 +280,10 @@ function buildEdgePropertiesEnvelope(
     const label = String(props.label || edge.label || '');
     const detail = String(props.detail || '');
     const frequency = String(props.frequency || '');
+    const protocol = String(props.protocol || '');
+    const format = String(props.format || '');
+    const auth = String(props.auth || '');
+    const encryption = String(props.encryption || '');
     const edgeEvidence = Array.isArray(props.evidence) ? props.evidence : [];
     for (const id of edgeEvidence) evidence.add(String(id));
 
@@ -292,8 +296,11 @@ function buildEdgePropertiesEnvelope(
       label,
       detail,
       frequency,
+      protocol,
+      format,
+      auth,
+      encryption,
       evidence: edgeEvidence,
-      properties: props,
     });
   }
 
@@ -302,7 +309,7 @@ function buildEdgePropertiesEnvelope(
     tables: rows.length
       ? [{
           name: `Edges (${rows.length})`,
-          columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'properties'],
+          columns: ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'frequency', 'evidence', 'protocol', 'format', 'auth', 'encryption'],
           rows,
           evidence: Array.from(evidence),
         }]
@@ -425,8 +432,8 @@ export function DetailPanel({
   const edgeColumnFilter = useMemo(() => {
     const base = ['from_name', 'to_name', 'type', 'label', 'detail'];
     if (panelWidth < 900) return base;
-    if (panelWidth < 1200) return [...base, 'from', 'to', 'properties'];
-    return [...base, 'from', 'to', 'properties', 'evidence'];
+    if (panelWidth < 1200) return [...base, 'from', 'to', 'protocol', 'format'];
+    return [...base, 'from', 'to', 'protocol', 'format', 'auth', 'encryption', 'evidence'];
   }, [panelWidth]);
 
   const stickyRef = useRef<{

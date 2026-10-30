@@ -116,9 +116,6 @@ const aqlTheme = EditorView.theme({
     padding: '6px 8px',
     caretColor: 'var(--focus-ring)',
   },
-  '.cm-line': {
-    whiteSpace: 'pre-wrap',
-  },
   '.cm-cursor': {
     borderLeftColor: 'var(--focus-ring)',
   },
@@ -436,6 +433,7 @@ function AqlEditorComponent(props: AqlEditorProps) {
 
   const extensions = useMemo(
     () => [
+      EditorView.lineWrapping,
       aqlLanguage,
       aqlTheme,
       syntaxHighlighting(aqlHighlightStyle),

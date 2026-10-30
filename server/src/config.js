@@ -138,6 +138,12 @@ export const config = {
     serviceUrl: process.env.DOCLING_SERVICE_URL || 'http://localhost:5001',
     forceOcr: getEnv('ARCHITXT_DOCLING_FORCE_OCR', 'false') === 'true',
   },
+  gotenberg: {
+    url: getEnv('ARCHITXT_GOTENBERG_URL', 'http://localhost:3031'),
+    convertDocDocxToPdf: getEnv('ARCHITXT_CONVERT_DOC_DOCX_TO_PDF', 'true') === 'true',
+    convertHtmlToPdf: getEnv('ARCHITXT_CONVERT_HTML_TO_PDF', 'true') === 'true',
+    convertPptPptxToPdf: getEnv('ARCHITXT_CONVERT_PPT_PPTX_TO_PDF', 'true') === 'true',
+  },
   server: {
     port: parseInt(process.env.ARCHITXT_PORT || '3000', 10),
     host: process.env.ARCHITXT_HOST || '0.0.0.0',
@@ -217,6 +223,7 @@ export const config = {
     provider: getEnv('ARCHITXT_DENOISE_LLM_PROVIDER', 'ollama_cloud'),
     model: getEnv('ARCHITXT_DENOISE_LLM_MODEL', 'gpt-oss:120b-cloud'),
     timeout_ms: getInt('ARCHITXT_DENOISE_LLM_TIMEOUT_MS', 1200000),
+    chunk_size: getInt('ARCHITXT_DENOISE_LLM_CHUNK_SIZE', 4000),
     task_prompt: getEnv('ARCHITXT_DENOISE_LLM_PROMPT', PROMPTS.document_denoise_llm.task),
     system_prompt: getEnv('ARCHITXT_DENOISE_LLM_SYSTEM_PROMPT', PROMPTS.document_denoise_llm.system),
     temperature: parseFloat(getEnv('ARCHITXT_DENOISE_LLM_TEMPERATURE', '0.0'))

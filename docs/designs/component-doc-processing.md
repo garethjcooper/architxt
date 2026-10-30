@@ -64,11 +64,35 @@ When a document is uploaded via the UI or API, the Ingestion Controller performs
 Supported formats:
 - **PDF** (preferred) — text extraction via Docling, optional OCR fallback
 - **DOCX** — Office Open XML parsing via Docling
+- **DOCX/DOC with Gotenberg** — when `ARCHITXT_CONVERT_DOC_DOCX_TO_PDF` is enabled, Word files are first converted to PDF by an external Gotenberg service, then sent to Docling. This preserves WMF/EMF diagrams as rendered page content. If Gotenberg is unavailable or fails, the original Word file is sent to Docling directly.
+- **HTML with Gotenberg** — when `ARCHITXT_CONVERT_HTML_TO_PDF` is enabled (default: `true`), `.html`/`.htm` files are first converted to PDF by Gotenberg, then sent to Docling. This removes "Image not available" placeholders that Docling often produces for HTML with inline/remote images. If Gotenberg fails, the original HTML file is sent to Docling directly.
 - **XLSX** — Spreadsheet ingestion (minimal testing; may lose formatting)
 - **PPTX** — Slide deck ingestion (minimal testing; text only)
 - **Images** (PNG, JPG) — Direct routing to vision pipeline; bypass Docling
 
-### Step 2: Docling Conversion
+### Optional Gotenberg preprocessing
+
+For Word documents that contain embedded WMF/EMF vector diagrams, the default direct Docling path only extracts the raster images that Docling can load. The optional Gotenberg preprocessing path converts `.doc` and `.docx` files to PDF before Docling extraction, which captures the rendered page content including WMF/EMF diagrams.
+
+For HTML documents, the default direct Docling path often emits `Image not available` placeholders for inline or remote images. The optional Gotenberg preprocessing path converts `.html` and `.htm` files to PDF before Docling extraction, removing those placeholders and capturing the rendered page content.
+
+Flow:
+1. Extract daemon reads the source file.
+2. If `ARCHITXT_CONVERT_DOC_DOCX_TO_PDF` is `true` and the file is `.doc` or `.docx`, the file is POSTed to `http://<gotenberg>/forms/libreoffice/convert`.
+3. If `ARCHITXT_CONVERT_HTML_TO_PDF` is `true` and the file is `.html` or `.htm`, the file is POSTed to the same Gotenberg endpoint.
+4. If Gotenberg returns a PDF, that PDF is sent to Docling.
+5. If Gotenberg fails or is unreachable, the original Word or HTML file is sent to Docling, preserving the legacy direct-to-Docling behaviour.
+
+Configuration:
+```bash
+ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=true
+ARCHITXT_CONVERT_HTML_TO_PDF=true
+ARCHITXT_GOTENBERG_URL=http://localhost:3031
+```
+
+When running under Docker Compose with the `docling` profile, the Gotenberg service is available at `http://gotenberg:3031` and `depends_on` waits for it to be healthy. Deployments without the Gotenberg service continue to work exactly as before, because the fallback path is automatic.
+
+## Step 2: Docling Conversion
 
 The extract daemon invokes the external Docling service at the configured service URL:
 

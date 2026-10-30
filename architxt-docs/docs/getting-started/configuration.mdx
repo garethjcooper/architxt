@@ -48,6 +48,50 @@ SQLite is used via `better-sqlite3`. The schema is created automatically on firs
 | `ARCHITXT_TEMP_DIR` | `./tmp` | Temporary directory used during extraction. |
 | `ARCHITXT_MAX_FILE_SIZE` | `104857600` | Maximum upload size in bytes (default is 100 MB). |
 
+## Document preprocessing
+
+Before Docling parses a document, architxt can optionally route certain formats through [Gotenberg](https://gotenberg.dev/) to convert them to PDF. This step is automatic and falls back to the original file if Gotenberg is unreachable, disabled, or returns an error.
+
+### Gotenberg
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_GOTENBERG_URL` | `http://localhost:3031` | URL of the Gotenberg service. In the `docling` and `hindsight` Docker Compose profiles this is overridden to `http://gotenberg:3031`. |
+| `ARCHITXT_CONVERT_DOC_DOCX_TO_PDF` | `true` | Convert `.doc` and `.docx` files to PDF via Gotenberg before sending them to Docling. |
+| `ARCHITXT_CONVERT_HTML_TO_PDF` | `true` | Convert `.html` and `.htm` files to PDF via Gotenberg before sending them to Docling. |
+| `ARCHITXT_CONVERT_PPT_PPTX_TO_PDF` | `true` | Convert `.ppt` and `.pptx` files to PDF via Gotenberg before sending them to Docling. |
+
+### When to enable or disable preprocessing
+
+- **Word documents** — Keep `ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=true` when Word files contain embedded WMF/EMF diagrams, or when the direct Docling path produces missing or badly rendered images. If you process plain text-only Word files, you can set this to `false` for faster extraction.
+- **HTML pages** — Keep `ARCHITXT_CONVERT_HTML_TO_PDF=true` when HTML contains inline or remote images that Docling reports as `Image not available` placeholders. Set to `false` if the HTML is mostly text and you prefer the faster direct path.
+- **PowerPoint presentations** — Keep `ARCHITXT_CONVERT_PPT_PPTX_TO_PDF=true` when `.ppt` or `.pptx` files fail to extract, render poorly, or lose slide images in Docling. Legacy `.ppt` binaries in particular often extract better after conversion to PDF. Set to `false` if you process simple text slides and prefer the direct path.
+
+### Fallback behaviour
+
+Preprocessing is a best-effort pass. If the Gotenberg request fails, times out, or returns a non-PDF response, architxt logs a warning and sends the original Word, HTML, or PowerPoint file directly to Docling. Extraction therefore continues even when Gotenberg is misconfigured or offline.
+
+### External Gotenberg host
+
+If you run Gotenberg on another machine, override the URL at Docker Compose interpolation time:
+
+```bash
+ARCHITXT_GOTENBERG_URL=http://192.168.1.205:3031 \
+  docker compose --profile hindsight up -d
+```
+
+Verify the override was applied:
+
+```bash
+docker compose exec architxt printenv ARCHITXT_GOTENBERG_URL
+```
+
+Expected output:
+
+```text
+http://192.168.1.205:3031
+```
+
 ## Docling
 
 | Variable | Default | Purpose |
@@ -170,6 +214,7 @@ You can override the built-in diagram-description prompts that are sent to the v
 | `ARCHITXT_DENOISE_LLM_PROVIDER` | `ollama_cloud` | Provider name for denoise calls. |
 | `ARCHITXT_DENOISE_LLM_MODEL` | `gpt-oss:20b-cloud` | Model used for LLM denoising. |
 | `ARCHITXT_DENOISE_LLM_TIMEOUT_MS` | `600000` | Request timeout in milliseconds (10 minutes). |
+| `ARCHITXT_DENOISE_LLM_CHUNK_SIZE` | `4000` | Target chunk size in characters for splitting long documents before sending them to the LLM. |
 | `ARCHITXT_DENOISE_LLM_PROMPT` | *(built-in)* | Custom task prompt override. |
 | `ARCHITXT_DENOISE_LLM_SYSTEM_PROMPT` | *(built-in)* | Custom system prompt override. |
 | `ARCHITXT_DENOISE_LLM_TEMPERATURE` | `0.1` | Sampling temperature. |

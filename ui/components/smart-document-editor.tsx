@@ -243,6 +243,7 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
   const [isSaving, setIsSaving] = useState(false);
   const [previewBlock, setPreviewBlock] = useState<SmartBlock | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const contentPaneRef = useRef<HTMLDivElement | null>(null);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [originalContent, setOriginalContent] = useState<string>('');
@@ -266,6 +267,23 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
       setBlocks([]);
     }
   }, [content, contentBlocks]);
+
+  // Page Up / Page Down scroll the content pane when not typing in an editor
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'PageUp' && e.key !== 'PageDown') return;
+      const target = e.target as HTMLElement | null;
+      // Don't intercept when user is typing in an editor or native scrollable
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
+      const pane = contentPaneRef.current;
+      if (!pane) return;
+      e.preventDefault();
+      const pageHeight = pane.clientHeight * 0.85;
+      pane.scrollBy({ top: e.key === 'PageDown' ? pageHeight : -pageHeight, behavior: 'smooth' });
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const structuralBlocks = useMemo(() => blocks.filter(b => b.type !== 'text'), [blocks]);
   const removedCount = useMemo(() => blocks.filter(b => b.deleted).length, [blocks]);
@@ -417,8 +435,11 @@ export function SmartDocumentEditor({ documentId, content, contentBlocks, conten
         </div>
 
         {/* Content pane */}
-        <div className="flex-1 min-h-0 rounded-lg border border-border-default bg-surface-overlay p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed"
-             style={{ maxHeight: '100%' }}>
+        <div
+          ref={contentPaneRef}
+          className="flex-1 min-h-0 rounded-lg border border-border-default bg-surface-overlay p-3 overflow-y-auto custom-scrollbar font-mono text-[13px] leading-relaxed"
+          style={{ maxHeight: '100%' }}
+        >
           {blocks.map(b => {
             if (b.deleted && !showRemoved) return null;
             const isEditing = editingBlockId === b.id;

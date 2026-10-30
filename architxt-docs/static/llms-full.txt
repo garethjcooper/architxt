@@ -116,6 +116,47 @@ The extract pipeline uses [Docling](https://github.com/DS4SD/docling) to parse P
 
 This is optional if you only plan to upload plain text or images handled directly by the vision pipeline, but for most document workflows it is required. A GPU is recommended for Docling processing — CPU-only conversion is much slower and can become a bottleneck when batching large PDFs or slide decks.
 
+## Gotenberg
+
+[Gotenberg](https://gotenberg.dev/) is an optional document-conversion service. When enabled, it converts `.doc`, `.docx`, `.html`, and `.htm` files to PDF before they are sent to Docling. This is useful when:
+
+- Word documents contain embedded WMF/EMF vector diagrams that Docling does not render correctly.
+- HTML files include inline or remote images that Docling reports as `Image not available` placeholders.
+
+Gotenberg is **not required**. If it is unreachable, disabled, or returns an error, architxt falls back to sending the original Word or HTML file directly to Docling.
+
+### Install and start Gotenberg
+
+The simplest way to run Gotenberg is with Docker:
+
+```bash
+docker run --rm -p 3031:3000 gotenberg/gotenberg:8
+```
+
+Gotenberg listens on port `3031` by default in architxt configurations to avoid colliding with the architxt UI dev server on port `3001` and other common local services.
+
+### Point architxt at the Gotenberg server
+
+In `server/.env`:
+
+```bash
+ARCHITXT_GOTENBERG_URL=http://localhost:3031
+```
+
+### Enable preprocessing
+
+Two toggles control which formats are routed through Gotenberg:
+
+```bash
+# Convert Word documents to PDF before Docling (default: true)
+ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=true
+
+# Convert HTML pages to PDF before Docling (default: true)
+ARCHITXT_CONVERT_HTML_TO_PDF=true
+```
+
+Both default to `true`, so Gotenberg preprocessing is active as soon as `ARCHITXT_GOTENBERG_URL` points at a healthy server. Set either toggle to `false` to send that format directly to Docling instead.
+
 ### Install and start Docling
 
 ```bash
@@ -127,6 +168,18 @@ docling serve
 ```
 
 The `--extra-index-url` installs the CPU-only PyTorch wheel, which is required for correct image extraction. Without it, embedded images may not be extracted properly.
+
+### Increase the Docling conversion timeout
+
+`docling serve` has a default synchronous conversion timeout that may be too short for large PDFs or slide decks. Set `DOCLING_SERVE_MAX_SYNC_WAIT` when starting the server to extend it:
+
+```bash
+DOCLING_SERVE_MAX_SYNC_WAIT=240 docling serve
+```
+
+The value is in seconds. Use `240` (4 minutes) as a practical default for mixed document sizes, or increase it further for very large files.
+
+When running under Docker Compose, this variable is set on the `docling` container automatically. See [Installation](./installation) for how to override it.
 
 ### Point architxt at the Docling server
 
@@ -246,6 +299,7 @@ For detailed setup instructions, including how to install Hindsight and configur
 
 - [ ] Node.js 22+ and npm 10+ installed.
 - [ ] Python 3.10–3.12 available if you plan to run Docling.
+- [ ] Gotenberg installed and running on port `3031` if you want `.doc`/`.docx`/`.html` preprocessing.
 - [ ] Docling installed and `docling serve` reachable on the URL you will set in `server/.env`.
 - [ ] At least one LLM provider configured with a working endpoint or API key.
 - [ ] Hindsight server running and ability to create your first bank.
@@ -275,7 +329,7 @@ Choose Docker Compose if you just want to use architxt. Choose local development
 
 ## Option 1: Docker Compose (recommended)
 
-Docker Compose lets you start architxt together with everything it can use: a PDF/document parser (Docling) and a memory server (Hindsight).
+Docker Compose lets you start architxt together with everything it can use: a PDF/document parser (Docling), a document converter (Gotenberg), and a memory server (Hindsight).
 
 ### 1. Clone the repo
 
@@ -307,11 +361,11 @@ Add the Hindsight key only if you are starting architxt with the `hindsight` Doc
 
 architxt ships with three Docker Compose profiles. Pick the one that matches what you need.
 
-| Profile | What it starts | Use this when... |
-|---|---|---|
-| *(none)* | architxt + SQLite | You only want the core app, no document parsing or memory. |
-| `docling` | architxt + SQLite + Docling | You want to upload and parse PDFs, Word docs, etc. |
-| `hindsight` | architxt + SQLite + Docling + Hindsight | You want the full stack: documents + long-term memory. |
+|| Profile | What it starts | Use this when... |
+|---|---|---|---|
+|| *(none)* | architxt + SQLite | You only want the core app, no document parsing or memory. |
+|| `docling` | architxt + SQLite + Docling + Gotenberg | You want to upload and parse PDFs, Word docs, HTML pages, etc. |
+|| `hindsight` | architxt + SQLite + Docling + Gotenberg + Hindsight | You want the full stack: documents + long-term memory. |
 
 Start a profile with:
 
@@ -337,12 +391,32 @@ DOCLING_SERVICE_URL=http://192.168.1.205:5001 \
 
 See [Configuration: external Docling host](./configuration#using-an-external-docling-host-for-example-a-gpu-machine) for details.
 
-Docling sync operations time out after 1200 seconds (20 minutes) by default. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
+Docling sync operations time out after 1200 seconds (20 minutes) by default inside Docker Compose. To change this, set `DOCLING_SERVE_MAX_SYNC_WAIT` before running compose. This is read by Docker Compose at interpolation time, not from `server/.env`.
 
 ```bash
 DOCLING_SERVE_MAX_SYNC_WAIT=2400 \
   docker compose --profile hindsight up --build -d
 ```
+
+### Gotenberg in Docker Compose
+
+The `docling` and `hindsight` profiles start a Gotenberg container on port `3031`. architxt connects to it automatically at `http://gotenberg:3031` and you do not need to set `ARCHITXT_GOTENBERG_URL` in `server/.env` unless you want to override it.
+
+To disable Gotenberg preprocessing for a specific format, set the matching variable in `server/.env`:
+
+```bash
+ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=false
+ARCHITXT_CONVERT_HTML_TO_PDF=false
+```
+
+If you prefer to run Gotenberg outside Docker Compose, override the URL at compose interpolation time:
+
+```bash
+ARCHITXT_GOTENBERG_URL=http://192.168.1.205:3031 \
+  docker compose --profile hindsight up --build -d
+```
+
+See [Configuration: external Gotenberg host](./configuration#external-gotenberg-host) for details.
 
 ### 4. Open the UI
 
@@ -382,6 +456,7 @@ Use this if you are changing architxt's code.
 - Node.js ≥ 22
 - npm 10+
 - A Docling server if you want PDF parsing (see [Prerequisites](./prerequisites))
+- A Gotenberg server on port `3031` if you want `.doc`/`.docx`/`.html` preprocessing
 - A Hindsight server URL and API token if you want memory
 
 ### Clone and install
@@ -597,6 +672,50 @@ SQLite is used via `better-sqlite3`. The schema is created automatically on firs
 | `ARCHITXT_TEMP_DIR` | `./tmp` | Temporary directory used during extraction. |
 | `ARCHITXT_MAX_FILE_SIZE` | `104857600` | Maximum upload size in bytes (default is 100 MB). |
 
+## Document preprocessing
+
+Before Docling parses a document, architxt can optionally route certain formats through [Gotenberg](https://gotenberg.dev/) to convert them to PDF. This step is automatic and falls back to the original file if Gotenberg is unreachable, disabled, or returns an error.
+
+### Gotenberg
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_GOTENBERG_URL` | `http://localhost:3031` | URL of the Gotenberg service. In the `docling` and `hindsight` Docker Compose profiles this is overridden to `http://gotenberg:3031`. |
+| `ARCHITXT_CONVERT_DOC_DOCX_TO_PDF` | `true` | Convert `.doc` and `.docx` files to PDF via Gotenberg before sending them to Docling. |
+| `ARCHITXT_CONVERT_HTML_TO_PDF` | `true` | Convert `.html` and `.htm` files to PDF via Gotenberg before sending them to Docling. |
+| `ARCHITXT_CONVERT_PPT_PPTX_TO_PDF` | `true` | Convert `.ppt` and `.pptx` files to PDF via Gotenberg before sending them to Docling. |
+
+### When to enable or disable preprocessing
+
+- **Word documents** — Keep `ARCHITXT_CONVERT_DOC_DOCX_TO_PDF=true` when Word files contain embedded WMF/EMF diagrams, or when the direct Docling path produces missing or badly rendered images. If you process plain text-only Word files, you can set this to `false` for faster extraction.
+- **HTML pages** — Keep `ARCHITXT_CONVERT_HTML_TO_PDF=true` when HTML contains inline or remote images that Docling reports as `Image not available` placeholders. Set to `false` if the HTML is mostly text and you prefer the faster direct path.
+- **PowerPoint presentations** — Keep `ARCHITXT_CONVERT_PPT_PPTX_TO_PDF=true` when `.ppt` or `.pptx` files fail to extract, render poorly, or lose slide images in Docling. Legacy `.ppt` binaries in particular often extract better after conversion to PDF. Set to `false` if you process simple text slides and prefer the direct path.
+
+### Fallback behaviour
+
+Preprocessing is a best-effort pass. If the Gotenberg request fails, times out, or returns a non-PDF response, architxt logs a warning and sends the original Word, HTML, or PowerPoint file directly to Docling. Extraction therefore continues even when Gotenberg is misconfigured or offline.
+
+### External Gotenberg host
+
+If you run Gotenberg on another machine, override the URL at Docker Compose interpolation time:
+
+```bash
+ARCHITXT_GOTENBERG_URL=http://192.168.1.205:3031 \
+  docker compose --profile hindsight up -d
+```
+
+Verify the override was applied:
+
+```bash
+docker compose exec architxt printenv ARCHITXT_GOTENBERG_URL
+```
+
+Expected output:
+
+```text
+http://192.168.1.205:3031
+```
+
 ## Docling
 
 | Variable | Default | Purpose |
@@ -719,6 +838,7 @@ You can override the built-in diagram-description prompts that are sent to the v
 | `ARCHITXT_DENOISE_LLM_PROVIDER` | `ollama_cloud` | Provider name for denoise calls. |
 | `ARCHITXT_DENOISE_LLM_MODEL` | `gpt-oss:20b-cloud` | Model used for LLM denoising. |
 | `ARCHITXT_DENOISE_LLM_TIMEOUT_MS` | `600000` | Request timeout in milliseconds (10 minutes). |
+| `ARCHITXT_DENOISE_LLM_CHUNK_SIZE` | `4000` | Target chunk size in characters for splitting long documents before sending them to the LLM. |
 | `ARCHITXT_DENOISE_LLM_PROMPT` | *(built-in)* | Custom task prompt override. |
 | `ARCHITXT_DENOISE_LLM_SYSTEM_PROMPT` | *(built-in)* | Custom system prompt override. |
 | `ARCHITXT_DENOISE_LLM_TEMPERATURE` | `0.1` | Sampling temperature. |
@@ -4048,43 +4168,90 @@ The raw properties stored for this entity or edge, excluding provenance and lega
 
 The **Export** button sits on the same row as the graph search bar and the node/edge count. Clicking it opens a dialog where you choose how to download the current bank's contextual graph.
 
-| Option | What it controls |
-|---|---|
-| **Format** | The export file format. |
-| **Filename base** | An optional prefix for the downloaded files. If you leave this blank, architxt uses the bank name and today's date. |
-| **Undirected edges only** | When checked, the export contains only edges explicitly marked as undirected. |
+|| Option | What it controls |
+|---|---|---|
+|| **Format** | The export file format. |
+|| **Filename base** | An optional prefix for the downloaded files. If you leave this blank, architxt uses the bank name and today's date. |
+|| **Undirected edges only** | When checked, the export contains only edges explicitly marked as undirected. |
+|| **Entity Content** *(JSON only)* | When checked, every mental-model ref attached to a node is expanded with its normalized envelope content. |
+|| **Edge Content** *(JSON only)* | When checked, every mental-model ref attached to a grounded co-occurrence edge is expanded with its normalized envelope content. Other edges are left unchanged. |
+
+:::tip[Entity Content and Edge Content are JSON-only]
+The two content checkboxes are only available when **Format** is set to **JSON**. They are disabled for all other export formats because those formats do not carry mental-model `model_refs` in a way that can meaningfully include full envelope content.
+:::
+
+### Embedded mental-model content
+
+When **Entity Content** is enabled, each node `properties.provenance.model_refs[]` entry gains a `content` field containing the normalized envelope of the referenced Hindsight mental model. The envelope follows the standard architxt shape — `narratives`, `graph`, `tables`, and `diagrams` — and is produced by `toEnvelopeWithFallback` from the model's `reflect_response`.
+
+When **Edge Content** is enabled, the same `content` field is added to `model_refs` on grounded co-occurrence edges (edges whose `properties.labels` contains `'grounded'`). Non-grounded edges keep their `model_refs` but receive no `content` field, so their mental models are not fetched.
+
+If a referenced model cannot be fetched, the `content` field is set to `null` and the export continues. Each referenced model is fetched individually, so large graphs with many attached models may take longer to export when these options are enabled.
 
 ### Supported formats
 
-| Format | Download |
-|---|---|
-| **JSON** | A single `.json` file containing the nodes, edges, and export metadata. |
-| **GraphML** | A single `.graphml` file for tools that support the GraphML format. |
-| **GEXF** | A single `.gexf` file for Gephi and other GEXF-compatible tools. |
-| **Cypher** | A single `.cypher` file containing Neo4j-flavoured Cypher statements. |
-| **CSV** | Two files: `nodes.csv` and `edges.csv`. The node file has an `id` and `labels` column plus any stored properties; the edge file has `id`, `source_id`, `target_id`, `type`, and `directed` columns plus any stored properties. |
-| **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
-| **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
-| **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
+|| Format | Download |
+|---|---|---|
+|| **JSON** | A single `.json` file containing the nodes, edges, export metadata, and (optionally) embedded mental-model envelope content. |
+|| **GraphML** | A single `.graphml` file for tools that support the GraphML format. |
+|| **GEXF** | A single `.gexf` file for Gephi and other GEXF-compatible tools. |
+|| **Cypher** | A single `.cypher` file containing Neo4j-flavoured Cypher statements. |
+|| **CSV** | Two files: `nodes.csv` and `edges.csv`. The node file has an `id` and `labels` column plus any stored properties; the edge file has `id`, `source_id`, `target_id`, `type`, and `directed` columns plus any stored properties. |
+|| **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
+|| **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
+|| **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
 
 ### API filtering
 
 The export dialog calls the `/contextual-graph/export` endpoint. The same endpoint can be used directly with the following query parameters:
 
-| Parameter | Effect |
-|---|---|
-| `server_id` *(required)* | The Hindsight server to export from. |
-| `bank_id` *(required)* | The bank to export from. |
-| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
-| `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
-| `id_prefix` | Include only nodes whose ID starts with this prefix. |
-| `ids` | Comma-separated list of exact node IDs to include. |
-| `source_id` | Include only edges that originate from this node ID. |
-| `target_id` | Include only edges that point to this node ID. |
-| `type` | Include only edges of this relationship type. Pass an empty value to match untyped edges. |
-| `undirected` | `true` to include only edges explicitly marked as undirected. |
+|| Parameter | Effect |
+|---|---|---|
+|| `server_id` *(required)* | The Hindsight server to export from. |
+|| `bank_id` *(required)* | The bank to export from. |
+|| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
+|| `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
+|| `id_prefix` | Include only nodes whose ID starts with this prefix. |
+|| `ids` | Comma-separated list of exact node IDs to include. |
+|| `source_id` | Include only edges that originate from this node ID. |
+|| `target_id` | Include only edges that point to this node ID. |
+|| `type` | Include only edges of this relationship type. Pass an empty value to match untyped edges. |
+|| `undirected` | `true` to include only edges explicitly marked as undirected. |
+|| `include_entity_content` | `true` to embed normalized mental-model envelope content in every node `model_refs` entry. JSON format only. |
+|| `include_edge_content` | `true` to embed normalized mental-model envelope content in grounded co-occurrence edge `model_refs` entries. JSON format only. |
 
 When any node selector is used (`labels`, `id_prefix`, or `ids`), the export trims the edge list to edges whose source and target are both in the returned node set, so the download stays a coherent subgraph.
+
+### Example JSON output with content enabled
+
+```json
+,
+  "nodes": [
+    ],
+                "graph": ,
+                "tables": [],
+                "diagrams": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "edges": [
+    ],
+                "graph": ,
+                "tables": [],
+                "diagrams": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
 
 ## How the Graph tab relates to the others
 

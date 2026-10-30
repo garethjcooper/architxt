@@ -101,7 +101,7 @@ export function graphToTableRows(
   edgeColumnFilter?: string[],
 ) {
   const nodeColumns = ['id', 'type', 'label', 'name'];
-  const allEdgeColumns = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'properties', 'evidence'];
+  const allEdgeColumns = ['from_name', 'to_name', 'from', 'to', 'type', 'label', 'detail', 'evidence', 'protocol', 'format', 'auth', 'encryption'];
   const edgeColumns = edgeColumnFilter?.length
     ? allEdgeColumns.filter((c) => edgeColumnFilter.includes(c))
     : allEdgeColumns;
@@ -122,7 +122,10 @@ export function graphToTableRows(
       type: e.type || '',
       label: e.label || '',
       detail: e.detail || '',
-      properties: e.properties ? JSON.stringify(e.properties) : '',
+      protocol: e.properties?.protocol ? String(e.properties.protocol) : '',
+      format: e.properties?.format ? String(e.properties.format) : '',
+      auth: e.properties?.auth ? String(e.properties.auth) : '',
+      encryption: e.properties?.encryption ? String(e.properties.encryption) : '',
       evidence: Array.isArray(e.evidence) ? e.evidence.join(', ') : '',
     };
     return edgeColumns.reduce((acc, col) => {
