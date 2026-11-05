@@ -54,11 +54,17 @@ export function extractFinalOutputs(provenanceLog) {
 
 /**
  * Get pipeline definition for extract workflow
- * Stages are conditionally included based on their enabled config flag.
+ * Stages are conditionally included based on global config and per-document
+ * processing_options overrides. The `doc` parameter is optional and defaults
+ * to an empty object when callers don't have a document instance.
  *
+ * @param {Object} doc - Document row (may include doc_processing_options)
  * @returns {Object} Pipeline definition with stages array
  */
-export function getExtractPipelineDefinition() {
+export function getExtractPipelineDefinition(doc = {}) {
+  const options = doc.doc_processing_options || {};
+  const stageOverrides = options.stages || {};
+
   const stages = [
     // Stage 1: Source file extraction (always present)
     {
@@ -70,7 +76,7 @@ export function getExtractPipelineDefinition() {
   ];
 
   // Stage 2: Text cleaning (rule-based denoise)
-  if (config.document_denoise.enabled) {
+  if (stageOverrides.denoise ?? config.document_denoise.enabled) {
     stages.push({
       stage: 'denoise',
       config: { document_denoise: config.document_denoise },
@@ -80,7 +86,7 @@ export function getExtractPipelineDefinition() {
   }
 
   // Stage 3: LLM-based denoise
-  if (config.document_denoise_llm.enabled) {
+  if (stageOverrides['denoise-llm'] ?? config.document_denoise_llm.enabled) {
     stages.push({
       stage: 'denoise-llm',
       config: { document_denoise_llm: config.document_denoise_llm },
@@ -90,7 +96,7 @@ export function getExtractPipelineDefinition() {
   }
 
   // Stage 4: Image analysis / vision
-  if (config.diagram_description.enabled) {
+  if (stageOverrides.vision ?? config.diagram_description.enabled) {
     stages.push({
       stage: 'vision',
       config: { diagram_description: config.diagram_description },
@@ -106,6 +112,24 @@ export function getExtractPipelineDefinition() {
 }
 
 /**
+ * Resolve extract stage names for a given document.
+ * Mirrors the per-document override logic in getExtractPipelineDefinition.
+ *
+ * @param {Object} doc - Document row
+ * @returns {string[]} Stage names
+ */
+export function getStageNames(doc = {}) {
+  const options = doc.doc_processing_options || {};
+  const overrides = options.stages || {};
+
+  const names = ['extract'];
+  if (overrides.denoise ?? config.document_denoise.enabled) names.push('denoise');
+  if (overrides['denoise-llm'] ?? config.document_denoise_llm.enabled) names.push('denoise-llm');
+  if (overrides.vision ?? config.diagram_description.enabled) names.push('vision');
+  return names;
+}
+
+/**
  * Process a single document using v3 pipeline
  * 
  * @param {Object} doc - Document object with id, filename, etc
@@ -115,8 +139,8 @@ export function getExtractPipelineDefinition() {
 export async function processDocument(doc, abortSignal) {
   logger.info('Processing document', { docId: doc.id, filename: doc.filename });
 
-  // Build pipeline configuration with document-specific data
-  const pipelineDef = getExtractPipelineDefinition();
+  // Build pipeline configuration with document-specific data and stage overrides
+  const pipelineDef = getExtractPipelineDefinition(doc);
   
   // Populate stage data with document info
   pipelineDef.stages.forEach(stage => {
@@ -179,16 +203,4 @@ export async function processDocument(doc, abortSignal) {
       images: []
     };
   }
-}
-
-/**
- * Get stage names for the extract pipeline
- * Reflects the current config's enabled stages.
- */
-export function getStageNames() {
-  const names = ['extract'];
-  if (config.document_denoise.enabled) names.push('denoise');
-  if (config.document_denoise_llm.enabled) names.push('denoise-llm');
-  if (config.diagram_description.enabled) names.push('vision');
-  return names;
 }

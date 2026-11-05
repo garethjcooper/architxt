@@ -172,6 +172,17 @@ All provider settings are read from `server/.env`. The backend registers four na
 | `ARCHITXT_OPENAI_TIMEOUT_MS` | `60000` | Request timeout in milliseconds. |
 | `ARCHITXT_OPENAI_CHAT_STYLE` | `openai` | Chat adapter style. |
 
+### OpenAI Responses API
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_OPENAI_RESPONSES_URL` | `https://api.openai.com/v1/responses` | OpenAI Responses API endpoint. |
+| `ARCHITXT_OPENAI_RESPONSES_API_KEY` | *(empty)* | Your API key. Set in `.env`. |
+| `ARCHITXT_OPENAI_RESPONSES_DEFAULT_MODEL` | `gpt-6-luna` | Default model when this provider is selected. |
+| `ARCHITXT_OPENAI_RESPONSES_TIMEOUT_MS` | `60000` | Request timeout in milliseconds. |
+| `ARCHITXT_OPENAI_CHAT_RESPONSES_STYLE` | `openai` | Chat adapter style. |
+| `ARCHITXT_OPENAI_RESPONSES_REASONING_EFFORT` | `high` | Reasoning effort level (OpenAI Responses API `reasoning_effort`). |
+
 ### Anthropic
 
 | Variable | Default | Purpose |

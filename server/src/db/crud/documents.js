@@ -6,7 +6,7 @@ import { upsertFtsDocument, deleteFtsDocument } from '../../services/search/full
 
 const TABLE = 'documents';
 const PK = 'doc_id';
-const JSON_FIELDS = ['doc_processing_history', 'doc_processing_progress', 'doc_tags', 'doc_metadata', 'doc_context', 'doc_content_blocks'];
+const JSON_FIELDS = ['doc_processing_history', 'doc_processing_progress', 'doc_tags', 'doc_metadata', 'doc_context', 'doc_content_blocks', 'doc_processing_options'];
 
 const base = createBaseCrud(TABLE, PK, JSON_FIELDS);
 
@@ -99,6 +99,7 @@ export const listDocuments = (db, options = {}) => dbExec(() => {
     SELECT d.doc_id, d.doc_ext_id, d.doc_status, d.doc_content_hash,
       d.doc_source_path, d.doc_filename, d.doc_authors, d.doc_generated_by, d.ctxt_id,
       d.doc_processing_progress, d.doc_processing_history,
+      d.doc_processing_options,
       d.doc_timestamp, d.doc_created_at, d.doc_updated_at,
       ROUND(LENGTH(d.doc_content) / 1000.0, 1) AS doc_content_length_k,
       CASE WHEN ${getSqlPresenceExpression('d.doc_content')} THEN 1 ELSE 0 END AS doc_has_entities,

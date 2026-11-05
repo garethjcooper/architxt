@@ -10,16 +10,57 @@ import { denoiseText } from '../../services/llm/stage-service.js';
 
 const logger = createLogger('stage-denoise-llm');
 
+// Tunable chunking constants. Kept in one place so they can later be moved to
+// environment variables without scattering magic numbers through the algorithm.
+// The base chunk size itself comes from config.document_denoise_llm.chunk_size
+// (env ARCHITXT_DENOISE_LLM_CHUNK_SIZE), so only the new controls live here.
+const HARD_CAP_MULTIPLIER = 1.5;
+const MAX_LINES_PER_CHUNK = 200;
+
+/**
+ * Find the best split index inside `currentChunk` for a forced break.
+ * Prefers, in order: Markdown headings, blank lines, lines ending in sentence
+ * punctuation. Returns the index (0..currentChunk.length) where the chunk
+ * should be cut; content from splitIdx onward moves to the next chunk.
+ *
+ * @param {string[]} currentChunk
+ * @returns {number}
+ */
+function findBestSplitIndex(currentChunk) {
+  for (let j = currentChunk.length - 1; j >= 0; j--) {
+    if (currentChunk[j].match(/^#{1,6}\s+/)) {
+      return j;
+    }
+  }
+  for (let j = currentChunk.length - 1; j > 0; j--) {
+    if (currentChunk[j].trim() === '') {
+      return j;
+    }
+  }
+  for (let j = currentChunk.length - 1; j > 0; j--) {
+    if (/[.!?]\s*$/.test(currentChunk[j])) {
+      return j + 1;
+    }
+  }
+  return currentChunk.length;
+}
+
 /**
  * Chunk markdown by line, trying to keep headings with their following content.
- * Splitting respects heading boundaries where possible.
+ * Splitting respects heading boundaries where possible, and falls back to
+ * blank lines, sentence boundaries, or a hard cap to avoid unbounded growth on
+ * flat inputs such as raw logs.
  *
  * @param {string} text - Markdown text
- * @param {number} maxSize - Maximum target chunk size in characters
+ * @param {number} targetSize - Target chunk size in characters
  * @returns {string[]} Array of markdown chunks
  */
-function chunkMarkdown(text, maxSize = 4000) {
+function chunkMarkdown(text, targetSize) {
+  if (!Number.isInteger(targetSize) || targetSize <= 0) {
+    throw new TypeError('chunkMarkdown targetSize must be a positive integer');
+  }
   const chunks = [];
+  const hardCap = Math.floor(targetSize * HARD_CAP_MULTIPLIER);
 
   let content = text.replace(/^---[\s\S]*?---\n*/, '');
   const lines = content.split('\n');
@@ -36,33 +77,54 @@ function chunkMarkdown(text, maxSize = 4000) {
   let currentChunk = [];
   let currentSize = 0;
 
+  function emitChunk(upToIndex) {
+    const chunk = currentChunk.slice(0, upToIndex).join('\n');
+    if (chunk.trim()) chunks.push(chunk);
+    currentChunk = currentChunk.slice(upToIndex);
+    currentSize = currentChunk.reduce((sum, l) => sum + l.length + 1, 0);
+  }
+
   for (let i = 0; i < validLines.length; i++) {
     const line = validLines[i];
     const lineSize = line.length + 1;
 
-    if (currentSize + lineSize > maxSize) {
-      let splitIdx = currentChunk.length;
-      for (let j = currentChunk.length - 1; j >= 0; j--) {
-        if (currentChunk[j].match(/^#{1,6}\s+/)) {
-          splitIdx = j;
-          break;
-        }
+    // If a single line is already larger than the hard cap, isolate it as its
+    // own chunk rather than allowing it into the accumulator. The chunk may
+    // still exceed the cap, but this preserves line integrity (important for
+    // XML/JSON-like records) while preventing it from merging with other lines.
+    if (line.length > hardCap) {
+      // Flush any pending content first so it doesn't inherit the giant line.
+      if (currentChunk.length > 0) {
+        emitChunk(findBestSplitIndex(currentChunk));
       }
+      if (line.trim()) chunks.push(line);
+      currentSize = 0;
+      continue;
+    }
 
-      const chunk = currentChunk.slice(0, splitIdx).join('\n');
-      if (chunk.trim()) chunks.push(chunk);
+    // Soft-target split: adding this line would exceed the target size.
+    if (currentSize + lineSize > targetSize && currentChunk.length > 0) {
+      emitChunk(findBestSplitIndex(currentChunk));
+    }
 
-      currentChunk = currentChunk.slice(splitIdx);
-      currentChunk.push(line);
-      currentSize = currentChunk.reduce((sum, l) => sum + l.length + 1, 0);
-    } else {
-      currentChunk.push(line);
-      currentSize += lineSize;
+    currentChunk.push(line);
+    currentSize += lineSize;
+
+    // Hard-cap / max-lines safety valves: guarantee a bounded chunk even when
+    // the input has no headings, blank lines, or sentence boundaries.
+    if (currentSize > hardCap || currentChunk.length >= MAX_LINES_PER_CHUNK) {
+      const splitIdx = findBestSplitIndex(currentChunk);
+      // Avoid emitting nothing when the whole current chunk is one giant line.
+      const effectiveSplit = splitIdx === 0 && currentChunk[0] && currentChunk[0].length > hardCap
+        ? 1
+        : splitIdx;
+      emitChunk(effectiveSplit);
     }
   }
 
   if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join('\n'));
+    const chunk = currentChunk.join('\n');
+    if (chunk.trim()) chunks.push(chunk);
   }
 
   return chunks;

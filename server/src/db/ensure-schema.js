@@ -1450,6 +1450,15 @@ function migrateAgentChatThreads(db) {
 function ensureMissingColumns(db) {
   const migrations = [
     {
+      table: 'documents',
+      columns: [
+        {
+          name: 'doc_processing_options',
+          ddl: 'ALTER TABLE documents ADD COLUMN doc_processing_options JSON'
+        }
+      ]
+    },
+    {
       table: 'servers',
       columns: [
         {

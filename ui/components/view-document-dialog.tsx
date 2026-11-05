@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2, ChevronDown, Check, FileText, Clock, ArrowRight, ChevronRight, ChevronUp, Calendar as CalendarIcon, X, Sparkles, AlertCircle } from 'lucide-react';
 import { ArchitxtIcon } from './icons/architxt-icon';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
-import { documentsApi, type Document, type Metadata } from '@/lib/api/client';
+import { Switch } from '@/components/ui/switch';
+import { documentsApi, type Document, type Metadata, configApi, type SettingsSnapshot } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -97,6 +98,20 @@ export function ViewDocumentDialog({
   const [authors, setAuthors] = useState<string[]>([]);
   const [authorInput, setAuthorInput] = useState('');
 
+  // Processing options state (extract always enabled; denoise/denoise-llm/vision override global config)
+  const [extractEnabled, setExtractEnabled] = useState(true);
+  const [denoiseEnabled, setDenoiseEnabled] = useState(true);
+  const [denoiseLlmEnabled, setDenoiseLlmEnabled] = useState(true);
+  const [visionEnabled, setVisionEnabled] = useState(true);
+
+  // Global stage availability from server config
+  const [globalStages, setGlobalStages] = useState({
+    extract: true,
+    denoise: true,
+    'denoise-llm': true,
+    vision: true,
+  });
+
   // Tab state
   const [activeTab, setActiveTab] = useState<'content' | 'history' | 'expandedMetadata'>('content');
 
@@ -134,15 +149,49 @@ export function ViewDocumentDialog({
     }
   }, [open]);
 
+  // Load global stage availability when the dialog opens or the document changes
   useEffect(() => {
-    if (document) {
-      setExtId(document.ext_id || '');
-      setTimestamp(document.timestamp || '');
-      setFullPath(document.full_path || '');
-      setAuthors(document.authors || []);
-      setAuthorInput('');
-    }
-  }, [document, open]);
+    if (!open || !document) return;
+
+    let cancelled = false;
+    configApi
+      .settings()
+      .then((settings: SettingsSnapshot) => {
+        if (cancelled) return;
+        const prompts = settings.prompts;
+        const isEnabled = (section: { enabled?: { value: boolean | '—'; envVar: string } } | null | undefined) =>
+          section?.enabled?.value === true;
+        setGlobalStages({
+          extract: true,
+          denoise: isEnabled(prompts?.document_denoise),
+          'denoise-llm': isEnabled(prompts?.document_denoise_llm),
+          vision: isEnabled(prompts?.diagram_description),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Keep defaults (all enabled) so the UI remains usable on error
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, document?.id]);
+
+  useEffect(() => {
+    if (!document) return;
+    setExtId(document.ext_id || '');
+    setTimestamp(document.timestamp || '');
+    setFullPath(document.full_path || '');
+    setAuthors(document.authors || []);
+    setAuthorInput('');
+    const opts = document.processing_options || {};
+    const stages = opts.stages || {};
+    setExtractEnabled(true);
+    setDenoiseEnabled(globalStages.denoise && stages.denoise !== false);
+    setDenoiseLlmEnabled(globalStages['denoise-llm'] && stages['denoise-llm'] !== false);
+    setVisionEnabled(globalStages.vision && stages.vision !== false);
+  }, [document, open, globalStages]);
 
   // Fetch document content when dialog opens
   useEffect(() => {
@@ -220,7 +269,22 @@ export function ViewDocumentDialog({
     extId !== (document.ext_id || '') ||
     timestamp !== (document.timestamp || '') ||
     fullPath !== (document.full_path || '') ||
-    JSON.stringify(authors) !== JSON.stringify(document.authors || []);
+    JSON.stringify(authors) !== JSON.stringify(document.authors || []) ||
+    denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
+    denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
+    visionEnabled !== (document.processing_options?.stages?.vision !== false);
+
+  const buildProcessingOptions = () => {
+    const opts: NonNullable<Document['processing_options']> = {
+      stages: {
+        extract: true,
+        denoise: globalStages.denoise ? denoiseEnabled : true,
+        'denoise-llm': globalStages['denoise-llm'] ? denoiseLlmEnabled : true,
+        vision: globalStages.vision ? visionEnabled : true,
+      },
+    };
+    return opts;
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -242,6 +306,12 @@ export function ViewDocumentDialog({
       const authorsChanged = JSON.stringify(authors) !== JSON.stringify(document.authors || []);
       if (authorsChanged) {
         updates.authors = authors.length > 0 ? authors : null;
+      }
+
+      if (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
+          denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
+          visionEnabled !== (document.processing_options?.stages?.vision !== false)) {
+        updates.processing_options = buildProcessingOptions();
       }
 
       if (Object.keys(updates).length > 0) {
@@ -477,6 +547,7 @@ export function ViewDocumentDialog({
                 </div>
               </div>
             </div>
+
             <div className="space-y-3 pt-2 border-t border-border-default">
               {/* Row 1: ID, Generated By, Created */}
               <div className="grid grid-cols-3 gap-4">
@@ -553,6 +624,47 @@ export function ViewDocumentDialog({
                 ) : (
                   <span className="text-sm text-foreground-subtle italic">-</span>
                 )}
+              </div>
+
+              {/* Processing Options */}
+              <div className="pt-1">
+                <p className="text-xs uppercase text-foreground-subtle font-medium mb-2">Processing Options</p>
+                <p className="text-[11px] text-foreground-faint mb-2">
+                  Override extract pipeline stages for this document. Extract is always run. Stages disabled globally in server config cannot be toggled here.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.denoise ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                    <span className="text-sm text-foreground-default">Denoise</span>
+                    <Switch
+                      checked={denoiseEnabled}
+                      onCheckedChange={(checked) => setDenoiseEnabled(Boolean(checked))}
+                      disabled={!globalStages.denoise}
+                      size="sm"
+                    />
+                  </label>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages['denoise-llm'] ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                    <span className="text-sm text-foreground-default">Denoise LLM</span>
+                    <Switch
+                      checked={denoiseLlmEnabled}
+                      onCheckedChange={(checked) => setDenoiseLlmEnabled(Boolean(checked))}
+                      disabled={!globalStages['denoise-llm']}
+                      size="sm"
+                    />
+                  </label>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.vision ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                    <span className="text-sm text-foreground-default">Vision</span>
+                    <Switch
+                      checked={visionEnabled}
+                      onCheckedChange={(checked) => setVisionEnabled(Boolean(checked))}
+                      disabled={!globalStages.vision}
+                      size="sm"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 cursor-not-allowed opacity-60">
+                    <span className="text-sm text-foreground-default">Extract</span>
+                    <Switch checked={true} disabled size="sm" />
+                  </label>
+                </div>
               </div>
             </div>
           </div>

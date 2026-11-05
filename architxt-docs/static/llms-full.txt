@@ -796,6 +796,17 @@ All provider settings are read from `server/.env`. The backend registers four na
 | `ARCHITXT_OPENAI_TIMEOUT_MS` | `60000` | Request timeout in milliseconds. |
 | `ARCHITXT_OPENAI_CHAT_STYLE` | `openai` | Chat adapter style. |
 
+### OpenAI Responses API
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_OPENAI_RESPONSES_URL` | `https://api.openai.com/v1/responses` | OpenAI Responses API endpoint. |
+| `ARCHITXT_OPENAI_RESPONSES_API_KEY` | *(empty)* | Your API key. Set in `.env`. |
+| `ARCHITXT_OPENAI_RESPONSES_DEFAULT_MODEL` | `gpt-6-luna` | Default model when this provider is selected. |
+| `ARCHITXT_OPENAI_RESPONSES_TIMEOUT_MS` | `60000` | Request timeout in milliseconds. |
+| `ARCHITXT_OPENAI_CHAT_RESPONSES_STYLE` | `openai` | Chat adapter style. |
+| `ARCHITXT_OPENAI_RESPONSES_REASONING_EFFORT` | `high` | Reasoning effort level (OpenAI Responses API `reasoning_effort`). |
+
 ### Anthropic
 
 | Variable | Default | Purpose |
@@ -1641,6 +1652,7 @@ The documents table in the architxt UI surfaces the most important facts about e
 | **Document ID** | Internal architxt identifier. | Used throughout the UI and API to refer to the document. |
 | **External ID** | Stable identifier you supply during upload or import. | Maps to Hindsight's [`document_id`](https://hindsight.vectorize.io/developer/api/retain#document_id), so the same id can survive re-imports. |
 | **Status** | Current lifecycle state such as **Uploaded**, **Extracting**, or **Extracted**. | Tells you whether the document is ready to use or still being processed. |
+| **Overrides** | Caution badges for any processing stage explicitly disabled in **Document Details**. | Shows at a glance which documents deviate from the default extraction pipeline. |
 | **Document Content** | Extracted Markdown representation of the file. | The material the contextual graph, mental models, and Reflect operate on. |
 | **Content Hash** | `sha256` fingerprint of the extracted content. | Lets architxt detect when content has changed and avoid duplicate work. |
 | **Full Path** | Stored location of the original file. | Used for re-download, re-processing, and integrity checks. |
@@ -1737,6 +1749,23 @@ If a daemon crashes while a document is `processing_extract`, the next daemon st
 | `request_release` | Daemon releases | `uploaded` or `processed_extract_success` |
 | `processing_extract` | Daemon releases | `uploaded` or `processed_extract_success` |
 | `processing_extract` | Orphan reconciliation | `uploaded` |
+
+## Processing Options
+
+The extraction pipeline normally runs every configured stage for every document. In the **Document Details** dialog you can override that default per document by enabling or disabling individual **Processing Stages**:
+
+| Stage | Default | What it does |
+|---|---|---|
+| **Extract** | Always on | Reads the source file and produces the Markdown representation. This stage cannot be disabled. |
+| **Denoise** | On | Removes extraction artifacts such as repeated headers, page numbers, and boilerplate. |
+| **Denoise LLM** | On | Uses an LLM pass for deeper cleanup of badly extracted or noisy documents. |
+| **Vision** | On | Extracts text, diagrams, and other structured content from embedded images. |
+
+A disabled stage appears as a caution badge in the **Overrides** column of the documents table. The badge is only shown when the stage is explicitly turned off for that document; default behavior is not badged.
+
+When a stage is disabled, the extraction daemon skips it while still running the remaining stages in order. For example, disabling **Denoise LLM** keeps the standard **Denoise** stage but skips the LLM pass. Disabling **Vision** means architxt will not extract text or diagrams from images inside the document.
+
+You can clear overrides by toggling all stages back on in **Document Details**. Re-queueing the document re-runs extraction with the saved overrides still applied.
 
 ## Processing History
 

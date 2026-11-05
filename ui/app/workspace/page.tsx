@@ -45,6 +45,7 @@ import { WorkspaceResultPanel } from './_components/workspace-result-panel';
 import { AgentChatPanel } from './_components/agent-chat-panel';
 
 import { useWorkspaceSession } from './_components/use-workspace-session';
+import { buildQueryOptionsFromParameters, type ResearchQueryOptions } from '@/app/research-shared/use-research-session';
 
 import { CuratedPageTabs, type WorkspaceTab, ANCHOR_TAB_ID, makeAnchorTab, generateNewPageName } from './_components/curated-page-tabs';
 import { CuratedPageEnvelope } from './_components/curated-page-editor';
@@ -1063,8 +1064,12 @@ export default function WorkspacePage() {
 
   const handleReuseStep = useCallback((step: ResearchStepSummary) => {
     setReflectQuery(step.raw_query || step.intent_text || '');
+    if (step.parameters) {
+      const restoredOptions = buildQueryOptionsFromParameters(step.action_type, step.parameters);
+      workspaceSession.setQueryOptions((prev) => ({ ...prev, ...restoredOptions }));
+    }
     toast.success('Query copied to Reflect input');
-  }, []);
+  }, [workspaceSession.setQueryOptions]);
 
   const handleInspectStep = useCallback((step: ResearchStepSummary) => {
     setInspectingStep(step);

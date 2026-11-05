@@ -36,6 +36,7 @@ export interface Document {
     reason?: string;
   }> | null;
   processing_progress: Record<string, unknown> | null;
+  processing_options: DocumentProcessingOptions | null;
   tags: Array<{ id: number; name: string }>;
   metadata: Array<{ id: number; key: string; value: string | null }>;
   content_length_k: number | null;
@@ -43,6 +44,15 @@ export interface Document {
   timestamp: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DocumentProcessingOptions {
+  stages?: {
+    extract?: boolean;
+    denoise?: boolean;
+    'denoise-llm'?: boolean;
+    vision?: boolean;
+  };
 }
 
 export interface Context {

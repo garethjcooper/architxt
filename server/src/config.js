@@ -53,6 +53,14 @@ export const providers = {
     timeout_ms: getInt('ARCHITXT_OPENAI_TIMEOUT_MS', 60000),
     chat_style: getEnv('ARCHITXT_OPENAI_CHAT_STYLE', 'openai')
   },
+  openai_responses: {
+    base_url: getEnv('ARCHITXT_OPENAI_RESPONSES_URL', 'https://api.openai.com/v1/responses'),
+    api_key: getEnv('ARCHITXT_OPENAI_RESPONSES_API_KEY', ''),
+    default_model: getEnv('ARCHITXT_OPENAI_RESPONSES_DEFAULT_MODEL', 'gpt-6-luna'),
+    timeout_ms: getInt('ARCHITXT_OPENAI_RESPONSES_TIMEOUT_MS', 60000),
+    chat_style: getEnv('ARCHITXT_OPENAI_CHAT_RESPONSES_STYLE', 'openai'),
+    reasoning_effort: getEnv('ARCHITXT_OPENAI_RESPONSES_REASONING_EFFORT', 'high')
+  },
   anthropic: {
     base_url: getEnv('ARCHITXT_ANTHROPIC_URL', 'https://api.anthropic.com/v1'),
     api_key: getEnv('ARCHITXT_ANTHROPIC_API_KEY', ''),

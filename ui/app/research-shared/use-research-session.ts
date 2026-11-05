@@ -133,7 +133,7 @@ export function buildDiscoverOptions(
   return {};
 }
 
-function buildQueryOptionsFromParameters(
+export function buildQueryOptionsFromParameters(
   actionType: string,
   parameters: Record<string, any> | null,
 ): ResearchQueryOptions {

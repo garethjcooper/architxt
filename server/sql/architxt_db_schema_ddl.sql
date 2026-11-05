@@ -38,6 +38,7 @@ CREATE TABLE documents (
   doc_processing_history JSON,
   doc_processing_progress JSON,
   doc_generated_by TEXT CHECK(doc_generated_by IN ('user', 'import')),
+  doc_processing_options JSON,
   doc_timestamp TEXT,
   doc_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   doc_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
