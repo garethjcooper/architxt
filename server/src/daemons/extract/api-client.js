@@ -189,7 +189,10 @@ export async function getDocument(docId) {
     return null;
   }
 
-  return result.data;
+  return {
+    ...result.data,
+    doc_processing_options: result.data.processing_options || {}
+  };
 }
 
 /**

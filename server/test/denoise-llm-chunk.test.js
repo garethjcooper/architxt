@@ -48,9 +48,46 @@ describe('chunkMarkdown', () => {
     assert.ok(chunks[0].startsWith('# Heading'));
   });
 
-  it('uses default chunk size of 4000 when maxSize is not provided', () => {
+  it('uses chunk size of 4000 when targetSize is 4000', () => {
     const text = 'A\n' + 'a'.repeat(5000);
-    const chunks = chunkMarkdown(text);
+    const chunks = chunkMarkdown(text, 4000);
     assert.equal(chunks.length, 2);
+  });
+
+  it('never emits chunks larger than the hard cap, even with no headings or blank lines', () => {
+    const text = Array.from({ length: 300 }, (_, i) => `Log entry ${i + 1} with some repetitive text here`).join('\n');
+    const chunks = chunkMarkdown(text, 100);
+    const hardCap = 150;
+    for (const chunk of chunks) {
+      assert.ok(chunk.length <= hardCap, `chunk length ${chunk.length} exceeds hard cap ${hardCap}`);
+    }
+  });
+
+  it('splits at a blank line when no heading is available', () => {
+    const lineA = 'Paragraph one has some text here that is long enough. ';
+    const lineB = 'Paragraph two has more text that is also long enough. ';
+    const text = `${lineA.repeat(3)}\n\n${lineB.repeat(3)}`;
+    const chunks = chunkMarkdown(text, 80);
+    assert.ok(chunks.length >= 2);
+    assert.ok(chunks[0].startsWith('Paragraph one'));
+    assert.ok(!chunks[0].includes('Paragraph two'));
+    assert.ok(chunks[1].startsWith('Paragraph two'));
+  });
+
+  it('isolates an over-long single line as its own chunk', () => {
+    const prefix = 'Short line.\n';
+    const giant = 'x'.repeat(500);
+    const text = prefix + giant;
+    const chunks = chunkMarkdown(text, 100);
+    assert.equal(chunks.length, 2);
+    assert.equal(chunks[1], giant);
+  });
+
+  it('forces a cut after 200 lines even when the hard cap is not reached', () => {
+    const text = Array.from({ length: 250 }, (_, i) => `l ${i + 1}`).join('\n');
+    const chunks = chunkMarkdown(text, 10000);
+    assert.ok(chunks.length >= 2, 'should have split by maxLines');
+    const firstChunkLines = chunks[0].split('\n').length;
+    assert.ok(firstChunkLines <= 200, `first chunk has ${firstChunkLines} lines`);
   });
 });

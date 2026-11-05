@@ -54,6 +54,17 @@ const upload = multer({
 
 const uploadMiddleware = createUploadMiddleware('file');
 
+function parseProcessingOptions(raw) {
+  if (!raw || raw === '') return null;
+  if (typeof raw === 'object' && raw !== null) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // DB → API name transform (content omitted for list — use GET /documents/:id for content)
 const toApiDocument = (dbRow) => ({
   id: dbRow.doc_id,
@@ -79,6 +90,7 @@ const toApiDocument = (dbRow) => ({
   context: dbRow.doc_context || null,
   processing_history: dbRow.doc_processing_history,
   processing_progress: dbRow.doc_processing_progress,
+  processing_options: dbRow.doc_processing_options || {},
   tags: dbRow.doc_tags || [],
   metadata: dbRow.doc_metadata || [],
   content_length_k: dbRow.doc_content_length_k || null,
@@ -526,7 +538,8 @@ router.post('/', uploadMiddleware, async (req, res) => {
     doc_status: 'uploaded',
     doc_source_path: 'UPLOADING',
     doc_filename: file.originalname,
-    doc_generated_by: 'user'
+    doc_generated_by: 'user',
+    doc_processing_options: parseProcessingOptions(req.body.processing_options)
   });
 
   if (!createResult.success) {
@@ -779,6 +792,13 @@ router.put('/:id', async (req, res) => {
     } else {
       return res.status(400).json({ error: 'authors must be an array or null', code: 'VALIDATION_ERROR' });
     }
+  }
+  if (req.body.processing_options !== undefined) {
+    const parsed = parseProcessingOptions(req.body.processing_options);
+    if (parsed === null && req.body.processing_options !== null) {
+      return res.status(400).json({ error: 'processing_options must be a JSON object or null', code: 'VALIDATION_ERROR' });
+    }
+    updateData.doc_processing_options = parsed;
   }
 
   if (Object.keys(updateData).length === 0) {

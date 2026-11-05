@@ -83,6 +83,15 @@ export async function runDiscoverStep(params) {
   try {
     const start = performance.now();
     const handlerOptions = queryDepth === 'prebuilt' ? { ...options, dimension: options.dimension || 'interface' } : options;
+
+    // Mirror the synchronous Hindsight call lifecycle into pending_operations so
+    // the global monitor shows "processing" while the reflect/recall request is
+    // in flight, rather than leaving the row stuck on "pending".
+    await updatePendingOperationStatusByResearchStep(db, rstepId, {
+      pop_status: 'processing',
+      pop_error_message: null,
+    });
+
     const handlerResult = await dispatchHandler(queryDepth, serverId, bankId, intentText, handlerOptions, db, rawQuery);
     const duration_ms = Math.round(performance.now() - start);
 

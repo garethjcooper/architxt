@@ -113,6 +113,7 @@ export async function handleRecall(serverId, bankId, query, options = {}) {
   if (typeof options.prefer_observations === 'boolean') body.prefer_observations = options.prefer_observations;
   if (options.include) body.include = options.include;
 
+  const start = performance.now();
   const result = await recall(serverId, bankId, body);
   if (!result.success) {
     return {
@@ -132,6 +133,7 @@ export async function handleRecall(serverId, bankId, query, options = {}) {
   }
 
   const requestPayloadChars = JSON.stringify(body).length;
+  const durationMs = Math.round(performance.now() - start);
 
   return {
     success: true,
@@ -144,7 +146,7 @@ export async function handleRecall(serverId, bankId, query, options = {}) {
       tool: 'recall',
       mode: 'recall',
       status: 'success',
-      duration_ms: 0,
+      duration_ms: durationMs,
       request_payload_chars: requestPayloadChars,
       prompt_text: `Query: ${query}\n\nRequest body:\n${JSON.stringify(body, null, 2)}`,
       response_text: JSON.stringify(result.data, null, 2),

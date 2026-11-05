@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement } from '../types';
+import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -117,7 +117,7 @@ export const documentsApi = {
   },
 
   // API field names: context_id (not DB ctxt_id)
-  update: (id: number, data: { ext_id?: string; context_id?: number | null; content?: string | null; blocks?: any[] | null }) => 
+  update: (id: number, data: { ext_id?: string; context_id?: number | null; content?: string | null; blocks?: any[] | null; processing_options?: DocumentProcessingOptions | null }) => 
     fetchApi<{ success: boolean }>(`/documents/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

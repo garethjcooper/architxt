@@ -247,6 +247,21 @@ function DocumentsPageContent() {
     return failed?.error || null;
   };
 
+  const STAGE_LABELS: Record<string, string> = {
+    extract: 'Extract',
+    denoise: 'Denoise',
+    'denoise-llm': 'Denoise LLM',
+    vision: 'Vision',
+  };
+
+  const getDisabledStageBadges = (doc: Document): string[] => {
+    const stages = doc.processing_options?.stages;
+    if (!stages) return [];
+    return Object.entries(stages)
+      .filter(([name, enabled]) => STAGE_LABELS[name] && enabled === false)
+      .map(([name]) => name);
+  };
+
   const isAllSelected = filteredDocuments.length > 0 && selected.size === filteredDocuments.length;
 
   const selectedDocuments = useMemo(() => documents.filter((d) => selected.has(d.id)), [documents, selected]);
@@ -405,6 +420,7 @@ function DocumentsPageContent() {
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Metadata</TableHead>
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Char (K)</TableHead>
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Entities</TableHead>
+                  <TableHead className={["w-24 text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Overrides</TableHead>
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -422,11 +438,12 @@ function DocumentsPageContent() {
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
                     </TableRow>
                   ))
                 ) : displayDocuments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-foreground-faint">
+                    <TableCell colSpan={11} className="text-center py-8 text-foreground-faint">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-8 w-8 opacity-50" />
                         <p>No documents found.</p>
@@ -570,6 +587,26 @@ function DocumentsPageContent() {
                         ) : (
                           <span className="text-foreground-placeholder text-xs">-</span>
                         )}
+                      </TableCell>
+                      <TableCell
+                        className="py-1.5 px-4 text-xs cursor-pointer"
+                        onClick={() => handleView(doc)}
+                      >
+                        <div className="flex flex-wrap gap-1">
+                          {getDisabledStageBadges(doc).map((name) => (
+                            <Badge
+                              key={name}
+                              title={`${STAGE_LABELS[name]} disabled`}
+                              className="bg-badge-caution-bg text-badge-caution-fg border-badge-caution-bd text-[10px] px-2 py-1 inline-flex items-center gap-1"
+                            >
+                              <X className="h-3 w-3" />
+                              {compactBadges ? name : STAGE_LABELS[name]}
+                            </Badge>
+                          ))}
+                          {getDisabledStageBadges(doc).length === 0 && (
+                            <span className="text-foreground-placeholder text-xs">-</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell
                         className="py-1.5 px-4 text-xs cursor-pointer"

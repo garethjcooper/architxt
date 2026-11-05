@@ -98,13 +98,16 @@ export async function handleReflect(serverId, bankId, query, options = {}, db, r
   if (typeof options.exclude_mental_models === 'boolean') body.exclude_mental_models = options.exclude_mental_models;
   if (options.include) body.include = options.include;
 
+  const start = performance.now();
   const result = await (typeof options.reflectFn === 'function' ? options.reflectFn(body) : reflect(serverId, bankId, body));
+  const durationMs = Math.round(performance.now() - start);
+
   const requestPayloadChars = JSON.stringify(body).length;
   const baseCall = {
     tool: 'reflect',
     mode: 'reflect',
     status: 'success',
-    duration_ms: 0,
+    duration_ms: durationMs,
     request_payload_chars: requestPayloadChars,
     prompt_text: `Query: ${query}\n\nRequest body:\n${JSON.stringify(body, null, 2)}`,
     response_text: JSON.stringify(result.data, null, 2),
