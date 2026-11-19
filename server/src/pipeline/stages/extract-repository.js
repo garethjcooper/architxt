@@ -115,6 +115,8 @@ async function execute(artifacts, _config, data, services, context) {
         markdownLength: markdown.length,
         promptTokens: result.usage?.promptTokens ?? 0,
         completionTokens: result.usage?.completionTokens ?? 0,
+        ...(result.repo?.commitDate ? { repoCommitDate: result.repo.commitDate } : {}),
+        ...(result.repo?.authors?.length ? { repoAuthors: result.repo.authors } : {}),
       },
       stageResult: { success: true },
     };

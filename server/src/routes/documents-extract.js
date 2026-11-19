@@ -133,7 +133,7 @@ router.post('/:id/extracted', async (req, res) => {
   const id = idCheck.id;
 
   // Extract markdown and images from request
-  const { success, error: errorMsg, metrics, markdown, images = [], metadata = {}, errorDetails } = req.body || {};
+  const { success, error: errorMsg, metrics, markdown, images = [], metadata = {}, errorDetails, timestamp, authors } = req.body || {};
 
   if (typeof success !== 'boolean') {
     sendResponse({ res, status: 400, error: 'success boolean required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: routePath, duration: Date.now() - start });
@@ -229,7 +229,15 @@ router.post('/:id/extracted', async (req, res) => {
       doc_content_hash: contentHash,
       doc_content_blocks: null
     };
-    
+
+    // Optional provenance supplied by the daemon (repository analysis: commit date + authors)
+    if (typeof timestamp === 'string' && !isNaN(new Date(timestamp).getTime())) {
+      updateData.doc_timestamp = new Date(timestamp).toISOString();
+    }
+    if (Array.isArray(authors) && authors.length > 0) {
+      updateData.doc_authors = JSON.stringify(authors.map(String));
+    }
+
     logger.info('Document extracted and saved', { id, contentLength: markdown.length, imageCount: images.length, hash: contentHash, imagePaths });
   }
 

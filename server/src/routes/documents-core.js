@@ -573,6 +573,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     doc_status: 'uploaded',
     doc_source_type: normalizedSourceType,
     doc_source_path: isRepository ? repo_uri.trim() : 'UPLOADING',
+    doc_full_path: isRepository ? repo_uri.trim() : null,
     doc_filename: file?.originalname || null,
     doc_generated_by: 'user',
     doc_processing_options: processingOptions

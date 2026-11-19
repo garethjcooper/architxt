@@ -171,7 +171,12 @@ async function processNext() {
     const reported = await reportExtracted(docId, processResult.success, {
       metrics: processResult.metrics,
       ...(processResult.success
-        ? { markdown: processResult.markdown, images: processResult.images }
+        ? {
+            markdown: processResult.markdown,
+            images: processResult.images,
+            ...(processResult.metrics?.repoCommitDate ? { timestamp: processResult.metrics.repoCommitDate } : {}),
+            ...(processResult.metrics?.repoAuthors?.length ? { authors: processResult.metrics.repoAuthors } : {}),
+          }
         : { error: processResult.error, errorDetails: processResult.errorDetails }
       )
     });
