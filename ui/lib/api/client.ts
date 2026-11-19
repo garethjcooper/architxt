@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement } from '../types';
+import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement, TraceProfile, TraceProfileVersion, TraceEngineManifest, TraceProfileValidationResult, TraceProfileSuggestionResult, TraceProfileFieldExtractionResult, TraceProfileDiscoveryHistogramResult, TraceProfileSequencePreviewResult } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -106,10 +106,31 @@ export const documentsApi = {
   getProcessingHistory: (id: number) =>
     fetchApi<{ processing_history: any[] | null }>(`/documents/${id}/processinghistory`),
 
-  create: (file: File, extId: string) => {
+  create: (file: File, extId: string, options?: {
+    source_type?: 'document' | 'trace';
+    trace_profile?: string;
+    context_id?: number | null;
+    tags_to_add?: number[];
+    metadata_to_add?: number[];
+  }) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('ext_id', extId);
+    if (options?.source_type) {
+      formData.append('source_type', options.source_type);
+    }
+    if (options?.trace_profile !== undefined) {
+      formData.append('trace_profile', options.trace_profile);
+    }
+    if (options?.context_id !== null && options?.context_id !== undefined) {
+      formData.append('context_id', String(options.context_id));
+    }
+    if (options?.tags_to_add && options.tags_to_add.length > 0) {
+      formData.append('tags_to_add', JSON.stringify(options.tags_to_add));
+    }
+    if (options?.metadata_to_add && options.metadata_to_add.length > 0) {
+      formData.append('metadata_to_add', JSON.stringify(options.metadata_to_add));
+    }
     return fetch(`${API_URL}/documents`, {
       method: 'POST',
       body: formData,
@@ -164,10 +185,22 @@ export const documentsApi = {
   },
 
   // Extract endpoints
-  getSource: (id: number) => 
+  getSource: (id: number) =>
     fetch(`${API_URL}/documents/${id}/source`),
 
-  submitExtracted: (id: number, data: { markdown: string; images?: string[] }) => 
+  getSourceText: async (id: number): Promise<string> => {
+    const response = await fetch(`${API_URL}/documents/${id}/source`);
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to fetch document source: ${response.statusText}`,
+        response.status,
+        'SOURCE_FETCH_ERROR'
+      );
+    }
+    return response.text();
+  },
+
+  submitExtracted: (id: number, data: { markdown: string; images?: string[] }) =>
     fetchApi<void>(`/documents/${id}/extracted`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -243,8 +276,8 @@ export const documentsApi = {
       }
     ),
   // Batch config update — use API field names
-  batchUpdateConfig: (docIds: number[], config: { timestamp?: string | null }) =>
-    fetchApi<{ success: boolean; docs_updated: number }>(
+  batchUpdateConfig: (docIds: number[], config: { timestamp?: string | null; trace_profile?: string | null }) =>
+    fetchApi<{ success: boolean; docs_updated: number; trace_docs_updated?: number; trace_docs_skipped?: number }>(
       '/documents/batch/updateconfig',
       {
         method: 'POST',
@@ -335,6 +368,75 @@ export const documentsApi = {
 
   deleteRetainRun: (docId: number, runId: number) =>
     fetchApi<void>(`/documents/${docId}/retain-runs/${runId}`, { method: 'DELETE' }),
+};
+
+// Trace Profiles API
+export const traceProfilesApi = {
+  list: () => fetchApi<TraceProfile[]>('/trace-profiles?limit=1000'),
+
+  get: (id: number) => fetchApi<TraceProfile>(`/trace-profiles/${id}`),
+
+  engines: () => fetchApi<{ engines: TraceEngineManifest[] }>('/trace-profiles/engines'),
+
+  validate: (config: Record<string, any>, sample: string) =>
+    fetchApi<TraceProfileValidationResult>('/trace-profiles/validate', {
+      method: 'POST',
+      body: JSON.stringify({ config, sample }),
+    }),
+
+  suggestConfig: (
+    sample: string,
+    options?: {
+      currentConfig?: Record<string, any>;
+      sampleBudget?: number;
+    }
+  ) =>
+    fetchApi<TraceProfileSuggestionResult>('/trace-profiles/suggest-config', {
+      method: 'POST',
+      body: JSON.stringify({ sample, ...options }),
+    }),
+
+  create: (data: { name: string; description?: string; config: Record<string, any> }) =>
+    fetchApi<{ id: number }>('/trace-profiles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: number, data: { name?: string; description?: string | null; config?: Record<string, any> }) =>
+    fetchApi<TraceProfile>(`/trace-profiles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) => fetchApi<void>(`/trace-profiles/${id}`, { method: 'DELETE' }),
+
+  extractFields: (
+    profileId: number | null,
+    rows: Array<{ raw: string }>,
+    existingRules?: Record<string, any>,
+    parserConfig?: Record<string, any>,
+    sample?: string
+  ) =>
+    fetchApi<TraceProfileFieldExtractionResult>('/trace-profiles/extract-fields', {
+      method: 'POST',
+      body: JSON.stringify({ profileId, rows, existingRules, parserConfig, sample }),
+    }, { timeoutMs: 300000 }),
+
+  discoveryHistogram: (
+    config: Record<string, any>,
+    sample: string,
+    options?: { minSupport?: number; minSupportPct?: number; constantRatio?: number; maxEntries?: number; contextChars?: number; minTokenLength?: number; includeShapes?: string[]; stopwords?: string[] | false }
+  ) =>
+    fetchApi<TraceProfileDiscoveryHistogramResult>('/trace-profiles/discovery-histogram', {
+      method: 'POST',
+      body: JSON.stringify({ config, sample, options }),
+    }, { timeoutMs: 30000 }),
+
+  previewSequences: (config: Record<string, any>, sample: string) =>
+    fetchApi<TraceProfileSequencePreviewResult>('/trace-profiles/preview-sequences', {
+      method: 'POST',
+      body: JSON.stringify({ config, sample }),
+    }),
 };
 
 // Contexts API
@@ -1752,7 +1854,7 @@ export interface DiscoverStepResponse {
   status: 'running' | 'completed' | 'failed';
   bank_id: string;
   viewpoint_ids: number[];
-  query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | string;
+  query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'models' | string;
   action_type?: string;
   parameters?: Record<string, any> | null;
   /** Unified envelope is the canonical shape for all step responses. */
@@ -1891,7 +1993,7 @@ export const researchApi = {
     viewpoint_ids: number[];
     intent_text: string;
     raw_query?: string;
-    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
+    query_depth?: 'prebuilt' | 'recall' | 'reflect' | 'models' | 'templates';
     selections?: any[];
     budget?: 'low' | 'mid' | 'high';
     max_tokens?: number;
@@ -2055,20 +2157,6 @@ export const researchApi = {
       body: JSON.stringify(payload),
     }, { timeoutMs: 30000 }).then((res) => res.data),
 
-  synthesize: (payload: {
-    server_id: number;
-    bank_id: string;
-    session_id: number;
-    source_step_ids: number[];
-    intent_text: string;
-    raw_query?: string;
-    max_tokens?: number;
-    section_focus?: Record<string, string | { name?: string; content: string } | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
-  }) =>
-    fetchApi<DiscoverStepResponse>('/research/synthesize', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { timeoutMs: 30000 }),
   getSessionSteps: (sessionId: number) =>
     fetchApi<ResearchStepSummary[]>(`/research/sessions/${sessionId}/steps`),
   getStep: (stepId: number) =>
@@ -2252,6 +2340,14 @@ export interface SettingsSnapshot {
   ui: {
     port: ConfigValue;
     api_base_url: ConfigValue;
+  };
+  trace_profile_suggest: {
+    provider: ConfigValue;
+    model: ConfigValue;
+    temperature: ConfigValue;
+    max_tokens: ConfigValue;
+    timeout_ms: ConfigValue;
+    sample_budget: ConfigValue;
   };
 }
 

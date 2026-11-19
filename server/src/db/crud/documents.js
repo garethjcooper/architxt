@@ -3,10 +3,23 @@ import { stmt } from '../../cache.js';
 import { fromJson, toJson, requireInt, requireField, requireNonEmpty, dbExec } from '../../utils/db-helpers.js';
 import { getSqlPresenceExpression } from '../../entity-tag-format.js';
 import { upsertFtsDocument, deleteFtsDocument } from '../../services/search/full-text.js';
+import { applySystemTraceContext } from '../../services/trace/system-context.js';
 
 const TABLE = 'documents';
 const PK = 'doc_id';
 const JSON_FIELDS = ['doc_processing_history', 'doc_processing_progress', 'doc_tags', 'doc_metadata', 'doc_context', 'doc_content_blocks', 'doc_processing_options'];
+
+/**
+ * Apply the system trace context to a document's { id, description } context
+ * object when the document is a trace. Non-trace documents pass through.
+ */
+function applyDocumentContext(docContext, docSourceType) {
+  if (!docContext || docSourceType !== 'trace') return docContext;
+  return {
+    ...docContext,
+    description: applySystemTraceContext(docContext.description, docSourceType),
+  };
+}
 
 const base = createBaseCrud(TABLE, PK, JSON_FIELDS);
 
@@ -46,7 +59,11 @@ export const getDocument = (db, id) => dbExec(() => {
     WHERE d.doc_id = ?
   `;
   const row = stmt(db, sql).get(requireInt('doc_id', id));
-  return fromJson(row, JSON_FIELDS);
+  const parsed = fromJson(row, JSON_FIELDS);
+  if (parsed) {
+    parsed.doc_context = applyDocumentContext(parsed.doc_context, parsed.doc_source_type);
+  }
+  return parsed;
 }, 'documents.get');
 
 // Fetch all documents with fields needed for diff comparison
@@ -65,7 +82,7 @@ export const getDocumentsForDiff = (db) => dbExec(() => {
 // Fetch all document-context associations for diff comparison
 export const getAllDocumentContexts = (db) => dbExec(() => {
   const sql = `
-    SELECT d.doc_id, c.ctxt_desc
+    SELECT d.doc_id, d.doc_source_type, c.ctxt_desc
     FROM documents d
     JOIN contexts c ON d.ctxt_id = c.ctxt_id
     WHERE d.ctxt_id IS NOT NULL
@@ -76,7 +93,7 @@ export const getAllDocumentContexts = (db) => dbExec(() => {
 // Fetch document by external ID
 export const getDocumentByExtId = (db, extId) => dbExec(() => {
   const sql = `
-    SELECT doc_id, doc_ext_id, doc_content_hash, doc_filename, doc_timestamp, ctxt_id
+    SELECT doc_id, doc_ext_id, doc_content_hash, doc_filename, doc_timestamp, ctxt_id, doc_source_type
     FROM documents WHERE doc_ext_id = ?
   `;
   return stmt(db, sql).get(extId);
@@ -97,7 +114,7 @@ export const listDocuments = (db, options = {}) => dbExec(() => {
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const sql = `
     SELECT d.doc_id, d.doc_ext_id, d.doc_status, d.doc_content_hash,
-      d.doc_source_path, d.doc_filename, d.doc_authors, d.doc_generated_by, d.ctxt_id,
+      d.doc_source_path, d.doc_source_type, d.doc_filename, d.doc_authors, d.doc_generated_by, d.ctxt_id,
       d.doc_processing_progress, d.doc_processing_history,
       d.doc_processing_options,
       d.doc_timestamp, d.doc_created_at, d.doc_updated_at,
@@ -112,7 +129,13 @@ export const listDocuments = (db, options = {}) => dbExec(() => {
     LIMIT ? OFFSET ?
   `;
   const rows = stmt(db, sql).all(...params, requireInt('limit', limit), requireInt('offset', offset));
-  return rows.map(r => fromJson(r, JSON_FIELDS));
+  return rows.map(r => {
+    const parsed = fromJson(r, JSON_FIELDS);
+    if (parsed) {
+      parsed.doc_context = applyDocumentContext(parsed.doc_context, parsed.doc_source_type);
+    }
+    return parsed;
+  });
 }, 'documents.list');
 
 // Explicit - needs JSON handling
@@ -216,3 +239,38 @@ export const batchUpdateDocumentTimestamp = (db, docIds, timestamp) => dbExec(()
   const result = stmt(db, sql).run(ts, ...ids);
   return { docsUpdated: result.changes };
 }, 'documents.batchUpdateTimestamp');
+
+// Custom - batch update config: timestamp for all docs, trace_profile (stored in
+// doc_processing_options) only for docs whose doc_source_type is 'trace'.
+// Returns per-group counts so the API can report skipped non-trace docs.
+export const batchUpdateDocumentConfig = (db, docIds, { timestamp, traceProfile }) => dbExec(() => {
+  const ids = docIds.map((id) => requireInt('doc_id', id));
+  if (ids.length === 0) return { docsUpdated: 0, traceDocsUpdated: 0, traceDocsSkipped: 0 };
+
+  let docsUpdated = 0;
+  if (timestamp !== undefined) {
+    const ts = timestamp === null ? null : timestamp;
+    const tsResult = stmt(db, `UPDATE ${TABLE} SET doc_timestamp = ?, doc_updated_at = CURRENT_TIMESTAMP WHERE ${PK} IN (${ids.map(() => '?').join(',')})`).run(ts, ...ids);
+    docsUpdated = tsResult.changes;
+  }
+
+  let traceDocsUpdated = 0;
+  let traceDocsSkipped = 0;
+  if (traceProfile !== undefined) {
+    const profileName = traceProfile === null ? null : String(traceProfile);
+    const rows = stmt(db, `SELECT ${PK} AS id, doc_source_type, doc_processing_options FROM ${TABLE} WHERE ${PK} IN (${ids.map(() => '?').join(',')})`).all(...ids);
+    for (const row of rows) {
+      if (row.doc_source_type !== 'trace') {
+        traceDocsSkipped += 1;
+        continue;
+      }
+      const opts = fromJson(row, ['doc_processing_options']).doc_processing_options || {};
+      const next = { ...opts, trace_profile: profileName };
+      stmt(db, `UPDATE ${TABLE} SET doc_processing_options = ?, doc_updated_at = CURRENT_TIMESTAMP WHERE ${PK} = ?`).run(JSON.stringify(next), row.id);
+      traceDocsUpdated += 1;
+    }
+  }
+
+  return { docsUpdated, traceDocsUpdated, traceDocsSkipped };
+}, 'documents.batchUpdateConfig');
+

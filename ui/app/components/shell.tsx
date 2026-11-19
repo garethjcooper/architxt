@@ -25,6 +25,7 @@ import {
   Puzzle,
   Database,
   Map,
+  Activity,
 } from "lucide-react";
 import { HindsightIcon } from '@/components/icons/hindsight-icon';
 import { MetadataIcon } from '@/components/icons/metadata-icon';
@@ -41,6 +42,7 @@ const navItems = [
   { href: '/contextual-graph/manager', label: 'Context Patches', icon: Network },
   { href: '/models', label: 'Mental Models', icon: Layers },
   { href: '/documents', label: 'Documents', icon: FileText },
+  { href: '/trace-profiles', label: 'Trace Profiles', icon: Activity },
   { href: '/hindsight', label: 'Hindsight Sync', icon: HindsightIcon },
   { href: '/entities', label: 'Entities', icon: Users },
   { href: '/tags', label: 'Tags', icon: Tags },

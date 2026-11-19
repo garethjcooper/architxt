@@ -173,38 +173,6 @@ function ensureMissingTables(db) {
       )`
     },
     {
-      name: 'research_artifacts',
-      ddl: `CREATE TABLE IF NOT EXISTS research_artifacts (
-        ra_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        rs_id INTEGER NOT NULL,
-        ra_title TEXT NOT NULL,
-        ra_description TEXT,
-        ra_bank_id TEXT NOT NULL,
-        ra_viewpoint_ids JSON NOT NULL,
-        ra_source_step_ids JSON NOT NULL,
-        ra_query_trail_snapshot JSON NOT NULL,
-        ra_seam_report JSON NOT NULL,
-        ra_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        ra_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
-      )`
-    },
-    {
-      name: 'research_artifact_outputs',
-      ddl: `CREATE TABLE IF NOT EXISTS research_artifact_outputs (
-        rao_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ra_id INTEGER NOT NULL,
-        rao_output_type TEXT NOT NULL,
-        rao_name TEXT NOT NULL,
-        rao_content JSON NOT NULL,
-        rao_rendered TEXT,
-        rao_source_selections JSON,
-        rao_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        rao_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (ra_id) REFERENCES research_artifacts(ra_id) ON DELETE CASCADE
-      )`
-    },
-    {
       name: 'research_tasks',
       ddl: `CREATE TABLE IF NOT EXISTS research_tasks (
         rt_id TEXT PRIMARY KEY,
@@ -368,6 +336,19 @@ function ensureMissingTables(db) {
         edt_archimate_relationship TEXT,
         edt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         edt_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      )`
+    },
+    {
+      name: 'trace_profiles',
+      ddl: `CREATE TABLE IF NOT EXISTS trace_profiles (
+        tfp_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tfp_name TEXT NOT NULL UNIQUE,
+        tfp_description TEXT,
+        tfp_config JSON NOT NULL,
+        tfp_versions JSON,
+        tfp_used_version_id INTEGER,
+        tfp_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        tfp_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`
     }
   ];
@@ -1423,6 +1404,25 @@ function ensureAgentChatIndexes(db) {
   return 1;
 }
 
+/**
+ * Drop dormant research_artifacts and research_artifact_outputs tables.
+ * They were never wired to any CRUD, route or service, so it is safe to
+ * remove them from existing databases.
+ */
+function dropDormantResearchArtifactTables(db) {
+  let dropped = 0;
+  const tables = ['research_artifact_outputs', 'research_artifacts'];
+  for (const name of tables) {
+    const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(name);
+    if (exists) {
+      db.exec(`DROP TABLE IF EXISTS ${name}`);
+      logger.info(`Dropped dormant table: ${name}`, { service: 'schema' });
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
 function migrateAgentChatThreads(db) {
   const threadsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_threads'").get();
   const messagesTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_messages'").get();
@@ -1455,6 +1455,27 @@ function ensureMissingColumns(db) {
         {
           name: 'doc_processing_options',
           ddl: 'ALTER TABLE documents ADD COLUMN doc_processing_options JSON'
+        },
+        {
+          name: 'doc_source_type',
+          ddl: "ALTER TABLE documents ADD COLUMN doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace'))"
+        }
+      ]
+    },
+    {
+      table: 'trace_profiles',
+      columns: [
+        {
+          name: 'tfp_versions',
+          ddl: 'ALTER TABLE trace_profiles ADD COLUMN tfp_versions JSON'
+        },
+        {
+          name: 'tfp_used_version_id',
+          ddl: 'ALTER TABLE trace_profiles ADD COLUMN tfp_used_version_id INTEGER'
+        },
+        {
+          name: 'tfp_config_updated_at',
+          ddl: 'ALTER TABLE trace_profiles ADD COLUMN tfp_config_updated_at TIMESTAMP'
         }
       ]
     },
@@ -2190,13 +2211,14 @@ export function ensureSchema(db) {
     const standardEntityTypesSeeded = ensureStandardEntityTypes(db);
     const idPlaceholderMigrated = migrateLegacyIdPlaceholder(db);
     const agentChatIndexes = ensureAgentChatIndexes(db);
+    const droppedResearchArtifacts = dropDormantResearchArtifactTables(db);
     migrateAgentChatThreads(db);
-    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, standard edge types seeded: ${standardEdgeTypesSeeded}, standard entity types seeded: ${standardEntityTypesSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}`);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0 || droppedResearchArtifacts > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, standard edge types seeded: ${standardEdgeTypesSeeded}, standard entity types seeded: ${standardEntityTypesSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}, dormant research artifact tables dropped: ${droppedResearchArtifacts}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0;
+    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0 || droppedResearchArtifacts > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

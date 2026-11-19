@@ -2,6 +2,22 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.5.1] - 2026-11-19
+
+### Added
+
+- Trace profile sequence mining: profiles can define a `sequenceProfile` (order/correlation/token/entity/direction fields); extracted trace documents then store the mined Trace Sequence Analysis report (per-sequence step tables with Entity/Direction leading, optional transitions) as the document content.
+- Trace profiles UI: six-page docs section, documents list Type/Trace Profile columns, trace-profile pickers in the document viewer and bulk config dialogs (trace docs only), and a nameMap regroup fix ensuring each value belongs to exactly one group.
+- Built-in `system-trace` context automatically prepended to any user-selected context on trace documents (Hindsight push, diff/compare, and documents API), describing the sequence report format and highlighting Entity/Direction as the key step-table columns.
+
+### Changed
+
+- `.env.example` now lists the complete set of env vars defined in `server/src/config.js` (trace field-extraction, trace-extract pipeline, relationship-extraction, and OpenAI Responses blocks added; suggest temperature default corrected to 0.0).
+
+### Removed
+
+- Dead `ARCHITXT_TRACE_PROFILE_SUGGEST_MAX_ITERATIONS` config and the unused `POST /trace-profiles/coverage-loop` route (plus its client method and UI types), which had no consumer since the Iterate loop was dropped.
+
 ## [0.5.0] - 2026-11-05
 
 ### Added

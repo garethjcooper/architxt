@@ -13,6 +13,7 @@ import { getExpandedDocumentMetadata } from '../../db/crud/document-metadata.js'
 import { createPendingOperation } from '../../db/crud/pending-operations.js';
 import { stmt } from '../../cache.js';
 import { readFile } from 'node:fs/promises';
+import { applySystemTraceContext } from '../trace/system-context.js';
 
 const logger = createLogger('hindsight-push');
 
@@ -52,6 +53,9 @@ function getDocumentWithRelations(docId) {
     const ctxRow = stmt(db, 'SELECT ctxt_desc FROM contexts WHERE ctxt_id = ?').get(doc.ctxt_id);
     context = ctxRow ? ctxRow.ctxt_desc : null;
   }
+
+  // Trace documents always get the system trace context prepended
+  context = applySystemTraceContext(context, doc.doc_source_type);
 
   return { ...doc, tags, metadata, context };
 }

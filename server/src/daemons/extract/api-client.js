@@ -189,10 +189,28 @@ export async function getDocument(docId) {
     return null;
   }
 
-  return {
+  const doc = {
     ...result.data,
     doc_processing_options: result.data.processing_options || {}
   };
+
+  // Resolve trace profile server-side for the daemon.
+  if (doc.source_type === 'trace') {
+    const profileName = doc.doc_processing_options?.trace_profile;
+    if (profileName) {
+      const profileResult = await apiCall('GET', `/trace-profiles/by-name/${encodeURIComponent(profileName)}`);
+      if (profileResult.ok && profileResult.data) {
+        doc.trace_profile = {
+          tfp_id: profileResult.data.id,
+          tfp_name: profileResult.data.name,
+          tfp_description: profileResult.data.description,
+          tfp_config: profileResult.data.config
+        };
+      }
+    }
+  }
+
+  return doc;
 }
 
 /**

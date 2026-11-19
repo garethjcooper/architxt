@@ -14,8 +14,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Upload,
   Loader2,
@@ -31,19 +31,17 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
-import { contextsApi, tagsApi, metadataApi } from '@/lib/api/client';
-import type { Context, Tag as TagType, Metadata } from '@/lib/types/index';
+import { contextsApi, tagsApi, metadataApi, documentsApi, traceProfilesApi } from '@/lib/api/client';
+import type { Context, Tag as TagType, Metadata, TraceProfile } from '@/lib/types/index';
 
 const logger = createLogger('UploadDialog');
 
-const API_URL = '/api/v1';
-
+type UploadMode = 'document' | 'trace';
 type UploadPhase = 'select' | 'running' | 'done';
 
 interface UploadFileItem {
   id: string;
   file: File;
-  extId: string;
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
 }
@@ -54,13 +52,13 @@ interface UploadDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-function filenameToExtId(name: string): string {
-  return name.replace(/\.[^/.]+$/, '');
-}
-
 let _idCounter = 0;
 function nextId(): string {
   return `uf-${++_idCounter}-${Date.now().toString(36)}`;
+}
+
+function filenameToExtId(name: string): string {
+  return name.replace(/\.[^/.]+$/, '');
 }
 
 export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenChange }: UploadDialogProps) {
@@ -74,6 +72,9 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
 
+  // Mode state
+  const [uploadMode, setUploadMode] = useState<UploadMode>('document');
+
   // Shared context & tags for the batch
   const [allContexts, setAllContexts] = useState<Context[]>([]);
   const [allTags, setAllTags] = useState<TagType[]>([]);
@@ -82,6 +83,10 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
   const [selectedMetaIds, setSelectedMetaIds] = useState<Set<number>>(new Set());
   const [prefsLoading, setPrefsLoading] = useState(false);
+
+  // Profile selection for trace uploads
+  const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
 
   /* ── Reset on open ─────────────────────── */
   useEffect(() => {
@@ -93,10 +98,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
       setSelectedContextId(null);
       setSelectedTagIds(new Set());
       setSelectedMetaIds(new Set());
+      setUploadMode('document');
+      setTraceProfiles([]);
+      setSelectedProfileId('');
     }
   }, [open]);
 
-  // Load contexts, tags & metadata once when dialog opens
+  // Load contexts, tags, metadata & trace profiles once when dialog opens
   useEffect(() => {
     if (!open) return;
     setPrefsLoading(true);
@@ -104,11 +112,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
       contextsApi.list().catch(() => [] as Context[]),
       tagsApi.list().catch(() => [] as TagType[]),
       metadataApi.list().catch(() => [] as Metadata[]),
+      traceProfilesApi.list().catch(() => [] as TraceProfile[]),
     ])
-      .then(([ctxs, tgs, mds]) => {
+      .then(([ctxs, tgs, mds, profiles]) => {
         setAllContexts(ctxs);
         setAllTags(tgs);
         setAllMetadata(mds);
+        setTraceProfiles(profiles);
       })
       .catch(() => {
         // non-fatal — user can still upload without tags/context/metadata
@@ -121,7 +131,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
     const newItems: UploadFileItem[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      newItems.push({ id: nextId(), file, extId: filenameToExtId(file.name), status: 'pending' });
+      newItems.push({ id: nextId(), file, status: 'pending' });
     }
     setItems((prev) => [...prev, ...newItems]);
   }, []);
@@ -138,10 +148,6 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
-  }, []);
-
-  const updateExtId = useCallback((id: string, extId: string) => {
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, extId } : it)));
   }, []);
 
   const handleClose = useCallback(() => {
@@ -172,11 +178,6 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
   const uploadAll = useCallback(async () => {
     if (items.length === 0) return;
-    const emptyItems = items.filter((it) => !it.extId.trim());
-    if (emptyItems.length > 0) {
-      toast.error(`${emptyItems.length} file(s) missing an External ID`);
-      return;
-    }
 
     const pendingItems = items.filter((it) => it.status === 'pending');
     if (pendingItems.length === 0) return;
@@ -187,8 +188,13 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
     let succeeded = 0;
     let failed = 0;
-    let current = 0;
 
+    const profile = uploadMode === 'trace'
+      ? traceProfiles.find((p) => String(p.id) === selectedProfileId)
+      : undefined;
+    const profileName = profile?.name;
+
+    let current = 0;
     for (const item of pendingItems) {
       if (abortRef.current) break;
 
@@ -198,24 +204,24 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
       );
       setProgress((p) => ({ ...p, current }));
 
-      const formData = new FormData();
-      formData.append('file', item.file);
-      formData.append('ext_id', item.extId.trim());
-      if (selectedContextId !== null) {
-        formData.append('context_id', String(selectedContextId));
-      }
-      if (selectedTagIds.size > 0) {
-        formData.append('tags_to_add', JSON.stringify([...selectedTagIds]));
-      }
-      if (selectedMetaIds.size > 0) {
-        formData.append('metadata_to_add', JSON.stringify([...selectedMetaIds]));
-      }
-
       try {
-        const response = await fetch(`${API_URL}/documents`, {
-          method: 'POST',
-          body: formData,
-        });
+        const extId = filenameToExtId(item.file.name);
+        let response: Response;
+        if (uploadMode === 'trace') {
+          response = await documentsApi.create(item.file, extId, {
+            source_type: 'trace',
+            trace_profile: profileName,
+            context_id: selectedContextId,
+            tags_to_add: selectedTagIds.size > 0 ? [...selectedTagIds] : undefined,
+            metadata_to_add: selectedMetaIds.size > 0 ? [...selectedMetaIds] : undefined,
+          });
+        } else {
+          response = await documentsApi.create(item.file, extId, {
+            context_id: selectedContextId,
+            tags_to_add: selectedTagIds.size > 0 ? [...selectedTagIds] : undefined,
+            metadata_to_add: selectedMetaIds.size > 0 ? [...selectedMetaIds] : undefined,
+          });
+        }
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
           throw new Error(data.error || `Upload failed: ${response.status}`);
@@ -229,9 +235,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
         const message = err?.message || String(err) || 'Failed';
         logger.warn('Upload failed', { file: item.file.name, error: message });
         setItems((prev) =>
-          prev.map((it) =>
-            it.id === item.id ? { ...it, status: 'error', error: message } : it
-          )
+          prev.map((it) => (it.id === item.id ? { ...it, status: 'error', error: message } : it))
         );
         failed++;
         setProgress((p) => ({ ...p, failed }));
@@ -239,9 +243,17 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
     }
 
     setPhase('done');
-    if (succeeded > 0) toast.success(`${succeeded} document(s) uploaded`);
+    if (succeeded > 0) toast.success(`${succeeded} file(s) uploaded`);
     if (failed > 0) toast.error(`${failed} upload(s) failed`);
-  }, [items, selectedContextId, selectedTagIds, selectedMetaIds]);
+  }, [
+    items,
+    uploadMode,
+    selectedProfileId,
+    selectedContextId,
+    selectedTagIds,
+    selectedMetaIds,
+    traceProfiles
+  ]);
 
   const pendingCount = items.filter((it) => it.status === 'pending').length;
   const hasErrors = items.some((it) => it.status === 'error');
@@ -376,6 +388,49 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                   )}
                 </div>
               </div>
+              
+              {/* Trace upload toggle + target selector — placed just above the file drop zone */}
+              <div className="rounded-lg border border-border-default bg-surface-card p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-foreground-faint flex items-center gap-1.5">
+                    <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-foreground-faint text-[8px] font-bold text-foreground-faint">T</span>
+                    Trace upload
+                  </Label>
+                  <Switch
+                    checked={uploadMode === 'trace'}
+                    onCheckedChange={(checked) => {
+                      setUploadMode(checked ? 'trace' : 'document');
+                    }}
+                    size="default"
+                  />
+                </div>
+
+                <div className="space-y-3 border-t border-border-default pt-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-foreground-faint">Trace profile (optional)</Label>
+                    <select
+                      value={selectedProfileId}
+                      onChange={(e) => setSelectedProfileId(e.target.value)}
+                      disabled={uploadMode !== 'trace' || prefsLoading}
+                      className="w-full h-10 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
+                    >
+                      <option value="">Select a profile if needed</option>
+                      {traceProfiles.length === 0 && (
+                        <option value="" disabled>No profiles configured</option>
+                      )}
+                      {traceProfiles.map((profile) => (
+                        <option key={profile.id} value={String(profile.id)}>
+                          {profile.name} ({profile.config?.parser?.module || '—'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <p className="text-[10px] text-foreground-subtle italic">
+                    Each file becomes a separate trace document. Leave the profile unset if the file does not need one.
+                  </p>
+                </div>
+              </div>
 
               {/* Drag & Drop Zone */}
               <div
@@ -422,33 +477,24 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                     {items.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-lg border border-border-default bg-surface-card p-3 space-y-2"
+                        className="rounded-lg border border-border-default bg-surface-card p-3 flex items-center justify-between gap-2"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <FileText className="h-4 w-4 text-foreground-subtle shrink-0" />
-                          <span className="text-sm font-medium text-foreground-default truncate flex-1 min-w-0">
+                          <span className="text-sm font-medium text-foreground-default truncate min-w-0">
                             {item.file.name}
                           </span>
                           <span className="text-xs text-foreground-subtle shrink-0">
                             {(item.file.size / 1024).toFixed(0)} KB
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            className="text-foreground-placeholder hover:text-destructive-fg shrink-0 p-0.5"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-foreground-subtle shrink-0">ID:</span>
-                          <Input
-                            value={item.extId}
-                            onChange={(e) => updateExtId(item.id, e.target.value)}
-                            placeholder="External ID"
-                            className="h-7 text-xs bg-surface-inset border-border-default"
-                          />
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="text-foreground-placeholder hover:text-destructive-fg shrink-0 p-0.5"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>

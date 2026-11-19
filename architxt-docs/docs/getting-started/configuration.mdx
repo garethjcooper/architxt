@@ -314,6 +314,46 @@ When both are set:
 
 This removes the manual server/bank setup step in Docker Compose. You still need to add Hindsight credentials in `server/.env` (see the Hindsight section in `.env.example`).
 
+## Trace profile suggestion
+
+These settings control the LLM used by the **Trace Profiles** page when it suggests or refines a parser config from a raw sample.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_PROVIDER` | `ollama_cloud` | Provider name for trace-profile suggestion calls. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_MODEL` | *(provider default)* | Model used to generate parser configs. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_TEMPERATURE` | `0.0` | Sampling temperature. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_MAX_TOKENS` | `4096` | Maximum tokens in the response. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_TIMEOUT_MS` | `300000` | Request timeout in milliseconds (5 minutes). |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_SAMPLE_BUDGET` | `20000` | Default characters of the sample to send to the LLM. Higher budgets let the model see more records but consume more context. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_SYSTEM_PROMPT` | *(built-in)* | Custom system prompt override. |
+
+### Trace field extraction (plaintext)
+
+These settings control the LLM used by the **Plaintext Field Extraction** tab in the trace profile modal:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_TRACE_FIELD_EXTRACT_PROVIDER` | `ollama_cloud` | Provider for field-extraction calls. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_MODEL` | *(provider default)* | Model used to suggest field-extraction rules. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_TEMPERATURE` | `0.0` | Sampling temperature. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_MAX_TOKENS` | `16384` | Maximum tokens in the response. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_TIMEOUT_MS` | `300000` | Request timeout in milliseconds. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_MIN_NAME_MAP_VALUES` | `5` | Minimum example values a nameMap group must list to count as a real named field. |
+
+### Trace extraction (pipeline)
+
+These settings control the `extract-trace` pipeline stage that runs when a trace document is extracted:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_TRACE_EXTRACT_TIMEOUT_MS` | `600000` | Stage timeout in milliseconds (10 minutes). |
+| `ARCHITXT_TRACE_EXTRACT_CHUNK_THRESHOLD_BYTES` | `52428800` (50 MB) | Files larger than this are parsed in record-boundary-aware chunks to bound peak memory. |
+| `ARCHITXT_TRACE_EXTRACT_CHUNK_SIZE` | `5000` | Records per chunk when chunked parsing is active. |
+| `ARCHITXT_TRACE_EXTRACT_MAX_OUTPUT_CHARS` | `10485760` (10 MB) | Cap on emitted document content characters; output is truncated with a marker. |
+
+All variables are optional. If the model variable is empty, the selected provider's default model is used. The system prompt can be overridden in `.env` if you need to adjust the parser-authoring role; leaving it empty uses the built-in prompt.
+
 ## Next steps
 
 - [Install architxt](./installation)

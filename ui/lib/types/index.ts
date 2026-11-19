@@ -14,6 +14,7 @@ export interface Document {
   source_path: string | null;
   full_path: string | null;
   authors: string[] | null;
+  source_type: 'document' | 'trace' | string;
   status:
     | 'uploaded'
     | 'ready_to_extract'
@@ -53,6 +54,8 @@ export interface DocumentProcessingOptions {
     'denoise-llm'?: boolean;
     vision?: boolean;
   };
+  /** Trace documents: name of the trace profile used for extraction. */
+  trace_profile?: string | null;
 }
 
 export interface Context {
@@ -409,6 +412,192 @@ export interface PaginatedResponse<T> {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface TraceProfile {
+  id: number;
+  name: string;
+  description: string | null;
+  config: Record<string, any>;
+  versions: TraceProfileVersion[];
+  usedVersionId: number | null;
+  config_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TraceProfileVersion {
+  id: number;
+  label: string;
+  config: Record<string, any>;
+  generatedBy: 'manual' | 'engine-default' | 'generated' | 'iterated';
+  suggestionResult?: TraceProfileSuggestionResult;
+  parentVersionId?: number | null;
+  prompt?: string;
+}
+
+export interface TraceEngineManifest {
+  module: string;
+  name: string;
+  description: string;
+  contentTypes: string[];
+  defaultConfig?: Record<string, unknown>;
+}
+
+export interface TraceProfileValidationResult {
+  valid: boolean;
+  error?: string;
+  totalRecords: number;
+  matched: number;
+  unmatched: number;
+  coverage: number;
+  unparsedSamples: string[];
+  availableFields?: string[];
+  warnings?: string[];
+  multiLineColumns?: string[];
+  fieldStats?: TraceProfileFieldStat[];
+  records: Array<Record<string, any>>;
+}
+
+export interface TraceProfileFieldStat {
+  field: string;
+  index: number;
+  present: number;
+  sparseness: number;
+  sample: string | null;
+  /** Preview-only: a few unique matched values for the field. */
+  samples?: string[];
+  uniqueValues: number;
+  uniquePercent: number;
+}
+
+export interface TraceProfileSuggestionResult {
+  valid: boolean;
+  engine?: string;
+  reasoning?: string;
+  config?: Record<string, any>;
+  raw?: string;
+  error?: string;
+  code?: string;
+  provenance?: {
+    mode: 'generation' | 'iteration';
+    engine?: string | null;
+    prompt?: string;
+    promptLength: number;
+    sampleLength: number;
+    truncatedSampleLength: number;
+    sampleWasTruncated: boolean;
+    sampleBudget: number;
+    coverageSummary: {
+      totalRecords: number;
+      totalMatched: number;
+      overallCoverage: number;
+      valid: boolean;
+      error?: string;
+      chunkCount: number;
+    } | null;
+    timestamp: string;
+  };
+}
+
+export interface TraceProfileFieldExtractionRule {
+  field: string;
+  regex: string;
+  samples?: string[];
+}
+
+/** Unified field entry: regex is applied within `source` (null = whole record). */
+export interface TraceProfileField {
+  name: string;
+  ordinal: number;
+  source: string | null;
+  regex: string | null;
+  samples?: string[];
+}
+
+export interface TraceProfilePayloadField {
+  path: string;
+  samples?: string[];
+}
+
+export interface TraceProfileNameMapGroup {
+  name: string;
+  values: string[];
+  /** Resolved classification: "enum" (listed values recur) or "high" (near-unique per row). Auto-detected upstream; user-overridable in config. */
+  variance?: 'enum' | 'high';
+}
+
+export interface TraceProfileFieldExtractionResult {
+  fieldExtraction: {
+    fields: TraceProfileField[];
+    payload: {
+      format: string | null;
+      fields: TraceProfilePayloadField[];
+    };
+    nameMap?: TraceProfileNameMapGroup[];
+  };
+  matched?: {
+    fields?: Record<string, string[]>;
+    payload: Record<string, string[]>;
+  };
+  persisted?: boolean;
+}
+
+export interface TraceProfileDiscoveryHistogramEntry {
+  value: string;
+  count: number;
+  rowCount: number;
+  shape: string;
+  contexts: string[];
+}
+
+export interface TraceProfileDiscoveryHistogramResult {
+  valid?: boolean;
+  error?: string;
+  totalRecords?: number;
+  parsedRows?: number;
+  inputLines?: number;
+  unparsedRecords?: number;
+  knobs?: { minSupport: number; minSupportPct: number; constantRatio: number; maxEntries: number; contextChars: number; minTokenLength: number; includeShapes: string[] | null; stopwords: string | string[] };
+  entries: TraceProfileDiscoveryHistogramEntry[];
+  totalRowsScanned: number;
+  totalCandidates: number;
+  truncated: boolean;
+}
+
+export interface TraceProfileSequenceConfig {
+  orderColumns: string[];
+  correlationColumns: string[];
+  tokenColumns: string[];
+  separator?: string;
+  includeTokenComponents?: boolean;
+  maxExampleKeys?: number;
+  sortOrder?: 'frequency-desc' | 'signature-asc' | 'none';
+  /** Exclude rows where the entity or direction value is missing. Default true. */
+  excludeMissingTokens?: boolean;
+  /** Required single field treated as the entity (who/what acts). Always the first column of the sequence output table. */
+  entityColumn?: string | null;
+  /** Required single field treated as the direction (e.g. request/response). Always the second column of the sequence output table. */
+  directionColumn?: string | null;
+  /** Include one-level-deep sequence transitions (adjacent signatures across traces). Default false. */
+  includeTransitions?: boolean;
+  /** Drop sequences with fewer steps than this. Default 2; 1 keeps all. */
+  minSteps?: number;
+  /** Placeholder rendered for missing token/entity/direction/correlation values. Default "-". */
+  missingValue?: string;
+}
+
+export interface TraceProfileSequencePreviewResult {
+  valid: boolean;
+  error?: string;
+  markdown: string;
+  stats: {
+    inputRows: number;
+    eligibleRows: number;
+    ineligibleRows: number;
+    sequenceCount: number;
+    correlationKeyCount: number;
+  } | null;
 }
 
 export type DocumentStatus = Document['status'];

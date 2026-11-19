@@ -71,6 +71,50 @@ export const providers = {
 };
 
 export const PROMPTS = {
+  trace_relationship_extraction: {
+    system: `You are a telemetry and trace analyst. You read structured log samples and extract the systems that appear and the directional interactions between them.
+
+Return ONLY the two markdown tables described below. Do not include introductions, explanations, summaries, or code fences. Be concise but specific.`,
+    task: `TASK: Extract a Systems Inventory and Connection Mappings from the structured log sample below.
+
+INPUT: a delimited/CSV log sample. The first line is the header. Each row is one captured span or event.
+
+WHAT TO EXTRACT:
+
+1. Systems Inventory — every distinct system, service, module, database, queue, API, or external actor that appears in the log.
+   - Use the exact names from the log when possible. Normalize only whitespace/punctuation for readability.
+   - Mark the Type as one of: service, database, queue, external, api, process, module, system.
+   - Include a short Description of what it does based on the operations and context.
+
+2. Connection Mappings — every meaningful interaction or flow between two systems.
+   - A connection should be a service-to-service call, a read/write to a database, a publish/consume to a queue, or an external request/response.
+   - Direction uses the operation semantics in the log:
+       ->  one-way flow / request / send (A initiates to B)
+       <-  one-way inbound / receive (B receives from A)
+       <-> request/response or bidirectional
+       -   association with no clear initiator
+   - Flow Text should quote the operation name or a short verb phrase (e.g. "GET /users", "publishOrder", "INSERT", "acknowledge").
+
+OUTPUT FORMAT: exactly these two tables in markdown, with no extra prose.
+
+**Systems Inventory:**
+
+| System Name | Type | Description |
+|-------------|------|-------------|
+| {name} | {type} | {short description} |
+
+**Connection Mappings:**
+
+| System From | System To | Flow Text | Direction | Description |
+|-------------|-----------|-----------|-----------|-------------|
+| {from} | {to} | {operation} | -> / <- / <-> / - | {what happens} |
+
+LOG SAMPLE:
+
+[sample]
+{sample}
+[/sample]`,
+  },
   diagram_description: {
     task: `Image Handling
 
@@ -190,6 +234,19 @@ export const config = {
     poll_interval_ms: parseInt(process.env.ARCHITXT_HINDSIGHT_POLL_INTERVAL_MS || '5000', 10),
     stale_threshold_ms: parseInt(process.env.ARCHITXT_HINDSIGHT_STALE_THRESHOLD_MS || '300000', 10),
   },
+  trace_relationship_extraction: {
+    enabled: getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_ENABLED', 'true') === 'true',
+    provider: getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_PROVIDER', 'ollama_cloud'),
+    model: getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_MODEL', providers.ollama_cloud.default_model),
+    task_prompt: getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_PROMPT', PROMPTS.trace_relationship_extraction.task),
+    system_prompt: getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_SYSTEM_PROMPT', PROMPTS.trace_relationship_extraction.system),
+    timeout_ms: getInt('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_TIMEOUT_MS', 300000),
+    temperature: parseFloat(getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_TEMPERATURE', '0.2')),
+    max_tokens: getEnv('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_MAX_TOKENS', '') !== ''
+      ? getInt('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_MAX_TOKENS', 0)
+      : 16384,
+    max_chunks: getInt('ARCHITXT_TRACE_RELATIONSHIP_EXTRACTION_MAX_CHUNKS', 4),
+  },
   diagram_description: {
     enabled: getEnv('ARCHITXT_VISION_ENABLED', 'true') === 'true',
     provider: getEnv('ARCHITXT_VISION_PROVIDER', 'ollama_cloud'),
@@ -212,19 +269,6 @@ export const config = {
     classify_intent_max_tokens: getEnv('ARCHITXT_AGENT_CLASSIFY_INTENT_MAX_TOKENS', '') !== ''
       ? getInt('ARCHITXT_AGENT_CLASSIFY_INTENT_MAX_TOKENS', 0)
       : 2048,
-  },
-  research: {
-    synthesize: {
-      provider: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_PROVIDER', 'ollama_cloud'),
-      model: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MODEL', ''),
-      template: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPLATE', 'generic'),
-      temperature: parseFloat(getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TEMPERATURE', '0.2')),
-      max_tokens: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', '') !== ''
-        ? getInt('ARCHITXT_RESEARCH_SYNTHESIZE_MAX_TOKENS', 0)
-        : undefined,
-      system_prompt: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_SYSTEM_PROMPT', ''),
-      task_prompt: getEnv('ARCHITXT_RESEARCH_SYNTHESIZE_TASK_PROMPT', ''),
-    },
   },
   document_denoise_llm: {
     enabled: getEnv('ARCHITXT_DENOISE_LLM_ENABLED', 'true') === 'true',
@@ -262,5 +306,90 @@ export const config = {
     // will fall back to parsing reflect_response.content/text as the standard envelope.
     // Only valid standard envelopes are accepted; anything else fails as before.
     noStructuredOutputFallbackContent: getEnv('ARCHITXT_NO_STRUCTURED_OUTPUT_FALLBACK_CONTENT', 'false') === 'true',
+  },
+  traceProfileSuggest: {
+    provider: getEnv('ARCHITXT_TRACE_PROFILE_SUGGEST_PROVIDER', 'ollama_cloud'),
+    model: getEnv('ARCHITXT_TRACE_PROFILE_SUGGEST_MODEL', providers.ollama_cloud.default_model),
+    temperature: parseFloat(getEnv('ARCHITXT_TRACE_PROFILE_SUGGEST_TEMPERATURE', '0.0')),
+    max_tokens: getEnv('ARCHITXT_TRACE_PROFILE_SUGGEST_MAX_TOKENS', '') !== ''
+      ? getInt('ARCHITXT_TRACE_PROFILE_SUGGEST_MAX_TOKENS', 0)
+      : 4096,
+    timeout_ms: getInt('ARCHITXT_TRACE_PROFILE_SUGGEST_TIMEOUT_MS', 300000),
+    sample_budget_default: getInt('ARCHITXT_TRACE_PROFILE_SUGGEST_SAMPLE_BUDGET', 20000),
+    system_prompt: getEnv(
+      'ARCHITXT_TRACE_PROFILE_SUGGEST_SYSTEM_PROMPT',
+      [
+        'You are an expert telemetry/trace profile author for a system called Architxt.',
+        'Given a raw sample from a log or trace file, choose one of the supported engines and',
+        'return a complete, valid trace profile JSON object that can be used as the parser.config section',
+        'of an Architxt trace profile.',
+        '',
+        'Supported engines: delimited, plaintext, json-lines, json-nd.',
+        '- delimited: CSV/TSV/pipe-delimited files. Records may span multiple rows; a new record starts when a configured key column matches a regex.',
+        '- plaintext: Line-oriented logs. A new record starts when a line matches a regex. Supports XML/JSON payload stitching.',
+        '- json-lines: NDJSON / JSON-lines. Each line is a JSON object; records may be grouped by a path+pattern.',
+        '- json-nd: pretty-printed JSON object/array spanning multiple lines.',
+        '',
+        'Return only a JSON object with this exact top-level shape:',
+        '{',
+        '  "engine": "plaintext|delimited|json-lines|json-nd",',
+        '  "reasoning": "one-sentence reason for the choice",',
+        '  "config": { "parser": { "module": "plaintext|delimited|json-lines|json-nd", "config": { ... } } }',
+        '}',
+        '',
+        'Important: use only the short engine/module names (delimited, plaintext, json-lines, json-nd).',
+        'Do not use fully-qualified names such as architxt.parsers.delimited.',
+        'The config.parser.config must be a real, engine-specific configuration using the canonical nested shape:',
+        '{',
+        '  "input":   { "encoding": "utf-8", "delimiter": "...", "quoteChar": "\"", "hasHeader": true },',
+        '  "records": { "recordStartPattern": "...", "recordStartRule": { "keyColumn": 0, "keyRegex": "...", "minColumns": N }, "variants": [...], "payloadStitching": "xml|json|none", "multilineColumn": "..." }',
+        '}',
+        'Do not use flat keys such as stitchPayload, payloadStartPattern, or payloadEndPattern.',
+        'Use "records.payloadStitching": "xml" for XML/SOAP payloads and "json" for JSON payloads.',
+        'Each variant object must use the key "regex" (not "pattern") and may include "selector".',
+        'Do NOT include "fieldMap" or "defaults" inside variants; the parser only detects rows.',
+        'For plaintext, include records.recordStartPattern and at least one variant with a regex that identifies the start of a row.',
+        'The first variant must match every record-start line (i.e. it should be roughly the same shape as records.recordStartPattern).',
+        'Add additional variants only for extended shapes such as lines that carry extra markers.',
+        'This ensures every record that matches records.recordStartPattern also matches at least one variant, which is how coverage is counted.',
+        'Avoid anchoring the end of recordStartPattern or variant regexes with "$" unless the line truly ends exactly there; prefer "\\s*" or a trailing catch-all so embedded metadata or trailing whitespace does not silently produce zero records.',
+        'Do not assume fixed token lengths (such as exact hex-character counts) for IDs unless the sample proves every value has that length; use a repeating class such as [0-9a-f]+ instead.',
+        'For delimited, include input.delimiter and a records.recordStartRule (or recordStartPattern).',
+        'If the delimited file has embedded XML/JSON/SOAP payloads that contain their own quotes, set input.quoteChar to an empty string so the parser does not treat those quotes as field delimiters.',
+        'For json-lines and json-nd, use records.recordStartPath and records.recordStartPattern only to select rows.',
+        'Do not invent fields that are not in the engine schema.',
+        '',
+        'The parser emits raw detected rows. Each row is one logical record, possibly spanning multiple physical lines, with at minimum the keys "raw" and "unparsed".',
+        'No field extraction, kind mapping, sorting, or relationship extraction happens at this stage.',
+      ].join('\n'),
+    ),
+  },
+  traceFieldExtract: {
+    provider: getEnv('ARCHITXT_TRACE_FIELD_EXTRACT_PROVIDER', 'ollama_cloud'),
+    model: getEnv('ARCHITXT_TRACE_FIELD_EXTRACT_MODEL', providers.ollama_cloud.default_model),
+    temperature: parseFloat(getEnv('ARCHITXT_TRACE_FIELD_EXTRACT_TEMPERATURE', '0.0')),
+    max_tokens: getEnv('ARCHITXT_TRACE_FIELD_EXTRACT_MAX_TOKENS', '') !== ''
+      ? getInt('ARCHITXT_TRACE_FIELD_EXTRACT_MAX_TOKENS', 0)
+      // 16384: the histogram prompt grew (entries + nameMap injections + contexts)
+      // and a reasoning model can burn the whole budget on reasoning before any
+      // JSON — at 4096 the response ends finishReason:"length" with empty content.
+      : 16384,
+    timeout_ms: getInt('ARCHITXT_TRACE_FIELD_EXTRACT_TIMEOUT_MS', 300000),
+    // Minimum number of example values a nameMap group must list to count as a
+    // real named field — groups with fewer values are too thin to be meaningful.
+    min_name_map_values: getInt('ARCHITXT_TRACE_FIELD_EXTRACT_MIN_NAME_MAP_VALUES', 5),
+  },
+  traceExtract: {
+    // Stage timeout for the extract-trace pipeline stage. Promise.race rejects
+    // the stage at this deadline; in-loop abort checks make it cooperative.
+    timeout_ms: getInt('ARCHITXT_TRACE_EXTRACT_TIMEOUT_MS', 600000),
+    // Files larger than this are parsed in record-boundary-aware chunks
+    // (chunker.js) instead of whole-file, bounding peak memory.
+    chunk_threshold_bytes: getInt('ARCHITXT_TRACE_EXTRACT_CHUNK_THRESHOLD_BYTES', 50 * 1024 * 1024),
+    // Records per chunk when chunked parsing is active.
+    chunk_size: getInt('ARCHITXT_TRACE_EXTRACT_CHUNK_SIZE', 5000),
+    // Cap on emitted document-md chars; output is truncated with a marker so the
+    // result stays well under express.json's 50mb body limit.
+    max_output_chars: getInt('ARCHITXT_TRACE_EXTRACT_MAX_OUTPUT_CHARS', 10 * 1024 * 1024),
   },
 };

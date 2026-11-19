@@ -1,0 +1,58 @@
+---
+sidebar_position: 5
+---
+
+# Profile modal UI
+
+The **Create / Edit trace profile** dialog is where you author and test profiles. It is a wide dialog (`95vw`, `90vh`) laid out as three resizable columns:
+
+1. **Profile data** (left) — name, description, and the config JSON editor.
+2. **Build** (middle) — the tabbed config editor (Format & Fields / Sequence Configuration / Plaintext Field Extraction).
+3. **Sample** (right) — Input Sample and Output Sample panes.
+
+All column and row dividers are draggable, double-click resets a divider to its default, and splits persist in local storage (with per-pane minimum widths). Long panes scroll a page at a time with **Page Up / Page Down**.
+
+## Left column — profile data
+
+- **Name** — required, unique.
+- **Description** — optional.
+- **Config JSON** — the live config the profile will use. Edit it directly; a green **Valid JSON** bar (or a caution bar with the parse error) sits above the editor, with copy/wrap controls in the pane header. Saving is blocked while the JSON is invalid or the config is empty.
+
+## Middle column — tabbed config editor
+
+Three tabs, styled like the Document Details modal tab bar:
+
+### Format & Fields
+
+- **Format pane** — engine `<select>` (populated from `GET /trace-profiles/engines`) plus an **Auto-detect** button. Auto-detect sends the sample to `POST /trace-profiles/suggest-config`, confirms before replacing the current parser config, and clears detected fields, the histogram, and sample/sequence previews. Switching engines manually asks for confirmation for the same reason.
+- **Format controls** in one row — delimiter, header-row switch, payload-stitching select — always visible but disabled unless the engine is `delimited`. When the validate run detects multi-line columns, the Format pane shows them as caution chips with one-click **multilineColumn** / **stitch as XML/JSON** actions.
+- **Fields list** — the configured `fieldExtraction.fields` as rows, each with **entity** and **direction** tag toggles used by sequence mining. Tagging both is **required** for sequence mining (they become the first two columns of the sequence output table). For `delimited` inputs the header columns populate automatically; for `xml`/`json-lines`/`json-nd` the deterministic `availableFields` from `/validate` are written in when the list is empty. Deliberate deletions are respected — auto-fill only happens while the list is empty.
+
+### Sequence Configuration
+
+All `sequenceProfile` settings in one bordered block over two rows:
+
+- **Row 1 (inputs)**: Separator, Missing value, Max example keys, Min steps, Sort order, and the **Preview sequences** button at the right edge.
+- **Row 2 (switches)**: Include token components, Exclude missing entity/direction (default on), Sequence transitions.
+
+**Preview sequences** runs `POST /api/v1/trace-profiles/preview-sequences` with the current config and sample and renders the resulting Markdown report plus stats — or the validation error (for example a missing entity/direction tag) inline. See [Sequence mining](./sequence-mining) and [API routes](./api-routes).
+
+### Plaintext Field Extraction
+
+Enabled only for the `plaintext` engine. Provides LLM-assisted field discovery: a deterministic value **histogram** over the sample (previewed via `POST /trace-profiles/discovery-histogram`, with a **Generate histogram** button) and suggested extraction rules via `POST /trace-profiles/extract-fields`. Added fields land on the **Format & Fields** tab.
+
+## Right column — sample data and output
+
+### Input Sample
+
+Three ways to provide a sample:
+
+1. **Paste** — type or paste representative lines into the text area.
+2. **Select a trace document** — dropdown of uploaded trace documents (source loaded via `GET /documents/:id/source`).
+3. **Upload a file** — the upload button loads the file contents as the sample.
+
+### Output Sample
+
+Runs `POST /api/v1/trace-profiles/validate` with the **current** config JSON and the sample. Reports matched/unmatched records, total records, coverage percentage, warnings (e.g. detected multi-line columns), unparsed samples, per-field stats, and the parsed records (up to 500) — each rendered as raw line plus extracted fields, or as JSON via the plain/JSON toggle in the pane header. Invalid configs surface the error inline.
+
+Performance note: the validate/histogram/preview requests are keyed to the sample plus the parser/field config only — editing **sequence-profile-only** settings never re-triggers them, so switching tabs stays fast even with large samples.

@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: architxt:0.5.0
+    image: architxt:0.5.1
     container_name: architxt
     ports:
       - "3000:3000"
@@ -91,7 +91,7 @@ services:
     profiles:
       - hindsight
     container_name: architxt-hindsight
-    image: ghcr.io/vectorize-io/hindsight:1.1.0
+    image: ghcr.io/vectorize-io/hindsight:1.2.1
     env_file:
       - server/.env
     ports:

@@ -938,6 +938,46 @@ When both are set:
 
 This removes the manual server/bank setup step in Docker Compose. You still need to add Hindsight credentials in `server/.env` (see the Hindsight section in `.env.example`).
 
+## Trace profile suggestion
+
+These settings control the LLM used by the **Trace Profiles** page when it suggests or refines a parser config from a raw sample.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_PROVIDER` | `ollama_cloud` | Provider name for trace-profile suggestion calls. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_MODEL` | *(provider default)* | Model used to generate parser configs. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_TEMPERATURE` | `0.0` | Sampling temperature. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_MAX_TOKENS` | `4096` | Maximum tokens in the response. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_TIMEOUT_MS` | `300000` | Request timeout in milliseconds (5 minutes). |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_SAMPLE_BUDGET` | `20000` | Default characters of the sample to send to the LLM. Higher budgets let the model see more records but consume more context. |
+| `ARCHITXT_TRACE_PROFILE_SUGGEST_SYSTEM_PROMPT` | *(built-in)* | Custom system prompt override. |
+
+### Trace field extraction (plaintext)
+
+These settings control the LLM used by the **Plaintext Field Extraction** tab in the trace profile modal:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_TRACE_FIELD_EXTRACT_PROVIDER` | `ollama_cloud` | Provider for field-extraction calls. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_MODEL` | *(provider default)* | Model used to suggest field-extraction rules. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_TEMPERATURE` | `0.0` | Sampling temperature. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_MAX_TOKENS` | `16384` | Maximum tokens in the response. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_TIMEOUT_MS` | `300000` | Request timeout in milliseconds. |
+| `ARCHITXT_TRACE_FIELD_EXTRACT_MIN_NAME_MAP_VALUES` | `5` | Minimum example values a nameMap group must list to count as a real named field. |
+
+### Trace extraction (pipeline)
+
+These settings control the `extract-trace` pipeline stage that runs when a trace document is extracted:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCHITXT_TRACE_EXTRACT_TIMEOUT_MS` | `600000` | Stage timeout in milliseconds (10 minutes). |
+| `ARCHITXT_TRACE_EXTRACT_CHUNK_THRESHOLD_BYTES` | `52428800` (50 MB) | Files larger than this are parsed in record-boundary-aware chunks to bound peak memory. |
+| `ARCHITXT_TRACE_EXTRACT_CHUNK_SIZE` | `5000` | Records per chunk when chunked parsing is active. |
+| `ARCHITXT_TRACE_EXTRACT_MAX_OUTPUT_CHARS` | `10485760` (10 MB) | Cap on emitted document content characters; output is truncated with a marker. |
+
+All variables are optional. If the model variable is empty, the selected provider's default model is used. The system prompt can be overridden in `.env` if you need to adjust the parser-authoring role; leaving it empty uses the built-in prompt.
+
 ## Next steps
 
 - [Install architxt](./installation)
@@ -1651,6 +1691,8 @@ The documents table in the architxt UI surfaces the most important facts about e
 |---|---|---|
 | **Document ID** | Internal architxt identifier. | Used throughout the UI and API to refer to the document. |
 | **External ID** | Stable identifier you supply during upload or import. | Maps to Hindsight's [`document_id`](https://hindsight.vectorize.io/developer/api/retain#document_id), so the same id can survive re-imports. |
+| **Type** | Whether the source is an ordinary **Document** or a **Trace** (log/trace file). | Shown as a badge; trace documents use a trace profile during extraction. |
+| **Trace Profile** | For trace documents, the name of the trace profile stored in its processing options. | Shows `-` for ordinary documents. Changeable in **Document Details** and via the bulk **Config** action. |
 | **Status** | Current lifecycle state such as **Uploaded**, **Extracting**, or **Extracted**. | Tells you whether the document is ready to use or still being processed. |
 | **Overrides** | Caution badges for any processing stage explicitly disabled in **Document Details**. | Shows at a glance which documents deviate from the default extraction pipeline. |
 | **Document Content** | Extracted Markdown representation of the file. | The material the contextual graph, mental models, and Reflect operate on. |
@@ -1658,7 +1700,7 @@ The documents table in the architxt UI surfaces the most important facts about e
 | **Full Path** | Stored location of the original file. | Used for re-download, re-processing, and integrity checks. |
 | **Processing History** | Log of every status transition. | Audit trail you can inspect in **Document Details**. |
 | **Progress** | Optional extraction progress object. | Shown while a document is actively being extracted. |
-| **Context** | The document's assigned context, if any. | Groups related documents and is sent to Hindsight during sync. |
+| **Context** | The document's assigned context, if any. | Groups related documents and is sent to Hindsight during sync. Trace documents additionally get a built-in `system-trace` context prepended automatically (see below). |
 | **Document Date** | Timestamp you assign to the document itself. | Independent of upload time; useful for filtering and sorting. |
 
 ## Document states
@@ -1787,6 +1829,62 @@ Once a document reaches **Extracted**:
 - It can be synced to a Hindsight memory bank.
 
 Documents remain in the table unless explicitly deleted; architxt does not use a `deleted` flag. The **Processing History** preserves the full lifecycle for audit purposes.
+
+## Trace documents
+
+A **trace document** is a special source type for log files, trace dumps, and other structured telemetry you want to parse into structured records before they are stored as architxt documents. Trace documents are uploaded through the same **Upload Documents** dialog as ordinary documents, but with the **Trace upload** switch turned on.
+
+### When to use a trace document
+
+Use a trace document when you have raw system output that already contains architectural information — for example:
+
+- Distributed request/response logs.
+- CSV or TSV dumps of interface calls.
+- JSON-lines telemetry files.
+- Plaintext service logs with a consistent start-of-record pattern.
+
+The goal is to extract caller/callee relationships, service names, and operation names without building a separate observability backend. The trace document keeps the original file in storage and, once the profile has been applied, stores the parsed content (cleaned log, or the mined sequence report when the profile has a `sequenceProfile`) as Markdown so the rest of architxt (entity detection, mental models, Reflect, and contextual graph sync) can work on it.
+
+### Uploading a trace document
+
+1. Open **Upload Documents** from the documents page.
+2. Turn on the **Trace upload** switch.
+3. Optional: choose a **trace profile** from the dropdown. The dropdown lists every profile configured on the **Trace Profiles** page and shows its engine (for example `delimited` or `plaintext`).
+4. Drag files into the drop zone, or click to select them.
+5. Click **Upload**.
+
+Each file becomes a separate trace document with `source_type = trace`. The selected profile name is written into the document's `processing_options` and can be inspected later in **Document Details**.
+
+### System trace context
+
+Every trace document automatically gets a built-in **`system-trace`** context prepended to whatever context you assign it. This is a fixed code constant (not a row in the Contexts page — it can't be edited, deleted, or counted). It briefly describes the stored **Trace Sequence Analysis** report — the header metadata, one section per mined sequence with its signature, frequency, and Step | Entity | Direction | Token table (Entity and Direction are the key columns, always first, identifying who performed each step and in which direction), and the optional transitions section — so downstream consumers such as Hindsight sync and Reflect know how to read the document. Your selected context text is appended after it, separated by a divider.
+
+### What happens after upload
+
+Trace documents follow the same document lifecycle as ordinary documents. They appear in the documents table with the same status values:
+
+- **Uploaded** — file is stored but extraction has not run.
+- **Extracting** — the extraction daemon has claimed the file.
+- **Extracted** — the trace parser has run and the resulting Markdown content is available.
+
+Because a trace document's content is produced by a parser rather than Docling, the extraction stage reads the raw file, applies the trace profile, and converts the parsed records into a Markdown representation. You can view that content on the **Document Content** tab in **Document Details**.
+
+### Trace profile reference
+
+A trace profile defines how the file should be parsed. If you do not select one at upload time, the document is created but no parser is applied until a profile is associated. Profiles are managed on the dedicated **Trace Profiles** page; see the [trace profiles guide](../trace-profiles/overview) for how to author, version, and test them.
+
+At upload time the UI only needs the **profile name**. The profile itself is resolved again at extraction time, so changes made to the profile after upload will affect the next extraction run.
+
+### Managing the trace profile on existing documents
+
+The documents list shows each document's **Type** and, for trace documents, its **Trace Profile**. You can change the profile in two places:
+
+- **Document Details dialog** — for a trace document, a **Trace Profile** selector (with a "— none —" option) next to the type badge. Changing it shows a warning that re-extraction with a different profile **may invalidate existing extracted data**, since the stored content was produced by the previous profile. The new value is saved into `processing_options.trace_profile` and applies on the next extraction.
+- **Bulk Config action** — select multiple documents in the list and open **Config**. The dialog has a **Document Date** field (as before) and, when the selection contains trace documents, a **Trace Profile** row showing the majority value across the selected trace documents. Setting it sends `POST /api/v1/documents/batch/updateconfig` with both `timestamp` and `trace_profile`; the timestamp applies to **all** selected documents, while `trace_profile` applies **only to documents of type Trace** — non-trace documents in the selection are skipped for that field (the response reports `trace_docs_updated` and `trace_docs_skipped`). The same re-extraction warning is shown when the profile value actually changes.
+
+### What extraction stores for a trace document
+
+The trace extraction stage (`extract-trace` pipeline stage) reads the raw source file, runs the profile's parser, and — when the profile has a `sequenceProfile` — mines the sequences and stores **the sequence analysis report alone** as the document's Markdown content (matching what **Preview sequences** shows in the profile modal). Without a `sequenceProfile`, the cleaned log remains the document content. The original file always stays available at the document's stored source path. See [sequence mining](../trace-profiles/sequence-mining) for the report format and config.
 ---
 
 # Mental Models
@@ -5258,6 +5356,411 @@ Bank settings map to the Hindsight bank config fields described in the [memory b
 ## Summary
 
 Bank Settings sync is a single-object comparison between architxt's master configuration and a Hindsight bank's config. It checks missions, extraction mode, chunk size, free-form entities, and disposition. Push sends the master settings to the bank; pull copies the bank's settings back into the architxt master.
+---
+
+# Trace profiles
+URL: https://architxtlabs.com/trace-profiles/overview
+# Trace profiles
+
+A **trace profile** tells architxt how to turn a raw log or trace file into structured records and — when sequence mining is enabled — a mined sequence analysis document. Once produced, the trace document keeps going through the normal architxt pipeline: entity detection, mental models, Reflect, and contextual graph sync, without architxt becoming a full observability backend.
+
+This section documents the current profile model end to end:
+
+- **[Concepts & lifecycle](./concepts)** — what a profile is, where it applies, the version workflow, and how trace documents relate to profiles.
+- **[Profile config reference](./config-reference)** — the top-level config JSON: parser engines, `fieldExtraction`, and the full `sequenceProfile` schema.
+- **[Sequence mining](./sequence-mining)** — how `sequenceProfile` turns parsed rows into the sequence output table, including entity/direction columns, missing-value semantics, and caps.
+- **[Profile modal UI](./profile-modal)** — the tabs, panes, resizers, preview, and engine auto-detect in the create/edit dialog.
+- **[API routes](./api-routes)** — the `/api/v1/trace-profiles/*` endpoints, including the new `POST /preview-sequences` route.
+
+## Where trace profiles apply
+
+Trace profiles are used in three places:
+
+1. **Trace document upload** — when you upload a file with **Trace upload** enabled, you can pick a profile. The profile name is stored in the document's processing options and applied during extraction.
+2. **Document management** — the documents list shows each document's **Type** (`Document` or `Trace`) and, for trace documents, its **Trace Profile**. The **Document Details** dialog and the multi-select **Config** bulk action let you change the profile on existing trace documents.
+3. **The Trace Profiles page** — where you create, edit, version, and test profiles against sample data without uploading a full document.
+
+A profile is not tied to a single file. Any number of trace documents can reference the same profile, and the profile is resolved at extraction time, so editing a profile affects the next extraction run. Changing a trace document's profile warns that re-extraction may invalidate existing extracted data.
+---
+
+# Concepts & lifecycle
+URL: https://architxtlabs.com/trace-profiles/concepts
+# Concepts & lifecycle
+
+## Why trace profiles exist
+
+Many systems already record their interactions in logs:
+
+- Service-to-service request/response logs.
+- CSV or TSV dumps exported from integration middleware.
+- JSON-lines telemetry from APIs or message queues.
+- Plaintext application logs with a consistent start-of-record pattern.
+- XML documents with repeated record elements.
+
+Those files contain architectural facts — which systems call which, what operations they perform, and how calls are grouped — but the facts are locked inside vendor-specific formatting. A trace profile is a small, explicit JSON configuration that unlocks that structure and turns the file into flat records that architxt can mine and work with.
+
+## What a trace profile stores
+
+Each profile is a single row in the `trace_profiles` table:
+
+| Field | Meaning |
+|---|---|
+| **ID** | Internal identifier. |
+| **Name** | Unique profile name. Used when a trace document references the profile. |
+| **Description** | Optional human-readable summary of what the profile is for. |
+| **Config** | The parser JSON (`tfp_config`). This is the authoritative configuration applied during extraction — there is no separate version history in the UI; you edit the config JSON directly in the profile modal. |
+| **Config updated at** | Timestamp of the last change to the config. |
+| **Created / updated at** | Standard lifecycle timestamps. |
+
+The **Trace Profiles page** lists profiles in a table with ID, Name, Engine (`parser.module` from the config), Config Updated, Description, and Updated columns. You can search by name/engine/description, multi-select rows, delete selected profiles, and click a row to open the editor.
+
+## Profile → trace document flow
+
+```text
+Trace profile (trace_profiles row, config JSON)
+        │  resolved at extraction time by name
+        ▼
+Trace document (documents row, source_type = "trace",
+                 processing_options.trace_profile = <profile name>)
+        │  extract-trace pipeline stage
+        ▼
+Parsed records → (optional) sequence mining → document-md content
+```
+
+Because the profile is resolved by name at extraction time, editing a profile after a document was uploaded changes what the **next** extraction of that document produces. Changing a document's profile in the UI carries an explicit warning that re-extraction may invalidate existing extracted data.
+
+## Authoring a profile
+
+The profile modal is where you build a config; see [Profile modal UI](./profile-modal). The typical flow is:
+
+1. **Create a profile** and give it a name and description.
+2. **Provide a sample** — paste lines, upload a file, or pick an existing trace document as the source.
+3. Either pick an **engine** from the dropdown, or click **Auto-detect** to have the LLM detect the format from the sample and write the parser block into the config (with a confirmation, since it replaces the current parser config and clears detected fields/previews).
+4. Refine format and fields on the **Format & Fields** tab, and sequence mining on the **Sequence Configuration** tab, using the **Output Sample** and **Preview sequences** panes to check results live.
+5. Click **Save changes** (or **Create profile**). The config is stored as the profile's current config and can be selected at trace-document upload time.
+
+Validation and previews always run against the **current** config JSON in the editor — there is no separate saved-version workflow. The LLM-assisted routes back the buttons in the modal: `suggest-config` powers **Auto-detect**, while `extract-fields` and `discovery-histogram` power the **Plaintext Field Extraction** tab. LLM suggestion settings are configured via the `ARCHITXT_TRACE_PROFILE_SUGGEST_*` variables in `server/.env` — see [Configuration](../getting-started/configuration).
+
+## Trace documents and profiles
+
+Once a profile is ready, you apply it by uploading a trace document:
+
+1. Go to **Documents → Upload Documents**.
+2. Enable the **Trace upload** switch.
+3. Select the profile from the dropdown.
+4. Upload the file.
+
+The document is created with `source_type = "trace"` and the profile name stored in `processing_options.trace_profile`. You can later change the profile from the **Document Details** dialog, or in bulk for several trace documents at once via the **Config** action on the multi-select — see [Documents](../core-concepts/documents#trace-documents) for details.
+---
+
+# Profile config reference
+URL: https://architxtlabs.com/trace-profiles/config-reference
+# Profile config reference
+
+The profile's config JSON has this top-level shape:
+
+```json
+,
+      "records": ,
+      "sequenceProfile": 
+    }
+  },
+  "fieldExtraction": 
+}
+```
+
+`sequenceProfile` is documented in detail on [Sequence mining](./sequence-mining); `fieldExtraction` is summarised at the bottom of this page.
+
+There is no span/OTLP mapping layer in the config anymore: parsers produce flat records (``), the optional cleaned-log rendering is configurable via the top-level `standardLog` block, and sequence mining reads fields directly. Suggestion prompts explicitly instruct the LLM not to emit `fieldMap`, `kindMap`, or attribute mappings.
+
+## Parser engines
+
+The engine is selected by `parser.module`. Engine manifests (name, description, suggested extensions/content types) are returned by `GET /api/v1/trace-profiles/engines` and drive the UI dropdown.
+
+| Engine | Best for |
+|---|---|
+| `delimited` | CSV, TSV, pipe-delimited and similar files (`.csv`, `.tsv`, `.txt`). Supports header rows, record-start rules keyed on a leading column, multi-line columns, and XML/JSON payload stitching. |
+| `plaintext` | Line-oriented or multi-line logs (`.log`, `.txt`) where each record starts with a regex pattern (`records.recordStartPattern`). Supports payload stitching. |
+| `json-lines` | NDJSON / JSON-lines files (`.jsonl`, `.ndjson`) where each line is independent JSON. Supports dot-path record-start markers. |
+| `json-nd` | Pretty-printed JSON (`.json`) where one object or array spans multiple lines; root arrays are split per element. Supports dot-path record-start markers and regex variants evaluated against the serialised record. |
+| `xml` | XML documents and streams (`.xml`). A root element wrapping repeated children (`<log><event/>…`) is split so each child is one record; concatenated top-level elements are split per element. `records.splitElements: false` keeps the whole document as one record; `records.recordStartTag` restricts which elements count as records. |
+
+### `input`
+
+How to read the file:
+
+| Key | Meaning |
+|---|---|
+| `delimiter` | Field separator for `delimited` files. |
+| `hasHeader` | Whether the first row is a header for `delimited` files (header names become field names; without a header, columns are named `column_0`, `column_1`, …). |
+| `encoding` | File encoding, usually `utf-8`. |
+
+### `records`
+
+How logical records are bounded:
+
+| Key | Meaning |
+|---|---|
+| `recordStartPattern` / `recordStartRule` | Regex or rule that marks the first line of a record (plaintext; also supported by delimited via `keyRegex`/`valueRegex`). |
+| `multilineColumn` | For `delimited` files, the column whose value may continue onto following lines. |
+| `payloadStitching` | `"xml"` or `"json"` — treat continuation lines as a payload appended to the last column. |
+| `splitElements` / `recordStartTag` | XML engine: split repeated child elements into records (default on); optionally only accept a given tag name. |
+
+### Example delimited config
+
+```json
+,
+      "records": 
+    }
+  }
+}
+```
+
+## Cleaned log output (`standardLog`)
+
+When a profile has no `sequenceProfile`, extraction stores a cleaned, delimited log as the document content. The rendering (`standard-log-formatter`) is fixed-shape: one line per record with the fixed leading columns `timestamp | direction | service | operation | traceId | messageId | parentId` followed by any dynamic keys, using a configurable `delimiter` (default `|`). Options under the top-level `standardLog` block: `delimiter`, `maxRawLength` (raw/evidence column cap, default 200), `stripXmlFromRaw` (default true), `cleanOperation` (trim operation at the first `~`, default false).
+
+## Field extraction
+
+`fieldExtraction.fields` is a unified list of `` rules applied to every parsed record (and to the raw sample in the UI):
+
+- **`name`** — the field name used everywhere else (sequence profile, entity/direction tags, token columns).
+- **`source`** — for `delimited`, `null` means the value comes straight from the parser column of the same name; for plaintext, a `regex` with capture groups extracts from the raw line. For `xml`/`json-lines`/`json-nd`, deterministic payload paths are surfaced as available fields and can be added to the list.
+- **`regex`** — optional refinement applied within the source value.
+- **`ordinal`** — position of the column (delimited).
+
+The UI's **Format & Fields** tab populates this list automatically: for delimited inputs the header columns are detected, and for `xml`, `json-lines`, and `json-nd` the deterministic `availableFields` reported by `POST /api/v1/trace-profiles/validate` are written into the config when the list is empty. Fields you deliberately delete are not re-added automatically. The **Plaintext Field Extraction** tab offers LLM-assisted discovery (histogram + suggested fields) for plaintext logs, where there is no header to read fields from.
+---
+
+# Sequence mining
+URL: https://architxtlabs.com/trace-profiles/sequence-mining
+# Sequence mining
+
+When a trace profile includes a `sequenceProfile`, extraction doesn't just clean the log — it **mines the repeating sequences** in the data and produces a single Markdown report as the document's content. This is the primary output for trace documents with sequence mining enabled: the stored document content (`document-md`) is the sequence analysis itself, and the raw source file stays available separately.
+
+Sequence mining is deterministic — no LLM involved — so the same input and profile always produce the same report.
+
+## How it works, in plain terms
+
+1. **Group** the parsed rows by their **correlation fields** (for example a trace/request id) — each group is one "trace" of related events.
+2. **Order** each group by its **order fields** (usually a timestamp).
+3. **Build a token signature** per group from its **token fields**.
+4. **Merge identical signatures** into sequences, count how often each occurs (frequency), and keep a few example trace keys.
+5. **Render** the distinct sequences as a Markdown report with a table per sequence.
+
+## The `sequenceProfile` config
+
+`sequenceProfile` lives inside `parser.config` in the profile JSON:
+
+```json
+,
+      "records": ,
+      "sequenceProfile": 
+    }
+  }
+}
+```
+
+### Required fields
+
+| Key | Meaning |
+|---|---|
+| `orderColumns` | Fields used to sort rows inside a group (e.g. `["timestamp"]`). Required, non-empty. |
+| `correlationColumns` | Fields that group rows into one trace (e.g. `["traceId"]`). Required, non-empty. |
+| `tokenColumns` | Fields that make up each step's token (e.g. `["service", "operation"]`). Required, non-empty. |
+| **`entityColumn`** | **Required.** The single field treated as the *entity* — who/what acts. It is always the **first data column** of the output table. |
+| **`directionColumn`** | **Required.** The single field treated as the *direction* — the action (e.g. request/response). It is always the **second data column** of the output table. |
+
+Entity and direction are mandatory on purpose: they are the *what* and *action* of a sequence, and without them the mined output loses its contextual meaning. If either is missing from the profile, sequence validation fails with e.g. `entityColumn is required — tag one field as the entity`, and the preview shows that error instead of a report. In the profile modal you tag them with the **entity** and **direction** toggles on each field row.
+
+### Options
+
+| Key | Default | Meaning |
+|---|---|---|
+| `separator` | `"$"` | Joins token components inside a signature. Must not appear inside any `tokenColumns` name. |
+| `missingValue` | `"-"` | Placeholder rendered for missing token, entity, direction, or correlation values. Empty string is not allowed (falls back to the default). |
+| `minSteps` | `2` | Sequences with fewer steps than this are omitted from the report — single-step sequences are usually one-off noise. Set to `1` to keep everything. Values below 1 are rejected. |
+| `maxExampleKeys` | `5` | How many example trace keys are listed per sequence. |
+| `sortOrder` | `"none"` | `"frequency-desc"` (most common first), `"signature-asc"` (alphabetical), or `"none"` (discovery order). |
+| `includeTokenComponents` | `true` | When on, the individual token fields are shown as extra columns in each sequence table, after the Token column. |
+| `excludeMissingTokens` | `true` | When on (default), rows whose **entity or direction** value is missing are excluded from mining. A stored explicit `false` turns this off. Missing *token* components are always tolerated — they just render as the missing-value placeholder. |
+| `includeTransitions` | `false` | When on, the report also lists adjacent-sequence transitions across ordered traces (up to 50). |
+
+### Caps (all optional, `0` = unlimited)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `maxInputRows` | `0` | Cap on input rows; excess rows are down-sampled deterministically (even spread), and the report notes how many were dropped. |
+| `maxSignatures` | `1000` | Cap on distinct sequences; the rest fold into one combined overflow section. Applied after sorting, so the kept sections are the top-N by the chosen sort order. |
+| `maxRowsPerGroup` | `0` | Cap on rows kept per correlation group after ordering (the tail, i.e. the least recent, is dropped). |
+
+## Missing and sparse values
+
+- A row is only **ineligible** (excluded) when an order value is truly absent, or — with `excludeMissingTokens` on — when its **entity or direction** is missing. Missing token components never make a row ineligible.
+- **Correlation ids use wildcard semantics**: the group key is built from the correlation values that are *present* only. A row missing a sparse id still joins the group of the rows it does match, instead of being blobbed into a single shared "missing" bucket. Only when *all* correlation values are missing does the row fall back to one placeholder group so it is still mined.
+
+## Output shape
+
+The report starts with a header summarising the run:
+
+```markdown
+# Trace Sequence Analysis: <filename>
+
+**Input format**: `delimited`
+**Order fields**: `timestamp`
+**Correlation fields**: `traceId`
+**Token fields**: `service`, `operation`
+**Entity field**: `service`
+**Direction field**: `direction`
+**Rows used**: 480 (12 ineligible)
+**Min steps**: 2 — shorter sequences omitted
+```
+
+Each sequence section then has a frequency, example trace keys, and a table whose first columns are always **Step | Entity | Direction | Token** (plus one column per token component when `includeTokenComponents` is on):
+
+```markdown
+## Sequence 1 — `orders$create → payments$charge`
+
+- **Frequency**: 42 traces
+- **Example trace keys**: `a1b2c3…`, `d4e5f6…`
+
+| Step | Entity | Direction | Token | Service | Operation |
+|---|---|---|---|---|---|
+| 1 | orders-service | REQUEST | orders$create | orders-service | create |
+| 2 | payments-service | REQUEST | payments$charge | payments-service | charge |
+```
+
+## Previewing sequences
+
+The **Sequence Configuration** tab in the profile modal has a **Preview sequences** button. It runs the current config against the sample and shows the exact Markdown report that extraction would store — same mining, same caps — together with run stats (rows used, ineligible rows, sequence count, correlation keys, truncation/overflow notes). Invalid profiles (for example a missing `entityColumn`) return the validation error inline instead of a report.
+
+The server route behind it is `POST /api/v1/trace-profiles/preview-sequences`; see [API routes](./api-routes).
+---
+
+# Profile modal UI
+URL: https://architxtlabs.com/trace-profiles/profile-modal
+# Profile modal UI
+
+The **Create / Edit trace profile** dialog is where you author and test profiles. It is a wide dialog (`95vw`, `90vh`) laid out as three resizable columns:
+
+1. **Profile data** (left) — name, description, and the config JSON editor.
+2. **Build** (middle) — the tabbed config editor (Format & Fields / Sequence Configuration / Plaintext Field Extraction).
+3. **Sample** (right) — Input Sample and Output Sample panes.
+
+All column and row dividers are draggable, double-click resets a divider to its default, and splits persist in local storage (with per-pane minimum widths). Long panes scroll a page at a time with **Page Up / Page Down**.
+
+## Left column — profile data
+
+- **Name** — required, unique.
+- **Description** — optional.
+- **Config JSON** — the live config the profile will use. Edit it directly; a green **Valid JSON** bar (or a caution bar with the parse error) sits above the editor, with copy/wrap controls in the pane header. Saving is blocked while the JSON is invalid or the config is empty.
+
+## Middle column — tabbed config editor
+
+Three tabs, styled like the Document Details modal tab bar:
+
+### Format & Fields
+
+- **Format pane** — engine `<select>` (populated from `GET /trace-profiles/engines`) plus an **Auto-detect** button. Auto-detect sends the sample to `POST /trace-profiles/suggest-config`, confirms before replacing the current parser config, and clears detected fields, the histogram, and sample/sequence previews. Switching engines manually asks for confirmation for the same reason.
+- **Format controls** in one row — delimiter, header-row switch, payload-stitching select — always visible but disabled unless the engine is `delimited`. When the validate run detects multi-line columns, the Format pane shows them as caution chips with one-click **multilineColumn** / **stitch as XML/JSON** actions.
+- **Fields list** — the configured `fieldExtraction.fields` as rows, each with **entity** and **direction** tag toggles used by sequence mining. Tagging both is **required** for sequence mining (they become the first two columns of the sequence output table). For `delimited` inputs the header columns populate automatically; for `xml`/`json-lines`/`json-nd` the deterministic `availableFields` from `/validate` are written in when the list is empty. Deliberate deletions are respected — auto-fill only happens while the list is empty.
+
+### Sequence Configuration
+
+All `sequenceProfile` settings in one bordered block over two rows:
+
+- **Row 1 (inputs)**: Separator, Missing value, Max example keys, Min steps, Sort order, and the **Preview sequences** button at the right edge.
+- **Row 2 (switches)**: Include token components, Exclude missing entity/direction (default on), Sequence transitions.
+
+**Preview sequences** runs `POST /api/v1/trace-profiles/preview-sequences` with the current config and sample and renders the resulting Markdown report plus stats — or the validation error (for example a missing entity/direction tag) inline. See [Sequence mining](./sequence-mining) and [API routes](./api-routes).
+
+### Plaintext Field Extraction
+
+Enabled only for the `plaintext` engine. Provides LLM-assisted field discovery: a deterministic value **histogram** over the sample (previewed via `POST /trace-profiles/discovery-histogram`, with a **Generate histogram** button) and suggested extraction rules via `POST /trace-profiles/extract-fields`. Added fields land on the **Format & Fields** tab.
+
+## Right column — sample data and output
+
+### Input Sample
+
+Three ways to provide a sample:
+
+1. **Paste** — type or paste representative lines into the text area.
+2. **Select a trace document** — dropdown of uploaded trace documents (source loaded via `GET /documents/:id/source`).
+3. **Upload a file** — the upload button loads the file contents as the sample.
+
+### Output Sample
+
+Runs `POST /api/v1/trace-profiles/validate` with the **current** config JSON and the sample. Reports matched/unmatched records, total records, coverage percentage, warnings (e.g. detected multi-line columns), unparsed samples, per-field stats, and the parsed records (up to 500) — each rendered as raw line plus extracted fields, or as JSON via the plain/JSON toggle in the pane header. Invalid configs surface the error inline.
+
+Performance note: the validate/histogram/preview requests are keyed to the sample plus the parser/field config only — editing **sequence-profile-only** settings never re-triggers them, so switching tabs stays fast even with large samples.
+---
+
+# API routes
+URL: https://architxtlabs.com/trace-profiles/api-routes
+# API routes
+
+All trace-profile endpoints are mounted under `/api/v1/trace-profiles`. Requests and responses use JSON; the standard envelope wraps list/detail payloads in a `data` key.
+
+## Profile CRUD
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/trace-profiles` | List all profiles (id, name, description, config, versions, used version). |
+| `GET` | `/api/v1/trace-profiles/by-name/:name` | Fetch one profile by name. |
+| `GET` | `/api/v1/trace-profiles/:id` | Fetch one profile by id. |
+| `POST` | `/api/v1/trace-profiles` | Create a profile (`name`, optional `description`, `config`). |
+| `PUT` | `/api/v1/trace-profiles/:id` | Update a profile; a changed `config` is snapshotted into `versions`. |
+| `DELETE` | `/api/v1/trace-profiles/:id` | Delete a profile. |
+
+## Engines and validation
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/trace-profiles/engines` | List engine manifests (module name, description, suggested extensions) for the UI dropdown. |
+| `POST` | `/api/v1/trace-profiles/validate` | Run a config against a sample string. Returns matched/unmatched record counts, coverage, unparsed samples, warnings, and — for `xml` / `json-lines` / `json-nd` — the deterministic `availableFields` (payload paths) that the UI uses to populate the fields list. Validation errors are returned as `` with HTTP 200. |
+
+## LLM-assisted authoring
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/trace-profiles/suggest-config` | Ask the LLM to propose or iterate a parser config from a sample (``). |
+| `POST` | `/api/v1/trace-profiles/extract-fields` | LLM-assisted field extraction for plaintext samples. |
+| `POST` | `/api/v1/trace-profiles/discovery-histogram` | Build a value histogram over the sample to support field discovery. |
+
+## Sequence preview (new)
+
+`POST /api/v1/trace-profiles/preview-sequences` runs sequence mining exactly as extraction would and returns the report Markdown.
+
+**Request body:**
+
+```json
+ } }, "fieldExtraction":  },
+  "sample": "<raw sample text>"
+}
+```
+
+- `config` — the full profile config object (the same shape as a stored profile's `config`). `config.parser.config.sequenceProfile` is **required**; without it the route returns HTTP 400.
+- `sample` — the raw sample text (string, required).
+
+**Success response (HTTP 200):**
+
+```json
+
+  }
+}
+```
+
+**Invalid profile (still HTTP 200):**
+
+```json
+ }
+```
+
+The mining uses the same `sequenceProfile` semantics as extraction — mandatory `entityColumn`/`directionColumn`, wildcard correlation, `missingValue` placeholders, `minSteps` filtering, and the `maxInputRows` / `maxSignatures` / `maxRowsPerGroup` caps — so the preview matches what a trace document's stored content will look like. The only cosmetic difference is the report title, which uses the sample name (`sample`) instead of the real filename.
+
+## Document-side routes
+
+The trace-profile-aware document endpoints live under `/api/v1/documents` and are documented on the [Documents](../core-concepts/documents#trace-documents) page — in particular `POST /documents` (with `source_type: "trace"` and `trace_profile`) and `POST /documents/batch/updateconfig` (which accepts `trace_profile` alongside `timestamp` and applies it only to trace-type documents).
 ---
 
 # Query your architecture, don’t hunt for it.

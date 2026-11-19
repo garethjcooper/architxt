@@ -1,0 +1,123 @@
+---
+sidebar_position: 4
+---
+
+# Sequence mining
+
+When a trace profile includes a `sequenceProfile`, extraction doesn't just clean the log — it **mines the repeating sequences** in the data and produces a single Markdown report as the document's content. This is the primary output for trace documents with sequence mining enabled: the stored document content (`document-md`) is the sequence analysis itself, and the raw source file stays available separately.
+
+Sequence mining is deterministic — no LLM involved — so the same input and profile always produce the same report.
+
+## How it works, in plain terms
+
+1. **Group** the parsed rows by their **correlation fields** (for example a trace/request id) — each group is one "trace" of related events.
+2. **Order** each group by its **order fields** (usually a timestamp).
+3. **Build a token signature** per group from its **token fields**.
+4. **Merge identical signatures** into sequences, count how often each occurs (frequency), and keep a few example trace keys.
+5. **Render** the distinct sequences as a Markdown report with a table per sequence.
+
+## The `sequenceProfile` config
+
+`sequenceProfile` lives inside `parser.config` in the profile JSON:
+
+```json
+{
+  "parser": {
+    "module": "delimited",
+    "config": {
+      "input": { ... },
+      "records": { ... },
+      "sequenceProfile": {
+        "orderColumns": ["timestamp"],
+        "correlationColumns": ["traceId"],
+        "tokenColumns": ["service", "operation"],
+        "entityColumn": "service",
+        "directionColumn": "direction",
+        "separator": "$",
+        "missingValue": "-",
+        "minSteps": 2,
+        "maxExampleKeys": 5,
+        "sortOrder": "frequency-desc",
+        "includeTokenComponents": true,
+        "excludeMissingTokens": true,
+        "includeTransitions": false
+      }
+    }
+  }
+}
+```
+
+### Required fields
+
+| Key | Meaning |
+|---|---|
+| `orderColumns` | Fields used to sort rows inside a group (e.g. `["timestamp"]`). Required, non-empty. |
+| `correlationColumns` | Fields that group rows into one trace (e.g. `["traceId"]`). Required, non-empty. |
+| `tokenColumns` | Fields that make up each step's token (e.g. `["service", "operation"]`). Required, non-empty. |
+| **`entityColumn`** | **Required.** The single field treated as the *entity* — who/what acts. It is always the **first data column** of the output table. |
+| **`directionColumn`** | **Required.** The single field treated as the *direction* — the action (e.g. request/response). It is always the **second data column** of the output table. |
+
+Entity and direction are mandatory on purpose: they are the *what* and *action* of a sequence, and without them the mined output loses its contextual meaning. If either is missing from the profile, sequence validation fails with e.g. `entityColumn is required — tag one field as the entity`, and the preview shows that error instead of a report. In the profile modal you tag them with the **entity** and **direction** toggles on each field row.
+
+### Options
+
+| Key | Default | Meaning |
+|---|---|---|
+| `separator` | `"$"` | Joins token components inside a signature. Must not appear inside any `tokenColumns` name. |
+| `missingValue` | `"-"` | Placeholder rendered for missing token, entity, direction, or correlation values. Empty string is not allowed (falls back to the default). |
+| `minSteps` | `2` | Sequences with fewer steps than this are omitted from the report — single-step sequences are usually one-off noise. Set to `1` to keep everything. Values below 1 are rejected. |
+| `maxExampleKeys` | `5` | How many example trace keys are listed per sequence. |
+| `sortOrder` | `"none"` | `"frequency-desc"` (most common first), `"signature-asc"` (alphabetical), or `"none"` (discovery order). |
+| `includeTokenComponents` | `true` | When on, the individual token fields are shown as extra columns in each sequence table, after the Token column. |
+| `excludeMissingTokens` | `true` | When on (default), rows whose **entity or direction** value is missing are excluded from mining. A stored explicit `false` turns this off. Missing *token* components are always tolerated — they just render as the missing-value placeholder. |
+| `includeTransitions` | `false` | When on, the report also lists adjacent-sequence transitions across ordered traces (up to 50). |
+
+### Caps (all optional, `0` = unlimited)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `maxInputRows` | `0` | Cap on input rows; excess rows are down-sampled deterministically (even spread), and the report notes how many were dropped. |
+| `maxSignatures` | `1000` | Cap on distinct sequences; the rest fold into one combined overflow section. Applied after sorting, so the kept sections are the top-N by the chosen sort order. |
+| `maxRowsPerGroup` | `0` | Cap on rows kept per correlation group after ordering (the tail, i.e. the least recent, is dropped). |
+
+## Missing and sparse values
+
+- A row is only **ineligible** (excluded) when an order value is truly absent, or — with `excludeMissingTokens` on — when its **entity or direction** is missing. Missing token components never make a row ineligible.
+- **Correlation ids use wildcard semantics**: the group key is built from the correlation values that are *present* only. A row missing a sparse id still joins the group of the rows it does match, instead of being blobbed into a single shared "missing" bucket. Only when *all* correlation values are missing does the row fall back to one placeholder group so it is still mined.
+
+## Output shape
+
+The report starts with a header summarising the run:
+
+```markdown
+# Trace Sequence Analysis: <filename>
+
+**Input format**: `delimited`
+**Order fields**: `timestamp`
+**Correlation fields**: `traceId`
+**Token fields**: `service`, `operation`
+**Entity field**: `service`
+**Direction field**: `direction`
+**Rows used**: 480 (12 ineligible)
+**Min steps**: 2 — shorter sequences omitted
+```
+
+Each sequence section then has a frequency, example trace keys, and a table whose first columns are always **Step | Entity | Direction | Token** (plus one column per token component when `includeTokenComponents` is on):
+
+```markdown
+## Sequence 1 — `orders$create → payments$charge`
+
+- **Frequency**: 42 traces
+- **Example trace keys**: `a1b2c3…`, `d4e5f6…`
+
+| Step | Entity | Direction | Token | Service | Operation |
+|---|---|---|---|---|---|
+| 1 | orders-service | REQUEST | orders$create | orders-service | create |
+| 2 | payments-service | REQUEST | payments$charge | payments-service | charge |
+```
+
+## Previewing sequences
+
+The **Sequence Configuration** tab in the profile modal has a **Preview sequences** button. It runs the current config against the sample and shows the exact Markdown report that extraction would store — same mining, same caps — together with run stats (rows used, ineligible rows, sequence count, correlation keys, truncation/overflow notes). Invalid profiles (for example a missing `entityColumn`) return the validation error inline instead of a report.
+
+The server route behind it is `POST /api/v1/trace-profiles/preview-sequences`; see [API routes](./api-routes).

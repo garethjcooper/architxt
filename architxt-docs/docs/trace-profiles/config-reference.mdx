@@ -1,0 +1,92 @@
+---
+sidebar_position: 3
+---
+
+# Profile config reference
+
+The profile's config JSON has this top-level shape:
+
+```json
+{
+  "parser": {
+    "module": "delimited",
+    "config": {
+      "input": { ... },
+      "records": { ... },
+      "sequenceProfile": { ... }
+    }
+  },
+  "fieldExtraction": {
+    "fields": [ ... ]
+  }
+}
+```
+
+`sequenceProfile` is documented in detail on [Sequence mining](./sequence-mining); `fieldExtraction` is summarised at the bottom of this page.
+
+There is no span/OTLP mapping layer in the config anymore: parsers produce flat records (`{ raw, fields }`), the optional cleaned-log rendering is configurable via the top-level `standardLog` block, and sequence mining reads fields directly. Suggestion prompts explicitly instruct the LLM not to emit `fieldMap`, `kindMap`, or attribute mappings.
+
+## Parser engines
+
+The engine is selected by `parser.module`. Engine manifests (name, description, suggested extensions/content types) are returned by `GET /api/v1/trace-profiles/engines` and drive the UI dropdown.
+
+| Engine | Best for |
+|---|---|
+| `delimited` | CSV, TSV, pipe-delimited and similar files (`.csv`, `.tsv`, `.txt`). Supports header rows, record-start rules keyed on a leading column, multi-line columns, and XML/JSON payload stitching. |
+| `plaintext` | Line-oriented or multi-line logs (`.log`, `.txt`) where each record starts with a regex pattern (`records.recordStartPattern`). Supports payload stitching. |
+| `json-lines` | NDJSON / JSON-lines files (`.jsonl`, `.ndjson`) where each line is independent JSON. Supports dot-path record-start markers. |
+| `json-nd` | Pretty-printed JSON (`.json`) where one object or array spans multiple lines; root arrays are split per element. Supports dot-path record-start markers and regex variants evaluated against the serialised record. |
+| `xml` | XML documents and streams (`.xml`). A root element wrapping repeated children (`<log><event/>…`) is split so each child is one record; concatenated top-level elements are split per element. `records.splitElements: false` keeps the whole document as one record; `records.recordStartTag` restricts which elements count as records. |
+
+### `input`
+
+How to read the file:
+
+| Key | Meaning |
+|---|---|
+| `delimiter` | Field separator for `delimited` files. |
+| `hasHeader` | Whether the first row is a header for `delimited` files (header names become field names; without a header, columns are named `column_0`, `column_1`, …). |
+| `encoding` | File encoding, usually `utf-8`. |
+
+### `records`
+
+How logical records are bounded:
+
+| Key | Meaning |
+|---|---|
+| `recordStartPattern` / `recordStartRule` | Regex or rule that marks the first line of a record (plaintext; also supported by delimited via `keyRegex`/`valueRegex`). |
+| `multilineColumn` | For `delimited` files, the column whose value may continue onto following lines. |
+| `payloadStitching` | `"xml"` or `"json"` — treat continuation lines as a payload appended to the last column. |
+| `splitElements` / `recordStartTag` | XML engine: split repeated child elements into records (default on); optionally only accept a given tag name. |
+
+### Example delimited config
+
+```json
+{
+  "parser": {
+    "module": "delimited",
+    "config": {
+      "input": { "delimiter": "\t", "hasHeader": true, "encoding": "utf-8" },
+      "records": {
+        "multilineColumn": "payload",
+        "payloadStitching": "xml"
+      }
+    }
+  }
+}
+```
+
+## Cleaned log output (`standardLog`)
+
+When a profile has no `sequenceProfile`, extraction stores a cleaned, delimited log as the document content. The rendering (`standard-log-formatter`) is fixed-shape: one line per record with the fixed leading columns `timestamp | direction | service | operation | traceId | messageId | parentId` followed by any dynamic keys, using a configurable `delimiter` (default `|`). Options under the top-level `standardLog` block: `delimiter`, `maxRawLength` (raw/evidence column cap, default 200), `stripXmlFromRaw` (default true), `cleanOperation` (trim operation at the first `~`, default false).
+
+## Field extraction
+
+`fieldExtraction.fields` is a unified list of `{ name, ordinal, source, regex }` rules applied to every parsed record (and to the raw sample in the UI):
+
+- **`name`** — the field name used everywhere else (sequence profile, entity/direction tags, token columns).
+- **`source`** — for `delimited`, `null` means the value comes straight from the parser column of the same name; for plaintext, a `regex` with capture groups extracts from the raw line. For `xml`/`json-lines`/`json-nd`, deterministic payload paths are surfaced as available fields and can be added to the list.
+- **`regex`** — optional refinement applied within the source value.
+- **`ordinal`** — position of the column (delimited).
+
+The UI's **Format & Fields** tab populates this list automatically: for delimited inputs the header columns are detected, and for `xml`, `json-lines`, and `json-nd` the deterministic `availableFields` reported by `POST /api/v1/trace-profiles/validate` are written into the config when the list is empty. Fields you deliberately delete are not re-added automatically. The **Plaintext Field Extraction** tab offers LLM-assisted discovery (histogram + suggested fields) for plaintext logs, where there is no header to read fields from.

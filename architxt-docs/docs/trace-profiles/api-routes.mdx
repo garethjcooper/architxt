@@ -1,0 +1,83 @@
+---
+sidebar_position: 6
+---
+
+# API routes
+
+All trace-profile endpoints are mounted under `/api/v1/trace-profiles`. Requests and responses use JSON; the standard envelope wraps list/detail payloads in a `data` key.
+
+## Profile CRUD
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/trace-profiles` | List all profiles (id, name, description, config, versions, used version). |
+| `GET` | `/api/v1/trace-profiles/by-name/:name` | Fetch one profile by name. |
+| `GET` | `/api/v1/trace-profiles/:id` | Fetch one profile by id. |
+| `POST` | `/api/v1/trace-profiles` | Create a profile (`name`, optional `description`, `config`). |
+| `PUT` | `/api/v1/trace-profiles/:id` | Update a profile; a changed `config` is snapshotted into `versions`. |
+| `DELETE` | `/api/v1/trace-profiles/:id` | Delete a profile. |
+
+## Engines and validation
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/trace-profiles/engines` | List engine manifests (module name, description, suggested extensions) for the UI dropdown. |
+| `POST` | `/api/v1/trace-profiles/validate` | Run a config against a sample string. Returns matched/unmatched record counts, coverage, unparsed samples, warnings, and — for `xml` / `json-lines` / `json-nd` — the deterministic `availableFields` (payload paths) that the UI uses to populate the fields list. Validation errors are returned as `{ valid: false, error }` with HTTP 200. |
+
+## LLM-assisted authoring
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/trace-profiles/suggest-config` | Ask the LLM to propose or iterate a parser config from a sample (`{ sample, currentConfig?, sampleBudget? }`). |
+| `POST` | `/api/v1/trace-profiles/extract-fields` | LLM-assisted field extraction for plaintext samples. |
+| `POST` | `/api/v1/trace-profiles/discovery-histogram` | Build a value histogram over the sample to support field discovery. |
+
+## Sequence preview (new)
+
+`POST /api/v1/trace-profiles/preview-sequences` runs sequence mining exactly as extraction would and returns the report Markdown.
+
+**Request body:**
+
+```json
+{
+  "config": { "parser": { "module": "delimited", "config": { "...": "...", "sequenceProfile": { "...": "..." } } }, "fieldExtraction": { "fields": [] } },
+  "sample": "<raw sample text>"
+}
+```
+
+- `config` — the full profile config object (the same shape as a stored profile's `config`). `config.parser.config.sequenceProfile` is **required**; without it the route returns HTTP 400.
+- `sample` — the raw sample text (string, required).
+
+**Success response (HTTP 200):**
+
+```json
+{
+  "data": {
+    "valid": true,
+    "markdown": "# Trace Sequence Analysis: sample\n\n...",
+    "stats": {
+      "inputRows": 480,
+      "eligibleRows": 480,
+      "ineligibleRows": 0,
+      "sequenceCount": 12,
+      "correlationKeyCount": 96,
+      "truncated": false,
+      "overflowSignatures": 0,
+      "cappedGroups": 0,
+      "minSteps": 2
+    }
+  }
+}
+```
+
+**Invalid profile (still HTTP 200):**
+
+```json
+{ "data": { "valid": false, "error": "entityColumn is required — tag one field as the entity", "markdown": "", "stats": null } }
+```
+
+The mining uses the same `sequenceProfile` semantics as extraction — mandatory `entityColumn`/`directionColumn`, wildcard correlation, `missingValue` placeholders, `minSteps` filtering, and the `maxInputRows` / `maxSignatures` / `maxRowsPerGroup` caps — so the preview matches what a trace document's stored content will look like. The only cosmetic difference is the report title, which uses the sample name (`sample`) instead of the real filename.
+
+## Document-side routes
+
+The trace-profile-aware document endpoints live under `/api/v1/documents` and are documented on the [Documents](../core-concepts/documents#trace-documents) page — in particular `POST /documents` (with `source_type: "trace"` and `trace_profile`) and `POST /documents/batch/updateconfig` (which accepts `trace_profile` alongside `timestamp` and applies it only to trace-type documents).

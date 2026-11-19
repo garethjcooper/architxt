@@ -1,0 +1,25 @@
+---
+sidebar_position: 1
+---
+
+# Trace profiles
+
+A **trace profile** tells architxt how to turn a raw log or trace file into structured records and — when sequence mining is enabled — a mined sequence analysis document. Once produced, the trace document keeps going through the normal architxt pipeline: entity detection, mental models, Reflect, and contextual graph sync, without architxt becoming a full observability backend.
+
+This section documents the current profile model end to end:
+
+- **[Concepts & lifecycle](./concepts)** — what a profile is, where it applies, the version workflow, and how trace documents relate to profiles.
+- **[Profile config reference](./config-reference)** — the top-level config JSON: parser engines, `fieldExtraction`, and the full `sequenceProfile` schema.
+- **[Sequence mining](./sequence-mining)** — how `sequenceProfile` turns parsed rows into the sequence output table, including entity/direction columns, missing-value semantics, and caps.
+- **[Profile modal UI](./profile-modal)** — the tabs, panes, resizers, preview, and engine auto-detect in the create/edit dialog.
+- **[API routes](./api-routes)** — the `/api/v1/trace-profiles/*` endpoints, including the new `POST /preview-sequences` route.
+
+## Where trace profiles apply
+
+Trace profiles are used in three places:
+
+1. **Trace document upload** — when you upload a file with **Trace upload** enabled, you can pick a profile. The profile name is stored in the document's processing options and applied during extraction.
+2. **Document management** — the documents list shows each document's **Type** (`Document` or `Trace`) and, for trace documents, its **Trace Profile**. The **Document Details** dialog and the multi-select **Config** bulk action let you change the profile on existing trace documents.
+3. **The Trace Profiles page** — where you create, edit, version, and test profiles against sample data without uploading a full document.
+
+A profile is not tied to a single file. Any number of trace documents can reference the same profile, and the profile is resolved at extraction time, so editing a profile affects the next extraction run. Changing a trace document's profile warns that re-extraction may invalidate existing extracted data.

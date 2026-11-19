@@ -15,14 +15,15 @@ let stageModules = null;
 
 async function getStageModules() {
   if (!stageModules) {
-    const [extract, denoise, denoiseLLM, vision, persist] = await Promise.all([
+    const [extract, denoise, denoiseLLM, vision, persist, extractTrace] = await Promise.all([
       import('./stages/extract.js'),
       import('./stages/denoise.js'),
       import('./stages/denoise-llm.js'),
       import('./stages/vision.js'),
-      import('./stages/persist.js')
+      import('./stages/persist.js'),
+      import('./stages/extract-trace.js')
     ]);
-    stageModules = { extract, denoise, denoiseLLM, vision, persist };
+    stageModules = { extract, denoise, denoiseLLM, vision, persist, extractTrace };
   }
   return stageModules;
 }
@@ -95,6 +96,23 @@ class StageRegistry {
       serviceSchema: ['extractor']
     });
 
+    // Extract trace stage (I/O)
+    this.register('extract-trace', {
+      name: 'extract-trace',
+      type: 'io',
+      execute: modules.extractTrace.execute,
+      validate: modules.extractTrace.validate,
+      inputs: {},
+      outputs: [
+        { name: 'document-md', type: 'string' },
+        { name: 'document-images', type: 'array' }
+      ],
+      inputSchema: [],
+      configSchema: ['storage_path'],
+      dataSchema: ['doc_id', 'source_path', 'filename', 'trace_profile'],
+      serviceSchema: []
+    });
+
     // Denoise stage (text transform)
     this.register('denoise', {
       name: 'denoise',
@@ -155,7 +173,9 @@ class StageRegistry {
       },
       outputs: [
         { name: 'archive-paths', type: 'object' },
-        { name: 'doc-converted-markdown-path', type: 'string' }
+        { name: 'doc-converted-markdown-path', type: 'string' },
+        { name: 'doc-metadata-sidecar-path', type: 'string' },
+        { name: 'doc-archive-images-path', type: 'string' }
       ],
       inputSchema: [],
       configSchema: ['storage_path'],

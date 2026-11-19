@@ -10,7 +10,8 @@ import { Loader2, ChevronDown, Check, FileText, Clock, ArrowRight, ChevronRight,
 import { ArchitxtIcon } from './icons/architxt-icon';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import { Switch } from '@/components/ui/switch';
-import { documentsApi, type Document, type Metadata, configApi, type SettingsSnapshot } from '@/lib/api/client';
+import { documentsApi, traceProfilesApi, type Document, type Metadata, configApi, type SettingsSnapshot } from '@/lib/api/client';
+import type { TraceProfile } from '@/lib/types';
 import { toast } from 'sonner';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -104,6 +105,11 @@ export function ViewDocumentDialog({
   const [denoiseLlmEnabled, setDenoiseLlmEnabled] = useState(true);
   const [visionEnabled, setVisionEnabled] = useState(true);
 
+  // Trace profile state (trace documents only)
+  const [traceProfileName, setTraceProfileName] = useState<string | null>(null);
+  const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
+  const isTraceDoc = document?.source_type === 'trace';
+
   // Global stage availability from server config
   const [globalStages, setGlobalStages] = useState({
     extract: true,
@@ -191,7 +197,16 @@ export function ViewDocumentDialog({
     setDenoiseEnabled(globalStages.denoise && stages.denoise !== false);
     setDenoiseLlmEnabled(globalStages['denoise-llm'] && stages['denoise-llm'] !== false);
     setVisionEnabled(globalStages.vision && stages.vision !== false);
+    setTraceProfileName(opts.trace_profile ?? null);
   }, [document, open, globalStages]);
+
+  // Load trace profiles for the trace-profile picker (trace documents only)
+  useEffect(() => {
+    if (!open || document?.source_type !== 'trace') return;
+    traceProfilesApi.list()
+      .then(setTraceProfiles)
+      .catch(() => setTraceProfiles([]));
+  }, [open, document?.id, document?.source_type]);
 
   // Fetch document content when dialog opens
   useEffect(() => {
@@ -272,7 +287,12 @@ export function ViewDocumentDialog({
     JSON.stringify(authors) !== JSON.stringify(document.authors || []) ||
     denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
     denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
-    visionEnabled !== (document.processing_options?.stages?.vision !== false);
+    visionEnabled !== (document.processing_options?.stages?.vision !== false) ||
+    (isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null));
+
+  // Re-extraction with a different profile may invalidate existing extracted data
+  const traceProfileChanges =
+    isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null);
 
   const buildProcessingOptions = () => {
     const opts: NonNullable<Document['processing_options']> = {
@@ -310,8 +330,14 @@ export function ViewDocumentDialog({
 
       if (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
           denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
-          visionEnabled !== (document.processing_options?.stages?.vision !== false)) {
-        updates.processing_options = buildProcessingOptions();
+          visionEnabled !== (document.processing_options?.stages?.vision !== false) ||
+          traceProfileChanges) {
+        updates.processing_options = {
+          ...buildProcessingOptions(),
+          ...(document.processing_options?.trace_profile !== undefined || traceProfileChanges
+            ? { trace_profile: traceProfileChanges ? traceProfileName : document.processing_options?.trace_profile ?? null }
+            : {}),
+        };
       }
 
       if (Object.keys(updates).length > 0) {
@@ -341,11 +367,21 @@ export function ViewDocumentDialog({
           <div className="space-y-6 overflow-y-auto custom-scrollbar min-h-0">
             {/* Status Badge */}
             <div className="flex items-center gap-3">
-              <span className="text-sm text-foreground-faint">Status:</span>
-              <Badge className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${statusColors[document.status] || 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'}`}>
-                <ArchitxtIcon className="h-3 w-3" />
-                {statusLabels[document.status] || document.status}
-              </Badge>
+            <span className="text-sm text-foreground-faint">Status:</span>
+            <Badge className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${statusColors[document.status] || 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'}`}>
+              <ArchitxtIcon className="h-3 w-3" />
+              {statusLabels[document.status] || document.status}
+            </Badge>
+            <Badge
+              className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${
+                document.source_type === 'trace'
+                  ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
+                  : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
+              }`}
+              title={document.source_type === 'trace' ? 'Trace document — extracted with a trace profile' : 'Standard document'}
+            >
+              {document.source_type === 'trace' ? 'Trace' : 'Document'}
+            </Badge>
             </div>
 
             {/* Editable Fields */}
@@ -632,6 +668,31 @@ export function ViewDocumentDialog({
                 <p className="text-[11px] text-foreground-faint mb-2">
                   Override extract pipeline stages for this document. Extract is always run. Stages disabled globally in server config cannot be toggled here.
                 </p>
+                {/* Trace Profile picker — trace documents only */}
+                {isTraceDoc && (
+                <div className="space-y-2 mb-3">
+                  <Label htmlFor="trace-profile" className="text-xs uppercase text-foreground-subtle font-medium">
+                    Trace Profile
+                  </Label>
+                  <select
+                    id="trace-profile"
+                    value={traceProfileName ?? '__none__'}
+                    onChange={(e) => setTraceProfileName(e.target.value === '__none__' ? null : e.target.value)}
+                    className="w-full h-10 rounded-lg border border-border-strong bg-surface-card px-3 text-sm text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                  >
+                    <option value="__none__">— none —</option>
+                    {traceProfiles.map((p) => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                  {traceProfileChanges && (
+                    <p className="text-xs text-badge-caution-fg flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      Changing the trace profile may invalidate existing extracted data on re-extraction.
+                    </p>
+                  )}
+                </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.denoise ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Denoise</span>

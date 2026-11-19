@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Send, Eye } from 'lucide-react';
 import { colorForType } from '@/lib/graph/render-utils';
 import { type ResearchQueryOptions } from './use-research-session';
-import { type ResearchStepSummary } from '@/lib/api/client';
 import { researchApi } from '@/lib/api/client';
 import { AqlEditor } from '@/components/aql-editor';
 import {
@@ -41,7 +40,7 @@ export interface QueryFormProps {
   availableEntities: EntityLike[];
   availableEdges: EdgeLike[];
   onSubmit: (e: React.FormEvent) => void;
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates';
+  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'models' | 'templates';
   selectedTemplateRoles: string[];
   setSelectedTemplateRoles: (r: string[]) => void;
   availableTemplateRoles: Array<{ value: string; label: string }>;
@@ -51,14 +50,6 @@ export interface QueryFormProps {
   serverId?: string;
   bankId?: string;
   showOptions?: boolean;
-  /** Trail for synthesize-mode source step preview. */
-  trail?: ResearchStepSummary[];
-  /** Current step selection state for synthesize-mode preview. */
-  selectedStepIds?: Set<number>;
-  /** Active step id in step mode; used as synthesize fallback. */
-  activeStepId?: number | null;
-  /** Current view mode; used to decide which steps to preview. */
-  viewMode?: 'step' | 'session';
 }
 
 export interface EntityLike {
@@ -80,7 +71,6 @@ const QUERY_PLACEHOLDERS: Record<string, string> = {
   prebuilt: 'Double-click an entity to add it to the prebuilt lookup list, then select one or more template roles to run.',
   recall: 'Returns facts for the given query in a table format. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   reflect: 'Returns a generated response for a given query. Type # for list of base document section types and [[ to show entities and edge list.',
-  synthesize: 'Returns a narrative based on existing query steps. Select one or more steps to run the query against. Type [[ to show list of existing known entities. Double click an entity or edge to add to this query.',
   models: 'Select one or more mental models and enter a query to explore their content. Type [[ to show list of existing known entities.',
   templates: 'Double-click an entity in the Entities panel to add it to the template lookup list.',
 };
@@ -104,10 +94,6 @@ export function QueryForm(props: QueryFormProps) {
     serverId,
     bankId,
     showOptions = true,
-    trail = [],
-    selectedStepIds = new Set(),
-    activeStepId,
-    viewMode = 'step',
   } = props;
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -150,19 +136,6 @@ export function QueryForm(props: QueryFormProps) {
       setPreviewLoading(false);
     }
   }, [query]);
-
-  const sourceSteps = useMemo(() => {
-    if (queryMode !== 'synthesize') return [];
-    const ids = selectedStepIds.size > 0
-      ? selectedStepIds
-      : activeStepId != null
-        ? new Set([activeStepId])
-        : new Set<number>();
-    if (ids.size === 0) return [];
-    return trail
-      .filter((s) => ids.has(s.id))
-      .sort((a, b) => trail.indexOf(a) - trail.indexOf(b));
-  }, [queryMode, trail, selectedStepIds, activeStepId]);
 
   // Fetch eligible templates whenever selected entities change in templates mode.
   useEffect(() => {
@@ -322,7 +295,7 @@ export function QueryForm(props: QueryFormProps) {
           </div>
         )}
 
-        {(queryMode === 'recall' || queryMode === 'reflect' || queryMode === 'synthesize') && showOptions && (
+        {(queryMode === 'recall' || queryMode === 'reflect') && showOptions && (
           <div className={`w-36 shrink-0 flex flex-col min-h-0 border-l border-border-default pl-2 ${isRunning ? 'opacity-50' : ''}`}>
             <div className="text-[10px] text-foreground-faint font-medium mb-1">Options</div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
@@ -331,9 +304,6 @@ export function QueryForm(props: QueryFormProps) {
               )}
               {queryMode === 'reflect' && (
                 <ReflectOptions options={queryOptions.reflect} onChange={(reflect) => setQueryOptions((prev) => ({ ...prev, reflect }))} disabled={isRunning} />
-              )}
-              {queryMode === 'synthesize' && (
-                <SynthesizeOptions options={queryOptions.synthesize} onChange={(synthesize) => setQueryOptions((prev) => ({ ...prev, synthesize }))} disabled={isRunning} />
               )}
             </div>
           </div>
@@ -529,32 +499,6 @@ export function QueryForm(props: QueryFormProps) {
         )}
       </div>
 
-        {queryMode === 'synthesize' && (
-          <div className="shrink-0 flex flex-col gap-1 border-t border-border-default pt-2">
-            <div className="flex items-center justify-between px-0.5">
-              <span className="text-[10px] text-foreground-faint font-medium">Synthesize source steps</span>
-              <span className="text-[10px] text-foreground-subtle">{sourceSteps.length} selected</span>
-            </div>
-            <div className="h-[3.5rem] overflow-y-auto rounded border border-border-default bg-surface-inset px-2 py-1 space-y-1">
-              {sourceSteps.length === 0 ? (
-                <div className="text-[10px] text-foreground-subtle italic">No steps selected. In step mode the active step is used; in merge mode the checked steps are used.</div>
-              ) : (
-                sourceSteps.map((step, idx) => (
-                  <div key={step.id} className="flex items-center gap-1.5 text-[10px] text-foreground-muted">
-                    <span className="px-1 rounded border border-border-default bg-surface-card text-foreground-faint uppercase tracking-wide shrink-0">
-                      {step.action_type || 'discover'}
-                    </span>
-                    <span className="truncate">
-                      <span className="text-foreground-subtle mr-1">#{idx + 1}</span>
-                      {step.intent_text || 'Untitled query'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
       <div className="flex gap-2 shrink-0">
         <Button
           type="submit"
@@ -565,11 +509,11 @@ export function QueryForm(props: QueryFormProps) {
           {isRunning ? 'Running…' : (
             <>
               <Send className="w-4 h-4 mr-2" />
-              {queryMode === 'synthesize' ? 'Synthesize' : queryMode === 'models' ? 'Run Models' : queryMode === 'templates' ? 'Run Templates' : 'Run Query'}
+              {queryMode === 'models' ? 'Run Models' : queryMode === 'templates' ? 'Run Templates' : 'Run Query'}
             </>
           )}
         </Button>
-        {(queryMode === 'recall' || queryMode === 'reflect' || queryMode === 'synthesize') && (
+        {(queryMode === 'recall' || queryMode === 'reflect') && (
           <Button
             type="button"
             variant="outline"
@@ -773,19 +717,3 @@ function ReflectOptions({
   );
 }
 
-function SynthesizeOptions({
-  options,
-  onChange,
-  disabled,
-}: {
-  options?: ResearchQueryOptions['synthesize'];
-  onChange: (options: ResearchQueryOptions['synthesize']) => void;
-  disabled?: boolean;
-}) {
-  const opts = options || {};
-  return (
-    <div className="space-y-2">
-      <MaxTokensInput value={opts.maxTokens} onChange={(maxTokens) => onChange({ ...opts, maxTokens })} disabled={disabled} />
-    </div>
-  );
-}

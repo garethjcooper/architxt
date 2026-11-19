@@ -413,7 +413,9 @@ function DocumentsPageContent() {
                     />
                   </TableHead>
                   <TableHead className={["w-12 text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>ID</TableHead>
-                  <TableHead className={["w-[25%] text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>External ID</TableHead>
+                  <TableHead className={["w-[20%] text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>External ID</TableHead>
+                  <TableHead className={["w-16 text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Type</TableHead>
+                  <TableHead className={["w-28 text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Trace Profile</TableHead>
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Document Date</TableHead>
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Tags</TableHead>
                   <TableHead className={["text-xs uppercase text-foreground-faint font-medium py-1.5 px-4", !freeze && "sticky top-0 z-20 bg-surface-card"].filter(Boolean).join(" ")}>Context</TableHead>
@@ -431,6 +433,8 @@ function DocumentsPageContent() {
                       <TableCell className={["py-1.5 px-4", !freeze && "sticky left-0 z-10 bg-surface-card border-r border-border-subtle"].filter(Boolean).join(" ")}><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="py-1.5 px-4"><Skeleton className="h-4 w-16" /></TableCell>
@@ -443,7 +447,7 @@ function DocumentsPageContent() {
                   ))
                 ) : displayDocuments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-foreground-faint">
+                    <TableCell colSpan={13} className="text-center py-8 text-foreground-faint">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-8 w-8 opacity-50" />
                         <p>No documents found.</p>
@@ -470,6 +474,28 @@ function DocumentsPageContent() {
                       <TableCell className="py-1.5 px-4 font-mono text-xs cursor-pointer text-foreground-default font-semibold"
                         onClick={() => handleView(doc)}
                       ><span className="truncate max-w-full inline-block">{doc.ext_id || '-'}</span></TableCell>
+                      <TableCell className="py-1.5 px-4 text-xs cursor-pointer"
+                        onClick={() => handleView(doc)}
+                      >
+                        <Badge
+                          className={`text-[10px] px-2 py-1 border inline-flex items-center gap-1 ${
+                            doc.source_type === 'trace'
+                              ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
+                              : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
+                          }`}
+                          title={doc.source_type === 'trace' ? 'Trace document — extracted with a trace profile' : 'Standard document'}
+                        >
+                          {doc.source_type === 'trace' ? 'Trace' : 'Document'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-1.5 px-4 text-xs cursor-pointer text-foreground-faint"
+                        onClick={() => handleView(doc)}
+                        title={doc.processing_options?.trace_profile || undefined}
+                      >
+                        {doc.source_type === 'trace'
+                          ? (doc.processing_options?.trace_profile || <span className="text-foreground-placeholder">-</span>)
+                          : <span className="text-foreground-placeholder">-</span>}
+                      </TableCell>
                       <TableCell className="py-1.5 px-4 text-xs cursor-pointer"
                         onClick={() => handleView(doc)}
                       >{formatDate(doc.timestamp) || '-'}</TableCell>
