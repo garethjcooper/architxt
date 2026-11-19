@@ -62,7 +62,7 @@ test('analyzeRepository surfaces service errors', async () => {
   await assert.rejects(() => analyzeRepository('/fail'), /not a git repo/);
 });
 
-test('extract-repository stage emits document-md with explanation + mermaid', async () => {
+test('extract-repository stage emits document-md as the JSON envelope', async () => {
   const stage = await import('../src/pipeline/stages/extract-repository.js');
   const out = await stage.execute(
     {},
@@ -73,9 +73,12 @@ test('extract-repository stage emits document-md with explanation + mermaid', as
   );
   assert.equal(out.stageResult.success, true);
   const md = out.stageOutput.find((o) => o.name === 'document-md');
-  assert.match(md.data, /# Repository Architecture Analysis/);
-  assert.match(md.data, /```mermaid/);
-  assert.match(md.data, /A demo repo\./);
+  const envelope = JSON.parse(md.data);
+  for (const key of ['narratives', 'graph', 'tables', 'diagrams']) assert.ok(key in envelope, `missing ${key}`);
+  assert.match(envelope.narratives[0].narrative, /A demo repo\./);
+  assert.match(envelope.diagrams[0].content, /graph TD/);
+  assert.equal(envelope.diagrams[0].type, 'mermaid');
+  assert.ok(!out.stageOutput.find((o) => o.name === 'document-envelope'), 'no separate envelope artifact');
   const images = out.stageOutput.find((o) => o.name === 'document-images');
   assert.deepEqual(images.data, []);
 });

@@ -5,12 +5,10 @@
  * to gitdiagram-serve, which analyzes the repo with an LLM and returns an
  * architecture diagram (Mermaid) plus an evidence-based explanation.
  *
- * Emits the same artifacts as the standard extract stage plus a structured
- * envelope:
- *   - document-md: explanation + Mermaid diagram report
+ * Emits the same artifacts as the standard extract stage, with the service
+ * result mapped onto the standard contextual-graph envelope:
+ *   - document-md: JSON-serialized envelope (narratives + graph + tables + diagrams)
  *   - document-images: empty array (repository analysis produces no images)
- *   - document-envelope: standard contextual-graph envelope
- *     (narratives + graph + tables + diagrams) built from the service result
  *
  * Relationship/entity extraction is intentionally not performed here — the
  * pipeline contract is unchanged from the trace stage.
@@ -20,28 +18,6 @@ import { createLogger } from '../../utils/logger.js';
 import { analyzeRepository } from '../../services/gitdiagram/client.js';
 
 const logger = createLogger('stage-extract-repository');
-
-function buildMarkdown(result) {
-  const explanation = result.explanation || '';
-  const mermaid = result.mermaid || '';
-  return [
-    '# Repository Architecture Analysis',
-    '',
-    `**Repository:** \`${result.repo?.path ?? ''}\``,
-    `**HEAD:** \`${result.repo?.head ?? ''}\` (${result.repo?.branch ?? ''})`,
-    '',
-    '## Explanation',
-    '',
-    explanation,
-    '',
-    '## Architecture Diagram (Mermaid)',
-    '',
-    '```mermaid',
-    mermaid,
-    '```',
-    '',
-  ].join('\n');
-}
 
 /**
  * Map gitdiagram-serve's result onto the standard contextual-graph envelope
@@ -111,8 +87,8 @@ async function execute(artifacts, _config, data, services, context) {
 
     const result = await analyzeRepository(repoUri, options, context?.abortSignal);
 
-    const markdown = buildMarkdown(result);
     const envelope = buildEnvelope(result);
+    const markdown = JSON.stringify(envelope, null, 2);
     const durationMs = Date.now() - startTime;
 
     logger.info('Repository analysis complete', {
@@ -130,7 +106,6 @@ async function execute(artifacts, _config, data, services, context) {
       stageOutput: [
         { name: 'document-md', data: markdown, type: 'string' },
         { name: 'document-images', data: [], type: 'array' },
-        { name: 'document-envelope', data: envelope, type: 'object' },
       ],
       stageMetrics: {
         durationMs,
@@ -161,4 +136,4 @@ function validate(config) {
   return { valid: errors.length === 0, errors };
 }
 
-export { execute, validate, buildMarkdown, buildEnvelope };
+export { execute, validate, buildEnvelope };
