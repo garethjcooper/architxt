@@ -5,9 +5,12 @@
  * to gitdiagram-serve, which analyzes the repo with an LLM and returns an
  * architecture diagram (Mermaid) plus an evidence-based explanation.
  *
- * Emits the same artifacts as the standard extract stage:
+ * Emits the same artifacts as the standard extract stage plus a structured
+ * envelope:
  *   - document-md: explanation + Mermaid diagram report
  *   - document-images: empty array (repository analysis produces no images)
+ *   - document-envelope: standard contextual-graph envelope
+ *     (narratives + graph + tables + diagrams) built from the service result
  *
  * Relationship/entity extraction is intentionally not performed here — the
  * pipeline contract is unchanged from the trace stage.
@@ -40,6 +43,49 @@ function buildMarkdown(result) {
   ].join('\n');
 }
 
+/**
+ * Map gitdiagram-serve's result onto the standard contextual-graph envelope
+ * (narratives + graph + tables + diagrams) so repository analysis can feed
+ * the same UI/consumers as Hindsight reflect output.
+ */
+function buildEnvelope(result) {
+  const repoName = result.repo?.remoteUri || result.repo?.path || 'repository';
+  const explanation = result.explanation || '';
+  const nodes = (result.graph?.nodes || []).map((n) => ({
+    id: n.id,
+    label: n.label,
+    path: n.path ?? null,
+    group: n.group ?? null,
+  }));
+  const edges = (result.graph?.edges || []).map((e) => ({
+    from: e.from,
+    to: e.to,
+    type: e.dashed ? 'inferred' : 'depends-on',
+    label: e.label || '',
+    detail: e.evidencePath ? `evidence: ${e.evidencePath}` : '',
+    evidence: e.evidencePath ? [e.evidencePath] : [],
+  }));
+  return {
+    narratives: [
+      {
+        narrative_name: 'Repository architecture',
+        narrative: explanation,
+        evidence: nodes.filter((n) => n.path).map((n) => n.path),
+      },
+    ],
+    graph: { name: String(repoName), nodes, edges },
+    tables: [],
+    diagrams: [
+      {
+        name: 'Architecture diagram',
+        type: 'mermaid',
+        content: result.mermaid || '',
+        evidence: [],
+      },
+    ],
+  };
+}
+
 async function execute(artifacts, _config, data, services, context) {
   const startTime = Date.now();
   const docId = data.doc_id;
@@ -66,6 +112,7 @@ async function execute(artifacts, _config, data, services, context) {
     const result = await analyzeRepository(repoUri, options, context?.abortSignal);
 
     const markdown = buildMarkdown(result);
+    const envelope = buildEnvelope(result);
     const durationMs = Date.now() - startTime;
 
     logger.info('Repository analysis complete', {
@@ -83,6 +130,7 @@ async function execute(artifacts, _config, data, services, context) {
       stageOutput: [
         { name: 'document-md', data: markdown, type: 'string' },
         { name: 'document-images', data: [], type: 'array' },
+        { name: 'document-envelope', data: envelope, type: 'object' },
       ],
       stageMetrics: {
         durationMs,
@@ -113,4 +161,4 @@ function validate(config) {
   return { valid: errors.length === 0, errors };
 }
 
-export { execute, validate, buildMarkdown };
+export { execute, validate, buildMarkdown, buildEnvelope };

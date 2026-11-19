@@ -123,7 +123,8 @@ class StageRegistry {
       inputs: {},
       outputs: [
         { name: 'document-md', type: 'string' },
-        { name: 'document-images', type: 'array' }
+        { name: 'document-images', type: 'array' },
+        { name: 'document-envelope', type: 'object' }
       ],
       inputSchema: [],
       configSchema: ['gitdiagram'],

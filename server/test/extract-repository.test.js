@@ -123,3 +123,35 @@ test('schema migration widens doc_source_type CHECK to include repository', asyn
   assert.equal(row.doc_source_type, 'repository');
   db.close();
 });
+
+test('buildEnvelope maps gitdiagram result onto unified envelope shape', async () => {
+  const { buildEnvelope } = await import('../src/pipeline/stages/extract-repository.js');
+  const result = {
+    repo: { path: '/repos/architxt-abc', head: 'h1', branch: 'main', source: 'cache-fresh', remoteUri: 'https://example/repo.git' },
+    explanation: 'The API server routes documents.',
+    graph: {
+      nodes: [
+        { id: 'api', label: 'API Server', path: 'server/src/index.js', group: 'backend' },
+        { id: 'ext', label: 'LLM', path: null, group: null },
+      ],
+      edges: [
+        { from: 'api', to: 'ext', label: 'calls', dashed: false, evidencePath: 'server/src/index.js' },
+        { from: 'ext', to: 'api', label: 'responds', dashed: true, evidencePath: null },
+      ],
+    },
+    mermaid: 'graph TD\n  api-->ext',
+  };
+  const env = buildEnvelope(result);
+  assert.ok(Array.isArray(env.narratives) && env.narratives.length === 1);
+  assert.equal(env.narratives[0].narrative, result.explanation);
+  assert.deepEqual(env.narratives[0].evidence, ['server/src/index.js']);
+  assert.equal(env.graph.nodes.length, 2);
+  assert.equal(env.graph.edges.length, 2);
+  assert.equal(env.graph.edges[0].type, 'depends-on');
+  assert.equal(env.graph.edges[0].evidence[0], 'server/src/index.js');
+  assert.equal(env.graph.edges[1].type, 'inferred');
+  assert.deepEqual(env.tables, []);
+  assert.equal(env.diagrams[0].type, 'mermaid');
+  assert.ok(env.diagrams[0].content.includes('graph TD'));
+  for (const key of ['narratives', 'graph', 'tables', 'diagrams']) assert.ok(key in env, `missing ${key}`);
+});
