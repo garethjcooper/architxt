@@ -587,7 +587,10 @@ router.post('/', uploadMiddleware, async (req, res) => {
     doc_source_type: normalizedSourceType,
     doc_source_path: isRepository ? repo_uri.trim() : 'UPLOADING',
     doc_full_path: isRepository ? repo_uri.trim() : null,
-    doc_filename: file?.originalname || null,
+    // Repository docs have no uploaded file — derive a display filename from the URI
+    doc_filename: isRepository
+      ? (repo_uri.trim().replace(/\.git$/, '').replace(/\/+$/, '').split('/').pop() || 'repository')
+      : (file?.originalname || null),
     doc_generated_by: 'user',
     doc_processing_options: processingOptions
   });

@@ -287,7 +287,7 @@ export function ViewDocumentDialog({
   const hasChanges =
     extId !== (document.ext_id || '') ||
     timestamp !== (document.timestamp || '') ||
-    fullPath !== (document.full_path || '') ||
+    (!isRepositoryDoc && fullPath !== (document.full_path || '')) ||
     JSON.stringify(authors) !== JSON.stringify(document.authors || []) ||
     (!isFixedPipelineDoc && denoiseEnabled !== (document.processing_options?.stages?.denoise !== false)) ||
     (!isFixedPipelineDoc && denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false)) ||
@@ -325,7 +325,7 @@ export function ViewDocumentDialog({
         updates.timestamp = timestamp || null;
       }
 
-      if (fullPath !== (document.full_path || '')) {
+      if (!isRepositoryDoc && fullPath !== (document.full_path || '')) {
         updates.full_path = fullPath || null;
       }
 
@@ -541,7 +541,9 @@ export function ViewDocumentDialog({
                     value={fullPath}
                     onChange={(e) => setFullPath(e.target.value)}
                     placeholder="e.g. https://..."
-                    className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                    disabled={isRepositoryDoc}
+                    readOnly={isRepositoryDoc}
+                    className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-70"
                   />
                 </div>
               </div>
