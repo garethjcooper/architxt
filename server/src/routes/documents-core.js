@@ -69,6 +69,19 @@ function parseProcessingOptions(raw) {
   }
 }
 
+/**
+ * Permissive repo reference check — accepts any URI (scheme://…) or a bare
+ * local path. gitdiagram-serve is the authority on whether it resolves.
+ */
+function isRepoRef(value) {
+  const v = String(value || '').trim();
+  if (!v) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return true; // scheme://…
+  if (/^git@[^:]+:/i.test(v)) return true;             // scp-like git@host:path
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return true;     // any other scheme
+  return v.startsWith('/') || v.startsWith('./') || v.startsWith('../') || v.startsWith('~');
+}
+
 // DB → API name transform (content omitted for list — use GET /documents/:id for content)
 const toApiDocument = (dbRow) => ({
   id: dbRow.doc_id,
@@ -553,9 +566,9 @@ router.post('/', uploadMiddleware, async (req, res) => {
 
   const isTrace = normalizedSourceType === 'trace';
   const isRepository = normalizedSourceType === 'repository';
-  if (isRepository && (!repo_uri || typeof repo_uri !== 'string' || repo_uri.trim() === '')) {
+  if (isRepository && !isRepoRef(repo_uri)) {
     sendResponse({
-      res, status: 400, error: 'repo_uri is required when source_type is \'repository\'', code: 'VALIDATION_ERROR',
+      res, status: 400, error: 'repo_uri must be a URI (scheme://…) or a local path when source_type is \'repository\'', code: 'VALIDATION_ERROR',
       logger, method: 'POST', path: routePath, duration: Date.now() - start
     });
     return;

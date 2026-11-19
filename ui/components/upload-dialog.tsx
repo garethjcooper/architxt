@@ -67,6 +67,21 @@ function filenameToExtId(name: string): string {
   return name.replace(/\.[^/.]+$/, '');
 }
 
+/**
+ * Permissive repo reference check: accepts a URI with any scheme
+ * (https://, http://, git://, ssh://, file://, git@host:path) or a bare
+ * local path. Anything non-empty passes — the service is the authority on
+ * whether the reference resolves.
+ */
+function isRepoRef(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return true;   // scheme://…
+  if (/^git@[^:]+:/i.test(v)) return true;                 // scp-like git@host:path
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return true;         // any other scheme (e.g. C:\…)
+  return v.startsWith('/') || v.startsWith('./') || v.startsWith('../') || v.startsWith('~'); // local path
+}
+
 export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenChange }: UploadDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -188,9 +203,9 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
   const uploadAll = useCallback(async () => {
     if (uploadMode === 'repository') {
-      // Repository mode: a single "document" per repo path, no file picker items.
-      if (!repoUri.trim()) {
-        toast.error('Enter a repository URI (e.g. https://github.com/org/repo or /host-repos/myrepo)');
+      // Repository mode: a single "document" per repo ref, no file picker items.
+      if (!isRepoRef(repoUri)) {
+        toast.error('Enter a repository URI (https://…, git://…, ssh://…, git@host:…) or a local path');
         return;
       }
     } else if (items.length === 0) {
@@ -691,7 +706,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               {(items.length > 0 || uploadMode === 'repository') && (
                 <Button
                   onClick={uploadAll}
-                  disabled={uploadMode === 'repository' ? !repoUri.trim() : pendingCount === 0}
+                  disabled={uploadMode === 'repository' ? !isRepoRef(repoUri) : pendingCount === 0}
                   className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
                 >
                   {uploadMode === 'repository'
