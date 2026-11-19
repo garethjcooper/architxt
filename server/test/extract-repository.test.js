@@ -62,7 +62,7 @@ test('analyzeRepository surfaces service errors', async () => {
   await assert.rejects(() => analyzeRepository('/fail'), /not a git repo/);
 });
 
-test('extract-repository stage emits document-md as the JSON envelope', async () => {
+test('extract-repository stage emits document-md as markdown with fenced mermaid + json graph', async () => {
   const stage = await import('../src/pipeline/stages/extract-repository.js');
   const out = await stage.execute(
     {},
@@ -73,11 +73,16 @@ test('extract-repository stage emits document-md as the JSON envelope', async ()
   );
   assert.equal(out.stageResult.success, true);
   const md = out.stageOutput.find((o) => o.name === 'document-md');
-  const envelope = JSON.parse(md.data);
-  for (const key of ['narratives', 'graph', 'tables', 'diagrams']) assert.ok(key in envelope, `missing ${key}`);
-  assert.match(envelope.narratives[0].narrative, /A demo repo\./);
-  assert.match(envelope.diagrams[0].content, /graph TD/);
-  assert.equal(envelope.diagrams[0].type, 'mermaid');
+  // Plain markdown, not a JSON envelope
+  assert.match(md.data, /A demo repo\./);
+  assert.doesNotMatch(md.data.trim(), /^\{/);
+  // Mermaid in a fenced mermaid block
+  assert.match(md.data, /```mermaid\n[\s\S]*graph TD[\s\S]*```/);
+  // Graph in a fenced json block
+  const jsonBlock = md.data.match(/```json\n([\s\S]*?)```/);
+  assert.ok(jsonBlock, 'missing fenced json block');
+  const graph = JSON.parse(jsonBlock[1]);
+  assert.deepEqual(graph, stubResponse.graph);
   assert.ok(!out.stageOutput.find((o) => o.name === 'document-envelope'), 'no separate envelope artifact');
   const images = out.stageOutput.find((o) => o.name === 'document-images');
   assert.deepEqual(images.data, []);
@@ -127,34 +132,26 @@ test('schema migration widens doc_source_type CHECK to include repository', asyn
   db.close();
 });
 
-test('buildEnvelope maps gitdiagram result onto unified envelope shape', async () => {
-  const { buildEnvelope } = await import('../src/pipeline/stages/extract-repository.js');
+test('buildMarkdown renders explanation + mermaid + fenced json graph', async () => {
+  const { buildMarkdown } = await import('../src/pipeline/stages/extract-repository.js');
   const result = {
-    repo: { path: '/repos/architxt-abc', head: 'h1', branch: 'main', source: 'cache-fresh', remoteUri: 'https://example/repo.git' },
+    repo: { path: '/repos/architxt-abc', remoteUri: 'https://example/repo.git' },
     explanation: 'The API server routes documents.',
     graph: {
       nodes: [
-        { id: 'api', label: 'API Server', path: 'server/src/index.js', group: 'backend' },
-        { id: 'ext', label: 'LLM', path: null, group: null },
+        { id: 'api', label: 'API Server', path: 'server/src/index.js' },
+        { id: 'ext', label: 'LLM' },
       ],
-      edges: [
-        { from: 'api', to: 'ext', label: 'calls', dashed: false, evidencePath: 'server/src/index.js' },
-        { from: 'ext', to: 'api', label: 'responds', dashed: true, evidencePath: null },
-      ],
+      edges: [{ from: 'api', to: 'ext', label: 'calls', dashed: false }],
     },
     mermaid: 'graph TD\n  api-->ext',
   };
-  const env = buildEnvelope(result);
-  assert.ok(Array.isArray(env.narratives) && env.narratives.length === 1);
-  assert.equal(env.narratives[0].narrative, result.explanation);
-  assert.deepEqual(env.narratives[0].evidence, ['server/src/index.js']);
-  assert.equal(env.graph.nodes.length, 2);
-  assert.equal(env.graph.edges.length, 2);
-  assert.equal(env.graph.edges[0].type, 'depends-on');
-  assert.equal(env.graph.edges[0].evidence[0], 'server/src/index.js');
-  assert.equal(env.graph.edges[1].type, 'inferred');
-  assert.deepEqual(env.tables, []);
-  assert.equal(env.diagrams[0].type, 'mermaid');
-  assert.ok(env.diagrams[0].content.includes('graph TD'));
-  for (const key of ['narratives', 'graph', 'tables', 'diagrams']) assert.ok(key in env, `missing ${key}`);
+  const md = buildMarkdown(result);
+  assert.match(md, /The API server routes documents\./);
+  assert.match(md, /```mermaid\n[\s\S]*api-->ext[\s\S]*```/);
+  const jsonBlock = md.match(/```json\n([\s\S]*?)```/);
+  assert.ok(jsonBlock, 'missing fenced json block');
+  assert.deepEqual(JSON.parse(jsonBlock[1]), result.graph);
+  // Explanation object form also works
+  assert.match(buildMarkdown({ ...result, explanation: { text: 'Obj form.' } }), /Obj form\./);
 });

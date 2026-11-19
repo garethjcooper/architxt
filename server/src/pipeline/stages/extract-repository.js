@@ -3,11 +3,12 @@
  *
  * I/O stage for repository documents: sends the repo path (doc.source_path)
  * to gitdiagram-serve, which analyzes the repo with an LLM and returns an
- * architecture diagram (Mermaid) plus an evidence-based explanation.
+ * architecture diagram (Mermaid), the structured dependency graph, and an
+ * evidence-based explanation.
  *
- * Emits the same artifacts as the standard extract stage, with the service
- * result mapped onto the standard contextual-graph envelope:
- *   - document-md: JSON-serialized envelope (narratives + graph + tables + diagrams)
+ * Emits the same artifacts as the standard extract stage:
+ *   - document-md: the explanation in markdown, followed by the Mermaid
+ *     diagram and the graph as a fenced ```json block
  *   - document-images: empty array (repository analysis produces no images)
  *
  * Relationship/entity extraction is intentionally not performed here — the
@@ -20,46 +21,18 @@ import { analyzeRepository } from '../../services/gitdiagram/client.js';
 const logger = createLogger('stage-extract-repository');
 
 /**
- * Map gitdiagram-serve's result onto the standard contextual-graph envelope
- * (narratives + graph + tables + diagrams) so repository analysis can feed
- * the same UI/consumers as Hindsight reflect output.
+ * Build the document markdown from a gitdiagram-serve result:
+ * explanation prose + Mermaid diagram + graph as a fenced JSON block.
  */
-function buildEnvelope(result) {
-  const repoName = result.repo?.remoteUri || result.repo?.path || 'repository';
-  const explanation = result.explanation || '';
-  const nodes = (result.graph?.nodes || []).map((n) => ({
-    id: n.id,
-    label: n.label,
-    path: n.path ?? null,
-    group: n.group ?? null,
-  }));
-  const edges = (result.graph?.edges || []).map((e) => ({
-    from: e.from,
-    to: e.to,
-    type: e.dashed ? 'inferred' : 'depends-on',
-    label: e.label || '',
-    detail: e.evidencePath ? `evidence: ${e.evidencePath}` : '',
-    evidence: e.evidencePath ? [e.evidencePath] : [],
-  }));
-  return {
-    narratives: [
-      {
-        narrative_name: 'Repository architecture',
-        narrative: explanation,
-        evidence: nodes.filter((n) => n.path).map((n) => n.path),
-      },
-    ],
-    graph: { name: String(repoName), nodes, edges },
-    tables: [],
-    diagrams: [
-      {
-        name: 'Architecture diagram',
-        type: 'mermaid',
-        content: result.mermaid || '',
-        evidence: [],
-      },
-    ],
-  };
+function buildMarkdown(result) {
+  const parts = [];
+  const explanation = typeof result.explanation === 'string' ? result.explanation : (result.explanation?.text || '');
+  if (explanation) parts.push(explanation.trim());
+  if (result.mermaid) parts.push('```mermaid\n' + result.mermaid.trim() + '\n```');
+  if (result.graph && (result.graph.nodes?.length || result.graph.edges?.length)) {
+    parts.push('```json\n' + JSON.stringify(result.graph, null, 2) + '\n```');
+  }
+  return parts.join('\n\n');
 }
 
 async function execute(artifacts, _config, data, services, context) {
@@ -87,8 +60,7 @@ async function execute(artifacts, _config, data, services, context) {
 
     const result = await analyzeRepository(repoUri, options, context?.abortSignal);
 
-    const envelope = buildEnvelope(result);
-    const markdown = JSON.stringify(envelope, null, 2);
+    const markdown = buildMarkdown(result);
     const durationMs = Date.now() - startTime;
 
     logger.info('Repository analysis complete', {
@@ -138,4 +110,4 @@ function validate(config) {
   return { valid: errors.length === 0, errors };
 }
 
-export { execute, validate, buildEnvelope };
+export { execute, validate, buildMarkdown };
