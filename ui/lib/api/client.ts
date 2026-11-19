@@ -106,21 +106,25 @@ export const documentsApi = {
   getProcessingHistory: (id: number) =>
     fetchApi<{ processing_history: any[] | null }>(`/documents/${id}/processinghistory`),
 
-  create: (file: File, extId: string, options?: {
-    source_type?: 'document' | 'trace';
+  create: (file: File | null, extId: string, options?: {
+    source_type?: 'document' | 'trace' | 'repository';
     trace_profile?: string;
+    repo_path?: string;
     context_id?: number | null;
     tags_to_add?: number[];
     metadata_to_add?: number[];
   }) => {
     const formData = new FormData();
-    formData.append('file', file);
+    if (file) formData.append('file', file);
     formData.append('ext_id', extId);
     if (options?.source_type) {
       formData.append('source_type', options.source_type);
     }
     if (options?.trace_profile !== undefined) {
       formData.append('trace_profile', options.trace_profile);
+    }
+    if (options?.repo_path) {
+      formData.append('repo_path', options.repo_path);
     }
     if (options?.context_id !== null && options?.context_id !== undefined) {
       formData.append('context_id', String(options.context_id));

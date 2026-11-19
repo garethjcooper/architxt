@@ -376,11 +376,19 @@ export function ViewDocumentDialog({
               className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${
                 document.source_type === 'trace'
                   ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
-                  : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
+                  : document.source_type === 'repository'
+                    ? 'bg-badge-success-bg text-badge-success-fg border-badge-success-bd'
+                    : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
               }`}
-              title={document.source_type === 'trace' ? 'Trace document — extracted with a trace profile' : 'Standard document'}
+              title={
+                document.source_type === 'trace'
+                  ? 'Trace document — extracted with a trace profile'
+                  : document.source_type === 'repository'
+                    ? 'Repository — analyzed into a Mermaid architecture diagram by gitdiagram-serve'
+                    : 'Standard document'
+              }
             >
-              {document.source_type === 'trace' ? 'Trace' : 'Document'}
+              {document.source_type === 'trace' ? 'Trace' : document.source_type === 'repository' ? 'Repository' : 'Document'}
             </Badge>
             </div>
 

@@ -28,7 +28,7 @@ CREATE TABLE documents (
   doc_ext_id TEXT UNIQUE,
   ctxt_id INTEGER,
   doc_status TEXT,
-  doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace')),
+  doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace', 'repository')),
   doc_content TEXT,
   doc_content_hash TEXT,
   doc_content_blocks JSON,

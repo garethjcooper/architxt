@@ -14,8 +14,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Upload,
   Loader2,
@@ -36,8 +36,14 @@ import type { Context, Tag as TagType, Metadata, TraceProfile } from '@/lib/type
 
 const logger = createLogger('UploadDialog');
 
-type UploadMode = 'document' | 'trace';
+type UploadMode = 'document' | 'trace' | 'repository';
 type UploadPhase = 'select' | 'running' | 'done';
+
+const UPLOAD_MODE_LABELS: Record<UploadMode, string> = {
+  document: 'Document',
+  trace: 'Trace Data',
+  repository: 'Repository',
+};
 
 interface UploadFileItem {
   id: string;
@@ -88,6 +94,9 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
 
+  // Repository path for repository uploads
+  const [repoPath, setRepoPath] = useState('');
+
   /* ── Reset on open ─────────────────────── */
   useEffect(() => {
     if (open) {
@@ -101,6 +110,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
       setUploadMode('document');
       setTraceProfiles([]);
       setSelectedProfileId('');
+      setRepoPath('');
     }
   }, [open]);
 
@@ -177,10 +187,18 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   }, []);
 
   const uploadAll = useCallback(async () => {
-    if (items.length === 0) return;
+    if (uploadMode === 'repository') {
+      // Repository mode: a single "document" per repo path, no file picker items.
+      if (!repoPath.trim()) {
+        toast.error('Enter a repository path (e.g. /repos/myrepo)');
+        return;
+      }
+    } else if (items.length === 0) {
+      return;
+    }
 
     const pendingItems = items.filter((it) => it.status === 'pending');
-    if (pendingItems.length === 0) return;
+    if (uploadMode !== 'repository' && pendingItems.length === 0) return;
 
     setPhase('running');
     abortRef.current = false;
@@ -195,7 +213,10 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
     const profileName = profile?.name;
 
     let current = 0;
-    for (const item of pendingItems) {
+    const effectiveItems = uploadMode === 'repository'
+      ? [{ id: 'repo', file: { name: repoPath.trim().replace(/\/+$/, '').split('/').pop() || 'repo' } as File, status: 'pending' as const }]
+      : pendingItems;
+    for (const item of effectiveItems) {
       if (abortRef.current) break;
 
       current++;
@@ -211,6 +232,14 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
           response = await documentsApi.create(item.file, extId, {
             source_type: 'trace',
             trace_profile: profileName,
+            context_id: selectedContextId,
+            tags_to_add: selectedTagIds.size > 0 ? [...selectedTagIds] : undefined,
+            metadata_to_add: selectedMetaIds.size > 0 ? [...selectedMetaIds] : undefined,
+          });
+        } else if (uploadMode === 'repository') {
+          response = await documentsApi.create(null, extId, {
+            source_type: 'repository',
+            repo_path: repoPath.trim(),
             context_id: selectedContextId,
             tags_to_add: selectedTagIds.size > 0 ? [...selectedTagIds] : undefined,
             metadata_to_add: selectedMetaIds.size > 0 ? [...selectedMetaIds] : undefined,
@@ -389,29 +418,29 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 </div>
               </div>
               
-              {/* Trace upload toggle + target selector — placed just above the file drop zone */}
+              {/* Type selector + per-type options — placed just above the file drop zone */}
               <div className="rounded-lg border border-border-default bg-surface-card p-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-foreground-faint flex items-center gap-1.5">
-                    <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-foreground-faint text-[8px] font-bold text-foreground-faint">T</span>
-                    Trace upload
-                  </Label>
-                  <Switch
-                    checked={uploadMode === 'trace'}
-                    onCheckedChange={(checked) => {
-                      setUploadMode(checked ? 'trace' : 'document');
-                    }}
-                    size="default"
-                  />
+                  <Label className="text-xs text-foreground-faint">Type</Label>
+                  <select
+                    value={uploadMode}
+                    onChange={(e) => setUploadMode(e.target.value as UploadMode)}
+                    className="h-8 rounded-md border border-border-default bg-surface-card px-2 text-xs text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                  >
+                    {(Object.keys(UPLOAD_MODE_LABELS) as UploadMode[]).map((m) => (
+                      <option key={m} value={m}>{UPLOAD_MODE_LABELS[m]}</option>
+                    ))}
+                  </select>
                 </div>
 
+                {uploadMode === 'trace' && (
                 <div className="space-y-3 border-t border-border-default pt-3">
                   <div className="space-y-2">
                     <Label className="text-xs text-foreground-faint">Trace profile (optional)</Label>
                     <select
                       value={selectedProfileId}
                       onChange={(e) => setSelectedProfileId(e.target.value)}
-                      disabled={uploadMode !== 'trace' || prefsLoading}
+                      disabled={prefsLoading}
                       className="w-full h-10 rounded-md border border-border-default bg-surface-card px-2.5 text-sm text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none disabled:opacity-50"
                     >
                       <option value="">Select a profile if needed</option>
@@ -430,9 +459,28 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                     Each file becomes a separate trace document. Leave the profile unset if the file does not need one.
                   </p>
                 </div>
+                )}
+
+                {uploadMode === 'repository' && (
+                <div className="space-y-3 border-t border-border-default pt-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-foreground-faint">Repository path</Label>
+                    <Input
+                      value={repoPath}
+                      onChange={(e) => setRepoPath(e.target.value)}
+                      placeholder="/repos/myrepo (path on the gitdiagram-serve host)"
+                      className="h-10 font-mono text-sm"
+                    />
+                  </div>
+                  <p className="text-[10px] text-foreground-subtle italic">
+                    No file upload — the repository is analyzed by gitdiagram-serve and becomes a document with a Mermaid architecture diagram.
+                  </p>
+                </div>
+                )}
               </div>
 
-              {/* Drag & Drop Zone */}
+              {/* Drag & Drop Zone (hidden in repository mode — no file upload) */}
+              {uploadMode !== 'repository' && (
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
@@ -456,6 +504,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                   onChange={handleInputChange}
                 />
               </div>
+              )}
 
               {/* File list */}
               {items.length > 0 && (
@@ -639,17 +688,17 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               >
                 Close
               </Button>
-              {items.length > 0 && (
+              {(items.length > 0 || uploadMode === 'repository') && (
                 <Button
                   onClick={uploadAll}
-                  disabled={pendingCount === 0}
+                  disabled={uploadMode === 'repository' ? !repoPath.trim() : pendingCount === 0}
                   className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
                 >
-                  {hasErrors && pendingCount === 0 ? (
-                    'Retry failed'
-                  ) : (
-                    `Upload ${pendingCount}`
-                  )}
+                  {uploadMode === 'repository'
+                    ? 'Analyze repository'
+                    : hasErrors && pendingCount === 0
+                      ? 'Retry failed'
+                      : `Upload ${pendingCount}`}
                 </Button>
               )}
             </>

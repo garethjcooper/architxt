@@ -1423,6 +1423,69 @@ function dropDormantResearchArtifactTables(db) {
   return dropped;
 }
 
+/**
+ * Extend the documents.doc_source_type CHECK constraint to allow 'repository'.
+ * SQLite cannot alter a CHECK, so the table is recreated with the widened
+ * constraint and all rows copied across. The documents_fts external-content
+ * table keys on doc_id rowid, so it is rebuilt afterwards by ensureDocumentsFts.
+ */
+function extendDocumentsSourceTypeCheck(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='documents'").get();
+  if (!tableExists) return 0;
+
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='documents'").pluck().get();
+  if (typeof sql !== 'string') return 0;
+  // Already migrated (fresh DDL or previous run) — nothing to do.
+  if (sql.includes("'repository'")) return 0;
+  if (!sql.includes('doc_source_type')) return 0;
+
+  logger.warn('Recreating documents to widen doc_source_type CHECK with repository');
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`DROP TABLE IF EXISTS documents_new`);
+    db.exec(`CREATE TABLE documents_new (
+      doc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      doc_ext_id TEXT UNIQUE,
+      ctxt_id INTEGER,
+      doc_status TEXT,
+      doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace', 'repository')),
+      doc_content TEXT,
+      doc_content_hash TEXT,
+      doc_content_blocks JSON,
+      doc_source_path TEXT,
+      doc_filename TEXT,
+      doc_full_path TEXT,
+      doc_authors JSON,
+      doc_processing_history JSON,
+      doc_processing_progress JSON,
+      doc_generated_by TEXT CHECK(doc_generated_by IN ('user', 'import')),
+      doc_processing_options JSON,
+      doc_timestamp TEXT,
+      doc_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      doc_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (ctxt_id) REFERENCES contexts(ctxt_id) ON DELETE SET NULL
+    )`);
+
+    const columns = db.prepare("PRAGMA table_info(documents)").all().map((r) => r.name);
+    // The new table is the canonical DDL; the live table may have legacy columns
+    // (e.g. doc_title) that no longer exist — copy only the shared columns.
+    const newColumns = db.prepare("PRAGMA table_info(documents_new)").all().map((r) => r.name);
+    const colList = columns.filter((c) => newColumns.includes(c)).join(', ');
+    db.exec(`INSERT INTO documents_new (${colList}) SELECT ${colList} FROM documents`);
+    db.exec('DROP TABLE documents');
+    db.exec('ALTER TABLE documents_new RENAME TO documents');
+
+    // External-content FTS now points at a dropped table — rebuild it.
+    db.exec('DROP TABLE IF EXISTS documents_fts');
+
+    logger.info('documents recreated with doc_source_type CHECK including repository');
+    return 1;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+
 function migrateAgentChatThreads(db) {
   const threadsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_threads'").get();
   const messagesTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_chat_messages'").get();
@@ -2200,6 +2263,7 @@ export function ensureSchema(db) {
     const relaxed = relaxResearchStepsParentCascade(db);
     const nullableDocId = ensurePendingOpsNullableDocId(db);
     const researchFkFixed = ensureResearchSessionsServerFk(db);
+    const sourceTypeExtended = extendDocumentsSourceTypeCheck(db);
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
@@ -2213,12 +2277,12 @@ export function ensureSchema(db) {
     const agentChatIndexes = ensureAgentChatIndexes(db);
     const droppedResearchArtifacts = dropDormantResearchArtifactTables(db);
     migrateAgentChatThreads(db);
-    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0 || droppedResearchArtifacts > 0) {
-      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, standard edge types seeded: ${standardEdgeTypesSeeded}, standard entity types seeded: ${standardEntityTypesSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}, dormant research artifact tables dropped: ${droppedResearchArtifacts}`);
+    if (created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || sourceTypeExtended > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0 || droppedResearchArtifacts > 0) {
+      logger.info(`Additive migration complete — ${created} new table(s), ${templatesSeeded} prompt template(s) seeded, ${cgTemplates} contextual-graph template(s), ${added} new column(s), ${removed} CHECK constraint(s) removed, ${templateRoleUniqueRemoved} mm_template_role UNIQUE constraint(s) removed, ${promptTemplateFixed} prompt template CHECK(s) removed, ${relaxed} FK action(s) relaxed, ${nullableDocId} pending_ops nullable fix, ${researchFkFixed} research_sessions FK fix, ${sourceTypeExtended} doc_source_type CHECK extension(s), FTS table created: ${ftsCreated}, entity inheritance normalizations: ${normalized}, contextual-graph tables recreated: ${cgSchemaFixed}, contextual-graph indexes created: ${cgIndexes}, mental model returns migrated: ${mmReturnsMigrated}, curated-page envelope migrations: ${curatedPagesMigrated}, template roles seeded: ${templateRolesSeeded}, template role unique index: ${templateRoleUniqueIndex}, bank settings seeded: ${bankSettingsSeeded}, standard edge types seeded: ${standardEdgeTypesSeeded}, standard entity types seeded: ${standardEntityTypesSeeded}, id placeholder migrated: ${idPlaceholderMigrated}, agent chat indexes created: ${agentChatIndexes}, dormant research artifact tables dropped: ${droppedResearchArtifacts}`);
     } else {
       logger.info('Database schema already present — no missing tables or columns');
     }
-    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0 || droppedResearchArtifacts > 0;
+    return created > 0 || added > 0 || removed > 0 || templateRoleUniqueRemoved > 0 || promptTemplateFixed > 0 || relaxed > 0 || nullableDocId > 0 || researchFkFixed > 0 || sourceTypeExtended > 0 || ftsCreated || normalized > 0 || templatesSeeded > 0 || cgIndexes > 0 || cgSchemaFixed > 0 || cgTemplates > 0 || mmReturnsMigrated > 0 || curatedPagesMigrated > 0 || templateRolesSeeded > 0 || templateRoleUniqueIndex || bankSettingsSeeded > 0 || standardEdgeTypesSeeded > 0 || standardEntityTypesSeeded > 0 || idPlaceholderMigrated > 0 || agentChatIndexes > 0 || droppedResearchArtifacts > 0;
   }
 
   if (!fs.existsSync(schemaPath)) {

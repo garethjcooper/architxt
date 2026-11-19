@@ -481,11 +481,19 @@ function DocumentsPageContent() {
                           className={`text-[10px] px-2 py-1 border inline-flex items-center gap-1 ${
                             doc.source_type === 'trace'
                               ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
-                              : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
+                              : doc.source_type === 'repository'
+                                ? 'bg-badge-success-bg text-badge-success-fg border-badge-success-bd'
+                                : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
                           }`}
-                          title={doc.source_type === 'trace' ? 'Trace document — extracted with a trace profile' : 'Standard document'}
+                          title={
+                            doc.source_type === 'trace'
+                              ? 'Trace document — extracted with a trace profile'
+                              : doc.source_type === 'repository'
+                                ? 'Repository — analyzed into a Mermaid architecture diagram by gitdiagram-serve'
+                                : 'Standard document'
+                          }
                         >
-                          {doc.source_type === 'trace' ? 'Trace' : 'Document'}
+                          {doc.source_type === 'trace' ? 'Trace' : doc.source_type === 'repository' ? 'Repository' : 'Document'}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-1.5 px-4 text-xs cursor-pointer text-foreground-faint"

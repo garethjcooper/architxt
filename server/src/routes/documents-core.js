@@ -519,8 +519,9 @@ router.post('/', uploadMiddleware, async (req, res) => {
   const start = Date.now();
   const routePath = '/documents';
   const file = req.file;
+  const requestedSourceType = req.body.source_type || 'document';
 
-  if (!file) {
+  if (!file && requestedSourceType !== 'repository') {
     sendResponse({
       res, status: 400, error: 'No file provided', code: 'VALIDATION_ERROR',
       logger, method: 'POST', path: routePath, duration: Date.now() - start
@@ -528,7 +529,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const { ext_id, source_type, trace_profile } = req.body;
+  const { ext_id, source_type, trace_profile, repo_path } = req.body;
 
   if (!ext_id || typeof ext_id !== 'string' || ext_id.trim() === '') {
     sendResponse({
@@ -538,18 +539,41 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const isTrace = source_type === 'trace';
+  const VALID_SOURCE_TYPES = ['document', 'trace', 'repository'];
+  const normalizedSourceType = source_type || 'document';
+  if (!VALID_SOURCE_TYPES.includes(normalizedSourceType)) {
+    sendResponse({
+      res, status: 400,
+      error: `source_type must be one of: ${VALID_SOURCE_TYPES.join(', ')}`,
+      code: 'VALIDATION_ERROR',
+      logger, method: 'POST', path: routePath, duration: Date.now() - start
+    });
+    return;
+  }
+
+  const isTrace = normalizedSourceType === 'trace';
+  const isRepository = normalizedSourceType === 'repository';
+  if (isRepository && (!repo_path || typeof repo_path !== 'string' || repo_path.trim() === '')) {
+    sendResponse({
+      res, status: 400, error: 'repo_path is required when source_type is \'repository\'', code: 'VALIDATION_ERROR',
+      logger, method: 'POST', path: routePath, duration: Date.now() - start
+    });
+    return;
+  }
+
   const parsedOptions = parseProcessingOptions(req.body.processing_options);
   const processingOptions = isTrace
     ? { ...parsedOptions, trace_profile: trace_profile || parsedOptions?.trace_profile }
-    : parsedOptions;
+    : isRepository
+      ? { ...parsedOptions, repo_path: repo_path.trim() }
+      : parsedOptions;
 
   const createResult = await createDocument(getDb(req), {
     doc_ext_id: ext_id.trim(),
     doc_status: 'uploaded',
-    doc_source_type: source_type || 'document',
-    doc_source_path: 'UPLOADING',
-    doc_filename: file.originalname,
+    doc_source_type: normalizedSourceType,
+    doc_source_path: isRepository ? repo_path.trim() : 'UPLOADING',
+    doc_filename: file?.originalname || null,
     doc_generated_by: 'user',
     doc_processing_options: processingOptions
   });
@@ -566,29 +590,34 @@ router.post('/', uploadMiddleware, async (req, res) => {
   const docId = createResult.data;
   let finalPath;
 
-  try {
-    finalPath = await writeToStorage(file.buffer, config.storage.path, docId, file.originalname);
-  } catch (fileErr) {
-    logger.error('File write failed, rolling back DB record', { docId, error: fileErr.message });
-    await deleteDocument(getDb(req), docId);
-    sendResponse({
-      res, status: 500, error: 'Failed to store file', code: 'FILE_WRITE_ERROR',
-      logger, method: 'POST', path: routePath, duration: Date.now() - start
-    });
-    return;
-  }
+  if (isRepository) {
+    // Repository documents have no uploaded file — source_path is the repo path.
+    finalPath = repo_path.trim();
+  } else {
+    try {
+      finalPath = await writeToStorage(file.buffer, config.storage.path, docId, file.originalname);
+    } catch (fileErr) {
+      logger.error('File write failed, rolling back DB record', { docId, error: fileErr.message });
+      await deleteDocument(getDb(req), docId);
+      sendResponse({
+        res, status: 500, error: 'Failed to store file', code: 'FILE_WRITE_ERROR',
+        logger, method: 'POST', path: routePath, duration: Date.now() - start
+      });
+      return;
+    }
 
-  const updateResult = await updateDocument(getDb(req), docId, { doc_source_path: finalPath });
+    const updateResult = await updateDocument(getDb(req), docId, { doc_source_path: finalPath });
 
-  if (!updateResult.success) {
-    logger.error('DB update failed, rolling back', { docId, error: updateResult.error });
-    await removeStorageById(config.storage.path, docId);
-    await deleteDocument(getDb(req), docId);
-    sendResponse({
-      res, status: 500, error: 'Failed to finalize document', code: 'DB_UPDATE_ERROR',
-      logger, method: 'POST', path: routePath, duration: Date.now() - start
-    });
-    return;
+    if (!updateResult.success) {
+      logger.error('DB update failed, rolling back', { docId, error: updateResult.error });
+      await removeStorageById(config.storage.path, docId);
+      await deleteDocument(getDb(req), docId);
+      sendResponse({
+        res, status: 500, error: 'Failed to finalize document', code: 'DB_UPDATE_ERROR',
+        logger, method: 'POST', path: routePath, duration: Date.now() - start
+      });
+      return;
+    }
   }
 
   // ── Apply optional context & tags on upload ─────────────────────────
@@ -646,7 +675,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     data: {
       id: docId,
       status: 'uploaded',
-      source_type: source_type || 'document',
+      source_type: normalizedSourceType,
       source_path: finalPath,
       processing_options: processingOptions,
       context_applied: contextApplied,

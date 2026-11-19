@@ -78,6 +78,31 @@ export function getExtractTracePipelineDefinition(doc = {}) {
 }
 
 /**
+ * Get pipeline definition for repository extract workflow
+ *
+ * Repository documents are analyzed by gitdiagram-serve (external service):
+ * the repo path is sent over HTTP and the service returns a Mermaid diagram
+ * plus an explanation, which becomes the document content.
+ *
+ * @param {Object} doc - Document row (must include doc_source_path = repo path)
+ * @returns {Object} Pipeline definition with stages array
+ */
+export function getExtractRepositoryPipelineDefinition(doc = {}) {
+  return {
+    name: 'extract-repository',
+    stages: [
+      {
+        stage: 'extract-repository',
+        config: { gitdiagram: config.gitdiagram, storage_path: config.storage_path },
+        data: {},
+        services: {},
+        timeoutMs: config.gitdiagram?.timeoutMs || null,
+      }
+    ]
+  };
+}
+
+/**
  * Get pipeline definition for extract workflow
  * Stages are conditionally included based on global config and per-document
  * processing_options overrides. The `doc` parameter is optional and defaults
@@ -164,10 +189,12 @@ export function getStageNames(doc = {}) {
 export async function processDocument(doc, abortSignal) {
   logger.info('Processing document', { docId: doc.id, filename: doc.filename, sourceType: doc.source_type });
 
-  const isTrace = doc.source_type === 'trace';
-  const pipelineDef = isTrace
+  const sourceType = doc.source_type || 'document';
+  const pipelineDef = sourceType === 'trace'
     ? getExtractTracePipelineDefinition(doc)
-    : getExtractPipelineDefinition(doc);
+    : sourceType === 'repository'
+      ? getExtractRepositoryPipelineDefinition(doc)
+      : getExtractPipelineDefinition(doc);
 
   // Populate stage data with document info
   pipelineDef.stages.forEach(stage => {
@@ -175,7 +202,8 @@ export async function processDocument(doc, abortSignal) {
       doc_id: doc.id,
       source_path: doc.source_path,
       filename: doc.filename || doc.doc_filename,
-      ...(isTrace && stage.stage === 'extract-trace' ? { trace_profile: doc.trace_profile } : {})
+      doc_processing_options: doc.doc_processing_options || {},
+      ...(sourceType === 'trace' && stage.stage === 'extract-trace' ? { trace_profile: doc.trace_profile } : {})
     };
   });
 

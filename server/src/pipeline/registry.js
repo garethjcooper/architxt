@@ -15,15 +15,16 @@ let stageModules = null;
 
 async function getStageModules() {
   if (!stageModules) {
-    const [extract, denoise, denoiseLLM, vision, persist, extractTrace] = await Promise.all([
+    const [extract, denoise, denoiseLLM, vision, persist, extractTrace, extractRepository] = await Promise.all([
       import('./stages/extract.js'),
       import('./stages/denoise.js'),
       import('./stages/denoise-llm.js'),
       import('./stages/vision.js'),
       import('./stages/persist.js'),
-      import('./stages/extract-trace.js')
+      import('./stages/extract-trace.js'),
+      import('./stages/extract-repository.js')
     ]);
-    stageModules = { extract, denoise, denoiseLLM, vision, persist, extractTrace };
+    stageModules = { extract, denoise, denoiseLLM, vision, persist, extractTrace, extractRepository };
   }
   return stageModules;
 }
@@ -110,6 +111,23 @@ class StageRegistry {
       inputSchema: [],
       configSchema: ['storage_path'],
       dataSchema: ['doc_id', 'source_path', 'filename', 'trace_profile'],
+      serviceSchema: []
+    });
+
+    // Extract repository stage (I/O)
+    this.register('extract-repository', {
+      name: 'extract-repository',
+      type: 'io',
+      execute: modules.extractRepository.execute,
+      validate: modules.extractRepository.validate,
+      inputs: {},
+      outputs: [
+        { name: 'document-md', type: 'string' },
+        { name: 'document-images', type: 'array' }
+      ],
+      inputSchema: [],
+      configSchema: ['gitdiagram'],
+      dataSchema: ['doc_id', 'source_path', 'doc_processing_options'],
       serviceSchema: []
     });
 

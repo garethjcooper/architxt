@@ -14,7 +14,7 @@ export interface Document {
   source_path: string | null;
   full_path: string | null;
   authors: string[] | null;
-  source_type: 'document' | 'trace' | string;
+  source_type: 'document' | 'trace' | 'repository' | string;
   status:
     | 'uploaded'
     | 'ready_to_extract'
