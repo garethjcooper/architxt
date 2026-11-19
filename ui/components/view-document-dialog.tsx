@@ -109,6 +109,10 @@ export function ViewDocumentDialog({
   const [traceProfileName, setTraceProfileName] = useState<string | null>(null);
   const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
   const isTraceDoc = document?.source_type === 'trace';
+  const isRepositoryDoc = document?.source_type === 'repository';
+  // Trace & repository docs run a fixed single-stage pipeline — the extra
+  // stage toggles (denoise/denoise-llm/vision) don't apply to them.
+  const isFixedPipelineDoc = isTraceDoc || isRepositoryDoc;
 
   // Global stage availability from server config
   const [globalStages, setGlobalStages] = useState({
@@ -285,9 +289,9 @@ export function ViewDocumentDialog({
     timestamp !== (document.timestamp || '') ||
     fullPath !== (document.full_path || '') ||
     JSON.stringify(authors) !== JSON.stringify(document.authors || []) ||
-    denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
-    denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
-    visionEnabled !== (document.processing_options?.stages?.vision !== false) ||
+    (!isFixedPipelineDoc && denoiseEnabled !== (document.processing_options?.stages?.denoise !== false)) ||
+    (!isFixedPipelineDoc && denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false)) ||
+    (!isFixedPipelineDoc && visionEnabled !== (document.processing_options?.stages?.vision !== false)) ||
     (isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null));
 
   // Re-extraction with a different profile may invalidate existing extracted data
@@ -296,12 +300,14 @@ export function ViewDocumentDialog({
 
   const buildProcessingOptions = () => {
     const opts: NonNullable<Document['processing_options']> = {
-      stages: {
-        extract: true,
-        denoise: globalStages.denoise ? denoiseEnabled : true,
-        'denoise-llm': globalStages['denoise-llm'] ? denoiseLlmEnabled : true,
-        vision: globalStages.vision ? visionEnabled : true,
-      },
+      stages: isFixedPipelineDoc
+        ? { extract: true }
+        : {
+            extract: true,
+            denoise: globalStages.denoise ? denoiseEnabled : true,
+            'denoise-llm': globalStages['denoise-llm'] ? denoiseLlmEnabled : true,
+            vision: globalStages.vision ? visionEnabled : true,
+          },
     };
     return opts;
   };
@@ -328,9 +334,9 @@ export function ViewDocumentDialog({
         updates.authors = authors.length > 0 ? authors : null;
       }
 
-      if (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
+      if ((!isFixedPipelineDoc && (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
           denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
-          visionEnabled !== (document.processing_options?.stages?.vision !== false) ||
+          visionEnabled !== (document.processing_options?.stages?.vision !== false))) ||
           traceProfileChanges) {
         updates.processing_options = {
           ...buildProcessingOptions(),
@@ -674,7 +680,9 @@ export function ViewDocumentDialog({
               <div className="pt-1">
                 <p className="text-xs uppercase text-foreground-subtle font-medium mb-2">Processing Options</p>
                 <p className="text-[11px] text-foreground-faint mb-2">
-                  Override extract pipeline stages for this document. Extract is always run. Stages disabled globally in server config cannot be toggled here.
+                  {isFixedPipelineDoc
+                    ? 'Trace and repository documents use a fixed pipeline (extract-repository / extract-trace) — no additional stages apply.'
+                    : 'Override extract pipeline stages for this document. Extract is always run. Stages disabled globally in server config cannot be toggled here.'}
                 </p>
                 {/* Trace Profile picker — trace documents only */}
                 {isTraceDoc && (
@@ -702,30 +710,30 @@ export function ViewDocumentDialog({
                 </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.denoise ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.denoise && !isFixedPipelineDoc ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Denoise</span>
                     <Switch
                       checked={denoiseEnabled}
                       onCheckedChange={(checked) => setDenoiseEnabled(Boolean(checked))}
-                      disabled={!globalStages.denoise}
+                      disabled={!globalStages.denoise || isFixedPipelineDoc}
                       size="sm"
                     />
                   </label>
-                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages['denoise-llm'] ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages['denoise-llm'] && !isFixedPipelineDoc ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Denoise LLM</span>
                     <Switch
                       checked={denoiseLlmEnabled}
                       onCheckedChange={(checked) => setDenoiseLlmEnabled(Boolean(checked))}
-                      disabled={!globalStages['denoise-llm']}
+                      disabled={!globalStages['denoise-llm'] || isFixedPipelineDoc}
                       size="sm"
                     />
                   </label>
-                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.vision ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.vision && !isFixedPipelineDoc ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Vision</span>
                     <Switch
                       checked={visionEnabled}
                       onCheckedChange={(checked) => setVisionEnabled(Boolean(checked))}
-                      disabled={!globalStages.vision}
+                      disabled={!globalStages.vision || isFixedPipelineDoc}
                       size="sm"
                     />
                   </label>
