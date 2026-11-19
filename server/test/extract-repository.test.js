@@ -80,7 +80,7 @@ test('extract-repository stage emits document-md with explanation + mermaid', as
   assert.deepEqual(images.data, []);
 });
 
-test('extract-repository stage fails cleanly without repo_path', async () => {
+test('extract-repository stage fails cleanly without repo_uri', async () => {
   const stage = await import('../src/pipeline/stages/extract-repository.js');
   const out = await stage.execute(
     {},

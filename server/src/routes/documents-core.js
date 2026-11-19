@@ -529,7 +529,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const { ext_id, source_type, trace_profile, repo_uri, repo_path } = req.body;
+  const { ext_id, source_type, trace_profile, repo_uri } = req.body;
 
   if (!ext_id || typeof ext_id !== 'string' || ext_id.trim() === '') {
     sendResponse({
@@ -553,8 +553,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
 
   const isTrace = normalizedSourceType === 'trace';
   const isRepository = normalizedSourceType === 'repository';
-  const repoUri = (repo_uri ?? repo_path); // repo_path kept as legacy alias
-  if (isRepository && (!repoUri || typeof repoUri !== 'string' || repoUri.trim() === '')) {
+  if (isRepository && (!repo_uri || typeof repo_uri !== 'string' || repo_uri.trim() === '')) {
     sendResponse({
       res, status: 400, error: 'repo_uri is required when source_type is \'repository\'', code: 'VALIDATION_ERROR',
       logger, method: 'POST', path: routePath, duration: Date.now() - start
@@ -566,14 +565,14 @@ router.post('/', uploadMiddleware, async (req, res) => {
   const processingOptions = isTrace
     ? { ...parsedOptions, trace_profile: trace_profile || parsedOptions?.trace_profile }
     : isRepository
-      ? { ...parsedOptions, repo_uri: repoUri.trim() }
+      ? { ...parsedOptions, repo_uri: repo_uri.trim() }
       : parsedOptions;
 
   const createResult = await createDocument(getDb(req), {
     doc_ext_id: ext_id.trim(),
     doc_status: 'uploaded',
     doc_source_type: normalizedSourceType,
-    doc_source_path: isRepository ? repoUri.trim() : 'UPLOADING',
+    doc_source_path: isRepository ? repo_uri.trim() : 'UPLOADING',
     doc_filename: file?.originalname || null,
     doc_generated_by: 'user',
     doc_processing_options: processingOptions
@@ -593,7 +592,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
 
   if (isRepository) {
     // Repository documents have no uploaded file — source_path is the repo path.
-    finalPath = repoUri.trim();
+    finalPath = repo_uri.trim();
   } else {
     try {
       finalPath = await writeToStorage(file.buffer, config.storage.path, docId, file.originalname);

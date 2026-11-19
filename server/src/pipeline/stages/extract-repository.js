@@ -49,8 +49,8 @@ async function execute(artifacts, _config, data, services, context) {
       throw new Error('Repository analysis cancelled before request');
     }
 
-    const repoPath = data.doc_processing_options?.repo_uri || data.doc_processing_options?.repo_path || data.source_path;
-    if (!repoPath || repoPath === 'UPLOADING') {
+    const repoUri = data.doc_processing_options?.repo_uri || data.source_path;
+    if (!repoUri || repoUri === 'UPLOADING') {
       throw new Error('Repository document missing repo_uri (doc_processing_options.repo_uri or source_path)');
     }
 
@@ -61,16 +61,16 @@ async function execute(artifacts, _config, data, services, context) {
       ...(data.doc_processing_options?.model ? { model: data.doc_processing_options.model } : {}),
     };
 
-    logger.info('Repository analysis starting', { docId, repoPath, serviceUrl: stageOptions.serviceUrl });
+    logger.info('Repository analysis starting', { docId, repoUri, serviceUrl: stageOptions.serviceUrl });
 
-    const result = await analyzeRepository(repoPath, options, context?.abortSignal);
+    const result = await analyzeRepository(repoUri, options, context?.abortSignal);
 
     const markdown = buildMarkdown(result);
     const durationMs = Date.now() - startTime;
 
     logger.info('Repository analysis complete', {
       docId,
-      repoPath,
+      repoUri,
       durationMs,
       markdownLength: markdown.length,
       nodes: result.graph?.nodes?.length ?? 0,
@@ -86,7 +86,7 @@ async function execute(artifacts, _config, data, services, context) {
       ],
       stageMetrics: {
         durationMs,
-        repoPath,
+        repoUri,
         nodes: result.graph?.nodes?.length ?? 0,
         edges: result.graph?.edges?.length ?? 0,
         markdownLength: markdown.length,
