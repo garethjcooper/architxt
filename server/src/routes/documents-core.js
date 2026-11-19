@@ -13,8 +13,8 @@ import {
   writeToStorage,
   removeStorageById
 } from '../utils/file-helpers.js';
-import { 
-  handleGetById, 
+import {
+  handleGetById,
   handleDeleteById,
   handleCrudResult,
   validateId,
@@ -30,6 +30,7 @@ import {
   updateDocument,
   batchUpdateDocumentContext,
   batchUpdateDocumentTimestamp,
+  batchUpdateDocumentConfig,
   getDocumentsForDiff,
   getAllDocumentContexts,
   getDocumentProcessing
@@ -44,6 +45,9 @@ import { batchUpdateDocumentMetadata } from '../db/crud/document-metadata.js';
 
 const logger = createLogger('documents-core-route');
 const router = Router();
+
+// Allow tests to inject a request-scoped DB via app.locals.db
+const getDb = (req) => req.app.locals.db || db;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -96,6 +100,7 @@ const toApiDocument = (dbRow) => ({
   content_length_k: dbRow.doc_content_length_k || null,
   has_entities: dbRow.doc_has_entities === 1,
   timestamp: dbRow.doc_timestamp || null,
+  source_type: dbRow.doc_source_type || 'document',
   created_at: dbRow.doc_created_at,
   updated_at: dbRow.doc_updated_at
 });
@@ -141,7 +146,7 @@ const toApiDocument = (dbRow) => ({
 router.get('/', async (req, res) => {
   const start = Date.now();
   
-  const result = await listDocuments(db, {
+  const result = await listDocuments(getDb(req), {
     status: req.query.status,
     limit: parseInt(req.query.limit, 10) || 100,
     offset: parseInt(req.query.offset, 10) || 0
@@ -187,7 +192,7 @@ router.get('/processing', async (req, res) => {
   const routePath = '/documents/processing';
 
   try {
-    const result = await getDocumentProcessing(db);
+    const result = await getDocumentProcessing(getDb(req));
 
     if (!result.success || !result.data) {
       sendResponse({
@@ -311,7 +316,7 @@ router.get('/:id/content', async (req, res) => {
   if (!idCheck.valid) return;
   const id = idCheck.id;
 
-  const result = await getDocument(db, id);
+  const result = await getDocument(getDb(req), id);
   if (!result.success) {
     const duration = Date.now() - start;
     sendResponse({
@@ -381,7 +386,7 @@ router.get('/:id/processinghistory', async (req, res) => {
   if (!idCheck.valid) return;
   const id = idCheck.id;
 
-  const result = await getDocument(db, id);
+  const result = await getDocument(getDb(req), id);
   if (!result.success) {
     const duration = Date.now() - start;
     sendResponse({
@@ -423,7 +428,7 @@ router.get('/:id/images/:imageId', async (req, res) => {
     return;
   }
 
-  const docResult = await getDocument(db, id);
+  const docResult = await getDocument(getDb(req), id);
   if (!docResult.success) {
     sendResponse({ res, status: 500, error: docResult.error, code: docResult.code, logger, method: 'GET', path: routePath, duration: Date.now() - start });
     return;
@@ -523,7 +528,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const { ext_id } = req.body;
+  const { ext_id, source_type, trace_profile } = req.body;
 
   if (!ext_id || typeof ext_id !== 'string' || ext_id.trim() === '') {
     sendResponse({
@@ -533,13 +538,20 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const createResult = await createDocument(db, {
+  const isTrace = source_type === 'trace';
+  const parsedOptions = parseProcessingOptions(req.body.processing_options);
+  const processingOptions = isTrace
+    ? { ...parsedOptions, trace_profile: trace_profile || parsedOptions?.trace_profile }
+    : parsedOptions;
+
+  const createResult = await createDocument(getDb(req), {
     doc_ext_id: ext_id.trim(),
     doc_status: 'uploaded',
+    doc_source_type: source_type || 'document',
     doc_source_path: 'UPLOADING',
     doc_filename: file.originalname,
     doc_generated_by: 'user',
-    doc_processing_options: parseProcessingOptions(req.body.processing_options)
+    doc_processing_options: processingOptions
   });
 
   if (!createResult.success) {
@@ -558,7 +570,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     finalPath = await writeToStorage(file.buffer, config.storage.path, docId, file.originalname);
   } catch (fileErr) {
     logger.error('File write failed, rolling back DB record', { docId, error: fileErr.message });
-    await deleteDocument(db, docId);
+    await deleteDocument(getDb(req), docId);
     sendResponse({
       res, status: 500, error: 'Failed to store file', code: 'FILE_WRITE_ERROR',
       logger, method: 'POST', path: routePath, duration: Date.now() - start
@@ -566,12 +578,12 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const updateResult = await updateDocument(db, docId, { doc_source_path: finalPath });
+  const updateResult = await updateDocument(getDb(req), docId, { doc_source_path: finalPath });
 
   if (!updateResult.success) {
     logger.error('DB update failed, rolling back', { docId, error: updateResult.error });
     await removeStorageById(config.storage.path, docId);
-    await deleteDocument(db, docId);
+    await deleteDocument(getDb(req), docId);
     sendResponse({
       res, status: 500, error: 'Failed to finalize document', code: 'DB_UPDATE_ERROR',
       logger, method: 'POST', path: routePath, duration: Date.now() - start
@@ -588,7 +600,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     if (req.body.context_id !== '' && req.body.context_id !== 'null' && req.body.context_id !== null) {
       contextId = parseInt(req.body.context_id, 10);
       if (!Number.isNaN(contextId)) {
-        await batchUpdateDocumentContext(db, [docId], contextId);
+        await batchUpdateDocumentContext(getDb(req), [docId], contextId);
         contextApplied = true;
       }
     }
@@ -606,7 +618,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
         .filter((n) => !Number.isNaN(n));
     }
     if (tagIds.length > 0) {
-      await batchUpdateDocumentTags(db, [docId], tagIds, []);
+      await batchUpdateDocumentTags(getDb(req), [docId], tagIds, []);
       tagsApplied = true;
     }
   }
@@ -624,7 +636,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
         .filter((n) => !Number.isNaN(n));
     }
     if (metaIds.length > 0) {
-      await batchUpdateDocumentMetadata(db, [docId], metaIds, []);
+      await batchUpdateDocumentMetadata(getDb(req), [docId], metaIds, []);
       metadataApplied = true;
     }
   }
@@ -634,7 +646,9 @@ router.post('/', uploadMiddleware, async (req, res) => {
     data: {
       id: docId,
       status: 'uploaded',
+      source_type: source_type || 'document',
       source_path: finalPath,
+      processing_options: processingOptions,
       context_applied: contextApplied,
       tags_applied: tagsApplied,
       metadata_applied: metadataApplied,
@@ -642,6 +656,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     logger, method: 'POST', path: routePath, duration: Date.now() - start
   });
 });
+
 
 /**
  * @openapi
@@ -811,7 +826,7 @@ router.put('/:id', async (req, res) => {
   }
 
   // CRUD
-  const result = await updateDocument(db, idCheck.id, updateData);
+  const result = await updateDocument(getDb(req), idCheck.id, updateData);
 
   handleCrudResult({
     res, result,
@@ -830,7 +845,7 @@ router.delete('/:id', async (req, res) => {
 
   const id = idCheck.id;
 
-  const docResult = await getDocument(db, id);
+  const docResult = await getDocument(getDb(req), id);
   if (!docResult.success) {
     sendResponse({ res, status: 500, error: `Failed to retrieve document: ${docResult.error}`, code: docResult.code, logger, method: 'DELETE', path: routePath, duration: Date.now() - start });
     return;
@@ -840,7 +855,7 @@ router.delete('/:id', async (req, res) => {
     return;
   }
 
-  const deleteResult = await deleteDocument(db, id);
+  const deleteResult = await deleteDocument(getDb(req), id);
   if (!deleteResult.success) {
     sendResponse({ res, status: 500, error: `Failed to delete document: ${deleteResult.error}`, code: deleteResult.code, logger, method: 'DELETE', path: routePath, duration: Date.now() - start });
     return;
@@ -936,7 +951,7 @@ router.post('/batch/updatetags', async (req, res) => {
   }
 
   // Execute batch update
-  const result = await batchUpdateDocumentTags(db, docIds, tagsToAdd, tagsToRemove);
+  const result = await batchUpdateDocumentTags(getDb(req), docIds, tagsToAdd, tagsToRemove);
 
   if (!result.success) {
     handleCrudResult({
@@ -983,7 +998,7 @@ router.post('/batch/context', async (req, res) => {
       contextId = parsed;
     }
 
-    const result = await batchUpdateDocumentContext(db, docIds, contextId);
+    const result = await batchUpdateDocumentContext(getDb(req), docIds, contextId);
 
     if (!result.success) {
       handleCrudResult({
@@ -1083,7 +1098,7 @@ router.post('/batch/updatemetadata', async (req, res) => {
     }
 
     // Execute batch update via CRUD
-    const result = batchUpdateDocumentMetadata(db, docIds, metadataToAdd, metadataToRemove);
+    const result = batchUpdateDocumentMetadata(getDb(req), docIds, metadataToAdd, metadataToRemove);
 
     if (!result.success) {
       handleCrudResult({
@@ -1171,18 +1186,30 @@ router.post('/batch/updateconfig', async (req, res) => {
     if (!docIdsCheck.valid) return;
     const docIds = docIdsCheck.ids;
 
-    const { timestamp } = req.body;
+    const { timestamp, trace_profile } = req.body;
 
-    if (timestamp === undefined) {
+    if (timestamp === undefined && trace_profile === undefined) {
       const duration = Date.now() - start;
       sendResponse({
-        res, status: 400, error: 'Must provide timestamp to update', code: 'VALIDATION_ERROR',
+        res, status: 400, error: 'Must provide timestamp and/or trace_profile to update', code: 'VALIDATION_ERROR',
         logger, method: 'POST', path, duration
       });
       return;
     }
 
-    const result = batchUpdateDocumentTimestamp(db, docIds, timestamp);
+    if (trace_profile !== undefined && trace_profile !== null && typeof trace_profile !== 'string') {
+      const duration = Date.now() - start;
+      sendResponse({
+        res, status: 400, error: 'trace_profile must be a profile name string or null', code: 'VALIDATION_ERROR',
+        logger, method: 'POST', path, duration
+      });
+      return;
+    }
+
+    const result = batchUpdateDocumentConfig(getDb(req), docIds, {
+      timestamp,
+      traceProfile: trace_profile,
+    });
 
     if (!result.success) {
       handleCrudResult({
@@ -1194,10 +1221,14 @@ router.post('/batch/updateconfig', async (req, res) => {
       return;
     }
 
-    const { docsUpdated } = result.data;
+    const { docsUpdated, traceDocsUpdated = 0, traceDocsSkipped = 0 } = result.data;
     const duration = Date.now() - start;
     sendResponse({
-      res, status: 200, data: { success: true, docs_updated: docsUpdated },
+      res, status: 200, data: {
+        success: true,
+        docs_updated: docsUpdated,
+        ...(trace_profile !== undefined ? { trace_docs_updated: traceDocsUpdated, trace_docs_skipped: traceDocsSkipped } : {}),
+      },
       logger, method: 'POST', path, duration
     });
   } catch (error) {

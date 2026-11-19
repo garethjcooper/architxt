@@ -103,6 +103,8 @@ The documents table in the architxt UI surfaces the most important facts about e
 |---|---|---|
 | **Document ID** | Internal architxt identifier. | Used throughout the UI and API to refer to the document. |
 | **External ID** | Stable identifier you supply during upload or import. | Maps to Hindsight's [`document_id`](https://hindsight.vectorize.io/developer/api/retain#document_id), so the same id can survive re-imports. |
+| **Type** | Whether the source is an ordinary **Document** or a **Trace** (log/trace file). | Shown as a badge; trace documents use a trace profile during extraction. |
+| **Trace Profile** | For trace documents, the name of the trace profile stored in its processing options. | Shows `-` for ordinary documents. Changeable in **Document Details** and via the bulk **Config** action. |
 | **Status** | Current lifecycle state such as **Uploaded**, **Extracting**, or **Extracted**. | Tells you whether the document is ready to use or still being processed. |
 | **Overrides** | Caution badges for any processing stage explicitly disabled in **Document Details**. | Shows at a glance which documents deviate from the default extraction pipeline. |
 | **Document Content** | Extracted Markdown representation of the file. | The material the contextual graph, mental models, and Reflect operate on. |
@@ -110,7 +112,7 @@ The documents table in the architxt UI surfaces the most important facts about e
 | **Full Path** | Stored location of the original file. | Used for re-download, re-processing, and integrity checks. |
 | **Processing History** | Log of every status transition. | Audit trail you can inspect in **Document Details**. |
 | **Progress** | Optional extraction progress object. | Shown while a document is actively being extracted. |
-| **Context** | The document's assigned context, if any. | Groups related documents and is sent to Hindsight during sync. |
+| **Context** | The document's assigned context, if any. | Groups related documents and is sent to Hindsight during sync. Trace documents additionally get a built-in `system-trace` context prepended automatically (see below). |
 | **Document Date** | Timestamp you assign to the document itself. | Independent of upload time; useful for filtering and sorting. |
 
 ## Document states
@@ -245,3 +247,59 @@ Once a document reaches **Extracted**:
 - It can be synced to a Hindsight memory bank.
 
 Documents remain in the table unless explicitly deleted; architxt does not use a `deleted` flag. The **Processing History** preserves the full lifecycle for audit purposes.
+
+## Trace documents
+
+A **trace document** is a special source type for log files, trace dumps, and other structured telemetry you want to parse into structured records before they are stored as architxt documents. Trace documents are uploaded through the same **Upload Documents** dialog as ordinary documents, but with the **Trace upload** switch turned on.
+
+### When to use a trace document
+
+Use a trace document when you have raw system output that already contains architectural information — for example:
+
+- Distributed request/response logs.
+- CSV or TSV dumps of interface calls.
+- JSON-lines telemetry files.
+- Plaintext service logs with a consistent start-of-record pattern.
+
+The goal is to extract caller/callee relationships, service names, and operation names without building a separate observability backend. The trace document keeps the original file in storage and, once the profile has been applied, stores the parsed content (cleaned log, or the mined sequence report when the profile has a `sequenceProfile`) as Markdown so the rest of architxt (entity detection, mental models, Reflect, and contextual graph sync) can work on it.
+
+### Uploading a trace document
+
+1. Open **Upload Documents** from the documents page.
+2. Turn on the **Trace upload** switch.
+3. Optional: choose a **trace profile** from the dropdown. The dropdown lists every profile configured on the **Trace Profiles** page and shows its engine (for example `delimited` or `plaintext`).
+4. Drag files into the drop zone, or click to select them.
+5. Click **Upload**.
+
+Each file becomes a separate trace document with `source_type = trace`. The selected profile name is written into the document's `processing_options` and can be inspected later in **Document Details**.
+
+### System trace context
+
+Every trace document automatically gets a built-in **`system-trace`** context prepended to whatever context you assign it. This is a fixed code constant (not a row in the Contexts page — it can't be edited, deleted, or counted). It briefly describes the stored **Trace Sequence Analysis** report — the header metadata, one section per mined sequence with its signature, frequency, and Step | Entity | Direction | Token table (Entity and Direction are the key columns, always first, identifying who performed each step and in which direction), and the optional transitions section — so downstream consumers such as Hindsight sync and Reflect know how to read the document. Your selected context text is appended after it, separated by a divider.
+
+### What happens after upload
+
+Trace documents follow the same document lifecycle as ordinary documents. They appear in the documents table with the same status values:
+
+- **Uploaded** — file is stored but extraction has not run.
+- **Extracting** — the extraction daemon has claimed the file.
+- **Extracted** — the trace parser has run and the resulting Markdown content is available.
+
+Because a trace document's content is produced by a parser rather than Docling, the extraction stage reads the raw file, applies the trace profile, and converts the parsed records into a Markdown representation. You can view that content on the **Document Content** tab in **Document Details**.
+
+### Trace profile reference
+
+A trace profile defines how the file should be parsed. If you do not select one at upload time, the document is created but no parser is applied until a profile is associated. Profiles are managed on the dedicated **Trace Profiles** page; see the [trace profiles guide](../trace-profiles/overview) for how to author, version, and test them.
+
+At upload time the UI only needs the **profile name**. The profile itself is resolved again at extraction time, so changes made to the profile after upload will affect the next extraction run.
+
+### Managing the trace profile on existing documents
+
+The documents list shows each document's **Type** and, for trace documents, its **Trace Profile**. You can change the profile in two places:
+
+- **Document Details dialog** — for a trace document, a **Trace Profile** selector (with a "— none —" option) next to the type badge. Changing it shows a warning that re-extraction with a different profile **may invalidate existing extracted data**, since the stored content was produced by the previous profile. The new value is saved into `processing_options.trace_profile` and applies on the next extraction.
+- **Bulk Config action** — select multiple documents in the list and open **Config**. The dialog has a **Document Date** field (as before) and, when the selection contains trace documents, a **Trace Profile** row showing the majority value across the selected trace documents. Setting it sends `POST /api/v1/documents/batch/updateconfig` with both `timestamp` and `trace_profile`; the timestamp applies to **all** selected documents, while `trace_profile` applies **only to documents of type Trace** — non-trace documents in the selection are skipped for that field (the response reports `trace_docs_updated` and `trace_docs_skipped`). The same re-extraction warning is shown when the profile value actually changes.
+
+### What extraction stores for a trace document
+
+The trace extraction stage (`extract-trace` pipeline stage) reads the raw source file, runs the profile's parser, and — when the profile has a `sequenceProfile` — mines the sequences and stores **the sequence analysis report alone** as the document's Markdown content (matching what **Preview sequences** shows in the profile modal). Without a `sequenceProfile`, the cleaned log remains the document content. The original file always stays available at the document's stored source path. See [sequence mining](../trace-profiles/sequence-mining) for the report format and config.

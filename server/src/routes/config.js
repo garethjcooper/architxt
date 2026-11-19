@@ -246,12 +246,46 @@ router.get('/contextual-graph', (req, res) => {
  *                       properties:
  *                         value: { type: string }
  *                         envVar:{ type: string }
+ *                 trace_profile_suggest:
+ *                   type: object
+ *                   properties:
+ *                     provider:
+ *                       type: object
+ *                       properties:
+ *                         value: { type: string }
+ *                         envVar:{ type: string }
+ *                     model:
+ *                       type: object
+ *                       properties:
+ *                         value: { type: string }
+ *                         envVar:{ type: string }
+ *                     temperature:
+ *                       type: object
+ *                       properties:
+ *                         value: { type: number }
+ *                         envVar:{ type: string }
+ *                     max_tokens:
+ *                       type: object
+ *                       properties:
+ *                         value: { type: number }
+ *                         envVar:{ type: string }
+ *                     timeout_ms:
+ *                       type: object
+ *                       properties:
+ *                         value: { type: number }
+ *                         envVar:{ type: string }
+ *                     sample_budget:
+ *                       type: object
+ *                       properties:
+ *                         value: { type: number }
+ *                         envVar:{ type: string }
  */
 router.get('/settings', (req, res) => {
   try {
     const diag = config.diagram_description || {};
     const denoise = config.document_denoise_llm || {};
     const denoiseBasic = config.document_denoise || {};
+    const tps = config.traceProfileSuggest || {};
 
     res.json({
       prompts: {
@@ -309,6 +343,14 @@ router.get('/settings', (req, res) => {
       ui: {
         port:         { value: config.ui?.port       ?? null, envVar: 'ARCHITXT_UI_PORT' },
         api_base_url: { value: config.ui?.apiBaseUrl ?? null, envVar: 'ARCHITXT_UI_API_BASE_URL' },
+      },
+      trace_profile_suggest: {
+        provider:     { value: tps.provider     ?? null, envVar: 'ARCHITXT_TRACE_PROFILE_SUGGEST_PROVIDER' },
+        model:        { value: tps.model        ?? null, envVar: 'ARCHITXT_TRACE_PROFILE_SUGGEST_MODEL' },
+        temperature:  { value: typeof tps.temperature === 'number' ? tps.temperature : null, envVar: 'ARCHITXT_TRACE_PROFILE_SUGGEST_TEMPERATURE' },
+        max_tokens:   { value: tps.max_tokens   ?? null, envVar: 'ARCHITXT_TRACE_PROFILE_SUGGEST_MAX_TOKENS' },
+        timeout_ms:   { value: tps.timeout_ms   ?? null, envVar: 'ARCHITXT_TRACE_PROFILE_SUGGEST_TIMEOUT_MS' },
+        sample_budget:{ value: tps.sample_budget_default ?? null, envVar: 'ARCHITXT_TRACE_PROFILE_SUGGEST_SAMPLE_BUDGET' },
       },
     });
   } catch (err) {

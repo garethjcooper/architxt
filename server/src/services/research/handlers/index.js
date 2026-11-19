@@ -1,11 +1,10 @@
 import { handlePrebuilt } from './prebuilt.js';
 import { handleRecall } from './recall.js';
 import { handleReflect } from './reflect.js';
-import { handleSynthesize } from './synthesize.js';
 import { handleModels } from './models.js';
 import { handleTemplates } from './templates.js';
 
-export const QUERY_DEPTHS = ['prebuilt', 'recall', 'reflect', 'synthesize', 'models', 'templates'];
+export const QUERY_DEPTHS = ['prebuilt', 'recall', 'reflect', 'models', 'templates'];
 
 export function isValidQueryDepth(value) {
   return QUERY_DEPTHS.includes(value);
@@ -19,8 +18,6 @@ export async function dispatchHandler(queryDepth, serverId, bankId, query, optio
       return handleRecall(serverId, bankId, query, options, db, rawQuery);
     case 'reflect':
       return handleReflect(serverId, bankId, query, options, db, rawQuery);
-    case 'synthesize':
-      return handleSynthesize(serverId, bankId, query, options, db, rawQuery);
     case 'models':
       return handleModels(serverId, bankId, query, options, db);
     case 'templates':

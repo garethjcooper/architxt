@@ -30,7 +30,7 @@ SelectTrigger.displayName = 'SelectTrigger';
 function SelectPopup({ className, ...props }: React.ComponentPropsWithoutRef<typeof SelectUI.Popup>) {
   return (
     <SelectUI.Portal>
-      <SelectUI.Positioner align="start" sideOffset={4}>
+      <SelectUI.Positioner align="start" side="bottom" sideOffset={4} className="z-[100]">
         <SelectUI.Popup
           className={cn(
             'relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-border-default bg-surface-panel p-1 text-foreground-default shadow-md',

@@ -141,7 +141,7 @@ async function completeResearchOperation(db, rstepId, { status, errorMessage }) 
  * @param {number} params.serverId
  * @param {string} params.bankId
  * @param {string} params.intentText
- * @param {'prebuilt'|'recall'|'reflect'|'synthesize'|'models'|'templates'} params.queryDepth
+ * @param {'prebuilt'|'recall'|'reflect'|'models'|'templates'} params.queryDepth
  * @param {number|null} [params.sessionId]
  * @param {string[]} [params.viewpointIds]
  * @param {Array} [params.selections]
@@ -503,7 +503,7 @@ const toApiStep = (dbRow) => {
  *                 type: string
  *               query_depth:
  *                 type: string
- *                 enum: [prebuilt, recall, reflect, synthesize, models, templates]
+ *                 enum: [prebuilt, recall, reflect, models, templates]
  *                 default: prebuilt
  *               selections:
  *                 type: array
@@ -2036,193 +2036,6 @@ router.get('/sessions/:id', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [bank_id, viewpoint_ids]
- *             properties:
- *               title:
- *                 type: string
- *               description:
- *                 type: string
- *               bank_id:
- *                 type: string
- *               viewpoint_ids:
- *                 type: array
- *                 items: { type: integer }
- */
-router.post('/synthesize', async (req, res) => {
-  const start = Date.now();
-
-  try {
-    const {
-      server_id,
-      bank_id,
-      session_id,
-      source_step_ids,
-      intent_text,
-      max_tokens,
-      section_focus,
-    } = req.body;
-
-    if (!bank_id || typeof bank_id !== 'string') {
-      sendResponse({ res, status: 400, error: 'bank_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-    if (!intent_text || typeof intent_text !== 'string') {
-      sendResponse({ res, status: 400, error: 'intent_text is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-    if (!server_id || typeof server_id !== 'number') {
-      sendResponse({ res, status: 400, error: 'server_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-    if (!session_id || typeof session_id !== 'number') {
-      sendResponse({ res, status: 400, error: 'session_id is required', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-    if (!Array.isArray(source_step_ids) || source_step_ids.length === 0) {
-      sendResponse({ res, status: 400, error: 'source_step_ids must be a non-empty array', code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-
-    const sessionResult = await getSessionWithCurrentStep(db, session_id);
-    if (!sessionResult.success || !sessionResult.data) {
-      sendResponse({ res, status: 404, error: 'Research session not found', code: 'NOT_FOUND', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-
-    if (sessionResult.data.rs_bank_id !== bank_id) {
-      sendResponse({ res, status: 400, error: 'session does not belong to the provided bank_id', code: 'BANK_MISMATCH', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-
-    logger.info('Synthesize request payload', { source_step_ids, count: source_step_ids.length });
-
-    const allStepsResult = await listStepsForSession(db, session_id);
-    if (!allStepsResult.success) {
-      sendResponse({ res, status: 500, error: allStepsResult.error, code: allStepsResult.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-
-    const stepIdsInDb = (allStepsResult.data || []).map((s) => s.rstep_id);
-    logger.info('Session steps loaded', { sessionId: session_id, dbStepCount: allStepsResult.data?.length, stepIdsInDb });
-
-    const stepMap = new Map((allStepsResult.data || []).map((s) => [s.rstep_id, s]));
-    const sourceSteps = [];
-    for (const rawId of source_step_ids) {
-      const id = typeof rawId === 'number' ? rawId : Number(rawId);
-      if (!Number.isFinite(id)) {
-        sendResponse({ res, status: 400, error: `Invalid source_step_id: ${rawId}`, code: 'SOURCE_STEP_INVALID', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-        return;
-      }
-      const step = stepMap.get(id);
-      if (!step) {
-        sendResponse({ res, status: 400, error: `Source step ${id} not found in session`, code: 'SOURCE_STEP_NOT_FOUND', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-        return;
-      }
-      sourceSteps.push(step);
-    }
-
-    const parsed = section_focus ? { sectionFocus: section_focus, intentText: intent_text } : parseSectionDirectives(intent_text);
-
-    const handlerOptions = {
-      ...(max_tokens !== undefined && { max_tokens }),
-      ...(parsed.sectionFocus !== undefined && { section_focus: parsed.sectionFocus }),
-      source_steps: sourceSteps.map((s) => ({
-        intent_text: s.rstep_intent_text,
-        action_type: s.rstep_action_type,
-        parameters: s.rstep_parameters,
-        selections: s.rstep_selections,
-        viewpoint_ids: s.rstep_viewpoint_ids,
-        envelope: s.rstep_envelope,
-        calls: s.rstep_calls,
-      })),
-    };
-
-    const parentStepId = sessionResult.data.current_step?.rstep_id || null;
-
-    const stepResult = await createStep(db, {
-      rs_id: session_id,
-      rstep_parent_step_id: parentStepId,
-      // Store the raw user query so "Use details" / reuse can restore the full
-      // AQL including block directives. The parsed/stripped intent is passed to
-      // the agent below while the original query lives in the step record.
-      rstep_intent_text: intent_text,
-      rstep_raw_query: req.body.raw_query || intent_text,
-      rstep_selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
-      rstep_action_type: 'synthesize',
-      rstep_parameters: handlerOptions,
-      rstep_viewpoint_ids: [],
-      rstep_tool_calls_used: 0,
-      rstep_status: 'running',
-      rstep_error_message: null,
-      rstep_calls: [],
-    });
-
-    if (!stepResult.success) {
-      sendResponse({ res, status: 500, error: stepResult.error, code: stepResult.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-
-    const stepId = stepResult.data;
-
-    const updateSessionResult = await updateSessionCurrentStep(db, session_id, stepId);
-    if (!updateSessionResult.success) {
-      sendResponse({ res, status: 500, error: updateSessionResult.error, code: updateSessionResult.code || 'DATABASE_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-      return;
-    }
-
-    setImmediate(() => {
-      runDiscoverStep({
-        db,
-        serverId: server_id,
-        bankId: bank_id,
-        queryDepth: 'synthesize',
-        intentText: parsed.intentText,
-        rawQuery: req.body.raw_query || intent_text,
-        selections: source_step_ids.map((id) => ({ id, kind: 'step' })),
-        options: handlerOptions,
-        rsId: session_id,
-        rstepId: stepId,
-      }).catch((agentErr) => {
-        logger.error('Synthesize agent runner failed outside request', { error: agentErr.message, stack: agentErr.stack, session_id, stepId });
-      });
-    });
-
-    sendResponse({
-      res,
-      status: 202,
-      data: {
-        step_id: stepId,
-        session_id: session_id,
-        status: 'running',
-        bank_id: bank_id,
-        viewpoint_ids: [],
-        query_depth: 'synthesize',
-        action_type: 'synthesize',
-        parameters: handlerOptions,
-      },
-      logger,
-      method: 'POST',
-      path: '/research/synthesize',
-      duration: Date.now() - start,
-    });
-  } catch (err) {
-    logger.error('Research synthesize route error', { error: err.message, stack: err.stack });
-    sendResponse({ res, status: 500, error: err.message, code: 'UNKNOWN_ERROR', logger, method: 'POST', path: '/research/synthesize', duration: Date.now() - start });
-  }
-});
-
-/**
- * @openapi
- * /research/sessions:
- *   post:
- *     summary: Create a new research session
- *     tags: [Research]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
  *             required: [server_id, bank_id, viewpoint_ids]
  *             properties:
  *               title:
@@ -2236,7 +2049,10 @@ router.post('/synthesize', async (req, res) => {
  *               viewpoint_ids:
  *                 type: array
  *                 items: { type: integer }
- */
+ *               scope_entity_ids:
+ *                 type: array
+ *                 items: { type: integer }
+ * */
 router.post('/sessions', async (req, res) => {
   const start = Date.now();
   const { title, description, server_id, bank_id, viewpoint_ids, scope_entity_ids } = req.body;
@@ -2674,7 +2490,7 @@ router.post('/steps/:id/rerun', async (req, res) => {
     return;
   }
 
-  const supportedActionTypes = new Set(['prebuilt', 'recall', 'reflect', 'synthesize']);
+  const supportedActionTypes = new Set(['prebuilt', 'recall', 'reflect']);
   if (!supportedActionTypes.has(step.rstep_action_type)) {
     sendResponse({ res, status: 400, error: `Re-run not supported for action_type: ${step.rstep_action_type}`, code: 'VALIDATION_ERROR', logger, method: 'POST', path: '/research/steps/:id/rerun', duration: Date.now() - start });
     return;

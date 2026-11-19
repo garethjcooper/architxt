@@ -59,6 +59,19 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: ['hindsight-sync/overview', 'hindsight-sync/documents', 'hindsight-sync/entities', 'hindsight-sync/mental-models', 'hindsight-sync/directives', 'hindsight-sync/bank-settings'],
     },
+    {
+      type: 'category',
+      label: 'Trace Profiles',
+      collapsed: false,
+      items: [
+        'trace-profiles/overview',
+        'trace-profiles/concepts',
+        'trace-profiles/config-reference',
+        'trace-profiles/sequence-mining',
+        'trace-profiles/profile-modal',
+        'trace-profiles/api-routes',
+      ],
+    },
   ],
 };
 

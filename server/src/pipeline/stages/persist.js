@@ -16,19 +16,19 @@ const logger = createLogger('stage-persist');
  */
 async function persistFiles(markdown, imageAnalyses, metadata, storagePath) {
   const { docId, filename } = metadata;
-  
+
   const docDir = path.join(storagePath, String(docId));
   const convertedDir = path.join(docDir, 'converted');
   const imagesDir = path.join(docDir, 'images');
-  
+
   try {
     await fs.mkdir(convertedDir, { recursive: true });
     await fs.mkdir(imagesDir, { recursive: true });
-    
+
     const safeName = (filename || 'document').replace(/[^a-zA-Z0-9]/g, '_');
     const markdownPath = path.join(convertedDir, `${safeName}.md`);
     await fs.writeFile(markdownPath, markdown, 'utf8');
-    
+
     const metadataSidecar = {
       doc_id: docId,
       filename: filename,
@@ -36,10 +36,10 @@ async function persistFiles(markdown, imageAnalyses, metadata, storagePath) {
       image_count: imageAnalyses.length,
       converted_markdown_path: markdownPath
     };
-    
+
     const metadataPath = path.join(convertedDir, `${safeName}.metadata.json`);
     await fs.writeFile(metadataPath, JSON.stringify(metadataSidecar, null, 2), 'utf8');
-    
+
     for (const analysis of imageAnalyses) {
       if (analysis.description && analysis.imageId) {
         const descriptionFileName = `image-${analysis.imageId}-description.md`;
@@ -47,13 +47,13 @@ async function persistFiles(markdown, imageAnalyses, metadata, storagePath) {
         await fs.writeFile(descriptionPath, analysis.description, 'utf8');
       }
     }
-    
+
     logger.info('File persistence complete', {
       storageDir: docDir,
       markdownPath,
-      imageCount: imageAnalyses.length
+      imageCount: imageAnalyses.length,
     });
-    
+
     return {
       storageDir: docDir,
       convertedDir,
@@ -62,7 +62,7 @@ async function persistFiles(markdown, imageAnalyses, metadata, storagePath) {
       docMetadataSidecarPath: metadataPath,
       docArchiveImagesPath: imagesDir
     };
-    
+
   } catch (error) {
     logger.error('File persistence failed', { error: error.message });
     throw error;
@@ -80,17 +80,17 @@ async function persistFiles(markdown, imageAnalyses, metadata, storagePath) {
  */
 async function execute(artifacts, config, data, services) {
   const startTime = Date.now();
-  
+
   const markdown = artifacts.markdown || '';
   const imageAnalyses = artifacts.imageAnalyses || [];
-  
+
   const metadata = {
     docId: data.doc_id,
     filename: data.filename
   };
-  
+
   const storagePath = config.storage_path;
-  
+
   if (!storagePath) {
     logger.error('Persist stage requires storage_path in config');
     return {
@@ -109,9 +109,9 @@ async function execute(artifacts, config, data, services) {
   try {
     // Persist files to archive storage
     const archivePaths = await persistFiles(markdown, imageAnalyses, metadata, storagePath);
-    
+
     const durationMs = Date.now() - startTime;
-    
+
     logger.info('Persist stage complete', {
       durationMs,
       archivePaths: archivePaths?.storageDir
@@ -127,12 +127,12 @@ async function execute(artifacts, config, data, services) {
         { name: 'doc-archive-images-path', data: archivePaths?.docArchiveImagesPath || null }
       ]
     };
-    
+
   } catch (error) {
     const durationMs = Date.now() - startTime;
-    
+
     logger.error('Persist stage failed', { error: error.message, durationMs });
-    
+
     return {
       stageResult: { success: false, error: error.message },
       stageMetrics: { durationMs },

@@ -8,10 +8,10 @@ const logger = createLogger('extract-daemon-pipeline');
 /**
  * Extract final outputs from provenance log for API reporting
  * Finds the latest 'document-md' and 'document-images' from any stage
- * 
+ *
  * Treats final outputs like stage inputs - resolves the latest occurrence
  * from the provenance log across all stages.
- * 
+ *
  * @param {Array} provenanceLog - Pipeline provenance log [{index, name, items}, ...]
  * @returns {Object} { markdown, images }
  */
@@ -23,7 +23,7 @@ export function extractFinalOutputs(provenanceLog) {
   // Flatten all outputs from all stages
   // Each entry: {index, name, items: [{name, data, type}, ...]}
   const allOutputs = [];
-  
+
   for (const entry of provenanceLog) {
     if (entry.items && Array.isArray(entry.items)) {
       for (const item of entry.items) {
@@ -41,7 +41,7 @@ export function extractFinalOutputs(provenanceLog) {
   const latestMarkdown = allOutputs
     .filter(item => item.name === 'document-md')
     .pop();
-  
+
   const latestImages = allOutputs
     .filter(item => item.name === 'document-images')
     .pop();
@@ -49,6 +49,31 @@ export function extractFinalOutputs(provenanceLog) {
   return {
     markdown: latestMarkdown?.data ?? '',
     images: latestImages?.data ?? []
+  };
+}
+
+/**
+ * Get pipeline definition for trace extract workflow
+ *
+ * Trace documents bypass docling/denoise/vision and run a deterministic
+ * profile-driven parser instead. The output is then persisted by the shared
+ * persist stage.
+ *
+ * @param {Object} doc - Document row (must include doc_processing_options and trace_profile)
+ * @returns {Object} Pipeline definition with stages array
+ */
+export function getExtractTracePipelineDefinition(doc = {}) {
+  return {
+    name: 'extract-trace',
+    stages: [
+      {
+        stage: 'extract-trace',
+        config: { storage_path: config.storage_path },
+        data: {},
+        services: {},
+        timeoutMs: config.traceExtract?.timeout_ms || null,
+      }
+    ]
   };
 }
 
@@ -130,27 +155,34 @@ export function getStageNames(doc = {}) {
 }
 
 /**
- * Process a single document using v3 pipeline
- * 
+ * Process a single document using the configured pipeline.
+ *
  * @param {Object} doc - Document object with id, filename, etc
  * @param {AbortSignal} abortSignal - AbortController signal for cancellation
  * @returns {Promise<Object>} Processing result with success, metrics, markdown, images
  */
 export async function processDocument(doc, abortSignal) {
-  logger.info('Processing document', { docId: doc.id, filename: doc.filename });
+  logger.info('Processing document', { docId: doc.id, filename: doc.filename, sourceType: doc.source_type });
 
-  // Build pipeline configuration with document-specific data and stage overrides
-  const pipelineDef = getExtractPipelineDefinition(doc);
-  
+  const isTrace = doc.source_type === 'trace';
+  const pipelineDef = isTrace
+    ? getExtractTracePipelineDefinition(doc)
+    : getExtractPipelineDefinition(doc);
+
   // Populate stage data with document info
   pipelineDef.stages.forEach(stage => {
     stage.data = {
       doc_id: doc.id,
       source_path: doc.source_path,
-      filename: doc.filename || doc.doc_filename
+      filename: doc.filename || doc.doc_filename,
+      ...(isTrace && stage.stage === 'extract-trace' ? { trace_profile: doc.trace_profile } : {})
     };
   });
-  
+
+  return runPipeline(pipelineDef, doc, abortSignal);
+}
+
+async function runPipeline(pipelineDef, doc, abortSignal) {
   const pipeline = buildPipeline(pipelineDef, registry);
 
   // Stage names for progress reporting — derived from the actual pipeline definition

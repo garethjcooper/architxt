@@ -25,6 +25,7 @@ import { listDirectives as hindsightListDirectives } from '../services/hindsight
 import { pushDirective as pushHindsightDirective } from '../services/hindsight/push-directive.js';
 import { pullDirective as pullHindsightDirective } from '../services/hindsight/pull-directive.js';
 import { pushMentalModel, createMentalModel } from '../services/hindsight/push-mental-model.js';
+import { applySystemTraceContext } from '../services/trace/system-context.js';
 import { pullMentalModels } from '../services/hindsight/pull-mental-model.js';
 import {
   getBankConfig,
@@ -967,7 +968,7 @@ router.get('/diff', async (req, res) => {
     const ctxRows = ctxResult.data;
     const docContextMap = new Map();
     for (const row of ctxRows) {
-      docContextMap.set(row.doc_id, row.ctxt_desc);
+      docContextMap.set(row.doc_id, applySystemTraceContext(row.ctxt_desc, row.doc_source_type));
     }
 
     // 3. Categorise + divergence detection
@@ -1581,6 +1582,7 @@ router.get('/compare', async (req, res) => {
       const ctxResult = await getContextDescriptionById(db, archRow.ctxt_id);
       archContext = ctxResult.success ? ctxResult.data : null;
     }
+    archContext = applySystemTraceContext(archContext, archRow.doc_source_type);
 
     // 6. Build field comparison
     const hindTags = h.tags || [];

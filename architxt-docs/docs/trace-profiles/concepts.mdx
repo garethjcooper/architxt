@@ -1,0 +1,70 @@
+---
+sidebar_position: 2
+---
+
+# Concepts & lifecycle
+
+## Why trace profiles exist
+
+Many systems already record their interactions in logs:
+
+- Service-to-service request/response logs.
+- CSV or TSV dumps exported from integration middleware.
+- JSON-lines telemetry from APIs or message queues.
+- Plaintext application logs with a consistent start-of-record pattern.
+- XML documents with repeated record elements.
+
+Those files contain architectural facts — which systems call which, what operations they perform, and how calls are grouped — but the facts are locked inside vendor-specific formatting. A trace profile is a small, explicit JSON configuration that unlocks that structure and turns the file into flat records that architxt can mine and work with.
+
+## What a trace profile stores
+
+Each profile is a single row in the `trace_profiles` table:
+
+| Field | Meaning |
+|---|---|
+| **ID** | Internal identifier. |
+| **Name** | Unique profile name. Used when a trace document references the profile. |
+| **Description** | Optional human-readable summary of what the profile is for. |
+| **Config** | The parser JSON (`tfp_config`). This is the authoritative configuration applied during extraction — there is no separate version history in the UI; you edit the config JSON directly in the profile modal. |
+| **Config updated at** | Timestamp of the last change to the config. |
+| **Created / updated at** | Standard lifecycle timestamps. |
+
+The **Trace Profiles page** lists profiles in a table with ID, Name, Engine (`parser.module` from the config), Config Updated, Description, and Updated columns. You can search by name/engine/description, multi-select rows, delete selected profiles, and click a row to open the editor.
+
+## Profile → trace document flow
+
+```text
+Trace profile (trace_profiles row, config JSON)
+        │  resolved at extraction time by name
+        ▼
+Trace document (documents row, source_type = "trace",
+                 processing_options.trace_profile = <profile name>)
+        │  extract-trace pipeline stage
+        ▼
+Parsed records → (optional) sequence mining → document-md content
+```
+
+Because the profile is resolved by name at extraction time, editing a profile after a document was uploaded changes what the **next** extraction of that document produces. Changing a document's profile in the UI carries an explicit warning that re-extraction may invalidate existing extracted data.
+
+## Authoring a profile
+
+The profile modal is where you build a config; see [Profile modal UI](./profile-modal). The typical flow is:
+
+1. **Create a profile** and give it a name and description.
+2. **Provide a sample** — paste lines, upload a file, or pick an existing trace document as the source.
+3. Either pick an **engine** from the dropdown, or click **Auto-detect** to have the LLM detect the format from the sample and write the parser block into the config (with a confirmation, since it replaces the current parser config and clears detected fields/previews).
+4. Refine format and fields on the **Format & Fields** tab, and sequence mining on the **Sequence Configuration** tab, using the **Output Sample** and **Preview sequences** panes to check results live.
+5. Click **Save changes** (or **Create profile**). The config is stored as the profile's current config and can be selected at trace-document upload time.
+
+Validation and previews always run against the **current** config JSON in the editor — there is no separate saved-version workflow. The LLM-assisted routes back the buttons in the modal: `suggest-config` powers **Auto-detect**, while `extract-fields` and `discovery-histogram` power the **Plaintext Field Extraction** tab. LLM suggestion settings are configured via the `ARCHITXT_TRACE_PROFILE_SUGGEST_*` variables in `server/.env` — see [Configuration](../getting-started/configuration).
+
+## Trace documents and profiles
+
+Once a profile is ready, you apply it by uploading a trace document:
+
+1. Go to **Documents → Upload Documents**.
+2. Enable the **Trace upload** switch.
+3. Select the profile from the dropdown.
+4. Upload the file.
+
+The document is created with `source_type = "trace"` and the profile name stored in `processing_options.trace_profile`. You can later change the profile from the **Document Details** dialog, or in bulk for several trace documents at once via the **Config** action on the multi-select — see [Documents](../core-concepts/documents#trace-documents) for details.

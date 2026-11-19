@@ -67,10 +67,6 @@ export interface ResearchQueryOptions {
     factTypes?: string[];
     excludeMentalModels?: boolean;
   };
-  synthesize?: {
-    maxTokens?: number;
-    sectionFocus?: Record<string, string | string[] | { name?: string; content: string }[] | { name?: string; type?: string; content: string }[]>;
-  };
   models?: {
     selections?: Array<{ kind: string; id: string; ext_id?: string; name?: string }>;
   };
@@ -80,10 +76,10 @@ export interface ResearchQueryOptions {
   };
 }
 
-const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>(['prebuilt', 'recall', 'reflect', 'synthesize', 'models', 'templates']);
+const VALID_QUERY_MODES = new Set<'prebuilt' | 'recall' | 'reflect' | 'models' | 'templates'>(['prebuilt', 'recall', 'reflect', 'models', 'templates']);
 
 export function buildDiscoverOptions(
-  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates',
+  queryMode: 'prebuilt' | 'recall' | 'reflect' | 'models' | 'templates',
   queryOptions?: ResearchQueryOptions,
 ): Partial<Parameters<typeof researchApi.discover>[0]> {
   if (queryMode === 'recall') {
@@ -109,15 +105,6 @@ export function buildDiscoverOptions(
       ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
       ...(opts.factTypes?.length && { fact_types: opts.factTypes }),
       ...(typeof opts.excludeMentalModels === 'boolean' && { exclude_mental_models: opts.excludeMentalModels }),
-    };
-  }
-
-  if (queryMode === 'synthesize') {
-    const opts = queryOptions?.synthesize;
-    if (!opts) return {};
-    return {
-      ...(opts.maxTokens != null && { max_tokens: opts.maxTokens }),
-      ...(opts.sectionFocus && { section_focus: opts.sectionFocus }),
     };
   }
 
@@ -167,11 +154,6 @@ export function buildQueryOptionsFromParameters(
       ...(Array.isArray(parameters.fact_types) && { factTypes: parameters.fact_types }),
       ...(typeof parameters.exclude_mental_models === 'boolean' && { excludeMentalModels: parameters.exclude_mental_models }),
     };
-  } else if (actionType === 'synthesize') {
-    opts.synthesize = {
-      ...(typeof parameters.max_tokens === 'number' && { maxTokens: parameters.max_tokens }),
-      ...(parameters.section_focus && { sectionFocus: parameters.section_focus }),
-    };
   } else if (actionType === 'models') {
     opts.models = {
       ...(Array.isArray(parameters.selections) && { selections: parameters.selections }),
@@ -200,9 +182,6 @@ const DEFAULT_QUERY_OPTIONS: ResearchQueryOptions = {
     factTypes: ['world', 'observation'],
     excludeMentalModels: false,
   },
-  synthesize: {
-    maxTokens: 4096,
-  },
   templates: {
     selectedEntities: [],
     selections: [],
@@ -218,12 +197,11 @@ export function useResearchSession({
   initialSessionId,
 }: UseResearchSessionOptions) {
   const [query, setQuery] = useState('');
-  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates'>('prebuilt');
+  const [queryMode, setQueryMode] = useState<'prebuilt' | 'recall' | 'reflect' | 'models' | 'templates'>('prebuilt');
   const [selectedTemplateRoles, setSelectedTemplateRoles] = useState<string[]>([]);
   const [queryOptions, setQueryOptions] = useState<ResearchQueryOptions>({
     recall: { ...DEFAULT_QUERY_OPTIONS.recall },
     reflect: { ...DEFAULT_QUERY_OPTIONS.reflect },
-    synthesize: { ...DEFAULT_QUERY_OPTIONS.synthesize },
   });
 
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
@@ -612,7 +590,7 @@ export function useResearchSession({
       setQuery(step.raw_query || step.intent_text);
 
       if (VALID_QUERY_MODES.has(step.action_type as any)) {
-        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'synthesize' | 'models' | 'templates');
+        setQueryMode(step.action_type as 'prebuilt' | 'recall' | 'reflect' | 'models' | 'templates');
       } else {
         logger.warn('Unsupported action_type for use details', { action_type: step.action_type });
       }
@@ -654,48 +632,6 @@ export function useResearchSession({
     }
   }, [availableTemplateRoles]);
 
-  const handleSynthesize = useCallback(async (sourceStepIds: number[], intentText: string) => {
-    if (!serverId || !bankId || !activeSessionId) {
-      toast.error('Select a server, bank, and session first');
-      return;
-    }
-    if (sourceStepIds.length === 0) {
-      toast.error('Select at least one trail step to synthesize');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const parsed = toSectionFocus(parseAql(intentText.trim()));
-      const response = await researchApi.synthesize({
-        server_id: parseInt(serverId, 10),
-        bank_id: bankId,
-        session_id: activeSessionId,
-        source_step_ids: sourceStepIds,
-        intent_text: parsed.intentText,
-        raw_query: query.trim() || undefined,
-        max_tokens: queryOptions.synthesize?.maxTokens,
-        ...(parsed.sectionFocus ? { section_focus: parsed.sectionFocus } : {}),
-      });
-      setActiveSessionId(response.session_id);
-      onViewModeChange?.('step');
-      setActiveStepId(response.step_id);
-      setSelectedStepIds((prev) => new Set([...prev, response.step_id]));
-      await pollForStepCompletion(response.session_id, response.step_id);
-      logger.info('Research synthesize step completed', {
-        session_id: response.session_id,
-        step_id: response.step_id,
-      });
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : String(err);
-      logger.error('Research synthesize failed', err);
-      setError(message);
-      toast.error(`Synthesis failed: ${message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [serverId, bankId, activeSessionId, queryOptions, pollForStepCompletion, onViewModeChange, setActiveStepId, setSelectedStepIds]);
-
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!serverId || !bankId) {
@@ -712,16 +648,6 @@ export function useResearchSession({
       }
     } else if (queryMode !== 'prebuilt' && !query.trim()) {
       toast.error('Enter a query');
-      return;
-    }
-
-    if (queryMode === 'synthesize') {
-      const sourceStepIds = selectedStepIds.size > 0
-        ? Array.from(selectedStepIds)
-        : activeStepId != null
-          ? [activeStepId]
-          : [];
-      await handleSynthesize(sourceStepIds, query);
       return;
     }
 
@@ -869,7 +795,7 @@ export function useResearchSession({
     } finally {
       setLoading(false);
     }
-  }, [serverId, bankId, query, queryMode, selectedTemplateRoles, activeSessionId, queryOptions, fetchSessions, pollForStepCompletion, viewMode, selectedStepIds, activeStepId, handleSynthesize]);
+  }, [serverId, bankId, query, queryMode, selectedTemplateRoles, activeSessionId, queryOptions, fetchSessions, pollForStepCompletion, viewMode, selectedStepIds, activeStepId]);
 
   return {
     sessions,
@@ -916,6 +842,5 @@ export function useResearchSession({
     handleRerunStep,
     handleLoadStepDetails,
     handleSubmit,
-    handleSynthesize,
   };
 }

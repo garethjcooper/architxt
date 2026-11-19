@@ -9,6 +9,7 @@ import { createLogger } from './utils/logger.js';
 import { db, closeDatabase } from './db/connection.js';
 import { ensureDefaultHindsightServer } from './services/hindsight/seed.js';
 import documentsRoute from './routes/documents.js';
+import traceProfilesRoute from './routes/trace-profiles.js';
 import contextsRoute from './routes/contexts.js';
 import tagsRoute from './routes/tags.js';
 import serversRoute from './routes/servers.js';
@@ -229,6 +230,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
 app.use('/api/v1/documents', documentsRoute);
+app.use('/api/v1/trace-profiles', traceProfilesRoute);
 app.use('/api/v1/contexts', contextsRoute);
 app.use('/api/v1/tags', tagsRoute);
 app.use('/api/v1/servers', serversRoute);
@@ -272,6 +274,25 @@ app.use(express.static(uiDistPath));
 // SPA fallback: serve index.html for any non-API route that didn't match above
 app.get('*', (req, res) => {
   res.sendFile(path.join(uiDistPath, 'index.html'));
+});
+
+// Global error handler: catch anything that escapes route try/catch blocks and
+// return JSON with enough detail for debugging. Must be the last middleware.
+app.use((err, req, res, _next) => {
+  logger.error('Unhandled route error', {
+    method: req.method,
+    path: req.path,
+    error: err.message,
+    stack: err.stack,
+  });
+  if (res.headersSent) {
+    return;
+  }
+  res.status(500).json({
+    error: err.message || 'Internal server error',
+    code: err.code || 'INTERNAL_ERROR',
+    path: req.path,
+  });
 });
 
 // Start server

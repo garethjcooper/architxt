@@ -28,6 +28,7 @@ CREATE TABLE documents (
   doc_ext_id TEXT UNIQUE,
   ctxt_id INTEGER,
   doc_status TEXT,
+  doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace')),
   doc_content TEXT,
   doc_content_hash TEXT,
   doc_content_blocks JSON,
@@ -299,6 +300,22 @@ CREATE TABLE edge_types (
 );
 
 -- ============================================================================
+-- TRACE PROFILES — parser configuration for trace-document import
+-- ============================================================================
+
+CREATE TABLE trace_profiles (
+  tfp_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tfp_name TEXT NOT NULL UNIQUE,
+  tfp_description TEXT,
+  tfp_config JSON NOT NULL,
+  tfp_versions JSON,
+  tfp_used_version_id INTEGER,
+  tfp_config_updated_at TIMESTAMP,
+  tfp_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  tfp_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- ============================================================================
 -- INDEXES
 -- ============================================================================
 
@@ -538,37 +555,6 @@ CREATE TABLE research_tasks (
 
 CREATE INDEX idx_research_tasks_step ON research_tasks(rstep_id);
 CREATE INDEX idx_research_tasks_status ON research_tasks(rt_status);
-
-CREATE TABLE research_artifacts (
-  ra_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  rs_id INTEGER NOT NULL,
-  ra_title TEXT NOT NULL,
-  ra_description TEXT,
-  ra_bank_id TEXT NOT NULL,
-  ra_viewpoint_ids JSON NOT NULL,
-  ra_source_step_ids JSON NOT NULL,
-  ra_query_trail_snapshot JSON NOT NULL,
-  ra_seam_report JSON NOT NULL,
-  ra_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  ra_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  FOREIGN KEY (rs_id) REFERENCES research_sessions(rs_id) ON DELETE CASCADE
-);
-
-CREATE TABLE research_artifact_outputs (
-  rao_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ra_id INTEGER NOT NULL,
-  rao_output_type TEXT NOT NULL,
-  rao_name TEXT NOT NULL,
-  rao_content JSON NOT NULL,
-  rao_rendered TEXT,
-  rao_source_selections JSON,
-  rao_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  rao_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  FOREIGN KEY (ra_id) REFERENCES research_artifacts(ra_id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_research_artifacts_session ON research_artifacts(rs_id);
-CREATE INDEX idx_research_artifact_outputs_artifact ON research_artifact_outputs(ra_id);
 
 -- ============================================================================
 -- VIEWS — persisted user-editable canvases over the contextual graph
