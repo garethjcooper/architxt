@@ -6,7 +6,7 @@
  * returns an architecture diagram (Mermaid) plus an evidence-based explanation.
  *
  * Environment: GITDIAGRAM_SERVICE_URL=http://localhost:5002
- * API: POST /v1/analyze { repoPath, options? } -> { ok, repo, explanation, graph, mermaid, usage }
+ * API: POST /v1/analyze { repo, options? } -> { ok, repo, explanation, graph, mermaid, usage }
  */
 
 import { createLogger } from '../../utils/logger.js';
@@ -20,14 +20,14 @@ const TIMEOUT_MS = () => config.gitdiagram?.timeoutMs || 600_000;
 /**
  * Analyze a local git repository via gitdiagram-serve.
  *
- * @param {string} repoPath - Absolute path to a git checkout on the service host
+ * @param {string} repoUri - Local path, file:// URI, or remote git URI (the service clones remote URIs into its cache)
  * @param {Object} [options] - { maxSourceFiles, maxSourceChars, model }
  * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
  * @returns {Promise<{repo: Object, explanation: string, graph: Object, mermaid: string, usage: Object}>}
  */
-export async function analyzeRepository(repoPath, options = {}, signal = null) {
-  if (!repoPath || typeof repoPath !== 'string') {
-    throw new Error('repoPath (string) is required');
+export async function analyzeRepository(repoUri, options = {}, signal = null) {
+  if (!repoUri || typeof repoUri !== 'string') {
+    throw new Error('repo (string) is required');
   }
 
   const url = `${SERVICE_URL()}/v1/analyze`;
@@ -45,7 +45,7 @@ export async function analyzeRepository(repoPath, options = {}, signal = null) {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repoPath, options }),
+      body: JSON.stringify({ repo: repoUri, options }),
       signal: controller.signal,
     });
 
@@ -58,7 +58,7 @@ export async function analyzeRepository(repoPath, options = {}, signal = null) {
     }
 
     logger.info('Repository analyzed via gitdiagram-serve', {
-      repoPath,
+      repo: repoUri,
       durationMs: Date.now() - startedAt,
       nodes: data.graph?.nodes?.length ?? 0,
       edges: data.graph?.edges?.length ?? 0,
@@ -76,7 +76,7 @@ export async function analyzeRepository(repoPath, options = {}, signal = null) {
     if (err.name === 'AbortError') {
       throw new Error(`gitdiagram-serve request timed out or was aborted after ${TIMEOUT_MS()}ms`);
     }
-    logger.error('gitdiagram-serve request failed', { repoPath, error: err.message });
+    logger.error('gitdiagram-serve request failed', { repo: repoUri, error: err.message });
     throw err;
   } finally {
     clearTimeout(timeout);

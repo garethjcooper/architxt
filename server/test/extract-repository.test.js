@@ -31,7 +31,7 @@ before(async () => {
         return;
       }
       lastRequest = { url: req.url, method: req.method, body: JSON.parse(body || '{}') };
-      if (lastRequest.body.repoPath === '/fail') {
+      if (lastRequest.body.repo === '/fail') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'not a git repo' }));
         return;
@@ -47,11 +47,11 @@ before(async () => {
 
 after(() => stubServer?.close());
 
-test('analyzeRepository posts repoPath and returns parsed result', async () => {
+test('analyzeRepository posts repo URI and returns parsed result', async () => {
   const { analyzeRepository } = await import('../src/services/gitdiagram/client.js');
-  const result = await analyzeRepository('/repos/demo', { maxSourceFiles: 5 });
+  const result = await analyzeRepository('https://github.com/example/demo', { maxSourceFiles: 5 });
   assert.equal(lastRequest.url, '/v1/analyze');
-  assert.deepEqual(lastRequest.body, { repoPath: '/repos/demo', options: { maxSourceFiles: 5 } });
+  assert.deepEqual(lastRequest.body, { repo: 'https://github.com/example/demo', options: { maxSourceFiles: 5 } });
   assert.equal(result.mermaid, stubResponse.mermaid);
   assert.equal(result.explanation, 'A demo repo.');
   assert.equal(result.repo.head, 'abc123');
@@ -67,7 +67,7 @@ test('extract-repository stage emits document-md with explanation + mermaid', as
   const out = await stage.execute(
     {},
     { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
-    { doc_id: 1, source_path: '/repos/demo', doc_processing_options: { repo_path: '/repos/demo' } },
+    { doc_id: 1, source_path: 'https://github.com/example/demo', doc_processing_options: { repo_uri: 'https://github.com/example/demo' } },
     {},
     {},
   );
@@ -90,7 +90,7 @@ test('extract-repository stage fails cleanly without repo_path', async () => {
     {},
   );
   assert.equal(out.stageResult.success, false);
-  assert.match(out.stageResult.error, /repo_path/);
+  assert.match(out.stageResult.error, /repo_uri/);
 });
 
 test('daemon routes repository docs to the extract-repository pipeline definition', async () => {

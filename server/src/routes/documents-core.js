@@ -529,7 +529,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
     return;
   }
 
-  const { ext_id, source_type, trace_profile, repo_path } = req.body;
+  const { ext_id, source_type, trace_profile, repo_uri, repo_path } = req.body;
 
   if (!ext_id || typeof ext_id !== 'string' || ext_id.trim() === '') {
     sendResponse({
@@ -553,9 +553,10 @@ router.post('/', uploadMiddleware, async (req, res) => {
 
   const isTrace = normalizedSourceType === 'trace';
   const isRepository = normalizedSourceType === 'repository';
-  if (isRepository && (!repo_path || typeof repo_path !== 'string' || repo_path.trim() === '')) {
+  const repoUri = (repo_uri ?? repo_path); // repo_path kept as legacy alias
+  if (isRepository && (!repoUri || typeof repoUri !== 'string' || repoUri.trim() === '')) {
     sendResponse({
-      res, status: 400, error: 'repo_path is required when source_type is \'repository\'', code: 'VALIDATION_ERROR',
+      res, status: 400, error: 'repo_uri is required when source_type is \'repository\'', code: 'VALIDATION_ERROR',
       logger, method: 'POST', path: routePath, duration: Date.now() - start
     });
     return;
@@ -565,14 +566,14 @@ router.post('/', uploadMiddleware, async (req, res) => {
   const processingOptions = isTrace
     ? { ...parsedOptions, trace_profile: trace_profile || parsedOptions?.trace_profile }
     : isRepository
-      ? { ...parsedOptions, repo_path: repo_path.trim() }
+      ? { ...parsedOptions, repo_uri: repoUri.trim() }
       : parsedOptions;
 
   const createResult = await createDocument(getDb(req), {
     doc_ext_id: ext_id.trim(),
     doc_status: 'uploaded',
     doc_source_type: normalizedSourceType,
-    doc_source_path: isRepository ? repo_path.trim() : 'UPLOADING',
+    doc_source_path: isRepository ? repoUri.trim() : 'UPLOADING',
     doc_filename: file?.originalname || null,
     doc_generated_by: 'user',
     doc_processing_options: processingOptions
@@ -592,7 +593,7 @@ router.post('/', uploadMiddleware, async (req, res) => {
 
   if (isRepository) {
     // Repository documents have no uploaded file — source_path is the repo path.
-    finalPath = repo_path.trim();
+    finalPath = repoUri.trim();
   } else {
     try {
       finalPath = await writeToStorage(file.buffer, config.storage.path, docId, file.originalname);

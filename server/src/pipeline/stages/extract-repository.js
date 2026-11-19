@@ -49,9 +49,9 @@ async function execute(artifacts, _config, data, services, context) {
       throw new Error('Repository analysis cancelled before request');
     }
 
-    const repoPath = data.doc_processing_options?.repo_path || data.source_path;
+    const repoPath = data.doc_processing_options?.repo_uri || data.doc_processing_options?.repo_path || data.source_path;
     if (!repoPath || repoPath === 'UPLOADING') {
-      throw new Error('Repository document missing repo_path (doc_processing_options.repo_path or source_path)');
+      throw new Error('Repository document missing repo_uri (doc_processing_options.repo_uri or source_path)');
     }
 
     const stageOptions = _config?.extract_repository || _config?.gitdiagram || {};

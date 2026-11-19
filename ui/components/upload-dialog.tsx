@@ -94,8 +94,8 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
 
-  // Repository path for repository uploads
-  const [repoPath, setRepoPath] = useState('');
+  // Repository URI for repository uploads (local path or git URI)
+  const [repoUri, setRepoUri] = useState('');
 
   /* ── Reset on open ─────────────────────── */
   useEffect(() => {
@@ -110,7 +110,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
       setUploadMode('document');
       setTraceProfiles([]);
       setSelectedProfileId('');
-      setRepoPath('');
+      setRepoUri('');
     }
   }, [open]);
 
@@ -189,8 +189,8 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   const uploadAll = useCallback(async () => {
     if (uploadMode === 'repository') {
       // Repository mode: a single "document" per repo path, no file picker items.
-      if (!repoPath.trim()) {
-        toast.error('Enter a repository path (e.g. /repos/myrepo)');
+      if (!repoUri.trim()) {
+        toast.error('Enter a repository URI (e.g. https://github.com/org/repo or /host-repos/myrepo)');
         return;
       }
     } else if (items.length === 0) {
@@ -214,7 +214,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
 
     let current = 0;
     const effectiveItems = uploadMode === 'repository'
-      ? [{ id: 'repo', file: { name: repoPath.trim().replace(/\/+$/, '').split('/').pop() || 'repo' } as File, status: 'pending' as const }]
+      ? [{ id: 'repo', file: { name: repoUri.trim().replace(/\.git$/, '').replace(/\/+$/, '').split('/').pop() || 'repo' } as File, status: 'pending' as const }]
       : pendingItems;
     for (const item of effectiveItems) {
       if (abortRef.current) break;
@@ -239,7 +239,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
         } else if (uploadMode === 'repository') {
           response = await documentsApi.create(null, extId, {
             source_type: 'repository',
-            repo_path: repoPath.trim(),
+            repo_uri: repoUri.trim(),
             context_id: selectedContextId,
             tags_to_add: selectedTagIds.size > 0 ? [...selectedTagIds] : undefined,
             metadata_to_add: selectedMetaIds.size > 0 ? [...selectedMetaIds] : undefined,
@@ -464,16 +464,16 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                 {uploadMode === 'repository' && (
                 <div className="space-y-3 border-t border-border-default pt-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-foreground-faint">Repository path</Label>
+                    <Label className="text-xs text-foreground-faint">Repository URI</Label>
                     <Input
-                      value={repoPath}
-                      onChange={(e) => setRepoPath(e.target.value)}
-                      placeholder="/repos/myrepo (path on the gitdiagram-serve host)"
+                      value={repoUri}
+                      onChange={(e) => setRepoUri(e.target.value)}
+                      placeholder="https://github.com/org/repo  or  /host-repos/myrepo"
                       className="h-10 font-mono text-sm"
                     />
                   </div>
                   <p className="text-[10px] text-foreground-subtle italic">
-                    No file upload — the repository is analyzed by gitdiagram-serve and becomes a document with a Mermaid architecture diagram.
+                    No file upload — the repo is cloned/cached by gitdiagram-serve and analyzed and becomes a document with a Mermaid architecture diagram.
                   </p>
                 </div>
                 )}
@@ -691,7 +691,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
               {(items.length > 0 || uploadMode === 'repository') && (
                 <Button
                   onClick={uploadAll}
-                  disabled={uploadMode === 'repository' ? !repoPath.trim() : pendingCount === 0}
+                  disabled={uploadMode === 'repository' ? !repoUri.trim() : pendingCount === 0}
                   className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
                 >
                   {uploadMode === 'repository'

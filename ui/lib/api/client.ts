@@ -109,7 +109,8 @@ export const documentsApi = {
   create: (file: File | null, extId: string, options?: {
     source_type?: 'document' | 'trace' | 'repository';
     trace_profile?: string;
-    repo_path?: string;
+    repo_uri?: string;
+    repo_path?: string; // legacy alias
     context_id?: number | null;
     tags_to_add?: number[];
     metadata_to_add?: number[];
@@ -123,7 +124,9 @@ export const documentsApi = {
     if (options?.trace_profile !== undefined) {
       formData.append('trace_profile', options.trace_profile);
     }
-    if (options?.repo_path) {
+    if (options?.repo_uri) {
+      formData.append('repo_uri', options.repo_uri);
+    } else if (options?.repo_path) {
       formData.append('repo_path', options.repo_path);
     }
     if (options?.context_id !== null && options?.context_id !== undefined) {

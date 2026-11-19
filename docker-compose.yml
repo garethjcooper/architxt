@@ -93,8 +93,9 @@ services:
 
   # GitDiagram repository-analysis service.
   # Active with: docker compose --profile gitdiagram up --build
-  # Analyzes local git repositories into Mermaid architecture diagrams.
-  # Mount the repos you want analyzed under /repos (read-only).
+  # Analyzes local git repositories or remote git URIs into Mermaid diagrams.
+  # Remote URIs are cloned into the persistent gitdiagram-repos volume (/repos).
+  # Host repos to analyze by path can be mounted at /host-repos (read-only).
   gitdiagram:
     profiles:
       - gitdiagram
@@ -106,13 +107,16 @@ services:
       - server/.env
     environment:
       PORT: "5002"
+      REPOS_CACHE_DIR: /repos
       LLM_BASE_URL: "${GITDIAGRAM_LLM_BASE_URL:-${LLM_BASE_URL:-https://api.openai.com/v1}}"
       LLM_API_KEY: "${GITDIAGRAM_LLM_API_KEY:-${LLM_API_KEY:-}}"
       LLM_MODEL: "${GITDIAGRAM_LLM_MODEL:-${LLM_MODEL:-gpt-4o-mini}}"
+      GIT_TOKEN: "${GITDIAGRAM_GIT_TOKEN:-${GIT_TOKEN:-}}"
     expose:
       - "5002"
     volumes:
-      - ${GITDIAGRAM_REPOS_MOUNT:-/home/richard}:/repos:ro
+      - gitdiagram-repos:/repos
+      - ${GITDIAGRAM_REPOS_MOUNT:-/home/richard}:/host-repos:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5002/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -173,4 +177,5 @@ volumes:
   architxt-documents:
   architxt-logs:
   architxt-tmp:
+  gitdiagram-repos:
   hindsight-data:
