@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   SYSTEM_TRACE_CONTEXT_NAME,
   SYSTEM_TRACE_CONTEXT_TEXT,
+  SYSTEM_REPOSITORY_CONTEXT_NAME,
+  SYSTEM_REPOSITORY_CONTEXT_TEXT,
   applySystemTraceContext,
 } from '../src/services/trace/system-context.js';
 
@@ -38,6 +40,29 @@ describe('system trace context', () => {
   });
 });
 
+describe('system repository context', () => {
+  it('exports a non-empty canonical text with a stable name', () => {
+    assert.strictEqual(SYSTEM_REPOSITORY_CONTEXT_NAME, 'system-repository');
+    assert.ok(typeof SYSTEM_REPOSITORY_CONTEXT_TEXT === 'string');
+    assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('system-repository'));
+    assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('gitdiagram-serve'));
+    assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('```json'));
+    assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('```mermaid'));
+  });
+
+  it('prepends the system text to a user context for repository documents', () => {
+    const result = applySystemTraceContext('my project context', 'repository');
+    assert.ok(result.startsWith(SYSTEM_REPOSITORY_CONTEXT_TEXT));
+    assert.ok(result.includes('my project context'));
+    assert.ok(result.indexOf(SYSTEM_REPOSITORY_CONTEXT_TEXT) < result.indexOf('my project context'));
+  });
+
+  it('returns only the system text for repository documents with no user context', () => {
+    assert.strictEqual(applySystemTraceContext(null, 'repository'), SYSTEM_REPOSITORY_CONTEXT_TEXT);
+    assert.strictEqual(applySystemTraceContext('   ', 'repository'), SYSTEM_REPOSITORY_CONTEXT_TEXT);
+  });
+});
+
 describe('system trace context at the CRUD layer', () => {
   it('prepends system text in getDocument/listDocuments for trace docs only', async () => {
     const { default: Database } = await import('better-sqlite3');
@@ -70,11 +95,22 @@ describe('system trace context at the CRUD layer', () => {
       });
       assert.ok(plainId.success, `plain doc created: ${plainId.error}`);
 
+      const repoId = createDocument(db, {
+        doc_source_path: 'https://example/repo.git', doc_full_path: 'https://example/repo.git',
+        doc_source_type: 'repository', ctxt_id: ctxId.data, doc_status: 'processed',
+      });
+      assert.ok(repoId.success, `repo doc created: ${repoId.error}`);
+
       const traceDoc = getDocument(db, traceId.data);
       assert.ok(traceDoc.success);
       assert.ok(traceDoc.data.doc_context.description.startsWith(SYSTEM_TRACE_CONTEXT_TEXT));
       assert.ok(traceDoc.data.doc_context.description.includes('user project context'));
       assert.strictEqual(traceDoc.data.doc_context.id, ctxId.data);
+
+      const repoDoc = getDocument(db, repoId.data);
+      assert.ok(repoDoc.success);
+      assert.ok(repoDoc.data.doc_context.description.startsWith(SYSTEM_REPOSITORY_CONTEXT_TEXT));
+      assert.ok(repoDoc.data.doc_context.description.includes('user project context'));
 
       const plainDoc = getDocument(db, plainId.data);
       assert.ok(plainDoc.success);
@@ -83,8 +119,10 @@ describe('system trace context at the CRUD layer', () => {
       const list = listDocuments(db, {});
       assert.ok(list.success);
       const traceRow = list.data.find(r => r.doc_id === traceId.data);
+      const repoRow = list.data.find(r => r.doc_id === repoId.data);
       const plainRow = list.data.find(r => r.doc_id === plainId.data);
       assert.ok(traceRow.doc_context.description.startsWith(SYSTEM_TRACE_CONTEXT_TEXT));
+      assert.ok(repoRow.doc_context.description.startsWith(SYSTEM_REPOSITORY_CONTEXT_TEXT));
       assert.strictEqual(plainRow.doc_context.description, 'user project context');
     } finally {
       db.close();
