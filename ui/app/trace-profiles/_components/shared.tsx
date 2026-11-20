@@ -1062,7 +1062,7 @@ export const FieldsPanel = memo(function FieldsPanel({
                 </select>
               </div>
               <div className="flex items-center gap-1.5">
-                <Label className="text-[11px]" title="Per-sequence table: step rows (Step|Entity|Direction|Token) or edge rows (From|To|Type|Label|Support|Tokens)">Output</Label>
+                <Label className="text-[11px]" title="Steps: one step table per mined sequence. Graph: one Nodes+Edges table per connected component of the observed flows (no sequence signatures)">Output</Label>
                 <select
                   value={profile.outputFormat ?? "steps"}
                   onChange={(e) => update({ outputFormat: e.target.value as TraceProfileSequenceConfig["outputFormat"] })}
