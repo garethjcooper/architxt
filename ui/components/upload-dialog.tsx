@@ -710,7 +710,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                   className="bg-accent-primary-solid hover:bg-accent-primary-solid-hover text-foreground-default"
                 >
                   {uploadMode === 'repository'
-                    ? 'Analyze repository'
+                    ? 'Upload'
                     : hasErrors && pendingCount === 0
                       ? 'Retry failed'
                       : `Upload ${pendingCount}`}
