@@ -151,12 +151,7 @@ test('buildMarkdown renders explanation + mermaid + fenced json graph', async ()
   assert.match(md, /```mermaid\n[\s\S]*api-->ext[\s\S]*```/);
   const jsonBlock = md.match(/```json\n([\s\S]*?)```/);
   assert.ok(jsonBlock, 'missing fenced json block');
-  const parsed = JSON.parse(jsonBlock[1]);
-  // Standard vocabulary labels are promoted to `type` (architxt edge shape)
-  assert.deepEqual(parsed.edges, [{ from: 'api', to: 'ext', type: 'calls', label: '', dashed: false }]);
-  // Non-standard / free-form labels pass through untouched
-  const free = buildMarkdown({ ...result, graph: { nodes: result.graph.nodes, edges: [{ from: 'api', to: 'ext', label: 'publishes events to' }] } });
-  assert.deepEqual(JSON.parse(free.match(/```json\n([\s\S]*?)```/)[1]).edges, [{ from: 'api', to: 'ext', label: 'publishes events to' }]);
+  assert.deepEqual(JSON.parse(jsonBlock[1]), result.graph);
   // Explanation object form also works
   assert.match(buildMarkdown({ ...result, explanation: { text: 'Obj form.' } }), /Obj form\./);
 });

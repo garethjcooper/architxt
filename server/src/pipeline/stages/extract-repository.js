@@ -21,30 +21,6 @@ import { analyzeRepository } from '../../services/gitdiagram/client.js';
 const logger = createLogger('stage-extract-repository');
 
 /**
- * architxt standard edge types (see prompts/normalize-graph.js
- * VALID_EDGE_TYPES). When gitdiagram-serve runs with
- * GITDIAGRAM_SERVE_EDGE_VOCABULARY=on, each graph edge `label` is one of
- * these verbs, so it can be promoted to `type` — matching architxt's edge
- * shape where `type` is the standardized kind and `label` is prose.
- */
-const STANDARD_EDGE_TYPES = new Set(['calls', 'sends', 'reads', 'writes', 'depends-on']);
-
-function promoteEdgeLabels(graph) {
-  if (!graph || !Array.isArray(graph.edges)) return graph;
-  return {
-    ...graph,
-    edges: graph.edges.map((e) => {
-      const label = typeof e?.label === 'string' ? e.label.trim().toLowerCase() : '';
-      if (label && STANDARD_EDGE_TYPES.has(label) && !e.type) {
-        const { label: _label, ...rest } = e;
-        return { ...rest, type: label, label: '' };
-      }
-      return e;
-    }),
-  };
-}
-
-/**
  * Build the document markdown from a gitdiagram-serve result:
  * explanation prose + Mermaid diagram + graph as a fenced JSON block.
  */
@@ -53,9 +29,8 @@ function buildMarkdown(result) {
   const explanation = typeof result.explanation === 'string' ? result.explanation : (result.explanation?.text || '');
   if (explanation) parts.push(explanation.trim());
   if (result.mermaid) parts.push('```mermaid\n' + result.mermaid.trim() + '\n```');
-  const graph = promoteEdgeLabels(result.graph);
-  if (graph && (graph.nodes?.length || graph.edges?.length)) {
-    parts.push('```json\n' + JSON.stringify(graph, null, 2) + '\n```');
+  if (result.graph && (result.graph.nodes?.length || result.graph.edges?.length)) {
+    parts.push('```json\n' + JSON.stringify(result.graph, null, 2) + '\n```');
   }
   return parts.join('\n\n');
 }
