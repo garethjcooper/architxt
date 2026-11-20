@@ -46,10 +46,22 @@ async function execute(artifacts, _config, data, services, context) {
     }
 
     const stageOptions = _config?.extract_repository || _config?.gitdiagram || {};
+    // Per-document overrides live in doc_processing_options.gitdiagram; blank or
+    // absent fields are omitted so gitdiagram-serve env defaults apply.
+    const gds = data.doc_processing_options?.gitdiagram || {};
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
     const options = {
+      // legacy flat fields act as fallback only
       ...(data.doc_processing_options?.maxSourceFiles ? { maxSourceFiles: data.doc_processing_options.maxSourceFiles } : {}),
       ...(data.doc_processing_options?.maxSourceChars ? { maxSourceChars: data.doc_processing_options.maxSourceChars } : {}),
       ...(data.doc_processing_options?.model ? { model: data.doc_processing_options.model } : {}),
+      // nested per-document block wins when set
+      ...(num(gds.maxSourceFiles) ? { maxSourceFiles: gds.maxSourceFiles } : {}),
+      ...(num(gds.maxSourceChars) ? { maxSourceChars: gds.maxSourceChars } : {}),
+      ...(num(gds.maxSourceFileBytes) ? { maxSourceFileBytes: gds.maxSourceFileBytes } : {}),
+      ...(num(gds.maxFactFiles) ? { maxFactFiles: gds.maxFactFiles } : {}),
+      ...(num(gds.maxFactHeadBytes) ? { maxFactHeadBytes: gds.maxFactHeadBytes } : {}),
+      ...(typeof gds.model === 'string' && gds.model.trim() ? { model: gds.model.trim() } : {}),
     };
 
     logger.info('Repository analysis starting', { docId, repoUri, serviceUrl: stageOptions.serviceUrl });

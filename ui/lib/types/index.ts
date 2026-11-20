@@ -56,6 +56,18 @@ export interface DocumentProcessingOptions {
   };
   /** Trace documents: name of the trace profile used for extraction. */
   trace_profile?: string | null;
+  /** Repository documents: repo URI/path sent to gitdiagram-serve. */
+  repo_uri?: string | null;
+  /** Repository documents: per-document overrides for gitdiagram-serve sampling.
+   *  Blank/absent fields fall back to the service env defaults. */
+  gitdiagram?: {
+    maxSourceFiles?: number | null;
+    maxSourceChars?: number | null;
+    maxSourceFileBytes?: number | null;
+    maxFactFiles?: number | null;
+    maxFactHeadBytes?: number | null;
+    model?: string | null;
+  } | null;
 }
 
 export interface Context {

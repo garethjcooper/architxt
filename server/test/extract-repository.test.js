@@ -131,6 +131,50 @@ test('schema migration widens doc_source_type CHECK to include repository', asyn
   db.close();
 });
 
+test('extract-repository stage sends per-document gitdiagram overrides, omitting blanks', async () => {
+  const stage = await import('../src/pipeline/stages/extract-repository.js');
+  const out = await stage.execute(
+    {},
+    { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
+    {
+      doc_id: 3,
+      source_path: 'https://github.com/example/demo',
+      doc_processing_options: {
+        repo_uri: 'https://github.com/example/demo',
+        gitdiagram: { maxSourceFiles: 60, maxSourceChars: 120000, maxSourceFileBytes: 262144, maxFactFiles: null, maxFactHeadBytes: 8192, model: 'gpt-oss' },
+      },
+    },
+    {},
+    {},
+  );
+  assert.equal(out.stageResult.success, true);
+  // null (blank) fields are omitted so service env defaults apply; set fields pass through
+  assert.deepEqual(lastRequest.body.options, {
+    maxSourceFiles: 60,
+    maxSourceChars: 120000,
+    maxSourceFileBytes: 262144,
+    maxFactHeadBytes: 8192,
+    model: 'gpt-oss',
+  });
+});
+
+test('extract-repository stage sends no options when per-document block is empty', async () => {
+  const stage = await import('../src/pipeline/stages/extract-repository.js');
+  const out = await stage.execute(
+    {},
+    { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
+    {
+      doc_id: 4,
+      source_path: 'https://github.com/example/demo',
+      doc_processing_options: { repo_uri: 'https://github.com/example/demo', gitdiagram: { maxSourceFiles: null, model: '' } },
+    },
+    {},
+    {},
+  );
+  assert.equal(out.stageResult.success, true);
+  assert.deepEqual(lastRequest.body.options, {});
+});
+
 test('buildMarkdown renders explanation + mermaid only (no json fence)', async () => {
   const { buildMarkdown } = await import('../src/pipeline/stages/extract-repository.js');
   const result = {

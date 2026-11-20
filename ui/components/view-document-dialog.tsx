@@ -107,6 +107,10 @@ export function ViewDocumentDialog({
 
   // Trace profile state (trace documents only)
   const [traceProfileName, setTraceProfileName] = useState<string | null>(null);
+  // gitdiagram-serve sampling overrides (repository documents only); '' = blank = service default
+  const [gdsOverrides, setGdsOverrides] = useState<Record<string, string>>({
+    maxSourceFiles: '', maxSourceChars: '', maxSourceFileBytes: '', maxFactFiles: '', maxFactHeadBytes: '', model: '',
+  });
   const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
   const isTraceDoc = document?.source_type === 'trace';
   const isRepositoryDoc = document?.source_type === 'repository';
@@ -202,6 +206,15 @@ export function ViewDocumentDialog({
     setDenoiseLlmEnabled(globalStages['denoise-llm'] && stages['denoise-llm'] !== false);
     setVisionEnabled(globalStages.vision && stages.vision !== false);
     setTraceProfileName(opts.trace_profile ?? null);
+    const g = opts.gitdiagram || {};
+    setGdsOverrides({
+      maxSourceFiles: g.maxSourceFiles != null ? String(g.maxSourceFiles) : '',
+      maxSourceChars: g.maxSourceChars != null ? String(g.maxSourceChars) : '',
+      maxSourceFileBytes: g.maxSourceFileBytes != null ? String(g.maxSourceFileBytes) : '',
+      maxFactFiles: g.maxFactFiles != null ? String(g.maxFactFiles) : '',
+      maxFactHeadBytes: g.maxFactHeadBytes != null ? String(g.maxFactHeadBytes) : '',
+      model: g.model ?? '',
+    });
   }, [document, open, globalStages]);
 
   // Load trace profiles for the trace-profile picker (trace documents only)
@@ -284,6 +297,20 @@ export function ViewDocumentDialog({
 
   if (!document) return null;
 
+  // True when any gitdiagram override field differs from the stored value (blank = unset)
+  const gdsOverridesChanged = () => {
+    const g = document.processing_options?.gitdiagram || {};
+    const stored: Record<string, string> = {
+      maxSourceFiles: g.maxSourceFiles != null ? String(g.maxSourceFiles) : '',
+      maxSourceChars: g.maxSourceChars != null ? String(g.maxSourceChars) : '',
+      maxSourceFileBytes: g.maxSourceFileBytes != null ? String(g.maxSourceFileBytes) : '',
+      maxFactFiles: g.maxFactFiles != null ? String(g.maxFactFiles) : '',
+      maxFactHeadBytes: g.maxFactHeadBytes != null ? String(g.maxFactHeadBytes) : '',
+      model: g.model ?? '',
+    };
+    return JSON.stringify(stored) !== JSON.stringify(gdsOverrides);
+  };
+
   const hasChanges =
     extId !== (document.ext_id || '') ||
     timestamp !== (document.timestamp || '') ||
@@ -292,7 +319,8 @@ export function ViewDocumentDialog({
     (!isFixedPipelineDoc && denoiseEnabled !== (document.processing_options?.stages?.denoise !== false)) ||
     (!isFixedPipelineDoc && denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false)) ||
     (!isFixedPipelineDoc && visionEnabled !== (document.processing_options?.stages?.vision !== false)) ||
-    (isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null));
+    (isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null)) ||
+    (isRepositoryDoc && gdsOverridesChanged());
 
   // Re-extraction with a different profile may invalidate existing extracted data
   const traceProfileChanges =
@@ -334,14 +362,33 @@ export function ViewDocumentDialog({
         updates.authors = authors.length > 0 ? authors : null;
       }
 
+      const gdsChanged = isRepositoryDoc && gdsOverridesChanged();
       if ((!isFixedPipelineDoc && (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
           denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
           visionEnabled !== (document.processing_options?.stages?.vision !== false))) ||
-          traceProfileChanges) {
+          traceProfileChanges || gdsChanged) {
+        const numField = (v: string) => {
+          if (v.trim() === '') return null;
+          const n = Number(v);
+          return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+        };
         updates.processing_options = {
           ...buildProcessingOptions(),
           ...(document.processing_options?.trace_profile !== undefined || traceProfileChanges
             ? { trace_profile: traceProfileChanges ? traceProfileName : document.processing_options?.trace_profile ?? null }
+            : {}),
+          ...(isRepositoryDoc
+            ? {
+                repo_uri: document.processing_options?.repo_uri,
+                gitdiagram: {
+                  maxSourceFiles: numField(gdsOverrides.maxSourceFiles),
+                  maxSourceChars: numField(gdsOverrides.maxSourceChars),
+                  maxSourceFileBytes: numField(gdsOverrides.maxSourceFileBytes),
+                  maxFactFiles: numField(gdsOverrides.maxFactFiles),
+                  maxFactHeadBytes: numField(gdsOverrides.maxFactHeadBytes),
+                  model: gdsOverrides.model.trim() !== '' ? gdsOverrides.model.trim() : null,
+                },
+              }
             : {}),
         };
       }
@@ -709,6 +756,50 @@ export function ViewDocumentDialog({
                       Changing the trace profile may invalidate existing extracted data on re-extraction.
                     </p>
                   )}
+                </div>
+                )}
+                {/* gitdiagram-serve sampling overrides — repository documents only */}
+                {isRepositoryDoc && (
+                <div className="space-y-2 mb-3">
+                  <Label className="text-xs uppercase text-foreground-subtle font-medium">
+                    gitdiagram-serve overrides
+                  </Label>
+                  <p className="text-[11px] text-foreground-faint">
+                    Blank = use the service defaults (env). Set a value to override for this document only.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      ['maxSourceFiles', 'Max source files'],
+                      ['maxSourceChars', 'Max source chars'],
+                      ['maxSourceFileBytes', 'Max file bytes'],
+                      ['maxFactFiles', 'Max fact files'],
+                      ['maxFactHeadBytes', 'Max fact head bytes'],
+                    ] as const).map(([key, label]) => (
+                      <div key={key}>
+                        <Label htmlFor={`gds-${key}`} className="text-[10px] text-foreground-subtle">{label}</Label>
+                        <input
+                          id={`gds-${key}`}
+                          type="number"
+                          min={1}
+                          placeholder="default"
+                          value={gdsOverrides[key]}
+                          onChange={(e) => setGdsOverrides((s) => ({ ...s, [key]: e.target.value }))}
+                          className="w-full h-8 rounded-md border border-border-strong bg-surface-card px-2 text-xs text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                        />
+                      </div>
+                    ))}
+                    <div className="col-span-2">
+                      <Label htmlFor="gds-model" className="text-[10px] text-foreground-subtle">Model</Label>
+                      <input
+                        id="gds-model"
+                        type="text"
+                        placeholder="default"
+                        value={gdsOverrides.model}
+                        onChange={(e) => setGdsOverrides((s) => ({ ...s, model: e.target.value }))}
+                        className="w-full h-8 rounded-md border border-border-strong bg-surface-card px-2 text-xs text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
