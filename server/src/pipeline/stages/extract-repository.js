@@ -26,6 +26,12 @@ const logger = createLogger('stage-extract-repository');
  */
 function buildMarkdown(result) {
   const parts = [];
+  // Provenance header: which repo and which commit this diagram describes.
+  const repo = result.repo || {};
+  const prov = [repo.remoteUri || repo.path, repo.head ? `@ ${repo.head}` : null, repo.commitDate || null]
+    .filter(Boolean)
+    .join(' · ');
+  if (prov) parts.push(`> ${prov}`);
   const explanation = typeof result.explanation === 'string' ? result.explanation : (result.explanation?.text || '');
   if (explanation) parts.push(explanation.trim());
   if (result.mermaid) parts.push('```mermaid\n' + result.mermaid.trim() + '\n```');

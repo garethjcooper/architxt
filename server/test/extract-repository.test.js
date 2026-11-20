@@ -178,12 +178,14 @@ test('extract-repository stage sends no options when per-document block is empty
 test('buildMarkdown renders explanation + mermaid only (no json fence)', async () => {
   const { buildMarkdown } = await import('../src/pipeline/stages/extract-repository.js');
   const result = {
-    repo: { path: '/repos/architxt-abc', remoteUri: 'https://example/repo.git' },
+    repo: { path: '/repos/architxt-abc', remoteUri: 'https://example/repo.git', head: 'a'.repeat(40), commitDate: '2026-11-21T08:00:00+00:00' },
     explanation: 'The API server routes documents.',
     graphStats: { nodes: 2, edges: 1 },
     mermaid: 'graph TD\n  api-->ext',
   };
   const md = buildMarkdown(result);
+  // Provenance line names repo + full commit SHA + commit date
+  assert.match(md, /^> https:\/\/example\/repo\.git · @ [0-9a-f]{40} · \d{4}-/m);
   assert.match(md, /The API server routes documents\./);
   assert.match(md, /```mermaid\n[\s\S]*api-->ext[\s\S]*```/);
   assert.doesNotMatch(md, /```json/);
