@@ -101,6 +101,7 @@ export function mineSequences(rows, profile, options = {}) {
     minSteps,
     missingValue,
     outputFormat,
+    includeSequenceNumbers,
   } = validated;
 
   const filename = options.filename || 'trace-source';
@@ -314,6 +315,7 @@ export function mineSequences(rows, profile, options = {}) {
       entityColumn,
       directionColumn,
       outputFormat,
+      includeSequenceNumbers,
       components,
       eligibleRows,
       ineligibleRows,
@@ -353,6 +355,7 @@ export function mineSequences(rows, profile, options = {}) {
     directionColumn,
     includeTransitions,
     outputFormat,
+    includeSequenceNumbers,
     transitions,
     sections,
     eligibleRows,
@@ -428,6 +431,9 @@ function validateProfile(profile) {
     ? profile.missingValue
     : DEFAULT_MISSING_VALUE;
   const outputFormat = normalizeOutputFormat(profile.outputFormat);
+  // Default OFF: the ordinal is report position, not signal strength, so
+  // headings carry only the descriptive name unless explicitly requested.
+  const includeSequenceNumbers = profile.includeSequenceNumbers === true;
 
   return {
     orderColumns,
@@ -447,6 +453,7 @@ function validateProfile(profile) {
     minSteps,
     missingValue,
     outputFormat,
+    includeSequenceNumbers,
   };
 }
 
@@ -558,6 +565,7 @@ function renderMarkdown({
   directionColumn,
   includeTransitions,
   outputFormat,
+  includeSequenceNumbers,
   components,
   transitions,
   sections,
@@ -594,7 +602,7 @@ function renderMarkdown({
         lines.push('');
       }
       const nodeList = [...component.nodes].sort((a, b) => a.localeCompare(b));
-      lines.push(`## Graph ${component.index} — ${nodeList.length} nodes, ${component.edges.length} edge${component.edges.length !== 1 ? 's' : ''}`);
+      lines.push(`## ${includeSequenceNumbers ? `Graph ${component.index} — ` : ''}${nodeList.length} nodes, ${component.edges.length} edge${component.edges.length !== 1 ? 's' : ''}`);
       lines.push('');
       lines.push('Nodes:');
       lines.push('');
@@ -617,7 +625,7 @@ function renderMarkdown({
     }
 
     if (section.overflow) {
-      lines.push(`## Sequence ${section.index} — \`${section.signature}\``);
+      lines.push(`## ${includeSequenceNumbers ? `Sequence ${section.index} — ` : ''}\`${section.signature}\``);
       lines.push('');
       lines.push(`- **Frequency**: ${section.frequency} trace${section.frequency !== 1 ? 's' : ''} (combined)`);
       lines.push('');
@@ -625,7 +633,7 @@ function renderMarkdown({
     }
 
     const displaySignature = section.steps.map((s) => s.displayToken).join(` ${separator} `);
-    lines.push(`## Sequence ${section.index} — ${describeSequence(section)}`);
+    lines.push(`## ${includeSequenceNumbers ? `Sequence ${section.index} — ` : ''}${describeSequence(section)}`);
     lines.push('');
     lines.push(`- **Signature**: \`${displaySignature}\``);
     lines.push(`- **Frequency**: ${section.frequency} trace${section.frequency !== 1 ? 's' : ''}`);

@@ -35,13 +35,12 @@ describe('sequence-miner', () => {
     assert.equal(stats.correlationKeyCount, 2);
     assert.equal(stats.sequenceCount, 2);
 
-    assert.ok(markdown.includes('## Sequence 1'));
+    // Default: no numbering — headings carry only the descriptive entity-flow name.
+    assert.ok(markdown.includes('## AuthService'));
+    assert.ok(markdown.includes('## AuthService → DbService'));
+    assert.ok(!markdown.includes('## Sequence'));
     assert.ok(markdown.includes('**Signature**: `AuthService:start:ok | AuthService:complete:ok`'));
-    assert.ok(markdown.includes('## Sequence 2'));
     assert.ok(markdown.includes('**Signature**: `AuthService:start:ok | DbService:lookup:ok`'));
-    // Headings carry a descriptive entity-flow name, not the raw signature.
-    assert.ok(markdown.includes('## Sequence 1 — AuthService'));
-    assert.ok(markdown.includes('## Sequence 2 — AuthService → DbService'));
   });
 
   it('aggregates identical signatures and counts distinct correlation keys', () => {
@@ -189,12 +188,8 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'frequency-desc' });
-    const sequenceHeaders = markdown.match(/## Sequence \d — [^\n]+/g);
-    assert.deepEqual(sequenceHeaders, [
-      '## Sequence 1 — X',
-      '## Sequence 2 — Z',
-      '## Sequence 3 — Y',
-    ]);
+    const sequenceHeaders = markdown.match(/## [^\n]+/g).filter((h) => h !== '## Sequence transitions');
+    assert.deepEqual(sequenceHeaders, ['## X', '## Z', '## Y']);
     // Raw signature is still available as a bullet under each heading.
     assert.ok(markdown.includes('**Signature**: `X`'));
   });
@@ -207,8 +202,8 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'signature-asc' });
-    const match = markdown.match(/Sequence \d — [^\n]+/g);
-    assert.deepEqual(match, ['Sequence 1 — Alpha', 'Sequence 2 — Bravo', 'Sequence 3 — Charlie']);
+    const match = markdown.match(/## [^\n]+/g).filter((h) => h !== '## Sequence transitions');
+    assert.deepEqual(match, ['## Alpha', '## Bravo', '## Charlie']);
   });
 
   it('uses numeric ordering for order columns when values are numbers', () => {
@@ -428,8 +423,7 @@ describe('sequence-miner', () => {
       assert.ok(markdown.includes('…+3 more signatures'));
       assert.ok(markdown.includes('**Overflow**: 3 signatures folded'));
       // kept sections are the first two by signature-asc
-      assert.ok(markdown.includes('## Sequence 1'));
-      assert.ok(markdown.includes('## Sequence 3 — `…+3 more signatures`')); // overflow heading unchanged
+      assert.ok(markdown.includes('## `…+3 more signatures`')); // overflow heading has no number by default
     });
 
     it('maxSignatures default is 1000 and uncapped small inputs report no overflow', () => {
@@ -501,8 +495,8 @@ describe('sequence-miner', () => {
       assert.ok(!graph.markdown.includes('| Step | Entity | Direction | Token |'));
       assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Actor | Action | Status |'));
       // All flows share nodes -> ONE component table, not one per group/signature.
-      assert.ok(graph.markdown.includes('## Graph 1'));
-      assert.ok(!graph.markdown.includes('## Graph 2'));
+      assert.ok(graph.markdown.includes('## 2 nodes, 2 edges'));
+      assert.ok(!graph.markdown.includes('## Graph'));
       // Per component: a nodes table AND an edges table.
       assert.ok(graph.markdown.includes('| Node |'));
       assert.ok(graph.markdown.includes('| AuthService |'));
@@ -529,8 +523,7 @@ describe('sequence-miner', () => {
       assert.equal(stats.graphCount, 2);
       assert.equal(stats.edgeCount, 2);
       // {A,B} and {C,D} share no nodes -> two component tables, no overlapping rows.
-      assert.ok(markdown.includes('## Graph 1'));
-      assert.ok(markdown.includes('## Graph 2'));
+      assert.ok(markdown.includes('## 2 nodes, 1 edge'));
       assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | A | x | ok |'));
       assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | C | p | ok |'));
       assert.ok(!markdown.includes('| A | D'));
@@ -569,8 +562,24 @@ describe('sequence-miner', () => {
         row('t2', '8', 'N8', 'h', 'ok'),
       ];
       const { markdown } = mineSequences(rows, { ...profile, minSteps: 1 });
-      assert.ok(markdown.includes('## Sequence 1 — A → B → C'));
-      assert.ok(markdown.includes('## Sequence 2 — N1 → N2 → N3 → N4 → N5 → N6 → …'));
+      assert.ok(markdown.includes('## A → B → C'));
+      assert.ok(markdown.includes('## N1 → N2 → N3 → N4 → N5 → N6 → …'));
+    });
+
+    it('includeSequenceNumbers: true keeps the "Sequence N —"/"Graph N —" ordinal prefix', () => {
+      const rows = [
+        row('t1', '1', 'A', 'x', 'ok'),
+        row('t1', '2', 'B', 'y', 'ok'),
+      ];
+      const numbered = mineSequences(rows, { ...profile, includeSequenceNumbers: true });
+      assert.ok(numbered.markdown.includes('## Sequence 1 — A → B'));
+
+      const graph = mineSequences(rows, { ...profile, outputFormat: 'graph', includeSequenceNumbers: true });
+      assert.ok(graph.markdown.includes('## Graph 1 — 2 nodes, 1 edge'));
+
+      // Default stays unnumbered.
+      const plain = mineSequences(rows, profile);
+      assert.ok(!plain.markdown.includes('## Sequence'));
     });
   });
 });

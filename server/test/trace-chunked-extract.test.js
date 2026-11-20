@@ -145,7 +145,7 @@ describe('commit 4: chunked parse/extract + stage wiring', () => {
     assert.ok(md.data.startsWith('# Trace Sequence Analysis: stage-seq.log'));
     assert.ok(!md.data.includes('# Cleaned Trace Log'));
     assert.ok(!md.data.includes('... (1 more lines) ...'));
-    assert.ok(md.data.includes('## Sequence 1'));
+    assert.ok(md.data.match(/## [^\n]+/));
     assert.ok(md.data.includes('| Step | Entity | Direction | Token | Actor | Action |'));
   });
 
