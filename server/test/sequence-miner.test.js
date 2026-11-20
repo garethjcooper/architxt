@@ -473,5 +473,50 @@ describe('sequence-miner', () => {
       assert.throws(() => mineSequences(rows, { ...profile, minSteps: 0 }), /minSteps must be at least 1/);
       assert.throws(() => mineSequences(rows, { ...profile, minSteps: 1.5 }), /minSteps must be a non-negative integer/);
     });
+
+    it('outputFormat defaults to steps; graph renders consecutive-step edge tables', () => {
+      const rows = [
+        row('t1', '1', 'AuthService', 'start', 'ok', 'REQ'),
+        row('t1', '2', 'DbService', 'lookup', 'ok', 'REQ'),
+        row('t1', '3', 'AuthService', 'complete', 'ok', 'RES'),
+        row('t2', '1', 'AuthService', 'start', 'ok', 'REQ'),
+        row('t2', '2', 'DbService', 'lookup', 'ok', 'REQ'),
+        row('t2', '3', 'AuthService', 'complete', 'ok', 'RES'),
+      ];
+      const graphProfile = { ...profile, separator: '$', outputFormat: 'graph' };
+
+      // Default: step table, no graph header.
+      const steps = mineSequences(rows, profile);
+      assert.ok(steps.markdown.includes('| Step | Entity | Direction | Token |'));
+      assert.ok(!steps.markdown.includes('| From | To | Type | Label | Support | Tokens |'));
+
+      const graph = mineSequences(rows, graphProfile);
+      assert.ok(!graph.markdown.includes('| Step | Entity | Direction | Token |'));
+      assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Tokens |'));
+      // 3-step sequence -> 2 edge rows; frequency is the support count on each.
+      assert.ok(graph.markdown.includes('| AuthService | DbService | REQ | `AuthService:start:ok` | 2 | `AuthService:start:ok $ DbService:lookup:ok $ AuthService:complete:ok` |'));
+      assert.ok(graph.markdown.includes('| DbService | AuthService | REQ | `DbService:lookup:ok` | 2 | `AuthService:start:ok $ DbService:lookup:ok $ AuthService:complete:ok` |'));
+      // No third edge row (only 2 consecutive pairs).
+      assert.equal(graph.markdown.split('\n').filter((l) => l.startsWith('| ') && l.includes('| `') && l.includes('| 2 |')).length, 2);
+    });
+
+    it('outputFormat graph yields one disconnected table per sequence and uses the configured separator in Tokens', () => {
+      const rows = [
+        row('t1', '1', 'A', 'x', 'ok'),
+        row('t1', '2', 'B', 'y', 'ok'),
+        row('t2', '1', 'C', 'p', 'ok'),
+        row('t2', '2', 'D', 'q', 'ok'),
+      ];
+      const { markdown, stats } = mineSequences(rows, { ...profile, outputFormat: 'graph', separator: '$' });
+      assert.equal(stats.sequenceCount, 2);
+      // Each section carries its own table; no shared rows across sections.
+      assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | `A:x:ok $ B:y:ok` |'));
+      assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | `C:p:ok $ D:q:ok` |'));
+      assert.ok(!markdown.includes('| A | D'));
+    });
+
+    it('outputFormat rejects unknown values', () => {
+      assert.throws(() => mineSequences([row('t1', '1', 'A', 'x', 'ok')], { ...profile, outputFormat: 'diagram' }), /outputFormat must be one of: steps, graph/);
+    });
   });
 });

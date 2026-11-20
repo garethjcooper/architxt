@@ -30,6 +30,7 @@ const MAX_TRANSITIONS = 50;
  * @property {number} [maxRowsPerGroup] - cap on rows retained per correlation group after ordering (0 = unlimited)
  * @property {number} [minSteps] - drop sequences with fewer steps than this (default 2; 1 keeps all)
  * @property {string} [missingValue] - placeholder rendered for missing token/entity/direction/correlation values (default "-")
+ * @property {string} [outputFormat] - 'steps' (default) renders per-sequence step tables; 'graph' renders per-sequence edge tables (From/To/Type/Label/Support/Tokens) built from consecutive step pairs
  */
 
 /**
@@ -99,6 +100,7 @@ export function mineSequences(rows, profile, options = {}) {
     maxRowsPerGroup,
     minSteps,
     missingValue,
+    outputFormat,
   } = validated;
 
   const filename = options.filename || 'trace-source';
@@ -295,6 +297,7 @@ export function mineSequences(rows, profile, options = {}) {
     entityColumn,
     directionColumn,
     includeTransitions,
+    outputFormat,
     transitions,
     sections,
     eligibleRows,
@@ -369,6 +372,7 @@ function validateProfile(profile) {
   const missingValue = typeof profile.missingValue === 'string' && profile.missingValue.length > 0
     ? profile.missingValue
     : DEFAULT_MISSING_VALUE;
+  const outputFormat = normalizeOutputFormat(profile.outputFormat);
 
   return {
     orderColumns,
@@ -387,7 +391,14 @@ function validateProfile(profile) {
     maxRowsPerGroup,
     minSteps,
     missingValue,
+    outputFormat,
   };
+}
+
+function normalizeOutputFormat(value) {
+  if (!value) return 'steps';
+  if (value === 'steps' || value === 'graph') return value;
+  throw new Error('outputFormat must be one of: steps, graph');
 }
 
 function normalizeCap(value, defaultValue, name) {
@@ -491,6 +502,7 @@ function renderMarkdown({
   entityColumn,
   directionColumn,
   includeTransitions,
+  outputFormat,
   transitions,
   sections,
   eligibleRows,
@@ -539,22 +551,10 @@ function renderMarkdown({
     lines.push(`- **Example trace keys**: ${section.exampleKeys.map((k) => `\`${k}\``).join(', ')}`);
     lines.push('');
 
-    // Entity and Direction are standard fields: they always lead the table,
-    // ahead of the token and the (optional) token components.
-    const headerCols = ['Step', 'Entity', 'Direction', 'Token'];
-    if (includeTokenComponents) {
-      headerCols.push(...tokenColumns.map((col) => capitalizeHeader(col)));
-    }
-    lines.push(`| ${headerCols.join(' | ')} |`);
-    lines.push(`|${headerCols.map(() => '---').join('|')}|`);
-
-    for (let i = 0; i < section.steps.length; i++) {
-      const step = section.steps[i];
-      const rowCols = [String(i + 1), step.entity, step.direction, `\`${step.displayToken}\``];
-      if (includeTokenComponents) {
-        rowCols.push(...tokenColumns.map((col) => step.components[col]));
-      }
-      lines.push(`| ${rowCols.join(' | ')} |`);
+    if (outputFormat === 'graph') {
+      renderGraphTable(lines, section, separator);
+    } else {
+      renderStepTable(lines, section, tokenColumns, includeTokenComponents);
     }
 
     lines.push('');
@@ -585,4 +585,55 @@ function capitalizeHeader(column) {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (c) => c.toUpperCase())
     .trim();
+}
+
+/**
+ * Step-table renderer (default "Sequence Steps" output). Entity and Direction
+ * are standard fields: they always lead the table, ahead of the token and the
+ * (optional) token components.
+ */
+function renderStepTable(lines, section, tokenColumns, includeTokenComponents) {
+  const headerCols = ['Step', 'Entity', 'Direction', 'Token'];
+  if (includeTokenComponents) {
+    headerCols.push(...tokenColumns.map((col) => capitalizeHeader(col)));
+  }
+  lines.push(`| ${headerCols.join(' | ')} |`);
+  lines.push(`|${headerCols.map(() => '---').join('|')}|`);
+
+  for (let i = 0; i < section.steps.length; i++) {
+    const step = section.steps[i];
+    const rowCols = [String(i + 1), step.entity, step.direction, `\`${step.displayToken}\``];
+    if (includeTokenComponents) {
+      rowCols.push(...tokenColumns.map((col) => step.components[col]));
+    }
+    lines.push(`| ${rowCols.join(' | ')} |`);
+  }
+}
+
+/**
+ * Graph-table renderer ("Sequence Graph" output). Each pair of consecutive
+ * steps becomes one edge row in the layout of the standard edge-context
+ * tables (From | To | Type | Label | Support | Tokens). From/To are the step
+ * entities, Type is the direction of the step *leaving* the From entity, Label
+ * is the display token of that step, Support is the sequence frequency
+ * (identical on every row of the section), and Tokens is the full signature.
+ *
+ * Rows within a section never share data with another section: a sequence's
+ * entity pairs are derived only from its own steps, so each table is a
+ * disconnected component of the overall graph (graphs, plural).
+ */
+function renderGraphTable(lines, section, separator) {
+  // Pipes inside a table cell break GFM table parsing even inside code spans,
+  // so escape them in every cell value (entities, tokens, and the signature
+  // joined by the separator can all contain a literal "|").
+  const cell = (value) => String(value).replace(/\|/g, '\\|');
+
+  lines.push('| From | To | Type | Label | Support | Tokens |');
+  lines.push('|---|---|---|---|---|---|');
+
+  for (let i = 0; i + 1 < section.steps.length; i++) {
+    const from = section.steps[i];
+    const to = section.steps[i + 1];
+    lines.push(`| ${cell(from.entity)} | ${cell(to.entity)} | ${cell(from.direction)} | \`${cell(from.displayToken)}\` | ${section.frequency} | \`${cell(section.steps.map((s) => s.displayToken).join(` ${separator} `))}\` |`);
+  }
 }
