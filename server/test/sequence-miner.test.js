@@ -474,33 +474,46 @@ describe('sequence-miner', () => {
       assert.throws(() => mineSequences(rows, { ...profile, minSteps: 1.5 }), /minSteps must be a non-negative integer/);
     });
 
-    it('outputFormat defaults to steps; graph renders consecutive-step edge tables', () => {
+    it('outputFormat defaults to steps; graph merges observed flows into disconnected component tables', () => {
+      // Three correlation groups, two of which share the AuthService -> DbService flow.
       const rows = [
         row('t1', '1', 'AuthService', 'start', 'ok', 'REQ'),
         row('t1', '2', 'DbService', 'lookup', 'ok', 'REQ'),
         row('t1', '3', 'AuthService', 'complete', 'ok', 'RES'),
         row('t2', '1', 'AuthService', 'start', 'ok', 'REQ'),
         row('t2', '2', 'DbService', 'lookup', 'ok', 'REQ'),
-        row('t2', '3', 'AuthService', 'complete', 'ok', 'RES'),
+        row('t3', '1', 'AuthService', 'start', 'ok', 'REQ'),
+        row('t3', '2', 'DbService', 'lookup', 'ok', 'REQ'),
       ];
       const graphProfile = { ...profile, separator: '$', outputFormat: 'graph' };
 
       // Default: step table, no graph header.
       const steps = mineSequences(rows, profile);
       assert.ok(steps.markdown.includes('| Step | Entity | Direction | Token |'));
-      assert.ok(!steps.markdown.includes('| From | To | Type | Label | Support | Tokens |'));
+      assert.ok(!steps.markdown.includes('| From | To | Type | Label | Support | Traces |'));
 
       const graph = mineSequences(rows, graphProfile);
       assert.ok(!graph.markdown.includes('| Step | Entity | Direction | Token |'));
-      assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Tokens |'));
-      // 3-step sequence -> 2 edge rows; frequency is the support count on each.
-      assert.ok(graph.markdown.includes('| AuthService | DbService | REQ | `AuthService:start:ok` | 2 | `AuthService:start:ok $ DbService:lookup:ok $ AuthService:complete:ok` |'));
-      assert.ok(graph.markdown.includes('| DbService | AuthService | REQ | `DbService:lookup:ok` | 2 | `AuthService:start:ok $ DbService:lookup:ok $ AuthService:complete:ok` |'));
-      // No third edge row (only 2 consecutive pairs).
-      assert.equal(graph.markdown.split('\n').filter((l) => l.startsWith('| ') && l.includes('| `') && l.includes('| 2 |')).length, 2);
+      assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Traces |'));
+      // All flows share nodes -> ONE component table, not one per group/signature.
+      assert.ok(graph.markdown.includes('## Graph 1'));
+      assert.ok(!graph.markdown.includes('## Graph 2'));
+      // Per component: a nodes table AND an edges table.
+      assert.ok(graph.markdown.includes('| Node |'));
+      assert.ok(graph.markdown.includes('| AuthService |'));
+      assert.ok(graph.markdown.includes('| DbService |'));
+      assert.equal(graph.stats.sequenceCount, 1);
+      assert.equal(graph.stats.graphCount, 1);
+      assert.equal(graph.stats.edgeCount, 2);
+      // Shared edge appears once, support = 3 raw observations, example keys listed.
+      const edgeRows = graph.markdown.split('\n').filter((l) => l.startsWith('| AuthService | DbService'));
+      assert.equal(edgeRows.length, 1);
+      assert.ok(edgeRows[0].includes('| REQ | `AuthService:start:ok` | 3 | `t1`, `t2`, `t3` |'));
+      // No sequence-signature column anywhere in graph mode.
+      assert.ok(!graph.markdown.includes('Tokens'));
     });
 
-    it('outputFormat graph yields one disconnected table per sequence and uses the configured separator in Tokens', () => {
+    it('outputFormat graph splits into multiple tables only when components are disconnected', () => {
       const rows = [
         row('t1', '1', 'A', 'x', 'ok'),
         row('t1', '2', 'B', 'y', 'ok'),
@@ -508,11 +521,25 @@ describe('sequence-miner', () => {
         row('t2', '2', 'D', 'q', 'ok'),
       ];
       const { markdown, stats } = mineSequences(rows, { ...profile, outputFormat: 'graph', separator: '$' });
-      assert.equal(stats.sequenceCount, 2);
-      // Each section carries its own table; no shared rows across sections.
-      assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | `A:x:ok $ B:y:ok` |'));
-      assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | `C:p:ok $ D:q:ok` |'));
+      assert.equal(stats.graphCount, 2);
+      assert.equal(stats.edgeCount, 2);
+      // {A,B} and {C,D} share no nodes -> two component tables, no overlapping rows.
+      assert.ok(markdown.includes('## Graph 1'));
+      assert.ok(markdown.includes('## Graph 2'));
+      assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | `t1` |'));
+      assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | `t2` |'));
       assert.ok(!markdown.includes('| A | D'));
+    });
+
+    it('outputFormat graph still applies minSteps to drop flowless groups', () => {
+      const rows = [
+        row('t1', '1', 'A', 'x', 'ok'),                                    // 1-step group, dropped
+        row('t2', '1', 'B', 'y', 'ok'), row('t2', '2', 'C', 'z', 'ok'),      // 2-step group
+      ];
+      const { markdown, stats } = mineSequences(rows, { ...profile, outputFormat: 'graph' });
+      assert.equal(stats.sequenceCount, 1);
+      assert.ok(markdown.includes('| B | C |'));
+      assert.ok(!markdown.includes('| A |'));
     });
 
     it('outputFormat rejects unknown values', () => {
