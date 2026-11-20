@@ -601,6 +601,7 @@ export const FieldsPanel = memo(function FieldsPanel({
     includeTokenComponents: true,
     excludeMissingTokens: true,
     includeTransitions: false,
+    outputFormat: "steps",
     maxExampleKeys: 5,
     minSteps: 2,
     missingValue: "-",
@@ -1058,6 +1059,17 @@ export const FieldsPanel = memo(function FieldsPanel({
                   <option value="frequency-desc">frequency-desc</option>
                   <option value="signature-asc">signature-asc</option>
                   <option value="none">none</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-[11px]" title="Per-sequence table: step rows (Step|Entity|Direction|Token) or edge rows (From|To|Type|Label|Support|Tokens)">Output</Label>
+                <select
+                  value={profile.outputFormat ?? "steps"}
+                  onChange={(e) => update({ outputFormat: e.target.value as TraceProfileSequenceConfig["outputFormat"] })}
+                  className="h-6 w-32 rounded-md border border-border-default bg-surface-card px-2 text-xs text-foreground-muted outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle"
+                >
+                  <option value="steps">Sequence Steps</option>
+                  <option value="graph">Sequence Graph</option>
                 </select>
               </div>
               <div className="flex-1" />

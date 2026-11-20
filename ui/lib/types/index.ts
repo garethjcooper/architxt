@@ -581,6 +581,8 @@ export interface TraceProfileSequenceConfig {
   directionColumn?: string | null;
   /** Include one-level-deep sequence transitions (adjacent signatures across traces). Default false. */
   includeTransitions?: boolean;
+  /** Output table per sequence: "steps" (Step|Entity|Direction|Token, default) or "graph" (From|To|Type|Label|Support|Tokens edge rows). */
+  outputFormat?: 'steps' | 'graph';
   /** Drop sequences with fewer steps than this. Default 2; 1 keeps all. */
   minSteps?: number;
   /** Placeholder rendered for missing token/entity/direction/correlation values. Default "-". */
