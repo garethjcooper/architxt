@@ -579,8 +579,6 @@ export interface TraceProfileSequenceConfig {
   entityColumn?: string | null;
   /** Required single field treated as the direction (e.g. request/response). Always the second column of the sequence output table. */
   directionColumn?: string | null;
-  /** Include one-level-deep sequence transitions (adjacent signatures across traces). Default false. */
-  includeTransitions?: boolean;
   /** Output mode: "steps" (per-sequence step tables, default) or "graph" (per connected component: Nodes + Edges tables From/To/Type/Label/Support/Traces, built from raw ordered rows). */
   outputFormat?: 'steps' | 'graph';
   /** Prefix section headings with "Sequence N —" / "Graph N —". Default false — the ordinal is report position, not signal strength. */

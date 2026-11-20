@@ -10,7 +10,6 @@
 
 const DEFAULT_SEPARATOR = '$';
 const DEFAULT_MISSING_VALUE = '-';
-const MAX_TRANSITIONS = 50;
 
 /**
  * @typedef {object} SequenceProfile
@@ -24,7 +23,6 @@ const MAX_TRANSITIONS = 50;
  * @property {boolean} [excludeMissingTokens] - exclude rows where the entity or direction value is missing (default true)
  * @property {string} entityColumn - single field treated as the entity (who/what acts); required, always the first column of the output table
  * @property {string} directionColumn - single field treated as the direction; required, always the second column of the output table
- * @property {boolean} [includeTransitions] - one-level-deep adjacent-signature transitions across traces
  * @property {number} [maxInputRows] - cap on input rows; excess down-sampled deterministically (0 = unlimited)
  * @property {number} [maxSignatures] - cap on distinct signatures; the rest fold into one overflow section (0 = unlimited, default 1000)
  * @property {number} [maxRowsPerGroup] - cap on rows retained per correlation group after ordering (0 = unlimited)
@@ -94,7 +92,6 @@ export function mineSequences(rows, profile, options = {}) {
     excludeMissingTokens,
     entityColumn,
     directionColumn,
-    includeTransitions,
     maxInputRows,
     maxSignatures,
     maxRowsPerGroup,
@@ -177,7 +174,6 @@ export function mineSequences(rows, profile, options = {}) {
   }
 
   const signatures = new Map(); // signature -> { frequency, exampleKeys, steps }
-  const groupOrder = []; // [{ signature, firstOrderValues }] in insertion order
   // Graph mode: raw ordered steps per correlation group, before any signature
   // merging — the graph is built from the seen flows, not from signatures.
   const flowGroups = []; // [{ keyValues, steps }]
@@ -235,23 +231,6 @@ export function mineSequences(rows, profile, options = {}) {
     if (entry.exampleKeys.length < maxExampleKeys) {
       entry.exampleKeys.push(group.keyValues.join(separator));
     }
-    groupOrder.push({ signature, firstOrderValues: group.rows[0]?.orderValues ?? [] });
-  }
-
-  // One level deep: order correlation groups by their first step, then count
-  // adjacent signature pairs. Only consecutive pairs are counted.
-  const transitions = [];
-  if (includeTransitions && groupOrder.length > 1) {
-    const ordered = [...groupOrder].sort((a, b) => compareOrderValues(a.firstOrderValues, b.firstOrderValues));
-    const counts = new Map(); // "from\x00to" -> { from, to, count }
-    for (let i = 0; i < ordered.length - 1; i++) {
-      const from = ordered[i].signature;
-      const to = ordered[i + 1].signature;
-      const key = `${from}\x00${to}`;
-      if (!counts.has(key)) counts.set(key, { from, to, count: 0 });
-      counts.get(key).count += 1;
-    }
-    transitions.push(...Array.from(counts.values()).sort((a, b) => b.count - a.count || a.from.localeCompare(b.from) || a.to.localeCompare(b.to)).slice(0, MAX_TRANSITIONS));
   }
 
   const sections = Array.from(signatures.values())
@@ -353,10 +332,8 @@ export function mineSequences(rows, profile, options = {}) {
     includeTokenComponents,
     entityColumn,
     directionColumn,
-    includeTransitions,
     outputFormat,
     includeSequenceNumbers,
-    transitions,
     sections,
     eligibleRows,
     ineligibleRows,
@@ -408,7 +385,6 @@ function validateProfile(profile) {
   // Default ON: rows whose entity/direction are missing are excluded — those
   // are the mandatory what/action context of the sequence.
   const excludeMissingTokens = profile.excludeMissingTokens !== false;
-  const includeTransitions = profile.includeTransitions === true;
   // Mandatory: entity/direction are the what/action of a sequence — without
   // them the mined output loses its contextual sense.
   const entityColumn = normalizeRequiredColumn(profile.entityColumn, 'entityColumn');
@@ -444,7 +420,6 @@ function validateProfile(profile) {
     maxExampleKeys,
     sortOrder,
     excludeMissingTokens,
-    includeTransitions,
     entityColumn,
     directionColumn,
     maxInputRows,
@@ -563,11 +538,9 @@ function renderMarkdown({
   includeTokenComponents,
   entityColumn,
   directionColumn,
-  includeTransitions,
   outputFormat,
   includeSequenceNumbers,
   components,
-  transitions,
   sections,
   eligibleRows,
   ineligibleRows,
@@ -644,23 +617,6 @@ function renderMarkdown({
 
     lines.push('');
   }
-  }
-
-  if (includeTransitions) {
-    lines.push('---');
-    lines.push('');
-    lines.push('## Sequence transitions (adjacent traces, one level deep)');
-    lines.push('');
-    if (transitions.length === 0) {
-      lines.push('No transitions — fewer than two correlation groups.');
-    } else {
-      lines.push('| From sequence | To sequence | Traces |');
-      lines.push('|---|---|---|');
-      for (const t of transitions) {
-        lines.push(`| \`${t.from}\` | \`${t.to}\` | ${t.count} |`);
-      }
-    }
-    lines.push('');
   }
 
   return lines.join('\n');

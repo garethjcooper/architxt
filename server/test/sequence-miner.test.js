@@ -188,7 +188,7 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'frequency-desc' });
-    const sequenceHeaders = markdown.match(/## [^\n]+/g).filter((h) => h !== '## Sequence transitions');
+    const sequenceHeaders = markdown.match(/## [^\n]+/g);
     assert.deepEqual(sequenceHeaders, ['## X', '## Z', '## Y']);
     // Raw signature is still available as a bullet under each heading.
     assert.ok(markdown.includes('**Signature**: `X`'));
@@ -202,7 +202,7 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'signature-asc' });
-    const match = markdown.match(/## [^\n]+/g).filter((h) => h !== '## Sequence transitions');
+    const match = markdown.match(/## [^\n]+/g);
     assert.deepEqual(match, ['## Alpha', '## Bravo', '## Charlie']);
   });
 
@@ -329,60 +329,6 @@ describe('sequence-miner', () => {
     assert.ok(markdown.includes('`AuthService:start:-`'));
   });
 
-  it('omits the transitions section by default', () => {
-    const rows = [
-      row('t1', '1', 'A', 'x', 'ok'),
-      row('t2', '2', 'B', 'y', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, profile);
-    assert.ok(!markdown.includes('Sequence transitions'));
-  });
-
-  it('counts adjacent signature pairs across traces when includeTransitions is on', () => {
-    const rows = [
-      // trace t1: signature A, first step 1
-      row('t1', '1', 'A', 'x', 'ok'),
-      // trace t2: signature A, first step 2
-      row('t2', '2', 'A', 'x', 'ok'),
-      // trace t3: signature B, first step 3
-      row('t3', '3', 'B', 'y', 'ok'),
-      // trace t4: signature C, first step 4
-      row('t4', '4', 'C', 'z', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, { ...profile, includeTransitions: true });
-    assert.ok(markdown.includes('## Sequence transitions'));
-    assert.ok(markdown.includes('| From sequence | To sequence | Traces |'));
-    // Ordered by first step: A(t1), A(t2), B(t3), C(t4) → A→A:1, A→B:1, B→C:1
-    assert.ok(markdown.includes('| `a|x|ok` | `a|x|ok` | 1 |'));
-    assert.ok(markdown.includes('| `a|x|ok` | `b|y|ok` | 1 |'));
-    assert.ok(markdown.includes('| `b|y|ok` | `c|z|ok` | 1 |'));
-  });
-
-  it('aggregates repeated transitions and sorts by count descending', () => {
-    const rows = [
-      row('t1', '1', 'A', 'x', 'ok'),
-      row('t2', '2', 'B', 'y', 'ok'),
-      row('t3', '3', 'B', 'y', 'ok'),
-      row('t4', '4', 'A', 'x', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, { ...profile, includeTransitions: true });
-    // Order: A(t1), B(t2), B(t3), A(t4) → A→B:1, B→B:1, B→A:1; ties broken alphabetically
-    const tableRows = markdown.match(/^\| `[^`]+` \| `[^`]+` \| \d+ \|$/gm);
-    assert.deepEqual(tableRows, [
-      '| `a|x|ok` | `b|y|ok` | 1 |',
-      '| `b|y|ok` | `a|x|ok` | 1 |',
-      '| `b|y|ok` | `b|y|ok` | 1 |',
-    ]);
-  });
-
-  it('reports no transitions when there is only one correlation group', () => {
-    const rows = [
-      row('t1', '1', 'A', 'x', 'ok'),
-      row('t1', '2', 'B', 'y', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, { ...profile, includeTransitions: true });
-    assert.ok(markdown.includes('No transitions — fewer than two correlation groups.'));
-  });
 
   describe('caps', () => {
     it('maxInputRows down-samples deterministically and reports truncated', () => {

@@ -33,7 +33,7 @@ Three tabs, styled like the Document Details modal tab bar:
 All `sequenceProfile` settings in one bordered block over two rows:
 
 - **Row 1 (inputs)**: Separator, Missing value, Max example keys, Min steps, Sort order, and the **Preview sequences** button at the right edge.
-- **Row 2 (switches)**: Include token components, Exclude missing entity/direction (default on), Sequence transitions.
+- **Row 2 (switches)**: Include token components, Exclude missing entity/direction (default on), Number sections (default off).
 
 **Preview sequences** runs `POST /api/v1/trace-profiles/preview-sequences` with the current config and sample and renders the resulting Markdown report plus stats — or the validation error (for example a missing entity/direction tag) inline. See [Sequence mining](./sequence-mining) and [API routes](./api-routes).
 

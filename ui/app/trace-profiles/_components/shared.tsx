@@ -600,7 +600,6 @@ export const FieldsPanel = memo(function FieldsPanel({
     separator: "$",
     includeTokenComponents: true,
     excludeMissingTokens: true,
-    includeTransitions: false,
     outputFormat: "steps",
     maxExampleKeys: 5,
     minSteps: 2,
@@ -1109,17 +1108,6 @@ export const FieldsPanel = memo(function FieldsPanel({
                 />
                 <Label htmlFor="exclude-missing-tokens" className="text-[11px] cursor-pointer" title="Exclude rows where the entity or direction value is missing (rendered as the missing-value placeholder)">
                   Exclude missing entity/direction
-                </Label>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Switch
-                  size="sm"
-                  id="include-transitions"
-                  checked={profile.includeTransitions === true}
-                  onCheckedChange={(checked) => update({ includeTransitions: checked === true })}
-                />
-                <Label htmlFor="include-transitions" className="text-[11px] cursor-pointer" title="Append a table of adjacent sequence pairs across traces (one level deep)">
-                  Sequence transitions
                 </Label>
               </div>
               <div className="flex items-center gap-1.5">

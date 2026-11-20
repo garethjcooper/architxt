@@ -42,8 +42,6 @@ export const SYSTEM_TRACE_CONTEXT_TEXT = [
   '  groups showed that step pair). Each graph section is a disconnected',
   '  component, so the report is a set of small graphs, not one connected',
   '  graph.',
-  '- An optional final `## Sequence transitions (adjacent traces, one level deep)`',
-  '  section with a From sequence | To sequence | Traces table.',
   '',
   'Field values come from the trace profile parser (records are { raw, fields }',
   'pairs); missing values render as "-" by default.',
