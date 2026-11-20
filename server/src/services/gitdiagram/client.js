@@ -90,7 +90,7 @@ export async function analyzeRepository(repoUri, options = {}, signal = null) {
  */
 export async function isServiceAvailable() {
   try {
-    const res = await fetch(`${SERVICE_URL()}/healthz`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${SERVICE_URL()}/health`, { signal: AbortSignal.timeout(5000) });
     return res.ok;
   } catch {
     return false;

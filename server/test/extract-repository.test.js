@@ -25,7 +25,7 @@ before(async () => {
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
-      if (req.url === '/healthz') {
+      if (req.url === '/health' || req.url === '/healthz') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'ok' }));
         return;
