@@ -280,6 +280,7 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
   }, [
     items,
     uploadMode,
+    repoUri,
     selectedProfileId,
     selectedContextId,
     selectedTagIds,
