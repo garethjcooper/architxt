@@ -7,8 +7,7 @@
  * evidence-based explanation.
  *
  * Emits the same artifacts as the standard extract stage:
- *   - document-md: the explanation in markdown, followed by the Mermaid
- *     diagram and the graph as a fenced ```json block
+ *   - document-md: the explanation in markdown, followed by the Mermaid diagram
  *   - document-images: empty array (repository analysis produces no images)
  *
  * Relationship/entity extraction is intentionally not performed here — the
@@ -22,19 +21,16 @@ const logger = createLogger('stage-extract-repository');
 
 /**
  * Build the document markdown from a gitdiagram-serve result:
- * explanation prose + Mermaid diagram + graph as a fenced JSON block.
+ * explanation prose + Mermaid diagram. The graph itself is not returned
+ * by the service; all relationship detail is covered by the explanation.
  */
 function buildMarkdown(result) {
   const parts = [];
   const explanation = typeof result.explanation === 'string' ? result.explanation : (result.explanation?.text || '');
   if (explanation) parts.push(explanation.trim());
   if (result.mermaid) parts.push('```mermaid\n' + result.mermaid.trim() + '\n```');
-  if (result.graph && (result.graph.nodes?.length || result.graph.edges?.length)) {
-    parts.push('```json\n' + JSON.stringify(result.graph, null, 2) + '\n```');
-  }
   return parts.join('\n\n');
 }
-
 async function execute(artifacts, _config, data, services, context) {
   const startTime = Date.now();
   const docId = data.doc_id;
@@ -68,8 +64,8 @@ async function execute(artifacts, _config, data, services, context) {
       repoUri,
       durationMs,
       markdownLength: markdown.length,
-      nodes: result.graph?.nodes?.length ?? 0,
-      edges: result.graph?.edges?.length ?? 0,
+      nodes: result.graphStats?.nodes ?? 0,
+      edges: result.graphStats?.edges ?? 0,
       promptTokens: result.usage?.promptTokens ?? 0,
       completionTokens: result.usage?.completionTokens ?? 0,
     });
@@ -82,8 +78,8 @@ async function execute(artifacts, _config, data, services, context) {
       stageMetrics: {
         durationMs,
         repoUri,
-        nodes: result.graph?.nodes?.length ?? 0,
-        edges: result.graph?.edges?.length ?? 0,
+        nodes: result.graphStats?.nodes ?? 0,
+        edges: result.graphStats?.edges ?? 0,
         markdownLength: markdown.length,
         promptTokens: result.usage?.promptTokens ?? 0,
         completionTokens: result.usage?.completionTokens ?? 0,

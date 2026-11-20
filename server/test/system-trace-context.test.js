@@ -46,7 +46,6 @@ describe('system repository context', () => {
     assert.ok(typeof SYSTEM_REPOSITORY_CONTEXT_TEXT === 'string');
     assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('system-repository'));
     assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('gitdiagram-serve'));
-    assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('```json'));
     assert.ok(SYSTEM_REPOSITORY_CONTEXT_TEXT.includes('```mermaid'));
   });
 

@@ -23,7 +23,7 @@ const TIMEOUT_MS = () => config.gitdiagram?.timeoutMs || 600_000;
  * @param {string} repoUri - Local path, file:// URI, or remote git URI (the service clones remote URIs into its cache)
  * @param {Object} [options] - { maxSourceFiles, maxSourceChars, model }
  * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
- * @returns {Promise<{repo: Object, explanation: string, graph: Object, mermaid: string, usage: Object}>}
+ * @returns {Promise<{repo: Object, explanation: string, graphStats: Object, mermaid: string, usage: Object}>}
  */
 export async function analyzeRepository(repoUri, options = {}, signal = null) {
   if (!repoUri || typeof repoUri !== 'string') {
@@ -60,15 +60,15 @@ export async function analyzeRepository(repoUri, options = {}, signal = null) {
     logger.info('Repository analyzed via gitdiagram-serve', {
       repo: repoUri,
       durationMs: Date.now() - startedAt,
-      nodes: data.graph?.nodes?.length ?? 0,
-      edges: data.graph?.edges?.length ?? 0,
+      nodes: data.graphStats?.nodes ?? 0,
+      edges: data.graphStats?.edges ?? 0,
       mermaidLength: data.mermaid?.length ?? 0,
     });
 
     return {
       repo: data.repo,
       explanation: typeof data.explanation === 'string' ? data.explanation : data.explanation?.text,
-      graph: data.graph,
+      graphStats: data.graphStats,
       mermaid: data.mermaid,
       usage: data.usage || {},
     };
