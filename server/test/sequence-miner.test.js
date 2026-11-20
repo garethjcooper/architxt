@@ -36,9 +36,12 @@ describe('sequence-miner', () => {
     assert.equal(stats.sequenceCount, 2);
 
     assert.ok(markdown.includes('## Sequence 1'));
-    assert.ok(markdown.includes('`AuthService:start:ok | AuthService:complete:ok`'));
+    assert.ok(markdown.includes('**Signature**: `AuthService:start:ok | AuthService:complete:ok`'));
     assert.ok(markdown.includes('## Sequence 2'));
-    assert.ok(markdown.includes('`AuthService:start:ok | DbService:lookup:ok`'));
+    assert.ok(markdown.includes('**Signature**: `AuthService:start:ok | DbService:lookup:ok`'));
+    // Headings carry a descriptive entity-flow name, not the raw signature.
+    assert.ok(markdown.includes('## Sequence 1 — AuthService'));
+    assert.ok(markdown.includes('## Sequence 2 — AuthService → DbService'));
   });
 
   it('aggregates identical signatures and counts distinct correlation keys', () => {
@@ -186,12 +189,14 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'frequency-desc' });
-    const sequenceHeaders = markdown.match(/## Sequence \d — `([^`]+)`/g);
+    const sequenceHeaders = markdown.match(/## Sequence \d — [^\n]+/g);
     assert.deepEqual(sequenceHeaders, [
-      '## Sequence 1 — `X`',
-      '## Sequence 2 — `Z`',
-      '## Sequence 3 — `Y`',
+      '## Sequence 1 — X',
+      '## Sequence 2 — Z',
+      '## Sequence 3 — Y',
     ]);
+    // Raw signature is still available as a bullet under each heading.
+    assert.ok(markdown.includes('**Signature**: `X`'));
   });
 
   it('sorts by signature ascending when configured', () => {
@@ -202,8 +207,8 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'signature-asc' });
-    const match = markdown.match(/Sequence \d — `([^`]+)`/g);
-    assert.deepEqual(match, ['Sequence 1 — `Alpha`', 'Sequence 2 — `Bravo`', 'Sequence 3 — `Charlie`']);
+    const match = markdown.match(/Sequence \d — [^\n]+/g);
+    assert.deepEqual(match, ['Sequence 1 — Alpha', 'Sequence 2 — Bravo', 'Sequence 3 — Charlie']);
   });
 
   it('uses numeric ordering for order columns when values are numbers', () => {
@@ -424,7 +429,7 @@ describe('sequence-miner', () => {
       assert.ok(markdown.includes('**Overflow**: 3 signatures folded'));
       // kept sections are the first two by signature-asc
       assert.ok(markdown.includes('## Sequence 1'));
-      assert.ok(markdown.includes('## Sequence 3 — `…+3 more signatures`'));
+      assert.ok(markdown.includes('## Sequence 3 — `…+3 more signatures`')); // overflow heading unchanged
     });
 
     it('maxSignatures default is 1000 and uncapped small inputs report no overflow', () => {
@@ -544,6 +549,28 @@ describe('sequence-miner', () => {
 
     it('outputFormat rejects unknown values', () => {
       assert.throws(() => mineSequences([row('t1', '1', 'A', 'x', 'ok')], { ...profile, outputFormat: 'diagram' }), /outputFormat must be one of: steps, graph/);
+    });
+
+    it('sequence headings get a descriptive entity-flow name; repeats collapse and long flows cap at 6 hops', () => {
+      const rows = [
+        // A -> A -> B -> C : repeated entity collapses to "A → B → C"
+        row('t1', '1', 'A', 'x', 'ok'),
+        row('t1', '2', 'A', 'y', 'ok'),
+        row('t1', '3', 'B', 'z', 'ok'),
+        row('t1', '4', 'C', 'w', 'ok'),
+        // 8 distinct entities: capped at 6 hops + ellipsis
+        row('t2', '1', 'N1', 'a', 'ok'),
+        row('t2', '2', 'N2', 'b', 'ok'),
+        row('t2', '3', 'N3', 'c', 'ok'),
+        row('t2', '4', 'N4', 'd', 'ok'),
+        row('t2', '5', 'N5', 'e', 'ok'),
+        row('t2', '6', 'N6', 'f', 'ok'),
+        row('t2', '7', 'N7', 'g', 'ok'),
+        row('t2', '8', 'N8', 'h', 'ok'),
+      ];
+      const { markdown } = mineSequences(rows, { ...profile, minSteps: 1 });
+      assert.ok(markdown.includes('## Sequence 1 — A → B → C'));
+      assert.ok(markdown.includes('## Sequence 2 — N1 → N2 → N3 → N4 → N5 → N6 → …'));
     });
   });
 });

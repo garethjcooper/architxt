@@ -625,8 +625,9 @@ function renderMarkdown({
     }
 
     const displaySignature = section.steps.map((s) => s.displayToken).join(` ${separator} `);
-    lines.push(`## Sequence ${section.index} — \`${displaySignature}\``);
+    lines.push(`## Sequence ${section.index} — ${describeSequence(section)}`);
     lines.push('');
+    lines.push(`- **Signature**: \`${displaySignature}\``);
     lines.push(`- **Frequency**: ${section.frequency} trace${section.frequency !== 1 ? 's' : ''}`);
     lines.push(`- **Example trace keys**: ${section.exampleKeys.map((k) => `\`${k}\``).join(', ')}`);
     lines.push('');
@@ -662,6 +663,23 @@ function capitalizeHeader(column) {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (c) => c.toUpperCase())
     .trim();
+}
+
+/**
+ * Derive a short human-readable name for a sequence from its entity flow:
+ * consecutive distinct entities joined with "→" (repeats collapsed, so a
+ * self-loop A→A→B reads "A → B"). Capped at 6 hops; longer flows end with "…".
+ * Deterministic — same steps, same name.
+ */
+function describeSequence(section) {
+  const MAX_HOPS = 6;
+  const entities = [];
+  for (const step of section.steps) {
+    if (entities[entities.length - 1] !== step.entity) entities.push(step.entity);
+  }
+  const shown = entities.slice(0, MAX_HOPS);
+  const suffix = entities.length > MAX_HOPS ? ' → …' : '';
+  return `${shown.join(' → ')}${suffix}`;
 }
 
 /**
