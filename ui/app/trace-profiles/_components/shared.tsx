@@ -1122,6 +1122,17 @@ export const FieldsPanel = memo(function FieldsPanel({
                   Sequence transitions
                 </Label>
               </div>
+              <div className="flex items-center gap-1.5">
+                <Switch
+                  size="sm"
+                  id="include-sequence-numbers"
+                  checked={profile.includeSequenceNumbers === true}
+                  onCheckedChange={(checked) => update({ includeSequenceNumbers: checked === true })}
+                />
+                <Label htmlFor="include-sequence-numbers" className="text-[11px] cursor-pointer" title="Prefix section headings with an ordinal (Sequence N / Graph N). Off by default — the number is report position, not signal strength">
+                  Number sections
+                </Label>
+              </div>
             </div>
           </div>
           {error && <div className="px-2 py-1 text-[11px] text-destructive-fg border-b border-border-default shrink-0">{error}</div>}
