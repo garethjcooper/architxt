@@ -71,7 +71,7 @@ Entity and direction are mandatory on purpose: they are the *what* and *action* 
 | `includeTokenComponents` | `true` | When on, the individual token fields are shown as extra columns in each sequence table, after the Token column. |
 | `excludeMissingTokens` | `true` | When on (default), rows whose **entity or direction** value is missing are excluded from mining. A stored explicit `false` turns this off. Missing *token* components are always tolerated — they just render as the missing-value placeholder. |
 | `includeTransitions` | `false` | When on, the report also lists adjacent-sequence transitions across ordered traces (up to 50). |
-| `outputFormat` | `"steps"` | `"steps"` renders each mined sequence as a step table (Step | Entity | Direction | Token …). `"graph"` skips sequence signatures entirely and works from the raw ordered rows: every consecutive step pair in every correlation group is one observed flow; edges are deduped and split into **connected components**, each rendered as its own `## Graph N` section containing a **Nodes** table (`| Node |`) and an **Edges** table with columns **From | To | Type | Label | Support | Traces** (From/To = step entities, Type = the leaving step's direction, Label = its token, Support = how many correlation groups showed that pair, Traces = example correlation keys). Each component table covers a disjoint set of rows — the report is a set of small disconnected graphs, not one connected graph. |
+| `outputFormat` | `"steps"` | `"steps"` renders each mined sequence as a step table (Step | Entity | Direction | Token …). `"graph"` skips sequence signatures entirely and works from the raw ordered rows: every consecutive step pair in every correlation group is one observed flow; edges are deduped and split into **connected components**, each rendered as its own `## Graph N` section containing a **Nodes** table (`| Node |`) and an **Edges** table with columns **From | To | Type | Label | Support** plus one column per token field (From/To = step entities, Type = the leaving step's direction, Label = its token, Support = how many correlation groups showed that pair). Each component table covers a disjoint set of rows — the report is a set of small disconnected graphs, not one connected graph. |
 
 ### Caps (all optional, `0` = unlimited)
 
@@ -131,9 +131,9 @@ Nodes:
 
 Edges:
 
-| From | To | Type | Label | Support | Traces |
-|---|---|---|---|---|---|
-| orders-service | payments-service | REQUEST | `orders$create` | 42 | `a1b2c3…`, `d4e5f6…` |
+| From | To | Type | Label | Support | Service | Operation |
+|---|---|---|---|---|---|---|
+| orders-service | payments-service | REQUEST | `orders$create` | 42 | orders-service | create |
 ```
 
 ## Previewing sequences
