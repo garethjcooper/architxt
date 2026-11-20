@@ -95,7 +95,7 @@ export interface Directive {
 export interface Tag {
   id: number;
   name: string;
-  generated_by: 'user' | 'import';
+  generated_by: 'user' | 'import' | 'system';
   usage_count?: number;
   created_at: string;
   updated_at: string;

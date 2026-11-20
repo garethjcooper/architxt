@@ -57,7 +57,7 @@ CREATE TABLE contexts (
 CREATE TABLE tags (
   tag_id INTEGER PRIMARY KEY AUTOINCREMENT,
   tag_name TEXT UNIQUE,
-  tag_generated_by TEXT CHECK(tag_generated_by IN ('user', 'import')),
+  tag_generated_by TEXT CHECK(tag_generated_by IN ('user', 'import', 'system')),
   tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

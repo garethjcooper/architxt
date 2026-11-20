@@ -131,6 +131,53 @@ test('schema migration widens doc_source_type CHECK to include repository', asyn
   db.close();
 });
 
+test('schema seeds system source tags with generated_by=system', async () => {
+  const { ensureSchema } = await import('../src/db/ensure-schema.js');
+  const { clearCache } = await import('../src/cache.js');
+  clearCache();
+  const Database = (await import('better-sqlite3')).default;
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
+  const tmp = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sys-tags-')), 't.db');
+  const db = new Database(tmp);
+  ensureSchema(db);
+  const tagsSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'").pluck().get();
+  assert.match(tagsSql, /'system'/, 'tags CHECK allows system');
+  const names = db.prepare("SELECT tag_name, tag_generated_by FROM tags ORDER BY tag_name").all()
+    .filter((r) => r.tag_name.startsWith('ARCHITXT-'));
+  assert.deepEqual(names, [
+    { tag_name: 'ARCHITXT-DOC', tag_generated_by: 'system' },
+    { tag_name: 'ARCHITXT-REPO', tag_generated_by: 'system' },
+    { tag_name: 'ARCHITXT-TRACE', tag_generated_by: 'system' },
+  ]);
+  db.close();
+});
+
+test('applySystemSourceTag stamps the matching system tag (idempotent)', async () => {
+  const { ensureSchema } = await import('../src/db/ensure-schema.js');
+  const { applySystemSourceTag, systemTagNameForSourceType } = await import('../src/utils/system-tags.js');
+  const { clearCache } = await import('../src/cache.js');
+  clearCache();
+  const Database = (await import('better-sqlite3')).default;
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
+  const tmp = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sys-tag-')), 't.db');
+  const db = new Database(tmp);
+  ensureSchema(db);
+  db.prepare("INSERT INTO documents (doc_ext_id, doc_status, doc_source_type, doc_source_path) VALUES ('d1', 'uploaded', 'trace', '/x')").run();
+  const docId = db.prepare("SELECT doc_id FROM documents WHERE doc_ext_id = 'd1'").get().doc_id;
+  assert.equal(systemTagNameForSourceType('trace'), 'ARCHITXT-TRACE');
+  assert.equal(systemTagNameForSourceType('bogus'), null);
+  const tagId = await applySystemSourceTag(db, docId, 'trace');
+  assert.ok(tagId);
+  await applySystemSourceTag(db, docId, 'trace'); // second call must not duplicate
+  const rows = db.prepare("SELECT t.tag_name FROM document_tags dt JOIN tags t ON t.tag_id = dt.tag_id WHERE dt.doc_id = ?").all(docId);
+  assert.deepEqual(rows, [{ tag_name: 'ARCHITXT-TRACE' }]);
+  db.close();
+});
+
 test('extract-repository stage sends per-document gitdiagram overrides, omitting blanks', async () => {
   const stage = await import('../src/pipeline/stages/extract-repository.js');
   const out = await stage.execute(

@@ -45,6 +45,13 @@ const UPLOAD_MODE_LABELS: Record<UploadMode, string> = {
   repository: 'Repository',
 };
 
+/** System tag auto-selected per upload mode (ARCHITXT-DOC / -TRACE / -REPO). */
+const SYSTEM_TAG_BY_MODE: Record<UploadMode, string> = {
+  document: 'ARCHITXT-DOC',
+  trace: 'ARCHITXT-TRACE',
+  repository: 'ARCHITXT-REPO',
+};
+
 interface UploadFileItem {
   id: string;
   file: File;
@@ -131,6 +138,9 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
         setAllTags(tgs);
         setAllMetadata(mds);
         setTraceProfiles(profiles);
+        // Auto-select the system tag for the default upload mode (document)
+        const sysTag = tgs.find((t) => t.name === SYSTEM_TAG_BY_MODE.document);
+        if (sysTag) setSelectedTagIds(new Set([sysTag.id]));
       })
       .catch(() => {
         // non-fatal — user can still upload without tags/context/metadata
@@ -371,6 +381,9 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                           >
                             {active && <span>✓</span>}
                             {tag.name}
+                            {tag.generated_by === 'system' && (
+                              <span className="text-[9px] text-badge-neutral-fg">(system)</span>
+                            )}
                           </button>
                         );
                       })}
@@ -428,7 +441,22 @@ export function UploadDialog({ onUploadComplete, open: controlledOpen, onOpenCha
                   <Label className="text-xs text-foreground-faint">Type</Label>
                   <select
                     value={uploadMode}
-                    onChange={(e) => setUploadMode(e.target.value as UploadMode)}
+                    onChange={(e) => {
+                      const mode = e.target.value as UploadMode;
+                      setUploadMode(mode);
+                      // Swap the auto-selected system tag to match the mode
+                      const sysTag = allTags.find((t) => t.name === SYSTEM_TAG_BY_MODE[mode]);
+                      if (sysTag) setSelectedTagIds((prev) => {
+                        const next = new Set(prev);
+                        // remove other system tags, add this one
+                        for (const m of Object.keys(SYSTEM_TAG_BY_MODE) as UploadMode[]) {
+                          const other = allTags.find((t) => t.name === SYSTEM_TAG_BY_MODE[m]);
+                          if (other && m !== mode) next.delete(other.id);
+                        }
+                        next.add(sysTag.id);
+                        return next;
+                      });
+                    }}
                     className="h-8 rounded-md border border-border-default bg-surface-card px-2 text-xs text-foreground-muted focus:border-accent-primary-bd focus:ring-2 focus:ring-focus-ring-subtle outline-none"
                   >
                     {(Object.keys(UPLOAD_MODE_LABELS) as UploadMode[]).map((m) => (

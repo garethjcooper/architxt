@@ -9,6 +9,7 @@ import { resetSeedData } from './ensure-seed.js';
 import { getTagByName, createTag } from './crud/tags.js';
 import { ensureStandardEdgeTypes } from './crud/edge-types.js';
 import { ensureStandardEntityTypes } from './crud/entity-types.js';
+import { SYSTEM_SOURCE_TAGS } from '../utils/system-tags.js';
 
 const logger = createLogger('schema');
 
@@ -1424,6 +1425,73 @@ function dropDormantResearchArtifactTables(db) {
 }
 
 /**
+ * Widen the tags.tag_generated_by CHECK constraint to allow 'system'.
+ * SQLite cannot alter a CHECK, so the table is recreated with the widened
+ * constraint and all rows copied across. document_tags references tags(tag_id)
+ * with ON DELETE CASCADE, so its rows are preserved via a temp-table backup.
+ */
+function extendTagsGeneratedByCheck(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tags'").get();
+  if (!tableExists) return 0;
+
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'").pluck().get();
+  if (typeof sql !== 'string') return 0;
+  // Already migrated (fresh DDL or previous run) — nothing to do.
+  if (sql.includes("'system'")) return 0;
+  if (!sql.includes('tag_generated_by')) return 0;
+
+  logger.warn('Recreating tags to widen tag_generated_by CHECK with system');
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec(`DROP TABLE IF EXISTS tags_new`);
+    db.exec(`CREATE TABLE tags_new (
+      tag_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tag_name TEXT UNIQUE,
+      tag_generated_by TEXT CHECK(tag_generated_by IN ('user', 'import', 'system')),
+      tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    )`);
+    db.exec(`INSERT INTO tags_new (tag_id, tag_name, tag_generated_by, tag_created_at, tag_updated_at)
+             SELECT tag_id, tag_name, tag_generated_by, tag_created_at, tag_updated_at FROM tags`);
+    // Preserve junction rows across the parent drop (CASCADE would delete them).
+    const dtExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='document_tags'").get();
+    if (dtExists) {
+      db.exec(`DROP TABLE IF EXISTS _temp_document_tags`);
+      db.exec(`CREATE TABLE _temp_document_tags AS SELECT * FROM document_tags`);
+    }
+    db.exec(`DROP TABLE tags`);
+    db.exec(`ALTER TABLE tags_new RENAME TO tags`);
+    if (dtExists) {
+      db.exec(`INSERT OR IGNORE INTO document_tags (tag_id, doc_id, doc_tag_created_at, doc_tag_updated_at)
+               SELECT tag_id, doc_id, doc_tag_created_at, doc_tag_updated_at FROM _temp_document_tags`);
+      db.exec(`DROP TABLE IF EXISTS _temp_document_tags`);
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  logger.info('tags recreated with tag_generated_by CHECK including system');
+  return 1;
+}
+
+/**
+ * Seed the system source-type tags (ARCHITXT-DOC / ARCHITXT-TRACE / ARCHITXT-REPO).
+ * Idempotent via get-or-create on unique tag_name.
+ */
+function ensureSystemSourceTags(db) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tags'").get();
+  if (!tableExists) return 0;
+  let seeded = 0;
+  for (const name of Object.values(SYSTEM_SOURCE_TAGS)) {
+    const existing = getTagByName(db, name);
+    if (existing?.data) continue;
+    createTag(db, { tag_name: name, tag_generated_by: 'system' });
+    seeded++;
+  }
+  return seeded;
+}
+
+/**
  * Extend the documents.doc_source_type CHECK constraint to allow 'repository'.
  * SQLite cannot alter a CHECK, so the table is recreated with the widened
  * constraint and all rows copied across. The documents_fts external-content
@@ -2264,6 +2332,8 @@ export function ensureSchema(db) {
     const nullableDocId = ensurePendingOpsNullableDocId(db);
     const researchFkFixed = ensureResearchSessionsServerFk(db);
     const sourceTypeExtended = extendDocumentsSourceTypeCheck(db);
+    const tagsCheckExtended = extendTagsGeneratedByCheck(db);
+    const systemTagsSeeded = ensureSystemSourceTags(db);
     const ftsCreated = ensureDocumentsFts(db);
     const normalized = normalizeEntityMatchInheritance(db);
     const cgIndexes = ensureContextualGraphIndexes(db);
@@ -2306,6 +2376,8 @@ export function ensureSchema(db) {
   const cgTemplates = ensureContextualGraphTemplates(db);
   ensureStandardEdgeTypes(db);
   ensureStandardEntityTypes(db);
+  extendTagsGeneratedByCheck(db);
+  ensureSystemSourceTags(db);
   return true;
 }
 

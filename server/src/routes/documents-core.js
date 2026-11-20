@@ -40,6 +40,7 @@ import {
   batchUpdateDocumentTags
 } from '../db/crud/document-tags.js';
 import { batchUpdateDocumentMetadata } from '../db/crud/document-metadata.js';
+import { applySystemSourceTag } from '../utils/system-tags.js';
 
 // Note: batchUpdateDocumentMetadata is in document-metadata.js
 
@@ -638,6 +639,8 @@ router.post('/', uploadMiddleware, async (req, res) => {
   }
 
   // ── Apply optional context & tags on upload ─────────────────────────
+  // System source-type tag is stamped automatically (forward-only).
+  await applySystemSourceTag(getDb(req), docId, normalizedSourceType);
   let contextApplied = false;
   let tagsApplied = false;
 
