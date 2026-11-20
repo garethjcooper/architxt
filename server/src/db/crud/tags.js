@@ -12,7 +12,22 @@ const base = createBaseCrud(TABLE, PK, JSON_FIELDS, { pkType: 'integer' });
 // Export generated base functions
 export const getTag = base.get;
 export const listTags = base.list;
-export const deleteTag = base.del;
+
+/**
+ * Delete tag — system tags (generated_by = 'system') are read-only and
+ * cannot be deleted, matching the metadata system-preset pattern.
+ */
+export const deleteTag = (db, id) => dbExec(() => {
+  const row = stmt(db, `SELECT tag_generated_by FROM ${TABLE} WHERE ${PK} = ?`).get(id);
+  if (!row) return false; // Not found — base.del would also return false
+  if (row.tag_generated_by === 'system') {
+    const err = new Error('System tags cannot be deleted');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+  const result = stmt(db, `DELETE FROM ${TABLE} WHERE ${PK} = ?`).run(id);
+  return result.changes > 0;
+}, 'tags.delete');
 
 /**
  * Get usage counts for a list of tag IDs
@@ -80,7 +95,9 @@ export const getOrCreateTagByName = (db, tagName, generatedBy) => dbExec(() => {
 }, 'tags.getOrCreateByName');
 
 /**
- * Update tag - expects DB field names from route layer
+ * Update tag - expects DB field names from route layer.
+ * System tags (generated_by = 'system') are read-only, matching the
+ * metadata system-preset pattern.
  * @param {Object} db - Database connection
  * @param {number} id - Tag ID (INTEGER primary key)
  * @param {Object} data - Fields to update (tag_name only)
@@ -89,12 +106,19 @@ export const getOrCreateTagByName = (db, tagName, generatedBy) => dbExec(() => {
 export const updateTag = (db, id, data) => dbExec(() => {
   // Only tag_name is updatable
   const tagName = data.tag_name;
-  
+
   requireString('tag_name', tagName);
-  
+
+  const existing = stmt(db, `SELECT tag_generated_by FROM ${TABLE} WHERE ${PK} = ?`).get(id);
+  if (existing && existing.tag_generated_by === 'system') {
+    const err = new Error('System tags cannot be updated');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+
   const sql = `UPDATE ${TABLE} SET tag_name = ?, tag_updated_at = CURRENT_TIMESTAMP WHERE ${PK} = ?`;
   const result = stmt(db, sql).run(tagName, id);
-  
+
   // Return null if no row was updated (not found), true otherwise
   return result.changes > 0 ? true : null;
 }, 'tags.update');
