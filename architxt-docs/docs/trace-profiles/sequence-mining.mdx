@@ -71,6 +71,7 @@ Entity and direction are mandatory on purpose: they are the *what* and *action* 
 | `includeTokenComponents` | `true` | When on, the individual token fields are shown as extra columns in each sequence table, after the Token column. |
 | `excludeMissingTokens` | `true` | When on (default), rows whose **entity or direction** value is missing are excluded from mining. A stored explicit `false` turns this off. Missing *token* components are always tolerated — they just render as the missing-value placeholder. |
 | `includeTransitions` | `false` | When on, the report also lists adjacent-sequence transitions across ordered traces (up to 50). |
+| `outputFormat` | `"steps"` | `"steps"` renders each sequence as a step table (Step | Entity | Direction | Token …); `"graph"` renders each sequence as a **graph table** — one edge row per pair of consecutive steps with columns **From | To | Type | Label | Support | Tokens** (From/To = step entities, Type = the leaving step's direction, Label = its token, Support = the sequence frequency, Tokens = the full signature joined by the separator). Each sequence section is its own table — its rows come only from that sequence's steps — so the report is a set of disconnected small graphs, not one connected graph. |
 
 ### Caps (all optional, `0` = unlimited)
 
@@ -114,6 +115,19 @@ Each sequence section then has a frequency, example trace keys, and a table whos
 |---|---|---|---|---|---|
 | 1 | orders-service | REQUEST | orders$create | orders-service | create |
 | 2 | payments-service | REQUEST | payments$charge | payments-service | charge |
+```
+
+With `outputFormat: "graph"` the same sequence section instead carries an edge table (one row per consecutive step pair):
+
+```markdown
+## Sequence 1 — `orders$create → payments$charge`
+
+- **Frequency**: 42 traces
+- **Example trace keys**: `a1b2c3…`, `d4e5f6…`
+
+| From | To | Type | Label | Support | Tokens |
+|---|---|---|---|---|---|
+| orders-service | payments-service | REQUEST | `orders$create` | 42 | `orders$create $ payments$charge` |
 ```
 
 ## Previewing sequences
