@@ -12,7 +12,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
 
 1. **Group** the parsed rows by their **correlation fields** (for example a trace/request id) — each group is one "trace" of related events.
 2. **Order** each group by its **order fields** (usually a timestamp).
-3. **Build a token signature** per group from its **token fields**.
+3. **Build a token signature** per group from its **token fields**, joined in the listed order.
 4. **Merge identical signatures** into sequences, count how often each occurs (frequency), and keep a few example trace keys.
 5. **Render** the distinct sequences as a Markdown report with a table per sequence.
 
@@ -52,7 +52,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
 |---|---|
 | `orderColumns` | Fields used to sort rows inside a group (e.g. `["timestamp"]`). Required, non-empty. |
 | `correlationColumns` | Fields that group rows into one trace (e.g. `["traceId"]`). Required, non-empty. |
-| `tokenColumns` | Fields that make up each step's token (e.g. `["service", "operation"]`). Required, non-empty. |
+| `tokenColumns` | Fields that make up each step's token, joined in the listed order (e.g. `["service", "operation"]` → `service:operation`). Required, non-empty. |
 | **`entityColumn`** | **Required.** The single field treated as the *entity* — who/what acts. It is always the **first data column** of the output table. |
 | **`directionColumn`** | **Required.** The single field treated as the *direction* — the action (e.g. request/response). It is always the **second data column** of the output table. |
 

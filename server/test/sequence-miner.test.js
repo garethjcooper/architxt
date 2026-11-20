@@ -158,6 +158,18 @@ describe('sequence-miner', () => {
     assert.ok(off.markdown.includes('| - | REQ |'));
   });
 
+  it('joins token components in the configured tokenColumns order', () => {
+    const rows = [
+      { traceId: 't1', step: '1', actor: 'AuthService', action: 'Start', status: 'OK', direction: 'REQ' },
+    ];
+
+    const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['status', 'action', 'actor'] });
+    assert.ok(markdown.includes('`OK:Start:AuthService`'));
+    // Component columns follow the same order in the rendered table.
+    assert.ok(markdown.includes('| Step | Entity | Direction | Token | Status | Action | Actor |'));
+    assert.ok(markdown.includes('| 1 | AuthService | REQ | `OK:Start:AuthService` |'));
+  });
+
   it('normalises signature tokens while preserving display case', () => {
     const rows = [
       row('t1', '1', 'AuthService', 'Start', 'OK'),
