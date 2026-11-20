@@ -5617,11 +5617,12 @@ The report starts with a header summarising the run:
 **Min steps**: 2 — shorter sequences omitted
 ```
 
-Each sequence section then has a frequency, example trace keys, and a table whose first columns are always **Step | Entity | Direction | Token** (plus one column per token component when `includeTokenComponents` is on):
+Each sequence section then has a descriptive name (the entity flow, e.g. `orders-service → payments-service`), the raw signature, frequency, example trace keys, and a table whose first columns are always **Step | Entity | Direction | Token** (plus one column per token component when `includeTokenComponents` is on):
 
 ```markdown
-## Sequence 1 — `orders$create → payments$charge`
+## Sequence 1 — orders-service → payments-service
 
+- **Signature**: `orders$create $ payments$charge`
 - **Frequency**: 42 traces
 - **Example trace keys**: `a1b2c3…`, `d4e5f6…`
 
