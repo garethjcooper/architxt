@@ -302,7 +302,7 @@ export function mineSequences(rows, profile, options = {}) {
     // in every correlation group is one observed flow edge; edges are deduped
     // and split into connected components — one table per component, so no
     // row overlaps between tables (graphs, plural).
-    const components = buildGraphComponents(flowGroups, separator, maxExampleKeys);
+    const components = buildGraphComponents(flowGroups);
     const graphCount = components.length;
     const edgeCount = components.reduce((sum, c) => sum + c.edges.length, 0);
     const markdown = renderMarkdown({
@@ -606,7 +606,7 @@ function renderMarkdown({
       lines.push('');
       lines.push('Edges:');
       lines.push('');
-      renderGraphTable(lines, component.edges);
+      renderGraphTable(lines, component.edges, tokenColumns);
       lines.push('');
     }
   } else {
@@ -691,36 +691,28 @@ function renderStepTable(lines, section, tokenColumns, includeTokenComponents) {
  * Build the connected components of the observed flow graph from raw ordered
  * rows. Every consecutive step pair in every correlation group is one observed
  * flow; distinct edges (from|to|type|label) are deduped with support = the
- * number of times the pair was seen, and example correlation keys are kept
- * (up to maxExampleKeys). Components are sets of edges linked through shared
- * entity nodes, so no edge row appears in more than one component table.
+ * number of times the pair was seen. Components are sets of edges linked
+ * through shared entity nodes, so no edge row appears in more than one
+ * component table.
  *
  * @param {Array<{ keyValues: string[], steps: TokenStep[] }>} flowGroups
- * @param {string} separator
- * @param {number} maxExampleKeys
- * @returns {Array<{ index: number, nodes: Set<string>, edges: Array<{from,to,type,label,support,exampleKeys}> }>}
+ * @returns {Array<{ index: number, nodes: Set<string>, edges: Array<{from,to,type,label,support,components}> }>}
  */
-function buildGraphComponents(flowGroups, separator, maxExampleKeys) {
-  const edgeMap = new Map(); // key -> { from, to, type, label, support, exampleKeys:Set }
+function buildGraphComponents(flowGroups) {
+  const edgeMap = new Map(); // key -> { from, to, type, label, support, components }
   for (const group of flowGroups) {
-    const key = group.keyValues.join(separator);
     for (let i = 0; i + 1 < group.steps.length; i++) {
       const from = group.steps[i];
       const to = group.steps[i + 1];
       const edgeKey = `${from.entity}\x00${to.entity}\x00${from.direction}\x00${from.displayToken}`;
       if (!edgeMap.has(edgeKey)) {
-        edgeMap.set(edgeKey, { from: from.entity, to: to.entity, type: from.direction, label: from.displayToken, support: 0, exampleKeys: new Set() });
+        edgeMap.set(edgeKey, { from: from.entity, to: to.entity, type: from.direction, label: from.displayToken, support: 0, components: from.components });
       }
-      const edge = edgeMap.get(edgeKey);
-      edge.support += 1;
-      if (edge.exampleKeys.size < maxExampleKeys) edge.exampleKeys.add(key);
+      edgeMap.get(edgeKey).support += 1;
     }
   }
 
-  const edges = Array.from(edgeMap.values()).map((e) => ({
-    ...e,
-    exampleKeys: Array.from(e.exampleKeys),
-  }));
+  const edges = Array.from(edgeMap.values());
 
   // Union-find over entity nodes.
   const parent = new Map();
@@ -763,23 +755,25 @@ function buildGraphComponents(flowGroups, separator, maxExampleKeys) {
 }
 
 /**
- * Graph-table renderer ("Sequence Graph" output). Renders one table of edge
- * rows in the layout of the standard edge-context tables
- * (From | To | Type | Label | Support | Traces). A row's Support is how many
- * correlation groups exhibited that exact step pair; Traces lists up to
- * maxExampleKeys example correlation keys. One table is rendered per
- * connected component, so the report is a set of disconnected small graphs,
- * never one connected graph.
+ * Graph-table renderer ("Sequence Graph" output). Renders one edges table in
+ * the layout of the standard edge-context tables: From | To | Type | Label |
+ * Support, plus one column per token field (like the steps tables), showing
+ * the leaving step's token components. One table is rendered per connected
+ * component, so the report is a set of disconnected small graphs, never one
+ * connected graph.
  */
-function renderGraphTable(lines, edges) {
+function renderGraphTable(lines, edges, tokenColumns) {
   // Pipes inside a table cell break GFM table parsing even inside code spans,
   // so escape them in every cell value.
   const cell = (value) => String(value).replace(/\|/g, '\\|');
 
-  lines.push('| From | To | Type | Label | Support | Traces |');
-  lines.push('|---|---|---|---|---|---|');
+  const headerCols = ['From', 'To', 'Type', 'Label', 'Support', ...tokenColumns.map((col) => capitalizeHeader(col))];
+  lines.push(`| ${headerCols.join(' | ')} |`);
+  lines.push(`|${headerCols.map(() => '---').join('|')}|`);
 
   for (const e of edges) {
-    lines.push(`| ${cell(e.from)} | ${cell(e.to)} | ${cell(e.type)} | \`${cell(e.label)}\` | ${e.support} | ${e.exampleKeys.map((k) => `\`${cell(k)}\``).join(', ')} |`);
+    const rowCols = [cell(e.from), cell(e.to), cell(e.type), `\`${cell(e.label)}\``, String(e.support)];
+    rowCols.push(...tokenColumns.map((col) => cell(e.components[col] ?? '')));
+    lines.push(`| ${rowCols.join(' | ')} |`);
   }
 }

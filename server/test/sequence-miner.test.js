@@ -490,11 +490,11 @@ describe('sequence-miner', () => {
       // Default: step table, no graph header.
       const steps = mineSequences(rows, profile);
       assert.ok(steps.markdown.includes('| Step | Entity | Direction | Token |'));
-      assert.ok(!steps.markdown.includes('| From | To | Type | Label | Support | Traces |'));
+      assert.ok(!steps.markdown.includes('| From | To | Type | Label | Support |'));
 
       const graph = mineSequences(rows, graphProfile);
       assert.ok(!graph.markdown.includes('| Step | Entity | Direction | Token |'));
-      assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Traces |'));
+      assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Actor | Action | Status |'));
       // All flows share nodes -> ONE component table, not one per group/signature.
       assert.ok(graph.markdown.includes('## Graph 1'));
       assert.ok(!graph.markdown.includes('## Graph 2'));
@@ -505,12 +505,12 @@ describe('sequence-miner', () => {
       assert.equal(graph.stats.sequenceCount, 1);
       assert.equal(graph.stats.graphCount, 1);
       assert.equal(graph.stats.edgeCount, 2);
-      // Shared edge appears once, support = 3 raw observations, example keys listed.
+      // Shared edge appears once, support = 3 raw observations; Traces column dropped,
+      // token fields have their own columns instead.
       const edgeRows = graph.markdown.split('\n').filter((l) => l.startsWith('| AuthService | DbService'));
       assert.equal(edgeRows.length, 1);
-      assert.ok(edgeRows[0].includes('| REQ | `AuthService:start:ok` | 3 | `t1`, `t2`, `t3` |'));
-      // No sequence-signature column anywhere in graph mode.
-      assert.ok(!graph.markdown.includes('Tokens'));
+      assert.ok(edgeRows[0].includes('| REQ | `AuthService:start:ok` | 3 | AuthService | start | ok |'));
+      assert.ok(!graph.markdown.includes('Traces'));
     });
 
     it('outputFormat graph splits into multiple tables only when components are disconnected', () => {
@@ -526,8 +526,8 @@ describe('sequence-miner', () => {
       // {A,B} and {C,D} share no nodes -> two component tables, no overlapping rows.
       assert.ok(markdown.includes('## Graph 1'));
       assert.ok(markdown.includes('## Graph 2'));
-      assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | `t1` |'));
-      assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | `t2` |'));
+      assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | A | x | ok |'));
+      assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | C | p | ok |'));
       assert.ok(!markdown.includes('| A | D'));
     });
 
