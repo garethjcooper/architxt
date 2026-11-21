@@ -769,19 +769,19 @@ export function ViewDocumentDialog({
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {([
-                      ['maxSourceFiles', 'Max source files'],
-                      ['maxSourceChars', 'Max source chars'],
-                      ['maxSourceFileBytes', 'Max file bytes'],
-                      ['maxFactFiles', 'Max fact files'],
-                      ['maxFactHeadBytes', 'Max fact head bytes'],
-                    ] as const).map(([key, label]) => (
+                      ['maxSourceFiles', 'Max source files', 'default: 12'],
+                      ['maxSourceChars', 'Max source chars', 'default: 48000'],
+                      ['maxSourceFileBytes', 'Max file bytes', 'default: 512000'],
+                      ['maxFactFiles', 'Max fact files', 'default: 2000'],
+                      ['maxFactHeadBytes', 'Max fact head bytes', 'default: 8192'],
+                    ] as const).map(([key, label, hint]) => (
                       <div key={key}>
                         <Label htmlFor={`gds-${key}`} className="text-[10px] text-foreground-subtle">{label}</Label>
                         <input
                           id={`gds-${key}`}
                           type="number"
                           min={1}
-                          placeholder="default"
+                          placeholder={hint}
                           value={gdsOverrides[key]}
                           onChange={(e) => setGdsOverrides((s) => ({ ...s, [key]: e.target.value }))}
                           className="w-full h-8 rounded-md border border-border-strong bg-surface-card px-2 text-xs text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
@@ -793,7 +793,7 @@ export function ViewDocumentDialog({
                       <input
                         id="gds-model"
                         type="text"
-                        placeholder="default"
+                        placeholder="default: service model (env GITDIAGRAM_SERVE_LLM_MODEL)"
                         value={gdsOverrides.model}
                         onChange={(e) => setGdsOverrides((s) => ({ ...s, model: e.target.value }))}
                         className="w-full h-8 rounded-md border border-border-strong bg-surface-card px-2 text-xs text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
