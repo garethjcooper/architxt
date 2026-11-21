@@ -109,7 +109,7 @@ export function ViewDocumentDialog({
   const [traceProfileName, setTraceProfileName] = useState<string | null>(null);
   // gitdiagram-serve sampling overrides (repository documents only); '' = blank = service default
   const [gdsOverrides, setGdsOverrides] = useState<Record<string, string>>({
-    maxSourceFiles: '', maxSourceChars: '', maxSourceFileBytes: '', maxFactFiles: '', maxFactHeadBytes: '', model: '',
+    maxSourceFiles: '', maxSourceChars: '', maxSourceFileBytes: '', maxFactFiles: '', maxFactHeadBytes: '',
   });
   const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
   const isTraceDoc = document?.source_type === 'trace';
@@ -213,7 +213,6 @@ export function ViewDocumentDialog({
       maxSourceFileBytes: g.maxSourceFileBytes != null ? String(g.maxSourceFileBytes) : '',
       maxFactFiles: g.maxFactFiles != null ? String(g.maxFactFiles) : '',
       maxFactHeadBytes: g.maxFactHeadBytes != null ? String(g.maxFactHeadBytes) : '',
-      model: g.model ?? '',
     });
   }, [document, open, globalStages]);
 
@@ -306,7 +305,6 @@ export function ViewDocumentDialog({
       maxSourceFileBytes: g.maxSourceFileBytes != null ? String(g.maxSourceFileBytes) : '',
       maxFactFiles: g.maxFactFiles != null ? String(g.maxFactFiles) : '',
       maxFactHeadBytes: g.maxFactHeadBytes != null ? String(g.maxFactHeadBytes) : '',
-      model: g.model ?? '',
     };
     return JSON.stringify(stored) !== JSON.stringify(gdsOverrides);
   };
@@ -386,7 +384,6 @@ export function ViewDocumentDialog({
                   maxSourceFileBytes: numField(gdsOverrides.maxSourceFileBytes),
                   maxFactFiles: numField(gdsOverrides.maxFactFiles),
                   maxFactHeadBytes: numField(gdsOverrides.maxFactHeadBytes),
-                  model: gdsOverrides.model.trim() !== '' ? gdsOverrides.model.trim() : null,
                 },
               }
             : {}),
@@ -788,17 +785,6 @@ export function ViewDocumentDialog({
                         />
                       </div>
                     ))}
-                    <div className="col-span-2">
-                      <Label htmlFor="gds-model" className="text-[10px] text-foreground-subtle">Model</Label>
-                      <input
-                        id="gds-model"
-                        type="text"
-                        placeholder="default: service model (env GITDIAGRAM_SERVE_LLM_MODEL)"
-                        value={gdsOverrides.model}
-                        onChange={(e) => setGdsOverrides((s) => ({ ...s, model: e.target.value }))}
-                        className="w-full h-8 rounded-md border border-border-strong bg-surface-card px-2 text-xs text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
-                      />
-                    </div>
                   </div>
                 </div>
                 )}

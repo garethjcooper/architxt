@@ -60,14 +60,12 @@ async function execute(artifacts, _config, data, services, context) {
       // legacy flat fields act as fallback only
       ...(data.doc_processing_options?.maxSourceFiles ? { maxSourceFiles: data.doc_processing_options.maxSourceFiles } : {}),
       ...(data.doc_processing_options?.maxSourceChars ? { maxSourceChars: data.doc_processing_options.maxSourceChars } : {}),
-      ...(data.doc_processing_options?.model ? { model: data.doc_processing_options.model } : {}),
       // nested per-document block wins when set
       ...(num(gds.maxSourceFiles) ? { maxSourceFiles: gds.maxSourceFiles } : {}),
       ...(num(gds.maxSourceChars) ? { maxSourceChars: gds.maxSourceChars } : {}),
       ...(num(gds.maxSourceFileBytes) ? { maxSourceFileBytes: gds.maxSourceFileBytes } : {}),
       ...(num(gds.maxFactFiles) ? { maxFactFiles: gds.maxFactFiles } : {}),
       ...(num(gds.maxFactHeadBytes) ? { maxFactHeadBytes: gds.maxFactHeadBytes } : {}),
-      ...(typeof gds.model === 'string' && gds.model.trim() ? { model: gds.model.trim() } : {}),
     };
 
     logger.info('Repository analysis starting', { docId, repoUri, serviceUrl: stageOptions.serviceUrl });

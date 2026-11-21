@@ -196,12 +196,12 @@ test('extract-repository stage sends per-document gitdiagram overrides, omitting
   );
   assert.equal(out.stageResult.success, true);
   // null (blank) fields are omitted so service env defaults apply; set fields pass through
+  // (model is no longer a per-document override — the service model is used)
   assert.deepEqual(lastRequest.body.options, {
     maxSourceFiles: 60,
     maxSourceChars: 120000,
     maxSourceFileBytes: 262144,
     maxFactHeadBytes: 8192,
-    model: 'gpt-oss',
   });
 });
 

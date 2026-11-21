@@ -66,7 +66,6 @@ export interface DocumentProcessingOptions {
     maxSourceFileBytes?: number | null;
     maxFactFiles?: number | null;
     maxFactHeadBytes?: number | null;
-    model?: string | null;
   } | null;
 }
 
