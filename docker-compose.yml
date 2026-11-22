@@ -116,6 +116,13 @@ services:
       GITDIAGRAM_SERVE_LLM_MODEL: "${GITDIAGRAM_SERVE_LLM_MODEL:-}"
       GITDIAGRAM_SERVE_LLM_TEMPERATURE: "${GITDIAGRAM_SERVE_LLM_TEMPERATURE:-0.0}"
       GITDIAGRAM_SERVE_GIT_TOKEN: "${GITDIAGRAM_SERVE_GIT_TOKEN:-}"
+      # TLS for cloning HTTPS repos with internal/self-signed certs (e.g. Forgejo).
+      # Preferred: mount a CA bundle and point GIT_SSL_CAINFO at it, e.g.
+      #   GITDIAGRAM_GIT_SSL_CAINFO=/ca/internal-ca.crt
+      #   volumes: - /path/to/internal-ca.crt:/ca/internal-ca.crt:ro
+      # GIT_SSL_NO_VERIFY=true disables verification entirely — internal use only.
+      GIT_SSL_CAINFO: "${GITDIAGRAM_GIT_SSL_CAINFO:-}"
+      GIT_SSL_NO_VERIFY: "${GITDIAGRAM_GIT_SSL_NO_VERIFY:-false}"
     expose:
       - "5002"
     volumes:
