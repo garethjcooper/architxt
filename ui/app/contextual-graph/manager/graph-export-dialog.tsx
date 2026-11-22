@@ -103,6 +103,7 @@ export function GraphExportDialog({
     setLoading(true);
     try {
       const baseName = sanitizeFilenameBase(filename || defaultBaseName(bankId)).slice(0, 100);
+      console.debug('[graph-export] start', { format, serverId, bankId, baseName });
 
       if (format === 'csv') {
         const result = (await contextualGraphApi.export(serverId, bankId, {
@@ -129,17 +130,21 @@ export function GraphExportDialog({
         downloadBlob(blob, `${baseName}${EXTENSIONS.json}`);
         toast.success('Downloaded JSON export');
       } else {
+        console.debug('[graph-export] requesting text format', { format });
         const result = (await contextualGraphApi.export(serverId, bankId, {
           format,
           undirected,
         })) as string;
+        console.debug('[graph-export] got response', { format, bytes: result?.length });
         const blob = new Blob([result], { type: MIME_TYPES[format] });
         downloadBlob(blob, `${baseName}${EXTENSIONS[format]}`);
         toast.success(`Downloaded ${format.toUpperCase()} export`);
       }
 
+      console.debug('[graph-export] done, closing dialog');
       onOpenChange(false);
     } catch (err: any) {
+      console.error('[graph-export] failed', err);
       toast.error(`Export failed: ${err.message || err}`);
     } finally {
       setLoading(false);
