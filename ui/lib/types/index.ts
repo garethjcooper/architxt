@@ -172,6 +172,7 @@ export interface EntityType {
   id_separator: 'none' | '-';
   c4_element: C4Element | null;
   archimate_element: ArchiMateElement | null;
+  likec4_shape: LikeC4Shape | null;
   created_at: string;
   updated_at: string;
 }
@@ -187,6 +188,21 @@ export const ARCHIMATE_ELEMENTS = [
   'DataObject',
 ] as const;
 export type ArchiMateElement = typeof ARCHIMATE_ELEMENTS[number];
+
+export const LIKEC4_SHAPES = [
+  'rectangle',
+  'component',
+  'storage',
+  'cylinder',
+  'browser',
+  'mobile',
+  'person',
+  'queue',
+  'bucket',
+  'document',
+  'agent',
+] as const;
+export type LikeC4Shape = typeof LIKEC4_SHAPES[number];
 
 export interface EdgeType {
   id: number;

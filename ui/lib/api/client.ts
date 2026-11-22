@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement, TraceProfile, TraceProfileVersion, TraceEngineManifest, TraceProfileValidationResult, TraceProfileSuggestionResult, TraceProfileFieldExtractionResult, TraceProfileDiscoveryHistogramResult, TraceProfileSequencePreviewResult } from '../types';
+import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement, LikeC4Shape, TraceProfile, TraceProfileVersion, TraceEngineManifest, TraceProfileValidationResult, TraceProfileSuggestionResult, TraceProfileFieldExtractionResult, TraceProfileDiscoveryHistogramResult, TraceProfileSequencePreviewResult } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -726,6 +726,7 @@ export const entityTypesApi = {
     id_separator?: 'none' | '-';
     c4_element?: C4Element | null;
     archimate_element?: ArchiMateElement | null;
+    likec4_shape?: LikeC4Shape | null;
   }) => fetchApi<{ id: number }>('/entities/types', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -745,6 +746,7 @@ export const entityTypesApi = {
       id_separator?: 'none' | '-';
       c4_element?: C4Element | null;
       archimate_element?: ArchiMateElement | null;
+      likec4_shape?: LikeC4Shape | null;
     }
   ) => fetchApi<unknown>(`/entities/types/${id}`, {
     method: 'PUT',
