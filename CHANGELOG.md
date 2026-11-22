@@ -2,6 +2,13 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.5.3] - 2026-11-23
+
+### Fixed
+
+- docker-compose: `gitdiagram` service now active under all profiles (`gitdiagram`, `docling`, `hindsight`), like docling — previously only started with `--profile gitdiagram`.
+- docker-compose: pass `GIT_SSL_CAINFO` / `GIT_SSL_NO_VERIFY` through to the `gitdiagram` service so cloning HTTPS repos with internal/self-signed certs (e.g. Forgejo) works; defaults keep verification on.
+
 ## [0.5.2] - 2026-11-23
 
 ### Added
