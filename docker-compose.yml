@@ -94,15 +94,16 @@ services:
   # GitDiagram repository-analysis service.
   # Active with: docker compose --profile gitdiagram up --build
   # Analyzes local git repositories or remote git URIs into Mermaid diagrams.
+  # Built from the public GitHub release tag (not a local checkout).
   # Remote URIs are cloned into the persistent gitdiagram-repos volume (/repos).
   # Host repos to analyze by path can be mounted at /host-repos (read-only).
   gitdiagram:
     profiles:
       - gitdiagram
     container_name: architxt-gitdiagram
-    image: gitdiagram-serve:latest
+    image: gitdiagram-serve:0.2.0
     build:
-      context: ../gitdiagram-serve
+      context: https://github.com/garethjcooper/gitdiagram-serve.git#v0.2.0
     env_file:
       - server/.env
     environment:
