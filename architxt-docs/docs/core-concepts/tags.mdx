@@ -37,6 +37,18 @@ Click a tag to add it, click it again to remove it, and click **Save Changes** t
 
 You can also assign tags at upload time. In the **Upload** dialog, choose tags from the shared batch settings and every uploaded document will receive them automatically.
 
+## System tags
+
+In addition to user-created tags, architxt maintains a small set of **system tags** (`generated_by = system`) that mark a document's source type:
+
+| Tag | Stamped on |
+|---|---|
+| `ARCHITXT-DOC` | Every ordinary document |
+| `ARCHITXT-TRACE` | Every trace document |
+| `ARCHITXT-REPO` | Every repository document |
+
+The matching tag is applied automatically when the document is created — you don't add it manually. System tags are **read-only**: they cannot be edited, renamed, or deleted (delete/update attempts are rejected with `403 FORBIDDEN`), following the same pattern as system metadata. Tag *associations* are still allowed, so you can remove a system tag from a document or re-add it via the Manage Tags dialog, but the tag itself stays. Existing documents created before this feature are not backfilled; the stamp applies to new documents only.
+
 ## Where tags are used
 
 Tags serve two roles in Hindsight:

@@ -303,3 +303,25 @@ The documents list shows each document's **Type** and, for trace documents, its 
 ### What extraction stores for a trace document
 
 The trace extraction stage (`extract-trace` pipeline stage) reads the raw source file, runs the profile's parser, and — when the profile has a `sequenceProfile` — mines the sequences and stores **the sequence analysis report alone** as the document's Markdown content (matching what **Preview sequences** shows in the profile modal). Without a `sequenceProfile`, the cleaned log remains the document content. The original file always stays available at the document's stored source path. See [sequence mining](../trace-profiles/sequence-mining) for the report format and config.
+
+## Repository documents
+
+A **repository document** analyzes a git repository through the gitdiagram-serve (gds) service and stores the result as an architecture diagram. Instead of uploading a file, you give architxt a **repository URI** — an `https://…`/`git@…` remote URL or a local path the gds service can reach.
+
+### Uploading a repository
+
+1. Open **Upload Documents** from the documents page.
+2. Switch the upload mode to **Repository** and enter the repo URI (remote URL or path).
+3. Click **Upload**.
+
+The repo URI is validated server-side and stored on the document as its **source path** and **full path** (`doc_full_path = repo_uri`); the display filename is derived from the URI. There is no uploaded file — the repository itself is the source. The document is stamped with the `ARCHITXT-REPO` system tag and gets the built-in **`system-repository`** context auto-prepended (like `system-trace`), so Hindsight sync and Reflect know the content is a repository analysis.
+
+### What extraction stores for a repository document
+
+The `extract-repository` stage sends the URI to the gds service and builds the document's Markdown as:
+
+- a **provenance header** — `> <repo URI> @ <full commit SHA> · <commit date>`, so the document records exactly which commit the diagram describes;
+- the **explanation prose** returned by gds;
+- the **Mermaid diagram** in a fenced code block.
+
+The stored diagram updates only when you re-run extraction — gds has no cache, so a re-extract after pulling the repo produces the current state.

@@ -354,6 +354,17 @@ These settings control the `extract-trace` pipeline stage that runs when a trace
 
 All variables are optional. If the model variable is empty, the selected provider's default model is used. The system prompt can be overridden in `.env` if you need to adjust the parser-authoring role; leaving it empty uses the built-in prompt.
 
+## GitDiagram repository analysis service (gds)
+
+Repository documents are analyzed by a separate [gitdiagram-serve](https://github.com/garethjcooper/gitdiagram-serve) service. architxt only needs to reach it:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GITDIAGRAM_SERVICE_URL` | `http://localhost:5002` | URL of the gds service. With the `gitdiagram` Docker Compose profile this is overridden internally to `http://gitdiagram:5002`. |
+| `GITDIAGRAM_TIMEOUT_MS` | `600000` | Max wait for a repository analysis (ms). Analysis is LLM-driven and can take minutes for large codebases. |
+
+The gds **service itself** is configured exclusively via `GITDIAGRAM_SERVE_*` variables in the same `.env` (read by compose): `GITDIAGRAM_SERVE_LLM_BASE_URL`, `GITDIAGRAM_SERVE_LLM_API_KEY`, `GITDIAGRAM_SERVE_LLM_MODEL`, `GITDIAGRAM_SERVE_LLM_TEMPERATURE`. The model is service-level only — there is no per-document model override; every repository analysis uses `GITDIAGRAM_SERVE_LLM_MODEL` (gds default `gpt-4o-mini`). Compose-only: `GITDIAGRAM_REPOS_MOUNT` mounts a host directory into the container read-only for analyzing repos by local path.
+
 ## Next steps
 
 - [Install architxt](./installation)

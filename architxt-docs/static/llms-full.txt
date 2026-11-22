@@ -978,6 +978,17 @@ These settings control the `extract-trace` pipeline stage that runs when a trace
 
 All variables are optional. If the model variable is empty, the selected provider's default model is used. The system prompt can be overridden in `.env` if you need to adjust the parser-authoring role; leaving it empty uses the built-in prompt.
 
+## GitDiagram repository analysis service (gds)
+
+Repository documents are analyzed by a separate [gitdiagram-serve](https://github.com/garethjcooper/gitdiagram-serve) service. architxt only needs to reach it:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GITDIAGRAM_SERVICE_URL` | `http://localhost:5002` | URL of the gds service. With the `gitdiagram` Docker Compose profile this is overridden internally to `http://gitdiagram:5002`. |
+| `GITDIAGRAM_TIMEOUT_MS` | `600000` | Max wait for a repository analysis (ms). Analysis is LLM-driven and can take minutes for large codebases. |
+
+The gds **service itself** is configured exclusively via `GITDIAGRAM_SERVE_*` variables in the same `.env` (read by compose): `GITDIAGRAM_SERVE_LLM_BASE_URL`, `GITDIAGRAM_SERVE_LLM_API_KEY`, `GITDIAGRAM_SERVE_LLM_MODEL`, `GITDIAGRAM_SERVE_LLM_TEMPERATURE`. The model is service-level only — there is no per-document model override; every repository analysis uses `GITDIAGRAM_SERVE_LLM_MODEL` (gds default `gpt-4o-mini`). Compose-only: `GITDIAGRAM_REPOS_MOUNT` mounts a host directory into the container read-only for analyzing repos by local path.
+
 ## Next steps
 
 - [Install architxt](./installation)
@@ -1313,9 +1324,9 @@ The following fields are shown when you create or edit an entity type:
 | **Minimum Number Of Id Digits** | `min_id_digits` | Zero-padded width for the numeric suffix. Allowed range: 1–10. |
 | **Id Separator** | `id_separator` | `none` or `-` between prefix and number. |
 
-### C4 and ArchiMate mappings
+### C4, ArchiMate, and LikeC4 mappings
 
-Entity types can carry optional mappings that tell the contextual-graph exporters which C4 and ArchiMate shapes a type represents. The exporters use these values directly; they do not guess from the type name or label.
+Entity types can carry optional mappings that tell the contextual-graph exporters which shapes a type represents. The exporters use these values directly; they do not guess from the type name or label.
 
 | UI column | API field | Exported as |
 |---|---|---|
@@ -1323,8 +1334,9 @@ Entity types can carry optional mappings that tell the contextual-graph exporter
 | **C4 Description** | `c4_description` | Relationship description in C4 exports. Stored on the edge type. |
 | **ArchiMate Element** | `archimate_element` | ArchiMate element type in ArchiMate XML exports. |
 | **ArchiMate Relationship** | `archimate_relationship` | ArchiMate relationship type in ArchiMate XML exports. Stored on the edge type. |
+| **LikeC4 Shape** | `likec4_shape` | Node shape in LikeC4 DSL exports. Allowed values: `rectangle`, `component`, `storage`, `cylinder`, `browser`, `mobile`, `person`, `queue`, `bucket`, `document`, `agent`. |
 
-If a mapping is empty, the exporter falls back to a sensible default (`SoftwareSystem` for unmapped nodes, `Association` for unmapped edges). For a fully deterministic export, set the mappings on the entity and [edge types](./edge-types) your bank uses.
+If a mapping is empty, the exporter falls back to a sensible default (`SoftwareSystem` for unmapped C4 nodes, `Association` for unmapped edges, LikeC4's default shape for unmapped LikeC4 nodes). For a fully deterministic export, set the mappings on the entity and [edge types](./edge-types) your bank uses.
 
 ### Matching defaults
 
@@ -1442,7 +1454,7 @@ Each edge type carries four values:
 | **C4 Description** | `c4_description` | Relationship label used in C4 (Structurizr DSL and Mermaid) exports. |
 | **ArchiMate Relationship** | `archimate_relationship` | Standard ArchiMate relationship type used in ArchiMate XML exports. |
 
-The C4 and ArchiMate mappings behave the same way as the mappings on [entity types](./entities#c4-and-archimate-mappings): the exporters read the stored value directly and only fall back to a default when the mapping is empty. The default for an unmapped edge relationship is `Association`.
+The C4, ArchiMate, and LikeC4 mappings behave the same way as the mappings on [entity types](./entities#c4-archimate-and-likec4-mappings): the exporters read the stored value directly and only fall back to a default when the mapping is empty. The default for an unmapped edge relationship is `Association`.
 
 ## Where you manage edge types
 
@@ -1885,6 +1897,28 @@ The documents list shows each document's **Type** and, for trace documents, its 
 ### What extraction stores for a trace document
 
 The trace extraction stage (`extract-trace` pipeline stage) reads the raw source file, runs the profile's parser, and — when the profile has a `sequenceProfile` — mines the sequences and stores **the sequence analysis report alone** as the document's Markdown content (matching what **Preview sequences** shows in the profile modal). Without a `sequenceProfile`, the cleaned log remains the document content. The original file always stays available at the document's stored source path. See [sequence mining](../trace-profiles/sequence-mining) for the report format and config.
+
+## Repository documents
+
+A **repository document** analyzes a git repository through the gitdiagram-serve (gds) service and stores the result as an architecture diagram. Instead of uploading a file, you give architxt a **repository URI** — an `https://…`/`git@…` remote URL or a local path the gds service can reach.
+
+### Uploading a repository
+
+1. Open **Upload Documents** from the documents page.
+2. Switch the upload mode to **Repository** and enter the repo URI (remote URL or path).
+3. Click **Upload**.
+
+The repo URI is validated server-side and stored on the document as its **source path** and **full path** (`doc_full_path = repo_uri`); the display filename is derived from the URI. There is no uploaded file — the repository itself is the source. The document is stamped with the `ARCHITXT-REPO` system tag and gets the built-in **`system-repository`** context auto-prepended (like `system-trace`), so Hindsight sync and Reflect know the content is a repository analysis.
+
+### What extraction stores for a repository document
+
+The `extract-repository` stage sends the URI to the gds service and builds the document's Markdown as:
+
+- a **provenance header** — `> <repo URI> @ <full commit SHA> · <commit date>`, so the document records exactly which commit the diagram describes;
+- the **explanation prose** returned by gds;
+- the **Mermaid diagram** in a fenced code block.
+
+The stored diagram updates only when you re-run extraction — gds has no cache, so a re-extract after pulling the repo produces the current state.
 ---
 
 # Mental Models
@@ -2354,6 +2388,18 @@ Tags are assigned from the **Documents** page:
 Click a tag to add it, click it again to remove it, and click **Save Changes** to apply the result to all selected documents. A document can have **many tags** at the same time.
 
 You can also assign tags at upload time. In the **Upload** dialog, choose tags from the shared batch settings and every uploaded document will receive them automatically.
+
+## System tags
+
+In addition to user-created tags, architxt maintains a small set of **system tags** (`generated_by = system`) that mark a document's source type:
+
+| Tag | Stamped on |
+|---|---|
+| `ARCHITXT-DOC` | Every ordinary document |
+| `ARCHITXT-TRACE` | Every trace document |
+| `ARCHITXT-REPO` | Every repository document |
+
+The matching tag is applied automatically when the document is created — you don't add it manually. System tags are **read-only**: they cannot be edited, renamed, or deleted (delete/update attempts are rejected with `403 FORBIDDEN`), following the same pattern as system metadata. Tag *associations* are still allowed, so you can remove a system tag from a document or re-add it via the Manage Tags dialog, but the tag itself stays. Existing documents created before this feature are not backfilled; the stamp applies to new documents only.
 
 ## Where tags are used
 
@@ -4327,6 +4373,7 @@ If a referenced model cannot be fetched, the `content` field is set to `null` an
 || **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
 || **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
 || **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
+|| **LikeC4 DSL** | A single `.likec4` file in [LikeC4](https://likec4.dev/) DSL format. Node shapes come from the **LikeC4 Shape** mapping on each entity type (see [entity types](../core-concepts/entities#c4-archimate-and-likec4-mappings)); unmapped types render with LikeC4's default shape. |
 
 ### API filtering
 
@@ -4336,7 +4383,7 @@ The export dialog calls the `/contextual-graph/export` endpoint. The same endpoi
 |---|---|---|
 || `server_id` *(required)* | The Hindsight server to export from. |
 || `bank_id` *(required)* | The bank to export from. |
-|| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
+|| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, `archimate`, or `likec4`. |
 || `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
 || `id_prefix` | Include only nodes whose ID starts with this prefix. |
 || `ids` | Comma-separated list of exact node IDs to include. |
@@ -5544,7 +5591,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
 
 1. **Group** the parsed rows by their **correlation fields** (for example a trace/request id) — each group is one "trace" of related events.
 2. **Order** each group by its **order fields** (usually a timestamp).
-3. **Build a token signature** per group from its **token fields**.
+3. **Build a token signature** per group from its **token fields**, joined in the listed order.
 4. **Merge identical signatures** into sequences, count how often each occurs (frequency), and keep a few example trace keys.
 5. **Render** the distinct sequences as a Markdown report with a table per sequence.
 
@@ -5567,7 +5614,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
 |---|---|
 | `orderColumns` | Fields used to sort rows inside a group (e.g. `["timestamp"]`). Required, non-empty. |
 | `correlationColumns` | Fields that group rows into one trace (e.g. `["traceId"]`). Required, non-empty. |
-| `tokenColumns` | Fields that make up each step's token (e.g. `["service", "operation"]`). Required, non-empty. |
+| `tokenColumns` | Fields that make up each step's token, joined in the listed order (e.g. `["service", "operation"]` → `service:operation`). Required, non-empty. |
 | **`entityColumn`** | **Required.** The single field treated as the *entity* — who/what acts. It is always the **first data column** of the output table. |
 | **`directionColumn`** | **Required.** The single field treated as the *direction* — the action (e.g. request/response). It is always the **second data column** of the output table. |
 
@@ -5584,7 +5631,6 @@ Entity and direction are mandatory on purpose: they are the *what* and *action* 
 | `sortOrder` | `"none"` | `"frequency-desc"` (most common first), `"signature-asc"` (alphabetical), or `"none"` (discovery order). |
 | `includeTokenComponents` | `true` | When on, the individual token fields are shown as extra columns in each sequence table, after the Token column. |
 | `excludeMissingTokens` | `true` | When on (default), rows whose **entity or direction** value is missing are excluded from mining. A stored explicit `false` turns this off. Missing *token* components are always tolerated — they just render as the missing-value placeholder. |
-| `includeTransitions` | `false` | When on, the report also lists adjacent-sequence transitions across ordered traces (up to 50). |
 | `includeSequenceNumbers` | `false` | Prefix section headings with an ordinal: `## Sequence N — <name>` / `## Graph N — <stats>`. Off by default — the number is just report position, not signal strength, so headings carry only the descriptive name. |
 | `outputFormat` | `"steps"` | `"steps"` renders each mined sequence as a step table (Step | Entity | Direction | Token …). `"graph"` skips sequence signatures entirely and works from the raw ordered rows: every consecutive step pair in every correlation group is one observed flow; edges are deduped and split into **connected components**, each rendered as its own `## Graph N` section containing a **Nodes** table (`| Node |`) and an **Edges** table with columns **From | To | Type | Label | Support** plus one column per token field (From/To = step entities, Type = the leaving step's direction, Label = its token, Support = how many correlation groups showed that pair). Each component table covers a disjoint set of rows — the report is a set of small disconnected graphs, not one connected graph. |
 
@@ -5692,7 +5738,9 @@ Three tabs, styled like the Document Details modal tab bar:
 All `sequenceProfile` settings in one bordered block over two rows:
 
 - **Row 1 (inputs)**: Separator, Missing value, Max example keys, Min steps, Sort order, and the **Preview sequences** button at the right edge.
-- **Row 2 (switches)**: Include token components, Exclude missing entity/direction (default on), Sequence transitions.
+- **Row 2 (switches)**: Include token components, Exclude missing entity/direction (default on), Number sections (default off).
+
+In the **full** fields table, the Order, Correlate, and Token columns all accept multiple checked fields; checked rows show a position number with ↑/↓ buttons to set priority (Order = row sort within groups, Token = component order inside each step's token).
 
 **Preview sequences** runs `POST /api/v1/trace-profiles/preview-sequences` with the current config and sample and renders the resulting Markdown report plus stats — or the validation error (for example a missing entity/direction tag) inline. See [Sequence mining](./sequence-mining) and [API routes](./api-routes).
 
