@@ -23,7 +23,7 @@ const DEFAULT_EDGE_C4_DESCRIPTION = 'relates to';
  * @param {Array<{id: string, labels?: string[], properties?: Record<string, any>}>} nodes
  * @param {Array<{id: string, type?: string | null, properties?: Record<string, any>}>} edges
  * @returns {{
- *   nodeMap: Map<string, { c4Element: string | null, archimateElement: string | null, typeName: string | null, defaulted: boolean }>,
+ *   nodeMap: Map<string, { c4Element: string | null, archimateElement: string | null, likec4Shape: string | null, typeName: string | null, defaulted: boolean }>,
  *   edgeMap: Map<string, { c4Description: string | null, archimateRelationship: string | null, typeName: string | null, defaulted: boolean }>
  * }}
  */
@@ -68,6 +68,7 @@ export async function resolveArchitectureMetadata(db, nodes, edges) {
     nodeMap.set(node.id, {
       c4Element,
       archimateElement,
+      likec4Shape: type?.et_likec4_shape || null,
       typeName,
       defaulted: !typeName,
     });
