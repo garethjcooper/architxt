@@ -168,10 +168,20 @@ async function processNext() {
     }
 
     // Step 6: Report result (success or non-cancel failure)
+    // Note: processResult.metrics is keyed by stage name; repo provenance lives
+    // under the extract-repository stage's metrics.
+    const repoMetrics = processResult.metrics?.['extract-repository'] || {};
+    const repoCommitDate = repoMetrics.repoCommitDate || null;
+    const repoAuthors = Array.isArray(repoMetrics.repoAuthors) && repoMetrics.repoAuthors.length ? repoMetrics.repoAuthors : null;
     const reported = await reportExtracted(docId, processResult.success, {
       metrics: processResult.metrics,
       ...(processResult.success
-        ? { markdown: processResult.markdown, images: processResult.images }
+        ? {
+            markdown: processResult.markdown,
+            images: processResult.images,
+            ...(repoCommitDate ? { timestamp: repoCommitDate } : {}),
+            ...(repoAuthors ? { authors: repoAuthors } : {}),
+          }
         : { error: processResult.error, errorDetails: processResult.errorDetails }
       )
     });

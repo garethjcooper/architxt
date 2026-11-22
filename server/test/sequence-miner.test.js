@@ -35,10 +35,12 @@ describe('sequence-miner', () => {
     assert.equal(stats.correlationKeyCount, 2);
     assert.equal(stats.sequenceCount, 2);
 
-    assert.ok(markdown.includes('## Sequence 1'));
-    assert.ok(markdown.includes('`AuthService:start:ok | AuthService:complete:ok`'));
-    assert.ok(markdown.includes('## Sequence 2'));
-    assert.ok(markdown.includes('`AuthService:start:ok | DbService:lookup:ok`'));
+    // Default: no numbering — headings carry only the descriptive entity-flow name.
+    assert.ok(markdown.includes('## AuthService'));
+    assert.ok(markdown.includes('## AuthService → DbService'));
+    assert.ok(!markdown.includes('## Sequence'));
+    assert.ok(markdown.includes('**Signature**: `AuthService:start:ok | AuthService:complete:ok`'));
+    assert.ok(markdown.includes('**Signature**: `AuthService:start:ok | DbService:lookup:ok`'));
   });
 
   it('aggregates identical signatures and counts distinct correlation keys', () => {
@@ -156,6 +158,18 @@ describe('sequence-miner', () => {
     assert.ok(off.markdown.includes('| - | REQ |'));
   });
 
+  it('joins token components in the configured tokenColumns order', () => {
+    const rows = [
+      { traceId: 't1', step: '1', actor: 'AuthService', action: 'Start', status: 'OK', direction: 'REQ' },
+    ];
+
+    const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['status', 'action', 'actor'] });
+    assert.ok(markdown.includes('`OK:Start:AuthService`'));
+    // Component columns follow the same order in the rendered table.
+    assert.ok(markdown.includes('| Step | Entity | Direction | Token | Status | Action | Actor |'));
+    assert.ok(markdown.includes('| 1 | AuthService | REQ | `OK:Start:AuthService` |'));
+  });
+
   it('normalises signature tokens while preserving display case', () => {
     const rows = [
       row('t1', '1', 'AuthService', 'Start', 'OK'),
@@ -186,12 +200,10 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'frequency-desc' });
-    const sequenceHeaders = markdown.match(/## Sequence \d — `([^`]+)`/g);
-    assert.deepEqual(sequenceHeaders, [
-      '## Sequence 1 — `X`',
-      '## Sequence 2 — `Z`',
-      '## Sequence 3 — `Y`',
-    ]);
+    const sequenceHeaders = markdown.match(/## [^\n]+/g);
+    assert.deepEqual(sequenceHeaders, ['## X', '## Z', '## Y']);
+    // Raw signature is still available as a bullet under each heading.
+    assert.ok(markdown.includes('**Signature**: `X`'));
   });
 
   it('sorts by signature ascending when configured', () => {
@@ -202,8 +214,8 @@ describe('sequence-miner', () => {
     ];
 
     const { markdown } = mineSequences(rows, { ...profile, tokenColumns: ['actor'], sortOrder: 'signature-asc' });
-    const match = markdown.match(/Sequence \d — `([^`]+)`/g);
-    assert.deepEqual(match, ['Sequence 1 — `Alpha`', 'Sequence 2 — `Bravo`', 'Sequence 3 — `Charlie`']);
+    const match = markdown.match(/## [^\n]+/g);
+    assert.deepEqual(match, ['## Alpha', '## Bravo', '## Charlie']);
   });
 
   it('uses numeric ordering for order columns when values are numbers', () => {
@@ -329,60 +341,6 @@ describe('sequence-miner', () => {
     assert.ok(markdown.includes('`AuthService:start:-`'));
   });
 
-  it('omits the transitions section by default', () => {
-    const rows = [
-      row('t1', '1', 'A', 'x', 'ok'),
-      row('t2', '2', 'B', 'y', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, profile);
-    assert.ok(!markdown.includes('Sequence transitions'));
-  });
-
-  it('counts adjacent signature pairs across traces when includeTransitions is on', () => {
-    const rows = [
-      // trace t1: signature A, first step 1
-      row('t1', '1', 'A', 'x', 'ok'),
-      // trace t2: signature A, first step 2
-      row('t2', '2', 'A', 'x', 'ok'),
-      // trace t3: signature B, first step 3
-      row('t3', '3', 'B', 'y', 'ok'),
-      // trace t4: signature C, first step 4
-      row('t4', '4', 'C', 'z', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, { ...profile, includeTransitions: true });
-    assert.ok(markdown.includes('## Sequence transitions'));
-    assert.ok(markdown.includes('| From sequence | To sequence | Traces |'));
-    // Ordered by first step: A(t1), A(t2), B(t3), C(t4) → A→A:1, A→B:1, B→C:1
-    assert.ok(markdown.includes('| `a|x|ok` | `a|x|ok` | 1 |'));
-    assert.ok(markdown.includes('| `a|x|ok` | `b|y|ok` | 1 |'));
-    assert.ok(markdown.includes('| `b|y|ok` | `c|z|ok` | 1 |'));
-  });
-
-  it('aggregates repeated transitions and sorts by count descending', () => {
-    const rows = [
-      row('t1', '1', 'A', 'x', 'ok'),
-      row('t2', '2', 'B', 'y', 'ok'),
-      row('t3', '3', 'B', 'y', 'ok'),
-      row('t4', '4', 'A', 'x', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, { ...profile, includeTransitions: true });
-    // Order: A(t1), B(t2), B(t3), A(t4) → A→B:1, B→B:1, B→A:1; ties broken alphabetically
-    const tableRows = markdown.match(/^\| `[^`]+` \| `[^`]+` \| \d+ \|$/gm);
-    assert.deepEqual(tableRows, [
-      '| `a|x|ok` | `b|y|ok` | 1 |',
-      '| `b|y|ok` | `a|x|ok` | 1 |',
-      '| `b|y|ok` | `b|y|ok` | 1 |',
-    ]);
-  });
-
-  it('reports no transitions when there is only one correlation group', () => {
-    const rows = [
-      row('t1', '1', 'A', 'x', 'ok'),
-      row('t1', '2', 'B', 'y', 'ok'),
-    ];
-    const { markdown } = mineSequences(rows, { ...profile, includeTransitions: true });
-    assert.ok(markdown.includes('No transitions — fewer than two correlation groups.'));
-  });
 
   describe('caps', () => {
     it('maxInputRows down-samples deterministically and reports truncated', () => {
@@ -423,8 +381,7 @@ describe('sequence-miner', () => {
       assert.ok(markdown.includes('…+3 more signatures'));
       assert.ok(markdown.includes('**Overflow**: 3 signatures folded'));
       // kept sections are the first two by signature-asc
-      assert.ok(markdown.includes('## Sequence 1'));
-      assert.ok(markdown.includes('## Sequence 3 — `…+3 more signatures`'));
+      assert.ok(markdown.includes('## `…+3 more signatures`')); // overflow heading has no number by default
     });
 
     it('maxSignatures default is 1000 and uncapped small inputs report no overflow', () => {
@@ -472,6 +429,115 @@ describe('sequence-miner', () => {
       assert.ok(!markdown.includes('**Min steps**'));
       assert.throws(() => mineSequences(rows, { ...profile, minSteps: 0 }), /minSteps must be at least 1/);
       assert.throws(() => mineSequences(rows, { ...profile, minSteps: 1.5 }), /minSteps must be a non-negative integer/);
+    });
+
+    it('outputFormat defaults to steps; graph merges observed flows into disconnected component tables', () => {
+      // Three correlation groups, two of which share the AuthService -> DbService flow.
+      const rows = [
+        row('t1', '1', 'AuthService', 'start', 'ok', 'REQ'),
+        row('t1', '2', 'DbService', 'lookup', 'ok', 'REQ'),
+        row('t1', '3', 'AuthService', 'complete', 'ok', 'RES'),
+        row('t2', '1', 'AuthService', 'start', 'ok', 'REQ'),
+        row('t2', '2', 'DbService', 'lookup', 'ok', 'REQ'),
+        row('t3', '1', 'AuthService', 'start', 'ok', 'REQ'),
+        row('t3', '2', 'DbService', 'lookup', 'ok', 'REQ'),
+      ];
+      const graphProfile = { ...profile, separator: '$', outputFormat: 'graph' };
+
+      // Default: step table, no graph header.
+      const steps = mineSequences(rows, profile);
+      assert.ok(steps.markdown.includes('| Step | Entity | Direction | Token |'));
+      assert.ok(!steps.markdown.includes('| From | To | Type | Label | Support |'));
+
+      const graph = mineSequences(rows, graphProfile);
+      assert.ok(!graph.markdown.includes('| Step | Entity | Direction | Token |'));
+      assert.ok(graph.markdown.includes('| From | To | Type | Label | Support | Actor | Action | Status |'));
+      // All flows share nodes -> ONE component table, not one per group/signature.
+      assert.ok(graph.markdown.includes('## 2 nodes, 2 edges'));
+      assert.ok(!graph.markdown.includes('## Graph'));
+      // Per component: a nodes table AND an edges table.
+      assert.ok(graph.markdown.includes('| Node |'));
+      assert.ok(graph.markdown.includes('| AuthService |'));
+      assert.ok(graph.markdown.includes('| DbService |'));
+      assert.equal(graph.stats.sequenceCount, 1);
+      assert.equal(graph.stats.graphCount, 1);
+      assert.equal(graph.stats.edgeCount, 2);
+      // Shared edge appears once, support = 3 raw observations; Traces column dropped,
+      // token fields have their own columns instead.
+      const edgeRows = graph.markdown.split('\n').filter((l) => l.startsWith('| AuthService | DbService'));
+      assert.equal(edgeRows.length, 1);
+      assert.ok(edgeRows[0].includes('| REQ | `AuthService:start:ok` | 3 | AuthService | start | ok |'));
+      assert.ok(!graph.markdown.includes('Traces'));
+    });
+
+    it('outputFormat graph splits into multiple tables only when components are disconnected', () => {
+      const rows = [
+        row('t1', '1', 'A', 'x', 'ok'),
+        row('t1', '2', 'B', 'y', 'ok'),
+        row('t2', '1', 'C', 'p', 'ok'),
+        row('t2', '2', 'D', 'q', 'ok'),
+      ];
+      const { markdown, stats } = mineSequences(rows, { ...profile, outputFormat: 'graph', separator: '$' });
+      assert.equal(stats.graphCount, 2);
+      assert.equal(stats.edgeCount, 2);
+      // {A,B} and {C,D} share no nodes -> two component tables, no overlapping rows.
+      assert.ok(markdown.includes('## 2 nodes, 1 edge'));
+      assert.ok(markdown.includes('| A | B | REQ | `A:x:ok` | 1 | A | x | ok |'));
+      assert.ok(markdown.includes('| C | D | REQ | `C:p:ok` | 1 | C | p | ok |'));
+      assert.ok(!markdown.includes('| A | D'));
+    });
+
+    it('outputFormat graph still applies minSteps to drop flowless groups', () => {
+      const rows = [
+        row('t1', '1', 'A', 'x', 'ok'),                                    // 1-step group, dropped
+        row('t2', '1', 'B', 'y', 'ok'), row('t2', '2', 'C', 'z', 'ok'),      // 2-step group
+      ];
+      const { markdown, stats } = mineSequences(rows, { ...profile, outputFormat: 'graph' });
+      assert.equal(stats.sequenceCount, 1);
+      assert.ok(markdown.includes('| B | C |'));
+      assert.ok(!markdown.includes('| A |'));
+    });
+
+    it('outputFormat rejects unknown values', () => {
+      assert.throws(() => mineSequences([row('t1', '1', 'A', 'x', 'ok')], { ...profile, outputFormat: 'diagram' }), /outputFormat must be one of: steps, graph/);
+    });
+
+    it('sequence headings get a descriptive entity-flow name; repeats collapse and long flows cap at 6 hops', () => {
+      const rows = [
+        // A -> A -> B -> C : repeated entity collapses to "A → B → C"
+        row('t1', '1', 'A', 'x', 'ok'),
+        row('t1', '2', 'A', 'y', 'ok'),
+        row('t1', '3', 'B', 'z', 'ok'),
+        row('t1', '4', 'C', 'w', 'ok'),
+        // 8 distinct entities: capped at 6 hops + ellipsis
+        row('t2', '1', 'N1', 'a', 'ok'),
+        row('t2', '2', 'N2', 'b', 'ok'),
+        row('t2', '3', 'N3', 'c', 'ok'),
+        row('t2', '4', 'N4', 'd', 'ok'),
+        row('t2', '5', 'N5', 'e', 'ok'),
+        row('t2', '6', 'N6', 'f', 'ok'),
+        row('t2', '7', 'N7', 'g', 'ok'),
+        row('t2', '8', 'N8', 'h', 'ok'),
+      ];
+      const { markdown } = mineSequences(rows, { ...profile, minSteps: 1 });
+      assert.ok(markdown.includes('## A → B → C'));
+      assert.ok(markdown.includes('## N1 → N2 → N3 → N4 → N5 → N6 → …'));
+    });
+
+    it('includeSequenceNumbers: true keeps the "Sequence N —"/"Graph N —" ordinal prefix', () => {
+      const rows = [
+        row('t1', '1', 'A', 'x', 'ok'),
+        row('t1', '2', 'B', 'y', 'ok'),
+      ];
+      const numbered = mineSequences(rows, { ...profile, includeSequenceNumbers: true });
+      assert.ok(numbered.markdown.includes('## Sequence 1 — A → B'));
+
+      const graph = mineSequences(rows, { ...profile, outputFormat: 'graph', includeSequenceNumbers: true });
+      assert.ok(graph.markdown.includes('## Graph 1 — 2 nodes, 1 edge'));
+
+      // Default stays unnumbered.
+      const plain = mineSequences(rows, profile);
+      assert.ok(!plain.markdown.includes('## Sequence'));
     });
   });
 });

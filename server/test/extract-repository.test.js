@@ -1,0 +1,241 @@
+/**
+ * Tests for the extract-repository pipeline stage and daemon routing.
+ * The gitdiagram-serve HTTP client is stubbed via a local HTTP server.
+ */
+
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+
+// Point the client at a stub server before importing modules that read config.
+let stubServer;
+let stubPort;
+let lastRequest = null;
+let stubResponse = {
+  ok: true,
+  repo: { path: '/repos/demo', head: 'abc123', branch: 'main' },
+  explanation: { text: 'A demo repo.' },
+  graphStats: { nodes: 1, edges: 0 },
+  mermaid: 'graph TD\n  n_a["A"]',
+  usage: { promptTokens: 10, completionTokens: 20 },
+};
+
+before(async () => {
+  stubServer = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      if (req.url === '/health' || req.url === '/healthz') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+      lastRequest = { url: req.url, method: req.method, body: JSON.parse(body || '{}') };
+      if (lastRequest.body.repo === '/fail') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'not a git repo' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(stubResponse));
+    });
+  });
+  await new Promise((resolve) => stubServer.listen(0, '127.0.0.1', resolve));
+  stubPort = stubServer.address().port;
+  process.env.GITDIAGRAM_SERVICE_URL = `http://127.0.0.1:${stubPort}`;
+});
+
+after(() => stubServer?.close());
+
+test('analyzeRepository posts repo URI and returns parsed result', async () => {
+  const { analyzeRepository } = await import('../src/services/gitdiagram/client.js');
+  const result = await analyzeRepository('https://github.com/example/demo', { maxSourceFiles: 5 });
+  assert.equal(lastRequest.url, '/v1/analyze');
+  assert.deepEqual(lastRequest.body, { repo: 'https://github.com/example/demo', options: { maxSourceFiles: 5 } });
+  assert.equal(result.mermaid, stubResponse.mermaid);
+  assert.equal(result.explanation, 'A demo repo.');
+  assert.equal(result.repo.head, 'abc123');
+});
+
+test('analyzeRepository surfaces service errors', async () => {
+  const { analyzeRepository } = await import('../src/services/gitdiagram/client.js');
+  await assert.rejects(() => analyzeRepository('/fail'), /not a git repo/);
+});
+
+test('extract-repository stage emits document-md as markdown with fenced mermaid only', async () => {
+  const stage = await import('../src/pipeline/stages/extract-repository.js');
+  const out = await stage.execute(
+    {},
+    { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
+    { doc_id: 1, source_path: 'https://github.com/example/demo', doc_processing_options: { repo_uri: 'https://github.com/example/demo' } },
+    {},
+    {},
+  );
+  assert.equal(out.stageResult.success, true);
+  const md = out.stageOutput.find((o) => o.name === 'document-md');
+  // Plain markdown, not a JSON envelope
+  assert.match(md.data, /A demo repo\./);
+  assert.doesNotMatch(md.data.trim(), /^\{/);
+  // Mermaid in a fenced mermaid block
+  assert.match(md.data, /```mermaid\n[\s\S]*graph TD[\s\S]*```/);
+  // No structured graph block — explanation + mermaid only
+  assert.doesNotMatch(md.data, /```json/);
+  assert.ok(!out.stageOutput.find((o) => o.name === 'document-envelope'), 'no separate envelope artifact');
+  assert.equal(out.stageMetrics.nodes, 1);
+  assert.equal(out.stageMetrics.edges, 0);
+  const images = out.stageOutput.find((o) => o.name === 'document-images');
+  assert.deepEqual(images.data, []);
+});
+
+test('extract-repository stage fails cleanly without repo_uri', async () => {
+  const stage = await import('../src/pipeline/stages/extract-repository.js');
+  const out = await stage.execute(
+    {},
+    { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
+    { doc_id: 2, source_path: 'UPLOADING', doc_processing_options: {} },
+    {},
+    {},
+  );
+  assert.equal(out.stageResult.success, false);
+  assert.match(out.stageResult.error, /repo_uri/);
+});
+
+test('daemon routes repository docs to the extract-repository pipeline definition', async () => {
+  const { getExtractRepositoryPipelineDefinition, getExtractTracePipelineDefinition, getExtractPipelineDefinition } = await import('../src/daemons/extract/pipeline-runner.js');
+
+  const repoDef = getExtractRepositoryPipelineDefinition({});
+  assert.equal(repoDef.name, 'extract-repository');
+  assert.equal(repoDef.stages[0].stage, 'extract-repository');
+  assert.ok(repoDef.stages[0].config.gitdiagram, 'stage config carries gitdiagram service config');
+
+  // Sanity: the other two types still route to their own pipelines
+  assert.equal(getExtractTracePipelineDefinition({}).name, 'extract-trace');
+  assert.equal(getExtractPipelineDefinition({}).name, 'extract-basic');
+});
+
+test('schema migration widens doc_source_type CHECK to include repository', async () => {
+  const { ensureSchema } = await import('../src/db/ensure-schema.js');
+  const Database = (await import('better-sqlite3')).default;
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
+  const tmp = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'gds-schema-')), 't.db');
+  const db = new Database(tmp);
+  ensureSchema(db);
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='documents'").pluck().get();
+  assert.match(sql, /'repository'/);
+  // Insert a repository doc to prove the CHECK accepts it
+  db.prepare("INSERT INTO documents (doc_ext_id, doc_status, doc_source_type) VALUES ('r1', 'uploaded', 'repository')").run();
+  const row = db.prepare("SELECT doc_source_type FROM documents WHERE doc_ext_id = 'r1'").get();
+  assert.equal(row.doc_source_type, 'repository');
+  db.close();
+});
+
+test('schema seeds system source tags with generated_by=system', async () => {
+  const { ensureSchema } = await import('../src/db/ensure-schema.js');
+  const { clearCache } = await import('../src/cache.js');
+  clearCache();
+  const Database = (await import('better-sqlite3')).default;
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
+  const tmp = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sys-tags-')), 't.db');
+  const db = new Database(tmp);
+  ensureSchema(db);
+  const tagsSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'").pluck().get();
+  assert.match(tagsSql, /'system'/, 'tags CHECK allows system');
+  const names = db.prepare("SELECT tag_name, tag_generated_by FROM tags ORDER BY tag_name").all()
+    .filter((r) => r.tag_name.startsWith('ARCHITXT-'));
+  assert.deepEqual(names, [
+    { tag_name: 'ARCHITXT-DOC', tag_generated_by: 'system' },
+    { tag_name: 'ARCHITXT-REPO', tag_generated_by: 'system' },
+    { tag_name: 'ARCHITXT-TRACE', tag_generated_by: 'system' },
+  ]);
+  db.close();
+});
+
+test('applySystemSourceTag stamps the matching system tag (idempotent)', async () => {
+  const { ensureSchema } = await import('../src/db/ensure-schema.js');
+  const { applySystemSourceTag, systemTagNameForSourceType } = await import('../src/utils/system-tags.js');
+  const { clearCache } = await import('../src/cache.js');
+  clearCache();
+  const Database = (await import('better-sqlite3')).default;
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
+  const tmp = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sys-tag-')), 't.db');
+  const db = new Database(tmp);
+  ensureSchema(db);
+  db.prepare("INSERT INTO documents (doc_ext_id, doc_status, doc_source_type, doc_source_path) VALUES ('d1', 'uploaded', 'trace', '/x')").run();
+  const docId = db.prepare("SELECT doc_id FROM documents WHERE doc_ext_id = 'd1'").get().doc_id;
+  assert.equal(systemTagNameForSourceType('trace'), 'ARCHITXT-TRACE');
+  assert.equal(systemTagNameForSourceType('bogus'), null);
+  const tagId = await applySystemSourceTag(db, docId, 'trace');
+  assert.ok(tagId);
+  await applySystemSourceTag(db, docId, 'trace'); // second call must not duplicate
+  const rows = db.prepare("SELECT t.tag_name FROM document_tags dt JOIN tags t ON t.tag_id = dt.tag_id WHERE dt.doc_id = ?").all(docId);
+  assert.deepEqual(rows, [{ tag_name: 'ARCHITXT-TRACE' }]);
+  db.close();
+});
+
+test('extract-repository stage sends per-document gitdiagram overrides, omitting blanks', async () => {
+  const stage = await import('../src/pipeline/stages/extract-repository.js');
+  const out = await stage.execute(
+    {},
+    { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
+    {
+      doc_id: 3,
+      source_path: 'https://github.com/example/demo',
+      doc_processing_options: {
+        repo_uri: 'https://github.com/example/demo',
+        gitdiagram: { maxSourceFiles: 60, maxSourceChars: 120000, maxSourceFileBytes: 262144, maxFactFiles: null, maxFactHeadBytes: 8192, model: 'gpt-oss' },
+      },
+    },
+    {},
+    {},
+  );
+  assert.equal(out.stageResult.success, true);
+  // null (blank) fields are omitted so service env defaults apply; set fields pass through
+  // (model is no longer a per-document override — the service model is used)
+  assert.deepEqual(lastRequest.body.options, {
+    maxSourceFiles: 60,
+    maxSourceChars: 120000,
+    maxSourceFileBytes: 262144,
+    maxFactHeadBytes: 8192,
+  });
+});
+
+test('extract-repository stage sends no options when per-document block is empty', async () => {
+  const stage = await import('../src/pipeline/stages/extract-repository.js');
+  const out = await stage.execute(
+    {},
+    { gitdiagram: { serviceUrl: `http://127.0.0.1:${stubPort}` } },
+    {
+      doc_id: 4,
+      source_path: 'https://github.com/example/demo',
+      doc_processing_options: { repo_uri: 'https://github.com/example/demo', gitdiagram: { maxSourceFiles: null, model: '' } },
+    },
+    {},
+    {},
+  );
+  assert.equal(out.stageResult.success, true);
+  assert.deepEqual(lastRequest.body.options, {});
+});
+
+test('buildMarkdown renders explanation + mermaid only (no json fence)', async () => {
+  const { buildMarkdown } = await import('../src/pipeline/stages/extract-repository.js');
+  const result = {
+    repo: { path: '/repos/architxt-abc', remoteUri: 'https://example/repo.git', head: 'a'.repeat(40), commitDate: '2026-11-21T08:00:00+00:00' },
+    explanation: 'The API server routes documents.',
+    graphStats: { nodes: 2, edges: 1 },
+    mermaid: 'graph TD\n  api-->ext',
+  };
+  const md = buildMarkdown(result);
+  // Provenance line names repo + full commit SHA + commit date
+  assert.match(md, /^> https:\/\/example\/repo\.git · @ [0-9a-f]{40} · \d{4}-/m);
+  assert.match(md, /The API server routes documents\./);
+  assert.match(md, /```mermaid\n[\s\S]*api-->ext[\s\S]*```/);
+  assert.doesNotMatch(md, /```json/);
+  // Explanation object form also works
+  assert.match(buildMarkdown({ ...result, explanation: { text: 'Obj form.' } }), /Obj form\./);
+});

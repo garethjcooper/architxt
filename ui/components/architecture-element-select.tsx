@@ -1,7 +1,7 @@
 'use client';
 
-import { C4_ELEMENTS, ARCHIMATE_ELEMENTS } from '@/lib/types';
-import type { C4Element, ArchiMateElement } from '@/lib/types';
+import { C4_ELEMENTS, ARCHIMATE_ELEMENTS, LIKEC4_SHAPES } from '@/lib/types';
+import type { C4Element, ArchiMateElement, LikeC4Shape } from '@/lib/types';
 
 interface C4ElementSelectProps {
   value: C4Element | null;
@@ -75,9 +75,9 @@ export function ArchiMateElementSelect({
 
 /** Convenience prop-driven wrapper used where the caller doesn't need strict kinds. */
 interface ArchitectureElementSelectProps {
-  kind: 'c4' | 'archimate';
-  value: C4Element | ArchiMateElement | null;
-  onChange: (value: C4Element | ArchiMateElement | null) => void;
+  kind: 'c4' | 'archimate' | 'likec4';
+  value: C4Element | ArchiMateElement | LikeC4Shape | null;
+  onChange: (value: C4Element | ArchiMateElement | LikeC4Shape | null) => void;
   placeholder?: string;
   disabled?: boolean;
   compact?: boolean;
@@ -95,6 +95,17 @@ export function ArchitectureElementSelect(props: ArchitectureElementSelectProps)
       />
     );
   }
+  if (props.kind === 'likec4') {
+    return (
+      <LikeC4ShapeSelect
+        value={props.value as LikeC4Shape | null}
+        onChange={props.onChange as (v: LikeC4Shape | null) => void}
+        placeholder={props.placeholder}
+        disabled={props.disabled}
+        compact={props.compact}
+      />
+    );
+  }
   return (
     <ArchiMateElementSelect
       value={props.value as ArchiMateElement | null}
@@ -103,5 +114,40 @@ export function ArchitectureElementSelect(props: ArchitectureElementSelectProps)
       disabled={props.disabled}
       compact={props.compact}
     />
+  );
+}
+
+interface LikeC4ShapeSelectProps {
+  value: LikeC4Shape | null;
+  onChange: (value: LikeC4Shape | null) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  compact?: boolean;
+}
+
+export function LikeC4ShapeSelect({
+  value,
+  onChange,
+  placeholder = 'None (rectangle)',
+  disabled,
+  compact,
+}: LikeC4ShapeSelectProps) {
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange((e.target.value as LikeC4Shape) || null)}
+      disabled={disabled}
+      className={`
+        w-full rounded-lg border border-border-strong bg-surface-card text-foreground-default
+        focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle
+        disabled:opacity-50 disabled:pointer-events-none
+        ${compact ? 'h-6 text-xs px-1.5 py-0' : 'h-8 text-sm px-2.5 py-1'}
+      `}
+    >
+      <option value="">{placeholder}</option>
+      {LIKEC4_SHAPES.map((opt) => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
   );
 }

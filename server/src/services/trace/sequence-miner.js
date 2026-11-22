@@ -10,7 +10,6 @@
 
 const DEFAULT_SEPARATOR = '$';
 const DEFAULT_MISSING_VALUE = '-';
-const MAX_TRANSITIONS = 50;
 
 /**
  * @typedef {object} SequenceProfile
@@ -24,12 +23,12 @@ const MAX_TRANSITIONS = 50;
  * @property {boolean} [excludeMissingTokens] - exclude rows where the entity or direction value is missing (default true)
  * @property {string} entityColumn - single field treated as the entity (who/what acts); required, always the first column of the output table
  * @property {string} directionColumn - single field treated as the direction; required, always the second column of the output table
- * @property {boolean} [includeTransitions] - one-level-deep adjacent-signature transitions across traces
  * @property {number} [maxInputRows] - cap on input rows; excess down-sampled deterministically (0 = unlimited)
  * @property {number} [maxSignatures] - cap on distinct signatures; the rest fold into one overflow section (0 = unlimited, default 1000)
  * @property {number} [maxRowsPerGroup] - cap on rows retained per correlation group after ordering (0 = unlimited)
  * @property {number} [minSteps] - drop sequences with fewer steps than this (default 2; 1 keeps all)
  * @property {string} [missingValue] - placeholder rendered for missing token/entity/direction/correlation values (default "-")
+ * @property {string} [outputFormat] - 'steps' (default) renders per-sequence step tables; 'graph' renders per-sequence edge tables (From/To/Type/Label/Support/Tokens) built from consecutive step pairs
  */
 
 /**
@@ -93,12 +92,13 @@ export function mineSequences(rows, profile, options = {}) {
     excludeMissingTokens,
     entityColumn,
     directionColumn,
-    includeTransitions,
     maxInputRows,
     maxSignatures,
     maxRowsPerGroup,
     minSteps,
     missingValue,
+    outputFormat,
+    includeSequenceNumbers,
   } = validated;
 
   const filename = options.filename || 'trace-source';
@@ -174,7 +174,9 @@ export function mineSequences(rows, profile, options = {}) {
   }
 
   const signatures = new Map(); // signature -> { frequency, exampleKeys, steps }
-  const groupOrder = []; // [{ signature, firstOrderValues }] in insertion order
+  // Graph mode: raw ordered steps per correlation group, before any signature
+  // merging — the graph is built from the seen flows, not from signatures.
+  const flowGroups = []; // [{ keyValues, steps }]
 
   for (const group of groups.values()) {
     group.rows.sort((a, b) => compareOrderValues(a.orderValues, b.orderValues));
@@ -205,6 +207,14 @@ export function mineSequences(rows, profile, options = {}) {
       };
     });
 
+    if (outputFormat === 'graph') {
+      // minSteps still applies: groups with fewer steps carry no flow.
+      if (steps.length >= minSteps) {
+        flowGroups.push({ keyValues: group.keyValues, steps });
+      }
+      continue;
+    }
+
     const signature = steps.map((s) => s.signatureToken).join(separator);
 
     if (!signatures.has(signature)) {
@@ -221,23 +231,6 @@ export function mineSequences(rows, profile, options = {}) {
     if (entry.exampleKeys.length < maxExampleKeys) {
       entry.exampleKeys.push(group.keyValues.join(separator));
     }
-    groupOrder.push({ signature, firstOrderValues: group.rows[0]?.orderValues ?? [] });
-  }
-
-  // One level deep: order correlation groups by their first step, then count
-  // adjacent signature pairs. Only consecutive pairs are counted.
-  const transitions = [];
-  if (includeTransitions && groupOrder.length > 1) {
-    const ordered = [...groupOrder].sort((a, b) => compareOrderValues(a.firstOrderValues, b.firstOrderValues));
-    const counts = new Map(); // "from\x00to" -> { from, to, count }
-    for (let i = 0; i < ordered.length - 1; i++) {
-      const from = ordered[i].signature;
-      const to = ordered[i + 1].signature;
-      const key = `${from}\x00${to}`;
-      if (!counts.has(key)) counts.set(key, { from, to, count: 0 });
-      counts.get(key).count += 1;
-    }
-    transitions.push(...Array.from(counts.values()).sort((a, b) => b.count - a.count || a.from.localeCompare(b.from) || a.to.localeCompare(b.to)).slice(0, MAX_TRANSITIONS));
   }
 
   const sections = Array.from(signatures.values())
@@ -284,6 +277,51 @@ export function mineSequences(rows, profile, options = {}) {
     sections[i].index = i + 1;
   }
 
+  if (outputFormat === 'graph') {
+    // Graph mode works from the raw ordered rows: every consecutive step pair
+    // in every correlation group is one observed flow edge; edges are deduped
+    // and split into connected components — one table per component, so no
+    // row overlaps between tables (graphs, plural).
+    const components = buildGraphComponents(flowGroups);
+    const graphCount = components.length;
+    const edgeCount = components.reduce((sum, c) => sum + c.edges.length, 0);
+    const markdown = renderMarkdown({
+      filename,
+      inputFormat,
+      orderColumns,
+      correlationColumns,
+      tokenColumns,
+      entityColumn,
+      directionColumn,
+      outputFormat,
+      includeSequenceNumbers,
+      components,
+      eligibleRows,
+      ineligibleRows,
+      truncated,
+      truncatedRows,
+      overflowSignatures,
+      cappedGroups,
+      minSteps,
+    });
+    return {
+      markdown,
+      stats: {
+        inputRows: rows.length,
+        eligibleRows,
+        ineligibleRows,
+        sequenceCount: graphCount,
+        correlationKeyCount: groups.size,
+        truncated,
+        truncatedRows,
+        overflowSignatures,
+        cappedGroups,
+        minSteps,
+        ...(outputFormat === 'graph' ? { graphCount, edgeCount } : {}),
+      },
+    };
+  }
+
   const markdown = renderMarkdown({
     filename,
     inputFormat,
@@ -294,8 +332,8 @@ export function mineSequences(rows, profile, options = {}) {
     includeTokenComponents,
     entityColumn,
     directionColumn,
-    includeTransitions,
-    transitions,
+    outputFormat,
+    includeSequenceNumbers,
     sections,
     eligibleRows,
     ineligibleRows,
@@ -347,7 +385,6 @@ function validateProfile(profile) {
   // Default ON: rows whose entity/direction are missing are excluded — those
   // are the mandatory what/action context of the sequence.
   const excludeMissingTokens = profile.excludeMissingTokens !== false;
-  const includeTransitions = profile.includeTransitions === true;
   // Mandatory: entity/direction are the what/action of a sequence — without
   // them the mined output loses its contextual sense.
   const entityColumn = normalizeRequiredColumn(profile.entityColumn, 'entityColumn');
@@ -369,6 +406,10 @@ function validateProfile(profile) {
   const missingValue = typeof profile.missingValue === 'string' && profile.missingValue.length > 0
     ? profile.missingValue
     : DEFAULT_MISSING_VALUE;
+  const outputFormat = normalizeOutputFormat(profile.outputFormat);
+  // Default OFF: the ordinal is report position, not signal strength, so
+  // headings carry only the descriptive name unless explicitly requested.
+  const includeSequenceNumbers = profile.includeSequenceNumbers === true;
 
   return {
     orderColumns,
@@ -379,7 +420,6 @@ function validateProfile(profile) {
     maxExampleKeys,
     sortOrder,
     excludeMissingTokens,
-    includeTransitions,
     entityColumn,
     directionColumn,
     maxInputRows,
@@ -387,7 +427,15 @@ function validateProfile(profile) {
     maxRowsPerGroup,
     minSteps,
     missingValue,
+    outputFormat,
+    includeSequenceNumbers,
   };
+}
+
+function normalizeOutputFormat(value) {
+  if (!value) return 'steps';
+  if (value === 'steps' || value === 'graph') return value;
+  throw new Error('outputFormat must be one of: steps, graph');
 }
 
 function normalizeCap(value, defaultValue, name) {
@@ -490,8 +538,9 @@ function renderMarkdown({
   includeTokenComponents,
   entityColumn,
   directionColumn,
-  includeTransitions,
-  transitions,
+  outputFormat,
+  includeSequenceNumbers,
+  components,
   sections,
   eligibleRows,
   ineligibleRows,
@@ -518,6 +567,30 @@ function renderMarkdown({
   if (minSteps > 1) lines.push(`**Min steps**: ${minSteps} — shorter sequences omitted`);
   lines.push('');
 
+  if (outputFormat === 'graph' && components) {
+    // Graph mode: one table per connected component of the merged edge set.
+    for (const component of components) {
+      if (lines.length > 8) {
+        lines.push('---');
+        lines.push('');
+      }
+      const nodeList = [...component.nodes].sort((a, b) => a.localeCompare(b));
+      lines.push(`## ${includeSequenceNumbers ? `Graph ${component.index} — ` : ''}${nodeList.length} nodes, ${component.edges.length} edge${component.edges.length !== 1 ? 's' : ''}`);
+      lines.push('');
+      lines.push('Nodes:');
+      lines.push('');
+      lines.push('| Node |');
+      lines.push('|---|');
+      for (const n of nodeList) {
+        lines.push(`| ${n.replace(/\|/g, '\\|')} |`);
+      }
+      lines.push('');
+      lines.push('Edges:');
+      lines.push('');
+      renderGraphTable(lines, component.edges, tokenColumns);
+      lines.push('');
+    }
+  } else {
   for (const section of sections) {
     if (lines.length > 8) {
       lines.push('---');
@@ -525,7 +598,7 @@ function renderMarkdown({
     }
 
     if (section.overflow) {
-      lines.push(`## Sequence ${section.index} — \`${section.signature}\``);
+      lines.push(`## ${includeSequenceNumbers ? `Sequence ${section.index} — ` : ''}\`${section.signature}\``);
       lines.push('');
       lines.push(`- **Frequency**: ${section.frequency} trace${section.frequency !== 1 ? 's' : ''} (combined)`);
       lines.push('');
@@ -533,48 +606,17 @@ function renderMarkdown({
     }
 
     const displaySignature = section.steps.map((s) => s.displayToken).join(` ${separator} `);
-    lines.push(`## Sequence ${section.index} — \`${displaySignature}\``);
+    lines.push(`## ${includeSequenceNumbers ? `Sequence ${section.index} — ` : ''}${describeSequence(section)}`);
     lines.push('');
+    lines.push(`- **Signature**: \`${displaySignature}\``);
     lines.push(`- **Frequency**: ${section.frequency} trace${section.frequency !== 1 ? 's' : ''}`);
     lines.push(`- **Example trace keys**: ${section.exampleKeys.map((k) => `\`${k}\``).join(', ')}`);
     lines.push('');
 
-    // Entity and Direction are standard fields: they always lead the table,
-    // ahead of the token and the (optional) token components.
-    const headerCols = ['Step', 'Entity', 'Direction', 'Token'];
-    if (includeTokenComponents) {
-      headerCols.push(...tokenColumns.map((col) => capitalizeHeader(col)));
-    }
-    lines.push(`| ${headerCols.join(' | ')} |`);
-    lines.push(`|${headerCols.map(() => '---').join('|')}|`);
-
-    for (let i = 0; i < section.steps.length; i++) {
-      const step = section.steps[i];
-      const rowCols = [String(i + 1), step.entity, step.direction, `\`${step.displayToken}\``];
-      if (includeTokenComponents) {
-        rowCols.push(...tokenColumns.map((col) => step.components[col]));
-      }
-      lines.push(`| ${rowCols.join(' | ')} |`);
-    }
+    renderStepTable(lines, section, tokenColumns, includeTokenComponents);
 
     lines.push('');
   }
-
-  if (includeTransitions) {
-    lines.push('---');
-    lines.push('');
-    lines.push('## Sequence transitions (adjacent traces, one level deep)');
-    lines.push('');
-    if (transitions.length === 0) {
-      lines.push('No transitions — fewer than two correlation groups.');
-    } else {
-      lines.push('| From sequence | To sequence | Traces |');
-      lines.push('|---|---|---|');
-      for (const t of transitions) {
-        lines.push(`| \`${t.from}\` | \`${t.to}\` | ${t.count} |`);
-      }
-    }
-    lines.push('');
   }
 
   return lines.join('\n');
@@ -585,4 +627,135 @@ function capitalizeHeader(column) {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (c) => c.toUpperCase())
     .trim();
+}
+
+/**
+ * Derive a short human-readable name for a sequence from its entity flow:
+ * consecutive distinct entities joined with "→" (repeats collapsed, so a
+ * self-loop A→A→B reads "A → B"). Capped at 6 hops; longer flows end with "…".
+ * Deterministic — same steps, same name.
+ */
+function describeSequence(section) {
+  const MAX_HOPS = 6;
+  const entities = [];
+  for (const step of section.steps) {
+    if (entities[entities.length - 1] !== step.entity) entities.push(step.entity);
+  }
+  const shown = entities.slice(0, MAX_HOPS);
+  const suffix = entities.length > MAX_HOPS ? ' → …' : '';
+  return `${shown.join(' → ')}${suffix}`;
+}
+
+/**
+ * Step-table renderer (default "Sequence Steps" output). Entity and Direction
+ * are standard fields: they always lead the table, ahead of the token and the
+ * (optional) token components.
+ */
+function renderStepTable(lines, section, tokenColumns, includeTokenComponents) {
+  const headerCols = ['Step', 'Entity', 'Direction', 'Token'];
+  if (includeTokenComponents) {
+    headerCols.push(...tokenColumns.map((col) => capitalizeHeader(col)));
+  }
+  lines.push(`| ${headerCols.join(' | ')} |`);
+  lines.push(`|${headerCols.map(() => '---').join('|')}|`);
+
+  for (let i = 0; i < section.steps.length; i++) {
+    const step = section.steps[i];
+    const rowCols = [String(i + 1), step.entity, step.direction, `\`${step.displayToken}\``];
+    if (includeTokenComponents) {
+      rowCols.push(...tokenColumns.map((col) => step.components[col]));
+    }
+    lines.push(`| ${rowCols.join(' | ')} |`);
+  }
+}
+
+/**
+ * Build the connected components of the observed flow graph from raw ordered
+ * rows. Every consecutive step pair in every correlation group is one observed
+ * flow; distinct edges (from|to|type|label) are deduped with support = the
+ * number of times the pair was seen. Components are sets of edges linked
+ * through shared entity nodes, so no edge row appears in more than one
+ * component table.
+ *
+ * @param {Array<{ keyValues: string[], steps: TokenStep[] }>} flowGroups
+ * @returns {Array<{ index: number, nodes: Set<string>, edges: Array<{from,to,type,label,support,components}> }>}
+ */
+function buildGraphComponents(flowGroups) {
+  const edgeMap = new Map(); // key -> { from, to, type, label, support, components }
+  for (const group of flowGroups) {
+    for (let i = 0; i + 1 < group.steps.length; i++) {
+      const from = group.steps[i];
+      const to = group.steps[i + 1];
+      const edgeKey = `${from.entity}\x00${to.entity}\x00${from.direction}\x00${from.displayToken}`;
+      if (!edgeMap.has(edgeKey)) {
+        edgeMap.set(edgeKey, { from: from.entity, to: to.entity, type: from.direction, label: from.displayToken, support: 0, components: from.components });
+      }
+      edgeMap.get(edgeKey).support += 1;
+    }
+  }
+
+  const edges = Array.from(edgeMap.values());
+
+  // Union-find over entity nodes.
+  const parent = new Map();
+  const find = (node) => {
+    if (!parent.has(node)) parent.set(node, node);
+    let root = parent.get(node);
+    while (root !== parent.get(root)) root = parent.get(root);
+    // path compression
+    let cur = node;
+    while (parent.get(cur) !== root) {
+      const next = parent.get(cur);
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const union = (a, b) => { parent.set(find(a), find(b)); };
+  for (const e of edges) union(e.from, e.to);
+
+  const byRoot = new Map();
+  for (const e of edges) {
+    const root = find(e.from);
+    if (!byRoot.has(root)) byRoot.set(root, { nodes: new Set(), edges: [] });
+    byRoot.get(root).nodes.add(e.from).add(e.to);
+    byRoot.get(root).edges.push(e);
+  }
+
+  const components = Array.from(byRoot.values()).map((c) => ({
+    nodes: c.nodes,
+    edges: c.edges.sort((a, b) =>
+      a.from.localeCompare(b.from) || a.to.localeCompare(b.to) || a.type.localeCompare(b.type) || a.label.localeCompare(b.label)),
+  }));
+  // Deterministic order: largest component first, then by smallest node id.
+  const minNode = (c) => Array.from(c.nodes).sort((a, b) => a.localeCompare(b))[0];
+  components.sort((a, b) =>
+    b.edges.length - a.edges.length ||
+    minNode(a).localeCompare(minNode(b)));
+  components.forEach((c, i) => { c.index = i + 1; });
+  return components;
+}
+
+/**
+ * Graph-table renderer ("Sequence Graph" output). Renders one edges table in
+ * the layout of the standard edge-context tables: From | To | Type | Label |
+ * Support, plus one column per token field (like the steps tables), showing
+ * the leaving step's token components. One table is rendered per connected
+ * component, so the report is a set of disconnected small graphs, never one
+ * connected graph.
+ */
+function renderGraphTable(lines, edges, tokenColumns) {
+  // Pipes inside a table cell break GFM table parsing even inside code spans,
+  // so escape them in every cell value.
+  const cell = (value) => String(value).replace(/\|/g, '\\|');
+
+  const headerCols = ['From', 'To', 'Type', 'Label', 'Support', ...tokenColumns.map((col) => capitalizeHeader(col))];
+  lines.push(`| ${headerCols.join(' | ')} |`);
+  lines.push(`|${headerCols.map(() => '---').join('|')}|`);
+
+  for (const e of edges) {
+    const rowCols = [cell(e.from), cell(e.to), cell(e.type), `\`${cell(e.label)}\``, String(e.support)];
+    rowCols.push(...tokenColumns.map((col) => cell(e.components[col] ?? '')));
+    lines.push(`| ${rowCols.join(' | ')} |`);
+  }
 }

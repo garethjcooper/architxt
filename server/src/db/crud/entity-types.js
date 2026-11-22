@@ -102,8 +102,6 @@ export const ARCHIMATE_ELEMENTS = Object.freeze([
   'DataObject',
 ]);
 
-const ARCHIMATE_ELEMENT_SET = new Set(ARCHIMATE_ELEMENTS);
-
 /**
  * Validate a C4 element value, if provided.
  * @param {unknown} value
@@ -134,20 +132,60 @@ export function normalizeArchiMateElement(value) {
   return trimmed;
 }
 
+const ARCHIMATE_ELEMENT_SET = new Set(ARCHIMATE_ELEMENTS);
+
+/**
+ * Valid LikeC4 shapes that can be assigned to an entity type for the LikeC4
+ * export. Unset (null) means the kind renders as the default rectangle.
+ * @see https://likec4.dev/dsl/styling/
+ */
+export const LIKEC4_SHAPES = Object.freeze([
+  'rectangle',
+  'component',
+  'storage',
+  'cylinder',
+  'browser',
+  'mobile',
+  'person',
+  'queue',
+  'bucket',
+  'document',
+  'agent',
+]);
+
+const LIKEC4_SHAPE_SET = new Set(LIKEC4_SHAPES);
+
+/**
+ * Validate a LikeC4 shape value, if provided.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeLikeC4Shape(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (!LIKEC4_SHAPE_SET.has(trimmed)) {
+    throw new Error(`likec4_shape must be one of: ${LIKEC4_SHAPES.join(', ')}`);
+  }
+  return trimmed;
+}
+
 export const entityTypeArchitecture = {
   C4_ELEMENTS,
   ARCHIMATE_ELEMENTS,
+  LIKEC4_SHAPES,
   normalizeC4Element,
   normalizeArchiMateElement,
+  normalizeLikeC4Shape,
 };
 
 /**
  * Create entity type
  * @param {Object} db
- * @param {Object} data — { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator, c4_element, archimate_element }
+ * @param {Object} data — { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator, c4_element, archimate_element, likec4_shape }
  */
 export const createEntityType = (db, data) => dbExec(() => {
-  const { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator, c4_element, archimate_element } = data;
+  const { type_name, description, id_label, name_label, case_match, word_boundary_match, uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator, c4_element, archimate_element, likec4_shape } = data;
   if (!type_name) throw new Error('Internal: type_name is required');
 
   const usesPattern = normalizeUsesPattern(uses_entity_id_pattern ?? false);
@@ -163,8 +201,8 @@ export const createEntityType = (db, data) => dbExec(() => {
     et_type_name, et_description, et_id_label, et_name_label,
     et_case_match, et_word_boundary_match,
     et_uses_entity_id_pattern, et_id_format_prefix, et_min_id_digits, et_id_separator,
-    et_c4_element, et_archimate_element
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    et_c4_element, et_archimate_element, et_likec4_shape
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const result = stmt(db, sql).run(
     type_name,
@@ -178,7 +216,8 @@ export const createEntityType = (db, data) => dbExec(() => {
     digits,
     separator,
     normalizeC4Element(c4_element),
-    normalizeArchiMateElement(archimate_element)
+    normalizeArchiMateElement(archimate_element),
+    normalizeLikeC4Shape(likec4_shape)
   );
   return result.lastInsertRowid;
 }, 'entity_types.create');
@@ -194,7 +233,7 @@ export const updateEntityType = (db, id, data) => dbExec(() => {
     type_name, description, id_label, name_label,
     case_match, word_boundary_match,
     uses_entity_id_pattern, id_format_prefix, min_id_digits, id_separator,
-    c4_element, archimate_element
+    c4_element, archimate_element, likec4_shape
   } = data;
 
   const updates = ['et_updated_at = CURRENT_TIMESTAMP'];
@@ -253,6 +292,11 @@ export const updateEntityType = (db, id, data) => dbExec(() => {
   if (archimate_element !== undefined) {
     updates.push('et_archimate_element = ?');
     params.push(normalizeArchiMateElement(archimate_element));
+  }
+
+  if (likec4_shape !== undefined) {
+    updates.push('et_likec4_shape = ?');
+    params.push(normalizeLikeC4Shape(likec4_shape));
   }
 
   if (updates.length > 1) {

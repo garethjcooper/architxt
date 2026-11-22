@@ -107,8 +107,16 @@ export function ViewDocumentDialog({
 
   // Trace profile state (trace documents only)
   const [traceProfileName, setTraceProfileName] = useState<string | null>(null);
+  // gitdiagram-serve sampling overrides (repository documents only); '' = blank = service default
+  const [gdsOverrides, setGdsOverrides] = useState<Record<string, string>>({
+    maxSourceFiles: '', maxSourceChars: '', maxSourceFileBytes: '', maxFactFiles: '', maxFactHeadBytes: '',
+  });
   const [traceProfiles, setTraceProfiles] = useState<TraceProfile[]>([]);
   const isTraceDoc = document?.source_type === 'trace';
+  const isRepositoryDoc = document?.source_type === 'repository';
+  // Trace & repository docs run a fixed single-stage pipeline — the extra
+  // stage toggles (denoise/denoise-llm/vision) don't apply to them.
+  const isFixedPipelineDoc = isTraceDoc || isRepositoryDoc;
 
   // Global stage availability from server config
   const [globalStages, setGlobalStages] = useState({
@@ -198,6 +206,14 @@ export function ViewDocumentDialog({
     setDenoiseLlmEnabled(globalStages['denoise-llm'] && stages['denoise-llm'] !== false);
     setVisionEnabled(globalStages.vision && stages.vision !== false);
     setTraceProfileName(opts.trace_profile ?? null);
+    const g = opts.gitdiagram || {};
+    setGdsOverrides({
+      maxSourceFiles: g.maxSourceFiles != null ? String(g.maxSourceFiles) : '',
+      maxSourceChars: g.maxSourceChars != null ? String(g.maxSourceChars) : '',
+      maxSourceFileBytes: g.maxSourceFileBytes != null ? String(g.maxSourceFileBytes) : '',
+      maxFactFiles: g.maxFactFiles != null ? String(g.maxFactFiles) : '',
+      maxFactHeadBytes: g.maxFactHeadBytes != null ? String(g.maxFactHeadBytes) : '',
+    });
   }, [document, open, globalStages]);
 
   // Load trace profiles for the trace-profile picker (trace documents only)
@@ -280,15 +296,29 @@ export function ViewDocumentDialog({
 
   if (!document) return null;
 
+  // True when any gitdiagram override field differs from the stored value (blank = unset)
+  const gdsOverridesChanged = () => {
+    const g = document.processing_options?.gitdiagram || {};
+    const stored: Record<string, string> = {
+      maxSourceFiles: g.maxSourceFiles != null ? String(g.maxSourceFiles) : '',
+      maxSourceChars: g.maxSourceChars != null ? String(g.maxSourceChars) : '',
+      maxSourceFileBytes: g.maxSourceFileBytes != null ? String(g.maxSourceFileBytes) : '',
+      maxFactFiles: g.maxFactFiles != null ? String(g.maxFactFiles) : '',
+      maxFactHeadBytes: g.maxFactHeadBytes != null ? String(g.maxFactHeadBytes) : '',
+    };
+    return JSON.stringify(stored) !== JSON.stringify(gdsOverrides);
+  };
+
   const hasChanges =
     extId !== (document.ext_id || '') ||
     timestamp !== (document.timestamp || '') ||
-    fullPath !== (document.full_path || '') ||
+    (!isRepositoryDoc && fullPath !== (document.full_path || '')) ||
     JSON.stringify(authors) !== JSON.stringify(document.authors || []) ||
-    denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
-    denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
-    visionEnabled !== (document.processing_options?.stages?.vision !== false) ||
-    (isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null));
+    (!isFixedPipelineDoc && denoiseEnabled !== (document.processing_options?.stages?.denoise !== false)) ||
+    (!isFixedPipelineDoc && denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false)) ||
+    (!isFixedPipelineDoc && visionEnabled !== (document.processing_options?.stages?.vision !== false)) ||
+    (isTraceDoc && traceProfileName !== (document.processing_options?.trace_profile ?? null)) ||
+    (isRepositoryDoc && gdsOverridesChanged());
 
   // Re-extraction with a different profile may invalidate existing extracted data
   const traceProfileChanges =
@@ -296,12 +326,14 @@ export function ViewDocumentDialog({
 
   const buildProcessingOptions = () => {
     const opts: NonNullable<Document['processing_options']> = {
-      stages: {
-        extract: true,
-        denoise: globalStages.denoise ? denoiseEnabled : true,
-        'denoise-llm': globalStages['denoise-llm'] ? denoiseLlmEnabled : true,
-        vision: globalStages.vision ? visionEnabled : true,
-      },
+      stages: isFixedPipelineDoc
+        ? { extract: true }
+        : {
+            extract: true,
+            denoise: globalStages.denoise ? denoiseEnabled : true,
+            'denoise-llm': globalStages['denoise-llm'] ? denoiseLlmEnabled : true,
+            vision: globalStages.vision ? visionEnabled : true,
+          },
     };
     return opts;
   };
@@ -319,7 +351,7 @@ export function ViewDocumentDialog({
         updates.timestamp = timestamp || null;
       }
 
-      if (fullPath !== (document.full_path || '')) {
+      if (!isRepositoryDoc && fullPath !== (document.full_path || '')) {
         updates.full_path = fullPath || null;
       }
 
@@ -328,14 +360,32 @@ export function ViewDocumentDialog({
         updates.authors = authors.length > 0 ? authors : null;
       }
 
-      if (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
+      const gdsChanged = isRepositoryDoc && gdsOverridesChanged();
+      if ((!isFixedPipelineDoc && (denoiseEnabled !== (document.processing_options?.stages?.denoise !== false) ||
           denoiseLlmEnabled !== (document.processing_options?.stages?.['denoise-llm'] !== false) ||
-          visionEnabled !== (document.processing_options?.stages?.vision !== false) ||
-          traceProfileChanges) {
+          visionEnabled !== (document.processing_options?.stages?.vision !== false))) ||
+          traceProfileChanges || gdsChanged) {
+        const numField = (v: string) => {
+          if (v.trim() === '') return null;
+          const n = Number(v);
+          return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+        };
         updates.processing_options = {
           ...buildProcessingOptions(),
           ...(document.processing_options?.trace_profile !== undefined || traceProfileChanges
             ? { trace_profile: traceProfileChanges ? traceProfileName : document.processing_options?.trace_profile ?? null }
+            : {}),
+          ...(isRepositoryDoc
+            ? {
+                repo_uri: document.processing_options?.repo_uri,
+                gitdiagram: {
+                  maxSourceFiles: numField(gdsOverrides.maxSourceFiles),
+                  maxSourceChars: numField(gdsOverrides.maxSourceChars),
+                  maxSourceFileBytes: numField(gdsOverrides.maxSourceFileBytes),
+                  maxFactFiles: numField(gdsOverrides.maxFactFiles),
+                  maxFactHeadBytes: numField(gdsOverrides.maxFactHeadBytes),
+                },
+              }
             : {}),
         };
       }
@@ -376,11 +426,19 @@ export function ViewDocumentDialog({
               className={`text-[10px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${
                 document.source_type === 'trace'
                   ? 'bg-badge-info-bg text-badge-info-fg border-badge-info-bd'
-                  : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
+                  : document.source_type === 'repository'
+                    ? 'bg-badge-success-bg text-badge-success-fg border-badge-success-bd'
+                    : 'bg-badge-neutral-bg/50 text-badge-neutral-fg border-badge-neutral-bd/50'
               }`}
-              title={document.source_type === 'trace' ? 'Trace document — extracted with a trace profile' : 'Standard document'}
+              title={
+                document.source_type === 'trace'
+                  ? 'Trace document — extracted with a trace profile'
+                  : document.source_type === 'repository'
+                    ? 'Repository — analyzed into a Mermaid architecture diagram by gitdiagram-serve'
+                    : 'Standard document'
+              }
             >
-              {document.source_type === 'trace' ? 'Trace' : 'Document'}
+              {document.source_type === 'trace' ? 'Trace' : document.source_type === 'repository' ? 'Repository' : 'Document'}
             </Badge>
             </div>
 
@@ -527,7 +585,9 @@ export function ViewDocumentDialog({
                     value={fullPath}
                     onChange={(e) => setFullPath(e.target.value)}
                     placeholder="e.g. https://..."
-                    className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                    disabled={isRepositoryDoc}
+                    readOnly={isRepositoryDoc}
+                    className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-70"
                   />
                 </div>
               </div>
@@ -666,7 +726,9 @@ export function ViewDocumentDialog({
               <div className="pt-1">
                 <p className="text-xs uppercase text-foreground-subtle font-medium mb-2">Processing Options</p>
                 <p className="text-[11px] text-foreground-faint mb-2">
-                  Override extract pipeline stages for this document. Extract is always run. Stages disabled globally in server config cannot be toggled here.
+                  {isFixedPipelineDoc
+                    ? 'Trace and repository documents use a fixed pipeline (extract-repository / extract-trace) — no additional stages apply.'
+                    : 'Override extract pipeline stages for this document. Extract is always run. Stages disabled globally in server config cannot be toggled here.'}
                 </p>
                 {/* Trace Profile picker — trace documents only */}
                 {isTraceDoc && (
@@ -693,31 +755,64 @@ export function ViewDocumentDialog({
                   )}
                 </div>
                 )}
+                {/* gitdiagram-serve sampling overrides — repository documents only */}
+                {isRepositoryDoc && (
+                <div className="space-y-2 mb-3">
+                  <Label className="text-xs uppercase text-foreground-subtle font-medium">
+                    gitdiagram-serve overrides
+                  </Label>
+                  <p className="text-[11px] text-foreground-faint">
+                    Blank = use the service defaults (env). Set a value to override for this document only.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      ['maxSourceFiles', 'Max source files', 'default: 12'],
+                      ['maxSourceChars', 'Max source chars', 'default: 48000'],
+                      ['maxSourceFileBytes', 'Max file bytes', 'default: 512000'],
+                      ['maxFactFiles', 'Max fact files', 'default: 2000'],
+                      ['maxFactHeadBytes', 'Max fact head bytes', 'default: 8192'],
+                    ] as const).map(([key, label, hint]) => (
+                      <div key={key}>
+                        <Label htmlFor={`gds-${key}`} className="text-[10px] text-foreground-subtle">{label}</Label>
+                        <input
+                          id={`gds-${key}`}
+                          type="number"
+                          min={1}
+                          placeholder={hint}
+                          value={gdsOverrides[key]}
+                          onChange={(e) => setGdsOverrides((s) => ({ ...s, [key]: e.target.value }))}
+                          className="w-full h-8 rounded-md border border-border-strong bg-surface-card px-2 text-xs text-foreground-default focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
-                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.denoise ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.denoise && !isFixedPipelineDoc ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Denoise</span>
                     <Switch
                       checked={denoiseEnabled}
                       onCheckedChange={(checked) => setDenoiseEnabled(Boolean(checked))}
-                      disabled={!globalStages.denoise}
+                      disabled={!globalStages.denoise || isFixedPipelineDoc}
                       size="sm"
                     />
                   </label>
-                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages['denoise-llm'] ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages['denoise-llm'] && !isFixedPipelineDoc ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Denoise LLM</span>
                     <Switch
                       checked={denoiseLlmEnabled}
                       onCheckedChange={(checked) => setDenoiseLlmEnabled(Boolean(checked))}
-                      disabled={!globalStages['denoise-llm']}
+                      disabled={!globalStages['denoise-llm'] || isFixedPipelineDoc}
                       size="sm"
                     />
                   </label>
-                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.vision ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-on-dark/[0.02] px-3 py-2 ${globalStages.vision && !isFixedPipelineDoc ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <span className="text-sm text-foreground-default">Vision</span>
                     <Switch
                       checked={visionEnabled}
                       onCheckedChange={(checked) => setVisionEnabled(Boolean(checked))}
-                      disabled={!globalStages.vision}
+                      disabled={!globalStages.vision || isFixedPipelineDoc}
                       size="sm"
                     />
                   </label>

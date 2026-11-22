@@ -13,8 +13,8 @@ import type { EntityType } from '@/lib/types';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
 import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
-import { C4ElementSelect, ArchiMateElementSelect } from './architecture-element-select';
-import type { C4Element, ArchiMateElement } from '@/lib/types';
+import { C4ElementSelect, ArchiMateElementSelect, LikeC4ShapeSelect } from './architecture-element-select';
+import type { C4Element, ArchiMateElement, LikeC4Shape } from '@/lib/types';
 
 interface ViewEntityTypeDialogProps {
   entityType: EntityType | null;
@@ -45,6 +45,7 @@ export function ViewEntityTypeDialog({
   const [idSeparator, setIdSeparator] = useState<'none' | '-'>('none');
   const [c4Element, setC4Element] = useState<C4Element | null>(null);
   const [archimateElement, setArchimateElement] = useState<ArchiMateElement | null>(null);
+  const [likec4Shape, setLikec4Shape] = useState<LikeC4Shape | null>(null);
 
   useEffect(() => {
     if (entityType) {
@@ -58,6 +59,7 @@ export function ViewEntityTypeDialog({
       setIdSeparator(entityType.id_separator ?? 'none');
       setC4Element((entityType.c4_element as C4Element | null) || null);
       setArchimateElement((entityType.archimate_element as ArchiMateElement | null) || null);
+      setLikec4Shape((entityType.likec4_shape as LikeC4Shape | null) || null);
     }
   }, [entityType, open]);
 
@@ -73,7 +75,8 @@ export function ViewEntityTypeDialog({
     Number(minIdDigits || DEFAULT_DIGITS) !== (entityType.min_id_digits ?? DEFAULT_DIGITS) ||
     idSeparator !== (entityType.id_separator ?? 'none') ||
     c4Element !== (entityType.c4_element ?? null) ||
-    archimateElement !== (entityType.archimate_element ?? null);
+    archimateElement !== (entityType.archimate_element ?? null) ||
+    likec4Shape !== (entityType.likec4_shape ?? null);
 
   const handlePrefixChange = (value: string) => {
     setIdFormatPrefix(value.replace(/[^a-zA-Z0-9]/g, ''));
@@ -140,6 +143,9 @@ export function ViewEntityTypeDialog({
       }
       if (archimateElement !== (entityType.archimate_element ?? null)) {
         updates.archimate_element = archimateElement;
+      }
+      if (likec4Shape !== (entityType.likec4_shape ?? null)) {
+        updates.likec4_shape = likec4Shape;
       }
 
       if (Object.keys(updates).length > 0) {
@@ -281,7 +287,7 @@ export function ViewEntityTypeDialog({
             </div>
 
             {/* Architecture mapping */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="space-y-2">
                 <Label className="text-xs uppercase text-foreground-subtle font-medium">C4 Element (optional)</Label>
                 <C4ElementSelect
@@ -296,6 +302,14 @@ export function ViewEntityTypeDialog({
                   value={archimateElement}
                   onChange={setArchimateElement}
                   placeholder="None"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-foreground-subtle font-medium">LikeC4 Shape (optional)</Label>
+                <LikeC4ShapeSelect
+                  value={likec4Shape}
+                  onChange={setLikec4Shape}
+                  placeholder="None (rectangle)"
                 />
               </div>
             </div>

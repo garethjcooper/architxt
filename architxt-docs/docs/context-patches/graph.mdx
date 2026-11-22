@@ -128,6 +128,7 @@ If a referenced model cannot be fetched, the `content` field is set to `null` an
 || **C4 (Structurizr DSL)** | A single `.dsl` file in [Structurizr DSL](https://docs.structurizr.com/dsl/language) format, using the C4 element and relationship mappings defined on entity/edge types. |
 || **C4 (Mermaid)** | A single `.mmd` file in [Mermaid C4 diagram](https://mermaid.js.org/syntax/c4.html) format, using the same C4 mappings. |
 || **ArchiMate XML** | A single `.xml` file in ArchiMate Open Exchange Format. |
+|| **LikeC4 DSL** | A single `.likec4` file in [LikeC4](https://likec4.dev/) DSL format. Node shapes come from the **LikeC4 Shape** mapping on each entity type (see [entity types](../core-concepts/entities#c4-archimate-and-likec4-mappings)); unmapped types render with LikeC4's default shape. |
 
 ### API filtering
 
@@ -137,7 +138,7 @@ The export dialog calls the `/contextual-graph/export` endpoint. The same endpoi
 |---|---|---|
 || `server_id` *(required)* | The Hindsight server to export from. |
 || `bank_id` *(required)* | The bank to export from. |
-|| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, or `archimate`. |
+|| `format` | `json` (default), `graphml`, `gexf`, `cypher`, `csv`, `c4`, `c4-mermaid`, `archimate`, or `likec4`. |
 || `labels` | Comma-separated node labels. Only nodes that have all of these labels are included. |
 || `id_prefix` | Include only nodes whose ID starts with this prefix. |
 || `ids` | Comma-separated list of exact node IDs to include. |

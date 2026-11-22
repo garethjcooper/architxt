@@ -10,11 +10,12 @@ const PK = 'doc_id';
 const JSON_FIELDS = ['doc_processing_history', 'doc_processing_progress', 'doc_tags', 'doc_metadata', 'doc_context', 'doc_content_blocks', 'doc_processing_options'];
 
 /**
- * Apply the system trace context to a document's { id, description } context
- * object when the document is a trace. Non-trace documents pass through.
+ * Apply the system document-type context to a document's { id, description }
+ * context object when the document has one (trace, repository). Others pass
+ * through unchanged.
  */
 function applyDocumentContext(docContext, docSourceType) {
-  if (!docContext || docSourceType !== 'trace') return docContext;
+  if (!docContext || (docSourceType !== 'trace' && docSourceType !== 'repository')) return docContext;
   return {
     ...docContext,
     description: applySystemTraceContext(docContext.description, docSourceType),

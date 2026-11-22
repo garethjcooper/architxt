@@ -14,7 +14,7 @@ export interface Document {
   source_path: string | null;
   full_path: string | null;
   authors: string[] | null;
-  source_type: 'document' | 'trace' | string;
+  source_type: 'document' | 'trace' | 'repository' | string;
   status:
     | 'uploaded'
     | 'ready_to_extract'
@@ -56,6 +56,17 @@ export interface DocumentProcessingOptions {
   };
   /** Trace documents: name of the trace profile used for extraction. */
   trace_profile?: string | null;
+  /** Repository documents: repo URI/path sent to gitdiagram-serve. */
+  repo_uri?: string | null;
+  /** Repository documents: per-document overrides for gitdiagram-serve sampling.
+   *  Blank/absent fields fall back to the service env defaults. */
+  gitdiagram?: {
+    maxSourceFiles?: number | null;
+    maxSourceChars?: number | null;
+    maxSourceFileBytes?: number | null;
+    maxFactFiles?: number | null;
+    maxFactHeadBytes?: number | null;
+  } | null;
 }
 
 export interface Context {
@@ -83,7 +94,7 @@ export interface Directive {
 export interface Tag {
   id: number;
   name: string;
-  generated_by: 'user' | 'import';
+  generated_by: 'user' | 'import' | 'system';
   usage_count?: number;
   created_at: string;
   updated_at: string;
@@ -161,6 +172,7 @@ export interface EntityType {
   id_separator: 'none' | '-';
   c4_element: C4Element | null;
   archimate_element: ArchiMateElement | null;
+  likec4_shape: LikeC4Shape | null;
   created_at: string;
   updated_at: string;
 }
@@ -176,6 +188,21 @@ export const ARCHIMATE_ELEMENTS = [
   'DataObject',
 ] as const;
 export type ArchiMateElement = typeof ARCHIMATE_ELEMENTS[number];
+
+export const LIKEC4_SHAPES = [
+  'rectangle',
+  'component',
+  'storage',
+  'cylinder',
+  'browser',
+  'mobile',
+  'person',
+  'queue',
+  'bucket',
+  'document',
+  'agent',
+] as const;
+export type LikeC4Shape = typeof LIKEC4_SHAPES[number];
 
 export interface EdgeType {
   id: number;
@@ -579,8 +606,10 @@ export interface TraceProfileSequenceConfig {
   entityColumn?: string | null;
   /** Required single field treated as the direction (e.g. request/response). Always the second column of the sequence output table. */
   directionColumn?: string | null;
-  /** Include one-level-deep sequence transitions (adjacent signatures across traces). Default false. */
-  includeTransitions?: boolean;
+  /** Output mode: "steps" (per-sequence step tables, default) or "graph" (per connected component: Nodes + Edges tables From/To/Type/Label/Support/Traces, built from raw ordered rows). */
+  outputFormat?: 'steps' | 'graph';
+  /** Prefix section headings with "Sequence N —" / "Graph N —". Default false — the ordinal is report position, not signal strength. */
+  includeSequenceNumbers?: boolean;
   /** Drop sequences with fewer steps than this. Default 2; 1 keeps all. */
   minSteps?: number;
   /** Placeholder rendered for missing token/entity/direction/correlation values. Default "-". */

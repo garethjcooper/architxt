@@ -8,6 +8,7 @@ import { toCypher } from '../utils/cypher.js';
 import { toCsv } from '../utils/csv.js';
 import { toC4StructurizrDsl } from '../utils/c4-structurizr-dsl.js';
 import { toC4Mermaid } from '../utils/c4-mermaid.js';
+import { toLikeC4 } from '../utils/likec4.js';
 import { toArchimateXml } from '../utils/archimate-xml.js';
 import { resolveArchitectureMetadata } from '../utils/architecture-metadata.js';
 import { getMentalModel } from '../services/hindsight/mental-models.js';
@@ -336,7 +337,7 @@ export function createContextualGraphRouter({
    *         schema: { type: string }
    *       - in: query
    *         name: format
-   *         schema: { type: string, enum: [json, graphml, gexf, cypher, csv, c4, c4-mermaid, archimate], default: json }
+   *         schema: { type: string, enum: [json, graphml, gexf, cypher, csv, c4, c4-mermaid, archimate, likec4], default: json }
    *       - in: query
    *         name: filename
    *         description: |-
@@ -348,6 +349,7 @@ export function createContextualGraphRouter({
    *           C4 export returns a Structurizr DSL (.dsl) file.
    *           C4 Mermaid export returns a Mermaid (.mmd) file.
    *           ArchiMate export returns an ArchiMate Open Exchange XML (.xml) file.
+   *           LikeC4 export returns a LikeC4 DSL (.likec4) file.
    *         schema: { type: string }
    *       - in: query
    *         name: include_entity_content
@@ -414,12 +416,12 @@ export function createContextualGraphRouter({
       ? req.query.format.trim().toLowerCase()
       : 'json';
 
-    if (format !== 'json' && format !== 'graphml' && format !== 'gexf' && format !== 'cypher' && format !== 'csv' && format !== 'c4' && format !== 'c4-mermaid' && format !== 'archimate') {
+    if (format !== 'json' && format !== 'graphml' && format !== 'gexf' && format !== 'cypher' && format !== 'csv' && format !== 'c4' && format !== 'c4-mermaid' && format !== 'archimate' && format !== 'likec4') {
       const duration = Date.now() - start;
       sendResponse({
         res,
         status: 400,
-        error: `Unsupported export format: ${format}. Supported formats: json, graphml, gexf, cypher, csv, c4, c4-mermaid, archimate.`,
+        error: `Unsupported export format: ${format}. Supported formats: json, graphml, gexf, cypher, csv, c4, c4-mermaid, archimate, likec4.`,
         code: 'UNSUPPORTED_FORMAT',
         logger,
         method: req.method,
@@ -500,7 +502,7 @@ export function createContextualGraphRouter({
       }
     }
 
-    const defaultExtension = format === 'graphml' ? '.graphml' : format === 'gexf' ? '.gexf' : format === 'cypher' ? '.cypher' : format === 'c4' ? '.dsl' : format === 'c4-mermaid' ? '.mmd' : format === 'archimate' ? '.xml' : '.json';
+    const defaultExtension = format === 'graphml' ? '.graphml' : format === 'gexf' ? '.gexf' : format === 'cypher' ? '.cypher' : format === 'c4' ? '.dsl' : format === 'c4-mermaid' ? '.mmd' : format === 'archimate' ? '.xml' : format === 'likec4' ? '.likec4' : '.json';
     const filename = requestedFilename
       ? (requestedFilename.endsWith(defaultExtension) ? requestedFilename : `${requestedFilename}${defaultExtension}`)
       : undefined;
@@ -563,6 +565,13 @@ export function createContextualGraphRouter({
       const xml = toArchimateXml(nodes, edges, meta, undirected, nodeMap, edgeMap);
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
       return res.status(200).send(xml);
+    }
+
+    if (format === 'likec4') {
+      const { nodeMap, edgeMap } = await resolveArchitectureMetadata(db, nodes, edges);
+      const dsl = toLikeC4(nodes, edges, meta, undirected, nodeMap, edgeMap);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(200).send(dsl);
     }
 
     const payload = { nodes, edges, meta };

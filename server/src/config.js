@@ -190,6 +190,10 @@ export const config = {
     serviceUrl: process.env.DOCLING_SERVICE_URL || 'http://localhost:5001',
     forceOcr: getEnv('ARCHITXT_DOCLING_FORCE_OCR', 'false') === 'true',
   },
+  gitdiagram: {
+    serviceUrl: process.env.GITDIAGRAM_SERVICE_URL || 'http://localhost:5002',
+    timeoutMs: parseInt(process.env.GITDIAGRAM_TIMEOUT_MS || '600000', 10),
+  },
   gotenberg: {
     url: getEnv('ARCHITXT_GOTENBERG_URL', 'http://localhost:3031'),
     convertDocDocxToPdf: getEnv('ARCHITXT_CONVERT_DOC_DOCX_TO_PDF', 'true') === 'true',

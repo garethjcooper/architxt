@@ -35,6 +35,7 @@ export default function TagsPage() {
   const [batchDescription, setBatchDescription] = useState('');
   const [batchOperation, setBatchOperation] = useState<(item: BatchItem) => Promise<void>>(() => async () => {});
   const [importOpen, setImportOpen] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<number[]>([]);
 
   /* ── Freeze panes state ── */
   const [freeze, setFreeze] = useState(false);
@@ -51,7 +52,19 @@ export default function TagsPage() {
     );
   }, [tags, search]);
 
-  const { selected, toggleSelection, toggleAll, clearSelection, isAllSelected } = useMultiSelect(filteredTags);
+  // System tags are read-only: keep them out of the selectable set.
+  const selectableTags = useMemo(
+    () => filteredTags.filter((t) => t.generated_by !== 'system'),
+    [filteredTags]
+  );
+
+  const {
+    selected,
+    toggleSelection,
+    toggleAll,
+    clearSelection,
+    isAllSelected,
+  } = useMultiSelect(selectableTags);
 
   // Always show selected rows even when filtered out by search
   const displayTags = useMemo(() => {
@@ -78,11 +91,19 @@ export default function TagsPage() {
   }, []);
 
   const openDeleteConfirm = () => {
+    // System tags are read-only and cannot be deleted — exclude them.
+    const deletable = Array.from(selected).filter((id) => {
+      const tag = tags.find((t) => t.id === id);
+      return tag?.generated_by !== 'system';
+    });
+    if (deletable.length === 0) return;
+    setDeletingIds(deletable);
     setConfirmOpen(true);
   };
 
   const handleDeleteConfirmed = async () => {
-    const ids = Array.from(selected) as number[];
+    const ids = deletingIds;
+    setDeletingIds([]);
     setBatchTitle('Deleting Tags');
     setBatchDescription(`${ids.length} tag${ids.length !== 1 ? 's' : ''}`);
     setBatchItems(ids.map((id) => {
@@ -238,6 +259,7 @@ export default function TagsPage() {
                   <td className={["py-1.5 px-4", freeze && "sticky left-0 z-10 border-r border-border-subtle", selected.has(tag.id) ? "bg-accent-primary-bg" : "bg-surface-card"].filter(Boolean).join(" ")} onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selected.has(tag.id)}
+                      disabled={tag.generated_by === 'system'}
                       onCheckedChange={() => toggleSelection(tag.id)}
                     />
                   </td>

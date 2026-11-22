@@ -560,6 +560,41 @@ describe('contextual-graph route', () => {
       assert.ok(text.includes('Rel(b_act_act_001, a_com_com_001'));
     });
 
+    it('exports LikeC4 DSL using entity/edge types as kinds', async () => {
+      upsertNode(db, serverId, bankId, 'a-com:COM-001', ['canonical', 'a-com'], { name: 'Customer Service' });
+      upsertNode(db, serverId, bankId, 'a-svc:SVC-001', ['canonical', 'a-svc'], { name: 'API' });
+      upsertEdge(db, serverId, bankId, 'e1', 'a-com:COM-001', 'a-svc:SVC-001', 'calls', {});
+
+      const app = makeApp({ db });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'likec4' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.headers['content-type'], 'text/plain; charset=utf-8');
+      const text = res.text;
+      assert.ok(text.includes('specification {'));
+      assert.ok(text.includes('element a-com'));
+      assert.ok(text.includes('element a-svc'));
+      assert.ok(text.includes('relationship calls'));
+      assert.ok(text.includes('model {'));
+      assert.ok(text.includes("a-com-COM-001 = a-com 'Customer Service'"));
+      assert.ok(text.includes("a-svc-SVC-001 = a-svc 'API'"));
+      assert.ok(text.includes("a-com-COM-001 -[calls]-> a-svc-SVC-001"));
+      assert.ok(text.includes('views {'));
+      assert.ok(text.includes('view index'));
+    });
+
+    it('uses .likec4 extension for likec4 filename', async () => {
+      const app = makeApp({ db });
+      const res = await request(app)
+        .get('/api/v1/contextual-graph/export')
+        .query({ server_id: serverId, bank_id: bankId, format: 'likec4', filename: 'my-graph' });
+
+      assert.equal(res.status, 200);
+      assert.ok(res.headers['content-disposition'].includes('my-graph.likec4'));
+    });
+
     it('exports ArchiMate XML using entity/edge type mappings', async () => {
       upsertNode(db, serverId, bankId, 'a-com:COM-001', ['canonical', 'a-com'], { name: 'Customer Service' });
       upsertNode(db, serverId, bankId, 'a-svc:SVC-001', ['canonical', 'a-svc'], { name: 'API' });

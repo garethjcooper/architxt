@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { tagsApi } from '@/lib/api/client';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 interface Tag {
   id: number;
   name: string;
-  generated_by: 'user' | 'import';
+  generated_by: 'user' | 'import' | 'system';
   usage_count?: number;
   created_at: string;
   updated_at: string;
@@ -35,6 +35,8 @@ export function ViewTagDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
 
+  const isSystem = tag?.generated_by === 'system';
+
   useEffect(() => {
     if (tag) {
       setName(tag.name || '');
@@ -43,9 +45,10 @@ export function ViewTagDialog({
 
   if (!tag) return null;
 
-  const hasChanges = name !== (tag.name || '');
+  const hasChanges = !isSystem && name !== (tag.name || '');
 
   const handleSave = async () => {
+    if (isSystem) return;
     setIsSaving(true);
     try {
       const updates: Record<string, any> = {};
@@ -71,8 +74,14 @@ export function ViewTagDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-foreground-default">
+          <DialogTitle className="text-xl font-semibold text-foreground-default flex items-center gap-2">
             Tag Details
+            {isSystem && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-badge-caution-bg border border-badge-caution-bd text-badge-caution-fg text-[10px] uppercase font-medium">
+                <Lock className="h-3 w-3" />
+                System — Read Only
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -88,8 +97,9 @@ export function ViewTagDialog({
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={isSystem}
                 placeholder="Enter tag name"
-                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle"
+                className="!rounded-lg !border !border-border-strong !bg-transparent !text-foreground-default !placeholder:text-foreground-subtle focus:!border-focus-ring focus:!ring-2 focus:!ring-focus-ring-subtle disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           </div>

@@ -12,7 +12,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
 
 1. **Group** the parsed rows by their **correlation fields** (for example a trace/request id) — each group is one "trace" of related events.
 2. **Order** each group by its **order fields** (usually a timestamp).
-3. **Build a token signature** per group from its **token fields**.
+3. **Build a token signature** per group from its **token fields**, joined in the listed order.
 4. **Merge identical signatures** into sequences, count how often each occurs (frequency), and keep a few example trace keys.
 5. **Render** the distinct sequences as a Markdown report with a table per sequence.
 
@@ -39,8 +39,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
         "maxExampleKeys": 5,
         "sortOrder": "frequency-desc",
         "includeTokenComponents": true,
-        "excludeMissingTokens": true,
-        "includeTransitions": false
+        "excludeMissingTokens": true
       }
     }
   }
@@ -53,7 +52,7 @@ Sequence mining is deterministic — no LLM involved — so the same input and p
 |---|---|
 | `orderColumns` | Fields used to sort rows inside a group (e.g. `["timestamp"]`). Required, non-empty. |
 | `correlationColumns` | Fields that group rows into one trace (e.g. `["traceId"]`). Required, non-empty. |
-| `tokenColumns` | Fields that make up each step's token (e.g. `["service", "operation"]`). Required, non-empty. |
+| `tokenColumns` | Fields that make up each step's token, joined in the listed order (e.g. `["service", "operation"]` → `service:operation`). Required, non-empty. |
 | **`entityColumn`** | **Required.** The single field treated as the *entity* — who/what acts. It is always the **first data column** of the output table. |
 | **`directionColumn`** | **Required.** The single field treated as the *direction* — the action (e.g. request/response). It is always the **second data column** of the output table. |
 
@@ -70,7 +69,8 @@ Entity and direction are mandatory on purpose: they are the *what* and *action* 
 | `sortOrder` | `"none"` | `"frequency-desc"` (most common first), `"signature-asc"` (alphabetical), or `"none"` (discovery order). |
 | `includeTokenComponents` | `true` | When on, the individual token fields are shown as extra columns in each sequence table, after the Token column. |
 | `excludeMissingTokens` | `true` | When on (default), rows whose **entity or direction** value is missing are excluded from mining. A stored explicit `false` turns this off. Missing *token* components are always tolerated — they just render as the missing-value placeholder. |
-| `includeTransitions` | `false` | When on, the report also lists adjacent-sequence transitions across ordered traces (up to 50). |
+| `includeSequenceNumbers` | `false` | Prefix section headings with an ordinal: `## Sequence N — <name>` / `## Graph N — <stats>`. Off by default — the number is just report position, not signal strength, so headings carry only the descriptive name. |
+| `outputFormat` | `"steps"` | `"steps"` renders each mined sequence as a step table (Step | Entity | Direction | Token …). `"graph"` skips sequence signatures entirely and works from the raw ordered rows: every consecutive step pair in every correlation group is one observed flow; edges are deduped and split into **connected components**, each rendered as its own `## Graph N` section containing a **Nodes** table (`| Node |`) and an **Edges** table with columns **From | To | Type | Label | Support** plus one column per token field (From/To = step entities, Type = the leaving step's direction, Label = its token, Support = how many correlation groups showed that pair). Each component table covers a disjoint set of rows — the report is a set of small disconnected graphs, not one connected graph. |
 
 ### Caps (all optional, `0` = unlimited)
 
@@ -102,11 +102,12 @@ The report starts with a header summarising the run:
 **Min steps**: 2 — shorter sequences omitted
 ```
 
-Each sequence section then has a frequency, example trace keys, and a table whose first columns are always **Step | Entity | Direction | Token** (plus one column per token component when `includeTokenComponents` is on):
+Each sequence section then has a descriptive name (the entity flow, e.g. `orders-service → payments-service`), the raw signature, frequency, example trace keys, and a table whose first columns are always **Step | Entity | Direction | Token** (plus one column per token component when `includeTokenComponents` is on):
 
 ```markdown
-## Sequence 1 — `orders$create → payments$charge`
+## orders-service → payments-service
 
+- **Signature**: `orders$create $ payments$charge`
 - **Frequency**: 42 traces
 - **Example trace keys**: `a1b2c3…`, `d4e5f6…`
 
@@ -114,6 +115,25 @@ Each sequence section then has a frequency, example trace keys, and a table whos
 |---|---|---|---|---|---|
 | 1 | orders-service | REQUEST | orders$create | orders-service | create |
 | 2 | payments-service | REQUEST | payments$charge | payments-service | charge |
+```
+
+With `outputFormat: "graph"` the report instead has one `## Graph N` section per connected component of the observed flows, each with a nodes table and an edges table (one row per distinct consecutive step pair):
+
+```markdown
+## 2 nodes, 1 edge
+
+Nodes:
+
+| Node |
+|---|
+| orders-service |
+| payments-service |
+
+Edges:
+
+| From | To | Type | Label | Support | Service | Operation |
+|---|---|---|---|---|---|---|
+| orders-service | payments-service | REQUEST | `orders$create` | 42 | orders-service | create |
 ```
 
 ## Previewing sequences

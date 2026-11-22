@@ -28,7 +28,7 @@ CREATE TABLE documents (
   doc_ext_id TEXT UNIQUE,
   ctxt_id INTEGER,
   doc_status TEXT,
-  doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace')),
+  doc_source_type TEXT DEFAULT 'document' CHECK(doc_source_type IN ('document', 'trace', 'repository')),
   doc_content TEXT,
   doc_content_hash TEXT,
   doc_content_blocks JSON,
@@ -57,7 +57,7 @@ CREATE TABLE contexts (
 CREATE TABLE tags (
   tag_id INTEGER PRIMARY KEY AUTOINCREMENT,
   tag_name TEXT UNIQUE,
-  tag_generated_by TEXT CHECK(tag_generated_by IN ('user', 'import')),
+  tag_generated_by TEXT CHECK(tag_generated_by IN ('user', 'import', 'system')),
   tag_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   tag_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -263,6 +263,7 @@ CREATE TABLE entity_types (
   et_id_separator TEXT,
   et_c4_element TEXT,
   et_archimate_element TEXT,
+  et_likec4_shape TEXT,
   et_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   et_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

@@ -29,6 +29,7 @@ const FORMAT_OPTIONS = [
   { value: 'c4', label: 'C4 (Structurizr DSL)' },
   { value: 'c4-mermaid', label: 'C4 (Mermaid)' },
   { value: 'archimate', label: 'ArchiMate XML' },
+  { value: 'likec4', label: 'LikeC4 DSL' },
   { value: 'csv', label: 'CSV (nodes + edges)' },
 ] as const;
 
@@ -49,6 +50,7 @@ const MIME_TYPES: Record<ExportFormat, string> = {
   c4: 'text/plain; charset=utf-8',
   'c4-mermaid': 'text/plain; charset=utf-8',
   archimate: 'application/xml; charset=utf-8',
+  likec4: 'text/plain; charset=utf-8',
   csv: 'text/csv; charset=utf-8',
 };
 
@@ -60,6 +62,7 @@ const EXTENSIONS: Record<ExportFormat, string> = {
   c4: '.dsl',
   'c4-mermaid': '.mmd',
   archimate: '.xml',
+  likec4: '.likec4',
   csv: '.csv',
 };
 
@@ -100,6 +103,7 @@ export function GraphExportDialog({
     setLoading(true);
     try {
       const baseName = sanitizeFilenameBase(filename || defaultBaseName(bankId)).slice(0, 100);
+      console.debug('[graph-export] start', { format, serverId, bankId, baseName });
 
       if (format === 'csv') {
         const result = (await contextualGraphApi.export(serverId, bankId, {
@@ -126,17 +130,21 @@ export function GraphExportDialog({
         downloadBlob(blob, `${baseName}${EXTENSIONS.json}`);
         toast.success('Downloaded JSON export');
       } else {
+        console.debug('[graph-export] requesting text format', { format });
         const result = (await contextualGraphApi.export(serverId, bankId, {
           format,
           undirected,
         })) as string;
+        console.debug('[graph-export] got response', { format, bytes: result?.length });
         const blob = new Blob([result], { type: MIME_TYPES[format] });
         downloadBlob(blob, `${baseName}${EXTENSIONS[format]}`);
         toast.success(`Downloaded ${format.toUpperCase()} export`);
       }
 
+      console.debug('[graph-export] done, closing dialog');
       onOpenChange(false);
     } catch (err: any) {
+      console.error('[graph-export] failed', err);
       toast.error(`Export failed: ${err.message || err}`);
     } finally {
       setLoading(false);

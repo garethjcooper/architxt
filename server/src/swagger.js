@@ -215,6 +215,7 @@ const options = {
             word_boundary_match: { type: 'string', enum: ['boundaries', 'no-boundaries'], default: 'boundaries', description: 'Default word-boundary matching rule for scan' },
             c4_element: { type: 'string', enum: ['Person', 'SoftwareSystem', 'Container', 'Component'], nullable: true, description: 'Optional C4 element type for entities of this type' },
             archimate_element: { type: 'string', enum: ['BusinessActor', 'ApplicationComponent', 'ApplicationService', 'ApplicationInterface', 'DataObject'], nullable: true, description: 'Optional ArchiMate element type for entities of this type' },
+            likec4_shape: { type: 'string', enum: ['rectangle', 'component', 'storage', 'cylinder', 'browser', 'mobile', 'person', 'queue', 'bucket', 'document', 'agent'], nullable: true, description: 'Optional LikeC4 shape for the element kind of this entity type' },
             created_at: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
             updated_at: { type: 'string', format: 'date-time', description: 'Last update timestamp' }
           }

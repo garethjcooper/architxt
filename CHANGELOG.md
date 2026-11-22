@@ -2,6 +2,27 @@
 
 All notable changes to architxt are documented in this file.
 
+## [0.5.2] - 2026-11-23
+
+### Added
+
+- **LikeC4 export**: new `likec4` format on the contextual-graph export endpoint and UI (`GET /contextual-graph/export?format=likec4`, `.likec4` DSL download), plus an optional `et_likec4_shape` mapping on entity types (shape select in the entity-type dialogs) that controls node shapes in LikeC4 output.
+- **Repository documents**: upload a git repository by URI (remote URL or local path) instead of a file; analyzed by gitdiagram-serve into explanation + Mermaid diagram, with a provenance header (`repo @ full commit SHA · commit date`) in the stored document-md. Repo URI is stored as the document full path (`doc_full_path = repo_uri`); the built-in `system-repository` context is auto-prepended like `system-trace`.
+- **System tags**: every new document is auto-stamped with a source-type system tag (`ARCHITXT-DOC` / `ARCHITXT-TRACE` / `ARCHITXT-REPO`, `generated_by=system`). System tags are read-only (update/delete → 403 FORBIDDEN) following the system-metadata pattern; tag association remains allowed. Forward-only — existing documents are not backfilled.
+- **Trace sequence graph output**: `sequenceProfile.outputFormat: "graph"` renders mined sequences as per-connected-component Nodes/Edges tables (From | To | Type | Label | Support + token columns) from raw ordered rows. Sequence/graph headings are unnumbered by default; `includeSequenceNumbers` opts back into ordinal prefixes. Removed the `includeTransitions` option.
+- **gitdiagram-serve integration**: per-document gds overrides removed — the LLM model is service-level only (`GITDIAGRAM_SERVE_LLM_MODEL`, default `gpt-4o-mini`); gds built-in defaults shown as placeholders in the UI. gds health checks point at `/health` (alias of `/healthz`).
+- **Token columns orderable** in trace views, like order columns.
+- Compose: gds built from the public GitHub tag (`gitdiagram-serve.git#v0.2.0`) instead of a local checkout; hindsight image bumped to `ghcr.io/vectorize-io/hindsight:1.2.3`.
+
+### Fixed
+
+- Graph export downloads made reliable, with export debug logging; LikeC4 export routed through the raw-text download path.
+- Upload dialog: stale-closure guard on `repoUri` fixed; client-side repo URI validation removed (server is the single validation authority); repository upload button labeled "Upload".
+
+### Docs
+
+- architxt-docs cover the v0.5.2 additions: LikeC4 export format + shape mapping, system tags, repository documents, gds configuration. `llms-full.txt` regenerated.
+
 ## [0.5.1] - 2026-11-19
 
 ### Added

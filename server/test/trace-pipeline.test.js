@@ -495,7 +495,7 @@ describe('trace pipeline', () => {
       assert.equal(res.body.stats.eligibleRows, 3);
       assert.equal(res.body.stats.ineligibleRows, 0);
       assert.ok(res.body.stats.sequenceCount >= 1);
-      assert.ok(res.body.markdown.includes('## Sequence 1'));
+      assert.ok(res.body.markdown.match(/## [^\n]+/));
     });
 
     it('POST /preview-sequences mines eligible rows from json-lines via JSON payload dot-paths', async () => {

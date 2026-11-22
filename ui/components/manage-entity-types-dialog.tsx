@@ -8,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Trash2, Pencil, X, Layers } from 'lucide-react';
 import { entityTypesApi, entitiesApi } from '@/lib/api/client';
-import type { EntityType, C4Element, ArchiMateElement } from '@/lib/types';
+import type { EntityType, C4Element, ArchiMateElement, LikeC4Shape } from '@/lib/types';
 import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import { CaseMatchToggle } from './case-match-toggle';
 import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
-import { C4ElementSelect, ArchiMateElementSelect, ArchitectureElementSelect } from './architecture-element-select';
+import { C4ElementSelect, ArchiMateElementSelect, LikeC4ShapeSelect, ArchitectureElementSelect } from './architecture-element-select';
 
 const logger = createLogger('ManageEntityTypesDialog');
 
@@ -49,6 +49,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   const [addIdSeparator, setAddIdSeparator] = useState<'none' | '-'>('none');
   const [addC4Element, setAddC4Element] = useState<C4Element | null>(null);
   const [addArchimateElement, setAddArchimateElement] = useState<ArchiMateElement | null>(null);
+  const [addLikec4Shape, setAddLikec4Shape] = useState<LikeC4Shape | null>(null);
   const [adding, setAdding] = useState(false);
 
   // Edit state: id -> field values
@@ -63,6 +64,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
   const [editIdSeparator, setEditIdSeparator] = useState<'none' | '-'>('none');
   const [editC4Element, setEditC4Element] = useState<C4Element | null>(null);
   const [editArchimateElement, setEditArchimateElement] = useState<ArchiMateElement | null>(null);
+  const [editLikec4Shape, setEditLikec4Shape] = useState<LikeC4Shape | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Delete state
@@ -107,6 +109,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     setAddIdSeparator('none');
     setAddC4Element(null);
     setAddArchimateElement(null);
+    setAddLikec4Shape(null);
     setShowAddForm(false);
   };
 
@@ -158,6 +161,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
         id_separator: addUsesPattern ? addIdSeparator : undefined,
         c4_element: addC4Element || undefined,
         archimate_element: addArchimateElement || undefined,
+        likec4_shape: addLikec4Shape || undefined,
       });
       toast.success('Entity type created');
       resetAddForm();
@@ -182,6 +186,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     setEditIdSeparator(t.id_separator ?? 'none');
     setEditC4Element(t.c4_element);
     setEditArchimateElement(t.archimate_element);
+    setEditLikec4Shape(t.likec4_shape);
   };
 
   const cancelEdit = () => {
@@ -196,6 +201,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
     setEditIdSeparator('none');
     setEditC4Element(null);
     setEditArchimateElement(null);
+    setEditLikec4Shape(null);
   };
 
   const handleSaveEdit = async (id: number) => {
@@ -231,6 +237,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
         id_separator: editUsesPattern ? editIdSeparator : undefined,
         c4_element: editC4Element ?? null,
         archimate_element: editArchimateElement ?? null,
+        likec4_shape: editLikec4Shape ?? null,
       });
       toast.success('Entity type updated');
       setEditingId(null);
@@ -385,7 +392,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-foreground-faint">C4 Element</Label>
                   <C4ElementSelect
@@ -400,6 +407,14 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                     value={addArchimateElement}
                     onChange={setAddArchimateElement}
                     placeholder="None"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-foreground-faint">LikeC4 Shape</Label>
+                  <LikeC4ShapeSelect
+                    value={addLikec4Shape}
+                    onChange={setAddLikec4Shape}
+                    placeholder="None (rectangle)"
                   />
                 </div>
               </div>
@@ -427,13 +442,14 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                   <th className="text-center py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-12">Entities</th>
                   <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">C4</th>
                   <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">ArchiMate</th>
+                  <th className="text-left py-2 px-3 text-xs uppercase text-foreground-subtle font-medium">LikeC4</th>
                   <th className="text-right py-2 px-3 text-xs uppercase text-foreground-subtle font-medium w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {types.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-foreground-subtle">
+                    <td colSpan={10} className="text-center py-8 text-foreground-subtle">
                       <div className="flex flex-col items-center gap-2">
                         <Layers className="h-6 w-6 opacity-40" />
                         <p>No entity types found.</p>
@@ -525,6 +541,14 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                               compact
                             />
                           </td>
+                          <td className="py-2 px-3">
+                            <LikeC4ShapeSelect
+                              value={editLikec4Shape}
+                              onChange={setEditLikec4Shape}
+                              placeholder="None"
+                              compact
+                            />
+                          </td>
                           <td className="py-2 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
@@ -587,6 +611,7 @@ export function ManageEntityTypesDialog({ open, onOpenChange, onTypesChanged }: 
                           </td>
                           <td className="py-2 px-3 text-foreground-subtle text-xs">{t.c4_element || <span className="text-foreground-placeholder">-</span>}</td>
                           <td className="py-2 px-3 text-foreground-subtle text-xs">{t.archimate_element || <span className="text-foreground-placeholder">-</span>}</td>
+                          <td className="py-2 px-3 text-foreground-subtle text-xs">{t.likec4_shape || <span className="text-foreground-placeholder">-</span>}</td>
                           <td className="py-2 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button

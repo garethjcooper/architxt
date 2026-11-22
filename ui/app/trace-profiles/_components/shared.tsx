@@ -600,7 +600,7 @@ export const FieldsPanel = memo(function FieldsPanel({
     separator: "$",
     includeTokenComponents: true,
     excludeMissingTokens: true,
-    includeTransitions: false,
+    outputFormat: "steps",
     maxExampleKeys: 5,
     minSteps: 2,
     missingValue: "-",
@@ -650,7 +650,7 @@ export const FieldsPanel = memo(function FieldsPanel({
   }
 
   /** Move a column one step up/down within its list to set priority order. */
-  function moveColumn(listKey: "orderColumns" | "correlationColumns", field: string, dir: -1 | 1) {
+  function moveColumn(listKey: "orderColumns" | "correlationColumns" | "tokenColumns", field: string, dir: -1 | 1) {
     const list = [...profile[listKey]];
     const i = list.indexOf(field);
     const j = i + dir;
@@ -744,7 +744,7 @@ export const FieldsPanel = memo(function FieldsPanel({
                             <TooltipTrigger>
                               <HelpCircle className="h-3 w-3 text-foreground-faint cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent side="top">Join these column values to form each sequence token.</TooltipContent>
+                            <TooltipContent side="top">Join these column values, in the order listed, to form each sequence token (use ↑/↓ on checked rows to set priority).</TooltipContent>
                           </Tooltip>
                         </div>
                       </th>
@@ -895,10 +895,42 @@ export const FieldsPanel = memo(function FieldsPanel({
                             </div>
                           </td>
                           <td className="px-2 py-1 text-center">
-                            <Checkbox
-                              checked={profile.tokenColumns.includes(row.name)}
-                              onCheckedChange={() => update({ tokenColumns: toggle(profile.tokenColumns, row.name) })}
-                            />
+                            <div className="flex items-center justify-center gap-0.5">
+                              <span className="relative inline-flex">
+                                <Checkbox
+                                  checked={profile.tokenColumns.includes(row.name)}
+                                  onCheckedChange={() => update({ tokenColumns: toggle(profile.tokenColumns, row.name) })}
+                                  className={cn(profile.tokenColumns.includes(row.name) && "text-transparent [&_svg]:hidden")}
+                                />
+                                {profile.tokenColumns.includes(row.name) && (
+                                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[9px] font-bold text-foreground-default">
+                                    {profile.tokenColumns.indexOf(row.name) + 1}
+                                  </span>
+                                )}
+                              </span>
+                              {profile.tokenColumns.includes(row.name) && (
+                                <span className="inline-flex items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => moveColumn("tokenColumns", row.name, -1)}
+                                    disabled={profile.tokenColumns.indexOf(row.name) === 0}
+                                    className="h-4 w-4 inline-flex items-center justify-center rounded text-foreground-faint hover:text-foreground-default disabled:opacity-30"
+                                    title={`Move ${row.name} up in token priority`}
+                                  >
+                                    <ArrowUp className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveColumn("tokenColumns", row.name, 1)}
+                                    disabled={profile.tokenColumns.indexOf(row.name) === profile.tokenColumns.length - 1}
+                                    className="h-4 w-4 inline-flex items-center justify-center rounded text-foreground-faint hover:text-foreground-default disabled:opacity-30"
+                                    title={`Move ${row.name} down in token priority`}
+                                  >
+                                    <ArrowDown className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-1 py-1 text-center">
                             <Checkbox
@@ -1060,6 +1092,17 @@ export const FieldsPanel = memo(function FieldsPanel({
                   <option value="none">none</option>
                 </select>
               </div>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-[11px]" title="Steps: one step table per mined sequence. Graph: one Nodes+Edges table per connected component of the observed flows (no sequence signatures)">Output</Label>
+                <select
+                  value={profile.outputFormat ?? "steps"}
+                  onChange={(e) => update({ outputFormat: e.target.value as TraceProfileSequenceConfig["outputFormat"] })}
+                  className="h-6 w-32 rounded-md border border-border-default bg-surface-card px-2 text-xs text-foreground-muted outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring-subtle"
+                >
+                  <option value="steps">Sequence Steps</option>
+                  <option value="graph">Sequence Graph</option>
+                </select>
+              </div>
               <div className="flex-1" />
               <Button size="sm" className="h-6 px-2 text-xs" onClick={onPreview} disabled={loading || !hasProfile}>
                 {loading ? (
@@ -1102,12 +1145,12 @@ export const FieldsPanel = memo(function FieldsPanel({
               <div className="flex items-center gap-1.5">
                 <Switch
                   size="sm"
-                  id="include-transitions"
-                  checked={profile.includeTransitions === true}
-                  onCheckedChange={(checked) => update({ includeTransitions: checked === true })}
+                  id="include-sequence-numbers"
+                  checked={profile.includeSequenceNumbers === true}
+                  onCheckedChange={(checked) => update({ includeSequenceNumbers: checked === true })}
                 />
-                <Label htmlFor="include-transitions" className="text-[11px] cursor-pointer" title="Append a table of adjacent sequence pairs across traces (one level deep)">
-                  Sequence transitions
+                <Label htmlFor="include-sequence-numbers" className="text-[11px] cursor-pointer" title="Prefix section headings with an ordinal (Sequence N / Graph N). Off by default — the number is report position, not signal strength">
+                  Number sections
                 </Label>
               </div>
             </div>

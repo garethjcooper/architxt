@@ -27,9 +27,9 @@ The following fields are shown when you create or edit an entity type:
 | **Minimum Number Of Id Digits** | `min_id_digits` | Zero-padded width for the numeric suffix. Allowed range: 1–10. |
 | **Id Separator** | `id_separator` | `none` or `-` between prefix and number. |
 
-### C4 and ArchiMate mappings
+### C4, ArchiMate, and LikeC4 mappings
 
-Entity types can carry optional mappings that tell the contextual-graph exporters which C4 and ArchiMate shapes a type represents. The exporters use these values directly; they do not guess from the type name or label.
+Entity types can carry optional mappings that tell the contextual-graph exporters which shapes a type represents. The exporters use these values directly; they do not guess from the type name or label.
 
 | UI column | API field | Exported as |
 |---|---|---|
@@ -37,8 +37,9 @@ Entity types can carry optional mappings that tell the contextual-graph exporter
 | **C4 Description** | `c4_description` | Relationship description in C4 exports. Stored on the edge type. |
 | **ArchiMate Element** | `archimate_element` | ArchiMate element type in ArchiMate XML exports. |
 | **ArchiMate Relationship** | `archimate_relationship` | ArchiMate relationship type in ArchiMate XML exports. Stored on the edge type. |
+| **LikeC4 Shape** | `likec4_shape` | Node shape in LikeC4 DSL exports. Allowed values: `rectangle`, `component`, `storage`, `cylinder`, `browser`, `mobile`, `person`, `queue`, `bucket`, `document`, `agent`. |
 
-If a mapping is empty, the exporter falls back to a sensible default (`SoftwareSystem` for unmapped nodes, `Association` for unmapped edges). For a fully deterministic export, set the mappings on the entity and [edge types](./edge-types) your bank uses.
+If a mapping is empty, the exporter falls back to a sensible default (`SoftwareSystem` for unmapped C4 nodes, `Association` for unmapped edges, LikeC4's default shape for unmapped LikeC4 nodes). For a fully deterministic export, set the mappings on the entity and [edge types](./edge-types) your bank uses.
 
 ### Matching defaults
 

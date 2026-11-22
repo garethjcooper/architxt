@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { entityTypesApi } from '@/lib/api/client';
-import type { C4Element, ArchiMateElement } from '@/lib/types';
+import type { C4Element, ArchiMateElement, LikeC4Shape } from '@/lib/types';
 import { toast } from 'sonner';
 import { CaseMatchToggle } from './case-match-toggle';
 import { EntityTypeIdSeparatorSelect } from './entity-type-id-separator-select';
-import { C4ElementSelect, ArchiMateElementSelect } from './architecture-element-select';
+import { C4ElementSelect, ArchiMateElementSelect, LikeC4ShapeSelect } from './architecture-element-select';
 
 interface Props {
   open: boolean;
@@ -36,6 +36,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
   const [idSeparator, setIdSeparator] = useState<'none' | '-'>('none');
   const [c4Element, setC4Element] = useState<C4Element | null>(null);
   const [archimateElement, setArchimateElement] = useState<ArchiMateElement | null>(null);
+  const [likec4Shape, setLikec4Shape] = useState<LikeC4Shape | null>(null);
 
   const reset = () => {
     setTypeName('');
@@ -48,6 +49,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
     setIdSeparator('none');
     setC4Element(null);
     setArchimateElement(null);
+    setLikec4Shape(null);
   };
 
   const handlePrefixChange = (value: string) => {
@@ -98,6 +100,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
         id_separator: usesPattern ? idSeparator : undefined,
         c4_element: c4Element || undefined,
         archimate_element: archimateElement || undefined,
+        likec4_shape: likec4Shape || undefined,
       });
       toast.success('Entity type created');
       reset();
@@ -231,7 +234,7 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
           </div>
 
           {/* Architecture mapping */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label className="text-xs uppercase text-foreground-subtle font-medium">C4 Element (optional)</Label>
               <C4ElementSelect
@@ -246,6 +249,14 @@ export function CreateEntityTypeDialog({ open, onOpenChange, onEntityTypeCreated
                 value={archimateElement}
                 onChange={setArchimateElement}
                 placeholder="None"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-foreground-subtle font-medium">LikeC4 Shape (optional)</Label>
+              <LikeC4ShapeSelect
+                value={likec4Shape}
+                onChange={setLikec4Shape}
+                placeholder="None (rectangle)"
               />
             </div>
           </div>

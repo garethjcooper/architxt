@@ -4,7 +4,7 @@
  * 100% decoupled - only HTTP calls to Express backend
  */
 
-import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement, TraceProfile, TraceProfileVersion, TraceEngineManifest, TraceProfileValidationResult, TraceProfileSuggestionResult, TraceProfileFieldExtractionResult, TraceProfileDiscoveryHistogramResult, TraceProfileSequencePreviewResult } from '../types';
+import type { Document, DocumentProcessingOptions, Context, Directive, Tag, Server, ContextualGraphBankConfig, Metadata, Entity, EntityType, EdgeType, MentalModel, DerivedMentalModel, MentalModelEntityOverrides, MentalModelReturns, BankSettings, View, CreateViewRequest, UpdateViewRequest, ViewTimelineSlice, C4Element, ArchiMateElement, LikeC4Shape, TraceProfile, TraceProfileVersion, TraceEngineManifest, TraceProfileValidationResult, TraceProfileSuggestionResult, TraceProfileFieldExtractionResult, TraceProfileDiscoveryHistogramResult, TraceProfileSequencePreviewResult } from '../types';
 
 const API_URL = '/api/v1';  // Relative - uses Next.js rewrite to backend
 
@@ -106,21 +106,25 @@ export const documentsApi = {
   getProcessingHistory: (id: number) =>
     fetchApi<{ processing_history: any[] | null }>(`/documents/${id}/processinghistory`),
 
-  create: (file: File, extId: string, options?: {
-    source_type?: 'document' | 'trace';
+  create: (file: File | null, extId: string, options?: {
+    source_type?: 'document' | 'trace' | 'repository';
     trace_profile?: string;
+    repo_uri?: string;
     context_id?: number | null;
     tags_to_add?: number[];
     metadata_to_add?: number[];
   }) => {
     const formData = new FormData();
-    formData.append('file', file);
+    if (file) formData.append('file', file);
     formData.append('ext_id', extId);
     if (options?.source_type) {
       formData.append('source_type', options.source_type);
     }
     if (options?.trace_profile !== undefined) {
       formData.append('trace_profile', options.trace_profile);
+    }
+    if (options?.repo_uri) {
+      formData.append('repo_uri', options.repo_uri);
     }
     if (options?.context_id !== null && options?.context_id !== undefined) {
       formData.append('context_id', String(options.context_id));
@@ -722,6 +726,7 @@ export const entityTypesApi = {
     id_separator?: 'none' | '-';
     c4_element?: C4Element | null;
     archimate_element?: ArchiMateElement | null;
+    likec4_shape?: LikeC4Shape | null;
   }) => fetchApi<{ id: number }>('/entities/types', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -741,6 +746,7 @@ export const entityTypesApi = {
       id_separator?: 'none' | '-';
       c4_element?: C4Element | null;
       archimate_element?: ArchiMateElement | null;
+      likec4_shape?: LikeC4Shape | null;
     }
   ) => fetchApi<unknown>(`/entities/types/${id}`, {
     method: 'PUT',
@@ -2361,7 +2367,7 @@ function buildExportParams(
   serverId: number,
   bankId: string,
   options?: {
-    format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+    format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate' | 'likec4';
     filename?: string;
     labels?: string[];
     ids?: string[];
@@ -2400,7 +2406,7 @@ export const contextualGraphApi = {
     serverId: number,
     bankId: string,
     options?: {
-      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate' | 'likec4';
       filename?: string;
       labels?: string[];
       ids?: string[];
@@ -2413,16 +2419,14 @@ export const contextualGraphApi = {
     }
   ) => {
     const params = buildExportParams(serverId, bankId, options);
-    if (options?.format === 'graphml' || options?.format === 'gexf' || options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'archimate') {
+    if (options?.format === 'graphml' || options?.format === 'gexf' || options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'archimate' || options?.format === 'likec4') {
       const accept = options.format === 'graphml'
         ? 'application/graphml+xml'
         : options.format === 'gexf'
           ? 'application/gexf+xml'
-          : options.format === 'cypher'
+          : options.format === 'cypher' || options.format === 'c4' || options.format === 'c4-mermaid' || options.format === 'likec4'
             ? 'text/plain'
-            : options.format === 'c4' || options.format === 'c4-mermaid'
-              ? 'text/plain'
-              : 'application/xml';
+            : 'application/xml';
       return fetch(`${API_URL}/contextual-graph/export?${params.toString()}`, {
         method: 'GET',
         headers: { Accept: accept },
@@ -2443,7 +2447,7 @@ export const contextualGraphApi = {
     serverId: number,
     bankId: string,
     options?: {
-      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate' | 'likec4';
       filename?: string;
       labels?: string[];
       ids?: string[];
@@ -2456,7 +2460,7 @@ export const contextualGraphApi = {
     const params = buildExportParams(serverId, bankId, options);
     return fetch(`${API_URL}/contextual-graph/export?${params.toString()}`, {
       method: 'GET',
-      headers: { Accept: options?.format === 'graphml' ? 'application/graphml+xml' : options?.format === 'gexf' ? 'application/gexf+xml' : options?.format === 'cypher' ? 'text/plain' : options?.format === 'c4' || options?.format === 'c4-mermaid' ? 'text/plain' : options?.format === 'archimate' ? 'application/xml' : 'application/json' },
+      headers: { Accept: options?.format === 'graphml' ? 'application/graphml+xml' : options?.format === 'gexf' ? 'application/gexf+xml' : options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'likec4' ? 'text/plain' : options?.format === 'archimate' ? 'application/xml' : 'application/json' },
     });
   },
 

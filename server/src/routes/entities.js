@@ -18,6 +18,7 @@ import {
   getEntityType,
   listEntityTypes,
   entityTypeArchitecture,
+  normalizeLikeC4Shape,
 } from '../db/crud/entity-types.js';
 import {
   createEdgeType,
@@ -72,6 +73,7 @@ const toApiEntityType = (dbRow) => ({
   id_separator: dbRow.et_id_separator ?? 'none',
   c4_element: dbRow.et_c4_element,
   archimate_element: dbRow.et_archimate_element,
+  likec4_shape: dbRow.et_likec4_shape,
   created_at: dbRow.et_created_at,
   updated_at: dbRow.et_updated_at,
 });
@@ -170,6 +172,7 @@ router.get('/types', async (req, res) => {
  *               id_separator: { type: string, enum: ['none', '-'], default: 'none', description: 'Separator between prefix and zero-padded entity id' }
  *               c4_element: { type: string, enum: [Person, SoftwareSystem, Container, Component], nullable: true, description: 'Optional C4 element type for entities of this type' }
  *               archimate_element: { type: string, enum: [BusinessActor, ApplicationComponent, ApplicationService, ApplicationInterface, DataObject], nullable: true, description: 'Optional ArchiMate element type for entities of this type' }
+ *               likec4_shape: { type: string, enum: [rectangle, component, storage, cylinder, browser, mobile, person, queue, bucket, document, agent], nullable: true, description: 'Optional LikeC4 shape for the element kind of this entity type' }
  *     responses:
  *       201:
  *         description: Entity type created
@@ -189,6 +192,18 @@ router.post('/types', async (req, res) => {
   const nameCheck = validateRequiredString({ req, res, field: 'type_name', logger, path, start });
   if (!nameCheck.valid) return;
 
+  let normalizedLikeC4Shape = null;
+  if (req.body.likec4_shape !== undefined) {
+    try {
+      normalizedLikeC4Shape = normalizeLikeC4Shape(req.body.likec4_shape);
+    } catch (err) {
+      return sendResponse({
+        res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+        logger, method: 'POST', path, duration: Date.now() - start,
+      });
+    }
+  }
+
   const result = await createEntityType(getDb(req), {
     type_name: nameCheck.value,
     description: req.body.description || null,
@@ -202,6 +217,7 @@ router.post('/types', async (req, res) => {
     id_separator: req.body.id_separator,
     c4_element: req.body.c4_element,
     archimate_element: req.body.archimate_element,
+    likec4_shape: normalizedLikeC4Shape,
   });
 
   handleCrudResult({
@@ -241,6 +257,7 @@ router.post('/types', async (req, res) => {
  *               id_separator: { type: string, enum: ['none', '-'], description: 'Separator between prefix and zero-padded entity id' }
  *               c4_element: { type: string, enum: [Person, SoftwareSystem, Container, Component], nullable: true, description: 'Optional C4 element type for entities of this type' }
  *               archimate_element: { type: string, enum: [BusinessActor, ApplicationComponent, ApplicationService, ApplicationInterface, DataObject], nullable: true, description: 'Optional ArchiMate element type for entities of this type' }
+ *               likec4_shape: { type: string, enum: [rectangle, component, storage, cylinder, browser, mobile, person, queue, bucket, document, agent], nullable: true, description: 'Optional LikeC4 shape for the element kind of this entity type' }
  *     responses:
  *       200:
  *         description: Entity type updated
@@ -260,6 +277,18 @@ router.put('/types/:id', async (req, res) => {
     return sendResponse({ res, status: 400, error: 'At least one field is required', code: 'VALIDATION_ERROR', logger, method: 'PUT', path, duration: Date.now() - start });
   }
 
+  let normalizedLikeC4Shape;
+  if (req.body.likec4_shape !== undefined) {
+    try {
+      normalizedLikeC4Shape = normalizeLikeC4Shape(req.body.likec4_shape);
+    } catch (err) {
+      return sendResponse({
+        res, status: 400, error: err.message, code: 'VALIDATION_ERROR',
+        logger, method: 'PUT', path, duration: Date.now() - start,
+      });
+    }
+  }
+
   const result = await updateEntityType(getDb(req), idCheck.id, {
     type_name: req.body.type_name,
     description: req.body.description,
@@ -273,6 +302,7 @@ router.put('/types/:id', async (req, res) => {
     id_separator: req.body.id_separator,
     c4_element: req.body.c4_element,
     archimate_element: req.body.archimate_element,
+    likec4_shape: normalizedLikeC4Shape,
   });
 
   handleCrudResult({
