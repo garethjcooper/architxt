@@ -133,7 +133,7 @@ services:
     profiles:
       - hindsight
     container_name: architxt-hindsight
-    image: ghcr.io/vectorize-io/hindsight:1.2.1
+    image: ghcr.io/vectorize-io/hindsight:1.2.3
     env_file:
       - server/.env
     ports:
