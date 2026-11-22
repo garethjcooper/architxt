@@ -2419,16 +2419,14 @@ export const contextualGraphApi = {
     }
   ) => {
     const params = buildExportParams(serverId, bankId, options);
-    if (options?.format === 'graphml' || options?.format === 'gexf' || options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'archimate') {
+    if (options?.format === 'graphml' || options?.format === 'gexf' || options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'archimate' || options?.format === 'likec4') {
       const accept = options.format === 'graphml'
         ? 'application/graphml+xml'
         : options.format === 'gexf'
           ? 'application/gexf+xml'
-          : options.format === 'cypher'
+          : options.format === 'cypher' || options.format === 'c4' || options.format === 'c4-mermaid' || options.format === 'likec4'
             ? 'text/plain'
-            : options.format === 'c4' || options.format === 'c4-mermaid'
-              ? 'text/plain'
-              : 'application/xml';
+            : 'application/xml';
       return fetch(`${API_URL}/contextual-graph/export?${params.toString()}`, {
         method: 'GET',
         headers: { Accept: accept },
@@ -2462,7 +2460,7 @@ export const contextualGraphApi = {
     const params = buildExportParams(serverId, bankId, options);
     return fetch(`${API_URL}/contextual-graph/export?${params.toString()}`, {
       method: 'GET',
-      headers: { Accept: options?.format === 'graphml' ? 'application/graphml+xml' : options?.format === 'gexf' ? 'application/gexf+xml' : options?.format === 'cypher' ? 'text/plain' : options?.format === 'c4' || options?.format === 'c4-mermaid' ? 'text/plain' : options?.format === 'archimate' ? 'application/xml' : 'application/json' },
+      headers: { Accept: options?.format === 'graphml' ? 'application/graphml+xml' : options?.format === 'gexf' ? 'application/gexf+xml' : options?.format === 'cypher' || options?.format === 'c4' || options?.format === 'c4-mermaid' || options?.format === 'likec4' ? 'text/plain' : options?.format === 'archimate' ? 'application/xml' : 'application/json' },
     });
   },
 
