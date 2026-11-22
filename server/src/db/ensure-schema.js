@@ -1800,6 +1800,10 @@ function ensureMissingColumns(db) {
         {
           name: 'et_archimate_element',
           ddl: 'ALTER TABLE entity_types ADD COLUMN et_archimate_element TEXT'
+        },
+        {
+          name: 'et_likec4_shape',
+          ddl: 'ALTER TABLE entity_types ADD COLUMN et_likec4_shape TEXT'
         }
       ]
     },

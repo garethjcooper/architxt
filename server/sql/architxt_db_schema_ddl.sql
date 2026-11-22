@@ -263,6 +263,7 @@ CREATE TABLE entity_types (
   et_id_separator TEXT,
   et_c4_element TEXT,
   et_archimate_element TEXT,
+  et_likec4_shape TEXT,
   et_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   et_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
