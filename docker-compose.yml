@@ -23,7 +23,7 @@ services:
       # When the docling profile is active, architxt talks to the docling service
       # by its compose network name instead of localhost.
       DOCLING_SERVICE_URL: "${DOCLING_SERVICE_URL:-http://docling:5001}"
-      # When the gitdiagram profile is active, architxt talks to the
+      # When the gitdiagram service is active, architxt talks to the
       # gitdiagram-serve service by its compose network name.
       GITDIAGRAM_SERVICE_URL: "${GITDIAGRAM_SERVICE_URL:-http://gitdiagram:5002}"
       # Optional DOCX/DOC/HTML-to-PDF preprocessing via Gotenberg.
@@ -92,7 +92,7 @@ services:
       start_period: 30s
 
   # GitDiagram repository-analysis service.
-  # Active with: docker compose --profile gitdiagram up --build
+  # Active with every profile (gitdiagram, docling, hindsight), like docling.
   # Analyzes local git repositories or remote git URIs into Mermaid diagrams.
   # Built from the public GitHub release tag (not a local checkout).
   # Remote URIs are cloned into the persistent gitdiagram-repos volume (/repos).
@@ -100,6 +100,8 @@ services:
   gitdiagram:
     profiles:
       - gitdiagram
+      - docling
+      - hindsight
     container_name: architxt-gitdiagram
     image: gitdiagram-serve:0.2.0
     build:
