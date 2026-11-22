@@ -2365,7 +2365,7 @@ function buildExportParams(
   serverId: number,
   bankId: string,
   options?: {
-    format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+    format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate' | 'likec4';
     filename?: string;
     labels?: string[];
     ids?: string[];
@@ -2404,7 +2404,7 @@ export const contextualGraphApi = {
     serverId: number,
     bankId: string,
     options?: {
-      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate' | 'likec4';
       filename?: string;
       labels?: string[];
       ids?: string[];
@@ -2447,7 +2447,7 @@ export const contextualGraphApi = {
     serverId: number,
     bankId: string,
     options?: {
-      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate';
+      format?: 'json' | 'graphml' | 'gexf' | 'cypher' | 'csv' | 'c4' | 'c4-mermaid' | 'archimate' | 'likec4';
       filename?: string;
       labels?: string[];
       ids?: string[];

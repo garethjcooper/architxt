@@ -29,6 +29,7 @@ const FORMAT_OPTIONS = [
   { value: 'c4', label: 'C4 (Structurizr DSL)' },
   { value: 'c4-mermaid', label: 'C4 (Mermaid)' },
   { value: 'archimate', label: 'ArchiMate XML' },
+  { value: 'likec4', label: 'LikeC4 DSL' },
   { value: 'csv', label: 'CSV (nodes + edges)' },
 ] as const;
 
@@ -49,6 +50,7 @@ const MIME_TYPES: Record<ExportFormat, string> = {
   c4: 'text/plain; charset=utf-8',
   'c4-mermaid': 'text/plain; charset=utf-8',
   archimate: 'application/xml; charset=utf-8',
+  likec4: 'text/plain; charset=utf-8',
   csv: 'text/csv; charset=utf-8',
 };
 
@@ -60,6 +62,7 @@ const EXTENSIONS: Record<ExportFormat, string> = {
   c4: '.dsl',
   'c4-mermaid': '.mmd',
   archimate: '.xml',
+  likec4: '.likec4',
   csv: '.csv',
 };
 
