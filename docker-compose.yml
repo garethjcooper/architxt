@@ -109,20 +109,15 @@ services:
     env_file:
       - server/.env
     environment:
+      # Fixed (non-secret) settings. GITDIAGRAM_SERVE_LLM_* / GITDIAGRAM_SERVE_GIT_TOKEN
+      # are NOT re-declared here on purpose: `environment:` overrides env_file, and
+      # ${VAR} interpolation does not read server/.env — so re-declaring them with
+      # empty defaults would blank them. They come from env_file (server/.env), like
+      # the ARCHITXT_HINDSIGHT_* vars on the architxt service.
       GITDIAGRAM_SERVE_PORT: "5002"
       GITDIAGRAM_SERVE_REPOS_CACHE_DIR: /repos
-      GITDIAGRAM_SERVE_LLM_BASE_URL: "${GITDIAGRAM_SERVE_LLM_BASE_URL:-}"
-      GITDIAGRAM_SERVE_LLM_API_KEY: "${GITDIAGRAM_SERVE_LLM_API_KEY:-}"
-      GITDIAGRAM_SERVE_LLM_MODEL: "${GITDIAGRAM_SERVE_LLM_MODEL:-}"
-      GITDIAGRAM_SERVE_LLM_TEMPERATURE: "${GITDIAGRAM_SERVE_LLM_TEMPERATURE:-0.0}"
-      GITDIAGRAM_SERVE_GIT_TOKEN: "${GITDIAGRAM_SERVE_GIT_TOKEN:-}"
-      # TLS for cloning HTTPS repos with internal/self-signed certs (e.g. Forgejo).
-      # Preferred: mount a CA bundle and point GIT_SSL_CAINFO at it, e.g.
-      #   GITDIAGRAM_GIT_SSL_CAINFO=/ca/internal-ca.crt
-      #   volumes: - /path/to/internal-ca.crt:/ca/internal-ca.crt:ro
-      # GIT_SSL_NO_VERIFY=true disables verification entirely — internal use only.
-      GIT_SSL_CAINFO: "${GITDIAGRAM_GIT_SSL_CAINFO:-}"
-      GIT_SSL_NO_VERIFY: "${GITDIAGRAM_GIT_SSL_NO_VERIFY:-false}"
+      # GIT_SSL_CAINFO / GIT_SSL_NO_VERIFY also come from env_file (server/.env),
+      # same reason as above — no ${VAR} interpolation here.
     expose:
       - "5002"
     volumes:
